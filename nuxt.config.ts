@@ -6,6 +6,9 @@ export default defineNuxtConfig({
     "pinia-plugin-persistedstate/nuxt",
     "@nuxtjs/supabase",
   ],
+  runtimeConfig: {
+    
+  },
   plugins: ["~/plugins/pinia-persistedstate.client.ts"],
   devtools: { enabled: true },
 });

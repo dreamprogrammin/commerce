@@ -1,11 +1,43 @@
 import { defineStore } from "pinia";
+import { signIn, signOut, signUp } from "~/composables/useAuth";
+import type { User } from "@supabase/supabase-js";
 
-export const useStore = defineStore(
+export const useAuthStore = defineStore(
   "store",
   () => {
-    const user = ref(null);
+    const user = ref<User | null>(null);
 
-    return {};
+    async function handleLogin (email: string, password: string) {
+        try {
+          const userData = await signIn(email, password)
+          user.value = userData
+        } catch (error) {
+          console.log((error as Error).message)
+          throw error
+        }
+
+      }
+
+
+    async function handleOut () {
+      await signOut()
+      user.value = null
+    }
+
+
+    async function handleRegister (email: string, password: string) {
+      try {
+        const userData = await signUp(email,password)
+        user.value = userData
+      } catch (error) {
+        console.log((error as Error).message)
+        throw error
+      } 
+    }
+
+    return {
+      user, handleLogin, handleOut, handleRegister
+    };
   },
   {
     persist: true,
