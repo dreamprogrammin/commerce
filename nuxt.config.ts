@@ -7,7 +7,10 @@ export default defineNuxtConfig({
     "@nuxtjs/supabase",
   ],
   runtimeConfig: {
-    
+    public : {
+      supabaseUrl : process.env.NUXT_PUBLIC_SUPABASE_URL,
+      supabaseKey: process.env.NUXT_PUBLIC_SUPABASE_KEY
+    }
   },
   plugins: ["~/plugins/pinia-persistedstate.client.ts"],
   devtools: { enabled: true },
