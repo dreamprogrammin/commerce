@@ -1,29 +1,29 @@
 <script setup lang="ts">
-import {useAuthStore} from "~/stores/auth"
-const email = ref('')
-const password = ref('')
+import { useAuthStore } from "~/stores/auth";
+const email = ref("");
+const password = ref("");
 
-const authStore = useAuthStore()
+const authStore = useAuthStore();
 
-async function handleLogin () {
-    try {
-        await authStore.handleLogin(email.value, password.value)
-        navigateTo('/')
-    } catch (error) {
-        console.log('ошибка', error)
-    }
+async function handleLogin() {
+  try {
+    await authStore.handleLogin(email.value, password.value);
+    navigateTo("/");
+  } catch (error) {
+    console.log("ошибка", error);
+  }
 }
 
+const config = useRuntimeConfig();
 </script>
 <template>
-    <div>
-        <h1>Страница авторизации</h1>
-
-        <form @submit.prevent="handleLogin">
-            <input type="email" v-model="email" placeholder="email">
-            <input type="password" v-model="password" placeholder="password">
-            <button type="submit">Войти</button>
-        </form>
-
-    </div>
+  <div>
+    <h1>Страница авторизации</h1>
+    {{ config.public.supabaseKey }}
+    <form @submit.prevent="handleLogin">
+      <input type="email" v-model="email" placeholder="email" />
+      <input type="password" v-model="password" placeholder="password" />
+      <button type="submit">Войти</button>
+    </form>
+  </div>
 </template>
