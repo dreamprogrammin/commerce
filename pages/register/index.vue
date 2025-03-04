@@ -1,6 +1,7 @@
 <script setup lang="ts"></script>
+
 <template>
   <div>
-    <h1>Домашняя страница</h1>
+    <!-- Ваш шаблон -->
   </div>
 </template>
