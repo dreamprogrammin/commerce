@@ -23,5 +23,6 @@ async function handleLogin() {
       <input type="password" v-model="password" placeholder="password" />
       <button type="submit">Войти</button>
     </form>
+    <nuxt-link to="/register">У вас нет аккаунта?</nuxt-link>
   </div>
 </template>
