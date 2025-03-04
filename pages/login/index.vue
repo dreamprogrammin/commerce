@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
+
 const email = ref("");
 const password = ref("");
 
@@ -13,13 +14,10 @@ async function handleLogin() {
     console.log("ошибка", error);
   }
 }
-
-const config = useRuntimeConfig();
 </script>
 <template>
   <div>
     <h1>Страница авторизации</h1>
-    {{ config.public.supabaseKey }}
     <form @submit.prevent="handleLogin">
       <input type="email" v-model="email" placeholder="email" />
       <input type="password" v-model="password" placeholder="password" />
