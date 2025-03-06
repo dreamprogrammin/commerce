@@ -7,39 +7,41 @@ export const useAuthStore = defineStore(
   () => {
     const user = ref<User | null>(null);
 
-    async function handleLogin (email: string, password: string) {
-        try {
-          const userData = await signIn(email, password)
-          user.value = userData
-        } catch (error) {
-          console.log((error as Error).message)
-          throw error
-        }
-
+    async function handleLogin(email: string, password: string) {
+      try {
+        const userData = await signIn(email, password);
+        user.value = userData;
+      } catch (error) {
+        console.log((error as Error).message);
+        throw error;
       }
-
-
-    async function handleOut () {
-      await signOut()
-      user.value = null
     }
 
+    async function handleOut() {
+      await signOut();
+      user.value = null;
+    }
 
-    async function handleRegister (email: string, password: string) {
+    async function handleRegister(email: string, password: string) {
       try {
-        const userData = await signUp(email,password)
-        user.value = userData
+        const userData = await signUp(email, password);
+        user.value = userData;
       } catch (error) {
-        console.log((error as Error).message)
-        throw error
-      } 
+        console.log((error as Error).message);
+        throw error;
+      }
     }
 
     return {
-      user, handleLogin, handleOut, handleRegister
+      user,
+      handleLogin,
+      handleOut,
+      handleRegister,
     };
   },
   {
-    persist: true,
+    persist: {
+      storage: piniaPluginPersistedstate.localStorage(),
+    },
   }
 );
