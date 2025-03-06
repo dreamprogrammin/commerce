@@ -9,7 +9,6 @@ const authStore = useAuthStore();
 async function handleLogin() {
   try {
     await authStore.handleLogin(email.value, password.value);
-    navigateTo("/");
   } catch (error) {
     console.log("ошибка", error);
   }

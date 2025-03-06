@@ -1,8 +1,16 @@
 export default defineNuxtRouteMiddleware((to, _from) => {
   const user = useSupabaseUser();
-  const publicRoutes = ["/", "/login", "/register"];
-  const isPublicRoute = publicRoutes.includes(to.path);
-  if (!user.value && !isPublicRoute) {
+  const publicRoutes = ["/", "/login", "/register", "/confirm"];
+
+  if (user.value && !user.value?.email_confirmed_at) {
+    return navigateTo("/confirm");
+  }
+
+  if (!user.value && !publicRoutes.includes(to.path)) {
     return navigateTo("/login");
+  }
+
+  if (user.value && ["/login", "/register"].includes(to.path)) {
+    return navigateTo("/");
   }
 });

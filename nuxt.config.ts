@@ -9,6 +9,5 @@ export default defineNuxtConfig({
   supabase: {
     redirect: false,
   },
-  plugins: ["~/plugins/pinia-persistedstate.client.ts"],
   devtools: { enabled: true },
 });
