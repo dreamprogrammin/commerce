@@ -24,5 +24,7 @@ async function handleLogin() {
       <button type="submit">Войти</button>
     </form>
     <nuxt-link to="/register">У вас нет аккаунта?</nuxt-link>
+    <br />
+    <nuxt-link to="/forgot-password">Забыли пароль?</nuxt-link>
   </div>
 </template>
