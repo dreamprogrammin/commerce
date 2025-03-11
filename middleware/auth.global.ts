@@ -1,6 +1,13 @@
 export default defineNuxtRouteMiddleware((to, _from) => {
   const user = useSupabaseUser();
-  const publicRoutes = ["/", "/login", "/register", "/confirm"];
+  const publicRoutes = [
+    "/",
+    "/login",
+    "/register",
+    "/confirm",
+    "/forgot-password",
+    "/reset-password",
+  ];
 
   if (user.value && !user.value?.email_confirmed_at) {
     return navigateTo("/confirm");
