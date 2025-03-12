@@ -36,11 +36,13 @@ async function handleResetPassword() {
         id="password"
         placeholder="Введите новый пароль"
         required
+        v-model="password"
       />
       <label for="confirmPassword">Повторите пароль</label>
       <input
         type="password"
         required
+        v-model="confirmPassword"
         id="confirmPassword"
         placeholder="Повторите новый пароль"
       />

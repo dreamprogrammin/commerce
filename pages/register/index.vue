@@ -31,6 +31,7 @@ async function handleRegister() {
         required
         id="email"
       />
+      <br />
       <label for="password">Пароль</label>
       <input
         type="password"
@@ -39,6 +40,7 @@ async function handleRegister() {
         required
         id="password"
       />
+      <br />
       <label for="confirmPassword">Повторить пароль</label>
       <input
         type="password"
@@ -46,6 +48,7 @@ async function handleRegister() {
         placeholder="Повторите пароль"
         id="confirmPassword"
       />
+      <br />
       <label for="firstName">Ваше имя</label>
       <input
         type="name"
@@ -54,6 +57,7 @@ async function handleRegister() {
         required
         id="firstName"
       />
+      <br />
       <label for="lastName">Ваше фамилия (Не обязательно)</label>
       <input
         type="name"
@@ -61,6 +65,7 @@ async function handleRegister() {
         placeholder="Ваше фамилия"
         id="lastName"
       />
+      <br />
       <button type="submit">Зарегистрироваться</button>
     </form>
     <nuxt-link to="/login">У вас есть аккаунт?</nuxt-link>

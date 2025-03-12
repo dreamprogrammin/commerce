@@ -1,6 +1,7 @@
-import type { User } from "@supabase/supabase-js";
-import type { ParamsSignUp } from "~/type";
-import { validatorSingUp } from "~/validator/signUp.valitator";
+import type { User, AuthApiError } from "@supabase/supabase-js";
+import type { IParamsForgotPassword, ParamsSignUp } from "~/type";
+import { validatorForgotPassword } from "~/validator/forgotPassword.validator";
+import { validatorSingUp } from "~/validator/signUp.validator";
 
 export async function signIn(email: string, password: string) {
   const supabase = useSupabaseClient();
@@ -37,4 +38,17 @@ export async function signUp(params: ParamsSignUp) {
 export async function signOut() {
   const supabase = useSupabaseClient();
   await supabase.auth.signOut();
+}
+
+export async function forgotPassword(params: IParamsForgotPassword) {
+  const supabase = useSupabaseClient();
+  const { email, option } = params;
+  validatorForgotPassword(params);
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: option.redirectTo,
+    });
+  } catch (err) {
+    console.error(err);
+  }
 }
