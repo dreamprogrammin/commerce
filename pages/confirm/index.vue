@@ -1,12 +1,13 @@
 <script setup lang="ts">
 const user = useSupabaseUser();
 const isLoading = ref(false);
+
 watch(
   user,
   () => {
     if (user.value) {
       isLoading.value = false;
-      return navigateTo("/dashboard");
+      return navigateTo('/dashboard');
     }
   },
   {

@@ -1,10 +1,10 @@
-import { defineStore } from "pinia";
-import { signIn, signOut, signUp } from "~/composables/useAuth";
-import type { User } from "@supabase/supabase-js";
-import type { ParamsSignUp } from "~/type";
+import { defineStore } from 'pinia';
+import { signIn, signOut, signUp } from '~/composables/useAuth';
+import type { User } from '@supabase/supabase-js';
+import type { ParamsSignUp } from '~/type';
 
 export const useAuthStore = defineStore(
-  "store",
+  'store',
   () => {
     const user = ref<User | null>(null);
 
