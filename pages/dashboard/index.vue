@@ -3,7 +3,7 @@ const authStore = useAuthStore();
 
 async function handleOut() {
   await authStore.handleOut();
-  await navigateTo("/");
+  await navigateTo('/');
 }
 </script>
 <template>
