@@ -7,7 +7,9 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@nuxtjs/supabase": "^1.4.6",
@@ -17,5 +19,8 @@
     "pinia-plugin-persistedstate": "^4.2.0",
     "vue": "latest",
     "vue-router": "latest"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3"
   }
 }

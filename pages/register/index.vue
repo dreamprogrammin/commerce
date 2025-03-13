@@ -29,8 +29,7 @@ async function handleRegister() {
         v-model="formData.email"
         placeholder="Введите email"
         required
-        id="email"
-      />
+        id="email" />
       <br />
       <label for="password">Пароль</label>
       <input
@@ -38,16 +37,14 @@ async function handleRegister() {
         v-model="formData.password"
         placeholder="Введите пароль"
         required
-        id="password"
-      />
+        id="password" />
       <br />
       <label for="confirmPassword">Повторить пароль</label>
       <input
         type="password"
         v-model="formData.confirmPassword"
         placeholder="Повторите пароль"
-        id="confirmPassword"
-      />
+        id="confirmPassword" />
       <br />
       <label for="firstName">Ваше имя</label>
       <input
@@ -55,16 +52,14 @@ async function handleRegister() {
         v-model="formData.firstName"
         placeholder="Ваше имя"
         required
-        id="firstName"
-      />
+        id="firstName" />
       <br />
       <label for="lastName">Ваше фамилия (Не обязательно)</label>
       <input
         type="name"
         v-model="formData.lastName"
         placeholder="Ваше фамилия"
-        id="lastName"
-      />
+        id="lastName" />
       <br />
       <button type="submit">Зарегистрироваться</button>
     </form>
