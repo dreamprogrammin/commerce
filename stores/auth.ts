@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { signIn, signOut, signUp } from '~/composables/auth/useAuth';
 import type { User } from '@supabase/supabase-js';
 import type { ParamsSignUp } from '~/type';
+import { forgotPassword } from '~/composables/auth/useForgotPassword';
 
 export const useAuthStore = defineStore(
   'authStore',
@@ -31,8 +32,29 @@ export const useAuthStore = defineStore(
             return 'Неверный email или пароль';
           }
           return generalError[message] || 'Ошибка при входе';
+        },
+        register: message => {
+          if (authError.message.includes('Email already registered')) {
+            return 'Этот email уже зарегистрирован';
+          }
+          return generalError[message] || 'Ошибка в регистрации';
+        },
+        forgotPassword: message => {
+          if (authError.message.includes('User not found')) {
+            return 'Пользователь с таким email не найден';
+          }
+          return generalError[message] || 'Ошибка восстановления пароля';
+        },
+        logout: message => {
+          return generalError[message] || 'Ошибка при выходе';
         }
       };
+
+      let errorMessage = generalError[authError.message] || 'Произошла ошибка';
+
+      if (actionHandlers[action]) {
+        errorMessage = actionHandlers[action](authError.message);
+      }
     }
 
     async function handleLogin(email: string, password: string) {
