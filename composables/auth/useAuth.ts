@@ -1,13 +1,12 @@
-import type { User, AuthApiError } from "@supabase/supabase-js";
-import type { IParamsForgotPassword, ParamsSignUp } from "~/type";
-import { validatorForgotPassword } from "~/validator/forgotPassword.validator";
-import { validatorSingUp } from "~/validator/signUp.validator";
+import type { User, AuthApiError } from '@supabase/supabase-js';
+import type { IParamsForgotPassword, ParamsSignUp } from '~/type';
+import { validatorSingUp } from '~/validator/signUp.validator';
 
 export async function signIn(email: string, password: string) {
   const supabase = useSupabaseClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
-    password,
+    password
   });
   if (error) {
     console.error(error.message);
@@ -22,12 +21,12 @@ export async function signUp(params: ParamsSignUp) {
     email,
     password,
     options: {
-      emailRedirectTo: window.location.origin + "/confirm",
+      emailRedirectTo: window.location.origin + '/confirm',
       data: {
         first_name: firstName,
-        last_name: lastName,
-      },
-    },
+        last_name: lastName
+      }
+    }
   });
   if (error) {
     console.error(error.message);
@@ -38,17 +37,4 @@ export async function signUp(params: ParamsSignUp) {
 export async function signOut() {
   const supabase = useSupabaseClient();
   await supabase.auth.signOut();
-}
-
-export async function forgotPassword(params: IParamsForgotPassword) {
-  const supabase = useSupabaseClient();
-  const { email, option } = params;
-  validatorForgotPassword(params);
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: option.redirectTo,
-    });
-  } catch (err) {
-    console.error(err);
-  }
 }

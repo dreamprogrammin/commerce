@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { useAuthStore } from "~/stores/auth";
+import { useAuthStore } from '~/stores/auth';
 
-const email = ref("");
-const password = ref("");
+const email = ref('');
+const password = ref('');
 
 const authStore = useAuthStore();
 
 async function handleLogin() {
   try {
     await authStore.handleLogin(email.value, password.value);
-    await navigateTo("/dashboard");
+    await navigateTo('/dashboard');
   } catch (error) {
-    console.log("ошибка", error);
+    console.log('ошибка', error);
   }
 }
 </script>

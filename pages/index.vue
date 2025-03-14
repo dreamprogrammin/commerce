@@ -1,8 +1,8 @@
 <script setup lang="ts">
 const user = useSupabaseUser();
 
-const firstName = getUserMetaData(user.value, "first_name", "");
-const lastName = getUserMetaData(user.value, "last_name", "");
+const firstName = getUserMetaData(user.value, 'first_name', '');
+const lastName = getUserMetaData(user.value, 'last_name', '');
 </script>
 <template>
   <div>
@@ -13,8 +13,6 @@ const lastName = getUserMetaData(user.value, "last_name", "");
       <nuxt-link to="/dashboard">Пройти в рабочую страницу</nuxt-link>
     </div>
 
-    <div v-else>
-      Пожалуйста пройдите<nuxt-link to="/login">войдите в систему.</nuxt-link>
-    </div>
+    <div v-else>Пожалуйста пройдите<nuxt-link to="/login">войдите в систему.</nuxt-link></div>
   </div>
 </template>

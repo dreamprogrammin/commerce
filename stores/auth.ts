@@ -1,12 +1,39 @@
 import { defineStore } from 'pinia';
-import { signIn, signOut, signUp } from '~/composables/useAuth';
+import { signIn, signOut, signUp } from '~/composables/auth/useAuth';
 import type { User } from '@supabase/supabase-js';
 import type { ParamsSignUp } from '~/type';
 
 export const useAuthStore = defineStore(
-  'store',
+  'authStore',
   () => {
     const user = ref<User | null>(null);
+    const errors = reactive<{ [action: string]: string }>({});
+
+    function setError(newError: { [action: string]: string }) {
+      Object.assign(errors, newError);
+    }
+
+    function handleError(err: unknown, action: string = 'general') {
+      const authError = err as Error;
+
+      console.log(`${[action]} ошибка:`, authError.message);
+
+      const generalError: { [key: string]: string } = {
+        'User not found': 'Пользователь с таким email не найден',
+        'Invalid login credentials': 'Неверный email или пароль',
+        'Email already registered': 'Этот email уже зарегистрирован',
+        'Network error': 'Проблемы с сетью. Пожалуйста, проверьте подключение.'
+      };
+
+      const actionHandlers: { [key: string]: (message: string) => string } = {
+        login: message => {
+          if (authError.message.includes('Invalid login credentials')) {
+            return 'Неверный email или пароль';
+          }
+          return generalError[message] || 'Ошибка при входе';
+        }
+      };
+    }
 
     async function handleLogin(email: string, password: string) {
       try {
@@ -37,12 +64,12 @@ export const useAuthStore = defineStore(
       user,
       handleLogin,
       handleOut,
-      handleRegister,
+      handleRegister
     };
   },
   {
     persist: {
-      storage: piniaPluginPersistedstate.localStorage(),
-    },
+      storage: piniaPluginPersistedstate.localStorage()
+    }
   }
 );
