@@ -1,5 +1,5 @@
-import type { User, AuthApiError } from '@supabase/supabase-js';
-import type { IParamsForgotPassword, ParamsSignUp } from '~/type';
+import type { User } from '@supabase/supabase-js';
+import type { ParamsSignUp } from '~/type';
 import { validatorSingUp } from '~/validator/signUp.validator';
 
 export async function signIn(email: string, password: string) {
@@ -9,8 +9,9 @@ export async function signIn(email: string, password: string) {
     password
   });
   if (error) {
-    console.error(error.message);
+    throw new Error(error.message || 'Ошибка входа');
   }
+
   return data.user as User;
 }
 export async function signUp(params: ParamsSignUp) {
