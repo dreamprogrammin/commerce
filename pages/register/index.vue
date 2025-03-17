@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useAuthStore } from '~/stores/auth';
 import type { ParamsSignUp } from '~/type';
+import { useAuthStore } from '~/stores/auth';
 const formData = ref<ParamsSignUp>({
   email: '',
   password: '',
@@ -40,6 +40,9 @@ async function handleRegister() {
       <br />
       <button type="submit">Зарегистрироваться</button>
     </form>
+    <div>
+      <p v-if="authStore.errors.register">{{ authStore.errors.register }}</p>
+    </div>
     <nuxt-link to="/login">У вас есть аккаунт?</nuxt-link>
   </div>
 </template>

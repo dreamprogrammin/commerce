@@ -1,24 +1,22 @@
 <script setup lang="ts">
-const user = useSupabaseClient();
+import { useAuthStore } from '~/stores/auth';
+import type { IParamsForgotPassword } from '~/type';
+
 const isLoading = ref(false);
-const message = ref('');
 const email = ref('');
+const authStore = useAuthStore();
 
 async function handleResetPassword() {
-  isLoading.value = true;
-  message.value = '';
-  try {
-    const { error } = await user.auth.resetPasswordForEmail(email.value, {
-      redirectTo: window.location.origin + '/reset-password'
-    });
-    if (error) {
-      throw error;
+  const params: IParamsForgotPassword = {
+    email: email.value,
+    option: {
+      redirectTo: `${window.location.origin}/reset-password`
     }
-    message.value = 'Проверьте вашу почту для получения дальнейших инструкций.';
-    isLoading.value = false;
+  };
+  try {
+    isLoading.value = true;
+    await authStore.handleForgotPassword(params);
   } catch (error) {
-    message.value = 'ошибка';
-    isLoading.value = false;
   } finally {
     isLoading.value = false;
   }
@@ -36,6 +34,6 @@ async function handleResetPassword() {
       </button>
     </form>
     <nuxt-link to="/login">Вернутся в авторизации</nuxt-link>
-    <p v-if="message">{{ message }}</p>
+    <p v-if="authStore.errors.forgotPassword">{{ authStore.errors.forgotPassword }}</p>
   </div>
 </template>

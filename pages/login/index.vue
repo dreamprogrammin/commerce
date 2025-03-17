@@ -23,6 +23,9 @@ async function handleLogin() {
       <input type="password" v-model="password" placeholder="password" />
       <button type="submit">Войти</button>
     </form>
+    <div>
+      <p v-if="authStore.errors.login">{{ authStore.errors.login }}</p>
+    </div>
     <nuxt-link to="/register">У вас нет аккаунта?</nuxt-link>
     <br />
     <nuxt-link to="/forgot-password">Забыли пароль?</nuxt-link>
