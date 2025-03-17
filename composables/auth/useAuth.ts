@@ -30,7 +30,7 @@ export async function signUp(params: ParamsSignUp) {
     }
   });
   if (error) {
-    console.error(error.message);
+    throw new Error(error.message || 'Ошибка регистрации');
   }
   return data.user as User;
 }

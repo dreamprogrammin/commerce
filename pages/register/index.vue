@@ -41,7 +41,7 @@ async function handleRegister() {
       <button type="submit">Зарегистрироваться</button>
     </form>
     <div>
-      <p v-if="authStore.errors.register">{{ authStore.errors.register }}</p>
+      <p v-if="">{{}}</p>
     </div>
     <nuxt-link to="/login">У вас есть аккаунт?</nuxt-link>
   </div>
