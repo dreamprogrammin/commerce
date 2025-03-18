@@ -5,6 +5,7 @@ import type { IParamsForgotPassword } from '~/type';
 const isLoading = ref(false);
 const email = ref('');
 const authStore = useAuthStore();
+const message = ref('');
 
 async function handleResetPassword() {
   const params: IParamsForgotPassword = {
@@ -17,6 +18,8 @@ async function handleResetPassword() {
     isLoading.value = true;
     await authStore.handleForgotPassword(params);
   } catch (error) {
+    message.value = authStore.errors.forgotPassword || 'Ошибка';
+    throw error;
   } finally {
     isLoading.value = false;
   }
@@ -34,6 +37,6 @@ async function handleResetPassword() {
       </button>
     </form>
     <nuxt-link to="/login">Вернутся в авторизации</nuxt-link>
-    <p v-if="authStore.errors.forgotPassword">{{ authStore.errors.forgotPassword }}</p>
+    <p v-if="authStore.errors.forgotPassword">{{ message }}</p>
   </div>
 </template>
