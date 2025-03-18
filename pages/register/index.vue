@@ -15,7 +15,7 @@ async function handleRegister() {
     await authStore.handleRegister(formData.value);
     await navigateTo('/confirm');
   } catch (error) {
-    console.log('ошибка', error);
+    console.log(error);
   }
 }
 </script>
@@ -41,7 +41,7 @@ async function handleRegister() {
       <button type="submit">Зарегистрироваться</button>
     </form>
     <div>
-      <p v-if="">{{}}</p>
+      <p v-if="authStore.errors.register">{{ authStore.errors.register }}</p>
     </div>
     <nuxt-link to="/login">У вас есть аккаунт?</nuxt-link>
   </div>

@@ -11,7 +11,9 @@ export async function signIn(email: string, password: string) {
   if (error) {
     throw new Error(error.message || 'Ошибка входа');
   }
-
+  if (!data.user) {
+    throw new Error('Пользователь не найден');
+  }
   return data.user as User;
 }
 export async function signUp(params: ParamsSignUp) {
