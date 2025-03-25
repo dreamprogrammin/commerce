@@ -4,9 +4,7 @@ import { useAuthStore } from '~/stores/auth';
 const formData = ref<ParamsSignUp>({
   email: '',
   password: '',
-  confirmPassword: '',
-  firstName: '',
-  lastName: ''
+  confirmPassword: ''
 });
 const authStore = useAuthStore();
 
@@ -15,7 +13,7 @@ async function handleRegister() {
     await authStore.handleRegister(formData.value);
     await navigateTo('/confirm');
   } catch (error) {
-    console.log(error);
+    throw error;
   }
 }
 </script>
@@ -31,12 +29,6 @@ async function handleRegister() {
       <br />
       <label for="confirmPassword">Повторить пароль</label>
       <input type="password" v-model="formData.confirmPassword" placeholder="Повторите пароль" id="confirmPassword" />
-      <br />
-      <label for="firstName">Ваше имя</label>
-      <input type="name" v-model="formData.firstName" placeholder="Ваше имя" required id="firstName" />
-      <br />
-      <label for="lastName">Ваше фамилия (Не обязательно)</label>
-      <input type="name" v-model="formData.lastName" placeholder="Ваше фамилия" id="lastName" />
       <br />
       <button type="submit">Зарегистрироваться</button>
     </form>

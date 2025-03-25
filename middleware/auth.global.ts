@@ -13,4 +13,7 @@ export default defineNuxtRouteMiddleware((to, _from) => {
   if (user.value && ['/login', '/register'].includes(to.path)) {
     return navigateTo('/dashboard');
   }
+  if (to.path === '/profile' && !user.value) {
+    return navigateTo('/login');
+  }
 });

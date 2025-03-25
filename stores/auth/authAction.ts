@@ -1,10 +1,10 @@
 import type { User } from '@supabase/supabase-js';
 import type { IParamsForgotPassword, ParamsSignUp } from '~/type';
-import { signIn, signUp, signOut } from '~/composables/auth/useAuth';
+import { signIn, signUp, signOut, signInOtp } from '~/composables/auth/useAuth';
 import { forgotPassword } from '~/composables/auth/useForgotPassword';
 import { handleError } from './errorHandles';
 export function createAuthAction() {
-  const user = ref<User | null>(null);
+  const user = ref<User | { provider: string } | null>(null);
   const errors = reactive<{ [action: string]: string }>({});
 
   function setError(newError: { [action: string]: string }) {
@@ -50,6 +50,17 @@ export function createAuthAction() {
       setError({});
     } catch (error) {
       setError({ forgotPassword: handleError(error, 'forgotPassword') });
+      throw error;
+    }
+  }
+
+  async function handleAuthGoogle(provider: 'google') {
+    try {
+      const userData = await signInOtp(provider);
+      user.value = userData;
+      setError({});
+    } catch (error) {
+      setError({ google: handleError(error, 'googleErr') });
       throw error;
     }
   }
