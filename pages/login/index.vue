@@ -19,10 +19,18 @@ async function handleLogin() {
   <div>
     <h1>Страница авторизации</h1>
     <form @submit.prevent="handleLogin">
-      <input type="email" v-model="email" placeholder="email" />
+      <input type="email" v-model="email" placeholder="введите email или номер телефона" />
       <input type="password" v-model="password" placeholder="password" />
       <button type="submit">Войти</button>
     </form>
+    <div>
+      <h2>войти как пользователь</h2>
+      <div class="socials">
+        <span>google</span>
+        <br />
+        <span>apple</span>
+      </div>
+    </div>
     <div>
       <p v-if="authStore.errors.login">{{ authStore.errors.login }}</p>
     </div>
