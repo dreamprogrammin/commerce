@@ -65,12 +65,25 @@ export function createAuthAction() {
     }
   }
 
+  async function handleAuthApple(provider: 'apple') {
+    try {
+      const userData = await signInOtp(provider) 
+      user.value = userData
+      setError({})
+    } catch (error) {
+      setError({ apple: handleError(error, 'appleErr') });
+      throw error
+    }
+  }
+
   return {
     user,
     errors,
     handleLogin,
     handleOut,
     handleRegister,
-    handleForgotPassword
+    handleForgotPassword,
+    handleAuthGoogle,
+    handleAuthApple
   };
 }

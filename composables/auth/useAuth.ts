@@ -1,7 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import type { ParamsSignUp } from '~/type';
 import { validatorSingUp } from '~/validator/signUp.validator';
-const supabase = useSupabaseClient();
 export async function signIn(email: string, password: string) {
   const supabase = useSupabaseClient();
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -16,7 +15,8 @@ export async function signIn(email: string, password: string) {
   }
   return data.user as User;
 }
-export async function signInOtp(provider: 'google') {
+export async function signInOtp(provider: 'google' | 'apple') {
+  const supabase = useSupabaseClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
