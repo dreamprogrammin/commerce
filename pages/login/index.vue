@@ -14,6 +14,23 @@ async function handleLogin() {
     console.log('ошибка', error);
   }
 }
+
+async function handleAuthGoogle() {
+  try {
+    await authStore.handleAuthGoogle('google')
+    await navigateTo('/dashboard')
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+async function handleAuthApple() {
+  try {
+    await authStore.handleAuthApple('apple')
+  } catch (error) {
+    console.log(error)
+  }
+}
 </script>
 <template>
   <div>
@@ -26,7 +43,7 @@ async function handleLogin() {
     <div>
       <h2>войти как пользователь</h2>
       <div class="socials">
-        <span>google</span>
+        <button @click="handleAuthGoogle">google</button>
         <br />
         <span>apple</span>
       </div>

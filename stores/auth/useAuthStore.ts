@@ -3,7 +3,7 @@ import { createAuthAction } from './authAction';
 export const useAuthStore = defineStore(
   'authStore',
   () => {
-    const { handleForgotPassword, handleLogin, handleRegister, handleOut, user, errors } = createAuthAction();
+    const { handleForgotPassword, handleLogin, handleRegister, handleOut, user, errors,handleAuthGoogle, handleAuthApple } = createAuthAction();
 
     return {
       user,
@@ -11,7 +11,9 @@ export const useAuthStore = defineStore(
       handleForgotPassword,
       handleLogin,
       handleRegister,
-      handleOut
+      handleOut,
+      handleAuthGoogle,
+      handleAuthApple
     };
   },
   {
