@@ -84,6 +84,6 @@ export function createAuthAction() {
     handleRegister,
     handleForgotPassword,
     handleAuthGoogle,
-    handleAuthApple
+    handleAuthApple,
   };
 }

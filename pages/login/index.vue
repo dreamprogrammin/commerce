@@ -41,7 +41,7 @@ async function handleAuthApple() {
       <button type="submit">Войти</button>
     </form>
     <div>
-      <h2>войти как пользователь</h2>
+      <h2>войти как пользователь социальной сети</h2>
       <div class="socials">
         <button @click="handleAuthGoogle">google</button>
         <br />
