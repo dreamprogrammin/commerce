@@ -13,12 +13,7 @@ export const useAuthStore = defineStore(
       handleRegister,
       handleOut,
       handleAuthGoogle,
-      handleAuthApple
+      handleAuthApple,
     };
   },
-  {
-    persist: {
-      storage: piniaPluginPersistedstate.localStorage()
-    }
-  }
 );
