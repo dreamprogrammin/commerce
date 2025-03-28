@@ -17,18 +17,17 @@ async function handleLogin() {
 
 async function handleAuthGoogle() {
   try {
-    await authStore.handleAuthGoogle('google')
-    await navigateTo('/dashboard')
+    await authStore.handleAuthGoogle('google');
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 }
 
 async function handleAuthApple() {
   try {
-    await authStore.handleAuthApple('apple')
+    await authStore.handleAuthApple('apple');
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 }
 </script>
