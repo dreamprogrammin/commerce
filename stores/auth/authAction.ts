@@ -4,7 +4,6 @@ import { signIn, signUp, signOut, signInOtp } from '~/composables/auth/useAuth';
 import { forgotPassword } from '~/composables/auth/useForgotPassword';
 import { handleError } from './errorHandles';
 export function createAuthAction() {
-  const user = ref<User | { provider: string } | null>(null);
   const errors = reactive<{ [action: string]: string }>({});
 
   function setError(newError: { [action: string]: string }) {
@@ -13,8 +12,7 @@ export function createAuthAction() {
 
   async function handleLogin(email: string, password: string) {
     try {
-      const userData = await signIn(email, password);
-      user.value = userData;
+      await signIn(email, password);
       setError({});
     } catch (error) {
       setError({ login: handleError(error, 'login') });
@@ -25,7 +23,6 @@ export function createAuthAction() {
   async function handleOut() {
     try {
       await signOut();
-      user.value = null;
       setError({});
     } catch (error) {
       setError({ logout: handleError(error, 'logout') });
@@ -35,8 +32,7 @@ export function createAuthAction() {
 
   async function handleRegister(params: ParamsSignUp) {
     try {
-      const userData = await signUp(params);
-      user.value = userData;
+      await signUp(params);
       setError({});
     } catch (error) {
       setError({ register: handleError(error, 'register') });
@@ -56,8 +52,7 @@ export function createAuthAction() {
 
   async function handleAuthGoogle(provider: 'google') {
     try {
-      const userData = await signInOtp(provider);
-      user.value = userData;
+      await signInOtp(provider);
       setError({});
     } catch (error) {
       setError({ google: handleError(error, 'googleErr') });
@@ -67,23 +62,21 @@ export function createAuthAction() {
 
   async function handleAuthApple(provider: 'apple') {
     try {
-      const userData = await signInOtp(provider) 
-      user.value = userData
-      setError({})
+      await signInOtp(provider);
+      setError({});
     } catch (error) {
       setError({ apple: handleError(error, 'appleErr') });
-      throw error
+      throw error;
     }
   }
 
   return {
-    user,
     errors,
     handleLogin,
     handleOut,
     handleRegister,
     handleForgotPassword,
     handleAuthGoogle,
-    handleAuthApple,
+    handleAuthApple
   };
 }
