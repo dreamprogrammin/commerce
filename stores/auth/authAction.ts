@@ -1,8 +1,8 @@
-import type { User } from '@supabase/supabase-js';
-import type { IParamsForgotPassword, ParamsSignUp } from '~/type';
-import { signIn, signUp, signOut, signInOtp } from '~/composables/auth/useAuth';
-import { forgotPassword } from '~/composables/auth/useForgotPassword';
-import { handleError } from './errorHandles';
+import type { User } from "@supabase/supabase-js";
+import type { IParamsForgotPassword, ParamsSignUp } from "~/types/type";
+import { signIn, signUp, signOut, signInOtp } from "~/composables/auth/useAuth";
+import { forgotPassword } from "~/composables/auth/useForgotPassword";
+import { handleError } from "./errorHandles";
 export function createAuthAction() {
   const errors = reactive<{ [action: string]: string }>({});
 
@@ -15,7 +15,7 @@ export function createAuthAction() {
       await signIn(email, password);
       setError({});
     } catch (error) {
-      setError({ login: handleError(error, 'login') });
+      setError({ login: handleError(error, "login") });
       throw error;
     }
   }
@@ -25,7 +25,7 @@ export function createAuthAction() {
       await signOut();
       setError({});
     } catch (error) {
-      setError({ logout: handleError(error, 'logout') });
+      setError({ logout: handleError(error, "logout") });
       throw error;
     }
   }
@@ -35,7 +35,7 @@ export function createAuthAction() {
       await signUp(params);
       setError({});
     } catch (error) {
-      setError({ register: handleError(error, 'register') });
+      setError({ register: handleError(error, "register") });
       throw error;
     }
   }
@@ -45,27 +45,27 @@ export function createAuthAction() {
       await forgotPassword(params);
       setError({});
     } catch (error) {
-      setError({ forgotPassword: handleError(error, 'forgotPassword') });
+      setError({ forgotPassword: handleError(error, "forgotPassword") });
       throw error;
     }
   }
 
-  async function handleAuthGoogle(provider: 'google') {
+  async function handleAuthGoogle(provider: "google") {
     try {
       await signInOtp(provider);
       setError({});
     } catch (error) {
-      setError({ google: handleError(error, 'googleErr') });
+      setError({ google: handleError(error, "googleErr") });
       throw error;
     }
   }
 
-  async function handleAuthApple(provider: 'apple') {
+  async function handleAuthApple(provider: "apple") {
     try {
       await signInOtp(provider);
       setError({});
     } catch (error) {
-      setError({ apple: handleError(error, 'appleErr') });
+      setError({ apple: handleError(error, "appleErr") });
       throw error;
     }
   }
@@ -77,6 +77,6 @@ export function createAuthAction() {
     handleRegister,
     handleForgotPassword,
     handleAuthGoogle,
-    handleAuthApple
+    handleAuthApple,
   };
 }

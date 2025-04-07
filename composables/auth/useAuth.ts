@@ -1,19 +1,19 @@
-import type { ParamsSignUp } from '~/type';
-import { validatorSingUp } from '~/validator/signUp.validator';
+import type { ParamsSignUp } from "~/types/type";
+import { validatorSingUp } from "~/validator/signUp.validator";
 export async function signIn(email: string, password: string) {
   const supabase = useSupabaseClient();
   const { error } = await supabase.auth.signInWithPassword({
     email,
-    password
+    password,
   });
   if (error) {
-    throw new Error(error.message || 'Ошибка входа');
+    throw new Error(error.message || "Ошибка входа");
   }
 }
-export async function signInOtp(provider: 'google' | 'apple') {
+export async function signInOtp(provider: "google" | "apple") {
   const supabase = useSupabaseClient();
   const { error } = await supabase.auth.signInWithOAuth({
-    provider
+    provider,
   });
   if (error) {
     throw error;
@@ -27,11 +27,11 @@ export async function signUp(params: ParamsSignUp) {
     email,
     password,
     options: {
-      emailRedirectTo: window.location.origin + '/confirm'
-    }
+      emailRedirectTo: window.location.origin + "/confirm",
+    },
   });
   if (error) {
-    throw new Error(error.message || 'Ошибка регистрации');
+    throw new Error(error.message || "Ошибка регистрации");
   }
 }
 
