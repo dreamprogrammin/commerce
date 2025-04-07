@@ -1,30 +1,58 @@
-export async function useEmptyProfile() {
-  const supabase = useSupabaseClient();
-  const { data, error } = await supabase
-    .from("profile")
-    .select("*")
-    .or("first_name.is.null, last_name.is.null");
+import type { Database } from "~/types/supabase";
+import type { IProfile } from "~/types/type";
 
-  if (error) {
-    throw error;
+type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
+
+export function useProfile() {
+  const supabase = useSupabaseClient<Database>();
+  const profile = ref<IProfile>({
+    id: "",
+    first_name: null,
+    last_name: null,
+  });
+  async function useEmptyProfile() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .or("first_name.is.null, last_name.is.null");
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
   }
 
-  return data;
-}
+  async function loadProfile() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .single();
+    if (error) {
+      throw error;
+    }
 
-// ~/composables/useProfiles.ts
-export async function updateProfile(profile: any) {
-  const supabase = useSupabaseClient();
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-    })
-    .eq("id", profile.id);
-
-  if (error) {
-    console.error("Ошибка при обновлении профиля:", error.message);
-    throw error;
+    return data;
   }
+  async function updateProfile(profiles: ProfileUpdate) {
+    if (!profiles.id) {
+      throw new Error("ID профиля не может быть пустым");
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        first_name: profiles.first_name ?? null,
+        last_name: profiles.last_name ?? null,
+      })
+      .eq("id", profiles.id);
+    if (error) {
+      throw error;
+    }
+  }
+  return {
+    profile,
+    updateProfile,
+    loadProfile,
+    useEmptyProfile,
+  };
 }

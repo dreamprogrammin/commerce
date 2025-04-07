@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import type { ParamsSignUp } from '~/type';
-import { useAuthStore } from '~/stores/auth';
+import type { ParamsSignUp } from "~/types/type";
+import { useAuthStore } from "~/stores/auth";
 const formData = ref<ParamsSignUp>({
-  email: '',
-  password: '',
-  confirmPassword: ''
+  email: "",
+  password: "",
+  confirmPassword: "",
 });
 const authStore = useAuthStore();
 
 async function handleRegister() {
   try {
     await authStore.handleRegister(formData.value);
-    await navigateTo('/confirm');
+    await navigateTo("/confirm");
   } catch (error) {
     throw error;
   }
@@ -22,13 +22,30 @@ async function handleRegister() {
     <h1>Страница Регистрации</h1>
     <form @submit.prevent="handleRegister">
       <label for="email">Почта</label>
-      <input type="email" v-model="formData.email" placeholder="Введите email" required id="email" />
+      <input
+        type="email"
+        v-model="formData.email"
+        placeholder="Введите email"
+        required
+        id="email"
+      />
       <br />
       <label for="password">Пароль</label>
-      <input type="password" v-model="formData.password" placeholder="Введите пароль" required id="password" />
+      <input
+        type="password"
+        v-model="formData.password"
+        placeholder="Введите пароль"
+        required
+        id="password"
+      />
       <br />
       <label for="confirmPassword">Повторить пароль</label>
-      <input type="password" v-model="formData.confirmPassword" placeholder="Повторите пароль" id="confirmPassword" />
+      <input
+        type="password"
+        v-model="formData.confirmPassword"
+        placeholder="Повторите пароль"
+        id="confirmPassword"
+      />
       <br />
       <button type="submit">Зарегистрироваться</button>
     </form>
