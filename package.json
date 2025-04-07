@@ -21,5 +21,15 @@
   },
   "devDependencies": {
     "prettier": "^3.5.3"
+  },
+  "prettier": {
+    "overrides": [
+      {
+        "files": "*.{js,ts}",
+        "options": {
+          "breakLongMethodChains": true
+        }
+      }
+    ]
   }
 }

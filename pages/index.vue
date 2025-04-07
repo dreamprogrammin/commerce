@@ -1,6 +1,4 @@
-<script setup lang="ts">
-
-</script>
+<script setup lang="ts"></script>
 <template>
   <div>
     <h1>Домашняя Страница</h1>
