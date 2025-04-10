@@ -11,42 +11,53 @@ export function useProfile() {
     last_name: null,
   });
   async function useEmptyProfile() {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .or("first_name.is.null, last_name.is.null");
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .or("first_name.is.null, last_name.is.null");
 
-    if (error) {
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
       throw error;
     }
-
-    return data;
   }
 
-  async function loadProfile() {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .single();
-    if (error) {
+  async function loadProfile(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      if (error) {
+        throw error;
+      }
+      profile.value = data;
+    } catch (error) {
       throw error;
     }
-
-    return data;
   }
   async function updateProfile(profiles: ProfileUpdate) {
-    if (!profiles.id) {
-      throw new Error("ID профиля не может быть пустым");
-    }
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        first_name: profiles.first_name ?? null,
-        last_name: profiles.last_name ?? null,
-      })
-      .eq("id", profiles.id);
-    if (error) {
-      throw error;
+    try {
+      if (!profiles.id) {
+        throw new Error("ID профиля не может быть пустым");
+      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          first_name: profiles.first_name ?? null,
+          last_name: profiles.last_name ?? null,
+        })
+        .eq("id", profiles.id);
+      if (error) {
+        throw error;
+      }
+      alert("Профиль успешно");
+    } catch (error) {
+      alert(error + "Ошибка");
     }
   }
   return {
