@@ -14,6 +14,10 @@ export async function signInOtp(provider: "google" | "apple") {
   const supabase = useSupabaseClient();
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
+    options: {
+      redirectTo: `${window.location.origin}/`,
+      scopes: "profile email",
+    },
   });
   if (error) {
     throw error;
