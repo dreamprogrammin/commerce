@@ -1,57 +1,48 @@
 <script setup lang="ts">
-import { useProfile } from "~/composables/profile/useProfile";
-const {
-  displayProfile,
-  editProfile,
-  updateProfile,
-  loadProfile,
-  isLoading,
-  isSaving,
-} = useProfile();
+import { useProfileStore } from '~/stores/profile';
+
+
+const profileStore = useProfileStore();
 
 onMounted(async () => {
-  try {
-    await loadProfile();
-  } catch (error) {
-    throw error;
-  }
+    await profileStore.loadProfile();
 });
 
 async function handleUpdate() {
-  await updateProfile(editProfile.value);
+  await profileStore.updateProfile(profileStore.editProfile);
 }
 </script>
 <template>
   <div>
     <h1>Настройка профайла</h1>
 
-    <div v-if="isLoading">Загрузка...</div>
+    <div v-if="profileStore.isLoading">Загрузка...</div>
     <div v-else>
-      <p v-if="!displayProfile.first_name && !displayProfile.last_name">
+      <p v-if="!profileStore.displayProfile.first_name && !profileStore.displayProfile.last_name">
         Привет гость
       </p>
       <p v-else>
-        Привет {{ displayProfile.first_name }} {{ displayProfile.last_name }}
+        Привет {{ profileStore.displayProfile.first_name }} {{ profileStore.displayProfile.last_name }}
       </p>
 
       <form @submit.prevent="handleUpdate">
         <input
-          v-model="editProfile.first_name"
+          v-model="profileStore.editProfile.first_name"
           type="text"
           placeholder="Ваше имя"
         />
         <input
-          v-model="editProfile.last_name"
+          v-model="profileStore.editProfile.last_name"
           type="text"
           placeholder="Ваше фамилия"
         />
         <input
           type="text"
-          v-model="editProfile.phone"
+          v-model="profileStore.editProfile.phone"
           placeholder="Ваш номер телефона"
         />
-        <button type="submit" :disabled="isSaving">
-          {{ isSaving ? "Сохранение..." : "Сохранить" }}
+        <button type="submit" :disabled="profileStore.isSaving">
+          {{ profileStore.isSaving ? "Сохранение..." : "Сохранить" }}
         </button>
       </form>
     </div>

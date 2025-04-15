@@ -1,6 +1,8 @@
-import { createAuthAction } from './authAction';
+import { createAuthAction } from "./actionAuth";
+
 
 export const useAuthStore = defineStore('authStore', () => {
+  const user = useSupabaseUser()
   const { handleForgotPassword, handleLogin, handleRegister, handleOut, errors, handleAuthGoogle, handleAuthApple } =
     createAuthAction();
 
@@ -11,6 +13,7 @@ export const useAuthStore = defineStore('authStore', () => {
     handleRegister,
     handleOut,
     handleAuthGoogle,
-    handleAuthApple
+    handleAuthApple,
+    user
   };
 });
