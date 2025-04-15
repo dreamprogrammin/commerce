@@ -1,3 +1,5 @@
+import type { Database } from "./supabase";
+
 export interface ParamsSignUp {
   email: string;
   password: string;
@@ -18,6 +20,10 @@ export interface IParamsForgotPassword {
 
 export interface IProfile {
   id: string;
+  email: string | null;
   first_name: string | null;
   last_name: string | null;
+  phone: string | null;
 }
+
+export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
