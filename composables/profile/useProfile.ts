@@ -1,8 +1,10 @@
+import { useAuthStore } from "~/stores/auth";
 import type { Database } from "~/types/supabase";
 import type { IProfile, ProfileUpdate } from "~/types/type";
 
 export function useProfile() {
   const supabase = useSupabaseClient<Database>();
+  const authStore = useAuthStore()
 
   const displayProfile = ref<IProfile>({
     id: "",
