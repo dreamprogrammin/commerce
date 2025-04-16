@@ -1,10 +1,18 @@
+import type { Database } from "~/types/supabase";
 import { createAuthAction } from "./actionAuth";
 
-
-export const useAuthStore = defineStore('authStore', () => {
-  const user = useSupabaseUser()
-  const { handleForgotPassword, handleLogin, handleRegister, handleOut, errors, handleAuthGoogle, handleAuthApple } =
-    createAuthAction();
+export const useAuthStore = defineStore("authStore", () => {
+  const user = useSupabaseUser();
+  const supabase = useSupabaseClient<Database>();
+  const {
+    handleForgotPassword,
+    handleLogin,
+    handleRegister,
+    handleOut,
+    errors,
+    handleAuthGoogle,
+    handleAuthApple,
+  } = createAuthAction();
 
   return {
     errors,
@@ -14,6 +22,7 @@ export const useAuthStore = defineStore('authStore', () => {
     handleOut,
     handleAuthGoogle,
     handleAuthApple,
-    user
+    user,
+    supabase,
   };
 });

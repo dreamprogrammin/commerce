@@ -3,8 +3,7 @@ import type { Database } from "~/types/supabase";
 import type { IProfile, ProfileUpdate } from "~/types/type";
 
 export function useProfile() {
-  const supabase = useSupabaseClient<Database>();
-  const authStore = useAuthStore()
+  const authStore = useAuthStore();
 
   const displayProfile = ref<IProfile>({
     id: "",
@@ -21,7 +20,7 @@ export function useProfile() {
 
   async function useEmptyProfile() {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await authStore.supabase
         .from("profiles")
         .select("*")
         .or("first_name.is.null, last_name.is.null, email.is.null");
@@ -37,12 +36,12 @@ export function useProfile() {
   async function loadProfile() {
     try {
       isLoading.value = true;
-      const user = await supabase.auth.getUser();
+      const user = await authStore.supabase.auth.getUser();
       if (!user.data?.user) {
         throw new Error("Пользователь не найден");
       }
       const userId = user.data.user?.id;
-      const { data, error } = await supabase
+      const { data, error } = await authStore.supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
@@ -64,7 +63,7 @@ export function useProfile() {
       if (!profiles.id) {
         throw new Error("ID профиля не может быть пустым");
       }
-      const { error } = await supabase
+      const { error } = await authStore.supabase
         .from("profiles")
         .update({
           first_name: profiles.first_name ?? null,
