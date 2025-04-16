@@ -1,11 +1,25 @@
-import { useProfile } from "~/composables/profile/useProfile"
+import { useProfile } from "~/composables/profile/useProfile";
 
 const profile = () => {
-    const {displayProfile, loadProfile, isLoading, isSaving, editProfile, useEmptyProfile, updateProfile} = useProfile()
+  const {
+    displayProfile,
+    loadProfile,
+    isLoading,
+    isSaving,
+    editProfile,
+    useEmptyProfile,
+    updateProfile,
+  } = useProfile();
 
-    return {
-        displayProfile, loadProfile, isLoading, isSaving, editProfile, useEmptyProfile, updateProfile
-    }
-}
+  return {
+    displayProfile,
+    loadProfile,
+    isLoading,
+    isSaving,
+    editProfile,
+    useEmptyProfile,
+    updateProfile,
+  };
+};
 
-export default profile
+export default profile;
