@@ -2,7 +2,6 @@ import type { Database } from "~/types/supabase";
 import { createAuthAction } from "./actionAuth";
 
 export const useAuthStore = defineStore("authStore", () => {
-  const user = useSupabaseUser();
   const supabase = useSupabaseClient<Database>();
   const {
     handleForgotPassword,
@@ -22,7 +21,6 @@ export const useAuthStore = defineStore("authStore", () => {
     handleOut,
     handleAuthGoogle,
     handleAuthApple,
-    user,
     supabase,
   };
 });
