@@ -2,7 +2,7 @@ import type { Database } from "~/types/supabase";
 import { createAuthAction } from "./actionAuth";
 
 export const useAuthStore = defineStore("authStore", () => {
-  const user = useSupabaseUser();
+  const user = ref(useSupabaseUser()?.value || null);
   const supabase = useSupabaseClient<Database>();
   const {
     handleForgotPassword,
@@ -13,6 +13,12 @@ export const useAuthStore = defineStore("authStore", () => {
     handleAuthGoogle,
     handleAuthApple,
   } = createAuthAction();
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN") {
+      user.value = session?.user;
+    }
+  });
 
   return {
     errors,
