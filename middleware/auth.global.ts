@@ -1,22 +1,30 @@
-export default defineNuxtRouteMiddleware((to, _from) => {
-  const user = useSupabaseUser();
-  const publicRoutes = ['/', '/login', '/register', '/confirm', '/forgot-password', '/reset-password'];
+import { useAuthStore } from "~/stores/auth";
 
-  if (user.value === null) {
+export default defineNuxtRouteMiddleware(async (to, _from) => {
+  const authStore = useAuthStore();
+  const publicRoutes = [
+    "/",
+    "/login",
+    "/register",
+    "/confirm",
+    "/forgot-password",
+    "/reset-password",
+  ];
+  if (authStore.user === null) {
     return;
   }
-  if (user.value && !user.value?.email_confirmed_at) {
-    return navigateTo('/confirm');
+  if (authStore.user && !authStore.user?.confirmed_at) {
+    return navigateTo("/confirm");
   }
 
-  if (!user.value && !publicRoutes.includes(to.path)) {
-    return navigateTo('/login');
+  if (!authStore.user && !publicRoutes.includes(to.path)) {
+    return navigateTo("/login");
   }
 
-  if (user.value && ['/login', '/register'].includes(to.path)) {
-    return navigateTo('/dashboard');
+  if (authStore.user && ["/login", "/register"].includes(to.path)) {
+    return navigateTo("/dashboard");
   }
-  if (to.path === '/profile' && !user.value) {
-    return navigateTo('/login');
+  if (to.path === "/profile" && !authStore.user) {
+    return navigateTo("/login");
   }
 });
