@@ -8,14 +8,7 @@ const formData = ref<ParamsSignUp>({
 });
 const authStore = useAuthStore();
 
-async function handleRegister() {
-  try {
-    await authStore.handleRegister(formData.value);
-    await navigateTo("/confirm");
-  } catch (error) {
-    throw error;
-  }
-}
+async function handleRegister() {}
 </script>
 <template>
   <div>
