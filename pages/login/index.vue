@@ -6,26 +6,10 @@ const password = ref("");
 
 const authStore = useAuthStore();
 
-async function handleLogin() {
-  try {
-    await authStore.handleLogin(email.value, password.value);
-    await navigateTo("/dashboard");
-  } catch (error) {
-    console.log("ошибка", error);
-  }
-}
-
 async function handleAuthGoogle() {
   try {
     await authStore.handleAuthGoogle("google");
-  } catch (error) {
-    console.log(error);
-  }
-}
-
-async function handleAuthApple() {
-  try {
-    await authStore.handleAuthApple("apple");
+    console.log("hi");
   } catch (error) {
     console.log(error);
   }
@@ -34,7 +18,7 @@ async function handleAuthApple() {
 <template>
   <div>
     <h1>Страница авторизации</h1>
-    <form @submit.prevent="handleLogin">
+    <form @submit.prevent="">
       <input
         type="email"
         v-model="email"
