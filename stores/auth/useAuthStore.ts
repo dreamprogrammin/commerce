@@ -3,10 +3,7 @@ import { createAuthAction } from "./actionAuth";
 
 export const useAuthStore = defineStore("authStore", () => {
   const supabase = useSupabaseClient<Database>();
-  const user = useSupabaseUser();
   const isClient = ref(false);
-
-  console.log(user.value);
 
   const { handleOut, errors, handleAuthGoogle } = createAuthAction();
   return {
@@ -14,7 +11,6 @@ export const useAuthStore = defineStore("authStore", () => {
     handleOut,
     handleAuthGoogle,
     supabase,
-    user,
     isClient,
   };
 });
