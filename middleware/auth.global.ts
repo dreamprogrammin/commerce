@@ -1,7 +1,7 @@
 import { useAuthStore } from "~/stores/auth";
 
 export default defineNuxtRouteMiddleware(async (to, _from) => {
-  const authStore = useAuthStore();
+  const user = useSupabaseUser();
   const publicRoutes = [
     "/",
     "/login",
@@ -10,21 +10,21 @@ export default defineNuxtRouteMiddleware(async (to, _from) => {
     "/forgot-password",
     "/reset-password",
   ];
-  if (authStore.user === null) {
+  if (user.value === null) {
     return;
   }
-  if (authStore.user && !authStore.user?.confirmed_at) {
+  if (user.value && !user.value?.confirmed_at) {
     return navigateTo("/confirm");
   }
 
-  if (!authStore.user && !publicRoutes.includes(to.path)) {
+  if (!user.value && !publicRoutes.includes(to.path)) {
     return navigateTo("/login");
   }
 
-  if (authStore.user && ["/login", "/register"].includes(to.path)) {
+  if (user.value && ["/login", "/register"].includes(to.path)) {
     return navigateTo("/dashboard");
   }
-  if (to.path === "/profile" && !authStore.user) {
+  if (to.path === "/profile" && !user.value) {
     return navigateTo("/login");
   }
 });
