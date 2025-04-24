@@ -9,7 +9,6 @@ const authStore = useAuthStore();
 async function handleAuthGoogle() {
   try {
     await authStore.handleAuthGoogle("google");
-    console.log("hi");
   } catch (error) {
     console.log(error);
   }
