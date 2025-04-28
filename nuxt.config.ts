@@ -1,9 +1,9 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  compatibilityDate: '2024-11-01',
-  modules: ['@pinia/nuxt', '@nuxtjs/supabase'],
+  compatibilityDate: "2024-11-01",
+  modules: ["@pinia/nuxt", "@nuxtjs/supabase"],
   supabase: {
-    redirect: false
+    redirect: false,
   },
-  devtools: { enabled: true }
+  devtools: { enabled: true },
 });

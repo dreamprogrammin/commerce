@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ClientOnly } from "#components";
-import { Suspense } from "vue";
-import { useAuthStore } from "~/stores/auth";
+import { useProfileStore } from "~/stores/profile";
 const user = useSupabaseUser();
+const profileStore = useProfileStore();
 </script>
 
 <template>
+  <h1>Добро пожаловать</h1>
   <ClientOnly>
-    <h1>Добро пожаловать</h1>
     <div v-if="user">
       <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
+
+      <p>Привет {{ profileStore.displayProfile.first_name }}</p>
     </div>
 
     <div v-else>
