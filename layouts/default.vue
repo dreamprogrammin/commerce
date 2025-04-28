@@ -1,15 +1,19 @@
-<script setup lang="ts"></script>
-<template>
-  <header class="header">
-    <div>
-      <div>LOGO</div>
+<script setup lang="ts">
+import { useProfileStore } from '~/stores/profile';
 
-      <button>Войти</button>
-      <button>Корзина</button>
-      <button>Кешбэк</button>
-    </div>
-    <slot />
-  </header>
+const user = useSupabaseUser();
+const profileStore = useProfileStore();
+const isLoaded = ref(false);
+onMounted(async () => {
+  if (user.value) {
+    await profileStore.loadProfile();
+  }
+  isLoaded.value = true;
+});
+</script>
+<template>
+  <CommonHeader />
+  <slot />
 </template>
 
 <style scoped></style>

@@ -1,18 +1,11 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
-
 const email = ref("");
 const password = ref("");
 
 const authStore = useAuthStore();
 
-async function handleAuthGoogle() {
-  try {
-    await authStore.handleAuthGoogle("google");
-  } catch (error) {
-    console.log(error);
-  }
-}
+
 </script>
 <template>
   <div>
@@ -29,7 +22,7 @@ async function handleAuthGoogle() {
     <div>
       <h2>войти как пользователь социальной сети</h2>
       <div class="socials">
-        <button @click="handleAuthGoogle">google</button>
+        <button @click="">google</button>
         <br />
         <button>apple</button>
       </div>

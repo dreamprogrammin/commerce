@@ -1,3 +1,4 @@
+import { useAuthStore } from "~/stores/auth";
 import type { ParamsSignUp } from "~/types/type";
 import { validatorSingUp } from "~/validator/signUp.validator";
 export async function signIn(email: string, password: string) {
@@ -42,4 +43,18 @@ export async function signUp(params: ParamsSignUp) {
 export async function signOut() {
   const supabase = useSupabaseClient();
   await supabase.auth.signOut();
+}
+
+export function useAuth() {
+  const authStore = useAuthStore()
+  async function handleAuthGoogle() {
+    try {
+      await authStore.handleAuthGoogle("google");
+    } catch (error) {
+      console.log(error);
+    }
+}
+  return {
+    handleAuthGoogle
+  }
 }
