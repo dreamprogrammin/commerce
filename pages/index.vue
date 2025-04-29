@@ -11,7 +11,6 @@ const profileStore = useProfileStore();
     <div v-if="user">
       <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
 
-      <p>Привет {{ profileStore.displayProfile.first_name }}</p>
     </div>
 
     <div v-else>

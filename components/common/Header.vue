@@ -6,9 +6,11 @@ const {handleAuthGoogle} = useAuth()
 <template>
       <header class="header">
     <div>
-      <div>LOGO</div>
+      <div>
+        <nuxt-link to="/">Logo</nuxt-link>
+      </div>
 
-      <button @click="handleAuthGoogle">Войти</button>
+      <nuxt-link to="/profile">Профиль</nuxt-link>
       <button>Корзина</button>
       <button>Кешбэк</button>
     </div>
