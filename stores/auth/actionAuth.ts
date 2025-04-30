@@ -23,7 +23,7 @@ export function createAuthAction() {
       const { error } = await authStore.supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/profile`,
           scopes: "profile email",
         },
       });
