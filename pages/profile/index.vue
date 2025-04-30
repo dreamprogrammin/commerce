@@ -15,7 +15,8 @@ async function handleUpdate() {
 }
 </script>
 <template>
-  <h1>Добро пожаловать</h1>
+  <NuxtLayout name="profile">
+    <h1>Добро пожаловать</h1>
   <ClientOnly>
     <div v-if="user">
       <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
@@ -31,6 +32,7 @@ async function handleUpdate() {
       <div>Загрузка...</div>
     </template>
   </ClientOnly>
+  </NuxtLayout>
 </template>
 
 <!-- <template>
