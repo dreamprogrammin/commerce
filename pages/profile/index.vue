@@ -1,18 +1,39 @@
 <script setup lang="ts">
 import { useProfileStore } from '~/stores/profile';
+import { useAuth } from '~/composables/auth/useAuth';
 
-
+const {handleAuthGoogle} = useAuth()
 const profileStore = useProfileStore();
+const user = useSupabaseUser()
 
-onMounted(async () => {
-    await profileStore.loadProfile();
-});
+// onMounted(async () => {
+//     await profileStore.loadProfile();
+// });
 
 async function handleUpdate() {
   await profileStore.updateProfile(profileStore.editProfile);
 }
 </script>
 <template>
+  <h1>Добро пожаловать</h1>
+  <ClientOnly>
+    <div v-if="user">
+      <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
+      Привет {{ profileStore.displayProfile.first_name }} {{ profileStore.displayProfile.last_name }}
+
+    </div>
+
+    <div v-else>
+      Привет гость
+      <button @click="handleAuthGoogle">Войти в профиль</button>
+    </div>
+    <template #fallback>
+      <div>Загрузка...</div>
+    </template>
+  </ClientOnly>
+</template>
+
+<!-- <template>
   <div>
     <h1>Настройка профайла</h1>
 
@@ -20,6 +41,7 @@ async function handleUpdate() {
     <div v-else>
       <p v-if="!profileStore.displayProfile.first_name && !profileStore.displayProfile.last_name">
         Привет гость
+        <button @click="handleAuthGoogle">Войти в профиль</button>
       </p>
       <p v-else>
         Привет {{ profileStore.displayProfile.first_name }} {{ profileStore.displayProfile.last_name }}
@@ -51,4 +73,4 @@ async function handleUpdate() {
       <nuxt-link to="/">Перейти домой</nuxt-link>
     </div>
   </div>
-</template>
+</template> -->
