@@ -1,6 +1,10 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+definePageMeta({
+  layout: "profile",
+});
+</script>
 <template>
-    <div>
-        <h1>Бонусы</h1>
-    </div>
+  <div>
+    <h1>Бонусы</h1>
+  </div>
 </template>
