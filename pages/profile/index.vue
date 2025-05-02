@@ -1,27 +1,28 @@
 <script setup lang="ts">
-import { useProfileStore } from '~/stores/profile';
-import { useAuth } from '~/composables/auth/useAuth';
+import { useProfileStore } from "~/stores/profile";
+import { useAuth } from "~/composables/auth/useAuth";
 
-const {handleAuthGoogle} = useAuth()
+const { handleAuthGoogle } = useAuth();
 const profileStore = useProfileStore();
-const user = useSupabaseUser()
+const user = useSupabaseUser();
 
 // onMounted(async () => {
 //     await profileStore.loadProfile();
 // });
-
+definePageMeta({
+  layout: "profile",
+});
 async function handleUpdate() {
   await profileStore.updateProfile(profileStore.editProfile);
 }
 </script>
 <template>
-  <NuxtLayout name="profile">
-    <h1>Добро пожаловать</h1>
+  <h1>Добро пожаловать</h1>
   <ClientOnly>
     <div v-if="user">
       <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
-      Привет {{ profileStore.displayProfile.first_name }} {{ profileStore.displayProfile.last_name }}
-
+      Привет {{ profileStore.displayProfile.first_name }}
+      {{ profileStore.displayProfile.last_name }}
     </div>
 
     <div v-else>
@@ -32,7 +33,6 @@ async function handleUpdate() {
       <div>Загрузка...</div>
     </template>
   </ClientOnly>
-  </NuxtLayout>
 </template>
 
 <!-- <template>
