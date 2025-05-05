@@ -46,15 +46,20 @@ export async function signOut() {
 }
 
 export function useAuth() {
-  const authStore = useAuthStore()
+  const authStore = useAuthStore();
   async function handleAuthGoogle() {
     try {
       await authStore.handleAuthGoogle("google");
     } catch (error) {
       console.log(error);
     }
-}
-  return {
-    handleAuthGoogle
   }
+  async function handleOut() {
+    await authStore.handleOut();
+    await navigateTo("/");
+  }
+  return {
+    handleAuthGoogle,
+    handleOut,
+  };
 }

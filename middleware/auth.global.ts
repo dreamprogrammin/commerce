@@ -1,7 +1,8 @@
-import { useAuthStore } from "~/stores/auth";
+import { useModalStore } from "~/stores/modal/useModalStore";
 
-export default defineNuxtRouteMiddleware(async (to, _from) => {
+export default defineNuxtRouteMiddleware((to, _from) => {
   const user = useSupabaseUser();
+  const modalStore = useModalStore();
   const publicRoutes = [
     "/",
     "/login",
@@ -9,10 +10,17 @@ export default defineNuxtRouteMiddleware(async (to, _from) => {
     "/confirm",
     "/forgot-password",
     "/reset-password",
+    "/profile",
   ];
-  if (user.value === null) {
-    return;
-  }
+  const profilePath = [
+    "/profile/bonus",
+    "/profile/favorites",
+    "/profile/order",
+    "/profile/settings",
+  ];
+  // if (user.value === null) {
+  //   return navigateTo("/login");
+  // }
   if (user.value && !user.value?.confirmed_at) {
     return navigateTo("/confirm");
   }
@@ -26,5 +34,10 @@ export default defineNuxtRouteMiddleware(async (to, _from) => {
   }
   if (to.path === "/profile" && !user.value) {
     return navigateTo("/login");
+  }
+  if (profilePath.includes(to.path) && !user.value) {
+    modalStore.openLoginModal();
+
+    return abortNavigation();
   }
 });

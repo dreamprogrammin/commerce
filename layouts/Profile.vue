@@ -6,17 +6,19 @@
 
       <div>
         <ul>
+          <li><nuxt-link to="/profile">Профайл</nuxt-link></li>
           <li><nuxt-link to="/profile/favorites">Избранное</nuxt-link></li>
           <li><nuxt-link to="/profile/bonus">Бонусы</nuxt-link></li>
-          <li><a href=""></a>Заказы</li>
-          <li><a href=""></a>Избранное</li>
+          <li><nuxt-link to="/profile/order">Заказы</nuxt-link></li>
+          <li>
+            <nuxt-link to="/profile/settings">Настройка профайла</nuxt-link>
+          </li>
         </ul>
       </div>
     </aside>
-  </div>
-
-  <div class="profile-content">
-    <slot />
+    <div class="profile-content">
+      <slot />
+    </div>
   </div>
 </template>
 <style lang="css">
