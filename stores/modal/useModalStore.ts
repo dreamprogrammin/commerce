@@ -11,6 +11,7 @@ export const useModalStore = defineStore("modalStore", () => {
 
   return {
     openLoginModal,
+    showLoginModal,
     closeLoginModal,
   };
 });

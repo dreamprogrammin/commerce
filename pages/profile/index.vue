@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { useProfileStore } from "~/stores/profile";
 import { useAuth } from "~/composables/auth/useAuth";
+import { useModalStore } from "~/stores/modal/useModalStore";
 const { handleAuthGoogle, handleOut } = useAuth();
 const profileStore = useProfileStore();
 const user = useSupabaseUser();
 definePageMeta({
   layout: "profile",
 });
+const modalStore = useModalStore()
 </script>
 <template>
   <h1>Добро пожаловать</h1>
@@ -24,5 +26,8 @@ definePageMeta({
     <template #fallback>
       <div>Загрузка...</div>
     </template>
+    <div v-if="modalStore.showLoginModal">
+      hi
+    </div>
   </ClientOnly>
 </template>
