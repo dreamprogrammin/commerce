@@ -7,22 +7,26 @@ export default defineNuxtConfig({
   supabase: {
     redirect: false,
   },
-  css: ['~/assets/css/tailwind.css'],
+  runtimeConfig: {
+    public: {
+      supabaseUrl: process.env.SUPABASE_URL,
+      supabaseKey: process.env.SUPABASE_ANON_KEY,
+    },
+  },
+  css: ["~/assets/css/tailwind.css"],
   vite: {
-    plugins: [
-      tailwindcss(),
-    ],
+    plugins: [tailwindcss()],
   },
   shadcn: {
     /**
      * Prefix for all the imported component
      */
-    prefix: '',
+    prefix: "",
     /**
      * Directory that the component lives in.
      * @default "./components/ui"
      */
-    componentDir: './components/ui'
+    componentDir: "./components/ui",
   },
   devtools: { enabled: true },
 });
