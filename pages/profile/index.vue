@@ -11,7 +11,7 @@ definePageMeta({
 const modalStore = useModalStore()
 </script>
 <template>
-  <h1>Добро пожаловать</h1>
+  <h1>Добро пожаловать на страницу профайла</h1>
   <ClientOnly>
     <div v-if="user">
       Привет {{ profileStore.displayProfile.first_name }}
