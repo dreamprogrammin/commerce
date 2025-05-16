@@ -15,13 +15,14 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <CommonHeaderTop />
-  <CommonHeader />
-
-  <main>
-    <NuxtLayout>
-      <NuxtPage />
-    </NuxtLayout>
-  </main>
+  <header>
+    <CommonHeaderTop />
+    <CommonHeader />
+  </header>
+    <main class="container max-w-screen-2xl px-4 mx-auto">
+      <NuxtLayout>
+        <NuxtPage />
+      </NuxtLayout>
+    </main>
   <AuthLoginModal v-if="modalStore.showLoginModal" />
 </template>

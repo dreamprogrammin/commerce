@@ -2,9 +2,9 @@
 
 <template>
   <div class="bg-gray-200">
-    <nav class="flex justify-content-between">
+    <nav class="flex justify-between">
       <div>
-        <ul class="flex">
+        <ul class="flex gap-4">
           <li>Оплата и доставка</li>
           <li>О нас</li>
         </ul>

@@ -5,6 +5,7 @@ const { handleAuthGoogle } = useAuth();
 </script>
 <template>
   <header class="header">
+
     <div class="wrapper">
       <div>
         <nuxt-link to="/">Logo</nuxt-link>
