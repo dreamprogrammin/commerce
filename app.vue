@@ -15,6 +15,7 @@ onMounted(async () => {
 });
 </script>
 <template>
+  <CommonHeaderTop />
   <CommonHeader />
 
   <main>
