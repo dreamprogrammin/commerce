@@ -28,5 +28,8 @@ export default defineNuxtConfig({
      */
     componentDir: "./components/ui",
   },
+  devServer: {
+    host: "192.168.2.50",
+  },
   devtools: { enabled: true },
 });

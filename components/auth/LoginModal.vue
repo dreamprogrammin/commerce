@@ -3,11 +3,13 @@ import { useAuth } from "~/composables/auth/useAuth";
 import { useModalStore } from "~/stores/modal/useModalStore";
 import {
   Dialog,
-  DialogHeader,
-  DialogTitle,
   DialogContent,
   DialogDescription,
-} from "../ui/dialog";
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const modalStore = useModalStore();
 const { handleAuthGoogle } = useAuth();
@@ -23,12 +25,17 @@ const isOpen = computed({
 
 <template>
   <Dialog :open="isOpen" @update:open="isOpen = $event">
-    <DialogContent class="w-20rem">
+    <DialogTrigger> Edit Profile </DialogTrigger>
+    <DialogContent>
       <DialogHeader>
-        <DialogTitle>Вход</DialogTitle>
-        <DialogDescription> Войти с помощью </DialogDescription>
+        <DialogTitle>Edit profile</DialogTitle>
+        <DialogDescription>
+          Make changes to your profile here. Click save when you're done.
+        </DialogDescription>
       </DialogHeader>
-      <button @click="handleAuthGoogle">Google</button>
+
+      <DialogFooter> Save changes </DialogFooter>
+      <Button @click="handleAuthGoogle">Google</Button>
     </DialogContent>
   </Dialog>
 </template>
