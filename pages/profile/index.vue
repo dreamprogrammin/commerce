@@ -8,10 +8,10 @@ const user = useSupabaseUser();
 definePageMeta({
   layout: "profile",
 });
-const modalStore = useModalStore()
+const modalStore = useModalStore();
 </script>
 <template>
-  <h1>Добро пожаловать на страницу профайла</h1>
+  <h1>Добро пожаловать на страницу профайла и настройки</h1>
   <ClientOnly>
     <div v-if="user">
       Привет {{ profileStore.displayProfile.first_name }}
@@ -26,8 +26,6 @@ const modalStore = useModalStore()
     <template #fallback>
       <div>Загрузка...</div>
     </template>
-    <div v-if="modalStore.showLoginModal">
-      hi
-    </div>
+    <div v-if="modalStore.showLoginModal">hi</div>
   </ClientOnly>
 </template>

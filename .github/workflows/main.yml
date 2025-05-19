@@ -1,39 +1,26 @@
-name: CI/CD Pipeline - Supabase Migrations & Vercel Deploy
+name: Deploy Migrations to Supabase
 
 on:
   push:
-    branches:
-      - master # Или master, или ваша основная ветка для деплоя
-  workflow_dispatch: # Позволяет запускать вручную из интерфейса GitHub Actions
+    branches: [main]
 
 jobs:
-  apply_supabase_migrations:
-    name: Apply Supabase Database Migrations
+  deploy:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' # Запускать только для основной ветки
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest # Или укажите конкретную версию
+          version: latest
 
-      - name: Apply database migrations
-        run: supabase db push --linked
+      - name: Link to Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          # Пароль ОБЯЗАТЕЛЕН для неинтерактивного режима CI
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          # Флаг --linked используется, так как мы предполагаем, что supabase/config.toml
-          # с project_id закоммичен в репозиторий после `supabase link`.
-          # Если нет, можно использовать SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-          # и запускать `supabase db push --project-ref $SUPABASE_PROJECT_ID`
-          # но --linked проще при наличии config.toml
 
-# --- Vercel сам подхватит изменения после пуша в 'master' и запустит свой деплой ---
-# Нет необходимости добавлять шаги для деплоя на Vercel здесь,
-# если вы используете нативную интеграцию Vercel с GitHub.
-# Vercel отреагирует на сам факт пуша в отслеживаемую ветку.
+      - name: Push database changes
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
