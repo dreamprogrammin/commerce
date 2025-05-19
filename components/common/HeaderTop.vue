@@ -2,7 +2,7 @@
 
 <template>
   <div class="bg-gray-200">
-    <nav class="flex justify-between">
+    <nav class="flex justify-between app-container">
       <div>
         <ul class="flex gap-4">
           <li>Оплата и доставка</li>
