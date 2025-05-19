@@ -16,11 +16,14 @@ onMounted(async () => {
 </script>
 <template>
   <CommonHeader />
+  <CommonTestCpm />
   <main class="app-container">
     <CommonTabBar />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
   </main>
-  <AuthLoginModal v-if="modalStore.showLoginModal" />
+  <ClientOnly>
+    <AuthLoginModal v-if="modalStore.showLoginModal" />
+  </ClientOnly>
 </template>
