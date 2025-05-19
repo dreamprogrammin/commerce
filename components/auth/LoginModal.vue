@@ -26,7 +26,7 @@ const isOpen = computed({
 <template>
   <Dialog :open="isOpen" @update:open="isOpen = $event">
     <DialogTrigger> Edit Profile </DialogTrigger>
-    <DialogContent class="ios-modal-fix">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Edit profile</DialogTitle>
         <DialogDescription>
@@ -40,8 +40,4 @@ const isOpen = computed({
   </Dialog>
 </template>
 <style>
-.ios-modal-fix {
-  transform: translateZ(0);
-  z-index: 51;
-}
 </style>
