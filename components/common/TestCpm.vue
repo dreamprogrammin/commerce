@@ -20,7 +20,7 @@ const confirmAction = () => {
 </script>
 <template>
     <div>
-      <Button @click="dialog = true">Открыть диалог</Button>
+      <Button variant="destructive" @click="dialog = true">Открыть диалог</Button>
       
       <Dialog :open="dialog" @update:open="dialog = $event">
         <DialogContent class="sm:max-w-md">
