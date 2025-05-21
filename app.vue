@@ -16,7 +16,6 @@ onMounted(async () => {
 </script>
 <template>
   <CommonHeader />
-  <CommonTestCpm />
   <main class="app-container">
     <CommonTabBar />
     <NuxtLayout>
