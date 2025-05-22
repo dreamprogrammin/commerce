@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue' // Добавляем импорт ref и computed
+import { ref, computed } from 'vue'
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -9,6 +9,8 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle
 } from '@/components/ui/navigation-menu'
+import { Search, Clock, TrendingUp, Star } from 'lucide-vue-next'
+import { Input } from '@/components/ui/input'
 
 // Данные для компонентов
 const components = [
@@ -58,33 +60,84 @@ const newItems = [
   { title: 'Рекомендуемые', href: '/new/recommended', description: 'Рекомендации наших экспертов.' },
 ]
 
-// --- Начало изменений ---
-// Ref для хранения значения активного пункта меню (соответствует 'value' на NavigationMenuItem)
+// Данные для поиска
+const searchSuggestions = [
+  { title: 'Популярные запросы', icon: TrendingUp, items: ['футболки', 'джинсы', 'кроссовки', 'куртки'] },
+  { title: 'Недавние поиски', icon: Clock, items: ['платья', 'шорты', 'рюкзаки'] },
+  { title: 'Рекомендуемые категории', icon: Star, items: ['Спортивная одежда', 'Школьная форма', 'Праздничные наряды'] },
+]
+
+// Ref для хранения значения активного пункта меню
 const activeMenuValue = ref<string | undefined>()
 
 // Вычисляемое свойство для определения, должен ли overlay быть видимым
 const isOverlayVisible = computed(() => !!activeMenuValue.value)
 
-// Функция для закрытия меню и overlay (например, при клике на overlay)
+// Функция для закрытия меню и overlay
 const closeMenu = () => {
   activeMenuValue.value = undefined
 }
-// --- Конец изменений ---
 </script>
 
 <template>
-  <div> <!-- Обертка, чтобы overlay был относительно чего-то, если нужно -->
-    <!-- 
-      Добавляем v-model="activeMenuValue"
-      Добавляем `relative` и `z-index` для NavigationMenu, чтобы он был выше overlay.
-      Компоненты NavigationMenuContent обычно имеют свой высокий z-index (например, 50)
-    -->
-    <NavigationMenu v-model="activeMenuValue" class="relative z-[50]">
-      <NavigationMenuList>
-        <!-- Пункт меню Акции с выпадающим подменю -->
-        <!-- Добавляем `value` к NavigationMenuItem -->
+  <div class="flex">
+    <!-- Растягиваем NavigationMenu на всю ширину контейнера -->
+    <NavigationMenu v-model="activeMenuValue" class="relative z-[50] w-full max-w-full">
+      <!-- Добавляем flex и justify-between для растягивания элементов -->
+      <NavigationMenuList class="flex w-full items-center space-x-1">
+        
+        <!-- Поиск как элемент NavigationMenu -->
+        <NavigationMenuItem value="search" class="flex-1">
+          <NavigationMenuTrigger class="w-full justify-start bg-background border border-input hover:bg-accent hover:text-accent-foreground p-0 h-10">
+            <div class="relative w-full items-center flex">
+              <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+                <Search class="size-4 text-muted-foreground" />
+              </span>
+              <span class="pl-10 pr-4 text-sm text-muted-foreground w-full text-left">
+                Поиск товаров...
+              </span>
+            </div>
+          </NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div class="min-w-screen p-4">
+              <!-- Поле ввода в выпадающем меню -->
+              <div class="relative mb-4 w-1/2">
+                <Input 
+                  id="search-input" 
+                  type="text" 
+                  placeholder="Введите запрос для поиска..." 
+                  class="pl-10" 
+                  autofocus
+                />
+                <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+                  <Search class="size-4 text-muted-foreground" />
+                </span>
+              </div>
+              
+              <!-- Секции с предложениями -->
+              <div class="space-y-4">
+                <div v-for="section in searchSuggestions" :key="section.title">
+                  <div class="flex items-center gap-2 mb-2">
+                    <component :is="section.icon" class="size-4 text-muted-foreground" />
+                    <h4 class="text-sm font-medium">{{ section.title }}</h4>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div v-for="item in section.items" :key="item" 
+                         class="block select-none rounded-md p-2 text-sm leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">
+                      {{ item }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <!-- Остальные пункты меню -->
         <NavigationMenuItem value="stocks">
-          <NavigationMenuTrigger><nuxt-link to="/stocks">Акции</nuxt-link></NavigationMenuTrigger>
+          <NavigationMenuTrigger>
+            <nuxt-link to="/stocks">Акции</nuxt-link>
+          </NavigationMenuTrigger>
           <NavigationMenuContent>
             <div class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
               <div v-for="item in stockItems" :key="item.title" class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
@@ -97,8 +150,6 @@ const closeMenu = () => {
           </NavigationMenuContent>
         </NavigationMenuItem>
 
-        <!-- Пункт меню Новинки с выпадающим подменю -->
-        <!-- Добавляем `value` к NavigationMenuItem -->
         <NavigationMenuItem value="new-items">
           <NavigationMenuTrigger>Новинки</NavigationMenuTrigger>
           <NavigationMenuContent>
@@ -113,10 +164,8 @@ const closeMenu = () => {
           </NavigationMenuContent>
         </NavigationMenuItem>
 
-        <!-- Пункт меню Documentation с выпадающим подменю компонентов -->
-        <!-- Добавляем `value` к NavigationMenuItem -->
-        <NavigationMenuItem value="documentation">
-          <NavigationMenuTrigger>Documentation</NavigationMenuTrigger>
+        <NavigationMenuItem value="boys">
+          <NavigationMenuTrigger>Мальчикам</NavigationMenuTrigger>
           <NavigationMenuContent>
             <div class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
               <div v-for="component in components" :key="component.title" class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
@@ -129,21 +178,55 @@ const closeMenu = () => {
           </NavigationMenuContent>
         </NavigationMenuItem>
 
-        <!-- Простая ссылка без выпадающего меню -->
-        <NavigationMenuItem>
-          <NavigationMenuLink :class="navigationMenuTriggerStyle()" href="/about">
-            О нас
-          </NavigationMenuLink>
+        <NavigationMenuItem value="girls">
+          <NavigationMenuTrigger>Девочкам</NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+              <div v-for="component in components" :key="component.title" class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
+                <nuxt-link :to="component.href" class="text-sm font-medium leading-none">{{ component.title }}</nuxt-link>
+                <p class="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                  {{ component.description }}
+                </p>
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem value="kiddy">
+          <NavigationMenuTrigger>Малышам</NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+              <div v-for="component in components" :key="component.title" class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
+                <nuxt-link :to="component.href" class="text-sm font-medium leading-none">{{ component.title }}</nuxt-link>
+                <p class="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                  {{ component.description }}
+                </p>
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem value="holydays">
+          <NavigationMenuTrigger>Отдых</NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+              <div v-for="component in components" :key="component.title" class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
+                <nuxt-link :to="component.href" class="text-sm font-medium leading-none">{{ component.title }}</nuxt-link>
+                <p class="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                  {{ component.description }}
+                </p>
+              </div>
+            </div>
+          </NavigationMenuContent>
         </NavigationMenuItem>
       </NavigationMenuList>
     </NavigationMenu>
 
-    <!-- --- Начало изменений: Overlay --- -->
+    <!-- Overlay -->
     <div
       v-if="isOverlayVisible"
       class="fixed inset-0 bg-black/50 z-[40] transition-opacity duration-200"
       @click="closeMenu" 
     />
-    <!-- --- Конец изменений: Overlay --- -->
   </div>
 </template>
