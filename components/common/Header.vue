@@ -5,7 +5,10 @@ const { handleAuthGoogle } = useAuth();
 </script>
 <template>
   <header class="header">
-    <CommonHeaderTop />
+    <div class="app-container">
+          <CommonHeaderTop />
     <CommonHeaderBottom />
+    <CommonTabBar />
+    </div>
   </header>
 </template>
