@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue' // Убедитесь, что watch импортирован
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -7,12 +7,14 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-  navigationMenuTriggerStyle
+  // navigationMenuTriggerStyle // Не используется для поиска
 } from '@/components/ui/navigation-menu'
+
 import { Search, Clock, TrendingUp, Star } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover' // Используем Popover для поиска
 
-// Данные для компонентов
+// Данные для компонентов (пример, возможно, для "Мальчикам", "Девочкам" и т.д.)
 const components = [
   {
     title: 'Alert Dialog',
@@ -67,72 +69,99 @@ const searchSuggestions = [
   { title: 'Рекомендуемые категории', icon: Star, items: ['Спортивная одежда', 'Школьная форма', 'Праздничные наряды'] },
 ]
 
-// Ref для хранения значения активного пункта меню
+// Ref для хранения значения активного пункта меню NavigationMenu
 const activeMenuValue = ref<string | undefined>()
 
-// Вычисляемое свойство для определения, должен ли overlay быть видимым
-const isOverlayVisible = computed(() => !!activeMenuValue.value)
+// Ref для хранения состояния открытия/закрытия поиска
+const isSearchOpen = ref(false)
 
-// Функция для закрытия меню и overlay
-const closeMenu = () => {
-  activeMenuValue.value = undefined
+// Вычисляемое свойство для определения, должен ли overlay быть видимым
+const isOverlayVisible = computed(() => !!activeMenuValue.value || isSearchOpen.value)
+
+// Функция для закрытия всех меню и overlay
+const closeAllMenus = () => {
+  activeMenuValue.value = undefined // Закрывает NavigationMenu
+  isSearchOpen.value = false       // Закрывает поиск
 }
+
+// Функция для открытия/закрытия поиска
+const toggleSearch = () => {
+  // При открытии поиска, закрываем NavigationMenu, если оно открыто
+  if (!isSearchOpen.value) { // Если поиск собирается открыться
+    activeMenuValue.value = undefined // Закрываем любое открытое меню NavigationMenu
+  }
+  isSearchOpen.value = !isSearchOpen.value
+}
+
+// Слушатель для закрытия поиска, когда NavigationMenu открывается
+// Это нужно, чтобы при наведении на "Акции" (когда поиск открыт), поиск закрывался
+watch(activeMenuValue, (newValue) => {
+  if (newValue !== undefined && isSearchOpen.value) {
+    isSearchOpen.value = false
+  }
+})
+
 </script>
 
 <template>
   <div class="flex">
-    <!-- Растягиваем NavigationMenu на всю ширину контейнера -->
-    <NavigationMenu v-model="activeMenuValue" class="relative z-[50] w-full max-w-full">
-      <!-- Добавляем flex и justify-between для растягивания элементов -->
-      <NavigationMenuList class="flex w-full items-center space-x-1">
+    <!-- Отдельный компонент для поиска (PopOver) -->
+    <!-- z-index для поиска должен быть выше, чем у оверлея, но равен z-index NavigationMenu -->
+    <Popover v-model:open="isSearchOpen">
+      <PopoverTrigger as-child>
+        <button
+          class="flex-1 w-full justify-start bg-background border border-input hover:bg-accent hover:text-accent-foreground p-0 h-10 rounded-md px-4 relative z-[50] mr-1"
+        >
+          <div class="relative w-full items-center flex">
+            <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+              <Search class="size-4 text-muted-foreground" />
+            </span>
+            <span class="pl-10 pr-4 text-sm text-muted-foreground w-full text-left">
+              Поиск товаров...
+            </span>
+          </div>
+        </button>
+      </PopoverTrigger>
+      <!-- ИСПРАВЛЕНО: УБРАНЫ absolute left-0 w-full И min-w-screen -->
+      <!-- PopoverContent сам позиционируется. Задайте нужную ширину через w-[...] -->
+      <PopoverContent class="p-4 min-w-screen"> <!-- Пример ширины, можно настроить -->
+        <!-- Поле ввода в выпадающем меню -->
+         <div class="w-full app-container">
+        <div class="relative mb-4">
+          <Input 
+            id="search-input" 
+            type="text" 
+            placeholder="Введите запрос для поиска..." 
+            class="pl-10" 
+            autofocus
+          />
+          <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+            <Search class="size-4 text-muted-foreground" />
+          </span>
+        </div>
         
-        <!-- Поиск как элемент NavigationMenu -->
-        <NavigationMenuItem value="search" class="flex-1">
-          <NavigationMenuTrigger class="w-full justify-start bg-background border border-input hover:bg-accent hover:text-accent-foreground p-0 h-10">
-            <div class="relative w-full items-center flex">
-              <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
-                <Search class="size-4 text-muted-foreground" />
-              </span>
-              <span class="pl-10 pr-4 text-sm text-muted-foreground w-full text-left">
-                Поиск товаров...
-              </span>
+        <!-- Секции с предложениями -->
+        <div class="space-y-4">
+          <div v-for="section in searchSuggestions" :key="section.title">
+            <div class="flex items-center gap-2 mb-2">
+              <component :is="section.icon" class="size-4 text-muted-foreground" />
+              <h4 class="text-sm font-medium">{{ section.title }}</h4>
             </div>
-          </NavigationMenuTrigger>
-          <NavigationMenuContent>
-            <div class="min-w-screen p-4">
-              <!-- Поле ввода в выпадающем меню -->
-              <div class="relative mb-4 w-1/2">
-                <Input 
-                  id="search-input" 
-                  type="text" 
-                  placeholder="Введите запрос для поиска..." 
-                  class="pl-10" 
-                  autofocus
-                />
-                <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
-                  <Search class="size-4 text-muted-foreground" />
-                </span>
-              </div>
-              
-              <!-- Секции с предложениями -->
-              <div class="space-y-4">
-                <div v-for="section in searchSuggestions" :key="section.title">
-                  <div class="flex items-center gap-2 mb-2">
-                    <component :is="section.icon" class="size-4 text-muted-foreground" />
-                    <h4 class="text-sm font-medium">{{ section.title }}</h4>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div v-for="item in section.items" :key="item" 
-                         class="block select-none rounded-md p-2 text-sm leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">
-                      {{ item }}
-                    </div>
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div v-for="item in section.items" :key="item" 
+                   class="block select-none rounded-md p-2 text-sm leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">
+                {{ item }}
               </div>
             </div>
-          </NavigationMenuContent>
-        </NavigationMenuItem>
+          </div>
+        </div>
+        </div>
+      </PopoverContent>
+    </Popover>
 
+    <!-- NavigationMenu для остальных пунктов (работает по наведению) -->
+    <NavigationMenu v-model="activeMenuValue" class="relative z-[50] max-w-full">
+      <NavigationMenuList class="flex w-full items-center space-x-1">
         <!-- Остальные пункты меню -->
         <NavigationMenuItem value="stocks">
           <NavigationMenuTrigger>
@@ -226,7 +255,7 @@ const closeMenu = () => {
     <div
       v-if="isOverlayVisible"
       class="fixed inset-0 bg-black/50 z-[40] transition-opacity duration-200"
-      @click="closeMenu" 
+      @click="closeAllMenus" 
     />
   </div>
 </template>

@@ -15,9 +15,8 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <CommonHeader />
+  <CommonHeader/>
   <main class="app-container">
-    <CommonTabBar />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
