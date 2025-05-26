@@ -1,8 +1,8 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div class="bg-gray-200 app-container z-[50] relative">
-    <nav class="flex justify-between">
+  <div class="bg-gray-200">
+    <nav class="flex justify-between app-container">
       <div>
         <ul class="flex gap-4">
           <li>Оплата и доставка</li>

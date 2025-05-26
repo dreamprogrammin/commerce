@@ -7,6 +7,7 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   NavigationMenuViewport,
+  navigationMenuTriggerStyle
 } from "@/components/ui/navigation-menu";
 
 import { Search, Clock, TrendingUp, Star } from "lucide-vue-next";
@@ -187,7 +188,7 @@ defineExpose({ closeAllPopups });
       </PopoverTrigger>
       <!-- ИСПРАВЛЕНО: УБРАНЫ absolute left-0 w-full И min-w-screen -->
       <!-- PopoverContent сам позиционируется. Задайте нужную ширину через w-[...] -->
-      <PopoverContent class="p-4 min-w-screen">
+      <PopoverContent class="p-4 min-w-screen rounded-b-md">
         <!-- Пример ширины, можно настроить -->
         <!-- Поле ввода в выпадающем меню -->
         <div class="w-full app-container">
@@ -234,75 +235,30 @@ defineExpose({ closeAllPopups });
     <!-- NavigationMenu для остальных пунктов (работает по наведению) -->
     <NavigationMenu
       v-model="activeMenuValue"
-      class="relative max-w-full"
+      class="static"
       :delay-duration="100"
     >
       <NavigationMenuList class="flex w-full items-center space-x-1">
         <!-- Остальные пункты меню -->
         <NavigationMenuItem value="stocks">
-          <NavigationMenuTrigger>
-            <nuxt-link to="/stocks">Акции</nuxt-link>
-          </NavigationMenuTrigger>
-          <NavigationMenuContent>
-            <div
-              class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
-            >
-              <div
-                v-for="item in stockItems"
-                :key="item.title"
-                class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <nuxt-link
-                  :to="item.href"
-                  class="text-sm font-medium leading-none"
-                  >{{ item.title }}</nuxt-link
-                >
-                <p
-                  class="line-clamp-2 text-sm leading-snug text-muted-foreground"
-                >
-                  {{ item.description }}
-                </p>
-              </div>
-            </div>
-          </NavigationMenuContent>
+            <nuxt-link to="/stocks" :class="navigationMenuTriggerStyle()">Акции</nuxt-link>
         </NavigationMenuItem>
 
         <NavigationMenuItem value="new-items">
-          <NavigationMenuTrigger>Новинки</NavigationMenuTrigger>
-          <NavigationMenuContent>
-            <div
-              class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
-            >
-              <div
-                v-for="item in newItems"
-                :key="item.title"
-                class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <nuxt-link
-                  :to="item.href"
-                  class="text-sm font-medium leading-none"
-                  >{{ item.title }}</nuxt-link
-                >
-                <p
-                  class="line-clamp-2 text-sm leading-snug text-muted-foreground"
-                >
-                  {{ item.description }}
-                </p>
-              </div>
-            </div>
-          </NavigationMenuContent>
+        <nuxt-link to="/new" :class="navigationMenuTriggerStyle()">Новинки</nuxt-link>
         </NavigationMenuItem>
 
         <NavigationMenuItem value="boys">
           <NavigationMenuTrigger>Мальчикам</NavigationMenuTrigger>
           <NavigationMenuContent>
             <div
-              class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
+              class="min-w-screen"
             >
+            <div class="w-full app-container grid gap-3 md:grid-cols-2">
               <div
                 v-for="component in components"
                 :key="component.title"
-                class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                class="block select-none space-y-1 rounded-md py-4 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
               >
                 <nuxt-link
                   :to="component.href"
@@ -315,6 +271,7 @@ defineExpose({ closeAllPopups });
                   {{ component.description }}
                 </p>
               </div>
+            </div>
             </div>
           </NavigationMenuContent>
         </NavigationMenuItem>
@@ -347,6 +304,32 @@ defineExpose({ closeAllPopups });
 
         <NavigationMenuItem value="kiddy">
           <NavigationMenuTrigger>Малышам</NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div
+              class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
+            >
+              <div
+                v-for="component in components"
+                :key="component.title"
+                class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              >
+                <nuxt-link
+                  :to="component.href"
+                  class="text-sm font-medium leading-none"
+                  >{{ component.title }}</nuxt-link
+                >
+                <p
+                  class="line-clamp-2 text-sm leading-snug text-muted-foreground"
+                >
+                  {{ component.description }}
+                </p>
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem value="holydays">
+          <NavigationMenuTrigger>Игры</NavigationMenuTrigger>
           <NavigationMenuContent>
             <div
               class="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
