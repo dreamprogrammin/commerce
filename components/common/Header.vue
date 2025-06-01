@@ -10,8 +10,8 @@ const hideHeaderOverlay = (): void => {
 };
 
 provide("headerOverlay", {
-  showOverlay: showHeaderOverlay(),
-  hideOverlay: hideHeaderOverlay(),
+  showOverlay: showHeaderOverlay,
+  hideOverlay: hideHeaderOverlay,
   isVisible: readonly(isHeaderOverlayVisible),
 });
 
@@ -26,11 +26,10 @@ const handleOverlayClick = () => {
       <CommonHeaderBottom />
       <CommonTabBar />
     </div>
-
-    <div
+  </header>
+      <div
       v-if="isHeaderOverlayVisible"
       class="fixed inset-0 bg-black/50 z-[40] transition-opacity duration-200"
       @click="handleOverlayClick"
     />
-  </header>
 </template>

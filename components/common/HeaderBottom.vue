@@ -1,5 +1,5 @@
 <template>
-  <div class="flex justify-between z-[50] relative">
+  <div class="flex justify-between">
     <div>
       <nuxt-link to="/">Logo</nuxt-link>
     </div>
