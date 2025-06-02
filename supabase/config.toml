@@ -250,7 +250,7 @@ redirect_uri = ""
 url = ""
 # If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
 skip_nonce_check = false
-
+#гугл секреты
 [auth.external.google]
 enabled = true
 client_id = "env(GOOGLE_CLIENT_ID_LOCAL)"
