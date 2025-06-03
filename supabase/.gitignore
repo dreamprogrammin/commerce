@@ -2,6 +2,7 @@
 .branches
 .temp
 
+#env
 # dotenvx
 .env
 .env.keys
