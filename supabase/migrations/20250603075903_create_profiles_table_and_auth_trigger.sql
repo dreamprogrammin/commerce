@@ -160,4 +160,4 @@ CREATE POLICY "Admins can update any profile"
 -- CREATE POLICY "Admins can delete any profile"
 --     ON public.profiles
 --     FOR DELETE
---     USING ( public.current_user_has_role_internal('admin') );
+--     USING ( public.current_user_has_role_internal('admin') ); да
