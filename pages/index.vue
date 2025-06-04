@@ -6,7 +6,7 @@ const profileStore = useProfileStore();
 </script>
 
 <template>
-  <h1>Добро пожаловать</h1>
+  <h1>Добро пожаловать в наш магазин</h1>
   <ClientOnly>
     <div v-if="user">
       <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
