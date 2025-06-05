@@ -9,6 +9,13 @@ definePageMeta({
   layout: "profile",
 });
 const modalStore = useModalStore();
+onMounted(async () => {
+  if (user.value) { // <--- Вызывайте loadProfile ТОЛЬКО если пользователь есть
+    console.log('профайл загружается')
+    await profileStore.loadProfile();
+    console.log('профайл загружен')
+  }
+});
 </script>
 <template>
   <h1>Добро пожаловать на страницу профайла и настройки</h1>
