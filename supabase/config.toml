@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "hlmpumstxgszlpdodjhc"
+project_id = "gvsdevsvzgcivpphcuai"
 
 [api]
 enabled = true
@@ -105,9 +105,9 @@ file_size_limit = "50MiB"
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "env(SUPABASE_AUTH_SITE_URL, https://commerce-eta-wheat.vercel.app/)"
+site_url = "env(SUPABASE_AUTH_SITE_URL,http://localhost:3000)"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:3000", "http://localhost:3000/**", "http://127.0.0.1:3000", "http://127.0.0.1:3000/**", "https://commerce-eta-wheat.vercel.app/", "https://commerce-eta-wheat.vercel.app/**"]
+additional_redirect_urls = ["https://127.0.0.1:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # If disabled, the refresh token will never expire.
@@ -257,7 +257,7 @@ skip_nonce_check = false
 [auth.external.google]
 enabled = true # <--- УБЕДИТЕСЬ, ЧТО ЭТО true
 client_id = "env(GOOGLE_CLIENT_ID)" # Используйте переменную окружения
-secret = "env(GOOGLE_CLIENT_SECRET)" 
+secret = "env(GOOGLE_CLIENT_SECRET)"
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]
