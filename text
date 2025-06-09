@@ -1,0 +1,4 @@
+WITH CHECK (
+  auth.uid() = id AND
+  (NOT (NEW.role IS DISTINCT FROM OLD.role) OR public.current_user_has_role_internal('admin'))
+)
