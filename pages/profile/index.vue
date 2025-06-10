@@ -10,10 +10,8 @@ definePageMeta({
 });
 const modalStore = useModalStore();
 onMounted(async () => {
-  if (user.value) { // <--- Вызывайте loadProfile ТОЛЬКО если пользователь есть
-    console.log('профайл загружается')
+  if (user.value) { 
     await profileStore.loadProfile();
-    console.log('профайл загружен')
   }
 });
 </script>
