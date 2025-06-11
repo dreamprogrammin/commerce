@@ -46,3 +46,8 @@ export interface MenuItem {
 export type MenuItemCreate = Omit<MenuItem, 'id' | 'created_at' | 'updated_at'>;
 
 export type MenuItemUpdate = Partial<MenuItemCreate>;
+
+export interface IHandlerSupabaseErrorOptions {
+  operationName: string
+  fallbackMessage?: string
+}
