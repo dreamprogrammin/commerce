@@ -10,6 +10,7 @@ export const useMenuItems = defineStore('menu-items', () => {
     //state
     const menuItems = ref<MenuItemRow[]>([])
     const isLoading = ref(false)
+    const error = ref<string | null>(null)
     
     //getter
     const parentSlugOptions = computed(() => {
@@ -37,12 +38,29 @@ export const useMenuItems = defineStore('menu-items', () => {
 
     async function fetchItems() {
         isLoading.value = true
+        error.value = null
         try {
-            const {data, error : fetchError} = await supabase.from('menu_items').select('*').order('parent_slug', {nullsFirst : true}).order('display_order', {nullsFirst: true})
+            const {data, error : fetchError} = await supabase
+            .from('menu_items')
+            .select('*')
+            .order('parent_slug', {nullsFirst : true})
+            .order('display_order', {nullsFirst: true})
 
             if (fetchError) throw fetchError
 
             menuItems.value = data || []
+        } catch (e) {
+            error.value = handleSupabaseError(e, {operationName : 'Ошибка при загрузке'})          
+        } finally {
+            isLoading.value = false
+        }
+    }
+
+    async function addItem(newItem : MenuItemInsert) {
+        isLoading.value = true
+        error.value = null
+        try {
+            
         } catch (error) {
             
         } finally {
