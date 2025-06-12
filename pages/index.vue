@@ -10,7 +10,6 @@ const profileStore = useProfileStore();
   <ClientOnly>
     <div v-if="user">
       <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
-
     </div>
 
     <div v-else>

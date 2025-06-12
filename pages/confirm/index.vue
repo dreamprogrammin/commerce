@@ -7,12 +7,12 @@ watch(
   () => {
     if (user.value) {
       isLoading.value = false;
-      return navigateTo('/dashboard');
+      return navigateTo("/dashboard");
     }
   },
   {
-    immediate: true
-  }
+    immediate: true,
+  },
 );
 </script>
 <template>

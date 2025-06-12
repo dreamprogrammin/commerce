@@ -34,7 +34,7 @@ export interface MenuItem {
   title: string;
   href: string | null;
   description: string | null;
-  item_type: 'link' | 'trigger' | 'trigger_and_link';
+  item_type: "link" | "trigger" | "trigger_and_link";
   parent_slug: string | null;
   display_order: number;
   image_url: string | null;
@@ -43,11 +43,19 @@ export interface MenuItem {
   updated_at: string;
 }
 
-export type MenuItemCreate = Omit<MenuItem, 'id' | 'created_at' | 'updated_at'>;
+export type MenuItemCreate = Omit<MenuItem, "id" | "created_at" | "updated_at">;
 
 export type MenuItemUpdate = Partial<MenuItemCreate>;
 
 export interface IHandlerSupabaseErrorOptions {
-  operationName: string
-  fallbackMessage?: string
+  operationName: string;
+  fallbackMessage?: string;
+}
+
+export interface IUploadFileOptions  {
+  bucketName: string
+  filePathPrefix?: string
+  upsert?: boolean
+  cashControl?: string
+  contentType?: string 
 }
