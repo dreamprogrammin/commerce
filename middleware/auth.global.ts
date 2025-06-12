@@ -3,7 +3,7 @@ import { useModalStore } from "~/stores/modal/useModalStore";
 export default defineNuxtRouteMiddleware((to, _from) => {
   const user = useSupabaseUser();
   const modalStore = useModalStore();
-  const dashboard = '/dashboard'
+  const dashboard = "/dashboard";
   const profilePath = [
     "/profile/bonus",
     "/profile/favorites",

@@ -2,14 +2,8 @@
   "[typescript]": {
     "editor.defaultFormatter": "denoland.vscode-deno"
   },
-  "cSpell.words": [
-    "lastname",
-    "Nuxt",
-    "supabase"
-  ],
-  "deno.enablePaths": [
-    "supabase/functions"
-  ],
+  "cSpell.words": ["lastname", "Nuxt", "sonner", "supabase", "uuidv"],
+  "deno.enablePaths": ["supabase/functions"],
   "deno.lint": true,
   "deno.unstable": [
     "bare-node-builtins",

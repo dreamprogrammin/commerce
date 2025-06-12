@@ -39,5 +39,4 @@ const isOpen = computed({
     </DialogContent>
   </Dialog>
 </template>
-<style>
-</style>
+<style></style>

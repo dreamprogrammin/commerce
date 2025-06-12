@@ -1,1 +1,1 @@
-export const BUCKET_NAME = 'menu-items-image'
+export const BUCKET_NAME = "menu-items-image";

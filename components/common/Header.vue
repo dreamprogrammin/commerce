@@ -27,9 +27,9 @@ const handleOverlayClick = () => {
       <CommonTabBar />
     </div>
   </header>
-      <div
-      v-if="isHeaderOverlayVisible"
-      class="fixed inset-0 bg-black/50 z-[40] transition-opacity duration-200"
-      @click="handleOverlayClick"
-    />
+  <div
+    v-if="isHeaderOverlayVisible"
+    class="fixed inset-0 bg-black/50 z-[40] transition-opacity duration-200"
+    @click="handleOverlayClick"
+  />
 </template>

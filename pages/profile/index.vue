@@ -10,7 +10,7 @@ definePageMeta({
 });
 const modalStore = useModalStore();
 onMounted(async () => {
-  if (user.value) { 
+  if (user.value) {
     await profileStore.loadProfile();
   }
 });

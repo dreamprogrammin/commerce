@@ -4,8 +4,6 @@ const email = ref("");
 const password = ref("");
 
 const authStore = useAuthStore();
-
-
 </script>
 <template>
   <div>
