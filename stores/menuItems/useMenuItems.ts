@@ -1,11 +1,7 @@
 import { toast } from "vue-sonner";
 import { BUCKET_NAME } from "~/constants";
-import type { Database } from "~/types";
+import type { Database, MenuItemRow, MenuItemInsert, MenuItemUpdate } from "~/types";
 import { handleSupabaseError } from "~/utils/supabaseErrorHandler";
-
-type MenuItemRow = Database["public"]["Tables"]["menu_items"]["Row"];
-type MenuItemInsert = Database["public"]["Tables"]["menu_items"]["Insert"];
-type MenuItemUpdate = Database["public"]["Tables"]["menu_items"]["Update"];
 
 export const useMenuItems = defineStore("menu-items", () => {
   const supabase = useSupabaseClient<Database>();

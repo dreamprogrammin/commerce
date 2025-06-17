@@ -1,12 +1,8 @@
 import { useMenuItems } from "~/stores/menuItems/useMenuItems";
-import type { Database } from "~/types";
+import type { Database, MenuItemRow, MenuItemInsert, MenuItemUpdate } from "~/types";
 import { useSupabaseStorage } from "./useSupabaseStorage";
 import { BUCKET_NAME } from "~/constants";
 import { toast } from "vue-sonner";
-
-type MenuItemRow = Database['public']['Tables']['menu_items']['Row']
-type MenuItemInsert = Database['public']['Tables']['menu_items']['Insert']
-type MenuItemUpdate = Database['public']['Tables']['menu_items']['Update']
 
 type MenuItemFormData = Omit<Partial<MenuItemRow>, 'created_id' | 'updated_id'>
 

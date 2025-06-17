@@ -45,7 +45,7 @@ export interface MenuItem {
 
 export type MenuItemCreate = Omit<MenuItem, "id" | "created_at" | "updated_at">;
 
-export type MenuItemUpdate = Partial<MenuItemCreate>;
+export type MenuItemUpdate1 = Partial<MenuItemCreate>;
 
 export interface IHandlerSupabaseErrorOptions {
   operationName: string;
@@ -59,3 +59,7 @@ export interface IUploadFileOptions  {
   cashControl?: string
   contentType?: string 
 }
+
+export type MenuItemRow = Database["public"]["Tables"]["menu_items"]["Row"];
+export type MenuItemInsert = Database["public"]["Tables"]["menu_items"]["Insert"];
+export type MenuItemUpdate = Database["public"]["Tables"]["menu_items"]["Update"];
