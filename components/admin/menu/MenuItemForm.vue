@@ -146,11 +146,11 @@ function onCancelClick() {
       <Input
         id="form-display_order"
         type="number"
-        v-model.number="form.display_order"
+        v-model="form.display_order"
       />
     </div>
 
-    <div>
+    <!-- <div>
       <Label
         for="form-icon_name"
         class="block text-sm font-medium text-foreground mb-1"
@@ -161,7 +161,7 @@ function onCancelClick() {
         v-model="formIconName"
         placeholder="например, 'home', 'settings'"
       />
-    </div>
+    </div> -->
 
     <div>
       <Label
@@ -216,11 +216,11 @@ function onCancelClick() {
 
     <div class="flex items-center gap-3 pt-4">
       <Button type="submit" :disabled="isProcessing">
-        <Icon
+        <!-- <Icon
           v-if="isProcessing"
           name="svg-spinners:ring-resize"
           class="mr-2 h-4 w-4"
-        />
+        /> -->
         {{
           isProcessing
             ? "Обработка..."
