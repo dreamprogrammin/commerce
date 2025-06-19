@@ -53,15 +53,18 @@ const formIconName = computed({
 const menuItemsStore = useMenuItems();
 
 async function onFormSubmit() {
+  console.log('gu')
   const success = await submitForm();
   if (success) {
     emit("form-saved");
+    console.log('click')
   }
 }
 
 function onCancelClick() {
   resetFormFields();
   emit("form-cancel");
+  console.log('click')
 }
 </script>
 <template>
@@ -84,6 +87,7 @@ function onCancelClick() {
         >Заголовок *</Label
       >
       <Input id="form-title" v-model="form.title" required />
+      {{ form.title }}
     </div>
 
     <div>
@@ -150,7 +154,7 @@ function onCancelClick() {
       />
     </div>
 
-    <!-- <div>
+    <div>
       <Label
         for="form-icon_name"
         class="block text-sm font-medium text-foreground mb-1"
@@ -161,7 +165,7 @@ function onCancelClick() {
         v-model="formIconName"
         placeholder="например, 'home', 'settings'"
       />
-    </div> -->
+    </div>
 
     <div>
       <Label
