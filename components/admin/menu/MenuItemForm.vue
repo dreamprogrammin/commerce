@@ -53,18 +53,18 @@ const formIconName = computed({
 const menuItemsStore = useMenuItems();
 
 async function onFormSubmit() {
-  console.log('gu')
+  console.log("gu");
   const success = await submitForm();
   if (success) {
     emit("form-saved");
-    console.log('click')
+    console.log("click");
   }
 }
 
 function onCancelClick() {
   resetFormFields();
   emit("form-cancel");
-  console.log('click')
+  console.log("click");
 }
 </script>
 <template>
@@ -137,6 +137,28 @@ function onCancelClick() {
           <SelectItem value="trigger_and_link"
             >Ссылка и выпадающий список</SelectItem
           >
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div>
+      <Label
+        for="form-parent_slug"
+        class="block text-sm font-medium text-foreground mb-1"
+        >Родительский пункт</Label
+      >
+      <Select v-model="form.parent_slug">
+        <SelectTrigger id="form-parent_slug"
+          ><SelectValue placeholder="Выберите родителя..."
+        /></SelectTrigger>
+        <SelectContent>
+          <SelectItem
+            v-for="option in menuItemsStore.parentSlugOptions"
+            :key="option.value || 'null-parent-option'"
+            :value="option.value!"
+          >
+            {{ option.label }}
+          </SelectItem>
         </SelectContent>
       </Select>
     </div>

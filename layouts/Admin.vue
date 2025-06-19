@@ -7,10 +7,8 @@
         >
         <div>
           <!-- Ссылки на другие разделы админки -->
-          <NuxtLink to="/admin/menu" class="px-3 py-2 hover:text-primary"
-            >Меню</NuxtLink
-          >
-          <NuxtLink to="/admin/users" class="px-3 py-2 hover:text-primary"
+          <NuxtLink to="" class="px-3 py-2 hover:text-primary">Меню</NuxtLink>
+          <NuxtLink to="/" class="px-3 py-2 hover:text-primary"
             >Пользователи</NuxtLink
           >
           <!-- Кнопка выхода и т.д. -->
