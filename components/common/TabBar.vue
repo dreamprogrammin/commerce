@@ -17,6 +17,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useMenuItems } from "~/stores/menuItems/useMenuItems";
+import { useSupabaseStorage } from "~/composables/menuItems/useSupabaseStorage";
 
 const components = [
   {
@@ -161,6 +163,15 @@ const closeAllPopups = () => {
 };
 
 defineExpose({ closeAllPopups });
+
+const menuItemsStore = useMenuItems();
+
+const { getPublicUrl } = useSupabaseStorage();
+
+onMounted(async () => {
+  await menuItemsStore.fetchItems();
+  console.log(menuItemsStore.menuItems.length);
+});
 </script>
 
 <template>
@@ -232,14 +243,13 @@ defineExpose({ closeAllPopups });
       </PopoverContent>
     </Popover>
 
-    <!-- NavigationMenu для остальных пунктов (работает по наведению) -->
+    <!-- NavigationMenu для остальных пунктов (работает по наведению)
     <NavigationMenu
       v-model="activeMenuValue"
       class="static"
       :delay-duration="100"
     >
-      <NavigationMenuList class="flex w-full items-center space-x-1">
-        <!-- Остальные пункты меню -->
+      <!-- <NavigationMenuList class="flex w-full items-center space-x-1">
         <NavigationMenuItem value="stocks">
           <nuxt-link to="/stocks" :class="navigationMenuTriggerStyle()"
             >Акции</nuxt-link
@@ -381,6 +391,123 @@ defineExpose({ closeAllPopups });
             </div>
           </NavigationMenuContent>
         </NavigationMenuItem>
+      </NavigationMenuList>
+    </NavigationMenu> -->
+    <NavigationMenu
+      v-if="!menuItemsStore.isLoading || menuItemsStore.menuItems.length > 0"
+      v-model="activeMenuValue"
+      class="static justify-start"
+      :delay-duration="100"
+    >
+      <NavigationMenuList
+        class="flex w-full items-center justify-start space-x-1"
+      >
+        <template v-for="item in menuItemsStore.topLevelItems" :key="item.slug">
+          <NavigationMenuItem
+            v-if="item.item_type === 'link'"
+            :value="item.slug"
+          >
+            <NuxtLink
+              :to="item.href || '#'"
+              :class="navigationMenuTriggerStyle()"
+              >{{ item.title }}</NuxtLink
+            >
+          </NavigationMenuItem>
+          <NavigationMenuItem
+            v-else-if="
+              item.item_type === 'trigger' &&
+              menuItemsStore.getChildren(item.slug).length > 0
+            "
+            :value="item.slug"
+          >
+            <NavigationMenuTrigger>
+              <component
+                v-if="item.icon_name"
+                :is="item.icon_name"
+                class="mr-2 h-4 w-4 inline-block"
+              />
+              {{ item.title }}
+              <!-- Можно добавить иконку стрелки вниз, если она не добавляется автоматически NavigationMenuTrigger -->
+              <!-- <ChevronDown class="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180" aria-hidden="true" /> -->
+            </NavigationMenuTrigger>
+            <NavigationMenuContent>
+              <div class="w-full app-container">
+                <ul
+                  :class="[
+                    'p-4 grid gap-3',
+                    menuItemsStore.getChildren(item.slug).length > 3
+                      ? 'md:grid-cols-2'
+                      : 'md:grid-cols-1',
+                    'min-w-[300px] md:min-w-[400px] lg:min-w-[500px]',
+                  ]"
+                >
+                  <li
+                    v-for="child in menuItemsStore.getChildren(item.slug)"
+                    :key="child.slug"
+                  >
+                    <NuxtLink
+                      :to="child.href || '#'"
+                      class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                      @click="activeMenuValue = undefined"
+                    >
+                      <div class="text-sm font-medium leading-none">
+                        {{ child.title }}
+                      </div>
+                      <p
+                        v-if="child.description"
+                        class="line-clamp-2 text-sm leading-snug text-muted-foreground"
+                      >
+                        {{ child.description }}
+                      </p>
+                    </NuxtLink>
+                  </li>
+                </ul>
+              </div>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
+          <NavigationMenuItem
+            v-else-if="
+              item.item_type === 'trigger_and_link' &&
+              menuItemsStore.getChildren(item.slug).length > 0
+            "
+            :value="item.slug"
+          >
+            <NavigationMenuTrigger>
+              <NuxtLink :to="item.href!" :class="navigationMenuTriggerStyle()">
+                {{ item.title }}
+              </NuxtLink>
+            </NavigationMenuTrigger>
+            <NavigationMenuContent>
+              <div class="min-w-screen">
+                <div class="w-full app-container grid gap-3 md:grid-cols-2">
+                  <ul
+                    :class="[
+                      'p-4 grid gap-3',
+                      menuItemsStore.getChildren(item.slug).length > 3
+                        ? 'md:grid-cols-2'
+                        : 'md:grid-cols-1',
+                    ]"
+                  >
+                    <li
+                      v-for="child in menuItemsStore.getChildren(item.slug)"
+                      :key="child.slug"
+                    >
+                      <NuxtLink
+                        :to="child.href || '#'"
+                        class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                        @click="activeMenuValue = undefined"
+                      >
+                        <div class="text-sm font-medium leading-none">
+                          {{ child.title }}
+                        </div>
+                      </NuxtLink>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
+        </template>
       </NavigationMenuList>
     </NavigationMenu>
   </div>
