@@ -111,7 +111,7 @@ export function useMenuItemFormData (initialSelectItem : Ref<MenuItemRow | null>
             return false
         }
 
-        if (initialSelectItem.value === null && form.value?.slug?.trim()) {
+        if (initialSelectItem.value === null && !form.value?.slug?.trim()) {
             toast.error('Ошибка валидации', {
                 description: 'Слаг обязателен для нового пункта!'
             })
