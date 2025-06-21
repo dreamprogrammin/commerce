@@ -501,8 +501,8 @@ onMounted(async () => {
                           {{ child.title }}
                         </div>
                       </NuxtLink>
-                      <ul v-if="menuItemsStore.getChildren(child.slug).length > 0">
-                        <li v-for="child3 in menuItemsStore.getChildren(child.slug)" :child3.slug>
+                      <ul v-if="(child.item_type === 'trigger' || child.item_type === 'trigger_and_link') && menuItemsStore.getChildren(child.slug).length > 0">
+                        <li v-for="child3 in menuItemsStore.getChildren(child.slug)" :key="child3.slug">
                             <NuxtLink
                         :to="child3.href || '#'"
                         class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
