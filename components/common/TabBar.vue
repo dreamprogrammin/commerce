@@ -501,7 +501,7 @@ onMounted(async () => {
                           {{ child.title }}
                         </div>
                       </NuxtLink>
-                      <ul>
+                      <ul v-if="menuItemsStore.getChildren(child.slug).length > 0">
                         <li v-for="child3 in menuItemsStore.getChildren(child.slug)" :child3.slug>
                             <NuxtLink
                         :to="child3.href || '#'"
