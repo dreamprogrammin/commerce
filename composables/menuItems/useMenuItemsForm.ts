@@ -1,10 +1,10 @@
 import { useMenuItems } from "~/stores/menuItems/useMenuItems";
-import type { Database, MenuItemRow, MenuItemInsert, MenuItemUpdate } from "~/types";
+import type { Database, MenuItemRow, MenuItemInsert, MenuItemUpdate, IEditableMenuItem } from "~/types";
 import { useSupabaseStorage } from "./useSupabaseStorage";
 import { BUCKET_NAME } from "~/constants";
 import { toast } from "vue-sonner";
+import {v4 as uuidv4} from 'uuid'
 
-type MenuItemFormData = Omit<Partial<MenuItemRow>, 'created_id' | 'updated_id'>
 
 export function useMenuItemFormData (initialSelectItem : Ref<MenuItemRow | null>) {
     const menuItemsStore = useMenuItems()
@@ -16,45 +16,52 @@ export function useMenuItemFormData (initialSelectItem : Ref<MenuItemRow | null>
         isUploading: isImageUploading 
     } = useSupabaseStorage()
 
-    const form = ref<MenuItemFormData>({})
+    const form = ref<IEditableMenuItem>({})
+    const childrenForms = ref<IEditableMenuItem[]>([])
     const imageFile = ref<File | null>(null)
     const imagePreviewUrl = ref<string | null>(null)
 
-    const isProcessing = computed(() => menuItemsStore.isLoading || isImageUploading.value)
+    const isProcessing = ref(false)
 
     watch(initialSelectItem, (item) => {
+        resetFormState()
         if (item) {
             form.value = {
-                id: item.id,
-                slug: item.slug,
-                title: item.title,
-                href: item.href,
-                description: item.description,
-                item_type: item.item_type,
-                parent_slug: item.parent_slug,
-                display_order: item.display_order,
-                image_url: item.image_url,
-                icon_name: item.icon_name
+                ...item,
+                _imagePreviewUrl: getStoragePublicUrl(BUCKET_NAME, item.image_url)
             }
-            imagePreviewUrl.value = getStoragePublicUrl(BUCKET_NAME, item.image_url)
+            const childrenFromStore = menuItemsStore.getChildren(item.slug)
+            childrenForms.value = childrenFromStore.map(children => ({
+                ...children,
+                _imagePreviewUrl: getStoragePublicUrl(BUCKET_NAME, children.image_url)
+            }))
         } else {
             form.value = {
-                id: undefined,
                 title: '',
                 slug: '',
                 item_type: 'link',
                 display_order: 0,
-                href: null,
-                description: null,
-                parent_slug: null,
-                image_url: null,
-                icon_name: null
+                _tempId:uuidv4()
             }
-            imagePreviewUrl.value = null
         }
-        imageFile.value = null
     }, {immediate: true, deep: true})
 
+    function resetFormState() {
+        form.value = {_tempId: uuidv4(), title: '', slug: '', item_type: 'link', display_order: 0}
+        childrenForms.value = []
+    }
+
+    function addChild() {
+        childrenForms.value.push({
+            _tempId: uuidv4(),
+            title: '',
+            slug: '',
+            item_type: 'link',
+            display_order: childrenForms.value.length,
+            parent_slug: form.value.slug
+        })
+    }
+//Продолжить дома
     function handleImageFileChange(event : Event) {
         const target = event.target as HTMLInputElement
 
