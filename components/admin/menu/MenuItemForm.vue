@@ -65,7 +65,7 @@ function onCancelClick() {
       <h2 class="text-xl font-semibold mb-1 text-foreground">
         {{
           selectedItem
-            ? `Редактирование: ${mainForm.title || selectedItem.title}`
+            ? `Редактирование: ${form.title || selectedItem.title}`
             : "Создание нового пункта меню"
         }}
       </h2>
@@ -75,13 +75,13 @@ function onCancelClick() {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
         <div>
           <Label for="main-title">Заголовок *</Label>
-          <Input id="main-title" v-model="mainForm.title" required />
+          <Input id="main-title" v-model="form.title" required />
         </div>
         <div>
           <Label for="main-slug">Слаг (уникальный, латиницей) *</Label>
           <Input
             id="main-slug"
-            v-model="mainForm.slug"
+            v-model="form.slug"
             required
             :disabled="!!selectedItem"
           />
@@ -93,13 +93,13 @@ function onCancelClick() {
           <Label for="main-href">Ссылка (URL)</Label>
           <Input
             id="main-href"
-            v-model="mainForm.href"
+            v-model="form.href"
             placeholder="/catalog/category"
           />
         </div>
         <div>
           <Label for="main-item_type">Тип пункта *</Label>
-          <Select v-model="mainForm.item_type" required>
+          <Select v-model="form.item_type" required>
             <SelectTrigger id="main-item_type"
               ><SelectValue placeholder="Выберите тип..."
             /></SelectTrigger>
@@ -118,7 +118,7 @@ function onCancelClick() {
           <Label for="main-parent_slug"
             >Родительский пункт (для этого пункта)</Label
           >
-          <Select v-model="mainForm.parent_slug">
+          <Select v-model="form.parent_slug">
             <SelectTrigger id="main-parent_slug"
               ><SelectValue placeholder="Выберите родителя..."
             /></SelectTrigger>
@@ -138,14 +138,14 @@ function onCancelClick() {
           <Input
             id="main-display_order"
             type="number"
-            v-model.number="mainForm.display_order"
+            v-model.number="form.display_order"
           />
         </div>
         <div>
           <Label for="main-icon_name">Имя иконки (Lucide)</Label>
           <Input
             id="main-icon_name"
-            v-model="mainForm.icon_name"
+            v-model="form.icon_name"
             placeholder="home, settings"
           />
         </div>
@@ -158,18 +158,16 @@ function onCancelClick() {
         <Input
           id="main-image"
           type="file"
-          @change="handleItemImageChange($event, mainForm)"
+          @change="handleItemImageChange($event, form)"
           accept="image/*"
         />
         <div
-          v-if="mainForm._imagePreviewUrl || mainForm.image_url"
+          v-if="form._imagePreviewUrl || form.image_url"
           class="mt-2 border p-2 rounded-md inline-block relative"
         >
           <p class="text-xs text-muted-foreground mb-1">Предпросмотр:</p>
           <img
-            :src="
-              mainForm._imagePreviewUrl || getPublicImageUrl(mainForm.image_url)
-            "
+            :src="form._imagePreviewUrl || getPublicImageUrl(form.image_url)"
             alt="Превью"
             class="max-w-[150px] max-h-[80px] object-contain rounded"
           />
