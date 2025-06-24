@@ -1,258 +1,350 @@
 <script setup lang="ts">
-import { useMenuItemFormData } from "~/composables/menuItems/useMenuItemsForm";
-import { useMenuItems } from "~/stores/menuItems/useMenuItems";
-import { Label } from "~/components/ui/label";
-import { Input } from "~/components/ui/input";
+import { toRef } from "vue";
+import type { Database } from "~/types/supabase";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
-} from "~/components/ui/select";
-import type { MenuItemRow } from "~/types";
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useMenuItemFormData } from "~/composables/menuItems/useMenuItemsForm";
+import { useMenuItems } from "~/stores/menuItems/useMenuItems";
+
+type MenuItemRow = Database["public"]["Tables"]["menu_items"]["Row"];
 
 const props = defineProps<{
   selectedItem: MenuItemRow | null;
 }>();
 
 const emit = defineEmits<{
-  (e: "form-saved"): null;
-  (e: "form-cancel"): null;
+  (e: "form-saved"): void;
+  (e: "form-cancel"): void;
 }>();
 
 const selectedItemRef = toRef(props, "selectedItem");
 
 const {
-  form,
-  imagePreviewUrl,
+  form, // ref<IEditableMenuItem>
+  childrenForms, // ref<IEditableMenuItem[]>
+  addChild,
+  removeChild,
   isProcessing,
-  handleImageFileChange,
-  removeCurrentImage,
+  handleItemChange,
+  removeItemImage,
   submitForm,
   resetFormFields,
+  getStoragePublicUrl,
 } = useMenuItemFormData(selectedItemRef);
 
-const formHref = computed({
-  get: () => form.value.href ?? "",
-  set: (val) => {
-    form.value.href = val === "" ? null : val;
-  },
-});
-
-const formDescription = computed({
-  get: () => form.value.description ?? "",
-  set: (val) => (form.value.description = val === "" ? null : val),
-});
-
-const formIconName = computed({
-  get: () => form.value.icon_name ?? "",
-  set: (val) => (form.value.icon_name = val === "" ? null : val),
-});
-
-const menuItemsStore = useMenuItems();
+const menuAdminStore = useMenuItems();
 
 async function onFormSubmit() {
-  console.log("gu");
   const success = await submitForm();
   if (success) {
     emit("form-saved");
-    console.log("click");
   }
 }
 
 function onCancelClick() {
-  resetFormFields();
+  resetFormFields(); // Это вызовет initialSelectedItem.value = null
   emit("form-cancel");
-  console.log("click");
 }
 </script>
+
 <template>
   <form
     @submit.prevent="onFormSubmit"
-    class="space-y-4 bg-card p-6 rounded-lg shadow-md"
+    class="space-y-6 bg-card p-6 rounded-lg shadow-md"
   >
-    <h2 class="text-xl font-semibold mb-4 text-foreground">
-      {{
-        selectedItem
-          ? `Редактирование : ${selectedItem.title}`
-          : `Создание нового пункта`
-      }}
-    </h2>
-
+    <!-- === Секция для основного пункта меню === -->
     <div>
-      <Label
-        for="form-title"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Заголовок *</Label
-      >
-      <Input id="form-title" v-model="form.title" required />
-      {{ form.title }}
-    </div>
-
-    <div>
-      <Label
-        for="form-slug"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Слаг (Уникальный, латиницей) *</Label
-      >
-      <Input
-        id="form-slug"
-        v-model="form.slug"
-        required
-        :disabled="!!selectedItem"
-      />
-      <p v-if="!!selectedItem" class="text-xs text-muted-foreground mt-1">
-        Слаг существующего элемента нельзя изменять
+      <h2 class="text-xl font-semibold mb-1 text-foreground">
+        {{
+          selectedItem
+            ? `Редактирование: ${form.title || selectedItem.title}`
+            : "Создание нового пункта меню"
+        }}
+      </h2>
+      <p class="text-sm text-muted-foreground mb-4">
+        Основная информация о пункте меню.
       </p>
-    </div>
-
-    <div>
-      <Label
-        for="form-href"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Ссылка (URL)</Label
-      >
-      <Input
-        id="form-href"
-        v-model="formHref"
-        required
-        placeholder="/например/категория"
-      />
-    </div>
-
-    <div>
-      <Label
-        for="form-item_type"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Тип пункта*</Label
-      >
-      <Select v-model="form.item_type" required>
-        <SelectTrigger id="form-item_type"
-          ><SelectValue placeholder="Выберите тип..."
-        /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="link">Ссылка</SelectItem>
-          <SelectItem value="trigger">Выпадающий список (не ссылка)</SelectItem>
-          <SelectItem value="trigger_and_link"
-            >Ссылка и выпадающий список</SelectItem
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+        <div>
+          <Label for="main-title">Заголовок *</Label>
+          <Input id="main-title" v-model="form.title" required />
+        </div>
+        <div>
+          <Label for="main-slug">Слаг (уникальный, латиницей) *</Label>
+          <Input
+            id="main-slug"
+            v-model="form.slug"
+            required
+            :disabled="!!selectedItem"
+          />
+          <p v-if="!!selectedItem" class="text-xs text-muted-foreground mt-1">
+            Слаг существующего элемента нельзя изменить.
+          </p>
+        </div>
+        <div>
+          <Label for="main-href">Ссылка (URL)</Label>
+          <Input
+            id="main-href"
+            v-model="form.href"
+            placeholder="/catalog/category"
+          />
+        </div>
+        <div>
+          <Label for="main-item_type">Тип пункта *</Label>
+          <Select v-model="form.item_type" required>
+            <SelectTrigger id="main-item_type"
+              ><SelectValue placeholder="Выберите тип..."
+            /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="link">Ссылка</SelectItem>
+              <SelectItem value="trigger"
+                >Выпадающий список (не ссылка)</SelectItem
+              >
+              <SelectItem value="trigger_and_link"
+                >Ссылка и выпадающий список</SelectItem
+              >
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label for="main-parent_slug"
+            >Родительский пункт (для этого пункта)</Label
           >
-        </SelectContent>
-      </Select>
-    </div>
-
-    <div>
-      <Label
-        for="form-parent_slug"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Родительский пункт</Label
-      >
-      <Select v-model="form.parent_slug">
-        <SelectTrigger id="form-parent_slug"
-          ><SelectValue placeholder="Выберите родителя..."
-        /></SelectTrigger>
-        <SelectContent>
-          <SelectItem
-            v-for="option in menuItemsStore.parentSlugOptions"
-            :key="option.value || 'null-parent-option'"
-            :value="option.value!"
-          >
-            {{ option.label }}
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <div>
-      <Label
-        for="form-display_order"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Порядок отображения</Label
-      >
-      <Input
-        id="form-display_order"
-        type="number"
-        v-model="form.display_order"
-      />
-    </div>
-
-    <div>
-      <Label
-        for="form-icon_name"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Имя иконки (Lucide)</Label
-      >
-      <Input
-        id="form-icon_name"
-        v-model="formIconName"
-        placeholder="например, 'home', 'settings'"
-      />
-    </div>
-
-    <div>
-      <Label
-        for="form-image"
-        class="block text-sm font-medium text-foreground mb-1"
-        >Изображение для выпадающего списка</Label
-      >
-      <Input
-        id="form-image"
-        type="file"
-        @change="handleImageFileChange"
-        accept="image/png, image/jpeg, image/webp, image/gif"
-      />
-      <div
-        v-if="imagePreviewUrl"
-        class="mt-2 border p-2 rounded-md inline-block relative"
-      >
-        <p class="text-xs text-muted-foreground mb-1">Предпросмотр:</p>
-        <img
-          :src="imagePreviewUrl"
-          alt="Предпросмотр"
-          class="max-w-[200px] max-h-[100px] object-contain rounded"
-        />
-        <Button
-          v-if="form.image_url || imagePreviewUrl"
-          @click="removeCurrentImage"
-          variant="destructive"
-          size="icon"
-          class="absolute top-1 right-1 h-6 w-6"
-          type="button"
-          aria-label="Удалить изображение"
+          <Select v-model="form.parent_slug">
+            <SelectTrigger id="main-parent_slug"
+              ><SelectValue placeholder="Выберите родителя..."
+            /></SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                v-for="option in menuAdminStore.parentSlugOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label for="main-display_order">Порядок отображения</Label>
+          <Input
+            id="main-display_order"
+            type="number"
+            v-model.number="form.display_order"
+          />
+        </div>
+        <div>
+          <Label for="main-icon_name">Имя иконки (Lucide)</Label>
+          <Input
+            id="main-icon_name"
+            v-model="form.icon_name"
+            placeholder="home, settings"
+          />
+        </div>
+      </div>
+      <div class="mt-4">
+        <Label for="main-image"
+          >Изображение для основного пункта (если тип 'link' и это
+          подкатегория)</Label
         >
-          Удалить изображение
+        <Input
+          id="main-image"
+          type="file"
+          @change="handleItemImageChange($event, form)"
+          accept="image/*"
+        />
+        <div
+          v-if="form._imagePreviewUrl || form.image_url"
+          class="mt-2 border p-2 rounded-md inline-block relative"
+        >
+          <p class="text-xs text-muted-foreground mb-1">Предпросмотр:</p>
+          <img
+            :src="form._imagePreviewUrl || getPublicImageUrl(form.image_url)"
+            alt="Превью"
+            class="max-w-[150px] max-h-[80px] object-contain rounded"
+          />
+          <Button
+            @click="removeItemImage(mainForm)"
+            variant="destructive"
+            size="icon"
+            class="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+            type="button"
+            aria-label="Удалить изображение"
+          >
+            <Icon name="lucide:x" class="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- === Секция для дочерних элементов (второй уровень относительно mainForm) === -->
+    <div class="pt-6 border-t mt-6">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-lg font-semibold text-foreground">
+          Подпункты для "{{ mainForm.title || "нового пункта" }}"
+        </h3>
+        <Button @click="addChild" variant="outline" size="sm" type="button">
+          <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" /> Добавить
+          подпункт
         </Button>
       </div>
-      <p
-        v-else-if="form.image_url && !imagePreviewUrl"
-        class="text-sm text-muted-foreground mt-1"
+
+      <div
+        v-if="childrenForms.length === 0"
+        class="text-sm text-muted-foreground py-4 text-center border-dashed border-2 rounded-md"
       >
-        Текущее изображение: {{ form.image_url.split("/").pop() }}
+        Нет подпунктов. Нажмите "Добавить подпункт", чтобы создать.
+      </div>
+
+      <div
+        v-for="(childForm, index) in childrenForms"
+        :key="childForm.id || childForm._tempId!"
+        class="border p-4 rounded-md mb-4 space-y-3 bg-muted/30 relative shadow-sm"
+      >
         <Button
-          @click="removeCurrentImage"
-          variant="link"
-          size="sm"
-          class="text-destructive p-0 h-auto ml-2"
+          @click="removeChild(childForm._tempId || index)"
+          variant="ghost"
+          size="icon"
           type="button"
+          class="absolute top-2 right-2 text-destructive hover:bg-destructive/10 h-7 w-7 z-10"
+          aria-label="Удалить этот подпункт"
         >
-          Удалить
+          <Icon name="lucide:trash-2" class="h-4 w-4" />
         </Button>
-      </p>
+        <p class="font-medium text-sm text-foreground">
+          Подпункт #{{ index + 1 }}
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+          <div>
+            <Label :for="`child-title-${childForm._tempId || index}`"
+              >Заголовок *</Label
+            >
+            <Input
+              :id="`child-title-${childForm._tempId || index}`"
+              v-model="childForm.title"
+              required
+            />
+          </div>
+          <div>
+            <Label :for="`child-slug-${childForm._tempId || index}`"
+              >Слаг * (уникальный в рамках родителя)</Label
+            >
+            <Input
+              :id="`child-slug-${childForm._tempId || index}`"
+              v-model="childForm.slug"
+              required
+              :disabled="!!childForm.id"
+            />
+          </div>
+          <div>
+            <Label :for="`child-href-${childForm._tempId || index}`"
+              >Ссылка</Label
+            >
+            <Input
+              :id="`child-href-${childForm._tempId || index}`"
+              v-model="childForm.href"
+            />
+          </div>
+          <div>
+            <Label :for="`child-item_type-${childForm._tempId || index}`"
+              >Тип</Label
+            >
+            <Select v-model="childForm.item_type" required>
+              <SelectTrigger
+                :id="`child-item_type-${childForm._tempId || index}`"
+                ><SelectValue placeholder="Тип подпункта..."
+              /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="link">Ссылка (конечный пункт)</SelectItem>
+                <SelectItem value="trigger"
+                  >Выпадающий список (3й уровень, не ссылка)</SelectItem
+                >
+                <SelectItem value="trigger_and_link"
+                  >Ссылка и список (3й уровень)</SelectItem
+                >
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label :for="`child-description-${childForm._tempId || index}`"
+            >Описание</Label
+          >
+          <Textarea
+            :id="`child-description-${childForm._tempId || index}`"
+            v-model="childForm.description"
+            rows="2"
+          />
+        </div>
+        <div>
+          <Label :for="`child-display_order-${childForm._tempId || index}`"
+            >Порядок</Label
+          >
+          <Input
+            :id="`child-display_order-${childForm._tempId || index}`"
+            type="number"
+            v-model.number="childForm.display_order"
+          />
+        </div>
+        <div>
+          <Label :for="`child-image-${childForm._tempId || index}`"
+            >Изображение для подпункта</Label
+          >
+          <Input
+            :id="`child-image-${childForm._tempId || index}`"
+            type="file"
+            @change="handleItemImageChange($event, childForm)"
+            accept="image/*"
+          />
+          <div
+            v-if="childForm._imagePreviewUrl || childForm.image_url"
+            class="mt-2 border p-2 rounded-md inline-block relative"
+          >
+            <img
+              :src="
+                childForm._imagePreviewUrl ||
+                getPublicImageUrl(childForm.image_url)
+              "
+              alt="Превью"
+              class="max-w-[120px] max-h-[70px] object-contain rounded"
+            />
+            <Button
+              @click="removeItemImage(childForm)"
+              variant="destructive"
+              size="icon"
+              class="absolute -top-2 -right-2 h-5 w-5 rounded-full"
+              type="button"
+              aria-label="Удалить изображение"
+            >
+              <Icon name="lucide:x" class="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+        <!-- Если childForm.item_type это trigger или trigger_and_link, здесь можно рекурсивно отобразить форму для его детей -->
+      </div>
     </div>
 
-    <div class="flex items-center gap-3 pt-4">
-      <Button type="submit" :disabled="isProcessing">
-        <!-- <Icon
-          v-if="isProcessing"
+    <div class="flex items-center gap-3 pt-6 border-t mt-6">
+      <Button type="submit" :disabled="isProcessingForm">
+        <Icon
+          v-if="isProcessingForm"
           name="svg-spinners:ring-resize"
           class="mr-2 h-4 w-4"
-        /> -->
+        />
         {{
-          isProcessing
+          isProcessingForm
             ? "Обработка..."
             : selectedItem
-              ? "Сохранить изменения"
-              : "Создать пункт"
+              ? "Сохранить все изменения"
+              : "Создать пункт и подпункты"
         }}
       </Button>
       <Button
