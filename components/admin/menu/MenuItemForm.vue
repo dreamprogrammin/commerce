@@ -28,8 +28,8 @@ const emit = defineEmits<{
 const selectedItemRef = toRef(props, "selectedItem");
 
 const {
-  form, // ref<IEditableMenuItem>
-  childrenForms, // ref<IEditableMenuItem[]>
+  form,
+  childrenForms,
   addChild,
   removeChild,
   isProcessing,
@@ -40,7 +40,17 @@ const {
   getStoragePublicUrl,
 } = useMenuItemFormData(selectedItemRef);
 
-const menuAdminStore = useMenuItems();
+const menuItemsStore = useMenuItems();
+
+const formHref = computed({
+  get: () => form.value.href ?? "",
+  set: (value) => (form.value.href = value === "" ? null : value),
+});
+
+const formIcon_name = computed({
+  get: () => form.value.icon_name ?? "",
+  set: (value) => (form.value.icon_name = value === "" ? null : ""),
+});
 
 async function onFormSubmit() {
   const success = await submitForm();
@@ -50,7 +60,7 @@ async function onFormSubmit() {
 }
 
 function onCancelClick() {
-  resetFormFields(); // Это вызовет initialSelectedItem.value = null
+  resetFormFields();
   emit("form-cancel");
 }
 </script>
@@ -93,7 +103,7 @@ function onCancelClick() {
           <Label for="main-href">Ссылка (URL)</Label>
           <Input
             id="main-href"
-            v-model="form.href"
+            v-model="formHref"
             placeholder="/catalog/category"
           />
         </div>
@@ -124,7 +134,7 @@ function onCancelClick() {
             /></SelectTrigger>
             <SelectContent>
               <SelectItem
-                v-for="option in menuAdminStore.parentSlugOptions"
+                v-for="option in menuItemsStore.parentSlugOptions"
                 :key="option.value"
                 :value="option.value"
               >
@@ -145,7 +155,7 @@ function onCancelClick() {
           <Label for="main-icon_name">Имя иконки (Lucide)</Label>
           <Input
             id="main-icon_name"
-            v-model="form.icon_name"
+            v-model="formIcon_name"
             placeholder="home, settings"
           />
         </div>
@@ -158,7 +168,7 @@ function onCancelClick() {
         <Input
           id="main-image"
           type="file"
-          @change="handleItemImageChange($event, form)"
+          @change="handleItemChange($event, form)"
           accept="image/*"
         />
         <div
@@ -167,12 +177,12 @@ function onCancelClick() {
         >
           <p class="text-xs text-muted-foreground mb-1">Предпросмотр:</p>
           <img
-            :src="form._imagePreviewUrl || getPublicImageUrl(form.image_url)"
+            :src="form._imagePreviewUrl ?? undefined"
             alt="Превью"
             class="max-w-[150px] max-h-[80px] object-contain rounded"
           />
           <Button
-            @click="removeItemImage(mainForm)"
+            @click="removeItemImage(form)"
             variant="destructive"
             size="icon"
             class="absolute -top-2 -right-2 h-6 w-6 rounded-full"
@@ -189,11 +199,10 @@ function onCancelClick() {
     <div class="pt-6 border-t mt-6">
       <div class="flex justify-between items-center mb-3">
         <h3 class="text-lg font-semibold text-foreground">
-          Подпункты для "{{ mainForm.title || "нового пункта" }}"
+          Подпункты для "{{ form.title || "нового пункта" }}"
         </h3>
         <Button @click="addChild" variant="outline" size="sm" type="button">
-          <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" /> Добавить
-          подпункт
+          Добавить подпункт
         </Button>
       </div>
 
@@ -217,7 +226,7 @@ function onCancelClick() {
           class="absolute top-2 right-2 text-destructive hover:bg-destructive/10 h-7 w-7 z-10"
           aria-label="Удалить этот подпункт"
         >
-          <Icon name="lucide:trash-2" class="h-4 w-4" />
+          Удалить
         </Button>
         <p class="font-medium text-sm text-foreground">
           Подпункт #{{ index + 1 }}
@@ -301,7 +310,7 @@ function onCancelClick() {
           <Input
             :id="`child-image-${childForm._tempId || index}`"
             type="file"
-            @change="handleItemImageChange($event, childForm)"
+            @change="handleItemChange($event, childForm)"
             accept="image/*"
           />
           <div
@@ -309,10 +318,7 @@ function onCancelClick() {
             class="mt-2 border p-2 rounded-md inline-block relative"
           >
             <img
-              :src="
-                childForm._imagePreviewUrl ||
-                getPublicImageUrl(childForm.image_url)
-              "
+              :src="childForm._imagePreviewUrl ?? undefined"
               alt="Превью"
               class="max-w-[120px] max-h-[70px] object-contain rounded"
             />
@@ -333,14 +339,14 @@ function onCancelClick() {
     </div>
 
     <div class="flex items-center gap-3 pt-6 border-t mt-6">
-      <Button type="submit" :disabled="isProcessingForm">
+      <Button type="submit" :disabled="isProcessing">
         <Icon
-          v-if="isProcessingForm"
+          v-if="isProcessing"
           name="svg-spinners:ring-resize"
           class="mr-2 h-4 w-4"
         />
         {{
-          isProcessingForm
+          isProcessing
             ? "Обработка..."
             : selectedItem
               ? "Сохранить все изменения"
