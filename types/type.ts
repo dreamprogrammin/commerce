@@ -52,22 +52,39 @@ export interface IHandlerSupabaseErrorOptions {
   fallbackMessage?: string;
 }
 
-export interface IUploadFileOptions  {
-  bucketName: string
-  filePathPrefix?: string
-  upsert?: boolean
-  cashControl?: string
-  contentType?: string 
+export interface IParentSelectOption {
+  value: string
+  label: string
+}
+
+export interface IUploadFileOptions {
+  bucketName: string;
+  filePathPrefix?: string;
+  upsert?: boolean;
+  cashControl?: string;
+  contentType?: string;
 }
 
 export type MenuItemRow = Database["public"]["Tables"]["menu_items"]["Row"];
-export type MenuItemInsert = Database["public"]["Tables"]["menu_items"]["Insert"];
-export type MenuItemUpdate = Database["public"]["Tables"]["menu_items"]["Update"];
+export type MenuItemInsert =
+  Database["public"]["Tables"]["menu_items"]["Insert"];
+export type MenuItemUpdate =
+  Database["public"]["Tables"]["menu_items"]["Update"];
 
-export interface IEditableMenuItem extends Partial<Omit<MenuItemRow, 'created_at' | 'updated_at'>> {
-  _tempId?: string
-  _isDirty?: boolean
-  _children?: IEditableMenuItem[]
-  _imageFile?: File | null
-  _imagePreviewUrl?: string | null
+export interface IEditableMenuItem
+  extends Partial<Omit<MenuItemRow, "created_at" | "updated_at">> {
+    href?: string
+  _tempId?: string;
+  _isDirty?: boolean;
+  _children?: IEditableMenuItem[];
+  _imageFile?: File | null;
+  _imagePreviewUrl?: string | null;
+}
+
+ export interface IStaticMainMenuItem {
+  slug: string; // Уникальный идентификатор, будет использоваться как parent_slug для дочерних из БД
+  title: string;
+  href?: string; // Ссылка, если сам пункт кликабельный
+  isTrigger: boolean; // true, если открывает выпадающий список
+  iconName?: string; // Опционально, имя иконки (например, 'Users' для "Мальчикам")
 }

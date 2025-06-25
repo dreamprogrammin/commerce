@@ -1,6 +1,13 @@
 import { toast } from "vue-sonner";
-import { BUCKET_NAME } from "~/constants";
-import type { Database, MenuItemRow, MenuItemInsert, MenuItemUpdate } from "~/types";
+import { BUCKET_NAME, NO_PARENT_SLUG_VALUE_FOR_SELECT } from "~/constants";
+import type {
+  Database,
+  MenuItemRow,
+  MenuItemInsert,
+  MenuItemUpdate,
+  IParentSelectOption,
+  IStaticMainMenuItem,
+} from "~/types";
 import { handleSupabaseError } from "~/utils/supabaseErrorHandler";
 
 export const useMenuItems = defineStore("menu-items", () => {
@@ -11,21 +18,74 @@ export const useMenuItems = defineStore("menu-items", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+
+const staticMainMenuItems: IStaticMainMenuItem[] = [
+  { slug: "stocks", title: "Акции", href: "/stocks", isTrigger: false },
+  { slug: "new-items", title: "Новинки", href: "/new", isTrigger: false },
+  {
+    slug: "boys",
+    title: "Мальчикам",
+    href: "/catalog/boys",
+    isTrigger: true,
+    iconName: "lucide:user",
+  }, // slug 'boys' будет parent_slug для его детей
+  {
+    slug: "girls",
+    title: "Девочкам",
+    href: "/catalog/girls",
+    isTrigger: true,
+    iconName: "lucide:female",
+  }, // slug 'girls'
+  {
+    slug: "kiddy",
+    title: "Малышам",
+    href: "/catalog/kiddy",
+    isTrigger: true,
+    iconName: "lucide:baby",
+  }, // slug 'kiddy'
+  {
+    slug: "games",
+    title: "Игры",
+    href: "/catalog/games",
+    isTrigger: true,
+    iconName: "lucide:gamepad-2",
+  }, // slug 'games'
+  {
+    slug: "holidays",
+    title: "Отдых",
+    href: "/catalog/holidays",
+    isTrigger: true,
+    iconName: "lucide:sun",
+  }, // slug 'holidays'
+];
+
   //getter
-  const parentSlugOptions = computed(() => {
-    return [
-      { value: null, label: "Нет родителя (верхний уровень)" },
-      ...menuItems.value
-        .filter(
-          (item) =>
-            item.item_type === "trigger" ||
-            item.item_type === "trigger_and_link",
-        )
-        .map((item) => ({
-          value: item.slug,
-          label: `${item.title} (${item.slug})`,
-        })),
-    ];
+  const parentSlugOptions = computed<IParentSelectOption[]>(() => {
+    const options : IParentSelectOption[] = [
+      {
+        value: NO_PARENT_SLUG_VALUE_FOR_SELECT,
+        label: '--- Нет родителя (Верхний уровень) ---'
+      }
+    ]
+
+    staticMainMenuItems.forEach(staticItem => {
+      if (staticItem.isTrigger) {
+        options.push({
+          value: staticItem.slug,
+          label: `[Статический] ${staticItem.title}`
+        })
+      }
+    })
+
+    menuItems.value.forEach(itemFromDb => {
+      if (itemFromDb.item_type === 'trigger' || itemFromDb.item_type === 'trigger_and_link') {
+        options.push({
+          value: itemFromDb.slug,
+          label: `${itemFromDb.title} (Динамический: ${itemFromDb.slug})`
+        })
+      }
+    })
+    return options
   });
 
   const topLevelItems = computed(() =>
@@ -98,7 +158,7 @@ export const useMenuItems = defineStore("menu-items", () => {
     } catch (e) {
       error.value = handleSupabaseError(e, {
         operationName: "Ошибка при добавлении элемента меню",
-      })
+      });
 
       throw e;
     } finally {
@@ -106,110 +166,123 @@ export const useMenuItems = defineStore("menu-items", () => {
     }
   }
 
-  async function updatedItem(itemId : string, updates :MenuItemUpdate): Promise<MenuItemRow | null> {
-    isLoading.value = true
-    error.value = null
+  async function updatedItem(
+    itemId: string,
+    updates: MenuItemUpdate,
+  ): Promise<MenuItemRow | null> {
+    isLoading.value = true;
+    error.value = null;
     try {
-      const preparedUpdated : MenuItemUpdate = { ...updates } 
-      if (updates.href === '') preparedUpdated.href = null
-      if (updates.description === '') preparedUpdated.description = null
-      if (updates.parent_slug === '') preparedUpdated.parent_slug = null
-      if (updates.image_url === '') preparedUpdated.image_url = null
-      if (updates.icon_name === '') preparedUpdated.icon_name = null
+      const preparedUpdated: MenuItemUpdate = { ...updates };
+      if (updates.href === "") preparedUpdated.href = null;
+      if (updates.description === "") preparedUpdated.description = null;
+      if (updates.parent_slug === "") preparedUpdated.parent_slug = null;
+      if (updates.image_url === "") preparedUpdated.image_url = null;
+      if (updates.icon_name === "") preparedUpdated.icon_name = null;
 
-      const {id, ...restOfUpdates} = preparedUpdated as any
+      const { id, ...restOfUpdates } = preparedUpdated as any;
 
-      const {data, error} = await supabase.from('menu_items')
-      .update(restOfUpdates)
-      .eq('id', itemId)
-      .select()
-      .single()
+      const { data, error } = await supabase
+        .from("menu_items")
+        .update(restOfUpdates)
+        .eq("id", itemId)
+        .select()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
       if (data) {
-        const index = menuItems.value.findIndex((item) => item.id === itemId)
+        const index = menuItems.value.findIndex((item) => item.id === itemId);
 
         if (index !== -1) {
-          menuItems.value[index] = data as MenuItemRow
+          menuItems.value[index] = data as MenuItemRow;
         } else {
-          await fetchItems()
+          await fetchItems();
         }
 
-        toast.success('Успех', {
-          description: `Элемент ${data.title} меню успешно обновлен`
-        })
-        return data as MenuItemRow
+        toast.success("Успех", {
+          description: `Элемент ${data.title} меню успешно обновлен`,
+        });
+        return data as MenuItemRow;
       }
-      return null
+      return null;
     } catch (e) {
       error.value = handleSupabaseError(e, {
-        operationName: 'Ошибка при обновление'
-      })     
-      throw e 
+        operationName: "Ошибка при обновление",
+      });
+      throw e;
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
-  async function deletedAssociatedImage(imageUrl : string | null) {
-    if (!imageUrl) return
+  async function deletedAssociatedImage(imageUrl: string | null) {
+    if (!imageUrl) return;
     try {
-      const { error: imageError } = await supabase
-      .storage.from(BUCKET_NAME).remove([imageUrl])
+      const { error: imageError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .remove([imageUrl]);
 
       if (imageError) {
-        console.warn(`Не удалось удалить изображение ${imageUrl} из Storage`, imageError.message)
-        toast.warning('Предупреждение', {
-          description: `Изображение ${imageUrl} не было удалено`
-        })
+        console.warn(
+          `Не удалось удалить изображение ${imageUrl} из Storage`,
+          imageError.message,
+        );
+        toast.warning("Предупреждение", {
+          description: `Изображение ${imageUrl} не было удалено`,
+        });
       } else {
-        console.log(`Изображение ${imageUrl} было удалено`)
+        console.log(`Изображение ${imageUrl} было удалено`);
       }
     } catch (e) {
-      const message = (e as Error).message || `Произошла неизвестная ошибка при удаление ${imageUrl} из Storage`
-      console.warn(message)
-      toast.warning('Предупреждение', {
-        description: message
-      })
+      const message =
+        (e as Error).message ||
+        `Произошла неизвестная ошибка при удаление ${imageUrl} из Storage`;
+      console.warn(message);
+      toast.warning("Предупреждение", {
+        description: message,
+      });
     }
   }
 
-  async function deleteItem(itemDelete : MenuItemRow) {
-    const confirmation = `Вы уверены что хотите удалить ${itemDelete.title} ? все дочерние элементы будут удалены`
-    if (!confirmation) return
+  async function deleteItem(itemDelete: MenuItemRow) {
+    const confirmation = `Вы уверены что хотите удалить ${itemDelete.title} ? все дочерние элементы будут удалены`;
+    if (!confirmation) return;
 
-    isLoading.value = true
-    error.value = null
+    isLoading.value = true;
+    error.value = null;
 
     try {
       const { error } = await supabase
-      .from('menu_items')
-      .delete()
-      .eq('id', itemDelete.id)
+        .from("menu_items")
+        .delete()
+        .eq("id", itemDelete.id);
 
-      if (error) throw error
+      if (error) throw error;
 
-      await fetchItems()
+      await fetchItems();
 
-      toast.success('Успех', {
-        description: `Элемент ${itemDelete.title} успешно удален.`
-      })
+      toast.success("Успех", {
+        description: `Элемент ${itemDelete.title} успешно удален.`,
+      });
     } catch (e) {
-      error.value = handleSupabaseError(e, {operationName : 'Удаление пункта меню'})
-      toast.error('Ошибка', {
-        description: error.value
-      })
+      error.value = handleSupabaseError(e, {
+        operationName: "Удаление пункта меню",
+      });
+      toast.error("Ошибка", {
+        description: error.value,
+      });
 
-      throw e
+      throw e;
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
   return {
     menuItems,
     isLoading,
+    staticMainMenuItems,
     error,
     fetchItems,
     addItem,
@@ -218,6 +291,6 @@ export const useMenuItems = defineStore("menu-items", () => {
     deletedAssociatedImage,
     getChildren,
     parentSlugOptions,
-    topLevelItems
-  }
+    topLevelItems,
+  };
 });
