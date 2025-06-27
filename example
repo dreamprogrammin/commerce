@@ -1,0 +1,7 @@
+ALTER TABLE public.profiles DISABLE TRIGGER trigger_protect_profile_role_update;
+
+UPDATE public.profiles
+SET role = 'admin'
+WHERE id = 'USER_ID_КОТОРОГО_НАЗНАЧАЕТЕ_АДМИНОМ';
+
+ALTER TABLE public.profiles ENABLE TRIGGER trigger_protect_profile_role_update;
