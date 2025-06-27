@@ -72,7 +72,8 @@ const staticMainMenuItems: IStaticMainMenuItem[] = [
       if (staticItem.isTrigger) {
         options.push({
           value: staticItem.slug,
-          label: `[Статический] ${staticItem.title}`
+          label: `[Статический] ${staticItem.title}`,
+          type: 'static'
         })
       }
     })
@@ -81,7 +82,8 @@ const staticMainMenuItems: IStaticMainMenuItem[] = [
       if (itemFromDb.item_type === 'trigger' || itemFromDb.item_type === 'trigger_and_link') {
         options.push({
           value: itemFromDb.slug,
-          label: `${itemFromDb.title} (Динамический: ${itemFromDb.slug})`
+          label: `${itemFromDb.title} (Динамический: ${itemFromDb.slug})`,
+          type: 'dynamic'
         })
       }
     })

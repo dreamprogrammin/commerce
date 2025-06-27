@@ -55,6 +55,7 @@ export interface IHandlerSupabaseErrorOptions {
 export interface IParentSelectOption {
   value: string
   label: string
+  type?: 'static' | 'dynamic'
 }
 
 export interface IUploadFileOptions {
