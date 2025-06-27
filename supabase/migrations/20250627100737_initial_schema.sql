@@ -1,4 +1,4 @@
-create table "public"."menu_items" (
+CREATE TABLE IF NOT EXISTS "public"."menu_items"(
     "id" uuid not null default uuid_generate_v4(),
     "slug" text not null,
     "title" text not null,
