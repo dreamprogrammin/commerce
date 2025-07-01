@@ -1,32 +1,31 @@
 import { toast } from "vue-sonner";
-import { v4 as uuidv4 } from "uuid";
 import type { Database, IUploadFileOptions } from "~/types";
+import { v4 as uuidv4 } from "uuid";
 
 export function useSupabaseStorage() {
   const supabase = useSupabaseClient<Database>();
-  const isUploading = ref(false);
+  const isLoading = ref(false);
   const uploadError = ref<string | null>(null);
 
   async function uploadFile(
     file: File,
     options: IUploadFileOptions,
   ): Promise<string | null> {
-    isUploading.value = true;
+    isLoading.value = true;
     uploadError.value = null;
 
     if (!file) {
-      const noFileError = "Файл для загрузки не выбран";
-      toast.error("Ошибка", {
+      const noFileError = "Файл не загружен";
+      uploadError.value = noFileError;
+      toast.error("Ошибка загрузки", {
         description: noFileError,
       });
-      isUploading.value = false;
+      isLoading.value = false;
       return null;
     }
 
     const fileExt = file.name.split(".").pop();
-
     const uniqueFileName = `${uuidv4()}${fileExt ? "." + fileExt : ""}`;
-
     const filePath = options.filePathPrefix
       ? `${options.filePathPrefix.replace(/\/$/, "")}/${uniqueFileName}`
       : uniqueFileName;
@@ -45,10 +44,10 @@ export function useSupabaseStorage() {
       return data.path;
     } catch (e: any) {
       const message =
-        e.message || `Ошибка загрузки файла в бакета ${options.bucketName}`;
+        e.message || `Ошибка загрузки файла в бакет ${options.bucketName}.`;
       uploadError.value = message;
-      toast.error("Ошибка загрузки Storage", {
-        description: message.e,
+      toast.error("Ошибка Storage", {
+        description: message,
       });
       console.error(
         `Error uploading to bucket "${options.bucketName}", path "${filePath}":`,
@@ -56,56 +55,39 @@ export function useSupabaseStorage() {
       );
       return null;
     } finally {
-      isUploading.value = true;
+      isLoading.value = false;
     }
   }
 
   async function removeFile(
     bucketName: string,
-    filePath: string | string[],
+    filePaths: string | string[],
   ): Promise<boolean> {
-    const pathsToRemove = Array.isArray(filePath) ? filePath : [filePath];
-
-    if (
-      pathsToRemove.length === 0 ||
-      pathsToRemove.every((path) => !path?.trim())
-    ) {
-      console.warn("Внимание: файлу не были указанны пути для удаление");
-      return true;
-    }
+    const pathsToRemove = Array.isArray(filePaths) ? filePaths : [filePaths];
+    const validPathsToRemove = pathsToRemove.filter(
+      (p) => p && p.trim() !== "",
+    );
+    if (validPathsToRemove.length === 0) return true;
 
     try {
-      const validPathsToRemove = pathsToRemove.filter(
-        (path) => path && path.trim() !== "",
-      );
-
-      if (validPathsToRemove.length === 0) return true;
-
       const { data, error } = await supabase.storage
         .from(bucketName)
         .remove(validPathsToRemove);
-
       if (error) throw error;
-
-      toast.success("Успешное удаление из Хранилище", {
-        description: `Файлы успешно удалены из бакета ${bucketName}.`,
+      toast.info("Информация Storage", {
+        description: `Файл(ы) удалены(ы) из ${bucketName}.`,
       });
-      console.log(`файлы успешны удалены из хранилище, ${data}`);
-
       return true;
     } catch (e: any) {
       const message =
-        e.message || `Ошибка удаления файлов из бакета ${bucketName}`;
-
-      toast.error("Ошибка", {
-        description: `Ошибка при удаление бакета ${message}`,
+        e.message || `Ошибка удаления файла(ов) из бакета ${bucketName}.`;
+      toast.error("Ошибка Storage", {
+        description: message,
       });
-
       console.error(
-        `Ошибка при удаление файлов из бакета "${bucketName}", paths "${pathsToRemove.join(", ")}:"`,
+        `Error removing files from bucket "${bucketName}", paths "${validPathsToRemove.join(", ")}":`,
         e,
       );
-
       return false;
     }
   }
@@ -120,11 +102,10 @@ export function useSupabaseStorage() {
 
     try {
       const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-
       return data?.publicUrl || null;
     } catch (e) {
       console.error(
-        `Ошибка при получение публичного URL адреса для "${filePath}" в бакета "${bucketName}":`,
+        `Error getting public URL for "${filePath}" in bucket "${bucketName}":`,
         e,
       );
       return null;
@@ -132,7 +113,7 @@ export function useSupabaseStorage() {
   }
 
   return {
-    isUploading,
+    isLoading,
     uploadError,
     uploadFile,
     removeFile,
