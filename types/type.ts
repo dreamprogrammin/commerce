@@ -53,9 +53,8 @@ export interface IHandlerSupabaseErrorOptions {
 }
 
 export interface IParentSelectOption {
-  value: string
-  label: string
-  type?: 'static' | 'dynamic'
+  value: string;
+  label: string;
 }
 
 export interface IUploadFileOptions {
@@ -74,7 +73,7 @@ export type MenuItemUpdate =
 
 export interface IEditableMenuItem
   extends Partial<Omit<MenuItemRow, "created_at" | "updated_at">> {
-    href?: string
+  href?: string;
   _tempId?: string;
   _isDirty?: boolean;
   _children?: IEditableMenuItem[];
@@ -82,7 +81,7 @@ export interface IEditableMenuItem
   _imagePreviewUrl?: string | null;
 }
 
- export interface IStaticMainMenuItem {
+export interface IStaticMainMenuItem {
   slug: string; // Уникальный идентификатор, будет использоваться как parent_slug для дочерних из БД
   title: string;
   href?: string; // Ссылка, если сам пункт кликабельный
