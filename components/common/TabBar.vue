@@ -8,11 +8,11 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { ChevronDown, Search } from "lucide-vue-next";
-import { useTopMenuItemsStore } from "~/stores/menuItems/useTopMenuItems";
 import { useSupabaseStorage } from "~/composables/menuItems/useSupabaseStorage";
 import { staticMainMenuItems } from "~/config/staticItems";
 import { BUCKET_NAME } from "~/constants";
+import { useMenuAdminStore } from "~/stores/menuItems/useTopMenuItems";
+
 
 const searchSuggestions = [
   {
@@ -79,7 +79,7 @@ const closeAllPopups = () => {
 
 defineExpose({ closeAllPopups });
 
-const menuItemsStore = useTopMenuItemsStore();
+const menuItemsStore = useMenuAdminStore();
 
 const { getPublicUrl } = useSupabaseStorage();
 
@@ -88,7 +88,7 @@ onMounted(async () => {
   console.log(menuItemsStore.items.length);
 });
 
-const menuStore = useTopMenuItemsStore();
+const menuStore = useMenuAdminStore();
 onMounted(() => {
   menuStore.fetchItems();
 });
@@ -158,94 +158,70 @@ onMounted(() => {
       class="static flex-1"
       :delay-duration="100"
     >
-      <NavigationMenuList
-        class="flex w-full items-center justify-start space-x-1"
-      >
-        <template
-          v-for="staticItem in staticMainMenuItems"
-          :key="staticItem.slug"
-        >
-          <NavigationMenuItem :value="staticItem.slug">
-            <!-- Если это триггер -->
-            <template v-if="staticItem.isTrigger">
-              <NuxtLink v-if="staticItem.href" :to="staticItem.href" as-child>
+      <NavigationMenuList class="flex w-full items-center justify-start gap-1">
+        <template v-for="itemL1 in staticMainMenuItems" :key="itemL1.slug">
+          <NavigationMenuItem :value="itemL1.slug">
+            <template v-if="itemL1.isTrigger">
+              <NuxtLink :to="itemL1.href" as-child>
                 <NavigationMenuTrigger :class="navigationMenuTriggerStyle()">
-                  <Icon
-                    v-if="staticItem.iconName"
-                    :name="staticItem.iconName"
-                    class="mr-1.5 h-4 w-4"
-                  />
-                  {{ staticItem.title }}
-                  <ChevronDown
-                    class="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180"
-                    aria-hidden="true"
-                  />
+                  {{ itemL1.title }}
                 </NavigationMenuTrigger>
               </NuxtLink>
-              <NavigationMenuTrigger
-                v-else
-                :class="navigationMenuTriggerStyle()"
-                >{{ staticItem.title }}</NavigationMenuTrigger
-              >
 
               <NavigationMenuContent>
-                <div class="p-4 md:w-[500px] lg:w-[600px]">
-                  <ul class="grid grid-cols-2 gap-4">
+                <div class="p-4 md:w-[550px] lg:w-[650px]">
+                  <ul class="grid grid-cols-2 gap-x-6 gap-y-4">
                     <li
-                      v-for="child in menuStore.getChildren(staticItem.slug)"
-                      :key="child.slug"
+                      v-for="itemL2 in menuStore.getChildren(itemL1.slug)"
+                      :key="itemL2.slug"
+                      class="space-y-1"
                     >
                       <NuxtLink
-                        :to="child.href"
-                        class="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                        :to="itemL2.href"
+                        class="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         @click="activeMenuValue = undefined"
                       >
-                        <img
-                          v-if="child.image_url"
-                          :src="
-                            getPublicUrl(BUCKET_NAME, child.image_url) ||
-                            undefined
-                          "
-                          :alt="child.title"
-                          class="mb-2 h-24 w-full object-cover rounded-md"
-                        />
-                        <div class="text-sm font-semibold leading-none">
-                          {{ child.title }}
+                        <div v-if="itemL2.image_url" class="mb-2 overflow-hidden rounded-md">
+                          <img
+                            :src="getPublicUrl(BUCKET_NAME, itemL2.image_url) || undefined"
+                            :alt="itemL2.title"
+                            class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
+                          />
                         </div>
-                        <p
-                          v-if="child.description"
-                          class="text-xs line-clamp-2 leading-snug text-muted-foreground"
-                        >
-                          {{ child.description }}
+                        <div class="text-sm font-semibold leading-tight text-foreground">
+                          {{ itemL2.title }}
+                        </div>
+                        <p v-if="itemL2.description" class="text-xs line-clamp-2 leading-snug text-muted-foreground">
+                          {{ itemL2.description }}
                         </p>
                       </NuxtLink>
+                      <ul
+                        v-if="menuStore.getChildren(itemL2.slug).length > 0"
+                        class="mt-2 ml-3 space-y-1 list-none"
+                      >
+                        <li v-for="itemL3 in menuStore.getChildren(itemL2.slug)" :key="itemL3.slug">
+                          <NuxtLink
+                            :to="itemL3.href"
+                            class="block select-none rounded-md py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors hover:bg-accent/50 focus:bg-accent/50 text-muted-foreground hover:text-foreground"
+                            @click="activeMenuValue = undefined"
+                          >
+                            {{ itemL3.title }}
+                          </NuxtLink>
+                        </li>
+                      </ul>
                     </li>
                   </ul>
-                  <div
-                    v-if="
-                      !menuStore.isLoading &&
-                      menuStore.getChildren(staticItem.slug).length === 0
-                    "
-                    class="py-10 text-center text-sm text-muted-foreground"
-                  >
+                   <div v-if="menuStore.getChildren(itemL1.slug).length === 0 && !menuStore.isLoading" class="py-10 text-center text-sm text-muted-foreground">
                     Скоро здесь появятся подкатегории...
+                  </div>
+                   <div v-if="menuStore.isLoading" class="py-10 text-center text-sm text-muted-foreground">
+                    Загрузка...
                   </div>
                 </div>
               </NavigationMenuContent>
             </template>
-
-            <!-- Если это просто статическая ссылка -->
-            <NuxtLink
-              v-else
-              :to="staticItem.href!"
-              :class="navigationMenuTriggerStyle()"
-            >
-              <Icon
-                v-if="staticItem.iconName"
-                :name="staticItem.iconName"
-                class="mr-1.5 h-4 w-4"
-              />
-              {{ staticItem.title }}
+            <NuxtLink v-else :to="itemL1.href" :class="navigationMenuTriggerStyle()">
+              {{ itemL1.title }}
             </NuxtLink>
           </NavigationMenuItem>
         </template>
