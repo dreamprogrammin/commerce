@@ -50,4 +50,11 @@ export const staticMainMenuItems: IStaticMainMenuItem[] = [
     isTrigger: true,
     iconName: "lucide:brain-circuit",
   },
+  {
+    slug: "holyday",
+    title: "Отдых",
+    href: "/catalog/holyday",
+    isTrigger: false,
+    iconName: "lucide:brain-circuit"
+  },
 ];

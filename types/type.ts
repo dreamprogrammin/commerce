@@ -73,12 +73,16 @@ export type MenuItemUpdate =
 
 export interface IEditableMenuItem
   extends Partial<Omit<MenuItemRow, "created_at" | "updated_at">> {
-  href?: string;
   _tempId?: string;
-  _isDirty?: boolean;
-  _children?: IEditableMenuItem[];
+  children: IEditableMenuItem[];
   _imageFile?: File | null;
-  _imagePreviewUrl?: string | null;
+  _imagePreviewUrl?: string | undefined;
+}
+
+export interface IItemToDelete {
+  id:string
+  title: string
+  image_url: string | null
 }
 
 export interface IStaticMainMenuItem {
