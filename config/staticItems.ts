@@ -4,7 +4,7 @@ export const staticMainMenuItems: IStaticMainMenuItem[] = [
   {
     slug: "actions",
     title: "Акции",
-    href: "/actions",
+    href: "/stocks",
     isTrigger: false,
     iconName: "lucide:percent",
   },
@@ -55,6 +55,6 @@ export const staticMainMenuItems: IStaticMainMenuItem[] = [
     title: "Отдых",
     href: "/catalog/holyday",
     isTrigger: false,
-    iconName: "lucide:brain-circuit"
+    iconName: "lucide:brain-circuit",
   },
 ];

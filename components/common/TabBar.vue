@@ -13,7 +13,6 @@ import { staticMainMenuItems } from "~/config/staticItems";
 import { BUCKET_NAME } from "~/constants";
 import { useMenuAdminStore } from "~/stores/menuItems/useTopMenuItems";
 
-
 const searchSuggestions = [
   {
     title: "Популярные запросы",
@@ -181,17 +180,28 @@ onMounted(() => {
                         class="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         @click="activeMenuValue = undefined"
                       >
-                        <div v-if="itemL2.image_url" class="mb-2 overflow-hidden rounded-md">
+                        <div
+                          v-if="itemL2.image_url"
+                          class="mb-2 overflow-hidden rounded-md"
+                        >
                           <img
-                            :src="getPublicUrl(BUCKET_NAME, itemL2.image_url) || undefined"
+                            :src="
+                              getPublicUrl(BUCKET_NAME, itemL2.image_url) ||
+                              undefined
+                            "
                             :alt="itemL2.title"
                             class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
                           />
                         </div>
-                        <div class="text-sm font-semibold leading-tight text-foreground">
+                        <div
+                          class="text-sm font-semibold leading-tight text-foreground"
+                        >
                           {{ itemL2.title }}
                         </div>
-                        <p v-if="itemL2.description" class="text-xs line-clamp-2 leading-snug text-muted-foreground">
+                        <p
+                          v-if="itemL2.description"
+                          class="text-xs line-clamp-2 leading-snug text-muted-foreground"
+                        >
                           {{ itemL2.description }}
                         </p>
                       </NuxtLink>
@@ -199,7 +209,10 @@ onMounted(() => {
                         v-if="menuStore.getChildren(itemL2.slug).length > 0"
                         class="mt-2 ml-3 space-y-1 list-none"
                       >
-                        <li v-for="itemL3 in menuStore.getChildren(itemL2.slug)" :key="itemL3.slug">
+                        <li
+                          v-for="itemL3 in menuStore.getChildren(itemL2.slug)"
+                          :key="itemL3.slug"
+                        >
                           <NuxtLink
                             :to="itemL3.href"
                             class="block select-none rounded-md py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors hover:bg-accent/50 focus:bg-accent/50 text-muted-foreground hover:text-foreground"
@@ -211,16 +224,29 @@ onMounted(() => {
                       </ul>
                     </li>
                   </ul>
-                   <div v-if="menuStore.getChildren(itemL1.slug).length === 0 && !menuStore.isLoading" class="py-10 text-center text-sm text-muted-foreground">
+                  <div
+                    v-if="
+                      menuStore.getChildren(itemL1.slug).length === 0 &&
+                      !menuStore.isLoading
+                    "
+                    class="py-10 text-center text-sm text-muted-foreground"
+                  >
                     Скоро здесь появятся подкатегории...
                   </div>
-                   <div v-if="menuStore.isLoading" class="py-10 text-center text-sm text-muted-foreground">
+                  <div
+                    v-if="menuStore.isLoading"
+                    class="py-10 text-center text-sm text-muted-foreground"
+                  >
                     Загрузка...
                   </div>
                 </div>
               </NavigationMenuContent>
             </template>
-            <NuxtLink v-else :to="itemL1.href" :class="navigationMenuTriggerStyle()">
+            <NuxtLink
+              v-else
+              :to="itemL1.href"
+              :class="navigationMenuTriggerStyle()"
+            >
               {{ itemL1.title }}
             </NuxtLink>
           </NavigationMenuItem>
