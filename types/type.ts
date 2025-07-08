@@ -80,9 +80,9 @@ export interface IEditableMenuItem
 }
 
 export interface IItemToDelete {
-  id:string
-  title: string
-  image_url: string | null
+  id: string;
+  title: string;
+  image_url: string | null;
 }
 
 export interface IStaticMainMenuItem {

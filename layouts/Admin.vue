@@ -1,34 +1,17 @@
 <template>
-  <div class="admin-layout bg-muted/40 min-h-screen">
-    <header class="bg-background border-b p-4 shadow-sm">
-      <nav class="container mx-auto flex justify-between items-center">
-        <NuxtLink to="/admin" class="text-xl font-bold text-primary"
-          >Админ-панель</NuxtLink
-        >
-        <div>
-          <!-- Ссылки на другие разделы админки -->
-          <NuxtLink to="" class="px-3 py-2 hover:text-primary">Меню</NuxtLink>
-          <NuxtLink to="/" class="px-3 py-2 hover:text-primary"
-            >Пользователи</NuxtLink
-          >
-          <!-- Кнопка выхода и т.д. -->
-        </div>
+  <div class="flex min-h-screen w-full bg-muted/40">
+    <aside class="hidden w-64 flex-col border-r bg-background sm:flex">
+      <div class="flex h-16 items-center border-b px-6">
+        <NuxtLink to="/" class="flex items-center gap-2 font-semibold">
+          <span>Мой проект</span>
+        </NuxtLink>
+      </div>
+
+      <nav class="flex-1 space-y-2 p-4">
+        <NuxtLink to="/"></NuxtLink>
+
+        <NuxtLink></NuxtLink>
       </nav>
-    </header>
-    <main class="py-8">
-      <slot />
-      <!-- Сюда будет рендериться содержимое страницы /admin/menu -->
-    </main>
-    <footer class="text-center p-4 border-t text-sm text-muted-foreground">
-      © {{ new Date().getFullYear() }} Админка Магазина
-    </footer>
+    </aside>
   </div>
 </template>
-
-<script setup lang="ts">
-// Логика для layout, если нужна (например, проверка аутентификации на уровне layout)
-</script>
-
-<style scoped>
-/* Стили для админского layout */
-</style>
