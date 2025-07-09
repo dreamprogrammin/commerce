@@ -4,7 +4,7 @@ definePageMeta({
 });
 </script>
 <template>
-  <div>Slider</div>
+  <h1>Управление пользователями</h1>
 </template>
 
 <style scoped></style>
