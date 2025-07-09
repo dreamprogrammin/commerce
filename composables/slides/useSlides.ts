@@ -4,7 +4,7 @@ export const useSlides = () => {
   const supabase = useSupabaseClient<Database>();
   const key = "global-slides";
 
-  return useAsyncData<SlideRow[]>(key, async () => {
+  const asyncData = useAsyncData<SlideRow[]>(key, async () => {
     const { data, error } = await supabase
       .from("slides")
       .select("*")
@@ -21,4 +21,11 @@ export const useSlides = () => {
 
     return data || [];
   });
+
+  return {
+    slides: asyncData.data,
+    status: asyncData.status,
+    error: asyncData.error,
+    refresh: asyncData.refresh,
+  };
 };
