@@ -5,26 +5,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter
-} from '~/components/ui/dialog';
-import Input from '~/components/ui/input/Input.vue';
-import Button from '~/components/ui/button/Button.vue';
-import Switch from '~/components/ui/switch/Switch.vue';
-import { Label } from '~/components/ui/label';
-import { useSlideForm } from '~/composables/admin/useSlideForm';
-import type { SlideRow } from '~/types';
+  DialogFooter,
+} from "~/components/ui/dialog";
+import Input from "~/components/ui/input/Input.vue";
+import Button from "~/components/ui/button/Button.vue";
+import Switch from "~/components/ui/switch/Switch.vue";
+import { Label } from "~/components/ui/label";
+import { useSlideForm } from "~/composables/admin/useSlideForm";
+import type { SlideRow } from "~/types";
 
 const props = defineProps<{
   initialData: SlideRow | null;
 }>();
 
-const open = defineModel('open', { required: true });
+const open = defineModel("open", { required: true });
 
 const emit = defineEmits<{
-  (e: 'saved'): void;
+  (e: "saved"): void;
 }>();
 
-const initialDataRef = toRef(props, 'initialData');
+const initialDataRef = toRef(props, "initialData");
 
 const {
   formData,
@@ -36,11 +36,11 @@ const {
   handleImageChange,
   ctaLinkValue,
   ctaTextValue,
-  descriptionValue
+  descriptionValue,
 } = useSlideForm(initialDataRef, {
   onSuccess: () => {
-    emit('saved');
-  }
+    emit("saved");
+  },
 });
 </script>
 <template>
@@ -48,9 +48,12 @@ const {
     <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>
-          {{ isEditMode ? 'Редактирование слайда' : 'Создание нового слайда' }}
+          {{ isEditMode ? "Редактирование слайда" : "Создание нового слайда" }}
         </DialogTitle>
-        <DialogDescription>Заполните информацию о слайде. Поля со звездочкой (*) обязательны.</DialogDescription>
+        <DialogDescription
+          >Заполните информацию о слайде. Поля со звездочкой (*)
+          обязательны.</DialogDescription
+        >
       </DialogHeader>
 
       <form @submit.prevent="handleSubmit" class="grid gap-6 py-4">
@@ -66,8 +69,16 @@ const {
 
         <div>
           <Label for="image">Изображение</Label>
-          <Input id="image" type="file" @change="handleImageChange" accept="image/*" />
-          <div v-if="imagePreviewUrl || formData.image_url" class="mt-2 border p-2 rounded-md inline-block relative">
+          <Input
+            id="image"
+            type="file"
+            @change="handleImageChange"
+            accept="image/*"
+          />
+          <div
+            v-if="imagePreviewUrl || formData.image_url"
+            class="mt-2 border p-2 rounded-md inline-block relative"
+          >
             <img
               :src="imagePreviewUrl || formData.image_url!"
               alt="Превью"
@@ -92,13 +103,21 @@ const {
 
         <div>
           <Label for="cta_text">Текст на кнопке</Label>
-          <Input id="cta_text" v-model="ctaLinkValue" placeholder="/catalog/new" />
+          <Input
+            id="cta_text"
+            v-model="ctaLinkValue"
+            placeholder="/catalog/new"
+          />
         </div>
 
         <div class="grid grid-cols-2 gap-4 items-center">
           <div>
             <Label for="display_order">Порядок сортировка</Label>
-            <Input id="display_order" type="number" v-model.number="formData.display_order" />
+            <Input
+              id="display_order"
+              type="number"
+              v-model.number="formData.display_order"
+            />
           </div>
         </div>
 
@@ -108,9 +127,11 @@ const {
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" @click="open = false">Отмена</Button>
+          <Button type="button" variant="outline" @click="open = false"
+            >Отмена</Button
+          >
           <Button type="submit" :disabled="isSaving">
-            {{ isSaving ? 'Сохранение...' : 'Сохранить' }}
+            {{ isSaving ? "Сохранение..." : "Сохранить" }}
           </Button>
         </DialogFooter>
       </form>

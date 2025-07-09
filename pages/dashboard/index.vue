@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CardHeader, CardTitle, Card, CardContent } from "~/components/ui/card";
 definePageMeta({
   layout: "admin",
 });
@@ -14,10 +15,6 @@ definePageMeta({
         <Card class="hover:border-primary transition-colors">
           <CardHeader class="flex flex-row items-center justify-between pb-2">
             <CardTitle class="text-sm font-medium">Управление меню</CardTitle>
-            <Icon
-              name="lucide:list-tree"
-              class="h-4 w-4 text-muted-foreground"
-            />
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">Меню сайта</div>
@@ -35,10 +32,6 @@ definePageMeta({
             <CardTitle class="text-sm font-medium"
               >Управление слайдами</CardTitle
             >
-            <Icon
-              name="lucide:gallery-horizontal"
-              class="h-4 w-4 text-muted-foreground"
-            />
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">Слайдер</div>
