@@ -68,6 +68,9 @@ function addTopLevelNode() {
     slug: selectedParent.value.slug,
   });
 }
+definePageMeta({
+  layout: "admin",
+});
 </script>
 
 <template>

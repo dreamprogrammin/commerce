@@ -86,9 +86,13 @@ export interface IItemToDelete {
 }
 
 export interface IStaticMainMenuItem {
-  slug: string; // Уникальный идентификатор, будет использоваться как parent_slug для дочерних из БД
+  slug: string;
   title: string;
-  href?: string; // Ссылка, если сам пункт кликабельный
-  isTrigger: boolean; // true, если открывает выпадающий список
-  iconName?: string; // Опционально, имя иконки (например, 'Users' для "Мальчикам")
+  href?: string;
+  isTrigger: boolean;
+  iconName?: string;
 }
+
+export type SlideRow = Database["public"]["Tables"]["slides"]["Row"];
+export type SlideInsert = Database["public"]["Tables"]["slides"]["Insert"];
+export type SlideUpdate = Database["public"]["Tables"]["slides"]["Update"];
