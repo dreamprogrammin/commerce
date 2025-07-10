@@ -1,5 +1,8 @@
 -- Файл: supabase/migrations/<timestamp>_initial_schema.sql
--- Полная, упорядоченная миграция для создания всей кастомной схемы с нуля.
+-- Полная, упорядоченная миграция для создания всей кастомной схемы с нуля. (Версия 2, с обновленными функциями)
+
+-- Отключаем проверку тел функций для совместимости
+set check_function_bodies = off;
 
 -- === СЕКЦИЯ 1: ОБЩИЕ РАСШИРЕНИЯ И ФУНКЦИИ ===
 
@@ -7,13 +10,18 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 
 -- Создаем универсальную функцию для автоматического обновления колонки `updated_at`.
+-- (Синтаксис обновлен в соответствии с выводом `supabase db pull`)
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER LANGUAGE plpgsql SET search_path = '' AS $$
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
 BEGIN
     NEW.updated_at = now();
     RETURN NEW;
 END;
-$$;
+$function$
+;
 
 
 -- === СЕКЦИЯ 2: СОЗДАНИЕ ТАБЛИЦ И БАКЕТА ===
@@ -75,42 +83,53 @@ CREATE TRIGGER trigger_menu_items_updated_at
     EXECUTE FUNCTION public.update_updated_at_column();
 
 -- 4.2. Функция и триггер для автоматического создания профиля.
--- Сначала удаляем старый триггер (если есть), чтобы безопасно обновить функцию.
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
+-- (Синтаксис обновлен в соответствии с выводом `supabase db pull`)
 CREATE OR REPLACE FUNCTION public.handle_new_user_profile_creation()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 BEGIN
   INSERT INTO public.profiles (id, first_name, role)
   VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name'), 'user')
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$;
+$function$
+;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user_profile_creation();
 
 -- 4.3. Функция для проверки роли (идет до зависимых от нее объектов).
+-- Эта функция не была в вашем файле от `pull`, но ее синтаксис изначально был корректен. Оставляем как есть.
 CREATE OR REPLACE FUNCTION public.current_user_has_role_internal(required_role text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$ SELECT EXISTS (SELECT 1 FROM public.profiles pr WHERE pr.id = auth.uid() AND pr.role = lower(required_role)); $$;
 GRANT EXECUTE ON FUNCTION public.current_user_has_role_internal(text) TO authenticated;
 
 -- 4.4. Функция и триггер для защиты поля 'role' в profiles.
--- Сначала удаляем старый триггер, чтобы безопасно обновить функцию.
 DROP TRIGGER IF EXISTS trigger_protect_profile_role_update ON public.profiles;
 
+-- (Синтаксис обновлен в соответствии с выводом `supabase db pull`)
 CREATE OR REPLACE FUNCTION public.protect_profile_role_update()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 BEGIN
     IF NEW.role IS DISTINCT FROM OLD.role AND NOT public.current_user_has_role_internal('admin') THEN
         RAISE EXCEPTION 'У вас нет прав на изменение роли пользователя.';
     END IF;
     RETURN NEW;
 END;
-$$;
+$function$
+;
 GRANT EXECUTE ON FUNCTION public.protect_profile_role_update() TO authenticated;
 
 CREATE TRIGGER trigger_protect_profile_role_update
@@ -124,7 +143,6 @@ CREATE TRIGGER trigger_protect_profile_role_update
 -- 5.1. Включаем RLS для всех необходимых таблиц.
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
---ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- 5.2. Политики для таблицы PROFILES.
 DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
@@ -154,7 +172,7 @@ DROP POLICY IF EXISTS "Admins can insert menu item images" ON storage.objects;
 CREATE POLICY "Admins can insert menu item images" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'menu-item-images' AND public.current_user_has_role_internal('admin'));
 
 DROP POLICY IF EXISTS "Admins can update menu item images" ON storage.objects;
-CREATE POLICY "Admins can update menu item images" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'menu-item-images' AND public.current_user_has_role_internal('admin')) WITH CHECK (bucket_id = 'menu-item-images' AND public.current_user_has_role_internal('admin'));
+CREATE POLICY "Admins can update menu item images" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'menu-item-images' AND public.current_user_has_role_internal('admin'));
 
 DROP POLICY IF EXISTS "Admins can delete menu item images" ON storage.objects;
 CREATE POLICY "Admins can delete menu item images" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'menu-item-images' AND public.current_user_has_role_internal('admin'));
