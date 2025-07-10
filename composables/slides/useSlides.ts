@@ -12,20 +12,23 @@ export const useSlides = () => {
       .order("display_order", { ascending: true });
 
     if (error) {
-      console.error("Ошибка при загрузке слайдов", error);
+    console.error("Ошибка при загрузке слайдов", error);
       throw createError({
         statusCode: 500,
         statusMessage: "Не удалось загрузить слайды",
+        fatal: false,
       });
     }
 
     return data || [];
   });
 
+const isLoading = computed(() => asyncData.status.value === 'pending')
+
   return {
     slides: asyncData.data,
-    status: asyncData.status,
     error: asyncData.error,
     refresh: asyncData.refresh,
+    isLoading
   };
 };
