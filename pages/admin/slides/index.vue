@@ -3,7 +3,7 @@ import { useAdminSlides } from '~/composables/admin/useAdminSlides';
 import Button from '~/components/ui/button/Button.vue';
 import { Card, CardHeader, CardDescription, CardTitle, CardContent } from '~/components/ui/card';
 import Badge from '~/components/ui/badge/Badge.vue';
-import SlidesForm from '~/components/admin/slides/SlidesForm.vue';
+import SlidesForm from '~/components/admin/slides/ SlidesForm.vue';
 
 definePageMeta({
   layout: 'admin'
