@@ -4,12 +4,7 @@ import type { Database, SlideRow } from "~/types";
 export function useAdminSlides() {
   const supabase = useSupabaseClient<Database>();
 
-  const {
-    data: slides,
-    status,
-    error,
-    refresh,
-  } = useAsyncData(
+  const asyncData = useAsyncData(
     "admin-all-slides",
     async () => {
       const { data, error } = await supabase
@@ -62,7 +57,7 @@ export function useAdminSlides() {
       if (dbError) throw dbError;
 
       toast.success("Слайд успешно удален!", { id: toastId });
-      await refresh();
+      await asyncData.refresh();
     } catch (e: any) {
       toast.error("Ошибка при удалении", {
         id: toastId,
@@ -74,12 +69,15 @@ export function useAdminSlides() {
   async function handleFormSaved() {
     isFormOpen.value = false;
     selectedSlide.value = null;
-    await refresh();
+    await asyncData.refresh();
   }
+
+  const isLoading = computed(() => asyncData.status.value === 'pending')
+
   return {
-    slides,
-    status,
-    error,
+    slides: asyncData.data,
+    isLoading,
+    error: asyncData.error,
     isFormOpen,
     selectedSlide,
     openFormForNew,
