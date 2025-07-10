@@ -9,7 +9,7 @@ const profileStore = useProfileStore();
   <h1>Добро пожаловать в наш магазин</h1>
   <ClientOnly>
     <div v-if="user">
-      <nuxt-link to="/dashboard">Пройти на рабочею страницу</nuxt-link>
+      <nuxt-link to="/admin">Пройти на рабочею страницу</nuxt-link>
     </div>
 
     <div v-else>

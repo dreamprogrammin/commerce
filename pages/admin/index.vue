@@ -11,7 +11,7 @@ definePageMeta({
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Карточка-ссылка на Управление меню -->
-      <NuxtLink to="/dashboard/menu" class="block">
+      <NuxtLink to="/admin/menu" class="block">
         <Card class="hover:border-primary transition-colors">
           <CardHeader class="flex flex-row items-center justify-between pb-2">
             <CardTitle class="text-sm font-medium">Управление меню</CardTitle>
@@ -26,7 +26,7 @@ definePageMeta({
       </NuxtLink>
 
       <!-- Карточка-ссылка на Управление слайдами -->
-      <NuxtLink to="/dashboard/slides" class="block">
+      <NuxtLink to="/admin/slides" class="block">
         <Card class="hover:border-primary transition-colors">
           <CardHeader class="flex flex-row items-center justify-between pb-2">
             <CardTitle class="text-sm font-medium"
