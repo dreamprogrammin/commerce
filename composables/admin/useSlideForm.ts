@@ -1,6 +1,7 @@
 import { toast } from "vue-sonner";
 import type { Database, SlideInsert, SlideRow, SlideUpdate } from "~/types";
 import { v4 as uuidv4 } from "uuid";
+import slugify from "slugify";
 
 interface UseSlideFromOptions {
   onSuccess?: () => void;
@@ -65,7 +66,12 @@ export function useSlideForm(
       let finalImageUrl = formData.value.image_url;
 
       if (imageFile.value) {
-        const fileName = `${uuidv4()}-${imageFile.value.name}`;
+        const sanitizedFileName = slugify(imageFile.value.name, {
+          lower: true,
+          strict: true,
+          locale: 'ru'
+        })
+        const fileName = `${uuidv4()}-${sanitizedFileName}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("slides-images")
           .upload(fileName, imageFile.value, { upsert: isEditMode.value });
