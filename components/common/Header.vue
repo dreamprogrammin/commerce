@@ -9,10 +9,10 @@ const hideHeaderOverlay = (): void => {
   isHeaderOverlayVisible.value = false;
 };
 
-provide("headerOverlay", {
+provide('headerOverlay', {
   showOverlay: showHeaderOverlay,
   hideOverlay: hideHeaderOverlay,
-  isVisible: readonly(isHeaderOverlayVisible),
+  isVisible: readonly(isHeaderOverlayVisible)
 });
 
 const handleOverlayClick = () => {
@@ -24,7 +24,7 @@ const handleOverlayClick = () => {
     <CommonHeaderTop />
     <div class="app-container">
       <CommonHeaderBottom />
-      <CommonTabBar />
+      <CommonAppTabBar />
     </div>
   </header>
   <div
