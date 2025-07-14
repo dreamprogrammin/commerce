@@ -1,8 +1,7 @@
 import { toast } from "vue-sonner";
 import type { Database, SlideInsert, SlideRow, SlideUpdate } from "~/types";
 import { v4 as uuidv4 } from "uuid";
-import slugify from "slugify";
-
+import slugify from 'slugify'
 interface UseSlideFromOptions {
   onSuccess?: () => void;
 }

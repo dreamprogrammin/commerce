@@ -18,5 +18,7 @@ const profileStore = useProfileStore();
     <template #fallback>
       <div>Загрузка...</div>
     </template>
+
+      <CommonAppCarousel />
   </ClientOnly>
 </template>

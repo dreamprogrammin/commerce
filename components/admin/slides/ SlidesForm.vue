@@ -91,8 +91,8 @@ const {
         </div>
 
         <div>
-          <Label for="cta_text">Текст на кнопке</Label>
-          <Input id="cta_text" v-model="ctaLinkValue" placeholder="/catalog/new" />
+          <Label for="cta_link">Текст на кнопке</Label>
+          <Input id="cta_link" v-model="ctaLinkValue" placeholder="/catalog/new" />
         </div>
 
         <div class="grid grid-cols-2 gap-4 items-center">
