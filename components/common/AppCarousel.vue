@@ -46,6 +46,7 @@ function playAutoplay() {
     <Carousel
       v-else-if="slides && slides.length > 0"
       class="w-full"
+      :plugins="[autoplayPlugin]"
       :opts="{
         align: 'start',
         loop: true
@@ -55,11 +56,13 @@ function playAutoplay() {
       @mouseleave="playAutoplay"
     >
       <CarouselContent class="-ml-4">
-        <CarouselItem v-for="slide in slides" :key="slide.id" class="pl-4 md:basis-5/6 lg:basis-4/5">
+        <CarouselItem v-for="slide in slides" :key="slide.id" class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8">
           <div class="p-1">
             <Card class="overflow-hidden border-none shadow-xl rounded-2xl group py-0">
               <NuxtLink :to="slide.cta_link || '#'" :external="!!slide.cta_link?.startsWith('http')" class="block">
-                <CardContent class="relative flex h-[55vh] min-h-[250px] max-h-[400px] items-center justify-center p-0">
+                <CardContent
+                  class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
+                >
                   <img
                     v-if="slide.image_url"
                     :src="slide.image_url"
