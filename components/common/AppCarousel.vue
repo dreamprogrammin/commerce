@@ -31,7 +31,7 @@ function playAutoplay() {
   <div class="w-full">
     <div v-if="isLoading">
       <div class="p-1">
-        <Skeleton class="w-full h-[55vh] max-h-[400px] rounded-2xl" />
+        <Skeleton class="w-full h-[35vh] md:h-[65vh] max-h-[400px] rounded-2xl" />
       </div>
     </div>
 
