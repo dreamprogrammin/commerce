@@ -30,9 +30,27 @@ function playAutoplay() {
 <template>
   <div class="w-full">
     <div v-if="isLoading">
-      <div class="p-1">
-        <Skeleton class="w-full h-[35vh] md:h-[65vh] max-h-[400px] rounded-2xl" />
-      </div>
+      <Carousel
+        class="w-full"
+        :opts="{
+          align: 'start',
+          loop: false
+        }"
+      >
+        <CarouselContent class="-ml-4">
+          <CarouselItem v-for="i in 2" :key="i" class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8">
+            <div class="p-1">
+              <Card class="overflow-hidden border-none shadow-xl rounded-2xl group py-0">
+                <CardContent
+                  class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
+                >
+                  <Skeleton class="w-full h-full" />
+                </CardContent>
+              </Card>
+            </div>
+          </CarouselItem>
+        </CarouselContent>
+      </Carousel>
     </div>
 
     <div
