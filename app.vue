@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { useProfileStore } from '@/stores/profile';
-import { useModalStore } from './stores/modal/useModalStore';
+import { useModalStore } from '@/stores/modal/useModalStore';
 const isLoaded = ref(false);
 
 const nuxtApp = useNuxtApp();
-const isLoading = ref(false);
+const isLoadingPage = ref(false);
 
 nuxtApp.hook('page:start', () => {
-  isLoading.value = true;
+  isLoadingPage.value = true;
 });
 nuxtApp.hook('page:finish', () => {
   setTimeout(() => {
-    isLoading.value = false;
+    isLoadingPage.value = false;
   }, 300);
 });
 
@@ -19,12 +19,9 @@ const user = useSupabaseUser();
 const profileStore = useProfileStore();
 const modalStore = useModalStore();
 
-onMounted(async () => {
-  if (user.value) {
-    await profileStore.loadProfile();
-  }
-  isLoaded.value = true;
-});
+if (user.value && import.meta.server) {
+  await profileStore.loadProfile();
+}
 </script>
 <template>
   <CommonHeader />
@@ -42,6 +39,11 @@ onMounted(async () => {
       </Suspense>
     </NuxtLayout>
   </main>
+
+  <Transition>
+    <AppLoader v-if="isLoadingPage" />
+  </Transition>
+
   <ClientOnly>
     <AuthLoginModal v-if="modalStore.showLoginModal" />
   </ClientOnly>
