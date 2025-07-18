@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { useProfileStore } from '@/stores/profile';
 import { useModalStore } from '@/stores/modal/useModalStore';
-const isLoaded = ref(false);
 
 const nuxtApp = useNuxtApp();
-const isLoadingPage = ref(false);
+const isLoadingPage = ref(true);
 
 nuxtApp.hook('page:start', () => {
   isLoadingPage.value = true;
 });
+
 nuxtApp.hook('page:finish', () => {
   setTimeout(() => {
     isLoadingPage.value = false;
@@ -22,6 +22,13 @@ const modalStore = useModalStore();
 if (user.value && import.meta.server) {
   await profileStore.loadProfile();
 }
+
+// Простое решение для первой загрузки
+onMounted(() => {
+  setTimeout(() => {
+    isLoadingPage.value = false;
+  }, 300);
+});
 </script>
 <template>
   <CommonHeader />
