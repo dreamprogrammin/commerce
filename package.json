@@ -12,7 +12,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@nuxtjs/supabase": "^1.4.6",
+    "@nuxtjs/supabase": "^1.5.3",
     "@pinia/nuxt": "^0.10.1",
     "@tailwindcss/vite": "^4.1.7",
     "@vueuse/core": "^13.5.0",

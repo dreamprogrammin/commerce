@@ -1,4 +1,4 @@
-import type { Database, SlideRow } from "~/types";
+import type { Database, SlideRow } from "@/types";
 
 export const useSlides = () => {
   const supabase = useSupabaseClient<Database>();
@@ -21,6 +21,8 @@ export const useSlides = () => {
     }
 
     return data || [];
+  }, {
+    lazy: true
   });
 
 const isLoading = computed(() => asyncData.status.value === 'pending')
