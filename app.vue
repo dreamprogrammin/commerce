@@ -1,4 +1,3 @@
-<!-- app.vue (Версия без лоадеров) -->
 <script setup lang="ts">
 import { useProfileStore } from '@/stores/profile';
 import { useModalStore } from '@/stores/modal/useModalStore';
