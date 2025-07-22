@@ -9,10 +9,10 @@ const hideHeaderOverlay = (): void => {
   isHeaderOverlayVisible.value = false;
 };
 
-provide('headerOverlay', {
+provide("headerOverlay", {
   showOverlay: showHeaderOverlay,
   hideOverlay: hideHeaderOverlay,
-  isVisible: readonly(isHeaderOverlayVisible)
+  isVisible: readonly(isHeaderOverlayVisible),
 });
 
 const handleOverlayClick = () => {

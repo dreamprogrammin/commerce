@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CardHeader, CardTitle, Card, CardContent } from "~/components/ui/card";
+import { CardHeader, CardTitle, Card, CardContent } from "@/components/ui/card";
 definePageMeta({
   layout: "admin",
 });
@@ -17,7 +17,7 @@ definePageMeta({
             <CardTitle class="text-sm font-medium">Управление меню</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-2xl font-bold">Меню сайта</div> 
+            <div class="text-2xl font-bold">Меню сайта</div>
             <p class="text-xs text-muted-foreground">
               Редактирование структуры навигации и подкатегорий.
             </p>

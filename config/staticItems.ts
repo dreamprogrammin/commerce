@@ -1,4 +1,4 @@
-import type { IStaticMainMenuItem } from "~/types";
+import type { IStaticMainMenuItem } from "@/types";
 
 export const staticMainMenuItems: IStaticMainMenuItem[] = [
   {

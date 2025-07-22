@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Button from "~/components/ui/button/Button.vue";
-import { useAuth } from "~/composables/auth/useAuth";
+import Button from "@/components/ui/button/Button.vue";
+import { useAuth } from "@/composables/auth/useAuth";
 const { handleOut } = useAuth();
 </script>
 
@@ -21,6 +21,13 @@ const { handleOut } = useAuth();
         >
           Управление меню
         </NuxtLink>
+
+        <NuxtLink
+          to="/admin/popular-categories"
+          active-class="bg-muted text-primary"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          >Популярные категории</NuxtLink
+        >
 
         <NuxtLink
           to="/admin/slides"

@@ -1,6 +1,5 @@
-import { validatorForgotPassword } from "~/validator/forgotPassword.validator";
-import type { IParamsForgotPassword } from "~/types/type";
-import type { AuthApiError } from "@supabase/supabase-js";
+import { validatorForgotPassword } from "@/validator/forgotPassword.validator";
+import type { IParamsForgotPassword } from "@/types/type";
 
 export async function forgotPassword(params: IParamsForgotPassword) {
   const supabase = useSupabaseClient();

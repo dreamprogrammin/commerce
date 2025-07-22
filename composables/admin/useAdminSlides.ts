@@ -1,5 +1,5 @@
 import { toast } from "vue-sonner";
-import type { Database, SlideRow } from "~/types";
+import type { Database, SlideRow } from "@/types";
 
 export function useAdminSlides() {
   const supabase = useSupabaseClient<Database>();
@@ -72,7 +72,7 @@ export function useAdminSlides() {
     await asyncData.refresh();
   }
 
-  const isLoading = computed(() => asyncData.status.value === 'pending')
+  const isLoading = computed(() => asyncData.status.value === "pending");
 
   return {
     slides: asyncData.data,
