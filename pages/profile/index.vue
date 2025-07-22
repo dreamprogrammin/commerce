@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useProfileStore } from "~/stores/profile";
-import { useAuth } from "~/composables/auth/useAuth";
-import { useModalStore } from "~/stores/modal/useModalStore";
+import { useProfileStore } from "@/stores/profile";
+import { useAuth } from "@/composables/auth/useAuth";
+import { useModalStore } from "@/stores/modal/useModalStore";
 const { handleAuthGoogle, handleOut } = useAuth();
 const profileStore = useProfileStore();
 const user = useSupabaseUser();
