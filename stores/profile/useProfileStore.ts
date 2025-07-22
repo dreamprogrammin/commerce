@@ -1,5 +1,5 @@
-import { useAuthStore } from "~/stores/auth";
-import type { IProfile, ProfileUpdate } from "~/types/type";
+import { useAuthStore } from "@/stores/auth";
+import type { IProfile, ProfileUpdate } from "@/types/type";
 export const useProfileStore = defineStore("profileStore", () => {
   const authStore = useAuthStore();
 
