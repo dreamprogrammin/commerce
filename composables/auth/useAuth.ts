@@ -1,6 +1,6 @@
-import { useAuthStore } from "~/stores/auth";
-import type { ParamsSignUp } from "~/types/type";
-import { validatorSingUp } from "~/validator/signUp.validator";
+import { useAuthStore } from "@/stores/auth";
+import type { ParamsSignUp } from "@/types/type";
+import { validatorSingUp } from "@/validator/signUp.validator";
 export async function signIn(email: string, password: string) {
   const supabase = useSupabaseClient();
   const { error } = await supabase.auth.signInWithPassword({

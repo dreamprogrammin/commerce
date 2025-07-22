@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Progress from '../ui/progress/Progress.vue';
+import Progress from "../ui/progress/Progress.vue";
 const progress = ref(10);
 
 onMounted(() => {
@@ -17,11 +17,17 @@ onMounted(() => {
 });
 </script>
 <template>
-  <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+  <div
+    class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50"
+  >
     <div class="flex flex-col items-center gap-6 w-full max-w-xs px-4">
       <div class="text-center">
-        <h2 class="text-xl font-semibold text-foreground">Загружаем наш магазин</h2>
-        <p class="text-sm text-muted-foreground">Пожалуйста, подождите немного</p>
+        <h2 class="text-xl font-semibold text-foreground">
+          Загружаем наш магазин
+        </h2>
+        <p class="text-sm text-muted-foreground">
+          Пожалуйста, подождите немного
+        </p>
       </div>
 
       <Progress v-model="progress" class="w-full h-2" />

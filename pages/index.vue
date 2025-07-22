@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ClientOnly } from "#components";
-import { useProfileStore } from "~/stores/profile";
+import { useProfileStore } from "@/stores/profile";
 const user = useSupabaseUser();
 const profileStore = useProfileStore();
 </script>
@@ -19,6 +18,8 @@ const profileStore = useProfileStore();
       <div>Загрузка...</div>
     </template>
 
-      <CommonAppCarousel />
+    <CommonAppCarousel />
+
+    <HomePopularCategories />
   </ClientOnly>
 </template>

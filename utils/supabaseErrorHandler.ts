@@ -1,6 +1,6 @@
 import { PostgrestError } from "@supabase/supabase-js";
 import { toast } from "vue-sonner";
-import type { IHandlerSupabaseErrorOptions } from "~/types";
+import type { IHandlerSupabaseErrorOptions } from "@/types";
 
 export function handleSupabaseError(
   error: PostgrestError | Error | any,

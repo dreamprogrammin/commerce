@@ -8,10 +8,10 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { useSupabaseStorage } from "~/composables/menuItems/useSupabaseStorage";
-import { staticMainMenuItems } from "~/config/staticItems";
-import { BUCKET_NAME } from "~/constants";
-import { useMenuAdminStore } from "~/stores/menuItems/useTopMenuItems";
+import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
+import { staticMainMenuItems } from "@/config/staticItems";
+import { BUCKET_NAME } from "@/constants";
+import { useMenuAdminStore } from "@/stores/menuItems/useTopMenuItems";
 
 const searchSuggestions = [
   {

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { useSlides } from '@/composables/slides/useSlides';
-import Skeleton from '../ui/skeleton/Skeleton.vue';
-import Autoplay from 'embla-carousel-autoplay';
-import type { CarouselApi } from '../ui/carousel';
+import { useSlides } from "@/composables/slides/useSlides";
+import Skeleton from "../ui/skeleton/Skeleton.vue";
+import Autoplay from "embla-carousel-autoplay";
+import type { CarouselApi } from "../ui/carousel";
 
 const { isLoading, slides, error } = useSlides();
 
 const autoplayPlugin = Autoplay({
   delay: 4000,
   stopOnInteraction: false,
-  stopOnMouseEnter: true
+  stopOnMouseEnter: true,
 });
 
 const emblaApi = ref<CarouselApi>();
@@ -34,13 +34,19 @@ function playAutoplay() {
         class="w-full"
         :opts="{
           align: 'start',
-          loop: false
+          loop: false,
         }"
       >
         <CarouselContent class="-ml-4">
-          <CarouselItem v-for="i in 2" :key="i" class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8">
+          <CarouselItem
+            v-for="i in 2"
+            :key="i"
+            class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8"
+          >
             <div class="p-1">
-              <Card class="overflow-hidden border-none shadow-xl rounded-2xl group py-0">
+              <Card
+                class="overflow-hidden border-none shadow-xl rounded-2xl group py-0"
+              >
                 <CardContent
                   class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
                 >
@@ -67,17 +73,27 @@ function playAutoplay() {
       :plugins="[autoplayPlugin]"
       :opts="{
         align: 'start',
-        loop: true
+        loop: true,
       }"
       @init-api="onInit"
       @mouseenter="stopAutoplay"
       @mouseleave="playAutoplay"
     >
       <CarouselContent class="-ml-4">
-        <CarouselItem v-for="slide in slides" :key="slide.id" class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8">
+        <CarouselItem
+          v-for="slide in slides"
+          :key="slide.id"
+          class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8"
+        >
           <div class="p-1">
-            <Card class="overflow-hidden border-none shadow-xl rounded-2xl group py-0">
-              <NuxtLink :to="slide.cta_link || '#'" :external="!!slide.cta_link?.startsWith('http')" class="block">
+            <Card
+              class="overflow-hidden border-none shadow-xl rounded-2xl group py-0"
+            >
+              <NuxtLink
+                :to="slide.cta_link || '#'"
+                :external="!!slide.cta_link?.startsWith('http')"
+                class="block"
+              >
                 <CardContent
                   class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
                 >
@@ -87,7 +103,10 @@ function playAutoplay() {
                     :alt="slide.title"
                     class="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
                   />
-                  <div v-else class="w-full h-full bg-gradient-to-br from-primary to-secondary" />
+                  <div
+                    v-else
+                    class="w-full h-full bg-gradient-to-br from-primary to-secondary"
+                  />
                 </CardContent>
               </NuxtLink>
             </Card>

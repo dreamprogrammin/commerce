@@ -2,9 +2,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { IEditableMenuItem } from "~/types";
-import { useSupabaseStorage } from "~/composables/menuItems/useSupabaseStorage";
-import { BUCKET_NAME } from "~/constants";
+import type { IEditableMenuItem } from "@/types";
+import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
+import { BUCKET_NAME } from "@/constants";
 
 const props = defineProps<{
   item: IEditableMenuItem;
@@ -18,7 +18,7 @@ const emit = defineEmits<{
 }>();
 
 const RecursiveMenuItemFormNode = defineAsyncComponent(
-  () => import("~/components/admin/menu/RecursiveMenuItemFormNode.vue"),
+  () => import("@/components/admin/menu/RecursiveMenuItemFormNode.vue"),
 );
 
 const isChildrenVisible = ref(true);
@@ -98,7 +98,7 @@ function removeImage() {
         :disabled="!!item.id"
       />
     </div>
-    <div>
+    <!-- <div>
       <Label :for="`desc-${item._tempId || item.id}`">Описание</Label>
       <Textarea
         :id="`desc-${item._tempId || item.id}`"
@@ -106,7 +106,7 @@ function removeImage() {
         rows="2"
         class="w-full mt-1"
       />
-    </div>
+    </div> -->
     <div>
       <Label :for="`order-${item._tempId || item.id}`">Порядок</Label>
       <Input
@@ -145,7 +145,6 @@ function removeImage() {
           type="button"
           aria-label="Удалить изображение"
         >
-          <Icon name="lucide:x" class="h-3 w-3" />
         </Button>
       </div>
     </div>
@@ -164,11 +163,6 @@ function removeImage() {
           variant="ghost"
         >
           {{ isChildrenVisible ? "Свернуть" : "Развернуть" }}
-          <Icon
-            name="lucide:chevron-down"
-            :class="{ 'rotate-180': !isChildrenVisible }"
-            class="ml-1 h-4 w-4 transition-transform"
-          />
         </Button>
       </div>
 
@@ -192,8 +186,7 @@ function removeImage() {
       variant="outline"
       class="mt-2 border-dashed w-full"
     >
-      <Icon name="lucide:plus" class="mr-1 h-4 w-4" /> Добавить подпункт
-      (Уровень {{ level + 3 }})
+      Добавить подпункт (Уровень {{ level + 3 }})
     </Button>
   </div>
 </template>

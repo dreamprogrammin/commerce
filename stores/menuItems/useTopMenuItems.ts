@@ -1,12 +1,12 @@
 import { toast } from "vue-sonner";
-import { useSupabaseStorage } from "~/composables/menuItems/useSupabaseStorage";
+import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
 import type {
   Database,
   IItemToDelete,
   MenuItemInsert,
   MenuItemRow,
   MenuItemUpdate,
-} from "~/types";
+} from "@/types";
 
 export const useMenuAdminStore = defineStore("menuAdminStore", () => {
   const supabase = useSupabaseClient<Database>();
@@ -125,6 +125,45 @@ export const useMenuAdminStore = defineStore("menuAdminStore", () => {
     }
   }
 
+// stores/menuItems/useTopMenuItems.ts
+
+async function toggleFeaturedStatus(itemToUpdate: MenuItemRow) {
+  const newValue = !itemToUpdate.is_featured_on_homepage;
+
+  // Оптимистичное обновление UI
+  const itemIndex = items.value.findIndex(i => i.id === itemToUpdate.id);
+  if (itemIndex === -1) return; // Элемент не найден в сторе
+
+  const originalItem = { ...items.value[itemIndex] }; // Сохраняем оригинал для отката
+  
+  // Создаем НОВЫЙ массив с обновленным элементом
+  const updatedItems = [...items.value];
+  updatedItems[itemIndex] = { ...originalItem, is_featured_on_homepage: newValue };
+  
+  // Перезаписываем весь массив. Это 100% реактивно.
+  items.value = updatedItems;
+
+  try {
+    const { error } = await supabase
+      .from("menu_items")
+      .update({ is_featured_on_homepage: newValue })
+      .eq("id", itemToUpdate.id);
+
+    if (error) throw error;
+
+    toast.success("Успех", { description: `Статус для "${itemToUpdate.title}" обновлен.` });
+
+  } catch (error) {
+    toast.error("Ошибка", { description: `Не удалось обновить статус.` });
+    console.error(error);
+    
+    // Откат в случае ошибки: возвращаем старый массив
+    const rollbackItems = [...items.value];
+    rollbackItems[itemIndex] = originalItem;
+    items.value = rollbackItems;
+  }
+}
+
   return {
     items,
     isLoading,
@@ -134,5 +173,6 @@ export const useMenuAdminStore = defineStore("menuAdminStore", () => {
     updateItem,
     deleteItem,
     getChildren,
+    toggleFeaturedStatus,
   };
 });

@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import RecursiveMenuItemFormNode from "~/components/admin/menu/RecursiveMenuItemFormNode.vue";
-import { Button } from "@/components/ui/button";
+import RecursiveMenuItemFormNode from "@/components/admin/menu/RecursiveMenuItemFormNode.vue";
 import { toast } from "vue-sonner";
 import { v4 as uuidv4 } from "uuid";
-import { useMenuAdminStore } from "~/stores/menuItems/useTopMenuItems";
-import type { IEditableMenuItem, IStaticMainMenuItem } from "~/types";
-import { useRecursiveMenuForm } from "~/composables/menuItems/useRecursiveMenuForm";
-import { staticMainMenuItems } from "~/config/staticItems";
+import { useMenuAdminStore } from "@/stores/menuItems/useTopMenuItems";
+import type { IEditableMenuItem, IStaticMainMenuItem } from "@/types";
+import { useRecursiveMenuForm } from "@/composables/menuItems/useRecursiveMenuForm";
+import { staticMainMenuItems } from "@/config/staticItems";
 
 const menuAdminStore = useMenuAdminStore();
 const selectedParent = ref<IStaticMainMenuItem | null>(null);
@@ -164,9 +163,7 @@ definePageMeta({
               variant="outline"
               class="w-full border-dashed"
             >
-              <Icon name="lucide:plus" class="mr-2" /> Добавить пункт в "{{
-                selectedParent.title
-              }}" (Уровень 2)
+              Добавить пункт в "{{ selectedParent.title }}" (Уровень 2)
             </Button>
           </div>
         </div>

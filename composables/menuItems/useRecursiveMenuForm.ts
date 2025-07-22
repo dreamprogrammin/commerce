@@ -5,12 +5,12 @@ import type {
   MenuItemInsert,
   MenuItemRow,
   MenuItemUpdate,
-} from "~/types/type";
+} from "@/types/type";
 import { toast } from "vue-sonner";
-import { slugify } from "~/utils/slugify";
-import { useMenuAdminStore } from "~/stores/menuItems/useTopMenuItems";
+import { slugify } from "@/utils/slugify";
+import { useMenuAdminStore } from "@/stores/menuItems/useTopMenuItems";
 import { useSupabaseStorage } from "./useSupabaseStorage";
-import { BUCKET_NAME } from "~/constants";
+import { BUCKET_NAME } from "@/constants";
 
 export function useRecursiveMenuForm(initialParentSlug: Ref<string | null>) {
   const menuAdminStore = useMenuAdminStore();

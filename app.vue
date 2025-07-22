@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useProfileStore } from '@/stores/profile';
-import { useModalStore } from '@/stores/modal/useModalStore';
+import { useProfileStore } from "@/stores/profile";
+import { useModalStore } from "@/stores/modal/useModalStore";
 
 const user = useSupabaseUser();
 const profileStore = useProfileStore();
