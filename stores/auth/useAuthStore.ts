@@ -1,4 +1,4 @@
-import type { Database } from "~/types/supabase";
+import type { Database } from "@/types/supabase";
 import { createAuthAction } from "./actionAuth";
 
 export const useAuthStore = defineStore("authStore", () => {
