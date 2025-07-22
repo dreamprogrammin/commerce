@@ -168,7 +168,7 @@ onMounted(() => {
               </NuxtLink>
 
               <NavigationMenuContent>
-                <div class="p-4 md:w-[550px] lg:w-[650px]">
+                <div class="p-4 min-w-screen">
                   <ul class="grid grid-cols-2 gap-x-6 gap-y-4">
                     <li
                       v-for="itemL2 in menuStore.getChildren(itemL1.slug)"
