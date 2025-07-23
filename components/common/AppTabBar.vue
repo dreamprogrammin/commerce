@@ -169,7 +169,7 @@ onMounted(() => {
 
               <NavigationMenuContent>
                 <div class="p-4 min-w-screen">
-                  <ul class="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <ul class="grid grid-cols-4 gap-x-6 gap-y-4">
                     <li
                       v-for="itemL2 in menuStore.getChildren(itemL1.slug)"
                       :key="itemL2.slug"
