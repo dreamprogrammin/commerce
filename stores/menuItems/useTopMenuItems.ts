@@ -17,6 +17,9 @@ export const useMenuAdminStore = defineStore("menuAdminStore", () => {
   const isLoading = ref(false);
   const storeError = ref<string | null>(null);
 
+  const allItems = ref<MenuItemRow[]>([]);
+  const featuredItems = ref<MenuItemRow[]>([]);
+
   function getChildren(parentSlug: string | null): MenuItemRow[] {
     if (!parentSlug) return [];
     return items.value
@@ -125,44 +128,57 @@ export const useMenuAdminStore = defineStore("menuAdminStore", () => {
     }
   }
 
-// stores/menuItems/useTopMenuItems.ts
+  async function fetchItemsAndSeparate(force: boolean = false) {
+    if (!force && allItems.value.length > 0) return; // Загружаем только один раз
+    isLoading.value = true;
+    try {
+      const { data, error } = await supabase
+        .from("menu_items")
+        .select("*")
+        .order("title", { ascending: true }); // Сортируем по алфавиту для удобства
 
-async function toggleFeaturedStatus(itemToUpdate: MenuItemRow) {
-  const newValue = !itemToUpdate.is_featured_on_homepage;
+      if (error) throw error;
 
-  // Оптимистичное обновление UI
-  const itemIndex = items.value.findIndex(i => i.id === itemToUpdate.id);
-  if (itemIndex === -1) return; // Элемент не найден в сторе
-
-  const originalItem = { ...items.value[itemIndex] }; // Сохраняем оригинал для отката
-  
-  // Создаем НОВЫЙ массив с обновленным элементом
-  const updatedItems = [...items.value];
-  updatedItems[itemIndex] = { ...originalItem, is_featured_on_homepage: newValue };
-  
-  // Перезаписываем весь массив. Это 100% реактивно.
-  items.value = updatedItems;
-
-  try {
-    const { error } = await supabase
-      .from("menu_items")
-      .update({ is_featured_on_homepage: newValue })
-      .eq("id", itemToUpdate.id);
-
-    if (error) throw error;
-
-    toast.success("Успех", { description: `Статус для "${itemToUpdate.title}" обновлен.` });
-
-  } catch (error) {
-    toast.error("Ошибка", { description: `Не удалось обновить статус.` });
-    console.error(error);
-    
-    // Откат в случае ошибки: возвращаем старый массив
-    const rollbackItems = [...items.value];
-    rollbackItems[itemIndex] = originalItem;
-    items.value = rollbackItems;
+      allItems.value = data || [];
+      featuredItems.value = allItems.value.filter(item => item.is_featured_on_homepage);
+    } catch (e) {
+      handleSupabaseError(e, { operationName: "загрузке списка меню" });
+    } finally {
+      isLoading.value = false;
+    }
   }
-}
+
+  /**
+   * НОВАЯ, СУПЕР-НАДЕЖНАЯ ФУНКЦИЯ СОХРАНЕНИЯ
+   * Принимает финальный список ID "избранных".
+   */
+  async function saveFeaturedList(featuredIds: string[]): Promise<boolean> {
+    try {
+      // 1. Устанавливаем is_featured_on_homepage = TRUE для всех ID из списка
+      const { error: errorFeatured } = await supabase
+        .from('menu_items')
+        .update({ is_featured_on_homepage: true } as MenuItemUpdate)
+        .in('id', featuredIds);
+      if (errorFeatured) throw errorFeatured;
+
+      // 2. Устанавливаем is_featured_on_homepage = FALSE для ВСЕХ ОСТАЛЬНЫХ
+      const { error: errorNotFeatured } = await supabase
+        .from('menu_items')
+        .update({ is_featured_on_homepage: false } as MenuItemUpdate)
+        .not('id', 'in', `(${featuredIds.join(',')})`); // Условие "где ID НЕ в списке"
+      if (errorNotFeatured) throw errorNotFeatured;
+
+      toast.success("Успех", { description: "Список популярных категорий обновлен." });
+      
+      // Перезагружаем данные, чтобы все было синхронизировано
+      await fetchItemsAndSeparate(true); 
+      return true;
+
+    } catch (err) {
+      handleSupabaseError(err, { operationName: 'сохранении списка' });
+      return false;
+    }
+  }
 
   return {
     items,
@@ -173,6 +189,9 @@ async function toggleFeaturedStatus(itemToUpdate: MenuItemRow) {
     updateItem,
     deleteItem,
     getChildren,
-    toggleFeaturedStatus,
+    allItems,
+    featuredItems,
+    saveFeaturedList,
+    fetchItemsAndSeparate
   };
 });
