@@ -1,69 +1,131 @@
 <script setup lang="ts">
 import { useMenuAdminStore } from '@/stores/menuItems/useTopMenuItems';
 import type { MenuItemRow } from '@/types';
+import { ref, onMounted } from 'vue';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 definePageMeta({ layout: 'admin' });
 
 const menuAdminStore = useMenuAdminStore();
+const isSaving = ref(false);
 
-// Загружаем все пункты меню при монтировании
-onMounted(() => {
-  if (menuAdminStore.items.length === 0) {
-    menuAdminStore.fetchItems();
-  }
+// Локальные копии для управления UI
+const available = ref<MenuItemRow[]>([]);
+const featured = ref<MenuItemRow[]>([]);
+
+// ID, выбранные в каждом из списков
+const selectedAvailable = ref<string[]>([]);
+const selectedFeatured = ref<string[]>([]);
+
+// Загружаем данные и инициализируем локальные списки
+onMounted(async () => {
+  await menuAdminStore.fetchItemsAndSeparate();
+  // Вычисляем начальный список доступных
+  updateLocalList()
 });
 
-// Функция для переключения статуса. Мы добавим ее в store.
-async function handleToggle(item: MenuItemRow) {
-  await menuAdminStore.toggleFeaturedStatus(item);
+function updateLocalList () {
+  const featuredIds = new Set(menuAdminStore.featuredItems.map(i => i.id));
+  available.value = menuAdminStore.allItems.filter(item => !featuredIds.has(item.id));
+  featured.value = [...menuAdminStore.featuredItems]; // Создаем копию
+  console.log('Локальные списки обновлены!');
+}
+
+// Функции для выбора элементов в списках
+function toggleSelection(list: 'available' | 'featured', id: string) {
+  const selectionRef = list === 'available' ? selectedAvailable : selectedFeatured;
+  const index = selectionRef.value.indexOf(id);
+  if (index > -1) {
+    selectionRef.value.splice(index, 1);
+  } else {
+    selectionRef.value.push(id);
+  }
+}
+
+// Функции для перемещения
+function moveToFeatured() {
+  const toMove = available.value.filter(item => selectedAvailable.value.includes(item.id));
+  featured.value.push(...toMove);
+  available.value = available.value.filter(item => !selectedAvailable.value.includes(item.id));
+  selectedAvailable.value = [];
+}
+
+function moveToAvailable() {
+  const toMove = featured.value.filter(item => selectedFeatured.value.includes(item.id));
+  available.value.push(...toMove);
+  featured.value = featured.value.filter(item => !selectedFeatured.value.includes(item.id));
+  selectedFeatured.value = [];
+}
+
+async function saveChanges() {
+  isSaving.value = true;
+  const featuredIds = featured.value.map(item => item.id);
+  const success = await menuAdminStore.saveFeaturedList(featuredIds);
+  if (success) {
+    updateLocalList()
+  }
+  isSaving.value = false;
 }
 </script>
 
 <template>
   <div class="container mx-auto p-4 md:p-8">
-    <h1 class="text-3xl font-bold text-foreground mb-6">
-      Управление популярными категориями
-    </h1>
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
+      <h1 class="text-3xl font-bold text-foreground">
+        Управление популярными категориями
+      </h1>
+      <Button @click="saveChanges" :disabled="isSaving">
+        Сохранить список
+      </Button>
+    </div>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>Список категорий</CardTitle>
-        <p class="text-muted-foreground text-sm mt-1">
-          Включите переключатель для тех категорий, которые должны отображаться на главной странице.
-          Рекомендуется выбирать не более 6-8 категорий с изображениями.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div v-if="menuAdminStore.isLoading" class="text-center py-10">
-          Загрузка...
-        </div>
-        <div v-else class="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Название категории</TableHead>
-                <TableHead>Путь (Slug)</TableHead>
-                <TableHead class="text-right">Показывать на главной</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="item in menuAdminStore.items" :key="item.id">
-                <TableCell class="font-medium flex items-center gap-2">
-                  <span>{{ item.title }}</span>
-                  <Badge v-if="!item.image_url" variant="destructive" class="text-xs">Нет фото</Badge>
-                </TableCell>
-                <TableCell class="text-muted-foreground">{{ item.href }}</TableCell>
-                <TableCell class="text-right">
-                  <Switch
-                    :checked="item.is_featured_on_homepage"
-                    @update:checked="() => handleToggle(item)"
-                  />
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+    <div v-if="menuAdminStore.isLoading" class="text-center py-20">Загрузка...</div>
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      
+      <!-- Левая колонка: Доступные категории -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Доступные категории</CardTitle>
+        </CardHeader>
+        <CardContent class="h-96 overflow-y-auto space-y-1">
+          <div
+            v-for="item in available"
+            :key="item.id"
+            @click="toggleSelection('available', item.id)"
+            class="p-2 rounded-md cursor-pointer border transition-colors"
+            :class="selectedAvailable.includes(item.id) ? 'bg-primary/20 border-primary' : 'hover:bg-muted/50'"
+          >
+            {{ item.title }}
+            <span v-if="!item.image_url" class="text-xs text-destructive ml-2">(нет фото)</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Правая колонка: Популярные категории -->
+      <Card>
+        <CardHeader class="flex flex-row items-center justify-between">
+          <CardTitle>Популярные на главной</CardTitle>
+          <div class="flex gap-2">
+            <Button variant="outline" size="icon" @click="moveToFeatured" :disabled="selectedAvailable.length === 0">
+            </Button>
+            <Button variant="outline" size="icon" @click="moveToAvailable" :disabled="selectedFeatured.length === 0">
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent class="h-96 overflow-y-auto space-y-1">
+          <div
+            v-for="item in featured"
+            :key="item.id"
+            @click="toggleSelection('featured', item.id)"
+            class="p-2 rounded-md cursor-pointer border transition-colors"
+            :class="selectedFeatured.includes(item.id) ? 'bg-primary/20 border-primary' : 'hover:bg-muted/50'"
+          >
+            {{ item.title }}
+          </div>
+        </CardContent>
+      </Card>
+
+    </div>
   </div>
 </template>
