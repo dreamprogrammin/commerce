@@ -6,9 +6,14 @@ const user = useSupabaseUser();
 const profileStore = useProfileStore();
 const modalStore = useModalStore();
 
-if (user.value && import.meta.server) {
-  profileStore.loadProfile();
-}
+watch(user, async (newUser) => {
+  if (newUser) {
+    await profileStore.loadProfile();
+  } else {
+    profileStore.clearProfile();
+  }
+}, { immediate: true });
+
 </script>
 
 <template>

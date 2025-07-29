@@ -1,24 +1,20 @@
-import { useAuthStore } from "@/stores/auth";
-import type { IProfile, ProfileUpdate } from "@/types/type";
+import type { Database } from "@/types";
+import type { ProfileRow, ProfileUpdate } from "@/types/type";
 export const useProfileStore = defineStore("profileStore", () => {
-  const authStore = useAuthStore();
+  const supabase = useSupabaseClient<Database>()
+  const user = useSupabaseUser()
 
-  const displayProfile = ref<IProfile>({
-    id: "",
-    email: null,
-    first_name: null,
-    last_name: null,
-    phone: null,
-  });
+  const displayProfile = ref<ProfileRow | null>(null)
+  const editProfile = ref<ProfileRow | null>(null);
 
-  const editProfile = ref<IProfile>({ ...displayProfile.value });
+  const bonusBalance = computed(() => displayProfile.value?.bonus_balance ?? 0)
 
-  const isLoading = ref(true);
+  const isLoading = ref(false);
   const isSaving = ref(false);
 
   async function useEmptyProfile() {
     try {
-      const { data, error } = await authStore.supabase
+      const { error } = await supabase
         .from("profiles")
         .select("*")
         .or("first_name.is.null, last_name.is.null, email.is.null");
@@ -33,52 +29,60 @@ export const useProfileStore = defineStore("profileStore", () => {
 
   async function loadProfile() {
     try {
-      isLoading.value = true;
-      const user = await authStore.supabase.auth.getUser();
-      if (!user.data?.user) {
-        throw new Error("Пользователь не найден");
+      if (!user.value) {
+        clearProfile()
+        return
       }
-      const userId = user.data.user?.id;
-      const { data, error } = await authStore.supabase
+
+      isLoading.value = true;
+
+      const userId = user.value.id;
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
       if (error) {
-        throw error;
+        console.warn(`Предупреждение при загрузке профиля: ${error.message}`);
       }
       displayProfile.value = data;
-      editProfile.value = { ...data };
-    } catch (error) {
-      throw error;
+      editProfile.value = data ? {...data} : null
+    } catch (e: any) {
+      console.error("Критическая ошибка в loadProfile:", e);
+      clearProfile()
     } finally {
       isLoading.value = false;
     }
   }
   async function updateProfile(profiles: ProfileUpdate) {
+    if (!displayProfile.value) return
     isSaving.value = true;
     try {
-      if (!profiles.id) {
+      const profileId = displayProfile.value?.id
+      if (!profileId) {
         throw new Error("ID профиля не может быть пустым");
       }
-      const { error } = await authStore.supabase
+      const { error } = await supabase
         .from("profiles")
-        .update({
-          first_name: profiles.first_name ?? null,
-          last_name: profiles.last_name ?? null,
-          phone: profiles.phone ?? null,
-        })
-        .eq("id", profiles.id);
+        .update(profiles)
+        .eq("id", profileId);
       if (error) {
-        throw error;
+        console.error("Ошибка обновления профиля:", error);
+      } else {
+        alert("Профиль успешно");
+        await loadProfile()
       }
-      alert("Профиль успешно");
-      displayProfile.value = { ...editProfile.value };
-    } catch (error) {
-      alert(error + "Ошибка");
+    } catch (e: any) {
+      console.error("Критическая ошибка при обновлении профиля:", e);
+      alert(`Произошла непредвиденная ошибка: ${e.message}`);
     } finally {
       isSaving.value = false;
     }
+  }
+
+  function clearProfile () {
+    displayProfile.value = null
+    editProfile.value = null
   }
   return {
     displayProfile,
@@ -88,5 +92,7 @@ export const useProfileStore = defineStore("profileStore", () => {
     useEmptyProfile,
     isLoading,
     isSaving,
+    bonusBalance,
+    clearProfile
   };
 });
