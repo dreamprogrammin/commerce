@@ -26,8 +26,6 @@ export interface IProfile {
   phone: string | null;
 }
 
-export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
-
 export interface MenuItem {
   id: string;
   slug: string;
@@ -96,3 +94,6 @@ export interface IStaticMainMenuItem {
 export type SlideRow = Database["public"]["Tables"]["slides"]["Row"];
 export type SlideInsert = Database["public"]["Tables"]["slides"]["Insert"];
 export type SlideUpdate = Database["public"]["Tables"]["slides"]["Update"];
+
+export type ProfileRow = Database['public']['Tables']['profiles']['Row']
+export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];

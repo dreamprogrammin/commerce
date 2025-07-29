@@ -21,5 +21,8 @@ const profileStore = useProfileStore();
     <CommonAppCarousel />
 
     <HomePopularCategories />
+    <div>
+      <HomeBonusProgramCard />
+    </div>
   </ClientOnly>
 </template>

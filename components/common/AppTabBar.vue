@@ -162,7 +162,7 @@ onMounted(() => {
           <NavigationMenuItem :value="itemL1.slug">
             <template v-if="itemL1.isTrigger">
               <NuxtLink :to="itemL1.href" as-child>
-                <NavigationMenuTrigger :class="navigationMenuTriggerStyle()">
+                <NavigationMenuTrigger :class="`${navigationMenuTriggerStyle()}`">
                   {{ itemL1.title }}
                 </NavigationMenuTrigger>
               </NuxtLink>

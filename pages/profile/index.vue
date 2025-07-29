@@ -2,35 +2,64 @@
 import { useProfileStore } from "@/stores/profile";
 import { useAuth } from "@/composables/auth/useAuth";
 import { useModalStore } from "@/stores/modal/useModalStore";
+
 const { handleAuthGoogle, handleOut } = useAuth();
 const profileStore = useProfileStore();
 const user = useSupabaseUser();
+
 definePageMeta({
   layout: "profile",
 });
-const modalStore = useModalStore();
-onMounted(async () => {
-  if (user.value) {
-    await profileStore.loadProfile();
+const {isLoading, displayProfile} = storeToRefs(profileStore)
+const displayName = computed(() => {
+  if (!user.value) {
+    return 'Гость'
   }
-});
+
+  if (displayProfile.value) {
+    const fullName = [displayProfile.value?.first_name, displayProfile.value?.last_name].filter(Boolean)
+    if (fullName) {
+      return fullName;
+    }
+  }
+  return user.value.email || 'Пользователь';
+})
+const modalStore = useModalStore();
 </script>
 <template>
-  <h1>Добро пожаловать на страницу профайла и настройки</h1>
+  <h1>Настройки профиля</h1>
+
   <ClientOnly>
-    <div v-if="user">
-      Привет {{ profileStore.displayProfile.first_name }}
-      {{ profileStore.displayProfile.last_name }}
-      <button @click="handleOut">Выйти с аккаунта:</button>
+    <!-- Блок для гостя (если user=null) -->
+    <div v-if="!user">
+      <h2>Привет, Гость!</h2>
+      <p>Войдите, чтобы управлять своим профилем.</p>
+      <button @click="handleAuthGoogle">Войти через Google</button>
     </div>
 
+    <!-- Блок для залогиненного пользователя (если user существует) -->
     <div v-else>
-      Привет гость
-      <button @click="handleAuthGoogle">Войти в профиль</button>
+      <!-- Состояние загрузки. Оно не зависит от displayName -->
+      <div v-if="isLoading">
+        <p>Загрузка данных профиля...</p>
+        <!-- Можно добавить скелетон или спиннер -->
+      </div>
+
+      <!-- Состояние, когда загрузка завершена. -->
+      <!-- Теперь неважно, есть ли профиль, мы покажем контент -->
+      <div v-else>
+        <!-- displayName всегда вернет корректное значение -->
+        <h2>Добро пожаловать, {{ displayName }}!</h2>
+        
+        <p>Ваш email: {{ user.email }}</p> 
+        <p>Ваши бонусы: {{ profileStore.bonusBalance }} ✨</p>
+
+        <button @click="handleOut" class="mt-4">Выйти из аккаунта</button>
+      </div>
     </div>
+    
     <template #fallback>
       <div>Загрузка...</div>
     </template>
-    <div v-if="modalStore.showLoginModal">hi</div>
   </ClientOnly>
 </template>
