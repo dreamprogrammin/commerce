@@ -1,8 +1,8 @@
-name: Deploy Migrations to Supabase
+name: Deploy Migrations to Supabase Production
 
 on:
   push:
-    branches: [main]
+    branches: [main] # Правильно! Срабатывает только при пуше в main
 
 jobs:
   deploy:
@@ -15,12 +15,16 @@ jobs:
         with:
           version: latest
 
+      # Связываемся с единственным облачным проектом
       - name: Link to Supabase project
         run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # Применяем протестированные миграции
       - name: Push database changes
         run: supabase db push
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Пароль от БД может понадобиться для неинтерактивного режима
+          # SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }} 
