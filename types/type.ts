@@ -63,20 +63,6 @@ export interface IUploadFileOptions {
   contentType?: string;
 }
 
-export type MenuItemRow = Database["public"]["Tables"]["menu_items"]["Row"];
-export type MenuItemInsert =
-  Database["public"]["Tables"]["menu_items"]["Insert"];
-export type MenuItemUpdate =
-  Database["public"]["Tables"]["menu_items"]["Update"];
-
-export interface IEditableMenuItem
-  extends Partial<Omit<MenuItemRow, "created_at" | "updated_at">> {
-  _tempId?: string;
-  children: IEditableMenuItem[];
-  _imageFile?: File | null;
-  _imagePreviewUrl?: string | undefined;
-}
-
 export interface IItemToDelete {
   id: string;
   title: string;
