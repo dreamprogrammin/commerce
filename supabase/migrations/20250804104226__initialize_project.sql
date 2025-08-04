@@ -1,6 +1,7 @@
 -- =====================================================================================
 -- ==                                                                                 ==
 -- ==           ЕДИНАЯ МИГРАЦИЯ ДЛЯ ПОЛНОЙ ИНИЦИАЛИЗАЦИИ ПРОЕКТА С НУЛЯ              ==
+-- ==           Версия 2.1 - Полная и исправленная                                    ==
 -- ==                                                                                 ==
 -- =====================================================================================
 
@@ -104,7 +105,6 @@ CREATE TABLE IF NOT EXISTS public.slides (
 COMMENT ON TABLE public.slides IS 'Слайды для глобальной карусели на сайте.';
 
 -- === СЕКЦИЯ 2: ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
--- Теперь, когда все таблицы созданы, можно создавать функции, которые их используют.
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
 
@@ -113,7 +113,6 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$ SELECT EXISTS (SELECT 1 FROM public.profiles pr WHERE pr.id = auth.uid() AND pr.role = lower(required_role)); $$;
 
 -- === СЕКЦИЯ 3: RPC-ФУНКЦИИ (БИЗНЕС-ЛОГИКА) ===
--- Теперь создаем наши основные RPC-функции.
 
 -- 3.1 Функция для получения отфильтрованных товаров
 CREATE OR REPLACE FUNCTION public.get_filtered_products(
@@ -164,7 +163,7 @@ BEGIN
     USING category_ids_subtree, p_subcategory_ids, p_price_min, p_price_max;
 END;
 $$;
-COMMENT ON FUNCTION public.get_filtered_products IS 'Возвращает отфильтрованный и отсортированный список товаров для страницы каталога.';
+COMMENT ON FUNCTION public.get_filtered_products IS 'Возвращает отфильтрованный и отсортированный список товаров.';
 
 -- 3.2 Функция для создания нового заказа
 CREATE OR REPLACE FUNCTION public.create_order(
@@ -328,3 +327,52 @@ CREATE POLICY "Admins can update images" ON storage.objects FOR UPDATE TO authen
     
 DROP POLICY IF EXISTS "Admins can delete images" ON storage.objects;
 CREATE POLICY "Admins can delete images" ON storage.objects FOR DELETE TO authenticated USING (public.current_user_has_role_internal('admin'));
+
+-- === СЕКЦИЯ 7: ФУНКЦИИ И ТРИГГЕРЫ ДЛЯ АВТОМАТИЗАЦИИ ===
+
+-- 7.1 Функция для автоматического создания профиля нового пользователя
+CREATE OR REPLACE FUNCTION public.handle_new_user_profile_creation()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS
+$function$
+BEGIN
+  INSERT INTO public.profiles (id, first_name, role)
+  VALUES (
+    NEW.id, 
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'Новый пользователь'), 
+    'user'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$function$;
+
+-- 7.2 Триггер для вызова функции создания профиля
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_profile_creation();
+
+
+-- 7.3 Функция для защиты от несанкционированного изменения роли
+CREATE OR REPLACE FUNCTION public.protect_profile_role_update()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS
+$function$
+BEGIN
+    -- Разрешаем изменение роли только если текущий пользователь - админ
+    IF NEW.role IS DISTINCT FROM OLD.role AND NOT public.current_user_has_role_internal('admin') THEN
+        RAISE EXCEPTION 'У вас нет прав на изменение роли пользователя.';
+    END IF;
+    RETURN NEW;
+END;
+$function$;
+
+-- 7.4 Триггер для защиты роли
+DROP TRIGGER IF EXISTS trigger_protect_profile_role_update ON public.profiles;
+CREATE TRIGGER trigger_protect_profile_role_update
+BEFORE UPDATE OF role ON public.profiles
+FOR EACH ROW WHEN (OLD.role IS DISTINCT FROM NEW.role)
+EXECUTE FUNCTION public.protect_profile_role_update();
+
+-- =====================================================================================
+-- ==                     КОНЕЦ ЕДИНОЙ МИГРАЦИИ ИНИЦИАЛИЗАЦИИ                         ==
+-- ===================================================================================== 
