@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2024-11-01",
-  modules: ["@pinia/nuxt", "@nuxtjs/supabase", "shadcn-nuxt"],
+  modules: ["@pinia/nuxt", "@nuxtjs/supabase", "shadcn-nuxt", '@pinia-plugin-persistedstate/nuxt'],
   supabase: {
     redirect: false,
   },

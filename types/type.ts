@@ -83,3 +83,34 @@ export type SlideUpdate = Database["public"]["Tables"]["slides"]["Update"];
 
 export type ProfileRow = Database['public']['Tables']['profiles']['Row']
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
+
+export type CategoryMenuItem = Database['public']['Tables']['categories']['Row'] & {
+  children?: CategoryMenuItem[]
+}
+
+export type Product = Database['public']['Tables']['products']['Row']
+
+export interface IProductFilters {
+  categorySlug: string
+  subCategoryIds?: string[]
+  priceMin?: number
+  priceMax?: number
+  sortBy?: 'newest' | 'popularity' | 'price_asc' | 'price_desc'
+}
+
+export interface ICartItem {
+  product: Product;
+  quantity: number;
+}
+
+export type CategoryRow = Database['public']['Tables']['categories']['Row'];
+export type CategoryInsert = Database['public']['Tables']['categories']['Insert'];
+export type CategoryUpdate = Database['public']['Tables']['categories']['Update'];
+
+export type EditableCategory = CategoryRow & {
+  children: EditableCategory[];
+  // Временные поля для новых, еще не сохраненных элементов
+  _tempId?: string;
+  _isNew?: boolean;
+  _isDeleted?: boolean;
+};
