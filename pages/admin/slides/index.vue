@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { useAdminSlides } from "~/composables/admin/useAdminSlides";
-import Button from "~/components/ui/button/Button.vue";
+import SlidesForm from '~/components/admin/slides/ SlidesForm.vue'
+import Badge from '~/components/ui/badge/Badge.vue'
+import Button from '~/components/ui/button/Button.vue'
 import {
   Card,
-  CardHeader,
-  CardDescription,
-  CardTitle,
   CardContent,
-} from "~/components/ui/card";
-import Badge from "~/components/ui/badge/Badge.vue";
-import SlidesForm from "~/components/admin/slides/ SlidesForm.vue";
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '~/components/ui/card'
+import { useAdminSlides } from '~/composables/admin/useAdminSlides'
 
 definePageMeta({
-  layout: "admin",
-});
+  layout: 'admin',
+})
 const {
   slides,
   error,
@@ -24,19 +24,26 @@ const {
   openFormForEdit,
   handleDelete,
   handleFormSaved,
-} = useAdminSlides();
+} = useAdminSlides()
 </script>
+
 <template>
   <div class="container mx-auto p-4 md:p-8">
     <div
       class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8"
     >
-      <h1 class="text-3xl font-bold text-foreground">Управление слайдами</h1>
+      <h1 class="text-3xl font-bold text-foreground">
+        Управление слайдами
+      </h1>
 
-      <Button @click="openFormForNew">Добавить слайд</Button>
+      <Button @click="openFormForNew">
+        Добавить слайд
+      </Button>
     </div>
 
-    <div v-if="isLoading" class="text-center py-20">Загрузка...</div>
+    <div v-if="isLoading" class="text-center py-20">
+      Загрузка...
+    </div>
 
     <div
       v-else-if="error"
@@ -56,9 +63,11 @@ const {
       >
         <CardHeader>
           <div class="flex justify-between items-start gap-2">
-            <CardTitle class="text-lg leading-tight">{{
-              slide.title
-            }}</CardTitle>
+            <CardTitle class="text-lg leading-tight">
+              {{
+                slide.title
+              }}
+            </CardTitle>
             <Badge :variant="slide.is_active ? 'default' : 'outline'">
               {{ slide.is_active ? "Активен" : "Скрыт" }}
             </Badge>
@@ -74,7 +83,7 @@ const {
             :src="slide.image_url ?? undefined"
             :alt="slide.title"
             class="rounded-md object-cover aspect-video w-full bg-muted"
-          />
+          >
 
           <div
             v-else
@@ -85,26 +94,28 @@ const {
         </CardContent>
 
         <CardFooter class="flex justify-end gap-2 pt-4">
-          <Button variant="outline" size="sm" @click="openFormForEdit(slide)"
-            >Редактировать</Button
-          >
-          <Button variant="destructive" size="sm" @click="handleDelete"
-            >Удалить</Button
-          >
+          <Button variant="outline" size="sm" @click="openFormForEdit(slide)">
+            Редактировать
+          </Button>
+          <Button variant="destructive" size="sm" @click="handleDelete">
+            Удалить
+          </Button>
         </CardFooter>
       </Card>
     </div>
 
     <div v-else class="text-center py-20 border-2 border-dashed rounded-lg">
-      <h2 class="text-xl font-semibold">Слайдов пока нет</h2>
+      <h2 class="text-xl font-semibold">
+        Слайдов пока нет
+      </h2>
       <p class="text-muted-foreground mt-2">
         Нажмите кнопку "Добавить слайд", чтобы создать первый.
       </p>
     </div>
 
     <SlidesForm
-      :initial-data="selectedSlide"
       v-model:open="isFormOpen"
+      :initial-data="selectedSlide"
       @saved="handleFormSaved"
     />
   </div>

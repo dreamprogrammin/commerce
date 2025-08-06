@@ -1,50 +1,58 @@
 <script setup lang="ts">
-import type { ParamsSignUp } from "~/types/type";
-import { useAuthStore } from "~/stores/auth";
+import type { ParamsSignUp } from '~/types/type'
+import { useAuthStore } from '~/stores/auth'
+
 const formData = ref<ParamsSignUp>({
-  email: "",
-  password: "",
-  confirmPassword: "",
-});
-const authStore = useAuthStore();
+  email: '',
+  password: '',
+  confirmPassword: '',
+})
+const authStore = useAuthStore()
 
 async function handleRegister() {}
 </script>
+
 <template>
   <div>
     <h1>Страница Регистрации</h1>
     <form @submit.prevent="handleRegister">
       <label for="email">Почта</label>
       <input
-        type="email"
+        id="email"
         v-model="formData.email"
+        type="email"
         placeholder="Введите email"
         required
-        id="email"
-      />
-      <br />
+      >
+      <br>
       <label for="password">Пароль</label>
       <input
-        type="password"
+        id="password"
         v-model="formData.password"
+        type="password"
         placeholder="Введите пароль"
         required
-        id="password"
-      />
-      <br />
+      >
+      <br>
       <label for="confirmPassword">Повторить пароль</label>
       <input
-        type="password"
-        v-model="formData.confirmPassword"
-        placeholder="Повторите пароль"
         id="confirmPassword"
-      />
-      <br />
-      <button type="submit">Зарегистрироваться</button>
+        v-model="formData.confirmPassword"
+        type="password"
+        placeholder="Повторите пароль"
+      >
+      <br>
+      <button type="submit">
+        Зарегистрироваться
+      </button>
     </form>
     <div>
-      <p v-if="authStore.errors.register">{{ authStore.errors.register }}</p>
+      <p v-if="authStore.errors.register">
+        {{ authStore.errors.register }}
+      </p>
     </div>
-    <nuxt-link to="/login">У вас есть аккаунт?</nuxt-link>
+    <nuxt-link to="/login">
+      У вас есть аккаунт?
+    </nuxt-link>
   </div>
 </template>

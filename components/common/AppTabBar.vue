@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { onMounted, ref } from 'vue'
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -7,90 +7,91 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { staticMainMenuItems } from "@/config/staticItems";
-import { BUCKET_NAME } from "@/constants";
-import { useMenuAdminStore } from "@/stores/menuItems/useTopMenuItems";
+} from '@/components/ui/navigation-menu'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { staticMainMenuItems } from '@/config/staticItems'
+import { BUCKET_NAME } from '@/constants'
+import { useMenuAdminStore } from '@/stores/menuItems/useTopMenuItems'
 
 const searchSuggestions = [
   {
-    title: "Популярные запросы",
-    items: ["футболки", "джинсы", "кроссовки", "куртки"],
+    title: 'Популярные запросы',
+    items: ['футболки', 'джинсы', 'кроссовки', 'куртки'],
   },
   {
-    title: "Недавние поиски",
-    items: ["платья", "шорты", "рюкзаки"],
+    title: 'Недавние поиски',
+    items: ['платья', 'шорты', 'рюкзаки'],
   },
   {
-    title: "Рекомендуемые категории",
-    items: ["Спортивная одежда", "Школьная форма", "Праздничные наряды"],
+    title: 'Рекомендуемые категории',
+    items: ['Спортивная одежда', 'Школьная форма', 'Праздничные наряды'],
   },
-];
+]
 
-const headerOverlay = inject("headerOverlay") as
+const headerOverlay = inject('headerOverlay') as
   | {
-      showOverlay: () => void;
-      hideOverlay: () => void;
-      isVisible: Readonly<Ref<boolean>>;
-    }
-  | undefined;
+    showOverlay: () => void
+    hideOverlay: () => void
+    isVisible: Readonly<Ref<boolean>>
+  }
+  | undefined
 
-const activeMenuValue = ref<string | undefined>();
+const activeMenuValue = ref<string | undefined>()
 
-const isSearchOpen = ref(false);
+const isSearchOpen = ref(false)
 
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
-);
+)
 watch(isAnyPopupOpenInTabBar, (isOpen) => {
   if (isOpen) {
-    headerOverlay?.showOverlay();
-  } else {
+    headerOverlay?.showOverlay()
+  }
+  else {
     setTimeout(() => {
       if (!activeMenuValue.value && !isSearchOpen.value) {
-        headerOverlay?.hideOverlay();
+        headerOverlay?.hideOverlay()
       }
-    }, 50);
+    }, 50)
   }
-});
+})
 
 watch(activeMenuValue, (newValue) => {
   if (newValue !== undefined && isSearchOpen.value) {
-    isSearchOpen.value = false;
+    isSearchOpen.value = false
   }
-});
+})
 watch(isSearchOpen, (isOpen) => {
   if (isOpen !== undefined && activeMenuValue.value) {
-    activeMenuValue.value = undefined;
+    activeMenuValue.value = undefined
   }
-});
+})
 onUnmounted(() => {
   if (isAnyPopupOpenInTabBar.value) {
-    headerOverlay?.hideOverlay();
+    headerOverlay?.hideOverlay()
   }
-});
+})
 
-const closeAllPopups = () => {
-  activeMenuValue.value = undefined;
-  isSearchOpen.value = false;
-};
+function closeAllPopups() {
+  activeMenuValue.value = undefined
+  isSearchOpen.value = false
+}
 
-defineExpose({ closeAllPopups });
+defineExpose({ closeAllPopups })
 
-const menuItemsStore = useMenuAdminStore();
+const menuItemsStore = useMenuAdminStore()
 
-const { getPublicUrl } = useSupabaseStorage();
+const { getPublicUrl } = useSupabaseStorage()
 
 onMounted(async () => {
-  await menuItemsStore.fetchItems();
-  console.log(menuItemsStore.items.length);
-});
+  await menuItemsStore.fetchItems()
+  console.log(menuItemsStore.items.length)
+})
 
-const menuStore = useMenuAdminStore();
+const menuStore = useMenuAdminStore()
 onMounted(() => {
-  menuStore.fetchItems();
-});
+  menuStore.fetchItems()
+})
 </script>
 
 <template>
@@ -135,7 +136,9 @@ onMounted(() => {
           <div class="space-y-4">
             <div v-for="section in searchSuggestions" :key="section.title">
               <div class="flex items-center gap-2 mb-2">
-                <h4 class="text-sm font-medium">{{ section.title }}</h4>
+                <h4 class="text-sm font-medium">
+                  {{ section.title }}
+                </h4>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div
@@ -162,7 +165,9 @@ onMounted(() => {
           <NavigationMenuItem :value="itemL1.slug">
             <template v-if="itemL1.isTrigger">
               <NuxtLink :to="itemL1.href" as-child>
-                <NavigationMenuTrigger :class="`${navigationMenuTriggerStyle()}`">
+                <NavigationMenuTrigger
+                  :class="`${navigationMenuTriggerStyle()}`"
+                >
                   {{ itemL1.title }}
                 </NavigationMenuTrigger>
               </NuxtLink>
@@ -186,12 +191,12 @@ onMounted(() => {
                         >
                           <img
                             :src="
-                              getPublicUrl(BUCKET_NAME, itemL2.image_url) ||
-                              undefined
+                              getPublicUrl(BUCKET_NAME, itemL2.image_url)
+                                || undefined
                             "
                             :alt="itemL2.title"
                             class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
-                          />
+                          >
                         </div>
                         <div
                           class="text-sm font-semibold leading-tight text-foreground"
@@ -226,8 +231,8 @@ onMounted(() => {
                   </ul>
                   <div
                     v-if="
-                      menuStore.getChildren(itemL1.slug).length === 0 &&
-                      !menuStore.isLoading
+                      menuStore.getChildren(itemL1.slug).length === 0
+                        && !menuStore.isLoading
                     "
                     class="py-10 text-center text-sm text-muted-foreground"
                   >

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 definePageMeta({
-  layout: "admin",
-});
+  layout: 'admin',
+})
 </script>
+
 <template>
   <h1>Управление пользователями</h1>
 </template>

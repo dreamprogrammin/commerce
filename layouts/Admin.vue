@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import Button from "@/components/ui/button/Button.vue";
-import { useAuth } from "@/composables/auth/useAuth";
-const { handleOut } = useAuth();
+import Button from '@/components/ui/button/Button.vue'
+import { useAuth } from '@/composables/auth/useAuth'
+
+const { handleOut } = useAuth()
 </script>
 
 <template>
@@ -26,24 +27,25 @@ const { handleOut } = useAuth();
           to="/admin/popular-categories"
           active-class="bg-muted text-primary"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-          >Популярные категории</NuxtLink
         >
+          Популярные категории
+        </NuxtLink>
 
         <NuxtLink
           to="/admin/slides"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
           active-class="bg-muted text-primary"
         >
-          Управление слайдами</NuxtLink
-        >
+          Управление слайдами
+        </NuxtLink>
 
         <NuxtLink
           to="/admin/users"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
           active-class="bg-muted text-primary"
         >
-          Управление пользователями</NuxtLink
-        >
+          Управление пользователями
+        </NuxtLink>
       </nav>
     </aside>
 
@@ -51,9 +53,13 @@ const { handleOut } = useAuth();
       <header
         class="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-6"
       >
-        <h1 class="text-xl font-semibold">Панель администратора</h1>
+        <h1 class="text-xl font-semibold">
+          Панель администратора
+        </h1>
         <div class="ml-auto flex items-center gap-4">
-          <Button @click="handleOut">Выйти</Button>
+          <Button @click="handleOut">
+            Выйти
+          </Button>
         </div>
       </header>
       <main class="flex-1 overflow-y-auto">

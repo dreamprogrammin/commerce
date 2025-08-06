@@ -1,25 +1,27 @@
-import { defineStore } from 'pinia';
-import type { Database } from '@/types/supabase';
-import { handleError } from './errorHandles'; 
+import type { Database } from '@/types/supabase'
+import { defineStore } from 'pinia'
+import { handleError } from './errorHandles'
 
 export const useAuthStore = defineStore('authStore', () => {
   // === STATE ===
-  const supabase = useSupabaseClient<Database>();
-  const errors = ref<{ [action: string]: string }>({}); // Используем ref для реактивности ошибок
+  const supabase = useSupabaseClient<Database>()
+  const errors = ref<{ [action: string]: string }>({}) // Используем ref для реактивности ошибок
 
   // === ACTIONS ===
   function setErrors(newErrors: { [action: string]: string }) {
-    errors.value = newErrors;
+    errors.value = newErrors
   }
   async function handleOut() {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setErrors({}); 
-    } catch (error) {
-      setErrors({ logout: handleError(error, 'logout') });
-      console.error("Ошибка при выходе:", error);
-      // throw error; 
+      const { error } = await supabase.auth.signOut()
+      if (error)
+        throw error
+      setErrors({})
+    }
+    catch (error) {
+      setErrors({ logout: handleError(error, 'logout') })
+      console.error('Ошибка при выходе:', error)
+      // throw error;
     }
   }
 
@@ -29,17 +31,18 @@ export const useAuthStore = defineStore('authStore', () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/profile`, 
+          redirectTo: `${window.location.origin}/profile`,
           scopes: 'profile email',
         },
-      });
+      })
 
-      if (error) throw error;
-      setErrors({});
-      
-    } catch (error) {
-      setErrors({ google: handleError(error, 'googleErr') });
-      console.error("Ошибка при входе через Google:", error);
+      if (error)
+        throw error
+      setErrors({})
+    }
+    catch (error) {
+      setErrors({ google: handleError(error, 'googleErr') })
+      console.error('Ошибка при входе через Google:', error)
       // throw error;
     }
   }
@@ -49,5 +52,5 @@ export const useAuthStore = defineStore('authStore', () => {
     errors,
     handleOut,
     handleAuthGoogle,
-  };
-});
+  }
+})

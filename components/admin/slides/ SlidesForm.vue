@@ -1,30 +1,30 @@
 <script setup lang="ts">
+import type { SlideRow } from '~/types'
+import Button from '~/components/ui/button/Button.vue'
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "~/components/ui/dialog";
-import Input from "~/components/ui/input/Input.vue";
-import Button from "~/components/ui/button/Button.vue";
-import Switch from "~/components/ui/switch/Switch.vue";
-import { Label } from "~/components/ui/label";
-import { useSlideForm } from "~/composables/admin/useSlideForm";
-import type { SlideRow } from "~/types";
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
+import Input from '~/components/ui/input/Input.vue'
+import { Label } from '~/components/ui/label'
+import Switch from '~/components/ui/switch/Switch.vue'
+import { useSlideForm } from '~/composables/admin/useSlideForm'
 
 const props = defineProps<{
-  initialData: SlideRow | null;
-}>();
-
-const open = defineModel<boolean>("open", { required: true });
+  initialData: SlideRow | null
+}>()
 
 const emit = defineEmits<{
-  (e: "saved"): void;
-}>();
+  (e: 'saved'): void
+}>()
 
-const initialDataRef = toRef(props, "initialData");
+const open = defineModel<boolean>('open', { required: true })
+
+const initialDataRef = toRef(props, 'initialData')
 
 const {
   formData,
@@ -39,10 +39,11 @@ const {
   descriptionValue,
 } = useSlideForm(initialDataRef, {
   onSuccess: () => {
-    emit("saved");
+    emit('saved')
   },
-});
+})
 </script>
+
 <template>
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -50,13 +51,13 @@ const {
         <DialogTitle>
           {{ isEditMode ? "Редактирование слайда" : "Создание нового слайда" }}
         </DialogTitle>
-        <DialogDescription
-          >Заполните информацию о слайде. Поля со звездочкой (*)
-          обязательны.</DialogDescription
-        >
+        <DialogDescription>
+          Заполните информацию о слайде. Поля со звездочкой (*)
+          обязательны.
+        </DialogDescription>
       </DialogHeader>
 
-      <form @submit.prevent="handleSubmit" class="grid gap-6 py-4">
+      <form class="grid gap-6 py-4" @submit.prevent="handleSubmit">
         <div>
           <Label for="title">Заголовок *</Label>
           <Input id="title" v-model="formData.title" />
@@ -72,8 +73,8 @@ const {
           <Input
             id="image"
             type="file"
-            @change="handleImageChange"
             accept="image/*"
+            @change="handleImageChange"
           />
           <div
             v-if="imagePreviewUrl || formData.image_url"
@@ -83,13 +84,13 @@ const {
               :src="imagePreviewUrl || formData.image_url!"
               alt="Превью"
               class="max-w-[200px] max-h-[100px] object-contain rounded"
-            />
+            >
             <Button
-              @click="removeImage"
               variant="destructive"
               size="icon"
               class="absolute -top-2 right-2 h-6 w-6 rounded-fill"
               type="button"
+              @click="removeImage"
             >
               Удалить
             </Button>
@@ -115,8 +116,8 @@ const {
             <Label for="display_order">Порядок сортировка</Label>
             <Input
               id="display_order"
-              type="number"
               v-model.number="formData.display_order"
+              type="number"
             />
           </div>
         </div>
@@ -127,9 +128,9 @@ const {
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" @click="open = false"
-            >Отмена</Button
-          >
+          <Button type="button" variant="outline" @click="open = false">
+            Отмена
+          </Button>
           <Button type="submit" :disabled="isSaving">
             {{ isSaving ? "Сохранение..." : "Сохранить" }}
           </Button>
