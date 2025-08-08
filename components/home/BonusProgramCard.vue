@@ -51,7 +51,6 @@ function openLoginModal() {
             1 бонус = 1 тенге
           </p>
 
-          <!-- Адаптивный блок -->
           <div v-if="user" class="mt-6 pt-6 border-t border-dashed">
             <!-- Спиннер во время загрузки профиля -->
             <div v-if="isLoading" class="h-16 flex items-center justify-center">

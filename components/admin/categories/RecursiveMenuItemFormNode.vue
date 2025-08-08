@@ -16,18 +16,22 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'add-child', parentItem: EditableCategory): void
-  (e: 'remove-self'): void
+  (e: 'addChild', parentItem: EditableCategory): void
+  (e: 'updateNode', updatedItem: EditableCategory): void
+  (e: 'removeNode', itemToRemove: EditableCategory): void
 }>()
+
+const localItem = ref<EditableCategory>(JSON.parse(JSON.stringify(props.item)))
 
 const RecursiveMenuItemFormNode = defineAsyncComponent(
   () => import('@/components/admin/categories/RecursiveMenuItemFormNode.vue'),
 )
 
-const a = 213
+watch(localItem, (newItem) => {
+  emit('updateNode', newItem)
+}, { deep: true })
 
 const isChildrenVisible = ref(true)
-
 const { getPublicUrl } = useSupabaseStorage()
 
 function autoFill() {
@@ -252,7 +256,7 @@ const descriptionValue = computed({
             :item="child"
             :parent-href="item.href || ''"
             :level="level + 1"
-            @add-child="(parent: EditableCategory) => emit('add-child', parent)"
+            @add-child="(parent: EditableCategory) => emit('addChild', parent)"
             @remove-self="child._isDeleted = true"
           />
         </div>
@@ -264,7 +268,7 @@ const descriptionValue = computed({
         variant="outline"
         class="mt-2 border-dashed w-full"
         :disabled="item._isDeleted"
-        @click="emit('add-child', item)"
+        @click="emit('addChild', item)"
       >
         Добавить подкатегорию в "{{ item.name }}" (Уровень {{ level + 3 }})
       </Button>

@@ -116,4 +116,6 @@ export type EditableCategory = CategoryRow & {
   _tempId?: string
   _isNew?: boolean
   _isDeleted?: boolean
+  _imageFile?: File | null
+  _imagePreview?: string
 }
