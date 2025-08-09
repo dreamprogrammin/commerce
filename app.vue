@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { useProfileStore } from "@/stores/profile";
-import { useModalStore } from "@/stores/modal/useModalStore";
+import { useModalStore } from '@/stores/modal/useModalStore'
+import { useProfileStore } from '@/stores/profile'
 
-const user = useSupabaseUser();
-const profileStore = useProfileStore();
-const modalStore = useModalStore();
+const user = useSupabaseUser()
+const profileStore = useProfileStore()
+const modalStore = useModalStore()
 
-watch(user, async (newUser) => {
-  if (newUser) {
-    await profileStore.loadProfile();
-  } else {
-    profileStore.clearProfile();
-  }
-}, { immediate: true });
-
+watch(
+  user,
+  async (newUser) => {
+    if (newUser) {
+      await profileStore.loadProfile()
+    }
+    else {
+      profileStore.clearProfile()
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

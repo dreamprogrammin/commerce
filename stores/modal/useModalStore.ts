@@ -1,17 +1,17 @@
-export const useModalStore = defineStore("modalStore", () => {
-  const showLoginModal = ref<boolean>(false);
+export const useModalStore = defineStore('modalStore', () => {
+  const showLoginModal = ref<boolean>(false)
 
   function openLoginModal() {
-    showLoginModal.value = true;
+    showLoginModal.value = true
   }
 
   function closeLoginModal() {
-    showLoginModal.value = false;
+    showLoginModal.value = false
   }
 
   return {
     openLoginModal,
     showLoginModal,
     closeLoginModal,
-  };
-});
+  }
+})

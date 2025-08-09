@@ -1,4 +1,5 @@
 <script setup lang="ts"></script>
+
 <template>
   <div class="profile">
     <aside>
@@ -6,12 +7,30 @@
 
       <div>
         <ul>
-          <li><nuxt-link to="/profile">Профайл</nuxt-link></li>
-          <li><nuxt-link to="/profile/favorites">Избранное</nuxt-link></li>
-          <li><nuxt-link to="/profile/bonus">Бонусы</nuxt-link></li>
-          <li><nuxt-link to="/profile/order">Заказы</nuxt-link></li>
           <li>
-            <nuxt-link to="/profile/settings">Настройка профайла</nuxt-link>
+            <nuxt-link to="/profile">
+              Профайл
+            </nuxt-link>
+          </li>
+          <li>
+            <nuxt-link to="/profile/favorites">
+              Избранное
+            </nuxt-link>
+          </li>
+          <li>
+            <nuxt-link to="/profile/bonus">
+              Бонусы
+            </nuxt-link>
+          </li>
+          <li>
+            <nuxt-link to="/profile/order">
+              Заказы
+            </nuxt-link>
+          </li>
+          <li>
+            <nuxt-link to="/profile/settings">
+              Настройка профайла
+            </nuxt-link>
           </li>
         </ul>
       </div>
@@ -21,6 +40,7 @@
     </div>
   </div>
 </template>
+
 <style lang="css">
 .profile {
   display: flex;

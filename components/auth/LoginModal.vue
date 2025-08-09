@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useAuth } from "~/composables/auth/useAuth";
-import { useModalStore } from "~/stores/modal/useModalStore";
 import {
   Dialog,
   DialogContent,
@@ -9,18 +7,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog'
+import { useAuth } from '~/composables/auth/useAuth'
+import { useModalStore } from '~/stores/modal/useModalStore'
 
-const modalStore = useModalStore();
-const { handleAuthGoogle } = useAuth();
+const modalStore = useModalStore()
+const { handleAuthGoogle } = useAuth()
 const isOpen = computed({
   get: () => modalStore.showLoginModal,
   set: (value) => {
     if (!value) {
-      modalStore.closeLoginModal();
+      modalStore.closeLoginModal()
     }
   },
-});
+})
 </script>
 
 <template>
@@ -35,8 +35,11 @@ const isOpen = computed({
       </DialogHeader>
 
       <DialogFooter> Save changes </DialogFooter>
-      <Button @click="handleAuthGoogle">Google</Button>
+      <Button @click="handleAuthGoogle">
+        Google
+      </Button>
     </DialogContent>
   </Dialog>
 </template>
+
 <style></style>

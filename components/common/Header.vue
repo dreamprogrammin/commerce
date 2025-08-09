@@ -1,24 +1,25 @@
 <script setup lang="ts">
-const isHeaderOverlayVisible = ref<boolean>(false);
+const isHeaderOverlayVisible = ref<boolean>(false)
 
-const showHeaderOverlay = (): void => {
-  isHeaderOverlayVisible.value = true;
-};
+function showHeaderOverlay(): void {
+  isHeaderOverlayVisible.value = true
+}
 
-const hideHeaderOverlay = (): void => {
-  isHeaderOverlayVisible.value = false;
-};
+function hideHeaderOverlay(): void {
+  isHeaderOverlayVisible.value = false
+}
 
-provide("headerOverlay", {
+provide('headerOverlay', {
   showOverlay: showHeaderOverlay,
   hideOverlay: hideHeaderOverlay,
   isVisible: readonly(isHeaderOverlayVisible),
-});
+})
 
-const handleOverlayClick = () => {
-  hideHeaderOverlay();
-};
+function handleOverlayClick() {
+  hideHeaderOverlay()
+}
 </script>
+
 <template>
   <header class="header z-[50] bg-amber-200 relative shadow-sm">
     <CommonHeaderTop />

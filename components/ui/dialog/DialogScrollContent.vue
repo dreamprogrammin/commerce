@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from "vue";
-import { reactiveOmit } from "@vueuse/core";
-import { X } from "lucide-vue-next";
+import type { DialogContentEmits, DialogContentProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import { X } from 'lucide-vue-next'
 import {
   DialogClose,
   DialogContent,
-  type DialogContentEmits,
-  type DialogContentProps,
+
   DialogOverlay,
   DialogPortal,
   useForwardPropsEmits,
-} from "reka-ui";
-import { cn } from "@/lib/utils";
+} from 'reka-ui'
+import { cn } from '@/lib/utils'
 
 const props = defineProps<
-  DialogContentProps & { class?: HTMLAttributes["class"] }
->();
-const emits = defineEmits<DialogContentEmits>();
+  DialogContentProps & { class?: HTMLAttributes['class'] }
+>()
+const emits = defineEmits<DialogContentEmits>()
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
@@ -41,8 +41,8 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
             const originalEvent = event.detail.originalEvent;
             const target = originalEvent.target as HTMLElement;
             if (
-              originalEvent.offsetX > target.clientWidth ||
-              originalEvent.offsetY > target.clientHeight
+              originalEvent.offsetX > target.clientWidth
+              || originalEvent.offsetY > target.clientHeight
             ) {
               event.preventDefault();
             }

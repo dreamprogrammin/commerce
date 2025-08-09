@@ -1,10 +1,10 @@
-import type { IUserMetaData } from "~/types/type";
-import type { User } from "@supabase/supabase-js";
+import type { User } from '@supabase/supabase-js'
+import type { IUserMetaData } from '~/types/type'
 
 export function getUserMetaData<T extends keyof IUserMetaData>(
   user: User | null,
   key: T,
-  defaultValue: string = "",
+  defaultValue: string = '',
 ): string {
-  return (user?.user_metadata as IUserMetaData)?.[key] || defaultValue;
+  return (user?.user_metadata as IUserMetaData)?.[key] || defaultValue
 }

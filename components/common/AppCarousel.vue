@@ -1,29 +1,29 @@
 <script setup lang="ts">
-import { useSlides } from "@/composables/slides/useSlides";
-import Skeleton from "../ui/skeleton/Skeleton.vue";
-import Autoplay from "embla-carousel-autoplay";
-import type { CarouselApi } from "../ui/carousel";
+import type { CarouselApi } from '../ui/carousel'
+import Autoplay from 'embla-carousel-autoplay'
+import { useSlides } from '@/composables/slides/useSlides'
+import Skeleton from '../ui/skeleton/Skeleton.vue'
 
-const { isLoading, slides, error } = useSlides();
+const { isLoading, slides, error } = useSlides()
 
 const autoplayPlugin = Autoplay({
   delay: 4000,
   stopOnInteraction: false,
   stopOnMouseEnter: true,
-});
+})
 
-const emblaApi = ref<CarouselApi>();
+const emblaApi = ref<CarouselApi>()
 
 function onInit(api: CarouselApi) {
-  emblaApi.value = api;
+  emblaApi.value = api
 }
 
 function stopAutoplay() {
-  emblaApi.value?.plugins()?.autoplay?.stop();
+  emblaApi.value?.plugins()?.autoplay?.stop()
 }
 
 function playAutoplay() {
-  emblaApi.value?.plugins()?.autoplay?.play();
+  emblaApi.value?.plugins()?.autoplay?.play()
 }
 </script>
 
@@ -63,8 +63,12 @@ function playAutoplay() {
       v-else-if="error"
       class="w-full aspect-[16/7] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center"
     >
-      <h3 class="mt-4 text-lg font-semibold">Не удалось загрузить слайдер</h3>
-      <p class="text-sm">{{ error.message }}</p>
+      <h3 class="mt-4 text-lg font-semibold">
+        Не удалось загрузить слайдер
+      </h3>
+      <p class="text-sm">
+        {{ error.message }}
+      </p>
     </div>
 
     <Carousel
@@ -102,7 +106,7 @@ function playAutoplay() {
                     :src="slide.image_url"
                     :alt="slide.title"
                     class="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
-                  />
+                  >
                   <div
                     v-else
                     class="w-full h-full bg-gradient-to-br from-primary to-secondary"
@@ -121,7 +125,9 @@ function playAutoplay() {
       v-else
       class="w-full aspect-[16/7] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed"
     >
-      <p class="text-muted-foreground">Нет активных слайдов для отображения.</p>
+      <p class="text-muted-foreground">
+        Нет активных слайдов для отображения.
+      </p>
     </div>
   </div>
 </template>
