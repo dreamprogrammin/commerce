@@ -1,23 +1,33 @@
 {
-  "[typescript]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
+  // Эта настройка ПЕРЕОПРЕДЕЛИТ ваш глобальный defaultFormatter для этого проекта.
+  // Она говорит: "При сохранении запускай авто-исправление ESLint".
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
   },
-  "cSpell.words": ["lastname", "Nuxt", "sonner", "supabase", "uuidv"],
-  "deno.enablePaths": ["supabase/functions"],
-  "deno.lint": true,
-  "deno.unstable": [
-    "bare-node-builtins",
-    "byonm",
-    "sloppy-imports",
-    "unsafe-proto",
-    "webgpu",
-    "broadcast-channel",
-    "worker-options",
-    "cron",
-    "kv",
-    "ffi",
-    "fs",
-    "http",
-    "net"
-  ]
+
+  // Эта настройка остаётся, чтобы работало форматирование для файлов,
+  // которые ESLint не обрабатывает (например, Markdown).
+  "editor.formatOnSave": true,
+
+  // Явно указываем расширению ESLint, какие файлы нужно проверять.
+  "eslint.validate": [
+    "javascript",
+    "typescript",
+    "vue",
+    "json",
+    "yaml",
+    "toml"
+  ],
+
+  // Для Vue-файлов мы хотим, чтобы работал только ESLint, а не Prettier.
+  // Эта настройка гарантирует, что для .vue файлов будет использоваться ESLint.
+  "[vue]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  }
 }

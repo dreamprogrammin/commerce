@@ -1,8 +1,9 @@
 <script setup lang="ts">
 definePageMeta({
-  layout: "profile",
-});
+  layout: 'profile',
+})
 </script>
+
 <template>
   <div>
     <h1>Избранное</h1>

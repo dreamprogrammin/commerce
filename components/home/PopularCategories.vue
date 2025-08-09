@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { BUCKET_NAME } from "@/constants";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { usePopularMenuStore } from "@/stores/popularMenu/usePopularMenu";
+import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME } from '@/constants'
+import { usePopularMenuStore } from '@/stores/popularMenu/usePopularMenu'
 
-const store = usePopularMenuStore();
-const { getPublicUrl } = useSupabaseStorage();
+const store = usePopularMenuStore()
+const { getPublicUrl } = useSupabaseStorage()
 
-await useAsyncData("popular-categories", () => store.fetchPopularCategories());
+await useAsyncData('popular-categories', () => store.fetchPopularCategories())
 </script>
+
 <template>
   <div class="container py-8 md:py-12">
     <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-center mb-8">
@@ -42,13 +43,13 @@ await useAsyncData("popular-categories", () => store.fetchPopularCategories());
           <CardContent class="p-0 flex flex-col items-center text-center">
             <img
               :src="
-                getPublicUrl(BUCKET_NAME, category.image_url || null) ||
-                '/images/placeholder.svg'
+                getPublicUrl(BUCKET_NAME, category.image_url || null)
+                  || '/images/placeholder.svg'
               "
               :alt="category.title"
               class="w-full h-32 object-cover"
               loading="lazy"
-            />
+            >
             <p class="font-semibold p-3 text-sm md:text-base">
               {{ category.title }}
             </p>

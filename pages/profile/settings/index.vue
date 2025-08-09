@@ -1,67 +1,67 @@
 <script setup lang="ts">
-import { useProfileStore } from '@/stores/profile';
-import { Loader2 } from 'lucide-vue-next';
+import { Loader2 } from 'lucide-vue-next'
+import { useProfileStore } from '@/stores/profile'
 
 definePageMeta({
-  layout: "profile",
-});
+  layout: 'profile',
+})
 
 const firstName = computed({
   // `get` срабатывает, когда Input читает значение
   get() {
     // Если в сторе `null` или `undefined`, возвращаем пустую строку для Input'а
-    return editProfile.value?.first_name ?? '';
+    return editProfile.value?.first_name ?? ''
   },
   // `set` срабатывает, когда пользователь вводит текст в Input
   set(value: string) {
     if (editProfile.value) {
       // Если пользователь стер текст, сохраняем `null` в стор, иначе - саму строку.
-      editProfile.value.first_name = value || null;
+      editProfile.value.first_name = value || null
     }
-  }
-});
+  },
+})
 
 const lastName = computed({
   get() {
-    return editProfile.value?.last_name ?? '';
+    return editProfile.value?.last_name ?? ''
   },
   set(value: string) {
     if (editProfile.value) {
-      editProfile.value.last_name = value || null;
+      editProfile.value.last_name = value || null
     }
-  }
-});
+  },
+})
 
 const phone = computed({
   get() {
-    return editProfile.value?.phone ?? '';
+    return editProfile.value?.phone ?? ''
   },
   set(value: string) {
     if (editProfile.value) {
-      editProfile.value.phone = value || null;
+      editProfile.value.phone = value || null
     }
-  }
-});
+  },
+})
 
-const profileStore = useProfileStore();
+const profileStore = useProfileStore()
 
 // Используем storeToRefs для удобного доступа к реактивным переменным
-const { editProfile, isSaving, isLoading } = storeToRefs(profileStore);
+const { editProfile, isSaving, isLoading } = storeToRefs(profileStore)
 
 // Адаптированная и более безопасная функция обновления
 async function handleUpdate() {
   if (!editProfile.value) {
-    console.error("Попытка сохранить пустой профиль.");
-    return;
+    console.error('Попытка сохранить пустой профиль.')
+    return
   }
-  
+
   const updates = {
     first_name: editProfile.value.first_name,
     last_name: editProfile.value.last_name,
     phone: editProfile.value.phone,
-  };
+  }
 
-  await profileStore.updateProfile(updates);
+  await profileStore.updateProfile(updates)
 }
 </script>
 
@@ -70,13 +70,14 @@ async function handleUpdate() {
     <!-- Используем Card для красивой обертки -->
     <Card class="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle class="text-2xl">Настройка профиля</CardTitle>
+        <CardTitle class="text-2xl">
+          Настройка профиля
+        </CardTitle>
         <CardDescription>
           Здесь вы можете обновить информацию о себе.
         </CardDescription>
       </CardHeader>
       <CardContent>
-
         <!-- === Состояние загрузки с использованием Skeleton === -->
         <div v-if="isLoading" class="space-y-6">
           <div class="space-y-2">
@@ -95,8 +96,11 @@ async function handleUpdate() {
         </div>
 
         <!-- === Форма редактирования (показывается после загрузки) === -->
-        <form v-else-if="editProfile" class="space-y-6" @submit.prevent="handleUpdate">
-          
+        <form
+          v-else-if="editProfile"
+          class="space-y-6"
+          @submit.prevent="handleUpdate"
+        >
           <!-- Поле "Имя" -->
           <div class="grid w-full items-center gap-1.5">
             <Label for="first_name">Имя</Label>
@@ -107,7 +111,7 @@ async function handleUpdate() {
               placeholder="Иван"
             />
           </div>
-          
+
           <!-- Поле "Фамилия" -->
           <div class="grid w-full items-center gap-1.5">
             <Label for="last_name">Фамилия</Label>
@@ -124,8 +128,8 @@ async function handleUpdate() {
             <Label for="phone">Телефон</Label>
             <Input
               id="phone"
-              type="tel"
               v-model="phone"
+              type="tel"
               placeholder="+7 (777) 123-45-67"
             />
           </div>
@@ -135,17 +139,21 @@ async function handleUpdate() {
             <Loader2 v-if="isSaving" class="mr-2 h-4 w-4 animate-spin" />
             {{ isSaving ? "Сохранение..." : "Сохранить изменения" }}
           </Button>
-
         </form>
-        
+
         <!-- === Сообщение об ошибке загрузки === -->
         <div v-else class="text-center py-10">
-          <p class="text-muted-foreground">Не удалось загрузить данные профиля.</p>
-          <Button variant="outline" class="mt-4" @click="profileStore.loadProfile()">
+          <p class="text-muted-foreground">
+            Не удалось загрузить данные профиля.
+          </p>
+          <Button
+            variant="outline"
+            class="mt-4"
+            @click="profileStore.loadProfile()"
+          >
             Попробовать снова
           </Button>
         </div>
-
       </CardContent>
     </Card>
   </div>

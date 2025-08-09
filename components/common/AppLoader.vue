@@ -1,21 +1,23 @@
 <script setup lang="ts">
-import Progress from "../ui/progress/Progress.vue";
-const progress = ref(10);
+import Progress from '../ui/progress/Progress.vue'
+
+const progress = ref(10)
 
 onMounted(() => {
   const timer = setInterval(() => {
-    progress.value += Math.floor(Math.random() * 10) + 5;
+    progress.value += Math.floor(Math.random() * 10) + 5
 
     if (progress.value >= 90) {
-      clearInterval(timer);
+      clearInterval(timer)
     }
-  }, 400);
+  }, 400)
 
   onUnmounted(() => {
-    clearInterval(timer);
-  });
-});
+    clearInterval(timer)
+  })
+})
 </script>
+
 <template>
   <div
     class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50"
