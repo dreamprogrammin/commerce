@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -9,9 +8,8 @@ import {
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { staticMainMenuItems } from '@/config/staticItems'
-import { BUCKET_NAME } from '@/constants'
-import { useMenuAdminStore } from '@/stores/menuItems/useTopMenuItems'
+import { useCategoriesStore } from '@/stores/categories/useCategoriesStore'
+import { HeaderOverlayKey } from '@/types/app'
 
 const searchSuggestions = [
   {
@@ -28,17 +26,18 @@ const searchSuggestions = [
   },
 ]
 
-const headerOverlay = inject('headerOverlay') as
-  | {
-    showOverlay: () => void
-    hideOverlay: () => void
-    isVisible: Readonly<Ref<boolean>>
-  }
-  | undefined
+const headerOverlay = inject(HeaderOverlayKey)
 
 const activeMenuValue = ref<string | undefined>()
-
 const isSearchOpen = ref(false)
+
+const categoriesStore = useCategoriesStore()
+const { getPublicUrl } = useSupabaseStorage()
+const BUCKET_NAME = 'category-images'
+
+const menuTree = computed(() => categoriesStore.menuTree)
+
+useAsyncData('menu-tree', () => categoriesStore.fetchMenuTree())
 
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
@@ -78,20 +77,6 @@ function closeAllPopups() {
 }
 
 defineExpose({ closeAllPopups })
-
-const menuItemsStore = useMenuAdminStore()
-
-const { getPublicUrl } = useSupabaseStorage()
-
-onMounted(async () => {
-  await menuItemsStore.fetchItems()
-  console.log(menuItemsStore.items.length)
-})
-
-const menuStore = useMenuAdminStore()
-onMounted(() => {
-  menuStore.fetchItems()
-})
 </script>
 
 <template>
@@ -161,14 +146,14 @@ onMounted(() => {
       :delay-duration="100"
     >
       <NavigationMenuList class="flex w-full items-center justify-start gap-1">
-        <template v-for="itemL1 in staticMainMenuItems" :key="itemL1.slug">
-          <NavigationMenuItem :value="itemL1.slug">
-            <template v-if="itemL1.isTrigger">
-              <NuxtLink :to="itemL1.href" as-child>
+        <template v-for="rootItem in menuTree" :key="rootItem.id">
+          <NavigationMenuItem :value="rootItem.slug">
+            <template v-if="rootItem.children && rootItem.children.length > 0">
+              <NuxtLink :to="rootItem.href" as-child>
                 <NavigationMenuTrigger
                   :class="`${navigationMenuTriggerStyle()}`"
                 >
-                  {{ itemL1.title }}
+                  {{ rootItem.name }}
                 </NavigationMenuTrigger>
               </NuxtLink>
 
@@ -176,54 +161,54 @@ onMounted(() => {
                 <div class="p-4 min-w-screen">
                   <ul class="grid grid-cols-4 gap-x-6 gap-y-4">
                     <li
-                      v-for="itemL2 in menuStore.getChildren(itemL1.slug)"
-                      :key="itemL2.slug"
+                      v-for="childItem in rootItem.children"
+                      :key="childItem.id"
                       class="space-y-1"
                     >
                       <NuxtLink
-                        :to="itemL2.href"
+                        :to="childItem.href"
                         class="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         @click="activeMenuValue = undefined"
                       >
                         <div
-                          v-if="itemL2.image_url"
+                          v-if="childItem.image_url"
                           class="mb-2 overflow-hidden rounded-md"
                         >
                           <img
                             :src="
-                              getPublicUrl(BUCKET_NAME, itemL2.image_url)
+                              getPublicUrl(BUCKET_NAME, childItem.image_url)
                                 || undefined
                             "
-                            :alt="itemL2.title"
+                            :alt="childItem.name"
                             class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
                           >
                         </div>
                         <div
                           class="text-sm font-semibold leading-tight text-foreground"
                         >
-                          {{ itemL2.title }}
+                          {{ childItem.name }}
                         </div>
                         <p
-                          v-if="itemL2.description"
+                          v-if="childItem.description"
                           class="text-xs line-clamp-2 leading-snug text-muted-foreground"
                         >
-                          {{ itemL2.description }}
+                          {{ childItem.description }}
                         </p>
                       </NuxtLink>
                       <ul
-                        v-if="menuStore.getChildren(itemL2.slug).length > 0"
+                        v-if="childItem.children && childItem.children.length > 0"
                         class="mt-2 ml-3 space-y-1 list-none"
                       >
                         <li
-                          v-for="itemL3 in menuStore.getChildren(itemL2.slug)"
-                          :key="itemL3.slug"
+                          v-for="grandChildItem in childItem.children"
+                          :key="grandChildItem.id"
                         >
                           <NuxtLink
-                            :to="itemL3.href"
+                            :to="grandChildItem.href"
                             class="block select-none rounded-md py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors hover:bg-accent/50 focus:bg-accent/50 text-muted-foreground hover:text-foreground"
                             @click="activeMenuValue = undefined"
                           >
-                            {{ itemL3.title }}
+                            {{ grandChildItem.name }}
                           </NuxtLink>
                         </li>
                       </ul>
@@ -231,15 +216,15 @@ onMounted(() => {
                   </ul>
                   <div
                     v-if="
-                      menuStore.getChildren(itemL1.slug).length === 0
-                        && !menuStore.isLoading
+                      rootItem.children.length === 0
+                        && !categoriesStore.isLoading
                     "
                     class="py-10 text-center text-sm text-muted-foreground"
                   >
                     Скоро здесь появятся подкатегории...
                   </div>
                   <div
-                    v-if="menuStore.isLoading"
+                    v-if="categoriesStore.isLoading"
                     class="py-10 text-center text-sm text-muted-foreground"
                   >
                     Загрузка...
@@ -249,10 +234,10 @@ onMounted(() => {
             </template>
             <NuxtLink
               v-else
-              :to="itemL1.href"
+              :to="rootItem.href"
               :class="navigationMenuTriggerStyle()"
             >
-              {{ itemL1.title }}
+              {{ rootItem.name }}
             </NuxtLink>
           </NavigationMenuItem>
         </template>
