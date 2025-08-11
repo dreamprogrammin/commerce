@@ -1,153 +1,179 @@
-import type {
-  CategoryInsert,
-  CategoryRow,
-  CategoryUpdate,
-  Database,
-  EditableCategory,
-} from '@/types'
+import type { CategoryInsert, CategoryRow, EditableCategory } from '@/types'
+import type { Database } from '@/types/supabase'
+import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 
-export const useAdminCategoriesStore = defineStore(
-  'adminCategoriesStore',
-  () => {
-    const supabase = useSupabaseClient<Database>()
-    const allCategories = ref<CategoryRow[]>([])
-    const isLoading = ref(false)
+interface CategoryUpsertPayload {
+  id: string
+  name: string
+  slug: string
+  href: string
+  description: string | null
+  parent_id: string | null
+  is_root_category: boolean
+  display_in_menu: boolean
+  display_order: number
+  image_url: string | null
+  icon_name: string | null
+}
 
-    async function fetchAllCategories(force = false) {
-      if (allCategories.value.length > 0 && !force)
-        return
-      isLoading.value = true
-      try {
-        const { data, error } = await supabase
-          .from('categories')
-          .select('*')
-          .order('display_order')
-        if (error)
-          throw error
-        allCategories.value = data || []
-      }
-      catch (e) {
-        toast.error('Ошибка загрузки категорий', {
-          description: (e as Error).message,
-        })
-      }
-      finally {
-        isLoading.value = false
-      }
+function createInsertPayload(item: EditableCategory, parentId: string | null, displayOrder: number): CategoryInsert {
+  return {
+    name: item.name,
+    slug: item.slug,
+    href: item.href,
+    description: item.description,
+    parent_id: parentId,
+    is_root_category: item.is_root_category,
+    display_in_menu: item.display_in_menu,
+    display_order: displayOrder,
+    image_url: item.image_url,
+    icon_name: item.icon_name,
+  }
+}
+
+function createUpdatePayload(item: EditableCategory, parentId: string | null, displayOrder: number): CategoryUpsertPayload {
+  return {
+    id: item.id,
+    name: item.name,
+    slug: item.slug,
+    href: item.href,
+    description: item.description,
+    parent_id: parentId,
+    is_root_category: item.is_root_category,
+    display_in_menu: item.display_in_menu,
+    display_order: displayOrder,
+    image_url: item.image_url,
+    icon_name: item.icon_name,
+  }
+}
+
+export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () => {
+  const supabase = useSupabaseClient<Database>()
+  const { uploadFile, removeFile } = useSupabaseStorage()
+
+  const allCategories = ref<CategoryRow[]>([])
+  const isLoading = ref(false)
+  const isSaving = ref(false)
+
+  async function fetchAllCategories(force = false) {
+    if (allCategories.value.length > 0 && !force)
+      return
+    isLoading.value = true
+    try {
+      const { data, error } = await supabase.from('categories').select('*').order('display_order')
+      if (error)
+        throw error
+      allCategories.value = data || []
     }
-
-    function buildCategoryTree(
-      parentId: string | null = null,
-    ): EditableCategory[] {
-      const children = allCategories.value
-        .filter(c => c.parent_id === parentId)
-        .map(c => ({
-          ...c,
-          children: buildCategoryTree(c.id),
-        }))
-      return children
+    catch (e: any) {
+      toast.error('Ошибка загрузки категорий', { description: e.message })
     }
+    finally {
+      isLoading.value = false
+    }
+  }
 
-    async function saveChanges(itemsToSave: EditableCategory[]) {
-      const itemsToInsert: CategoryInsert[] = []
-      const itemsToUpdate: { updates: CategoryUpdate, id: string }[] = []
-      const itemsToDelete: string[] = []
+  function buildCategoryTree(parentId: string | null = null): EditableCategory[] {
+    return allCategories.value
+      .filter(c => c.parent_id === parentId)
+      .map(c => ({
+        ...c,
+        children: buildCategoryTree(c.id),
+      }))
+  }
 
-      function collectChanges(
-        items: EditableCategory[],
-        parentId: string | null = null,
-      ) {
-        items.forEach((item, index) => {
-          const currentItem = {
-            ...item,
-            parent_id: parentId,
-            display_order: index,
+  async function saveChanges(tree: EditableCategory[]) {
+    isSaving.value = true
+    try {
+      const toInsert: CategoryInsert[] = []
+      const toUpdate: CategoryUpsertPayload[] = []
+      const toDelete: { id: string, imageUrl: string | null }[] = []
+      const originalItems = new Map(allCategories.value.map(c => [c.id, c]))
+
+      async function processTree(items: EditableCategory[], parentId: string | null) {
+        for (const [index, item] of items.entries()) {
+          const originalItem = item.id ? originalItems.get(item.id) : null
+
+          if (item._imageFile) {
+            if (originalItem?.image_url)
+              await removeFile('category-images', originalItem.image_url)
+            const newPath = await uploadFile(item._imageFile, { bucketName: 'category-images', filePathPrefix: `categories/${item.slug || 'new'}` })
+            item.image_url = newPath || null
+          }
+          else if (originalItem?.image_url && item.image_url === null) {
+            await removeFile('category-images', originalItem.image_url)
           }
 
           if (item._isDeleted && item.id) {
-            itemsToDelete.push(item.id)
+            toDelete.push({ id: item.id, imageUrl: originalItem?.image_url || null })
+            const queue = [...(item.children || [])]
+            while (queue.length > 0) {
+              const current = queue.shift()
+              if (current?.id) {
+                const originalChild = originalItems.get(current.id)
+                toDelete.push({ id: current.id, imageUrl: originalChild?.image_url || null })
+              }
+              if (current?.children)
+                queue.push(...current.children)
+            }
+            continue
           }
-          else if (item._isNew) {
-            const {
-              id,
-              created_at,
-              updated_at,
-              children,
-              _tempId,
-              _isNew,
-              _isDeleted,
-              ...insertData
-            } = currentItem
-            itemsToInsert.push(insertData)
+
+          if (item._isNew) {
+            if (!item.name || !item.slug || !item.href)
+              throw new Error(`Новая категория должна иметь название, слаг и ссылку.`)
+            toInsert.push(createInsertPayload(item, parentId, index))
           }
           else if (item.id) {
-            const {
-              id,
-              created_at,
-              updated_at,
-              children,
-              _tempId,
-              _isNew,
-              _isDeleted,
-              ...updateData
-            } = currentItem
-            itemsToUpdate.push({ updates: updateData, id: item.id })
+            toUpdate.push(createUpdatePayload(item, parentId, index))
           }
 
           if (item.children?.length) {
-            collectChanges(item.children, item.id)
-          }
-        })
-      }
-
-      collectChanges(itemsToSave)
-
-      try {
-        if (itemsToDelete.length > 0) {
-          const { error } = await supabase
-            .from('categories')
-            .delete()
-            .in('id', itemsToDelete)
-          if (error)
-            throw error
-        }
-        if (itemsToInsert.length > 0) {
-          const { error } = await supabase
-            .from('categories')
-            .insert(itemsToInsert)
-          if (error)
-            throw error
-        }
-        if (itemsToUpdate.length > 0) {
-          for (const { updates, id } of itemsToUpdate) {
-            const { error } = await supabase
-              .from('categories')
-              .update(updates)
-              .eq('id', id)
-            if (error)
-              throw error
+            await processTree(item.children, item.id)
           }
         }
-
-        toast.success('Категории успешно сохранены!')
-        await fetchAllCategories(true) // Перезагружаем данные
-        return true
       }
-      catch (e) {
-        toast.error('Ошибка сохранения категорий', {
-          description: (e as Error).message,
-        })
-        return false
-      }
-    }
 
-    return {
-      allCategories,
-      isLoading,
-      fetchAllCategories,
-      buildCategoryTree,
-      saveChanges,
+      await processTree(tree, null)
+
+      if (toDelete.length > 0) {
+        const idsToDelete = toDelete.map(d => d.id)
+        const { error } = await supabase.from('categories').delete().in('id', idsToDelete)
+        if (error)
+          throw error
+
+        const filesToDelete = toDelete.map(d => d.imageUrl).filter((url): url is string => !!url)
+        if (filesToDelete.length > 0) {
+          await removeFile('category-images', filesToDelete)
+        }
+      }
+
+      if (toUpdate.length > 0) {
+        const { error } = await supabase.from('categories').upsert(toUpdate)
+        if (error)
+          throw error
+      }
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from('categories').insert(toInsert)
+        if (error)
+          throw error
+      }
+
+      toast.success('Категории успешно сохранены!')
+      await fetchAllCategories(true)
+      return true
     }
-  },
-)
+    catch (e: any) {
+      toast.error('Ошибка сохранения категорий', { description: e.message })
+      return false
+    }
+    finally {
+      isSaving.value = false
+    }
+  }
+
+  return { allCategories, isLoading, isSaving, fetchAllCategories, buildCategoryTree, saveChanges }
+})

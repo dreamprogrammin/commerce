@@ -1,5 +1,8 @@
 <script setup lang="ts">
-const isHeaderOverlayVisible = ref<boolean>(false)
+import type { HeaderOverlay } from '@/types/app'
+import { HeaderOverlayKey } from '@/types/app'
+
+const isHeaderOverlayVisible = ref(false)
 
 function showHeaderOverlay(): void {
   isHeaderOverlayVisible.value = true
@@ -9,11 +12,13 @@ function hideHeaderOverlay(): void {
   isHeaderOverlayVisible.value = false
 }
 
-provide('headerOverlay', {
+const overlayProvider: HeaderOverlay = {
   showOverlay: showHeaderOverlay,
   hideOverlay: hideHeaderOverlay,
   isVisible: readonly(isHeaderOverlayVisible),
-})
+}
+
+provide(HeaderOverlayKey, overlayProvider)
 
 function handleOverlayClick() {
   hideHeaderOverlay()
