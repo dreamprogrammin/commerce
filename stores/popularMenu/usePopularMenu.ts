@@ -15,7 +15,7 @@ export const usePopularMenuStore = defineStore('popularMenu', () => {
 
     try {
       const { data, error } = await supabase
-        .from('menu_items')
+        .from('categories')
         .select('id, title, slug, href, image_url')
         .eq('is_featured_on_homepage', true)
         .not('image_url', 'is', null)
