@@ -135,6 +135,25 @@ async function saveAllChanges() {
   }
   isSaving.value = false
 }
+function handleNodeUpdate(updatedNode: EditableCategory, tree: EditableCategory[]): boolean {
+  const targetId = updatedNode.id || updatedNode._tempId
+  const index = tree.findIndex(item => (item.id || item._tempId) === targetId)
+
+  if (index !== -1) {
+    // Нашли узел на этом уровне, заменяем его
+    tree[index] = updatedNode
+    return true
+  }
+
+  // Если не нашли, ищем в дочерних элементах
+  for (const item of tree) {
+    if (item.children && handleNodeUpdate(updatedNode, item.children)) {
+      return true
+    }
+  }
+
+  return false
+}
 </script>
 
 <template>
@@ -195,7 +214,9 @@ async function saveAllChanges() {
               :item="item"
               :level="0"
               :parent-href="selectedRootCategory.href || ''"
-              @add-child="handleAddChild" @remove-self="handleRemoveNode(item, formTree)"
+              @add-child="handleAddChild"
+              @remove-node="handleRemoveNode(item, formTree)"
+              @update-node="(updatedItem) => handleNodeUpdate(updatedItem, formTree)"
             />
           </div>
 
