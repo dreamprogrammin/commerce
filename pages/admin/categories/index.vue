@@ -13,7 +13,7 @@ const adminCategoriesStore = useAdminCategoriesStore()
 
 const rootCategories = computed(() => adminCategoriesStore.buildCategoryTree(null))
 const selectedRootCategory = ref<EditableCategory | null>(null)
-const formTree = ref<EditableCategory[]>([]) // ИСПРАВЛЕНИЕ №1: Это независимый ref
+const formTree = reactive<EditableCategory[]>([]) // ИСПРАВЛЕНИЕ №1: Это независимый ref
 const isSaving = ref(false)
 
 onMounted(() => {
@@ -23,31 +23,9 @@ onMounted(() => {
 function selectRootCategory(category: EditableCategory) {
   selectedRootCategory.value = category
   // ИСПРАВЛЕНИЕ №1: Создаем глубокую копию для безопасного редактирования
-  formTree.value = JSON.parse(JSON.stringify(category.children || []))
-}
-
-function handleAddChild(parentItem: EditableCategory) {
-  if (!parentItem.children)
-    parentItem.children = []
-  const newChild: EditableCategory = {
-    id: '',
-    _tempId: uuidv4(),
-    _isNew: true,
-    name: '',
-    slug: '',
-    href: '',
-    parent_id: parentItem.id,
-    display_order: parentItem.children.length,
-    children: [],
-    description: null,
-    is_root_category: false,
-    display_in_menu: true,
-    image_url: null,
-    icon_name: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-  parentItem.children.push(newChild)
+  formTree.length = 0
+  const newChildren = JSON.parse(JSON.stringify(category.children || []))
+  formTree.push(...newChildren)
 }
 
 function addNodeToRoot() {
@@ -61,7 +39,7 @@ function addNodeToRoot() {
     slug: '',
     href: '',
     parent_id: selectedRootCategory.value.id,
-    display_order: formTree.value.length,
+    display_order: formTree.length,
     children: [],
     description: null,
     is_root_category: false,
@@ -71,37 +49,7 @@ function addNodeToRoot() {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
-  formTree.value.push(newChild)
-}
-
-function handleRemoveNode(itemToRemove: EditableCategory, tree: EditableCategory[]): boolean {
-  const targetId = itemToRemove.id || itemToRemove._tempId
-  const index = tree.findIndex(item => (item.id || item._tempId) === targetId)
-
-  if (index !== -1) {
-    const nodeToModify = tree[index]
-
-    if (nodeToModify) {
-      if (nodeToModify.id) {
-        nodeToModify._isDeleted = true
-      }
-      else {
-        tree.splice(index, 1)
-      }
-    }
-    return true // Нашли и обработали
-  }
-
-  // Ищем в дочерних элементах (этот блок уже был правильным)
-  for (const item of tree) {
-    if (Array.isArray(item.children) && item.children.length > 0) {
-      if (handleRemoveNode(itemToRemove, item.children)) {
-        return true
-      }
-    }
-  }
-
-  return false
+  formTree.push(newChild)
 }
 
 async function saveAllChanges() {
@@ -113,7 +61,7 @@ async function saveAllChanges() {
   const categoryToUpdate = finalTreeState.find(c => c.id === selectedRootCategory.value?.id)
 
   if (categoryToUpdate) {
-    categoryToUpdate.children = formTree.value // Заменяем детей на отредактированную копию
+    categoryToUpdate.children = toRaw(formTree)
   }
   else {
     toast.error('Критическая ошибка: не удалось найти корневую категорию.')
@@ -125,15 +73,52 @@ async function saveAllChanges() {
 
   if (success) {
     await adminCategoriesStore.fetchAllCategories(true)
-    const updatedRootCategory = adminCategoriesStore.allCategories.find(c => c.id === selectedRootCategory.value?.id)
-    if (updatedRootCategory) {
-      const fullTree = adminCategoriesStore.buildCategoryTree(null)
-      const newlySelected = fullTree.find(c => c.id === updatedRootCategory.id) || null
-      if (newlySelected)
-        selectRootCategory(newlySelected)
+    const updatedFullTree = adminCategoriesStore.buildCategoryTree(null)
+    const newlySelected = updatedFullTree.find(c => c.id === selectedRootCategory.value?.id) || null
+    if (newlySelected) {
+      selectRootCategory(newlySelected)
+    }
+    else {
+      selectedRootCategory.value = null
+      formTree.length = 0
     }
   }
   isSaving.value = false
+}
+function handleRemove(itemToRemove: EditableCategory) {
+  // Рекурсивная функция для поиска и удаления
+  function findAndRemove(tree: EditableCategory[]): boolean {
+    const targetId = itemToRemove.id || itemToRemove._tempId
+    const index = tree.findIndex(item => (item.id || item._tempId) === targetId)
+
+    if (index !== -1) {
+      // === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ ===
+      // 1. Получаем сам узел (node) по найденному индексу
+      const nodeToRemove = tree[index]
+
+      // 2. Добавляем явную проверку, что узел существует
+      if (nodeToRemove) {
+        if (nodeToRemove.id) { // Если узел из БД (имеет реальный id)
+          nodeToRemove._isDeleted = true // то помечаем его на удаление
+        }
+        else { // Если узел новый (имеет только _tempId)
+          tree.splice(index, 1) // то просто удаляем его из массива
+        }
+      }
+      return true // Сообщаем, что нашли и обработали
+    }
+
+    // Ищем в дочерних элементах
+    for (const item of tree) {
+      if (Array.isArray(item.children) && findAndRemove(item.children)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  findAndRemove(formTree)
 }
 </script>
 
@@ -190,12 +175,14 @@ async function saveAllChanges() {
             Нет подкатегорий. Нажмите кнопку ниже, чтобы добавить.
           </div>
 
-          <div v-for="item in formTree" :key="item.id || item._tempId!">
+          <div v-for="(item, index) in formTree" :key="item.id || item._tempId!">
             <RecursiveMenuItemFormNode
               :item="item"
               :level="0"
               :parent-href="selectedRootCategory.href || ''"
-              @add-child="handleAddChild" @remove-self="handleRemoveNode(item, formTree)"
+              @remove-self="handleRemove(item)"
+              @update:item="(updateItem) => { formTree[index] = updateItem }"
+              @remove-child="handleRemove"
             />
           </div>
 
