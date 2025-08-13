@@ -3,6 +3,7 @@ import type { Database } from '@/types/supabase'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useCategoriesStore } from '../categories/useCategoriesStore'
 
 interface CategoryUpsertPayload {
   id: string
@@ -52,6 +53,8 @@ function createUpdatePayload(item: EditableCategory, parentId: string | null, di
 export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () => {
   const supabase = useSupabaseClient<Database>()
   const { uploadFile, removeFile } = useSupabaseStorage()
+
+  const categoriesStore = useCategoriesStore()
 
   const allCategories = ref<CategoryRow[]>([])
   const isLoading = ref(false)
@@ -164,6 +167,7 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
 
       toast.success('Категории успешно сохранены!')
       await fetchAllCategories(true)
+      await categoriesStore.forceRefetchMenuTree()
       return true
     }
     catch (e: any) {
