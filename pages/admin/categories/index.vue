@@ -5,7 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import RecursiveMenuItemFormNode from '@/components/admin/categories/RecursiveMenuItemFormNode.vue'
 import { Button } from '@/components/ui/button'
-import { useAdminCategoriesStore } from '@/stores/adminCategories/useAdminCategoriesStore'
+import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 
 definePageMeta({ layout: 'admin' })
 

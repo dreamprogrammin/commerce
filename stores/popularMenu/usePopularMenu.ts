@@ -1,4 +1,4 @@
-import type { Database, MenuItemRow } from '@/types'
+import type { Database } from '@/types'
 
 export const usePopularMenuStore = defineStore('popularMenu', () => {
   const supabase = useSupabaseClient<Database>()
