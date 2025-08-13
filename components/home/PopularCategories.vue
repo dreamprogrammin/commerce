@@ -7,8 +7,6 @@ import { usePopularMenuStore } from '@/stores/popularMenu/usePopularMenu'
 
 const store = usePopularMenuStore()
 const { getPublicUrl } = useSupabaseStorage()
-
-await useAsyncData('popular-categories', () => store.fetchPopularCategories())
 </script>
 
 <template>

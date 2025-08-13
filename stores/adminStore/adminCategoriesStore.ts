@@ -3,7 +3,7 @@ import type { Database } from '@/types/supabase'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useCategoriesStore } from '../categories/useCategoriesStore'
+import { useCategoriesStore } from '../publicStore/useCategoriesStore'
 
 interface CategoryUpsertPayload {
   id: string
