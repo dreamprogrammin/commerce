@@ -96,6 +96,7 @@ export type ProductUpdate = Database['public']['Tables']['products']['Update']
 export type ProductWithCategory = ProductRow & {
   categories: {
     name: string | null
+    slug: string | null
   } | null
 }
 
@@ -112,8 +113,15 @@ export interface IProductFilters {
 }
 
 export interface ICartItem {
-  product: Product
+  product: ProductRow
   quantity: number
+}
+
+export interface ICheckoutData {
+  deliveryMethod: 'pickup' | 'courier'
+  paymentMethod: string
+  deliveryAddress?: { line1: string, city: string, postalCode?: string }
+  guestInfo?: { name: string, email: string, phone: string }
 }
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row']

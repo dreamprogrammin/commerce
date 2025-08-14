@@ -8,7 +8,7 @@ import {
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useCategoriesStore } from '@/stores/publicStore/useCategoriesStore'
+import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { HeaderOverlayKey } from '@/types/app'
 
 const searchSuggestions = [
