@@ -84,11 +84,6 @@ export type SlideUpdate = Database['public']['Tables']['slides']['Update']
 export type ProfileRow = Database['public']['Tables']['profiles']['Row']
 export type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
-export type CategoryMenuItem
-  = Database['public']['Tables']['categories']['Row'] & {
-    children?: CategoryMenuItem[]
-  }
-
 export type ProductRow = Database['public']['Tables']['products']['Row']
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
 export type ProductUpdate = Database['public']['Tables']['products']['Update']
@@ -130,6 +125,11 @@ export type CategoryInsert
 export type CategoryUpdate
   = Database['public']['Tables']['categories']['Update']
 
+export type CategoryMenuItem
+  = Database['public']['Tables']['categories']['Row'] & {
+    children?: CategoryMenuItem[]
+  }
+
 export type EditableCategory = CategoryRow & {
   children: EditableCategory[]
   // Временные поля для новых, еще не сохраненных элементов
@@ -138,4 +138,10 @@ export type EditableCategory = CategoryRow & {
   _isDeleted?: boolean
   _imageFile?: File | null
   _imagePreview?: string
+}
+
+export interface IBreadcrumbItem {
+  id: string
+  name: string
+  href?: string
 }

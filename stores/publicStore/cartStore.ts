@@ -44,21 +44,6 @@ export const useCartStore = defineStore('cartStore', () => {
   })
 
   /**
-   * Добавляет товар в корзину или увеличивает его количество, если он уже там есть.
-   */
-
-  function addItem(product: ProductRow, quantity: number = 1) {
-    const existingItem = items.value.find(i => i.product.id === product.id)
-    if (existingItem) {
-      existingItem.quantity += quantity
-    }
-    else {
-      items.value.push({ product, quantity })
-    }
-    toast.success(`"${product.name}" добавлен в корзину`)
-  }
-
-  /**
    * Полностью удаляет товар из корзины по его ID.
    */
 
@@ -145,6 +130,29 @@ export const useCartStore = defineStore('cartStore', () => {
     finally {
       isProcessing.value = false
     }
+  }
+  /**
+   * Добавляет товар в корзину или увеличивает его количество.
+   * @param product - Объект товара, который нужно добавить.
+   * @param quantity - Количество единиц товара для добавления (по умолчанию 1).
+   */
+  function addItem(product: ProductRow, quantity: number = 1) {
+  // Проверяем, что количество - это положительное число
+    if (quantity <= 0)
+      return
+
+    const existingItem = items.value.find(i => i.product.id === product.id)
+
+    if (existingItem) {
+    // Если товар уже в корзине, УВЕЛИЧИВАЕМ его количество
+      existingItem.quantity += quantity
+    }
+    else {
+    // Если товара нет, ДОБАВЛЯЕМ его с указанным количеством
+      items.value.push({ product, quantity })
+    }
+
+    toast.success(`"${product.name}" (x${quantity}) добавлен в корзину`)
   }
 
   return {
