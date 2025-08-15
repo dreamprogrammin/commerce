@@ -35,6 +35,8 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   })
 
+  console.log(products.value)
+
   /**
    * Загружает список товаров с применением фильтров, вызывая RPC-функцию в Supabase.
    * @param filters - Объект с параметрами фильтрации.

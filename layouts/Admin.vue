@@ -46,6 +46,14 @@ const { handleOut } = useAuth()
         >
           Управление пользователями
         </NuxtLink>
+
+        <NuxtLink
+          to="/admin/products"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          Управление товарами
+        </NuxtLink>
       </nav>
     </aside>
 
