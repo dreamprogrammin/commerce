@@ -7,7 +7,17 @@ export const useProductsStore = defineStore('productsStore', () => {
   const products = ref<ProductRow[]>([])
   const currentProduct = ref<ProductWithCategory | null>(null)
   const isLoading = ref(false)
-
+  const isLoadingMore = ref(false)
+  const currentPage = ref(1)
+  /**
+   * Флаг, который показывает, есть ли еще товары для загрузки.
+   * Когда он станет `false`, мы скроем кнопку "Показать ещё".
+   */
+  const hasMoreProducts = ref(true)
+  /**
+   * Константа, определяющая, сколько товаров загружать за один раз.
+   */
+  const PAGE_SIZE = 12
   /**
    * Динамически вычисляет минимальную и максимальную цену из текущего
    * списка загруженных товаров (`products`).
@@ -31,9 +41,17 @@ export const useProductsStore = defineStore('productsStore', () => {
    * @returns Promise, который разрешается массивом найденных товаров.
    */
 
-  async function fetchProducts(filters: IProductFilters): Promise<ProductRow[]> {
-    isLoading.value = true
-    products.value = []
+  async function fetchProducts(filters: IProductFilters, loadMore = false) {
+    if (loadMore) {
+      isLoadingMore.value = true
+    }
+    else {
+      isLoading.value = true
+      // При полной перезагрузке сбрасываем все состояние пагинации
+      products.value = []
+      currentPage.value = 1
+      hasMoreProducts.value = true
+    }
     try {
       const { data, error } = await supabase
         .rpc('get_filtered_products', {
@@ -42,21 +60,39 @@ export const useProductsStore = defineStore('productsStore', () => {
           p_price_min: filters.priceMin,
           p_price_max: filters.priceMax,
           p_sort_by: filters.sortBy,
+          p_page_size: PAGE_SIZE,
+          p_page_number: currentPage.value,
         })
 
       if (error)
         throw error
+      const newProducts = data || []
 
-      const result = data || []
-      products.value = result
-      return result
+      if (loadMore) {
+        // РЕЖИМ ДОЗАГРУЗКИ: Добавляем новые товары в конец существующего списка.
+        products.value.push(...newProducts)
+      }
+      else {
+        // РЕЖИМ ПЕРЕЗАГРУЗКИ: Полностью заменяем список.
+        products.value = newProducts
+      }
+
+      // Если сервер вернул меньше товаров, чем мы просили (PAGE_SIZE),
+      // это значит, что мы достигли конца списка.
+      if (newProducts.length < PAGE_SIZE) {
+        hasMoreProducts.value = false
+      }
+
+      // Готовимся к следующему запросу "Показать ещё"
+      currentPage.value++
     }
     catch (error: any) {
       toast.error('Ошибка при загрузке товаров', { description: error.message })
-      return []
+      hasMoreProducts.value = false
     }
     finally {
       isLoading.value = false
+      isLoadingMore.value = false
     }
   }
 
@@ -96,6 +132,8 @@ export const useProductsStore = defineStore('productsStore', () => {
     products,
     currentProduct,
     isLoading,
+    isLoadingMore,
+    hasMoreProducts,
     priceRange,
     fetchProducts,
     fetchProductBySlug,

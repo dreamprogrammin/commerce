@@ -37,7 +37,7 @@ const BUCKET_NAME = 'category-images'
 
 const menuTree = computed(() => categoriesStore.menuTree)
 
-useAsyncData('menu-tree', () => categoriesStore.fetchMenuTree())
+useAsyncData('category-data', () => categoriesStore.fetchCategoryData())
 
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
