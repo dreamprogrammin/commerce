@@ -2,31 +2,42 @@
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
+// `defineModel` - это наш главный инструмент для связи с родительской страницей.
 const filters = defineModel<{
   subCategoryIds: string[]
   price: [number, number]
 }>({ required: true })
 
+// Инициализация сторов и получение данных
 const route = useRoute()
 const categoriesStore = useCategoriesStore()
 const productsStore = useProductsStore()
 
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
-
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 const priceRange = computed(() => productsStore.priceRange)
 
-// Локальное состояние для слайдера, чтобы не вызывать запросы на каждое движение.
-const priceValue = ref([priceRange.value.min, priceRange.value.max])
+// Локальное состояние ТОЛЬКО для слайдера, чтобы UI был отзывчивым.
+const localPrice = ref<[number, number]>([priceRange.value.min, priceRange.value.max])
 
-// Функция вызывается, когда пользователь ОТПУСКАЕТ ползунок.
-function updatePriceFilterOnCommit(newPriceValue: [number, number]) {
-  filters.value.price = newPriceValue
+// Функция, которая вызывается, когда пользователь ОТПУСКАЕТ ползунок.
+// Она обновляет ГЛАВНЫЙ объект `filters`, что запускает перезагрузку товаров.
+// Мы говорим функции, что она принимает `number[]` - то, что отдает Slider.
+function commitPriceToFilters(newPrice: number[]) {
+  // "Защита от дурака": проверяем, что в массиве действительно два элемента.
+  if (Array.isArray(newPrice) && newPrice.length === 2) {
+    // Если все хорошо, мы "утверждаем" (as), что это теперь
+    // наш надежный кортеж `[number, number]`, и присваиваем его.
+    filters.value.price = newPrice as [number, number]
+  }
 }
 
-// Следим за изменением `priceRange` из стора, чтобы обновить наш слайдер.
+// Следим за изменением `priceRange` из стора (когда загружаются новые товары)
+// и сбрасываем локальное состояние слайдера на полный диапазон.
 watch(priceRange, (newRange) => {
-  priceValue.value = [newRange.min, newRange.max]
+  // Мы обновляем ТОЛЬКО локальное состояние слайдера.
+  // Это не вызовет `watch` на родительской странице.
+  localPrice.value = [newRange.min, newRange.max]
 }, { deep: true })
 </script>
 
@@ -46,8 +57,15 @@ watch(priceRange, (newRange) => {
       <div v-for="cat in subcategories" :key="cat.id" class="flex items-center space-x-2">
         <Checkbox
           :id="`cat-${cat.id}`"
-          v-model="filters.subCategoryIds"
-          :value="cat.id"
+          :checked="filters.subCategoryIds.includes(cat.id)"
+          @update:checked="(checked: boolean) => {
+            if (checked) {
+              filters.subCategoryIds.push(cat.id);
+            }
+            else {
+              filters.subCategoryIds = filters.subCategoryIds.filter(id => id !== cat.id);
+            }
+          }"
         />
         <Label :for="`cat-${cat.id}`" class="font-normal cursor-pointer">{{ cat.name }}</Label>
       </div>
@@ -64,21 +82,20 @@ watch(priceRange, (newRange) => {
       </div>
       <template v-else>
         <!--
-          `v-model:model-value` для мгновенного обновления локального `priceValue`.
-          `@value-commit` - специальное событие от компонента Slider,
-          срабатывает, когда пользователь отпустил ползунок.
+          ИСПРАВЛЕНО: v-model теперь привязан к `localPrice`.
+          Это синтаксический сахар для `:model-value` и `@update:model-value`.
         -->
         <Slider
-          :model-value="priceValue"
+          v-model="localPrice"
           :min="priceRange.min"
           :max="priceRange.max"
           :step="100"
-          @update:model-value="val => priceValue = val"
-          @value-commit="updatePriceFilterOnCommit"
+          @value-commit="commitPriceToFilters"
         />
         <div class="flex justify-between text-sm text-muted-foreground">
-          <span>{{ Math.round(priceValue[0]) }} ₸</span>
-          <span>{{ Math.round(priceValue[1]) }} ₸</span>
+          <!-- ИСПРАВЛЕНО: Отображаем `localPrice`, а не `priceValue` -->
+          <span>{{ Math.round(localPrice[0]) }} ₸</span>
+          <span>{{ Math.round(localPrice[1]) }} ₸</span>
         </div>
       </template>
     </div>
