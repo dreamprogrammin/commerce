@@ -1,23 +1,25 @@
 <script setup lang="ts">
-import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
+// НОВЫЙ ПРОПС: Компонент теперь просто принимает готовое название
 const props = defineProps<{
-  categorySlug: string | null
+  title: string
 }>()
+// v-model для сортировки остается
 const sortBy = defineModel<string>('sortBy', { required: true })
-const categoriesStore = useCategoriesStore()
-
-const pageTitle = computed(() => {
-  // Используем наш getter для поиска имени категории по слагу
-  const categoryInfo = categoriesStore.getBreadcrumbs(props.categorySlug)?.pop()
-  return categoryInfo?.name || props.categorySlug?.replace(/-/g, ' ') || 'Каталог'
-})
 </script>
 
 <template>
   <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+    <!-- Используем `title` из пропса -->
     <h1 class="text-3xl font-bold capitalize">
-      {{ pageTitle }}
+      {{ props.title }}
     </h1>
     <div>
       <Select v-model="sortBy">
