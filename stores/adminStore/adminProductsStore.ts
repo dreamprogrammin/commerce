@@ -16,7 +16,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, categories(name)')
+        .select('*, categories(name, slug)')
         .order('created_at', { ascending: false })
 
       if (error)

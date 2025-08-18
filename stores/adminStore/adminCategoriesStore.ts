@@ -167,7 +167,7 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
 
       toast.success('Категории успешно сохранены!')
       await fetchAllCategories(true)
-      await categoriesStore.forceRefetchMenuTree()
+      await categoriesStore.forceRefetch()
       return true
     }
     catch (e: any) {
