@@ -4,5 +4,11 @@
     "paths": {
       "@/*": ["./*"]
     }
-  }
+  },
+  "exclude": [
+    "node_modules",
+    ".output",
+    "dist",
+    "supabase/functions" // <-- Вот эта строка
+  ]
 }

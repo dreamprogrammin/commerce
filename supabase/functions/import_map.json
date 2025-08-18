@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2",
+    "https://deno.land/x/edge_cors@v1.0.1/mod.ts": "https://deno.land/x/edge_cors@v1.0.1/mod.ts"
+  }
+}
