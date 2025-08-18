@@ -8,33 +8,38 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const { getPublicUrl } = useSupabaseStorage()
 const BUCKET_NAME = 'product-images'
-
-const { currentProduct, isLoading } = storeToRefs(productsStore)
 const slug = route.params.slug as string
+
+const { isLoading } = storeToRefs(productsStore)
 
 // --- 3. Загрузка данных ---
 // `useAsyncData` выполняет загрузку на сервере для SEO и быстрой первой отрисовки.
 // `product-${slug}` - уникальный ключ, чтобы Nuxt не загружал данные для одного и того же товара повторно.
-const { error } = await useAsyncData(`product-${slug}`, () => productsStore.fetchProductBySlug(slug))
+const { data: currentProduct, error } = await useAsyncData(
+  `product-${slug}`,
+  () => {
+    // Очищаем предыдущий товар в сторе перед новым запросом.
+    // Это предотвратит "мерцание" старых данных.
+    productsStore.currentProduct = null
+    return productsStore.fetchProductBySlug(slug)
+  },
+  {
+    // `watch` гарантирует, что `useAsyncData` будет перезапущен
+    // при клиентских переходах между страницами товаров.
+    watch: [() => route.params.slug],
+  },
+)
 
-// --- 4. Обработка ошибок и состояния "не найдено" ---
-// ИЗМЕНЕНО: Проверяем не только `currentProduct.value`, но и ошибку от `useAsyncData`.
-// Эта проверка выполняется на сервере. Если товар не найден, Nuxt сразу отдаст 404.
 if (error.value || !currentProduct.value) {
-  // `fatal: true` говорит Nuxt, что это критическая ошибка и нужно немедленно показать страницу ошибки.
   throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
 }
 
 // --- 5. SEO и метаданные страницы ---
 // ИЗМЕНЕНО: Оборачиваем в `watchEffect`, чтобы title обновлялся,
 // даже если пользователь переходит между страницами товаров без перезагрузки.
-watchEffect(() => {
-  if (currentProduct.value) {
-    useHead({
-      title: currentProduct.value.name,
-      meta: [{ name: 'description', content: currentProduct.value.description || `Купить ${currentProduct.value.name} в нашем магазине` }],
-    })
-  }
+useHead({
+  title: currentProduct.value.name,
+  meta: [{ name: 'description', content: currentProduct.value.description || `Купить ${currentProduct.value.name} в нашем магазине` }],
 })
 
 // --- 6. Локальное состояние для UI ---
