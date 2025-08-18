@@ -2,6 +2,8 @@ import type { Database, ICartItem, ICheckoutData, ProductRow } from '@/types'
 import { toast } from 'vue-sonner'
 import { useProfileStore } from '../core/profileStore'
 
+const CART_STORAGE_KEY = 'krakenshop-cart-v1'
+
 export const useCartStore = defineStore('cartStore', () => {
   const supabase = useSupabaseClient<Database>()
   const router = useRouter()
@@ -11,50 +13,43 @@ export const useCartStore = defineStore('cartStore', () => {
   const isProcessing = ref(false)
   const bonusesToSpend = ref(0)
 
-  /**
-   * Общее количество всех единиц товаров в корзине (например, 2 футболки + 1 шорты = 3).
-   */
+  // УБИРАЕМ всю логику hydrateFromStorage() и watch() - плагин все сделает сам
 
   const totalItems = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
-
-  /**
-   * Общая стоимость товаров в корзине до применения скидок.
-   */
 
   const subtotal = computed(() =>
     items.value.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0),
   )
 
-  /**
-   * Сумма скидки в тенге. Равна количеству бонусов, но не может превышать баланс пользователя.
-   */
-
   const discountAmount = computed(() => {
     return Math.min(bonusesToSpend.value, profileStore.bonusBalance)
   })
 
-  /**
-   * Итоговая сумма к оплате с учетом скидки.
-   */
-
   const total = computed(() => {
     const finalTotal = subtotal.value - discountAmount.value
-    // Округляем до 2 знаков после запятой и гарантируем, что сумма не будет отрицательной.
     return finalTotal > 0 ? Number(finalTotal.toFixed(2)) : 0
   })
 
-  /**
-   * Полностью удаляет товар из корзины по его ID.
-   */
+  function addItem(product: ProductRow, quantity: number = 1) {
+    if (quantity <= 0)
+      return
+
+    const existingItem = items.value.find(i => i.product.id === product.id)
+
+    if (existingItem) {
+      existingItem.quantity += quantity
+    }
+    else {
+      items.value = [...items.value, { product, quantity }]
+    }
+
+    toast.success(`"${product.name}" (x${quantity}) добавлен в корзину`)
+  }
 
   function removeItem(productId: string) {
     items.value = items.value.filter(i => i.product.id !== productId)
     toast.info('Товар удален из корзины')
   }
-
-  /**
-   * Обновляет количество конкретного товара. Если новое количество <= 0, товар удаляется.
-   */
 
   function updateQuantity(productId: string, quantity: number) {
     const item = items.value.find(i => i.product.id === productId)
@@ -68,35 +63,21 @@ export const useCartStore = defineStore('cartStore', () => {
     }
   }
 
-  /**
-   * Полностью очищает корзину и сбрасывает примененные бонусы.
-   */
-
   function clearCart() {
     items.value = []
     bonusesToSpend.value = 0
   }
 
-  /**
-   * Устанавливает, сколько бонусов пользователь хочет потратить, с проверками.
-   */
-
   function setBonusesToSpend(amount: number) {
     const userBalance = profileStore.bonusBalance
     if (amount < 0 || Number.isNaN(amount)) {
       bonusesToSpend.value = 0
+      return
     }
-    // Максимум бонусов для списания не может превышать сумму заказа.
     const maxBonusesForOrder = Math.ceil(subtotal.value)
-    // Реальный максимум - это минимум из баланса пользователя и суммы заказа.
     const maxPossible = Math.min(userBalance, maxBonusesForOrder)
-    // Устанавливаем значение, не превышающее этот максимум.
     bonusesToSpend.value = amount > maxPossible ? maxPossible : Math.floor(amount)
   }
-
-  /**
-   * Главная функция оформления заказа. Вызывает RPC-функцию `create_order`.
-   */
 
   async function checkout(orderData: ICheckoutData) {
     if (items.value.length === 0) {
@@ -131,29 +112,6 @@ export const useCartStore = defineStore('cartStore', () => {
       isProcessing.value = false
     }
   }
-  /**
-   * Добавляет товар в корзину или увеличивает его количество.
-   * @param product - Объект товара, который нужно добавить.
-   * @param quantity - Количество единиц товара для добавления (по умолчанию 1).
-   */
-  function addItem(product: ProductRow, quantity: number = 1) {
-  // Проверяем, что количество - это положительное число
-    if (quantity <= 0)
-      return
-
-    const existingItem = items.value.find(i => i.product.id === product.id)
-
-    if (existingItem) {
-    // Если товар уже в корзине, УВЕЛИЧИВАЕМ его количество
-      existingItem.quantity += quantity
-    }
-    else {
-    // Если товара нет, ДОБАВЛЯЕМ его с указанным количеством
-      items.value.push({ product, quantity })
-    }
-
-    toast.success(`"${product.name}" (x${quantity}) добавлен в корзину`)
-  }
 
   return {
     items,
@@ -170,4 +128,9 @@ export const useCartStore = defineStore('cartStore', () => {
     checkout,
     setBonusesToSpend,
   }
+}, {
+  persist: {
+    key: CART_STORAGE_KEY,
+    pick: ['items', 'bonusesToSpend'],
+  },
 })
