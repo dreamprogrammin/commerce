@@ -1,0 +1,88 @@
+<script setup lang="ts">
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
+
+definePageMeta({ layout: 'admin' })
+
+const adminProductsStore = useAdminProductsStore()
+const router = useRouter()
+const { getPublicUrl } = useSupabaseStorage()
+
+onMounted(() => {
+  adminProductsStore.fetchProducts()
+})
+</script>
+
+<template>
+  <div class="container mx-auto p-4 md:p-8">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">
+        Управление товарами
+      </h1>
+      <NuxtLink to="/admin/products/new">
+        <Button>Добавить товар</Button>
+      </NuxtLink>
+    </div>
+
+    <div v-if="adminProductsStore.isLoading" class="text-center py-10">
+      Загрузка...
+    </div>
+    <div v-else class="border rounded-lg bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead class="w-[80px]">
+              Фото
+            </TableHead>
+            <TableHead>Название</TableHead>
+            <TableHead>Категория</TableHead>
+            <TableHead>Цена</TableHead>
+            <TableHead>Остаток</TableHead>
+            <TableHead>Статус</TableHead>
+            <TableHead class="text-right">
+              Действия
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-if="adminProductsStore.products.length === 0">
+            <TableCell colspan="7" class="h-24 text-center">
+              Товары еще не добавлены.
+            </TableCell>
+          </TableRow>
+          <TableRow v-for="product in adminProductsStore.products" :key="product.id">
+            <TableCell>
+              <div class="w-16 h-16 bg-muted rounded-md overflow-hidden">
+                <img
+                  v-if="product.image_url"
+                  :src="getPublicUrl('product-images', product.image_url) || undefined"
+                  :alt="product.name"
+                  class="w-full h-full object-cover"
+                >
+              </div>
+            </TableCell>
+            <TableCell class="font-medium">
+              {{ product.name }}
+            </TableCell>
+            <TableCell>{{ product.categories?.name || 'Без категории' }}</TableCell>
+            <TableCell>{{ product.price }} ₸</TableCell>
+            <TableCell>{{ product.stock_quantity }} шт.</TableCell>
+            <TableCell>
+              <Badge :variant="product.is_active ? 'default' : 'outline'">
+                {{ product.is_active ? 'Активен' : 'Скрыт' }}
+              </Badge>
+            </TableCell>
+            <TableCell class="text-right space-x-2">
+              <Button variant="outline" size="sm" @click="router.push(`/admin/products/${product.id}`)">
+                Редактировать
+              </Button>
+              <Button variant="destructive" size="sm" @click="adminProductsStore.deleteProduct(product)">
+                Удалить
+              </Button>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  </div>
+</template>

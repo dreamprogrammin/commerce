@@ -12,4 +12,7 @@ export default antfu({
     // например, если вы не хотите требовать многословные имена компонентов
     'vue/multi-word-component-names': 'off',
   },
+  ignores: [
+    ' supabase/functions/**/*',
+  ],
 })

@@ -1,0 +1,56 @@
+<script setup lang="ts">
+import type { ProductRow } from '@/types' // Убедись, что этот тип импортирован
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+
+// === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ ===
+// Мы сохраняем результат `defineProps` в константу `props`.
+const props = defineProps<{
+  product: ProductRow
+}>()
+// ===================================
+
+const cartStore = useCartStore()
+const { getPublicUrl } = useSupabaseStorage()
+const BUCKET_NAME = 'product-images'
+</script>
+
+<template>
+  <div class="border rounded-lg overflow-hidden group transition-shadow hover:shadow-lg bg-card">
+    <!-- Теперь в шаблоне мы обращаемся к товару через `props.product` -->
+    <NuxtLink :to="`/product/${props.product.slug}`" class="block bg-muted">
+      <div class="aspect-square overflow-hidden">
+        <img
+          v-if="props.product.image_url"
+          :src="getPublicUrl(BUCKET_NAME, props.product.image_url) || undefined"
+          :alt="props.product.name"
+          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        >
+        <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+          <span>Нет фото</span>
+        </div>
+      </div>
+    </NuxtLink>
+
+    <div class="p-4 space-y-2">
+      <h3 class="font-semibold truncate h-6">
+        {{ props.product.name }}
+      </h3>
+      <div class="flex items-baseline justify-between">
+        <p class="text-lg font-bold">
+          {{ props.product.price }} ₸
+        </p>
+        <p v-if="props.product.bonus_points_award > 0" class="text-xs text-primary">
+          +{{ props.product.bonus_points_award }} бонусов
+        </p>
+      </div>
+      <!--
+        И при клике мы тоже передаем `props.product`.
+        Теперь `addItem` гарантированно получит правильный объект товара.
+      -->
+      <Button class="w-full" @click="cartStore.addItem(props.product)">
+        В корзину
+      </Button>
+    </div>
+  </div>
+</template>

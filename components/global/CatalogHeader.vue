@@ -1,0 +1,46 @@
+<script setup lang="ts">
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+// НОВЫЙ ПРОПС: Компонент теперь просто принимает готовое название
+const props = defineProps<{
+  title: string
+}>()
+// v-model для сортировки остается
+const sortBy = defineModel<string>('sortBy', { required: true })
+</script>
+
+<template>
+  <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+    <!-- Используем `title` из пропса -->
+    <h1 class="text-3xl font-bold capitalize">
+      {{ props.title }}
+    </h1>
+    <div>
+      <Select v-model="sortBy">
+        <SelectTrigger class="w-[220px]">
+          <SelectValue placeholder="Сортировка" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="popularity">
+            Популярные
+          </SelectItem>
+          <SelectItem value="newest">
+            По новизне
+          </SelectItem>
+          <SelectItem value="price_asc">
+            Цена: по возрастанию
+          </SelectItem>
+          <SelectItem value="price_desc">
+            Цена: по убыванию
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+</template>

@@ -10,7 +10,9 @@
       <nuxt-link to="/profile">
         Профиль
       </nuxt-link>
-      <button>Корзина</button>
+      <NuxtLink to="/cart">
+        Корзина
+      </NuxtLink>
       <button>Кешбэк</button>
     </div>
   </div>

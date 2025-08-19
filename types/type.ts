@@ -84,12 +84,20 @@ export type SlideUpdate = Database['public']['Tables']['slides']['Update']
 export type ProfileRow = Database['public']['Tables']['profiles']['Row']
 export type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
-export type CategoryMenuItem
-  = Database['public']['Tables']['categories']['Row'] & {
-    children?: CategoryMenuItem[]
-  }
+export type ProductRow = Database['public']['Tables']['products']['Row']
+export type ProductInsert = Database['public']['Tables']['products']['Insert']
+export type ProductUpdate = Database['public']['Tables']['products']['Update']
 
-export type Product = Database['public']['Tables']['products']['Row']
+export type ProductWithCategory = ProductRow & {
+  categories: {
+    name: string | null
+    slug: string | null
+  } | null
+}
+
+export type Product = ProductRow & {
+  images: string[]
+}
 
 export interface IProductFilters {
   categorySlug: string
@@ -100,8 +108,15 @@ export interface IProductFilters {
 }
 
 export interface ICartItem {
-  product: Product
+  product: ProductRow
   quantity: number
+}
+
+export interface ICheckoutData {
+  deliveryMethod: 'pickup' | 'courier'
+  paymentMethod: string
+  deliveryAddress?: { line1: string, city: string, postalCode?: string }
+  guestInfo?: { name: string, email: string, phone: string }
 }
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row']
@@ -109,6 +124,11 @@ export type CategoryInsert
   = Database['public']['Tables']['categories']['Insert']
 export type CategoryUpdate
   = Database['public']['Tables']['categories']['Update']
+
+export type CategoryMenuItem
+  = Database['public']['Tables']['categories']['Row'] & {
+    children?: CategoryMenuItem[]
+  }
 
 export type EditableCategory = CategoryRow & {
   children: EditableCategory[]
@@ -118,4 +138,10 @@ export type EditableCategory = CategoryRow & {
   _isDeleted?: boolean
   _imageFile?: File | null
   _imagePreview?: string
+}
+
+export interface IBreadcrumbItem {
+  id: string
+  name: string
+  href?: string
 }

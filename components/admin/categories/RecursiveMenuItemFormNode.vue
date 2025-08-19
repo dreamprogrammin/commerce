@@ -16,108 +16,156 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  (e: 'update:item', value: EditableCategory): void
   (e: 'addChild', parentItem: EditableCategory): void
-  (e: 'updateNode', updatedItem: EditableCategory): void
-  (e: 'removeNode', itemToRemove: EditableCategory): void
+  (e: 'removeChild', itemToRemove: EditableCategory): void
+  (e: 'removeSelf'): void
 }>()
 
-const localItem = ref<EditableCategory>(JSON.parse(JSON.stringify(props.item)))
-
-const RecursiveMenuItemFormNode = defineAsyncComponent(
+const RecursiveCategoryFormNode = defineAsyncComponent(
   () => import('@/components/admin/categories/RecursiveMenuItemFormNode.vue'),
 )
-
-watch(localItem, (newItem) => {
-  emit('updateNode', newItem)
-}, { deep: true })
 
 const isChildrenVisible = ref(true)
 const { getPublicUrl } = useSupabaseStorage()
 
-function autoFill() {
-  // Автозаполнение работает только для НОВЫХ, еще не сохраненных элементов
-  if (props.item._isNew && props.item.name) {
-    const newSlug = slugify(props.item.name)
-    props.item.slug = newSlug
-    props.item.href = `${props.parentHref}/${newSlug}`
-  }
-}
+const name = computed({
+  get: () => props.item.name,
+  set: (value) => {
+    const updatedItem = { ...props.item, name: value }
+    if (props.item._isNew) { // Автозаполнение при изменении имени
+      const newSlug = slugify(value)
+      updatedItem.slug = newSlug
+      updatedItem.href = `${props.parentHref}/${newSlug}`
+    }
+    emit('update:item', updatedItem)
+  },
+})
+const slug = computed({
+  get: () => props.item.slug,
+  set: value => emit('update:item', { ...props.item, slug: value }),
+})
+const href = computed({
+  get: () => props.item.href,
+  set: value => emit('update:item', { ...props.item, href: value }),
+})
+const description = computed({
+  get: () => props.item.description ?? '',
+  set: value => emit('update:item', { ...props.item, description: value || null }),
+})
+const display_order = computed({
+  get: () => props.item.display_order,
+  set: value => emit('update:item', { ...props.item, display_order: value }),
+})
+const display_in_menu = computed({
+  get: () => props.item.display_in_menu,
+  set: value => emit('update:item', { ...props.item, display_in_menu: value }),
+})
+const isDeleted = computed({
+  get: () => props.item._isDeleted || false,
+  set: value => emit('update:item', { ...props.item, _isDeleted: value }),
+})
+
 function handleImageChange(event: Event) {
   const target = event.target as HTMLInputElement
-  if (target.files && target.files[0]) {
-    console.log('File selected:', target.files[0])
+  const file = target.files?.[0]
+  if (file) {
+    emit('update:item', {
+      ...props.item,
+      _imageFile: file,
+      _imagePreview: URL.createObjectURL(file),
+      image_url: null,
+    })
   }
 }
 
 function removeImage() {
-  props.item.image_url = null
+  emit('update:item', {
+    ...props.item,
+    _imageFile: undefined,
+    _imagePreview: undefined,
+    image_url: null,
+  })
 }
-const descriptionValue = computed({
-  // `get` будет вызываться, когда компонент читает значение
-  get() {
-    // Если item.description это null, мы возвращаем undefined.
-    // Иначе, возвращаем само значение.
-    return props.item.description ?? undefined
-  },
-  // `set` будет вызываться, когда пользователь что-то вводит в Textarea
-  set(newValue) {
-    // Если новое значение - пустая строка, мы сохраняем null в наши данные.
-    // Иначе, сохраняем новую строку.
-    props.item.description = newValue || null
-  },
-})
+// function handleChildRemove(itemToRemove: EditableCategory) {
+//   const targetId = itemToRemove.id || itemToRemove._tempId
+//   const index = localItem.value.children.findIndex(item => (item.id || item._tempId) === targetId)
+
+//   if (index !== -1) {
+//     const nodeToModify = localItem.value.children[index]
+//     if (nodeToModify) {
+//       if (nodeToModify.id) {
+//         nodeToModify._isDeleted = true
+//       }
+//       else {
+//         localItem.value.children.splice(index, 1)
+//       }
+//     }
+//   }
+// }
+
+// function autoFill() {
+//   if (localItem.value._isNew && localItem.value.name) {
+//     const newSlug = slugify(localItem.value.name)
+//     localItem.value.slug = newSlug
+//     localItem.value.href = `${props.parentHref}/${newSlug}`
+//   }
+// }
+// function handleImageChange(event: Event) {
+//   const target = event.target as HTMLInputElement
+//   const file = target.files?.[0]
+//   if (file) {
+//     localItem.value._imageFile = file
+//     localItem.value._imagePreview = URL.createObjectURL(file)
+//     localItem.value.image_url = null
+//   }
+// }
+
+// function removeImage() {
+//   localItem.value._imageFile = undefined
+//   localItem.value._imagePreview = undefined
+//   localItem.value.image_url = null
+// }
+// const descriptionValue = computed({
+//   get() {
+//     return props.item.description ?? undefined
+//   },
+//   set(newValue) {
+//     localItem.value.description = newValue || null
+//   },
+// })
+
+// function handleChildUpdate(updatedChild: EditableCategory) {
+//   const index = localItem.value.children.findIndex(c => (c.id || c._tempId) === (updatedChild.id || updatedChild._tempId))
+//   if (index !== -1) {
+//     localItem.value.children[index] = updatedChild
+//   }
+// }
 </script>
 
 <template>
-  <!--
-    Обертка, которая делает "удаленные" элементы полупрозрачными и добавляет красную полоску слева.
-    Это дает админу понять, что этот блок помечен на удаление.
-  -->
-  <div
-    :class="{
-      'opacity-50 border-l-2 border-destructive pl-4 transition-opacity':
-        item._isDeleted,
-    }"
-  >
+  <div :class="{ 'opacity-50 border-l-2 border-destructive pl-4 transition-opacity': isDeleted }">
     <div
       class="border p-4 rounded-lg space-y-4 bg-muted/40 relative shadow-sm"
       :style="{ marginLeft: `${level * 25}px` }"
     >
-      <!-- Блок с кнопками управления в правом верхнем углу -->
       <div class="absolute top-2 right-2 flex items-center gap-2 z-10">
-        <!-- Кнопка "Восстановить" появляется, только если элемент помечен на удаление -->
         <Button
-          v-if="item._isDeleted"
+          v-if="isDeleted"
           variant="outline"
-          size="sm"
-          type="button"
-          class="text-xs h-7 border-primary text-primary hover:bg-primary/10"
-          @click="item._isDeleted = false"
+          size="sm" type="button" class="text-xs h-7 border-primary text-primary hover:bg-primary/10"
+          @click="isDeleted = false"
         >
           Восстановить
         </Button>
-        <!-- Кнопка "Удалить", которая теперь просто меняет флаг -->
         <Button
           v-else
           variant="ghost"
-          size="icon"
-          type="button"
-          class="text-destructive hover:bg-destructive/10 h-7 w-7"
+          size="icon" type="button" class="text-destructive hover:bg-destructive/10 h-7 w-7"
           aria-label="Пометить на удаление"
-          @click="emit('remove-self')"
+          @click="emit('removeSelf')"
         >
-          <!-- Иконка мусорной корзины -->
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zM17 6H7v13h10zM9 17h2V8H9zm4 0h2V8h-2zM7 6v13z"
-            />
-          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zM17 6H7v13h10zM9 17h2V8H9zm4 0h2V8h-2zM7 6v13z" /></svg>
         </Button>
       </div>
 
@@ -125,152 +173,74 @@ const descriptionValue = computed({
         Редактирование категории (Уровень {{ level + 2 }})
       </p>
 
-      <!-- Основная форма с полями -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
         <div>
-          <Label :for="`name-${item._tempId || item.id}`">Название *</Label>
-          <Input
-            :id="`name-${item._tempId || item.id}`"
-            v-model="item.name"
-            required
-            :disabled="item._isDeleted"
-            @input="autoFill"
-          />
+          <Label :for="`name-${props.item._tempId || props.item.id}`">Название *</Label>
+          <Input :id="`name-${props.item._tempId || props.item.id}`" v-model="name" required :disabled="isDeleted" />
         </div>
         <div>
-          <Label :for="`slug-${item._tempId || item.id}`">Слаг (Slug) *</Label>
-          <Input
-            :id="`slug-${item._tempId || item.id}`"
-            v-model="item.slug"
-            required
-            :disabled="item._isDeleted"
-          />
+          <Label :for="`slug-${props.item._tempId || props.item.id}`">Слаг (Slug) *</Label>
+          <Input :id="`slug-${props.item._tempId || props.item.id}`" v-model="slug" required :disabled="isDeleted" />
         </div>
       </div>
       <div>
-        <Label :for="`href-${item._tempId || item.id}`">Ссылка (URL) *</Label>
-        <Input
-          :id="`href-${item._tempId || item.id}`"
-          v-model="item.href"
-          required
-          :disabled="item._isDeleted"
-        />
+        <Label :for="`href-${props.item._tempId || props.item.id}`">Ссылка (URL) *</Label>
+        <Input :id="`href-${props.item._tempId || props.item.id}`" v-model="href" required :disabled="isDeleted" />
       </div>
       <div>
-        <Label :for="`desc-${item._tempId || item.id}`">Описание</Label>
-        <Textarea
-          :id="`desc-${item._tempId || item.id}`"
-          v-model="descriptionValue"
-          rows="2"
-          placeholder="Краткое описание для SEO и меню..."
-          :disabled="item._isDeleted"
-        />
+        <Label :for="`desc-${props.item._tempId || props.item.id}`">Описание</Label>
+        <Textarea :id="`desc-${props.item._tempId || props.item.id}`" v-model="description" rows="2" placeholder="Краткое описание для SEO и меню..." :disabled="isDeleted" />
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
         <div>
-          <Label :for="`order-${item._tempId || item.id}`">Порядок в меню</Label>
-          <Input
-            :id="`order-${item._tempId || item.id}`"
-            v-model.number="item.display_order"
-            type="number"
-            :disabled="item._isDeleted"
-          />
+          <Label :for="`order-${props.item._tempId || props.item.id}`">Порядок в меню</Label>
+          <Input :id="`order-${props.item._tempId || props.item.id}`" v-model.number="display_order" type="number" :disabled="isDeleted" />
         </div>
         <div class="flex items-center space-x-2 pt-5">
-          <Switch
-            :id="`display-${item._tempId || item.id}`"
-            v-model:checked="item.display_in_menu"
-            :disabled="item._isDeleted"
-          />
-          <Label :for="`display-${item._tempId || item.id}`">Показывать в меню</Label>
+          <Switch :id="`display-${props.item._tempId || props.item.id}`" v-model:checked="display_in_menu" :disabled="props.item._isDeleted" />
+          <Label :for="`display-${props.item._tempId || props.item.id}`">Показывать в меню</Label>
         </div>
       </div>
       <div>
-        <Label :for="`image-${item._tempId || item.id}`">Изображение для меню</Label>
-        <Input
-          :id="`image-${item._tempId || item.id}`"
-          type="file"
-          accept="image/png, image/jpeg, image/webp"
-          :disabled="item._isDeleted"
-          @change="handleImageChange"
-        />
-        <div
-          v-if="item.image_url"
-          class="mt-2 border p-2 rounded-md inline-block relative bg-background"
-        >
-          <img
-            :src="getPublicUrl(BUCKET_NAME, item.image_url!) || undefined"
-            :alt="`Изображение для ${item.name}`"
-            class="max-w-[150px] max-h-[80px] object-contain rounded"
-          >
-          <Button
-            variant="destructive"
-            size="icon"
-            class="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-            type="button"
-            aria-label="Удалить изображение"
-            :disabled="item._isDeleted"
-            @click="removeImage"
-          >
-            <!-- Иконка крестика -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-            >
-              <path
-                fill="currentColor"
-                d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"
-              />
-            </svg>
+        <Label :for="`image-${props.item._tempId || props.item.id}`">Изображение для меню</Label>
+        <Input :id="`image-${props.item._tempId || props.item.id}`" type="file" accept="image/png, image/jpeg, image/webp" :disabled="isDeleted" @change="handleImageChange" />
+        <div v-if="props.item._imagePreview || props.item.image_url" class="mt-2 border p-2 rounded-md inline-block relative bg-background">
+          <img :src="props.item._imagePreview || getPublicUrl(BUCKET_NAME, props.item.image_url!) || undefined" :alt="`Изображение для ${props.item.name}`" class="max-w-[150px] max-h-[80px] object-contain rounded">
+          <Button variant="destructive" size="icon" class="absolute -top-2 -right-2 h-6 w-6 rounded-full" type="button" aria-label="Удалить изображение" :disabled="isDeleted" @click="removeImage">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z" /></svg>
           </Button>
         </div>
       </div>
 
-      <!-- Рекурсивный блок для дочерних элементов -->
-      <div
-        v-if="item.children && item.children.length > 0"
-        class="pt-3 mt-3 border-t"
-      >
+      <div v-if="props.item.children && props.item.children.length > 0" class="pt-3 mt-3 border-t">
         <div class="flex items-center justify-between">
           <h4 class="font-semibold text-sm text-muted-foreground">
-            Подкатегории для "{{ item.name }}" ({{
-              item.children.filter((c) => !c._isDeleted).length
-            }}
-            шт.)
+            Подкатегории для "{{ props.item.name }}" ({{ props.item.children.filter(c => !c._isDeleted).length }} шт.)
           </h4>
-          <Button
-            size="sm"
-            variant="ghost"
-            @click="isChildrenVisible = !isChildrenVisible"
-          >
+          <Button size="sm" variant="ghost" @click="isChildrenVisible = !isChildrenVisible">
             {{ isChildrenVisible ? "Свернуть" : "Развернуть" }}
           </Button>
         </div>
-
         <div v-if="isChildrenVisible" class="mt-2 space-y-3">
           <RecursiveCategoryFormNode
-            v-for="child in item.children"
+            v-for="(child, index) in props.item.children"
             :key="child.id || child._tempId!"
             :item="child"
-            :parent-href="item.href || ''"
+            :parent-href="props.item.href || ''"
             :level="level + 1"
-            @add-child="(parent: EditableCategory) => emit('addChild', parent)"
-            @remove-self="child._isDeleted = true"
+            @add-child="emit('addChild', child)"
+            @remove-self="emit('removeChild', child)"
+            @update:item="(updatedChild) => {
+              const newChildren = [...props.item.children]
+              newChildren[index] = updatedChild
+              emit('update:item', { ...props.item, children: newChildren })
+            }"
           />
         </div>
       </div>
 
-      <!-- Кнопка "Добавить подкатегорию" -->
-      <Button
-        size="sm"
-        variant="outline"
-        class="mt-2 border-dashed w-full"
-        :disabled="item._isDeleted"
-        @click="emit('addChild', item)"
-      >
-        Добавить подкатегорию в "{{ item.name }}" (Уровень {{ level + 3 }})
+      <Button size="sm" variant="outline" class="mt-2 border-dashed w-full" :disabled="isDeleted" @click="emit('addChild', props.item)">
+        Добавить подкатегорию в "{{ props.item.name }}" (Уровень {{ level + 3 }})
       </Button>
     </div>
   </div>

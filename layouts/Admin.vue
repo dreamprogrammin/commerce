@@ -16,7 +16,7 @@ const { handleOut } = useAuth()
 
       <nav class="flex-1 space-y-2 p-4">
         <NuxtLink
-          to="/admin/menu"
+          to="/admin/categories"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
           active-class="bg-muted text-primary"
         >
@@ -45,6 +45,14 @@ const { handleOut } = useAuth()
           active-class="bg-muted text-primary"
         >
           Управление пользователями
+        </NuxtLink>
+
+        <NuxtLink
+          to="/admin/products"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          Управление товарами
         </NuxtLink>
       </nav>
     </aside>
