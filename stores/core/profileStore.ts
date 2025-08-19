@@ -68,7 +68,7 @@ export const useProfileStore = defineStore('profileStore', () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(toRaw(updates))
         .eq('id', user.value.id)
         .select()
         .single()

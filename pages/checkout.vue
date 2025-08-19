@@ -68,7 +68,7 @@ async function submitOrder() {
   await cartStore.checkout({
     deliveryMethod: orderForm.value.deliveryMethod,
     paymentMethod: orderForm.value.paymentMethod,
-    deliveryAddress: orderForm.value.deliveryMethod === 'courier' ? orderForm.value.address : undefined,
+    deliveryAddress: orderForm.value.deliveryMethod === 'courier' ? toRaw(orderForm.value.address) : undefined,
     // Если пользователь гость (не авторизован), передаем его данные
     guestInfo: !user.value
       ? {
