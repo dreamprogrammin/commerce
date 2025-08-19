@@ -35,6 +35,7 @@ interface OrderData {
 }
 // -------------------------------------------------------------------------
 
+// eslint-disable-next-line no-console
 console.log('Функция notify-order-to-telegram инициализирована.')
 
 // Основная функция
@@ -46,6 +47,7 @@ Deno.serve(async (req) => {
   try {
     const payload: OrderPayload = await req.json()
     const orderId = payload.record.id
+    // eslint-disable-next-line no-console
     console.log(`Получен новый заказ для обработки: ${orderId}`)
 
     const supabaseAdminClient = createClient(
@@ -74,6 +76,7 @@ Deno.serve(async (req) => {
     if (!orderData) {
       throw new Error(`Заказ с ID ${orderId} не найден в базе данных.`)
     }
+    // eslint-disable-next-line no-console
     console.log('Данные заказа успешно получены из БД.')
 
     const customerName = orderData.profile?.first_name
@@ -142,7 +145,7 @@ Deno.serve(async (req) => {
       const errorBody = await response.json()
       throw new Error(`Ошибка Telegram API: ${errorBody.description}`)
     }
-
+    // eslint-disable-next-line no-console
     console.log('Сообщение успешно отправлено в Telegram.')
 
     return new Response(JSON.stringify({ success: true, message: `Уведомление для заказа ${orderId} отправлено.` }), {
