@@ -6,30 +6,33 @@ export const useProfileStore = defineStore('profileStore', () => {
   const user = useSupabaseUser()
 
   const profile = ref<ProfileRow | null>(null)
-
   const isLoading = ref(false)
   const isSaving = ref(false)
 
+  // Computed свойства
   const bonusBalance = computed(() => profile.value?.bonus_balance ?? 0)
-
+  const isLoggedIn = computed(() => !!user.value && !!profile.value)
   const fullName = computed(() => {
     if (!profile.value)
       return 'Гость'
-    return `${profile.value.first_name || ''} ${profile.value.last_name || ''}`.trim()
-  })
 
+    const firstName = profile.value.first_name || ''
+    const lastName = profile.value.last_name || ''
+    const fullName = `${firstName} ${lastName}`.trim()
+
+    // Если имя и фамилия не заданы, возвращаем email
+    return fullName || user.value?.email || 'Пользователь'
+  })
   const isAdmin = computed(() => profile.value?.role === 'admin')
 
   /**
-   * Загружает профиль текущего авторизованного пользователя.
-   * Если пользователь не вошел, ничего не делает.
+   * Загружает профиль текущего авторизованного пользователя
    */
-
   async function loadProfile() {
-    if (profile.value)
+    if (!user.value) {
+      profile.value = null
       return
-    if (!user.value)
-      return
+    }
 
     isLoading.value = true
 
@@ -40,13 +43,17 @@ export const useProfileStore = defineStore('profileStore', () => {
         .eq('id', user.value.id)
         .single()
 
-      if (error && status !== 406)
+      if (error && status !== 406) {
         throw error
+      }
 
       profile.value = data
     }
     catch (error: any) {
-      toast.error('Ошибка при загрузке профиля', { description: error.message })
+      console.error('Profile loading error:', error)
+      toast.error('Ошибка при загрузке профиля', {
+        description: error.message,
+      })
     }
     finally {
       isLoading.value = false
@@ -54,13 +61,12 @@ export const useProfileStore = defineStore('profileStore', () => {
   }
 
   /**
-   * Обновляет профиль пользователя в базе данных.
-   * @param updates - Объект с полями, которые нужно обновить.
+   * Обновляет профиль пользователя
    */
-
   async function updateProfile(updates: ProfileUpdate) {
     if (!user.value) {
       toast.error('Для обновления профиля необходимо войти в систему.')
+      return false
     }
 
     isSaving.value = true
@@ -78,9 +84,14 @@ export const useProfileStore = defineStore('profileStore', () => {
 
       profile.value = data
       toast.success('Профиль успешно обновлен!')
+      return true
     }
     catch (error: any) {
-      toast.error('Ошибка при обновлении профиля', { description: error.message })
+      console.error('Profile update error:', error)
+      toast.error('Ошибка при обновлении профиля', {
+        description: error.message,
+      })
+      return false
     }
     finally {
       isSaving.value = false
@@ -88,33 +99,25 @@ export const useProfileStore = defineStore('profileStore', () => {
   }
 
   /**
-   * Очищает состояние профиля.
-   * Вызывается при выходе пользователя из системы.
+   * Очищает состояние профиля
    */
-
   function clearProfile() {
     profile.value = null
   }
 
-  // Следим за состоянием авторизации. Если пользователь меняется (входит или выходит),
-  // мы реагируем на это.
-
-  watch(user, (newUser) => {
-    if (newUser) {
-      loadProfile()
-    }
-    else {
-      clearProfile()
-    }
-  }, { immediate: true })
-
   return {
+    // State
     profile,
     isLoading,
     isSaving,
+
+    // Computed
     bonusBalance,
     fullName,
     isAdmin,
+    isLoggedIn,
+
+    // Actions
     loadProfile,
     updateProfile,
     clearProfile,

@@ -1,73 +1,98 @@
 <script setup lang="ts">
-import { useAuth } from '@/composables/auth/useAuth'
-import { useModalStore } from '@/stores/modal/useModalStore'
-import { useProfileStore } from '@/stores/profile'
+import { storeToRefs } from 'pinia'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { useAuthStore } from '@/stores/core/useAuthStore'
 
-const { handleAuthGoogle, handleOut } = useAuth()
+// --- Инициализация сторов ---
+const authStore = useAuthStore()
 const profileStore = useProfileStore()
-const user = useSupabaseUser()
 
+// --- Реактивные данные ---
+const { user } = storeToRefs(authStore)
+const { profile, fullName, bonusBalance, isLoading } = storeToRefs(profileStore)
+
+// --- Метаданные страницы БЕЗ middleware ---
 definePageMeta({
   layout: 'profile',
 })
-const { isLoading, displayProfile } = storeToRefs(profileStore)
-const displayName = computed(() => {
-  if (!user.value) {
-    return 'Гость'
-  }
 
-  if (displayProfile.value) {
-    const fullName = [
-      displayProfile.value?.first_name,
-      displayProfile.value?.last_name,
-    ].filter(Boolean)
-    if (fullName) {
-      return fullName
-    }
-  }
-  return user.value.email || 'Пользователь'
+// --- SEO ---
+useHead({
+  title: 'Мой профиль',
 })
-const modalStore = useModalStore()
+
+// --- Загружаем профиль при монтировании ---
+onMounted(async () => {
+  if (user.value) {
+    await profileStore.loadProfile()
+  }
+})
 </script>
 
 <template>
-  <h1>Настройки профиля</h1>
+  <div>
+    <h1 class="text-3xl font-bold mb-6">
+      Настройки профиля
+    </h1>
 
-  <ClientOnly>
-    <!-- Блок для гостя (если user=null) -->
+    <!-- Проверяем авторизацию прямо в шаблоне -->
     <div v-if="!user">
-      <h2>Привет, Гость!</h2>
-      <p>Войдите, чтобы управлять своим профилем.</p>
-      <button @click="handleAuthGoogle">
-        Войти через Google
-      </button>
+      <div class="text-center space-y-4">
+        <h2 class="text-xl">
+          Войдите в систему
+        </h2>
+        <p>Для просмотра профиля необходимо войти в систему</p>
+        <Button @click="authStore.signInWithOAuth('google')">
+          Войти через Google
+        </Button>
+      </div>
     </div>
 
-    <!-- Блок для залогиненного пользователя (если user существует) -->
+    <!-- Авторизованный пользователь -->
     <div v-else>
-      <!-- Состояние загрузки. Оно не зависит от displayName -->
-      <div v-if="isLoading">
-        <p>Загрузка данных профиля...</p>
-        <!-- Можно добавить скелетон или спиннер -->
+      <!-- Загрузка -->
+      <div v-if="isLoading" class="space-y-4">
+        <Skeleton class="h-8 w-1/2" />
+        <Skeleton class="h-4 w-3/4" />
+        <Skeleton class="h-4 w-2/3" />
       </div>
 
-      <!-- Состояние, когда загрузка завершена. -->
-      <!-- Теперь неважно, есть ли профиль, мы покажем контент -->
-      <div v-else>
-        <!-- displayName всегда вернет корректное значение -->
-        <h2>Добро пожаловать, {{ displayName }}!</h2>
+      <!-- Профиль загружен -->
+      <div v-else-if="profile" class="space-y-4">
+        <h2 class="text-2xl font-semibold">
+          Добро пожаловать, {{ fullName }}!
+        </h2>
 
-        <p>Ваш email: {{ user.email }}</p>
-        <p>Ваши бонусы: {{ profileStore.bonusBalance }} ✨</p>
+        <div class="space-y-2">
+          <p><strong>Email:</strong> {{ user.email }}</p>
+          <p><strong>Телефон:</strong> {{ profile.phone || 'Не указан' }}</p>
+          <p>
+            <strong>Ваши бонусы:</strong>
+            <span class="font-bold text-primary">{{ bonusBalance }} ✨</span>
+          </p>
+        </div>
 
-        <button class="mt-4" @click="handleOut">
-          Выйти из аккаунта
-        </button>
+        <div class="flex gap-4 mt-6">
+          <Button variant="outline" @click="profileStore.loadProfile()">
+            Обновить данные
+          </Button>
+          <Button variant="destructive" @click="authStore.signOut()">
+            Выйти из аккаунта
+          </Button>
+        </div>
+      </div>
+
+      <!-- Ошибка загрузки профиля -->
+      <div v-else class="text-center space-y-4">
+        <p class="text-destructive">
+          Не удалось загрузить данные профиля
+        </p>
+        <Button @click="profileStore.loadProfile()">
+          Попробовать снова
+        </Button>
       </div>
     </div>
-
-    <template #fallback>
-      <div>Загрузка...</div>
-    </template>
-  </ClientOnly>
+  </div>
 </template>

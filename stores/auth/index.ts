@@ -1,2 +1,2 @@
 export * from './errorHandles'
-export * from './useAuthStore'
+export * from '../core/useAuthStore'
