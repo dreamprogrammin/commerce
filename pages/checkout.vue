@@ -32,18 +32,17 @@ const bonusesInput = ref(0)
 // --- 4. Жизненный цикл ---
 // `onMounted` выполняется один раз, когда компонент загрузился в браузере.
 // Идеально для предзаполнения формы.
-onMounted(async () => {
-  // Если пользователь авторизован, но его профиль еще не загружен
-  if (user.value && !profileStore.profile) {
-    await profileStore.loadProfile()
-  }
-  // Если профиль есть, заполняем поля формы
-  if (profileStore.profile) {
-    orderForm.value.name = `${profileStore.profile.first_name || ''} ${profileStore.profile.last_name || ''}`.trim()
-    orderForm.value.phone = profileStore.profile.phone || ''
-    orderForm.value.email = user.value?.email || ''
-  }
-})
+watch(
+  () => profileStore.profile,
+  (newProfile) => {
+    if (newProfile) {
+      orderForm.value.name = `${newProfile.first_name || ''} ${newProfile.last_name || ''}`.trim()
+      orderForm.value.phone = newProfile.phone || ''
+      orderForm.value.email = user.value?.email || ''
+    }
+  },
+  { immediate: true }, // immediate: true заполнит форму, если профиль уже загружен
+)
 
 // --- 5. Методы-обработчики ---
 
@@ -68,7 +67,7 @@ async function submitOrder() {
   await cartStore.checkout({
     deliveryMethod: orderForm.value.deliveryMethod,
     paymentMethod: orderForm.value.paymentMethod,
-    deliveryAddress: orderForm.value.deliveryMethod === 'courier' ? orderForm.value.address : undefined,
+    deliveryAddress: orderForm.value.deliveryMethod === 'courier' ? toRaw(orderForm.value.address) : undefined,
     // Если пользователь гость (не авторизован), передаем его данные
     guestInfo: !user.value
       ? {

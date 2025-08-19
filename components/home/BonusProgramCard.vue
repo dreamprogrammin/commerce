@@ -1,25 +1,22 @@
 <script setup lang="ts">
+import { Gift, History, LogIn } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
+// Импортируем UI-компоненты
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
-import { useProfileStore } from '@/stores/profile'
 
-const user = useSupabaseUser()
+// --- 1. Инициализация сторов ---
 const profileStore = useProfileStore()
 const modalStore = useModalStore()
 
-const { isLoading, bonusBalance, displayProfile } = storeToRefs(profileStore)
-
-function openLoginModal() {
-  // Например, если метод называется `showLoginModal = true`
-  // modalStore.showLoginModal = true;
-  // или если это функция:
-  // modalStore.open();
-
-  // Я предположу, что у вас есть метод, который делает что-то вроде этого:
-  // modalStore.setModalState('login', true);
-  // Напишите здесь тот код, который у вас открывает модалку
-  console.log('Открытие модального окна входа...')
-  // Например: modalStore.showLogin();
-}
+// --- 2. Получаем реактивные данные ---
+// `profile` - сам объект профиля (может быть null)
+// `isLoading` - флаг загрузки профиля
+// `bonusBalance` - computed для бонусов
+// `isLoggedIn` - computed-флаг, показывающий, авторизован ли пользователь
+const { profile, isLoading, bonusBalance, isLoggedIn } = storeToRefs(profileStore)
 </script>
 
 <template>
@@ -29,9 +26,7 @@ function openLoginModal() {
         class="bg-gradient-to-br from-primary/10 via-background to-background dark:from-primary/20 dark:via-background text-center shadow-lg border-2 border-primary/20"
       >
         <CardHeader class="items-center">
-          <div
-            class="p-4 bg-background rounded-full mb-4 ring-2 ring-yellow-400/50"
-          >
+          <div class="p-4 bg-background rounded-full mb-4 ring-2 ring-yellow-400/50">
             <Gift class="w-10 h-10 text-primary" />
           </div>
           <CardTitle class="text-2xl md:text-3xl">
@@ -51,21 +46,24 @@ function openLoginModal() {
             1 бонус = 1 тенге
           </p>
 
-          <div v-if="user" class="mt-6 pt-6 border-t border-dashed">
-            <!-- Спиннер во время загрузки профиля -->
+          <!--
+            ИЗМЕНЕНО: Проверяем флаг `isLoggedIn` из стора.
+            Это чище, чем проверять `user` напрямую.
+          -->
+          <div v-if="isLoggedIn" class="mt-6 pt-6 border-t border-dashed">
+            <!-- Спиннер, пока `isLoading` === true -->
             <div v-if="isLoading" class="h-16 flex items-center justify-center">
-              <div
-                class="w-8 h-8 border-4 border-dashed rounded-full animate-spin border-primary"
-              />
+              <div class="w-8 h-8 border-4 border-dashed rounded-full animate-spin border-primary" />
             </div>
-            <!-- Баланс после загрузки -->
-            <div v-else-if="displayProfile">
+            <!--
+              ИЗМЕНЕНО: Проверяем наличие `profile`.
+              `displayProfile` больше не используется.
+            -->
+            <div v-else-if="profile">
               <p class="text-muted-foreground">
                 На вашем счету:
               </p>
-              <p
-                class="text-4xl font-bold text-amber-500 flex items-center justify-center gap-2"
-              >
+              <p class="text-4xl font-bold text-amber-500 flex items-center justify-center gap-2">
                 {{ bonusBalance }} ✨
                 <span class="text-2xl font-normal text-muted-foreground">бонусов</span>
               </p>
@@ -75,7 +73,7 @@ function openLoginModal() {
 
         <CardFooter class="flex flex-col items-center gap-4 pt-6">
           <!-- Кнопка для залогиненного пользователя -->
-          <NuxtLink v-if="user" to="/profile/bonuses">
+          <NuxtLink v-if="isLoggedIn" to="/profile/bonuses">
             <Button size="lg" variant="default">
               <History class="w-4 h-4 mr-2" />
               История начислений
@@ -83,7 +81,11 @@ function openLoginModal() {
           </NuxtLink>
           <!-- Кнопка для гостя, открывающая модалку -->
           <div v-else>
-            <Button size="lg" variant="default" @click="openLoginModal">
+            <!--
+              ИЗМЕНЕНО: Вызываем метод `openLoginModal` из `modalStore`.
+              `openLoginModal` был просто примером, замени на реальное имя твоего метода.
+            -->
+            <Button size="lg" variant="default" @click="modalStore.openLoginModal()">
               <LogIn class="w-4 h-4 mr-2" />
               Войти и начать копить
             </Button>
