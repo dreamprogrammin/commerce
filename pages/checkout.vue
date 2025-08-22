@@ -2,12 +2,11 @@
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, toRaw, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
-
-// --- Импорты сторов (убедись, что пути правильные) ---
 
 // --- Инициализация ---
 const authStore = useAuthStore()
@@ -114,7 +113,7 @@ function handleRegisterAndGetBonus() {
 <template>
   <div class="container py-12">
     <!-- Сценарий 1: Корзина пуста -->
-    <div v-if="items.length === 0" class="text-center text-muted-foreground py-20">
+    <div v-if="items.length === 0" class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4">
       <h1 class="text-3xl font-bold mb-4">
         Ваша корзина пуста
       </h1>
@@ -134,7 +133,11 @@ function handleRegisterAndGetBonus() {
             <CardTitle>1. Контактная информация</CardTitle>
             <CardDescription v-if="!isLoggedIn">
               Уже есть аккаунт?
-              <button type="button" class="font-semibold text-primary hover:underline" @click="handleRegisterAndGetBonus">
+              <button
+                type="button"
+                class="font-semibold text-primary hover:underline"
+                @click="handleRegisterAndGetBonus"
+              >
                 Войдите
               </button>, чтобы использовать бонусы!
             </CardDescription>
@@ -152,7 +155,7 @@ function handleRegisterAndGetBonus() {
             </div>
             <div>
               <Label for="email">Email</Label>
-              <Input id="email" v-model="orderForm.email" type="email" required />
+              <Input id="email" v-model="orderForm.email" type="email" required autocomplete="email" />
             </div>
           </CardContent>
         </Card>
@@ -165,20 +168,25 @@ function handleRegisterAndGetBonus() {
             <RadioGroup v-model="orderForm.deliveryMethod" class="grid grid-cols-2 gap-4">
               <!-- ... (radio buttons) ... -->
             </RadioGroup>
-            <div v-if="orderForm.deliveryMethod === 'courier'" class="space-y-4">
-              <!-- ... (поля для адреса) ... -->
+            <div v-if="orderForm.deliveryMethod === 'courier'" class="space-y-4 animate-in fade-in">
+              <div>
+                <Label for="city">Город</Label>
+                <Input id="city" v-model="orderForm.address.city" required />
+              </div>
+              <div>
+                <Label for="address">Улица, дом, квартира</Label>
+                <Input id="address" v-model="orderForm.address.line1" required />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <!-- =============================================== -->
-        <!-- === ВОТ НЕДОСТАЮЩИЙ БЛОК ДЛЯ АВТОРИЗОВАННЫХ === -->
-        <!-- =============================================== -->
+        <!-- Блок 3: Бонусы (только для ПОЛНОСТЬЮ авторизованных) -->
         <Card v-if="isLoggedIn && bonusBalance > 0">
           <CardHeader><CardTitle>3. Бонусы</CardTitle></CardHeader>
           <CardContent>
             <p class="text-sm">
-              У вас на счету <span class="font-bold text-primary">{{ bonusBalance }} бонусов</span>.
+              У вас на счету <span class="font-bold text-primary">{{ bonusBalance }} бонусов</span>. 1 бонус = 1 ₸.
             </p>
             <div class="flex items-center gap-4 mt-4">
               <Input id="bonuses" v-model.number="bonusesInput" type="number" placeholder="Сколько списать?" :max="bonusBalance" />
@@ -196,10 +204,7 @@ function handleRegisterAndGetBonus() {
           <span v-else>Подтвердить заказ на {{ total }} ₸</span>
         </Button>
       </form>
-
-      <!-- ================================================= -->
-      <!-- === ВОТ НЕДОСТАЮЩИЙ БЛОК С ИТОГАМИ ЗАКАЗА === -->
-      <!-- ================================================= -->
+      <!-- Правая колонка: Состав и итоги заказа -->
       <aside class="col-span-1 lg:sticky top-24">
         <Card>
           <CardHeader><CardTitle>Ваш заказ</CardTitle></CardHeader>
@@ -207,31 +212,45 @@ function handleRegisterAndGetBonus() {
             <!-- `items` используется здесь -->
             <div v-for="item in items" :key="item.product.id" class="flex justify-between items-start">
               <span class="pr-2">{{ item.product.name }} (x{{ item.quantity }})</span>
-              <span class="font-semibold whitespace-nowrap">{{ Number(item.product.price) * item.quantity }} ₸</span>
+              <span class="font-semibold whitespace-nowrap">{{ (Number(item.product.price) * item.quantity).toFixed(2) }} ₸</span>
             </div>
             <div class="pt-4 border-t flex justify-between">
               <span>Сумма:</span>
-              <!-- `subtotal` используется здесь -->
-              <span>{{ subtotal }} ₸</span>
+              <span>{{ subtotal.toFixed(2) }} ₸</span>
             </div>
             <div v-if="discountAmount > 0" class="flex justify-between text-primary font-medium">
               <span>Скидка бонусами:</span>
-              <!-- `discountAmount` используется здесь -->
-              <span>-{{ discountAmount }} ₸</span>
+              <span>-{{ discountAmount.toFixed(2) }} ₸</span>
             </div>
           </CardContent>
           <CardFooter class="pt-4 border-t flex justify-between font-bold text-lg">
             <span>Итого к оплате:</span>
-            <!-- `total` используется здесь -->
-            <span>{{ total }} ₸</span>
+            <span>{{ total.toFixed(2) }} ₸</span>
           </CardFooter>
         </Card>
       </aside>
     </div>
-
-    <!-- Модальное окно (без изменений) -->
+    <!-- Модальное окно с предложением бонусов для гостей -->
     <AlertDialog :open="showBonusModal" @update:open="showBonusModal = false">
-      <!-- ... -->
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Получите двойные бонусы!</AlertDialogTitle>
+          <AlertDialogDescription class="py-4">
+            За этот заказ вам будет начислено <span class="font-bold">{{ bonusesToAward }} бонусов</span>.
+            <br><br>
+            Войдите или зарегистрируйтесь сейчас, и мы **удвоим** их до <span class="font-bold text-primary text-lg">{{ bonusesToAward * 2 }}</span> в подарок!
+            Ваша корзина и введенные данные сохранятся.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button variant="ghost" @click="placeOrder">
+            Нет, спасибо, продолжить как гость
+          </Button>
+          <Button @click="handleRegisterAndGetBonus">
+            Войти через Google и получить бонусы
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
     </AlertDialog>
   </div>
 </template>
