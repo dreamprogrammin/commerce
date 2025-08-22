@@ -9,23 +9,28 @@ export const useAuthStore = defineStore('authStore', () => {
   const user = useSupabaseUser()
   const profileStore = useProfileStore() // Получаем доступ к стору профиля
 
-  const isLoggedIn = computed(() => !!user.value)
+  const isLoggedIn = computed(() => !!user.value && !user.value.is_anonymous)
+  const isGuest = computed(() => !!user.value && user.value.is_anonymous)
   /**
    * Инициирует вход через OAuth (например, Google).
    */
-  async function signInWithOAuth(provider: 'google' | 'apple' = 'google') {
+  async function signInWithOAuth(provider: 'google' | 'apple', redirectTo: string = '/profile') {
+    if (user.value && user.value.is_anonymous) {
+      localStorage.setItem('anon_user_id_to_merge', user.value.id)
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           // Указываем, куда Supabase должен вернуть пользователя после успешного входа
-          redirectTo: `${window.location.origin}/profile`,
+          redirectTo: `${window.location.origin}${redirectTo}`,
         },
       })
       if (error)
         throw error
     }
     catch (e: any) {
+      localStorage.removeItem('anon_user_id_to_merge')
       toast.error(`Ошибка входа через ${provider}`, { description: e.message })
     }
   }
@@ -49,10 +54,30 @@ export const useAuthStore = defineStore('authStore', () => {
       toast.error('Ошибка при выходе', { description: e.message })
     }
   }
+  async function checkForUserMerge() {
+    const oldAnonId = localStorage.getItem('anon_user_id_to_merge')
+    const newUserId = user.value?.id
 
-  // === СЛУШАЕМ ИЗМЕНЕНИЯ СОСТОЯНИЯ АУТЕНТИФИКАЦИИ ===
-  // Эта функция будет автоматически вызываться библиотекой Supabase
-  // каждый раз, когда меняется статус пользователя (вошел, вышел, обновился токен).
+    if (oldAnonId && newUserId && oldAnonId !== newUserId && user.value?.id.is_anonymous) {
+      try {
+        const { error } = await supabase
+          .rpc('merge_anon_user_into_real_user', {
+            old_anon_user_id: oldAnonId,
+            new_real_user_id: newUserId,
+          })
+        if (error)
+          throw error
+        toast.success('Ваши гостевые данные и корзина успешно перенесены!')
+        await profileStore.loadProfile(true)
+      }
+      catch (e: any) {
+        toast.error('Не удалось перенести данные гостя.', { description: e.message })
+      }
+      finally {
+        localStorage.removeItem('anon_user_id_to_merge')
+      }
+    }
+  }
   supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
       // Если пользователь вошел или сессия восстановилась,
@@ -66,7 +91,9 @@ export const useAuthStore = defineStore('authStore', () => {
   })
 
   return {
-    user, // Возвращаем `user` прямо из стора для удобства
+    user,
+    isGuest,
+    checkForUserMerge,
     signInWithOAuth,
     signOut,
     isLoggedIn,

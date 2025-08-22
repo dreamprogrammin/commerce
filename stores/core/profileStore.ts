@@ -28,7 +28,10 @@ export const useProfileStore = defineStore('profileStore', () => {
   /**
    * Загружает профиль текущего авторизованного пользователя
    */
-  async function loadProfile() {
+  async function loadProfile(force: boolean = false) {
+    if (!force && profile.value) {
+      return
+    }
     if (!user.value) {
       profile.value = null
       return

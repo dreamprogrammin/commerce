@@ -8,6 +8,7 @@ export const useCartStore = defineStore('cartStore', () => {
   const supabase = useSupabaseClient<Database>()
   const router = useRouter()
   const profileStore = useProfileStore()
+  const user = useSupabaseUser()
 
   const items = ref<ICartItem[]>([])
   const isProcessing = ref(false)
@@ -30,14 +31,25 @@ export const useCartStore = defineStore('cartStore', () => {
     return finalTotal > 0 ? Number(finalTotal.toFixed(2)) : 0
   })
 
-  function addItem(product: ProductRow, quantity: number = 1) {
+  async function addItem(product: ProductRow, quantity: number = 1) {
+    const currentUser = await ensureUserSession()
+
+    if (!currentUser) {
+      toast.error('Не удалось добавить товар', { description: 'Пожалуйста, обновите страницу и попробуйте снова.' })
+      return
+    }
+
     if (quantity <= 0)
       return
 
-    const existingItem = items.value.find(i => i.product.id === product.id)
+    const existingItemIndex = items.value.findIndex(i => i.product.id === product.id)
 
-    if (existingItem) {
-      existingItem.quantity += quantity
+    if (existingItemIndex > -1) {
+      items.value = items.value.map((item, index) =>
+        index === existingItemIndex
+          ? { ...item, quantity: item.quantity + quantity }
+          : item,
+      )
     }
     else {
       items.value = [...items.value, { product, quantity }]
@@ -77,6 +89,28 @@ export const useCartStore = defineStore('cartStore', () => {
     const maxBonusesForOrder = Math.ceil(subtotal.value)
     const maxPossible = Math.min(userBalance, maxBonusesForOrder)
     bonusesToSpend.value = amount > maxPossible ? maxPossible : Math.floor(amount)
+  }
+
+  /**
+   * Гарантирует наличие сессии (реальной или анонимной) перед действием с корзиной.
+   */
+
+  async function ensureUserSession() {
+    if (user.value)
+      return user.value
+    try {
+      const { data, error } = await supabase
+        .auth
+        .signInAnonymously()
+      if (error)
+        throw error
+      console.warn('Создана анонимная сессия для гостя:', data.user?.id)
+      return data.user
+    }
+    catch (e: any) {
+      toast.error('Ошибка создания гостевой сессии', { description: e.message })
+      return null
+    }
   }
 
   async function checkout(orderData: ICheckoutData) {
