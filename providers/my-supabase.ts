@@ -24,7 +24,6 @@ export const getImage: ProviderGetImage = (src, { modifiers, baseURL }) => {
   if (modifiers?.width) {
     params.append('width', modifiers.width.toString())
   }
-
   if (modifiers?.height) {
     params.append('height', modifiers.height.toString())
   }
