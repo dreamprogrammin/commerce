@@ -131,9 +131,17 @@ export const useCartStore = defineStore('cartStore', () => {
 
       if (error)
         throw error
+      const bonusesAwarded = items.value
+        .reduce((sum, item) =>
+          sum + (item.product.bonus_points_award || 0) * item.quantity, 0)
 
       toast.success('Заказ успешно создан!', {
         description: 'Наш менеджер скоро с вами свяжется.',
+      })
+
+      toast.success('Заказ успешно создан!', {
+        description: `Спасибо за покупку! ${bonusesAwarded} бонусов будут начислены на ваш счет и станут активны через 14 дней. Отслеживать статус можно в личном кабинете.`,
+        duration: 10000, // Показываем еще дольше
       })
 
       clearCart()
