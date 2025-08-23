@@ -21,6 +21,8 @@ const cartStore = useCartStore()
           :alt="props.product.name"
           format="webp"
           quality="80"
+          width="400"
+          height="400"
           class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
