@@ -31,8 +31,8 @@
     "packageJson": {
       "dependencies": [
         "npm:@antfu/eslint-config@^5.2.0",
+        "npm:@nuxt/image@^1.11.0",
         "npm:@nuxtjs/supabase@^1.6.0",
-        "npm:@pinia-plugin-persistedstate/nuxt@^1.2.1",
         "npm:@pinia/nuxt@~0.11.2",
         "npm:@tailwindcss/vite@^4.1.11",
         "npm:@tanstack/vue-table@^8.21.3",
@@ -46,6 +46,7 @@
         "npm:lint-staged@^16.1.4",
         "npm:lucide-vue-next@0.536",
         "npm:nuxt@^4.0.2",
+        "npm:pinia-plugin-persistedstate@^4.5.0",
         "npm:pinia@^3.0.3",
         "npm:prettier@^3.6.2",
         "npm:reka-ui@^2.4.1",
@@ -57,6 +58,7 @@
         "npm:tailwindcss@^4.1.11",
         "npm:tw-animate-css@^1.3.6",
         "npm:typescript@^5.9.2",
+        "npm:ufo@^1.6.1",
         "npm:uuid@^11.1.0",
         "npm:vue-router@latest",
         "npm:vue-sonner@^2.0.2",
