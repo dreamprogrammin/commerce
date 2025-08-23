@@ -247,10 +247,10 @@ function handleRegisterAndGetBonus() {
         <AlertDialogHeader>
           <AlertDialogTitle>Получите двойные бонусы!</AlertDialogTitle>
           <AlertDialogDescription class="py-4">
-            За этот заказ вам будет начислено <span class="font-bold">{{ bonusesToAward }} бонусов</span>.
+            За этот заказ вам будет начислено 1000 бонусов
             <br><br>
-            Войдите или зарегистрируйтесь сейчас, и мы **удвоим** их до <span class="font-bold text-primary text-lg">{{ bonusesToAward * 2 }}</span> в подарок!
-            Ваша корзина и введенные данные сохранятся.
+            Зарегистрируйтесь сейчас и получите <span class="font-bold text-primary text-lg">1000</span> в подарок!
+            приветственных бонусов на свой счет! Они станут доступны для использования через 14 дней. Ваша корзина и введенные данные сохранятся."
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

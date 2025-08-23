@@ -10,7 +10,8 @@ export const useProfileStore = defineStore('profileStore', () => {
   const isSaving = ref(false)
 
   // Computed свойства
-  const bonusBalance = computed(() => profile.value?.bonus_balance ?? 0)
+  const bonusBalance = computed(() => profile.value?.active_bonus_balance ?? 0)
+  const pendingBonuses = computed(() => profile.value?.pending_bonus_balance ?? 0)
   const isLoggedIn = computed(() => !!user.value && !!profile.value)
   const fullName = computed(() => {
     if (!profile.value)
@@ -28,13 +29,13 @@ export const useProfileStore = defineStore('profileStore', () => {
   /**
    * Загружает профиль текущего авторизованного пользователя
    */
-  async function loadProfile(force: boolean = false) {
+  async function loadProfile(force: boolean = false): Promise<boolean> {
     if (!force && profile.value) {
-      return
+      return true
     }
     if (!user.value) {
       profile.value = null
-      return
+      return false
     }
 
     isLoading.value = true
@@ -51,12 +52,14 @@ export const useProfileStore = defineStore('profileStore', () => {
       }
 
       profile.value = data
+      return !!data
     }
     catch (error: any) {
       console.error('Profile loading error:', error)
       toast.error('Ошибка при загрузке профиля', {
         description: error.message,
       })
+      return false
     }
     finally {
       isLoading.value = false
@@ -116,6 +119,7 @@ export const useProfileStore = defineStore('profileStore', () => {
 
     // Computed
     bonusBalance,
+    pendingBonuses,
     fullName,
     isAdmin,
     isLoggedIn,

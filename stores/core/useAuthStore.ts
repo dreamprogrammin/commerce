@@ -68,6 +68,10 @@ export const useAuthStore = defineStore('authStore', () => {
         if (error)
           throw error
         toast.success('Ваши гостевые данные и корзина успешно перенесены!')
+        toast.success('С возвращением! Мы объединили ваши данные.', {
+          description: 'Ваша гостевая корзина и приветственные бонусы успешно перенесены на ваш аккаунт!',
+          duration: 8000,
+        })
         await profileStore.loadProfile(true)
       }
       catch (e: any) {
@@ -75,6 +79,15 @@ export const useAuthStore = defineStore('authStore', () => {
       }
       finally {
         localStorage.removeItem('anon_user_id_to_merge')
+      }
+    }
+    else if (newUserId && !user.value?.is_anonymous) {
+      const profileExisted = await profileStore.loadProfile()
+      if (profileExisted) {
+        // Если профиль уже существовал, значит, это "старый" друг.
+        toast.info('С возвращением в наш магазин!', {
+          description: `Рады видеть вас снова, ${profileStore.fullName}.`,
+        })
       }
     }
   }
