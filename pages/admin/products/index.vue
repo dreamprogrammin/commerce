@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 definePageMeta({ layout: 'admin' })
 
 const adminProductsStore = useAdminProductsStore()
 const router = useRouter()
-const { getPublicUrl } = useSupabaseStorage()
 
 onMounted(() => {
   adminProductsStore.fetchProducts()
@@ -53,12 +52,14 @@ onMounted(() => {
           <TableRow v-for="product in adminProductsStore.products" :key="product.id">
             <TableCell>
               <div class="w-16 h-16 bg-muted rounded-md overflow-hidden">
-                <img
+                <NuxtImg
                   v-if="product.image_url"
-                  :src="getPublicUrl('product-images', product.image_url) || undefined"
+                  :src="`${BUCKET_NAME_PRODUCT}/${product.image_url}`"
                   :alt="product.name"
                   class="w-full h-full object-cover"
-                >
+                  format="webp"
+                  quality="80"
+                />
               </div>
             </TableCell>
             <TableCell class="font-medium">

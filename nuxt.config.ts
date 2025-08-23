@@ -7,8 +7,21 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@nuxtjs/supabase',
     'shadcn-nuxt',
-    '@pinia-plugin-persistedstate/nuxt',
+    'pinia-plugin-persistedstate/nuxt',
+    '@nuxt/image',
   ],
+  image: {
+    provider: 'mySupabase',
+    providers: {
+      mySupabase: {
+        name: 'mySupabase',
+        provider: './providers/my-supabase.ts',
+        options: {
+          baseUrl: 'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/image-transformer',
+        },
+      },
+    },
+  },
   supabase: {
     redirect: false,
   },
