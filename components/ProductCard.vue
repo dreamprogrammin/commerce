@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProductRow } from '@/types'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
 const props = defineProps<{
@@ -7,7 +8,6 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
-const BUCKET_NAME = 'product-images'
 </script>
 
 <template>
@@ -17,7 +17,7 @@ const BUCKET_NAME = 'product-images'
       <div class="aspect-square overflow-hidden">
         <NuxtImg
           v-if="props.product.image_url"
-          :src="`${BUCKET_NAME}/${props.product.image_url}`"
+          :src="`${BUCKET_NAME_PRODUCT}/${props.product.image_url}`"
           :alt="props.product.name"
           format="webp"
           quality="80"
