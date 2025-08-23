@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
-const { getPublicUrl } = useSupabaseStorage()
-const BUCKET_NAME = 'product-images'
 const slug = route.params.slug as string
 
 const { isLoading } = storeToRefs(productsStore)
@@ -61,12 +59,16 @@ const quantity = ref(1)
       <!-- Левая колонка: Изображение -->
       <div>
         <div class="aspect-square bg-muted rounded-lg overflow-hidden border">
-          <img
+          <NuxtImg
             v-if="currentProduct.image_url"
-            :src="getPublicUrl(BUCKET_NAME, currentProduct.image_url) || undefined"
+            :src="`${BUCKET_NAME_PRODUCT}/${currentProduct.image_url}`"
             :alt="currentProduct.name"
+            format="webp"
+            quality="80"
+            width="400"
+            height="400"
             class="w-full h-full object-cover"
-          >
+          />
           <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground">
             Нет фото
           </div>
