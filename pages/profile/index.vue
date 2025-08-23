@@ -11,7 +11,7 @@ const profileStore = useProfileStore()
 
 // --- Реактивные данные ---
 const { user } = storeToRefs(authStore)
-const { profile, fullName, bonusBalance, isLoading } = storeToRefs(profileStore)
+const { profile, fullName, bonusBalance, isLoading, pendingBonuses } = storeToRefs(profileStore)
 
 // --- Метаданные страницы БЕЗ middleware ---
 definePageMeta({
@@ -68,9 +68,9 @@ onMounted(async () => {
         <div class="space-y-2">
           <p><strong>Email:</strong> {{ user.email }}</p>
           <p><strong>Телефон:</strong> {{ profile.phone || 'Не указан' }}</p>
-          <p>
-            <strong>Ваши бонусы:</strong>
-            <span class="font-bold text-primary">{{ bonusBalance }} ✨</span>
+          <p><strong>Доступно бонусов:</strong> {{ bonusBalance }} ✨</p>
+          <p v-if="pendingBonuses > 0" class="text-sm text-muted-foreground">
+            Ожидает начисления: {{ pendingBonuses }} бонусов
           </p>
         </div>
 
