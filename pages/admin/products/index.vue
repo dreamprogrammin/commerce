@@ -61,6 +61,7 @@ onMounted(() => {
                   class="w-full h-full object-cover"
                   format="webp"
                   quality="80"
+                  type="fetch"
                 />
               </div>
             </TableCell>

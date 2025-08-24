@@ -72,10 +72,8 @@ const quantity = ref(1)
             v-if="imgUrl"
             :src="imgUrl"
             :alt="currentProduct.name"
-            format="webp"
-            quality="80"
-            width="400"
-            height="400"
+            width="987"
+            height="987"
             class="w-full h-full object-cover"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground">
