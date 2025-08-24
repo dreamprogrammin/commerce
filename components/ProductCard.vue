@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProductRow } from '@/types'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
@@ -8,6 +9,13 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
+const { getPublicUrl } = useSupabaseStorage()
+const imgUrl = computed(() => {
+  if (props.product.image_url) {
+    return getPublicUrl(BUCKET_NAME_PRODUCT, props.product.image_url)
+  }
+  return null
+})
 </script>
 
 <template>
@@ -15,9 +23,9 @@ const cartStore = useCartStore()
     <!-- Теперь в шаблоне мы обращаемся к товару через `props.product` -->
     <NuxtLink :to="`/product/${props.product.slug}`" class="block bg-muted">
       <div class="aspect-square overflow-hidden">
-        <NuxtImg
-          v-if="props.product.image_url"
-          :src="`${BUCKET_NAME_PRODUCT}/${props.product.image_url}`"
+        <CldImage
+          v-if="imgUrl"
+          :src="imgUrl"
           :alt="props.product.name"
           format="webp"
           quality="80"
