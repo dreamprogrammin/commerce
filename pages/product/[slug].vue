@@ -68,13 +68,14 @@ const quantity = ref(1)
       <!-- Левая колонка: Изображение -->
       <div>
         <div class="aspect-square bg-muted rounded-lg overflow-hidden border">
-          <CldImage
+          <NuxtImg
             v-if="imgUrl"
             :src="imgUrl"
             :alt="currentProduct.name"
             width="987"
             height="987"
             class="w-full h-full object-cover"
+            format="webp"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground">
             Нет фото

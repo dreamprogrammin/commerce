@@ -9,6 +9,7 @@ export default defineNuxtConfig({
     'shadcn-nuxt',
     'pinia-plugin-persistedstate/nuxt',
     '@nuxtjs/cloudinary',
+    '@nuxt/image',
   ],
   supabase: {
     redirect: false,
