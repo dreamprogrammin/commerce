@@ -10,6 +10,9 @@ export default defineNuxtConfig({
     'pinia-plugin-persistedstate/nuxt',
     '@nuxt/image',
   ],
+  image: {
+    domains: ['https://gvsdevsvzgcivpphcuai.supabase.co'],
+  },
   supabase: {
     redirect: false,
   },
@@ -27,9 +30,6 @@ export default defineNuxtConfig({
      * @default "./components/ui"
      */
     componentDir: './components/ui',
-  },
-  cloudinary: {
-    cloudName: 'dinxfohja',
   },
   devtools: { enabled: true },
 })

@@ -76,6 +76,7 @@ const quantity = ref(1)
             height="987"
             class="w-full h-full object-cover"
             format="webp"
+            quality="80"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground">
             Нет фото
