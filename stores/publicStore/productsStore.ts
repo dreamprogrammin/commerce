@@ -34,6 +34,32 @@ export const useProductsStore = defineStore('productsStore', () => {
       max: Math.ceil(Math.max(...prices)),
     }
   })
+  /**
+   * Загружает ТОЛЬКО ПЕРВУЮ, НЕБОЛЬШУЮ порцию товаров.
+   * Предназначен для вызова на сервере для быстрой первой отрисовки и SEO.
+   */
+
+  async function fetchInitialProductsSSR(filters: IProductFilters): Promise<ProductRow[]> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_filtered_products', {
+          p_category_slug: filters.categorySlug,
+          p_subcategory_ids: filters.subCategoryIds,
+          p_price_min: filters.priceMin,
+          p_price_max: filters.priceMax,
+          p_sort_by: filters.sortBy,
+          p_page_size: 4,
+          p_page_number: 1,
+        })
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (e: any) {
+      console.error('Ошибка при SSR-загрузке товаров:', e.message)
+      return []
+    }
+  }
 
   /**
    * Загружает список товаров с применением фильтров, вызывая RPC-функцию в Supabase.
@@ -137,5 +163,6 @@ export const useProductsStore = defineStore('productsStore', () => {
     priceRange,
     fetchProducts,
     fetchProductBySlug,
+    fetchInitialProductsSSR,
   }
 })
