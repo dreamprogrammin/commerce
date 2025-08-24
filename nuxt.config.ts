@@ -8,20 +8,8 @@ export default defineNuxtConfig({
     '@nuxtjs/supabase',
     'shadcn-nuxt',
     'pinia-plugin-persistedstate/nuxt',
-    '@nuxt/image',
+    '@nuxtjs/cloudinary',
   ],
-  image: {
-    provider: 'mySupabase',
-    providers: {
-      mySupabase: {
-        name: 'mySupabase',
-        provider: './providers/my-supabase.ts',
-        options: {
-          baseURL: 'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/image-transformer',
-        },
-      },
-    },
-  },
   supabase: {
     redirect: false,
   },
@@ -39,6 +27,9 @@ export default defineNuxtConfig({
      * @default "./components/ui"
      */
     componentDir: './components/ui',
+  },
+  cloudinary: {
+    cloudName: 'dinxfohja',
   },
   devtools: { enabled: true },
 })

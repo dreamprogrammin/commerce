@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -9,6 +10,7 @@ const cartStore = useCartStore()
 const slug = route.params.slug as string
 
 const { isLoading } = storeToRefs(productsStore)
+const { getPublicUrl } = useSupabaseStorage()
 
 // --- 3. Загрузка данных ---
 // `useAsyncData` выполняет загрузку на сервере для SEO и быстрой первой отрисовки.
@@ -31,6 +33,13 @@ const { data: currentProduct, error } = await useAsyncData(
 if (error.value || !currentProduct.value) {
   throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
 }
+
+const imgUrl = computed(() => {
+  if (currentProduct.value?.image_url) {
+    return getPublicUrl(BUCKET_NAME_PRODUCT, currentProduct.value.image_url)
+  }
+  return null
+})
 
 // --- 5. SEO и метаданные страницы ---
 // ИЗМЕНЕНО: Оборачиваем в `watchEffect`, чтобы title обновлялся,
@@ -59,9 +68,9 @@ const quantity = ref(1)
       <!-- Левая колонка: Изображение -->
       <div>
         <div class="aspect-square bg-muted rounded-lg overflow-hidden border">
-          <NuxtImg
-            v-if="currentProduct.image_url"
-            :src="`${BUCKET_NAME_PRODUCT}/${currentProduct.image_url}`"
+          <CldImage
+            v-if="imgUrl"
+            :src="imgUrl"
             :alt="currentProduct.name"
             format="webp"
             quality="80"
