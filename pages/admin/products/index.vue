@@ -54,7 +54,7 @@ onMounted(() => {
           <TableRow v-for="product in adminProductsStore.products" :key="product.id">
             <TableCell>
               <div class="w-16 h-16 bg-muted rounded-md overflow-hidden">
-                <CldImage
+                <NuxtImg
                   v-if="product.image_url"
                   :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.image_url)"
                   :alt="product.name"

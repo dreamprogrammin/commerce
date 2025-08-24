@@ -23,7 +23,7 @@ const imgUrl = computed(() => {
     <!-- Теперь в шаблоне мы обращаемся к товару через `props.product` -->
     <NuxtLink :to="`/product/${props.product.slug}`" class="block bg-muted">
       <div class="aspect-square overflow-hidden">
-        <CldImage
+        <NuxtImg
           v-if="imgUrl"
           :src="imgUrl"
           :alt="props.product.name"
