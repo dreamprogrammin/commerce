@@ -14,9 +14,10 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@nuxt/image": "^1.11.0",
+    "@nuxtjs/cloudinary": "^4.0.0",
     "@nuxtjs/supabase": "^1.6.0",
     "@pinia/nuxt": "^0.11.2",
+    "@supabase/supabase-js": "^2.56.0",
     "@tailwindcss/vite": "^4.1.11",
     "@tanstack/vue-table": "^8.21.3",
     "@vueuse/core": "^13.6.0",
