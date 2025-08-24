@@ -17,7 +17,7 @@ export default defineNuxtConfig({
         name: 'mySupabase',
         provider: './providers/my-supabase.ts',
         options: {
-          baseUrl: 'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/image-transformer',
+          baseURL: 'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/image-transformer',
         },
       },
     },
