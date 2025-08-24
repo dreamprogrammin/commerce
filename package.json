@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@nuxt/image": "^1.11.0",
-    "@nuxtjs/cloudinary": "^4.0.0",
     "@nuxtjs/supabase": "^1.6.1",
     "@pinia/nuxt": "^0.11.2",
     "@supabase/supabase-js": "^2.56.0",
