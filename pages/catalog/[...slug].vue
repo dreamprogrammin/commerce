@@ -5,81 +5,82 @@ import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-// Убедись, что все компоненты лежат в `components/global/` или импортированы явно
 
-// --- 1. Инициализация ---
+// --- 1. Инициализация и Реактивное Состояние ---
 const route = useRoute()
 const productsStore = useProductsStore()
 const categoriesStore = useCategoriesStore()
 
-// --- 2. Реактивное состояние из сторов ---
-// `pending` из useAsyncData будет нашим главным флагом загрузки
-const { products, isLoadingMore, hasMoreProducts, priceRange } = storeToRefs(productsStore)
-const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
+const { products, isLoadingList, isLoadingMore, hasMoreProducts, priceRange } = storeToRefs(productsStore)
 
 interface ActiveFilters {
   sortBy: SortByType
   subCategoryIds: string[]
   price: [number, number]
 }
+const activeFilters = ref<ActiveFilters>({
+  sortBy: 'popularity',
+  subCategoryIds: [],
+  price: [0, 50000], // Временное начальное значение
+})
 
-// --- 3. Главная логика загрузки данных (SSR-First) ---
-// `useAsyncData` отвечает за загрузку на сервере и при смене URL.
-// `refresh` - функция для его ручного перезапуска.
-const { pending, refresh } = await useAsyncData(
-  `catalog-data-${route.fullPath}`, // Уникальный ключ для каждой страницы каталога
+const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
+
+// --- 2. Главная логика загрузки данных ---
+
+// `useAsyncData` - наш единственный "дирижер" для загрузки при смене URL.
+const { refresh } = await useAsyncData(
+  `catalog-${route.fullPath}`,
   async () => {
     if (!currentCategorySlug.value)
       return
 
-    // Собираем фильтры для первого запроса.
-    // При смене URL мы всегда используем дефолтные фильтры.
-    const initialFilters: IProductFilters = {
-      categorySlug: currentCategorySlug.value,
+    // Сбрасываем фильтры при каждой новой загрузке категории
+    activeFilters.value = {
       sortBy: 'popularity',
-      // subCategoryIds, priceMin, priceMax - здесь undefined, так как это начальная загрузка
+      subCategoryIds: [],
+      price: [0, 50000], // Сбрасываем на дефолт
     }
 
-    // Параллельно грузим категории и первую страницу товаров.
+    const initialFilters: IProductFilters = {
+      categorySlug: currentCategorySlug.value,
+      sortBy: activeFilters.value.sortBy,
+    }
+
+    // Параллельно грузим категории и первую страницу товаров
     await Promise.all([
       categoriesStore.fetchCategoryData(),
       productsStore.fetchProducts(initialFilters, false),
     ])
 
-    return true // Возвращаем что-то, чтобы `useAsyncData` был доволен
+    // ПОСЛЕ загрузки товаров, устанавливаем ПРАВИЛЬНЫЙ диапазон цен в фильтры
+    const newPriceRange = priceRange.value
+    activeFilters.value.price = [newPriceRange.min, newPriceRange.max]
   },
-  { watch: [() => route.fullPath] }, // Перезапускаем `useAsyncData` при смене URL
+  { watch: [() => route.fullPath] },
 )
 
-// --- 4. Локальное состояние для фильтров ---
-// ВАЖНО: Инициализируем фильтры ПОСЛЕ `useAsyncData`,
-// чтобы `priceRange` уже содержал актуальные данные.
-const activeFilters = ref<ActiveFilters>({
-  sortBy: 'popularity',
-  subCategoryIds: [] as string[],
-  price: [priceRange.value.min, priceRange.value.max] as [number, number],
-})
-
-// --- 5. Вычисляемые свойства (Computeds), зависящие от данных ---
+// --- 3. Вычисляемые свойства, зависящие от загруженных данных ---
 const breadcrumbs = computed(() => categoriesStore.getBreadcrumbs(currentCategorySlug.value))
 const title = computed(() => {
   const path = breadcrumbs.value
   if (Array.isArray(path) && path.length > 0) {
     const lastCrumb = path[path.length - 1]
-    if (lastCrumb)
-      return lastCrumb.name
+    if (lastCrumb) {
+      return lastCrumb.name // <-- `return` есть только здесь
+    }
   }
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 
-// --- 6. Клиентская логика ---
+// --- 4. Клиентская логика для реакции на действия пользователя ---
 
-// `watchDebounced` реагирует ТОЛЬКО на изменения фильтров на клиенте
+// `watchDebounced` реагирует ТОЛЬКО на изменения фильтров, сделанные пользователем.
 watchDebounced(
   activeFilters,
   () => {
-    // При любом изменении фильтров мы просто перезапускаем наш `useAsyncData`.
-    // Он заново выполнит блок кода, но уже с новыми значениями `activeFilters`.
+    // Не нужно ничего проверять. Просто перезапускаем `useAsyncData`.
+    // Он сам возьмет новые значения из `activeFilters`.
     refresh()
   },
   { debounce: 500, deep: true },
@@ -105,21 +106,17 @@ async function loadMoreProducts() {
     <Breadcrumbs :items="breadcrumbs" class="mb-6" />
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <aside class="col-span-1 lg:sticky top-24 self-start">
-        <!--
-          Сайдбар можно не оборачивать в ClientOnly, так как
-          `priceRange` (для слайдера) и `subcategories`
-          будут доступны сразу после серверного рендеринга.
-        -->
         <FilterSidebar v-model="activeFilters" />
       </aside>
       <main class="col-span-3">
         <CatalogHeader v-model:sort-by="activeFilters.sortBy" :title="title" />
 
         <!--
-          Используем `pending` из `useAsyncData` как наш главный индикатор загрузки.
-          Он будет `true` и при смене URL, и при смене фильтров.
+          Используем `isLoadingList` для показа скелетона.
+          Он будет `true` только когда идет полная перезагрузка СПИСКА товаров,
+          и не будет затрагиваться при переходе на страницу отдельного товара.
         -->
-        <ProductGridSkeleton v-if="pending" />
+        <ProductGridSkeleton v-if="isLoadingList" />
         <div v-else-if="products.length > 0" class="space-y-8">
           <ProductGrid :products="products" />
           <div v-if="hasMoreProducts" class="text-center">
@@ -129,6 +126,7 @@ async function loadMoreProducts() {
             </Button>
           </div>
         </div>
+        <!-- Этот блок показывается, если загрузка завершена, но товаров нет -->
         <div v-else class="text-center py-20 text-muted-foreground border-2 border-dashed rounded-lg">
           <h3 class="text-2xl font-semibold">
             Товары не найдены

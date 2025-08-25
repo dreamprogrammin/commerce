@@ -9,7 +9,7 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const slug = route.params.slug as string
 
-const { isLoading } = storeToRefs(productsStore)
+const { isLoadingSingle } = storeToRefs(productsStore)
 const { getPublicUrl } = useSupabaseStorage()
 
 // --- 3. Загрузка данных ---
@@ -57,7 +57,7 @@ const quantity = ref(1)
 <template>
   <div class="container py-12">
     <!-- Показываем скелетон, пока данные грузятся (например, при медленном клиентском переходе) -->
-    <div v-if="isLoading">
+    <div v-if="isLoadingSingle">
       <ProductImagesSkeleton />
     </div>
     <!--

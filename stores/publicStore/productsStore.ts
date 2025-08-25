@@ -6,7 +6,8 @@ export const useProductsStore = defineStore('productsStore', () => {
 
   const products = ref<ProductRow[]>([])
   const currentProduct = ref<ProductWithCategory | null>(null)
-  const isLoading = ref(false)
+  const isLoadingList = ref(false)
+  const isLoadingSingle = ref(false)
   const isLoadingMore = ref(false)
   const currentPage = ref(1)
   /**
@@ -72,7 +73,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       isLoadingMore.value = true
     }
     else {
-      isLoading.value = true
+      isLoadingList.value = true
       // При полной перезагрузке сбрасываем все состояние пагинации
       products.value = []
       currentPage.value = 1
@@ -117,7 +118,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       hasMoreProducts.value = false
     }
     finally {
-      isLoading.value = false
+      isLoadingList.value = false
       isLoadingMore.value = false
     }
   }
@@ -129,7 +130,7 @@ export const useProductsStore = defineStore('productsStore', () => {
    */
 
   async function fetchProductBySlug(slug: string): Promise<ProductWithCategory | null> {
-    isLoading.value = true
+    isLoadingSingle.value = true
     currentProduct.value = null
     try {
       const { data, error } = await supabase
@@ -150,15 +151,16 @@ export const useProductsStore = defineStore('productsStore', () => {
       return null
     }
     finally {
-      isLoading.value = false
+      isLoadingSingle.value = false
     }
   }
 
   return {
     products,
     currentProduct,
-    isLoading,
+    isLoadingList,
     isLoadingMore,
+    isLoadingSingle,
     hasMoreProducts,
     priceRange,
     fetchProducts,

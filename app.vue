@@ -48,9 +48,11 @@ useSeoMeta({
     <CommonHeader />
 
     <main>
-      <NuxtLayout>
-        <NuxtPage />
-      </NuxtLayout>
+      <div class="app-container">
+        <NuxtLayout>
+          <NuxtPage />
+        </NuxtLayout>
+      </div>
     </main>
 
     <!--

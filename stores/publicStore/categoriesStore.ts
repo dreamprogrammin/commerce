@@ -10,19 +10,23 @@ export const useCategoriesStore = defineStore('categories', () => {
   const categoriesById = computed(() => new Map(allCategories.value.map(cat => [cat.id, cat])))
   const categoriesBySlug = computed(() => new Map(allCategories.value.map(cat => [cat.slug, cat])))
 
-  const getBreadcrumbs = computed(() => {
-    return (leafSlug: string | null): CategoryRow[] => {
-      if (!leafSlug || allCategories.value.length === 0)
-        return []
-      const breadcrumbs: CategoryRow[] = []
-      let currentCategory = categoriesBySlug.value.get(leafSlug)
-      while (currentCategory) {
-        breadcrumbs.unshift(currentCategory)
-        currentCategory = currentCategory.parent_id ? categoriesById.value.get(currentCategory.parent_id) : undefined
-      }
-      return breadcrumbs
+  function getBreadcrumbs(leafSlug: string | null): CategoryRow[] {
+    if (!leafSlug || allCategories.value.length === 0) {
+      return []
     }
-  })
+
+    const breadcrumbs: CategoryRow[] = []
+    let currentCategory = categoriesBySlug.value.get(leafSlug)
+
+    while (currentCategory) {
+      breadcrumbs.unshift(currentCategory)
+      currentCategory = currentCategory.parent_id
+        ? categoriesById.value.get(currentCategory.parent_id)
+        : undefined
+    }
+
+    return breadcrumbs
+  }
 
   async function fetchCategoryData(): Promise<CategoryRow[]> {
     if (allCategories.value.length > 0)

@@ -31,8 +31,8 @@
     "packageJson": {
       "dependencies": [
         "npm:@antfu/eslint-config@^5.2.0",
-        "npm:@nuxtjs/cloudinary@4",
-        "npm:@nuxtjs/supabase@^1.6.0",
+        "npm:@nuxt/image@^1.11.0",
+        "npm:@nuxtjs/supabase@^1.6.1",
         "npm:@pinia/nuxt@~0.11.2",
         "npm:@supabase/supabase-js@^2.56.0",
         "npm:@tailwindcss/vite@^4.1.11",
@@ -52,7 +52,6 @@
         "npm:prettier@^3.6.2",
         "npm:reka-ui@^2.4.1",
         "npm:shadcn-nuxt@^2.2.0",
-        "npm:sharp@~0.34.3",
         "npm:simple-git-hooks@^2.13.1",
         "npm:slugify@^1.6.6",
         "npm:supabase@^2.33.9",
