@@ -99,12 +99,14 @@ export type Product = ProductRow & {
   images: string[]
 }
 
+export type SortByType = 'popularity' | 'newest' | 'price_asc' | 'price_desc'
+
 export interface IProductFilters {
   categorySlug: string
   subCategoryIds?: string[]
   priceMin?: number
   priceMax?: number
-  sortBy?: 'newest' | 'popularity' | 'price_asc' | 'price_desc'
+  sortBy?: SortByType
 }
 
 export interface ICartItem {
