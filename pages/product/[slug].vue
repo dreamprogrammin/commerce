@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
@@ -9,74 +7,57 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const slug = route.params.slug as string
 
-const { isLoadingSingle } = storeToRefs(productsStore)
-const { getPublicUrl } = useSupabaseStorage()
-
-// --- 3. Загрузка данных ---
-// `useAsyncData` выполняет загрузку на сервере для SEO и быстрой первой отрисовки.
-// `product-${slug}` - уникальный ключ, чтобы Nuxt не загружал данные для одного и того же товара повторно.
-const { data: currentProduct, error } = await useAsyncData(
+const { data: product, pending: isLoading, error } = await useAsyncData(
   `product-${slug}`,
-  () => {
-    // Очищаем предыдущий товар в сторе перед новым запросом.
-    // Это предотвратит "мерцание" старых данных.
-    productsStore.currentProduct = null
-    return productsStore.fetchProductBySlug(slug)
-  },
+  () => productsStore.fetchProductBySlug(slug),
   {
-    // `watch` гарантирует, что `useAsyncData` будет перезапущен
-    // при клиентских переходах между страницами товаров.
     watch: [() => route.params.slug],
   },
 )
 
-if (error.value || !currentProduct.value) {
+if (error.value || !product.value) {
   throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
 }
 
-const imgUrl = computed(() => {
-  if (currentProduct.value?.image_url) {
-    return getPublicUrl(BUCKET_NAME_PRODUCT, currentProduct.value.image_url)
-  }
-  return null
-})
+useHead(() => ({
+  title: product.value?.name || 'Товар',
+  meta: [
+    {
+      name: 'description',
+      content: product.value?.description || `Купить ${product.value?.name} в нашем магазине`,
+    },
+  ],
+}))
 
-// --- 5. SEO и метаданные страницы ---
-// ИЗМЕНЕНО: Оборачиваем в `watchEffect`, чтобы title обновлялся,
-// даже если пользователь переходит между страницами товаров без перезагрузки.
-useHead({
-  title: currentProduct.value.name,
-  meta: [{ name: 'description', content: currentProduct.value.description || `Купить ${currentProduct.value.name} в нашем магазине` }],
-})
-
-// --- 6. Локальное состояние для UI ---
-// Количество товара для добавления в корзину.
 const quantity = ref(1)
 </script>
 
 <template>
   <div class="container py-12">
     <!-- Показываем скелетон, пока данные грузятся (например, при медленном клиентском переходе) -->
-    <div v-if="isLoadingSingle">
+    <div v-if="isLoading">
       <ProductImagesSkeleton />
     </div>
     <!--
       После загрузки, если `currentProduct` существует, показываем основную разметку.
       Эта проверка дублирует проверку в <script>, но является хорошей практикой для шаблона.
     -->
-    <div v-else-if="currentProduct" class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+    <div v-else-if="product" class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
       <!-- Левая колонка: Изображение -->
       <div>
         <div class="aspect-square bg-muted rounded-lg overflow-hidden border">
           <NuxtImg
-            v-if="imgUrl"
-            :src="imgUrl"
-            :alt="currentProduct.name"
-            width="987"
-            height="987"
-            class="w-full h-full object-cover"
+            v-if="product.image_url"
+            :src="`/product-images/${product.image_url}`"
+            :alt="product.name"
+            width="800"
+            height="800"
+            fit="contain"
             format="webp"
             quality="80"
+            placeholder
+            loading="lazy"
+            class="w-full h-full object-cover"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground">
             Нет фото
@@ -90,43 +71,43 @@ const quantity = ref(1)
         <div>
           <!-- "Хлебные крошки" - ссылка на категорию товара -->
           <NuxtLink
-            v-if="currentProduct.categories"
-            :to="`/catalog/${currentProduct.categories.slug}`"
+            v-if="product.categories"
+            :to="`/catalog/${product.categories.slug}`"
             class="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
-            {{ currentProduct.categories.name }}
+            {{ product.categories.name }}
           </NuxtLink>
           <h1 class="text-3xl lg:text-4xl font-bold mt-1">
-            {{ currentProduct.name }}
+            {{ product.name }}
           </h1>
         </div>
 
         <p class="text-4xl font-bold">
-          {{ currentProduct.price }} ₸
+          {{ product.price }} ₸
         </p>
 
         <!-- Описание товара, обернутое в `prose` для красивого форматирования текста -->
-        <div v-if="currentProduct.description" class="prose prose-sm max-w-none text-muted-foreground">
-          <p>{{ currentProduct.description }}</p>
+        <div v-if="product.description" class="prose prose-sm max-w-none text-muted-foreground">
+          <p>{{ product.description }}</p>
         </div>
 
         <div class="p-4 bg-primary/10 text-primary rounded-lg border border-primary/20">
-          При покупке вы получите <span class="font-bold">{{ currentProduct.bonus_points_award }} бонусов</span>
+          При покупке вы получите <span class="font-bold">{{ product.bonus_points_award }} бонусов</span>
         </div>
 
         <!-- Блок добавления в корзину -->
         <div class="flex items-center gap-4 pt-4">
           <!-- ИЗМЕНЕНО: Добавлена проверка на наличие товара на складе -->
-          <template v-if="currentProduct.stock_quantity > 0">
+          <template v-if="product.stock_quantity > 0">
             <Input
               v-model.number="quantity"
               type="number"
               min="1"
-              :max="currentProduct.stock_quantity"
+              :max="product.stock_quantity"
               class="w-24 text-center"
               aria-label="Количество товара"
             />
-            <Button size="lg" class="flex-grow" @click="cartStore.addItem(currentProduct, quantity)">
+            <Button size="lg" class="flex-grow" @click="cartStore.addItem(product, quantity)">
               Добавить в корзину
             </Button>
           </template>
@@ -137,8 +118,8 @@ const quantity = ref(1)
         </div>
 
         <!-- Индикатор наличия на складе -->
-        <p v-if="currentProduct.stock_quantity > 0" class="text-sm text-green-600">
-          В наличии: {{ currentProduct.stock_quantity }} шт.
+        <p v-if="product.stock_quantity > 0" class="text-sm text-green-600">
+          В наличии: {{ product.stock_quantity }} шт.
         </p>
       </div>
     </div>

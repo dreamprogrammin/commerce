@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { IProductFilters, SortByType } from '@/types'
-import { watchDebounced } from '@vueuse/core'
+import type { IProductFilters } from '@/types'
+import { useDebounceFn } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -13,54 +13,7 @@ const categoriesStore = useCategoriesStore()
 
 const { products, isLoadingList, isLoadingMore, hasMoreProducts, priceRange } = storeToRefs(productsStore)
 
-interface ActiveFilters {
-  sortBy: SortByType
-  subCategoryIds: string[]
-  price: [number, number]
-}
-const activeFilters = ref<ActiveFilters>({
-  sortBy: 'popularity',
-  subCategoryIds: [],
-  price: [0, 50000], // Временное начальное значение
-})
-
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
-
-// --- 2. Главная логика загрузки данных ---
-
-// `useAsyncData` - наш единственный "дирижер" для загрузки при смене URL.
-const { refresh } = await useAsyncData(
-  `catalog-${route.fullPath}`,
-  async () => {
-    if (!currentCategorySlug.value)
-      return
-
-    // Сбрасываем фильтры при каждой новой загрузке категории
-    activeFilters.value = {
-      sortBy: 'popularity',
-      subCategoryIds: [],
-      price: [0, 50000], // Сбрасываем на дефолт
-    }
-
-    const initialFilters: IProductFilters = {
-      categorySlug: currentCategorySlug.value,
-      sortBy: activeFilters.value.sortBy,
-    }
-
-    // Параллельно грузим категории и первую страницу товаров
-    await Promise.all([
-      categoriesStore.fetchCategoryData(),
-      productsStore.fetchProducts(initialFilters, false),
-    ])
-
-    // ПОСЛЕ загрузки товаров, устанавливаем ПРАВИЛЬНЫЙ диапазон цен в фильтры
-    const newPriceRange = priceRange.value
-    activeFilters.value.price = [newPriceRange.min, newPriceRange.max]
-  },
-  { watch: [() => route.fullPath] },
-)
-
-// --- 3. Вычисляемые свойства, зависящие от загруженных данных ---
 const breadcrumbs = computed(() => categoriesStore.getBreadcrumbs(currentCategorySlug.value))
 const title = computed(() => {
   const path = breadcrumbs.value
@@ -73,18 +26,61 @@ const title = computed(() => {
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 
-// --- 4. Клиентская логика для реакции на действия пользователя ---
+const activeFilters = ref({
+  sortBy: 'popularity' as const,
+  subCategoryIds: [] as string[],
+  price: [0, 50000] as [number, number],
+})
 
-// `watchDebounced` реагирует ТОЛЬКО на изменения фильтров, сделанные пользователем.
-watchDebounced(
-  activeFilters,
-  () => {
-    // Не нужно ничего проверять. Просто перезапускаем `useAsyncData`.
-    // Он сам возьмет новые значения из `activeFilters`.
-    refresh()
+// --- 2. Главная логика загрузки данных ---
+
+// `useAsyncData` - наш единственный "дирижер" для загрузки при смене URL.
+const { pending: isLoading, refresh } = await useAsyncData(
+  'catalog-data', // Используем статичный ключ, но с `watch` на URL
+  async () => {
+    if (!currentCategorySlug.value)
+      return
+
+    const filters: IProductFilters = {
+      categorySlug: currentCategorySlug.value,
+      sortBy: activeFilters.value.sortBy,
+      subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
+      priceMin: activeFilters.value.price[0],
+      priceMax: activeFilters.value.price[1],
+    }
+
+    // `useAsyncData` вызывает actions, которые наполняют наши сторы
+    await Promise.all([
+      categoriesStore.fetchCategoryData(),
+      productsStore.fetchProducts(filters, false),
+    ])
   },
-  { debounce: 500, deep: true },
+  {
+    // Этот `watch` заставит `useAsyncData` перезапуститься при смене категории
+    watch: [currentCategorySlug],
+  },
 )
+const debouncedRefresh = useDebounceFn(() => {
+  refresh()
+}, 500)
+
+watch(activeFilters, () => {
+  debouncedRefresh()
+}, { deep: true })
+
+async function fetchInitialProducts() {
+  if (!currentCategorySlug.value)
+    return
+
+  const filters: IProductFilters = {
+    categorySlug: currentCategorySlug.value,
+    sortBy: activeFilters.value.sortBy,
+    subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
+    priceMin: activeFilters.value.price[0],
+    priceMax: activeFilters.value.price[1],
+  }
+  await productsStore.fetchProducts(filters, false)
+}
 
 // Функция для кнопки "Показать еще"
 async function loadMoreProducts() {
@@ -94,8 +90,8 @@ async function loadMoreProducts() {
     categorySlug: currentCategorySlug.value,
     sortBy: activeFilters.value.sortBy,
     subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
-    priceMin: activeFilters.value.price[0],
-    priceMax: activeFilters.value.price[1],
+    priceMin: activeFilters.value.price?.[0],
+    priceMax: activeFilters.value.price?.[1],
   }
   await productsStore.fetchProducts(filters, true)
 }
@@ -106,7 +102,7 @@ async function loadMoreProducts() {
     <Breadcrumbs :items="breadcrumbs" class="mb-6" />
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <aside class="col-span-1 lg:sticky top-24 self-start">
-        <FilterSidebar v-model="activeFilters" />
+        <FilterSidebar v-model="activeFilters" :price-range="priceRange" :is-loading="isLoading" />
       </aside>
       <main class="col-span-3">
         <CatalogHeader v-model:sort-by="activeFilters.sortBy" :title="title" />
@@ -116,7 +112,7 @@ async function loadMoreProducts() {
           Он будет `true` только когда идет полная перезагрузка СПИСКА товаров,
           и не будет затрагиваться при переходе на страницу отдельного товара.
         -->
-        <ProductGridSkeleton v-if="isLoadingList" />
+        <ProductGridSkeleton v-if="isLoading && products.length === 0" />
         <div v-else-if="products.length > 0" class="space-y-8">
           <ProductGrid :products="products" />
           <div v-if="hasMoreProducts" class="text-center">

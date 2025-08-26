@@ -133,6 +133,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     isLoadingSingle.value = true
     currentProduct.value = null
     try {
+      await new Promise(resolve => setTimeout(resolve, 5000))
       const { data, error } = await supabase
         .from('products')
         .select('*, categories(name, slug)')

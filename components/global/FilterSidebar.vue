@@ -1,42 +1,49 @@
 <script setup lang="ts">
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
-import { useProductsStore } from '@/stores/publicStore/productsStore'
 
-// `defineModel` - это наш главный инструмент для связи с родительской страницей.
-const filters = defineModel<{
-  subCategoryIds: string[]
-  price: [number, number]
-}>({ required: true })
+const props = defineProps<{
+  modelValue: {
+    subCategoryIds: string[]
+    price: [number, number] | undefined
+    sortBy: string
+  }
+  isLoading: boolean
+  priceRange: { min: number, max: number }
+}>()
 
-// Инициализация сторов и получение данных
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: typeof props.modelValue): void
+}>()
+
 const route = useRoute()
 const categoriesStore = useCategoriesStore()
-const productsStore = useProductsStore()
 
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
-const priceRange = computed(() => productsStore.priceRange)
 
 // Локальное состояние ТОЛЬКО для слайдера, чтобы UI был отзывчивым.
-const localPrice = ref<[number, number]>([priceRange.value.min, priceRange.value.max])
+const localPrice = ref<[number, number]>(props.modelValue.price || [props.priceRange.min, props.priceRange.max])
 
-// Функция, которая вызывается, когда пользователь ОТПУСКАЕТ ползунок.
-// Она обновляет ГЛАВНЫЙ объект `filters`, что запускает перезагрузку товаров.
-// Мы говорим функции, что она принимает `number[]` - то, что отдает Slider.
+function updateSubCategory(checked: boolean, catId: string) {
+  const newIds = [...props.modelValue.subCategoryIds]
+  if (checked) {
+    newIds.push(catId)
+  }
+  else {
+    const index = newIds.indexOf(catId)
+    if (index > -1)
+      newIds.splice(index, 1)
+  }
+  emit('update:modelValue', { ...props.modelValue, subCategoryIds: newIds })
+}
+
 function commitPriceToFilters(newPrice: number[]) {
-  // "Защита от дурака": проверяем, что в массиве действительно два элемента.
   if (Array.isArray(newPrice) && newPrice.length === 2) {
-    // Если все хорошо, мы "утверждаем" (as), что это теперь
-    // наш надежный кортеж `[number, number]`, и присваиваем его.
-    filters.value.price = newPrice as [number, number]
+    emit('update:modelValue', { ...props.modelValue, price: newPrice as [number, number] })
   }
 }
 
-// Следим за изменением `priceRange` из стора (когда загружаются новые товары)
-// и сбрасываем локальное состояние слайдера на полный диапазон.
-watch(priceRange, (newRange) => {
-  // Мы обновляем ТОЛЬКО локальное состояние слайдера.
-  // Это не вызовет `watch` на родительской странице.
+watch(() => props.priceRange, (newRange) => {
   localPrice.value = [newRange.min, newRange.max]
 }, { deep: true })
 </script>
@@ -57,15 +64,8 @@ watch(priceRange, (newRange) => {
       <div v-for="cat in subcategories" :key="cat.id" class="flex items-center space-x-2">
         <Checkbox
           :id="`cat-${cat.id}`"
-          :checked="filters.subCategoryIds.includes(cat.id)"
-          @update:checked="(checked: boolean) => {
-            if (checked) {
-              filters.subCategoryIds.push(cat.id);
-            }
-            else {
-              filters.subCategoryIds = filters.subCategoryIds.filter(id => id !== cat.id);
-            }
-          }"
+          :checked="props.modelValue.subCategoryIds.includes(cat.id)"
+          @update:checked="(checked: boolean) => updateSubCategory(checked, cat.id)"
         />
         <Label :for="`cat-${cat.id}`" class="font-normal cursor-pointer">{{ cat.name }}</Label>
       </div>
@@ -76,7 +76,7 @@ watch(priceRange, (newRange) => {
       <h4 class="font-semibold">
         Цена
       </h4>
-      <div v-if="productsStore.isLoading" class="space-y-4 pt-2">
+      <div v-if="isLoading" class="space-y-4 pt-2">
         <Skeleton class="h-4 w-full" />
         <Skeleton class="h-4 w-1/2" />
       </div>
