@@ -21,7 +21,7 @@ const imgUrl = computed(() => {
 <template>
   <div class="border rounded-lg overflow-hidden group transition-shadow hover:shadow-lg bg-card">
     <!-- Теперь в шаблоне мы обращаемся к товару через `props.product` -->
-    <NuxtLink :to="`/product/${props.product.slug}`" class="block bg-muted">
+    <NuxtLink :to="`/catalog/products/${props.product.slug}`" class="block bg-muted">
       <div class="aspect-square overflow-hidden">
         <NuxtImg
           v-if="imgUrl"

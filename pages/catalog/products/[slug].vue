@@ -5,43 +5,69 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
-const slug = route.params.slug as string
+const slug = computed(() => route.params.slug as string)
 
-const { data: product, pending: isLoading, error } = await useAsyncData(
-  `product-${slug}`,
-  () => productsStore.fetchProductBySlug(slug),
+// Добавляем локальное состояние загрузки
+const isLocalLoading = ref(true)
+
+const { data: product, pending: isAsyncLoading, error } = await useAsyncData(
+  () => `product-${slug.value}`, // Динамический ключ
+  async () => {
+    isLocalLoading.value = true
+    try {
+      const result = await productsStore.fetchProductBySlug(slug.value)
+      return result || null
+    }
+    finally {
+      isLocalLoading.value = false
+    }
+  },
   {
-    watch: [() => route.params.slug],
+    watch: [slug],
+    server: true,
+    default: () => null,
   },
 )
 
-if (error.value || !product.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
-}
+// Комбинируем состояния загрузки
+const isLoading = computed(() => isAsyncLoading.value || isLocalLoading.value)
+
+// Отслеживаем изменения slug и показываем loading
+watch(slug, () => {
+  isLocalLoading.value = true
+}, { immediate: false })
+
+// Проверяем ошибки после загрузки
+watchEffect(() => {
+  if (!isLoading.value && (error.value || !product.value)) {
+    throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
+  }
+})
 
 useHead(() => ({
-  title: product.value?.name || 'Товар',
+  title: product.value?.name || 'Загрузка...',
   meta: [
     {
       name: 'description',
-      content: product.value?.description || `Купить ${product.value?.name} в нашем магазине`,
+      content: product.value?.description || `Купить ${product.value?.name || 'товар'} в нашем магазине`,
     },
   ],
 }))
 
 const quantity = ref(1)
+
+// Сбрасываем количество при смене товара
+watch(() => product.value?.id, () => {
+  quantity.value = 1
+})
 </script>
 
 <template>
   <div class="container py-12">
-    <!-- Показываем скелетон, пока данные грузятся (например, при медленном клиентском переходе) -->
-    <div v-if="isLoading">
-      <ProductImagesSkeleton />
-    </div>
-    <!--
-      После загрузки, если `currentProduct` существует, показываем основную разметку.
-      Эта проверка дублирует проверку в <script>, но является хорошей практикой для шаблона.
-    -->
+    <!-- Показываем скелетон при любой загрузке -->
+    <ProductImagesSkeleton v-if="isLoading" />
+
+    <!-- Показываем товар только когда загрузка завершена -->
     <div v-else-if="product" class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
       <!-- Левая колонка: Изображение -->
       <div>
@@ -63,13 +89,11 @@ const quantity = ref(1)
             Нет фото
           </div>
         </div>
-        <!-- TODO: Добавить галерею с дополнительными фото, если они будут -->
       </div>
 
       <!-- Правая колонка: Информация и покупка -->
       <div class="space-y-6">
         <div>
-          <!-- "Хлебные крошки" - ссылка на категорию товара -->
           <NuxtLink
             v-if="product.categories"
             :to="`/catalog/${product.categories.slug}`"
@@ -86,7 +110,6 @@ const quantity = ref(1)
           {{ product.price }} ₸
         </p>
 
-        <!-- Описание товара, обернутое в `prose` для красивого форматирования текста -->
         <div v-if="product.description" class="prose prose-sm max-w-none text-muted-foreground">
           <p>{{ product.description }}</p>
         </div>
@@ -95,9 +118,7 @@ const quantity = ref(1)
           При покупке вы получите <span class="font-bold">{{ product.bonus_points_award }} бонусов</span>
         </div>
 
-        <!-- Блок добавления в корзину -->
         <div class="flex items-center gap-4 pt-4">
-          <!-- ИЗМЕНЕНО: Добавлена проверка на наличие товара на складе -->
           <template v-if="product.stock_quantity > 0">
             <Input
               v-model.number="quantity"
@@ -111,17 +132,28 @@ const quantity = ref(1)
               Добавить в корзину
             </Button>
           </template>
-          <!-- Если товара нет в наличии, показываем сообщение -->
           <Button v-else size="lg" class="flex-grow" disabled>
             Нет в наличии
           </Button>
         </div>
 
-        <!-- Индикатор наличия на складе -->
         <p v-if="product.stock_quantity > 0" class="text-sm text-green-600">
           В наличии: {{ product.stock_quantity }} шт.
         </p>
       </div>
+    </div>
+
+    <!-- Fallback -->
+    <div v-else class="text-center py-20">
+      <h1 class="text-2xl font-bold">
+        Товар не найден
+      </h1>
+      <p class="text-muted-foreground mt-2">
+        Возможно, товар был удален или ссылка неверна.
+      </p>
+      <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
+        ← Вернуться в каталог
+      </NuxtLink>
     </div>
   </div>
 </template>

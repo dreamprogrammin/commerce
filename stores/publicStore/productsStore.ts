@@ -1,139 +1,65 @@
 import type { Database, IProductFilters, ProductRow, ProductWithCategory } from '@/types'
+import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
+
+// Этот стор больше не хранит состояние (state) для продуктов.
+// Он работает как типизированный API-клиент.
+// Состояние (products, currentProduct, isLoading) будет храниться
+// локально на страницах, которые его используют.
+// Это решает проблемы с "мельканием" UI и "грязным" состоянием.
 
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
-  const products = ref<ProductRow[]>([])
-  const currentProduct = ref<ProductWithCategory | null>(null)
-  const isLoadingList = ref(false)
-  const isLoadingSingle = ref(false)
-  const isLoadingMore = ref(false)
-  const currentPage = ref(1)
   /**
-   * Флаг, который показывает, есть ли еще товары для загрузки.
-   * Когда он станет `false`, мы скроем кнопку "Показать ещё".
-   */
-  const hasMoreProducts = ref(true)
-  /**
-   * Константа, определяющая, сколько товаров загружать за один раз.
-   */
-  const PAGE_SIZE = 12
-  /**
-   * Динамически вычисляет минимальную и максимальную цену из текущего
-   * списка загруженных товаров (`products`).
-   * Используется для настройки слайдера цен в фильтрах.
-   */
-
-  const priceRange = computed(() => {
-    if (products.value.length === 0) {
-      return { min: 0, max: 50000 }
-    }
-    const prices = products.value.map(p => Number(p.price))
-    return {
-      min: Math.floor(Math.min(...prices)),
-      max: Math.ceil(Math.max(...prices)),
-    }
-  })
-  /**
-   * Загружает ТОЛЬКО ПЕРВУЮ, НЕБОЛЬШУЮ порцию товаров.
-   * Предназначен для вызова на сервере для быстрой первой отрисовки и SEO.
-   */
-
-  async function fetchInitialProductsSSR(filters: IProductFilters): Promise<ProductRow[]> {
-    try {
-      const { data, error } = await supabase
-        .rpc('get_filtered_products', {
-          p_category_slug: filters.categorySlug,
-          p_subcategory_ids: filters.subCategoryIds,
-          p_price_min: filters.priceMin,
-          p_price_max: filters.priceMax,
-          p_sort_by: filters.sortBy,
-          p_page_size: 4,
-          p_page_number: 1,
-        })
-      if (error)
-        throw error
-      return data || []
-    }
-    catch (e: any) {
-      console.error('Ошибка при SSR-загрузке товаров:', e.message)
-      return []
-    }
-  }
-
-  /**
-   * Загружает список товаров с применением фильтров, вызывая RPC-функцию в Supabase.
+   * Загружает отфильтрованный и отсортированный список товаров с пагинацией.
+   * НЕ изменяет никакое состояние, а просто ВОЗВРАЩАЕТ результат.
    * @param filters - Объект с параметрами фильтрации.
-   * @returns Promise, который разрешается массивом найденных товаров.
+   * @param loadMore - Флаг, управляющий пагинацией.
+   * @param currentPage - Текущая страница для дозагрузки.
+   * @param pageSize - Размер страницы.
+   * @returns Promise, который разрешается объектом с товарами и флагом `hasMore`.
    */
-
-  async function fetchProducts(filters: IProductFilters, loadMore = false) {
-    if (loadMore) {
-      isLoadingMore.value = true
-    }
-    else {
-      isLoadingList.value = true
-      // При полной перезагрузке сбрасываем все состояние пагинации
-      products.value = []
-      currentPage.value = 1
-      hasMoreProducts.value = true
-    }
+  async function fetchProducts(
+    filters: IProductFilters,
+    currentPage = 1,
+    pageSize = 12,
+  ): Promise<{ products: ProductRow[], hasMore: boolean }> {
     try {
-      const { data, error } = await supabase
-        .rpc('get_filtered_products', {
-          p_category_slug: filters.categorySlug,
-          p_subcategory_ids: filters.subCategoryIds,
-          p_price_min: filters.priceMin,
-          p_price_max: filters.priceMax,
-          p_sort_by: filters.sortBy,
-          p_page_size: PAGE_SIZE,
-          p_page_number: currentPage.value,
-        })
+      const { data, error } = await supabase.rpc('get_filtered_products', {
+        p_category_slug: filters.categorySlug,
+        p_subcategory_ids: filters.subCategoryIds,
+        p_price_min: filters.priceMin,
+        p_price_max: filters.priceMax,
+        p_sort_by: filters.sortBy,
+        p_page_size: pageSize,
+        p_page_number: currentPage,
+      })
 
       if (error)
         throw error
+
       const newProducts = data || []
+      // Определяем, есть ли еще страницы для загрузки
+      const hasMore = newProducts.length === pageSize
 
-      if (loadMore) {
-        // РЕЖИМ ДОЗАГРУЗКИ: Добавляем новые товары в конец существующего списка.
-        products.value.push(...newProducts)
-      }
-      else {
-        // РЕЖИМ ПЕРЕЗАГРУЗКИ: Полностью заменяем список.
-        products.value = newProducts
-      }
-
-      // Если сервер вернул меньше товаров, чем мы просили (PAGE_SIZE),
-      // это значит, что мы достигли конца списка.
-      if (newProducts.length < PAGE_SIZE) {
-        hasMoreProducts.value = false
-      }
-
-      // Готовимся к следующему запросу "Показать ещё"
-      currentPage.value++
+      return { products: newProducts, hasMore }
     }
     catch (error: any) {
       toast.error('Ошибка при загрузке товаров', { description: error.message })
-      hasMoreProducts.value = false
-    }
-    finally {
-      isLoadingList.value = false
-      isLoadingMore.value = false
+      // В случае ошибки возвращаем пустой результат
+      return { products: [], hasMore: false }
     }
   }
 
   /**
    * Загружает один конкретный товар по его `slug`.
+   * НЕ изменяет никакое состояние, а просто ВОЗВРАЩАЕТ результат.
    * @param slug - Уникальный URL-идентификатор товара.
-   * @returns Promise, который разрешается объектом товара или `null`, если не найден.
+   * @returns Promise, который разрешается объектом товара или `null`.
    */
-
   async function fetchProductBySlug(slug: string): Promise<ProductWithCategory | null> {
-    isLoadingSingle.value = true
-    currentProduct.value = null
     try {
-      await new Promise(resolve => setTimeout(resolve, 5000))
       const { data, error } = await supabase
         .from('products')
         .select('*, categories(name, slug)')
@@ -144,28 +70,17 @@ export const useProductsStore = defineStore('productsStore', () => {
       if (error && error.code !== 'PGRST116')
         throw error
 
-      currentProduct.value = data
       return data
     }
     catch (error: any) {
       toast.error(`Ошибка загрузки товара`, { description: error.message })
       return null
     }
-    finally {
-      isLoadingSingle.value = false
-    }
   }
 
+  // Возвращаем только функции, никакого состояния.
   return {
-    products,
-    currentProduct,
-    isLoadingList,
-    isLoadingMore,
-    isLoadingSingle,
-    hasMoreProducts,
-    priceRange,
     fetchProducts,
     fetchProductBySlug,
-    fetchInitialProductsSSR,
   }
 })
