@@ -1,0 +1,67 @@
+-- Миграция для исправления логики функции get_filtered_products.
+-- Версия 2: Добавлены значения по умолчанию (DEFAULT) для соответствия
+-- существующей сигнатуре функции, что исправляет ошибку "cannot remove parameter defaults".
+
+-- Сначала удаляем старую функцию, чтобы избежать любых конфликтов сигнатур.
+-- Это самый надежный способ.
+DROP FUNCTION IF EXISTS public.get_filtered_products(text, uuid[], numeric, numeric, text, integer, integer);
+
+-- Теперь создаем новую функцию с нуля с правильной логикой и значениями по умолчанию.
+CREATE OR REPLACE FUNCTION public.get_filtered_products(
+  p_category_slug TEXT,
+  p_subcategory_ids UUID[] DEFAULT NULL,
+  p_price_min NUMERIC DEFAULT NULL,
+  p_price_max NUMERIC DEFAULT NULL,
+  p_sort_by TEXT DEFAULT 'popularity',
+  p_page_size INT DEFAULT 12,
+  p_page_number INT DEFAULT 1
+)
+RETURNS SETOF public.products AS $$
+BEGIN
+  RETURN QUERY
+  -- 1. Сначала находим все ID категорий, включая дочерние
+  WITH RECURSIVE category_tree AS (
+    SELECT id FROM public.categories WHERE slug = p_category_slug
+    UNION ALL
+    SELECT c.id FROM public.categories c JOIN category_tree ct ON c.parent_id = ct.id
+  )
+  -- 2. Затем выполняем основной запрос
+  SELECT p.*
+  FROM public.products p
+  WHERE
+    p.is_active = TRUE
+    
+    -- ИСПРАВЛЕННАЯ ЛОГИКА ФИЛЬТРАЦИИ ПО КАТЕГОРИЯМ
+    AND (
+      -- СЛУЧАЙ 1: Если массив подкатегорий НЕ предоставлен (пустой или NULL),
+      -- то мы ищем товары во всем дереве категорий.
+      (
+        (p_subcategory_ids IS NULL OR array_length(p_subcategory_ids, 1) IS NULL OR array_length(p_subcategory_ids, 1) = 0)
+        AND p.category_id IN (SELECT id FROM category_tree)
+      )
+      OR
+      -- СЛУЧАЙ 2: Если массив подкатегорий предоставлен,
+      -- то мы ищем товары ТОЛЬКО в этом массиве.
+      (
+        (p_subcategory_ids IS NOT NULL AND array_length(p_subcategory_ids, 1) > 0)
+        AND p.category_id = ANY(p_subcategory_ids)
+      )
+    )
+
+    -- Фильтр по цене (без изменений)
+    AND (p_price_min IS NULL OR p.price >= p_price_min)
+    AND (p_price_max IS NULL OR p.price <= p_price_max)
+    
+  -- 3. Сортируем результат (без изменений)
+  ORDER BY
+    CASE WHEN p_sort_by = 'popularity' THEN p.sales_count END DESC,
+    CASE WHEN p_sort_by = 'newest' THEN p.created_at END DESC,
+    CASE WHEN p_sort_by = 'price_asc'  THEN p.price END ASC,
+    CASE WHEN p_sort_by = 'price_desc' THEN p.price END DESC,
+    p.created_at DESC -- Вторичная сортировка по новизне для стабильности
+    
+  -- 4. Применяем пагинацию (без изменений)
+  LIMIT p_page_size
+  OFFSET (p_page_number - 1) * p_page_size;
+END;
+$$ LANGUAGE plpgsql STABLE;
