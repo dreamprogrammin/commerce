@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
+
+const { getPublicUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
 
@@ -22,6 +26,13 @@ const { data: product, pending: isLoading } = await useAsyncData(
     lazy: true,
   },
 )
+
+const imgUrl = computed(() => {
+  if (product.value?.image_url) {
+    return getPublicUrl(BUCKET_NAME_PRODUCT, product.value?.image_url ?? 'сделать заглушку')
+  }
+  return null
+})
 
 // --- Обработка ошибок и 404 ---
 // Этот watchEffect сработает на сервере и на клиенте, если данные не загрузились.
@@ -46,10 +57,6 @@ useHead(() => ({
   ],
 }))
 
-if (isLoading.value) {
-  console.log('не возвращает true всегда false поэтому я не вижу скелета')
-}
-
 // --- Локальное состояние для корзины ---
 const quantity = ref(1)
 
@@ -72,8 +79,8 @@ watch(() => product.value?.id, () => {
       <div>
         <div class="aspect-square bg-muted rounded-lg overflow-hidden border">
           <NuxtImg
-            v-if="product.image_url"
-            :src="`/product-images/${product.image_url}`"
+            v-if="imgUrl"
+            :src="imgUrl"
             :alt="product.name"
             width="800"
             height="800"
