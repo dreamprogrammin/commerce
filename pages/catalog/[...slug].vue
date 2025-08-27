@@ -119,14 +119,17 @@ await useAsyncData(
 watch(
   currentCategorySlug,
   (newSlug) => {
-    if (newSlug) {
+    // ----> ДОБАВЬТЕ ЭТУ ПРОВЕРКУ <----
+    // Мы запускаем загрузку, только если новый слаг существует
+    // И мы все еще находимся на странице каталога.
+    // 'catalog-slug' — это имя маршрута для файла [...slug].vue
+    if (newSlug && route.name === 'catalog-slug') {
       activeFilters.value.subCategoryIds = []
       loadProducts(false) // Запускаем полную перезагрузку
     }
   },
-  { immediate: true }, // `immediate: true` запускает `watch` сразу при первой загрузке.
+  { immediate: true },
 )
-
 // `watchDebounced` реагирует на изменения фильтров, сделанные пользователем.
 watchDebounced(
   activeFilters,
