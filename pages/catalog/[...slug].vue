@@ -119,13 +119,17 @@ await useAsyncData(
 watch(
   currentCategorySlug,
   (newSlug) => {
-    // ----> ДОБАВЬТЕ ЭТУ ПРОВЕРКУ <----
-    // Мы запускаем загрузку, только если новый слаг существует
-    // И мы все еще находимся на странице каталога.
-    // 'catalog-slug' — это имя маршрута для файла [...slug].vue
-    if (newSlug && route.name === 'catalog-slug') {
-      activeFilters.value.subCategoryIds = []
-      loadProducts(false) // Запускаем полную перезагрузку
+    if (newSlug) {
+      // ПОЛНЫЙ СБРОС ФИЛЬТРОВ К СОСТОЯНИЮ ПО УМОЛЧАНИЮ
+      activeFilters.value = {
+        sortBy: 'popularity', // Возвращаем сортировку к дефолтной
+        subCategoryIds: [],
+        price: [0, 50000], // Также сбрасываем цену (важно!)
+      }
+      // После сброса запускаем загрузку.
+      // watchDebounced не сработает, так как мы меняем весь объект,
+      // а не ждем реакции пользователя.
+      loadProducts(false)
     }
   },
   { immediate: true },
@@ -133,13 +137,15 @@ watch(
 // `watchDebounced` реагирует на изменения фильтров, сделанные пользователем.
 watchDebounced(
   activeFilters,
-  (newFilters, oldFilters) => {
-    // Сравниваем, чтобы не вызывать перезагрузку, если `watch(priceRange, ...)` просто обновил диапазон.
-    if (JSON.stringify(newFilters) !== JSON.stringify(oldFilters)) {
-      loadProducts(false)
-    }
+  () => {
+    // Если этот код выполнился, значит, в activeFilters что-то изменилось.
+    // Просто вызываем перезагрузку. Аргументы newFilters и oldFilters нам даже не нужны.
+    loadProducts(false)
   },
-  { debounce: 500, deep: true },
+  {
+    debounce: 500,
+    deep: true,
+  },
 )
 </script>
 
