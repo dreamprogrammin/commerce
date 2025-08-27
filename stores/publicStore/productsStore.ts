@@ -7,7 +7,7 @@ import { toast } from 'vue-sonner'
 // Состояние (products, currentProduct, isLoading) будет храниться
 // локально на страницах, которые его используют.
 // Это решает проблемы с "мельканием" UI и "грязным" состоянием.
-
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
@@ -59,6 +59,9 @@ export const useProductsStore = defineStore('productsStore', () => {
    * @returns Promise, который разрешается объектом товара или `null`.
    */
   async function fetchProductBySlug(slug: string): Promise<ProductWithCategory | null> {
+    if (import.meta.dev) {
+      await delay(2000)
+    }
     try {
       const { data, error } = await supabase
         .from('products')

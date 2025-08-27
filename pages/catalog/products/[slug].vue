@@ -5,71 +5,70 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
+
 const slug = computed(() => route.params.slug as string)
 
-// Добавляем локальное состояние загрузки
-const isLocalLoading = ref(true)
-
-const { data: product, pending: isAsyncLoading, error } = await useAsyncData(
-  () => `product-${slug.value}`, // Динамический ключ
-  async () => {
-    isLocalLoading.value = true
-    try {
-      const result = await productsStore.fetchProductBySlug(slug.value)
-      return result || null
-    }
-    finally {
-      isLocalLoading.value = false
-    }
-  },
+// --- Упрощенная загрузка данных ---
+// Мы используем ключ, зависящий от slug, чтобы Nuxt кэшировал результаты.
+// `pending` будет нашим ЕДИНСТВЕННЫМ источником состояния загрузки.
+const { data: product, pending: isLoading } = await useAsyncData(
+  `product-${slug.value}`,
+  () => productsStore.fetchProductBySlug(slug.value),
   {
+    // `watch` будет перезапускать `fetchProductBySlug` при смене slug.
     watch: [slug],
-    server: true,
+    // `default` помогает избежать ошибок рендеринга на стороне сервера, если данные не пришли.
     default: () => null,
+    lazy: true,
   },
 )
 
-// Комбинируем состояния загрузки
-const isLoading = computed(() => isAsyncLoading.value || isLocalLoading.value)
-
-// Отслеживаем изменения slug и показываем loading
-watch(slug, () => {
-  isLocalLoading.value = true
-}, { immediate: false })
-
-// Проверяем ошибки после загрузки
-watchEffect(() => {
-  if (!isLoading.value && (error.value || !product.value)) {
-    throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
+// --- Обработка ошибок и 404 ---
+// Этот watchEffect сработает на сервере и на клиенте, если данные не загрузились.
+watch(isLoading, (newIsLoadingValue) => {
+  // Мы запускаем проверку только тогда, когда загрузка ЗАКОНЧИЛАСЬ
+  // (т.е. newIsLoadingValue стало false).
+  // И если после этого product всё ещё пуст, значит, это реальная ошибка 404.
+  if (newIsLoadingValue === false && !product.value) {
+    // showError - это рекомендуемый Nuxt способ вызова ошибки
+    // на стороне клиента асинхронно.
+    showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
   }
 })
-
+// --- Мета-теги ---
 useHead(() => ({
-  title: product.value?.name || 'Загрузка...',
+  title: product.value?.name || 'Загрузка товара...',
   meta: [
     {
       name: 'description',
-      content: product.value?.description || `Купить ${product.value?.name || 'товар'} в нашем магазине`,
+      content: product.value?.description || `Купить ${product.value?.name || 'товар'} в нашем интернет-магазине.`,
     },
   ],
 }))
 
+if (isLoading.value) {
+  console.log('не возвращает true всегда false поэтому я не вижу скелета')
+}
+
+// --- Локальное состояние для корзины ---
 const quantity = ref(1)
 
-// Сбрасываем количество при смене товара
+// Сбрасываем количество при переходе на другой товар
 watch(() => product.value?.id, () => {
   quantity.value = 1
-})
+}, { immediate: true })
 </script>
 
 <template>
   <div class="container py-12">
-    <!-- Показываем скелетон при любой загрузке -->
-    <ProductImagesSkeleton v-if="isLoading" />
+    <!-- Используем `pending` от `useAsyncData` для показа скелетона. -->
+    <!-- Важно: этот скелетон теперь будет виден только при ПЕРВОЙ загрузке страницы -->
+    <!-- или если вы переходите на товар, который еще не был загружен. -->
+    <ProductDetailSkeleton v-if="isLoading" />
 
-    <!-- Показываем товар только когда загрузка завершена -->
+    <!-- Отображаем товар, как только `isLoading` становится `false` и `product` существует -->
     <div v-else-if="product" class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-      <!-- Левая колонка: Изображение -->
+      <!-- Левая колонка: Изображение (без изменений) -->
       <div>
         <div class="aspect-square bg-muted rounded-lg overflow-hidden border">
           <NuxtImg
@@ -81,8 +80,6 @@ watch(() => product.value?.id, () => {
             fit="contain"
             format="webp"
             quality="80"
-            placeholder
-            loading="lazy"
             class="w-full h-full object-cover"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -91,7 +88,7 @@ watch(() => product.value?.id, () => {
         </div>
       </div>
 
-      <!-- Правая колонка: Информация и покупка -->
+      <!-- Правая колонка: Информация и покупка (без изменений) -->
       <div class="space-y-6">
         <div>
           <NuxtLink
@@ -143,7 +140,7 @@ watch(() => product.value?.id, () => {
       </div>
     </div>
 
-    <!-- Fallback -->
+    <!-- Этот блок можно оставить на случай, если `createError` по какой-то причине не сработает -->
     <div v-else class="text-center py-20">
       <h1 class="text-2xl font-bold">
         Товар не найден
