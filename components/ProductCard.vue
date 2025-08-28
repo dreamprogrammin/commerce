@@ -31,6 +31,8 @@ const imgUrl = computed(() => {
           quality="80"
           width="400"
           height="400"
+          loading="lazy"
+          placeholder
           class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
