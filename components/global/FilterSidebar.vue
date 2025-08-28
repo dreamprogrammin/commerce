@@ -56,7 +56,6 @@ watch(() => props.priceRange, (newRange) => {
       </h3>
     </div>
 
-    <!-- Фильтр по подкатегориям -->
     <div v-if="subcategories.length > 0" class="space-y-4">
       <h4 class="font-semibold">
         Подкатегории
@@ -65,13 +64,12 @@ watch(() => props.priceRange, (newRange) => {
         <Checkbox
           :id="`cat-${cat.id}`"
           :checked="props.modelValue.subCategoryIds.includes(cat.id)"
-          @update:checked="(checked: boolean) => updateSubCategory(checked, cat.id)"
+          @update:model-value="(checked) => updateSubCategory(!!checked, cat.id)"
         />
         <Label :for="`cat-${cat.id}`" class="font-normal cursor-pointer">{{ cat.name }}</Label>
       </div>
     </div>
 
-    <!-- Фильтр по цене -->
     <div class="space-y-4 pt-4 border-t">
       <h4 class="font-semibold">
         Цена
@@ -81,10 +79,6 @@ watch(() => props.priceRange, (newRange) => {
         <Skeleton class="h-4 w-1/2" />
       </div>
       <template v-else>
-        <!--
-          ИСПРАВЛЕНО: v-model теперь привязан к `localPrice`.
-          Это синтаксический сахар для `:model-value` и `@update:model-value`.
-        -->
         <Slider
           v-model="localPrice"
           :min="priceRange.min"
@@ -93,7 +87,6 @@ watch(() => props.priceRange, (newRange) => {
           @value-commit="commitPriceToFilters"
         />
         <div class="flex justify-between text-sm text-muted-foreground">
-          <!-- ИСПРАВЛЕНО: Отображаем `localPrice`, а не `priceValue` -->
           <span>{{ Math.round(localPrice[0]) }} ₸</span>
           <span>{{ Math.round(localPrice[1]) }} ₸</span>
         </div>

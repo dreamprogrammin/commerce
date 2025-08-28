@@ -22,13 +22,13 @@
   // Для Vue-файлов мы хотим, чтобы работал только ESLint, а не Prettier.
   // Эта настройка гарантирует, что для .vue файлов будет использоваться ESLint.
   "[vue]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[javascript]": {
     "editor.defaultFormatter": "dbaeumer.vscode-eslint"
   },
   "[typescript]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
   },
   "cSpell.words": [
     "supabase"
