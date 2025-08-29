@@ -87,6 +87,54 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
       }))
   }
 
+  function updateFeaturedStatus(categoryIds: string[], isFeatured: boolean) {
+    allCategories.value.forEach((cat, index) => {
+      if (categoryIds.includes(cat.id)) {
+        allCategories.value[index] = {
+          ...cat,
+          is_featured: isFeatured,
+        }
+      }
+    })
+  }
+
+  async function saveFeaturedChanges(): Promise<boolean> {
+    const featuredIds = allCategories.value
+      .filter(cat => cat.is_featured)
+      .map(cat => cat.id)
+
+    const notFeaturedIds = allCategories.value
+      .filter(cat => !cat.is_featured)
+      .map(cat => cat.id)
+
+    try {
+      const setFeaturedPromise = supabase
+        .from('categories')
+        .update({ is_featured: true })
+        .in('id', featuredIds)
+
+      const setNotFeaturedPromise = supabase
+        .from('categories')
+        .update({ is_featured: false })
+        .in('id', notFeaturedIds)
+
+      const [featuredResult, notFeaturedResult] = await Promise.all([
+        setFeaturedPromise,
+        setNotFeaturedPromise,
+      ])
+
+      if (featuredResult.error)
+        throw featuredResult.error
+      if (notFeaturedResult.error)
+        throw notFeaturedResult.error
+      return true
+    }
+    catch (error: any) {
+      toast.error('Ошибка при сохранении популярных категорий', { description: error.message })
+      return false
+    }
+  }
+
   async function saveChanges(tree: EditableCategory[]) {
     isSaving.value = true
     try {
@@ -179,5 +227,14 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
     }
   }
 
-  return { allCategories, isLoading, isSaving, fetchAllCategories, buildCategoryTree, saveChanges }
+  return {
+    allCategories,
+    isLoading,
+    isSaving,
+    fetchAllCategories,
+    updateFeaturedStatus,
+    saveFeaturedChanges,
+    buildCategoryTree,
+    saveChanges,
+  }
 })

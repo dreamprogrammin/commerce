@@ -31,6 +31,7 @@ function selectRootCategory(category: EditableCategory) {
 function addNodeToRoot() {
   if (!selectedRootCategory.value)
     return
+
   const newChild: EditableCategory = {
     id: '',
     _tempId: uuidv4(),

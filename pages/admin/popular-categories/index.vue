@@ -1,40 +1,21 @@
 <script setup lang="ts">
-import type { MenuItemRow } from '@/types'
 import { onMounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useMenuAdminStore } from '@/stores/menuItems/useTopMenuItems'
+import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 
 definePageMeta({ layout: 'admin' })
 
-const menuAdminStore = useMenuAdminStore()
+const adminCategoriesStore = useAdminCategoriesStore()
 const isSaving = ref(false)
 
-// Локальные копии для управления UI
-const available = ref<MenuItemRow[]>([])
-const featured = ref<MenuItemRow[]>([])
+const available = computed(() => adminCategoriesStore.allCategories.filter(cat => !cat.is_featured))
+const featured = computed(() => adminCategoriesStore.allCategories.filter(cat => cat.is_featured))
 
-// ID, выбранные в каждом из списков
 const selectedAvailable = ref<string[]>([])
 const selectedFeatured = ref<string[]>([])
 
-// Загружаем данные и инициализируем локальные списки
-onMounted(async () => {
-  await menuAdminStore.fetchItemsAndSeparate()
-  // Вычисляем начальный список доступных
-  updateLocalList()
-})
-
-function updateLocalList() {
-  const featuredIds = new Set(menuAdminStore.featuredItems.map(i => i.id))
-  available.value = menuAdminStore.allItems.filter(
-    item => !featuredIds.has(item.id),
-  )
-  featured.value = [...menuAdminStore.featuredItems] // Создаем копию
-  console.log('Локальные списки обновлены!')
-}
-
-// Функции для выбора элементов в списках
 function toggleSelection(list: 'available' | 'featured', id: string) {
   const selectionRef
     = list === 'available' ? selectedAvailable : selectedFeatured
@@ -47,35 +28,29 @@ function toggleSelection(list: 'available' | 'featured', id: string) {
   }
 }
 
+onMounted(async () => {
+  await adminCategoriesStore.fetchAllCategories()
+})
+
 // Функции для перемещения
-function moveToFeatured() {
-  const toMove = available.value.filter(item =>
-    selectedAvailable.value.includes(item.id),
-  )
-  featured.value.push(...toMove)
-  available.value = available.value.filter(
-    item => !selectedAvailable.value.includes(item.id),
-  )
+function moveToAvailable() {
+  adminCategoriesStore.updateFeaturedStatus(selectedAvailable.value, true)
   selectedAvailable.value = []
 }
 
-function moveToAvailable() {
-  const toMove = featured.value.filter(item =>
-    selectedFeatured.value.includes(item.id),
-  )
-  available.value.push(...toMove)
-  featured.value = featured.value.filter(
-    item => !selectedFeatured.value.includes(item.id),
-  )
-  selectedFeatured.value = []
+function moveToFeatured() {
+  adminCategoriesStore.updateFeaturedStatus(selectedFeatured.value, false)
+  selectedAvailable.value = []
 }
 
 async function saveChanges() {
   isSaving.value = true
-  const featuredIds = featured.value.map(item => item.id)
-  const success = await menuAdminStore.saveFeaturedList(featuredIds)
+  const success = await adminCategoriesStore.saveFeaturedChanges()
   if (success) {
-    updateLocalList()
+    toast.success('Список популярных категорий успешно сохранен!')
+  }
+  else {
+    toast.error('Не удалось сохранить изменения.')
   }
   isSaving.value = false
 }
@@ -94,7 +69,7 @@ async function saveChanges() {
       </Button>
     </div>
 
-    <div v-if="menuAdminStore.isLoading" class="text-center py-20">
+    <div v-if="adminCategoriesStore.isLoading" class="text-center py-20">
       Загрузка...
     </div>
     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -115,7 +90,7 @@ async function saveChanges() {
             "
             @click="toggleSelection('available', item.id)"
           >
-            {{ item.title }}
+            {{ item.name }}
             <span v-if="!item.image_url" class="text-xs text-destructive ml-2">(нет фото)</span>
           </div>
         </CardContent>
@@ -152,7 +127,7 @@ async function saveChanges() {
             "
             @click="toggleSelection('featured', item.id)"
           >
-            {{ item.title }}
+            {{ item.name }}
           </div>
         </CardContent>
       </Card>

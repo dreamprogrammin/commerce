@@ -2,10 +2,10 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME } from '@/constants'
-import { usePopularMenuStore } from '@/stores/popularMenu/usePopularMenu'
+import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
-const store = usePopularMenuStore()
+const popularCategories = usePopularCategoriesStore()
 const { getPublicUrl } = useSupabaseStorage()
 </script>
 
@@ -16,7 +16,7 @@ const { getPublicUrl } = useSupabaseStorage()
     </h2>
 
     <div
-      v-if="store.isLoading"
+      v-if="popularCategories.isLoading"
       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
     >
       <div v-for="i in 6" :key="i">
@@ -26,11 +26,11 @@ const { getPublicUrl } = useSupabaseStorage()
     </div>
 
     <div
-      v-else-if="store.popularMenuItems.length > 0"
+      v-else-if="popularCategories.popularCategories.length > 0"
       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
     >
       <NuxtLink
-        v-for="category in store.popularMenuItems"
+        v-for="category in popularCategories.popularCategories"
         :key="category.id"
         :to="category.href"
         class="group"
@@ -39,17 +39,20 @@ const { getPublicUrl } = useSupabaseStorage()
           class="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
         >
           <CardContent class="p-0 flex flex-col items-center text-center">
-            <img
+            <NuxtImg
               :src="
-                getPublicUrl(BUCKET_NAME, category.image_url || null)
+                getPublicUrl(BUCKET_NAME_CATEGORY, category.image_url || null)
                   || '/images/placeholder.svg'
               "
-              :alt="category.title"
+              :alt="category.name"
               class="w-full h-32 object-cover"
               loading="lazy"
-            >
+              placeholder
+              format="webp"
+              quality="80"
+            />
             <p class="font-semibold p-3 text-sm md:text-base">
-              {{ category.title }}
+              {{ category.name }}
             </p>
           </CardContent>
         </Card>
