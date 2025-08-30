@@ -47,6 +47,7 @@ function addNodeToRoot() {
     display_in_menu: true,
     image_url: null,
     icon_name: null,
+    is_featured: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
