@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,30 +16,59 @@ const selectedAvailable = ref<string[]>([])
 const selectedFeatured = ref<string[]>([])
 
 function toggleSelection(list: 'available' | 'featured', id: string) {
-  const selectionRef
-    = list === 'available' ? selectedAvailable : selectedFeatured
-  const index = selectionRef.value.indexOf(id)
+  const selectionRef = list === 'available' ? selectedAvailable : selectedFeatured
+  // Создаем копию текущего массива
+  const newSelection = [...selectionRef.value]
+  const index = newSelection.indexOf(id)
+
   if (index > -1) {
-    selectionRef.value.splice(index, 1)
+    // Если элемент уже есть, удаляем его
+    newSelection.splice(index, 1)
   }
   else {
-    selectionRef.value.push(id)
+    // Если элемента нет, добавляем его
+    newSelection.push(id)
   }
-}
 
-onMounted(async () => {
-  await adminCategoriesStore.fetchAllCategories()
-})
+  // Полностью заменяем старый массив на новый.
+  // Это "громкое" изменение, которое Vue точно не пропустит.
+  selectionRef.value = newSelection
+}
+const { pending: isLoading } = useAsyncData(
+  'admin-all-categories', // Уникальный ключ
+  () => adminCategoriesStore.fetchAllCategories(),
+  {
+    // `lazy: false` (по умолчанию) означает, что Nuxt дождется загрузки данных
+    // перед тем как отрендерить страницу. Это идеально для админки.
+  },
+)
 
 // Функции для перемещения
-function moveToAvailable() {
-  adminCategoriesStore.updateFeaturedStatus(selectedAvailable.value, true)
+function moveToFeatured() {
+  // 1. Берем ID из левого списка `selectedAvailable`.
+  const idsToMove = selectedAvailable.value
+
+  // 2. Устанавливаем им флаг `is_featured = true`.
+  adminCategoriesStore.updateFeaturedStatus(idsToMove, true)
+
+  // 3. Очищаем выбор в левом списке.
   selectedAvailable.value = []
 }
 
-function moveToFeatured() {
-  adminCategoriesStore.updateFeaturedStatus(selectedFeatured.value, false)
-  selectedAvailable.value = []
+/**
+ * Перемещает выбранные элементы из "Популярных" (справа)
+ * в "Доступные" (слева).
+ * Вызывается кнопкой `<`.
+ */
+function moveToAvailable() {
+  // 1. Берем ID из правого списка `selectedFeatured`.
+  const idsToMove = selectedFeatured.value
+
+  // 2. Устанавливаем им флаг `is_featured = false`.
+  adminCategoriesStore.updateFeaturedStatus(idsToMove, false)
+
+  // 3. Очищаем выбор в правом списке.
+  selectedFeatured.value = []
 }
 
 async function saveChanges() {
@@ -69,7 +97,7 @@ async function saveChanges() {
       </Button>
     </div>
 
-    <div v-if="adminCategoriesStore.isLoading" class="text-center py-20">
+    <div v-if="isLoading" class="text-center py-20">
       Загрузка...
     </div>
     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -113,6 +141,8 @@ async function saveChanges() {
               :disabled="selectedFeatured.length === 0"
               @click="moveToAvailable"
             />
+            {{ selectedFeatured.length }}
+            {{ selectedAvailable.length }}
           </div>
         </CardHeader>
         <CardContent class="h-96 overflow-y-auto space-y-1">

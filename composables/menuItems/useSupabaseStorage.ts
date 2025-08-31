@@ -1,4 +1,4 @@
-import type { Database, IUploadFileOptions } from '~/types'
+import type { Database, IUploadFileOptions } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
 
@@ -74,7 +74,7 @@ export function useSupabaseStorage() {
       return true
 
     try {
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from(bucketName)
         .remove(validPathsToRemove)
       if (error)

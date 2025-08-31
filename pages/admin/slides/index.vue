@@ -1,15 +1,6 @@
 <script setup lang="ts">
-import SlidesForm from '~/components/admin/slides/ SlidesForm.vue'
-import Badge from '~/components/ui/badge/Badge.vue'
-import Button from '~/components/ui/button/Button.vue'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card'
-import { useAdminSlides } from '~/composables/admin/useAdminSlides'
+import SlidesForm from '@/components/admin/slides/ SlidesForm.vue'
+import { useAdminSlides } from '@/composables/admin/useAdminSlides'
 
 definePageMeta({
   layout: 'admin',
@@ -78,12 +69,16 @@ const {
         </CardHeader>
 
         <CardContent class="flex-grow">
-          <img
+          <NuxtImg
             v-if="slide.image_url"
             :src="slide.image_url ?? undefined"
             :alt="slide.title"
             class="rounded-md object-cover aspect-video w-full bg-muted"
-          >
+            placeholder
+            loading="lazy"
+            format="webp"
+            quality="85"
+          />
 
           <div
             v-else

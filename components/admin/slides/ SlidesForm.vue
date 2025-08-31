@@ -1,18 +1,6 @@
 <script setup lang="ts">
-import type { SlideRow } from '~/types'
-import Button from '~/components/ui/button/Button.vue'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
-import Input from '~/components/ui/input/Input.vue'
-import { Label } from '~/components/ui/label'
-import Switch from '~/components/ui/switch/Switch.vue'
-import { useSlideForm } from '~/composables/admin/useSlideForm'
+import type { SlideRow } from '@/types'
+import { useSlideForm } from '@/composables/admin/useSlideForm'
 
 const props = defineProps<{
   initialData: SlideRow | null
@@ -80,11 +68,15 @@ const {
             v-if="imagePreviewUrl || formData.image_url"
             class="mt-2 border p-2 rounded-md inline-block relative"
           >
-            <img
+            <NuxtImg
               :src="imagePreviewUrl || formData.image_url!"
               alt="Превью"
               class="max-w-[200px] max-h-[100px] object-contain rounded"
-            >
+              placeholder
+              format="webp"
+              quality="80"
+              loading="lazy"
+            />
             <Button
               variant="destructive"
               size="icon"
@@ -123,7 +115,7 @@ const {
         </div>
 
         <div class="flex items-center space-x-2 pt-6">
-          <Switch id="is_active" v-model:checked="formData.is_active" />
+          <Switch id="is_active" v-model:model-value="formData.is_active" />
           <Label for="is_active">Слайд активен</Label>
         </div>
 

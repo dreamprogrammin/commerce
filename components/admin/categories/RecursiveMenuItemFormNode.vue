@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants'
 import { slugify } from '@/utils/slugify'
 
 const props = defineProps<{
@@ -205,7 +205,7 @@ function removeImage() {
         <Label :for="`image-${props.item._tempId || props.item.id}`">Изображение для меню</Label>
         <Input :id="`image-${props.item._tempId || props.item.id}`" type="file" accept="image/png, image/jpeg, image/webp" :disabled="isDeleted" @change="handleImageChange" />
         <div v-if="props.item._imagePreview || props.item.image_url" class="mt-2 border p-2 rounded-md inline-block relative bg-background">
-          <img :src="props.item._imagePreview || getPublicUrl(BUCKET_NAME_PRODUCT, props.item.image_url!) || undefined" :alt="`Изображение для ${props.item.name}`" class="max-w-[150px] max-h-[80px] object-contain rounded">
+          <NuxtImg :src="props.item._imagePreview || getPublicUrl(BUCKET_NAME_CATEGORY, props.item.image_url!) || undefined" :alt="`Изображение для ${props.item.name}`" class="max-w-[150px] max-h-[80px] object-contain rounded" placeholder quality="85" format="webp" />
           <Button variant="destructive" size="icon" class="absolute -top-2 -right-2 h-6 w-6 rounded-full" type="button" aria-label="Удалить изображение" :disabled="isDeleted" @click="removeImage">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z" /></svg>
           </Button>
@@ -228,8 +228,9 @@ function removeImage() {
             :item="child"
             :parent-href="props.item.href || ''"
             :level="level + 1"
-            @add-child="emit('addChild', child)"
+            @add-child="emit('addChild', $event)"
             @remove-self="emit('removeChild', child)"
+            @remove-child="emit('removeChild', $event)"
             @update:item="(updatedChild) => {
               const newChildren = [...props.item.children]
               newChildren[index] = updatedChild

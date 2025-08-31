@@ -147,7 +147,7 @@ function handleFileChange(event: Event) {
             <Input id="stock" v-model.number="form.stock_quantity" type="number" />
           </div>
           <div class="flex items-center space-x-2 pt-2">
-            <Switch id="is_active" v-model:checked="form.is_active" />
+            <Switch id="is_active" v-model:model-value="form.is_active" />
             <Label for="is_active">Активен</Label>
           </div>
         </CardContent>
