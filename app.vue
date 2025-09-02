@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { Toaster } from 'vue-sonner'
 // --- 1. ИМПОРТЫ ---
 // Импортируем наши "ядерные" сторы.
 // Сам факт их импорта и вызова заставит Pinia их создать и запустить.
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useAuthStore } from './stores/auth'
 import { useProductsStore } from './stores/publicStore/productsStore'
+import 'vue-sonner/style.css'
 
 // --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ ---
 // Просто вызываем их один раз. Вся логика (`onAuthStateChange`, `watch`)
@@ -51,6 +53,7 @@ useSeoMeta({
       <div class="app-container">
         <NuxtLayout>
           <NuxtPage />
+          <Toaster />
         </NuxtLayout>
       </div>
     </main>
