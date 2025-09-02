@@ -174,14 +174,17 @@ defineExpose({ closeAllPopups })
                           v-if="childItem.image_url"
                           class="mb-2 overflow-hidden rounded-md"
                         >
-                          <img
+                          <NuxtImg
                             :src="
                               getPublicUrl(BUCKET_NAME, childItem.image_url)
                                 || undefined
                             "
                             :alt="childItem.name"
+                            format="webp"
+                            quality="85"
+                            loading="lazy"
                             class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
-                          >
+                          />
                         </div>
                         <div
                           class="text-sm font-semibold leading-tight text-foreground"

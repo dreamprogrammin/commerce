@@ -129,13 +129,13 @@ export function useSlideForm(
   const ctaLinkValue = computed({
     get: () => formData.value.cta_link as string,
     set: (value: string) => {
-      formData.value.cta_text = value
+      formData.value.cta_link = value
     },
   })
   const descriptionValue = computed({
     get: () => formData.value.description as string,
     set: (value: string) => {
-      formData.value.cta_text = value
+      formData.value.description = value
     },
   })
 

@@ -7,7 +7,6 @@ export const usePopularCategoriesStore = defineStore('popularMenu', () => {
     if (categoriesStore.allCategories.length === 0) {
       return []
     }
-
     return categoriesStore.allCategories
       .filter(cat => cat.is_featured && cat.image_url)
       .sort((a, b) => a.display_order - b.display_order)

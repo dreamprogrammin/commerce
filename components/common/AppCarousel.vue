@@ -94,19 +94,23 @@ function playAutoplay() {
               class="overflow-hidden border-none shadow-xl rounded-2xl group py-0"
             >
               <NuxtLink
-                :to="slide.cta_link || '#'"
+                :to="slide.cta_link || ''"
                 :external="!!slide.cta_link?.startsWith('http')"
                 class="block"
               >
                 <CardContent
                   class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
                 >
-                  <img
+                  <NuxtImg
                     v-if="slide.image_url"
                     :src="slide.image_url"
                     :alt="slide.title"
                     class="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
-                  >
+                    format="webp"
+                    placeholder
+                    quality="80"
+                    loading="lazy"
+                  />
                   <div
                     v-else
                     class="w-full h-full bg-gradient-to-br from-primary to-secondary"

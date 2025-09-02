@@ -70,6 +70,5 @@ onMounted(() => {
     <!-- Твои остальные компоненты главной страницы -->
     <CommonAppCarousel />
     <HomePopularCategories />
-    <HomeBonusProgramCard />
   </div>
 </template>

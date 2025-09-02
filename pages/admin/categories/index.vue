@@ -20,6 +20,53 @@ onMounted(() => {
   adminCategoriesStore.fetchAllCategories()
 })
 
+function handleAddChild(parentItem: EditableCategory) {
+  // Рекурсивная функция для поиска родителя и добавления ребенка
+  function findAndAdd(tree: EditableCategory[]): boolean {
+    const parentId = parentItem.id || parentItem._tempId
+    const parentNode = tree.find(item => (item.id || item._tempId) === parentId)
+
+    if (parentNode) {
+      // Если у родителя еще нет массива children, создаем его
+      if (!parentNode.children) {
+        parentNode.children = []
+      }
+
+      const newChild: EditableCategory = {
+        id: '',
+        _tempId: uuidv4(),
+        _isNew: true,
+        name: '',
+        slug: '',
+        href: '',
+        parent_id: parentNode.id, // ID реального родителя
+        display_order: parentNode.children.length,
+        children: [],
+        description: null,
+        is_root_category: false,
+        display_in_menu: true,
+        image_url: null,
+        icon_name: null,
+        is_featured: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      parentNode.children.push(newChild)
+      return true // Нашли и добавили
+    }
+
+    // Если не нашли на текущем уровне, ищем в дочерних элементах
+    for (const item of tree) {
+      if (Array.isArray(item.children) && findAndAdd(item.children)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  findAndAdd(formTree)
+}
+
 function selectRootCategory(category: EditableCategory) {
   selectedRootCategory.value = category
   // ИСПРАВЛЕНИЕ №1: Создаем глубокую копию для безопасного редактирования
@@ -47,6 +94,7 @@ function addNodeToRoot() {
     display_in_menu: true,
     image_url: null,
     icon_name: null,
+    is_featured: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -184,6 +232,7 @@ function handleRemove(itemToRemove: EditableCategory) {
               @remove-self="handleRemove(item)"
               @update:item="(updateItem) => { formTree[index] = updateItem }"
               @remove-child="handleRemove"
+              @add-child="handleAddChild"
             />
           </div>
 

@@ -15,6 +15,7 @@ export default defineNuxtConfig({
   },
   supabase: {
     redirect: false,
+    baseURL: `${import.meta.env.NUXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public`,
   },
   css: ['~/assets/css/tailwind.css'],
   vite: {

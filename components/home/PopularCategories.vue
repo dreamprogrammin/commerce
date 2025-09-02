@@ -5,8 +5,16 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
-const popularCategories = usePopularCategoriesStore()
+const popularCategoriesStore = usePopularCategoriesStore()
 const { getPublicUrl } = useSupabaseStorage()
+
+const { data: popularCategories, pending: isLoading } = useAsyncData(
+  'home-popular-categories', // Уникальный ключ для этой операции
+  async () => {
+    await popularCategoriesStore.fetchPopularCategories()
+    return popularCategoriesStore.popularCategories
+  },
+)
 </script>
 
 <template>
@@ -16,7 +24,7 @@ const { getPublicUrl } = useSupabaseStorage()
     </h2>
 
     <div
-      v-if="popularCategories.isLoading"
+      v-if="isLoading"
       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
     >
       <div v-for="i in 6" :key="i">
@@ -26,11 +34,11 @@ const { getPublicUrl } = useSupabaseStorage()
     </div>
 
     <div
-      v-else-if="popularCategories.popularCategories.length > 0"
+      v-else-if="popularCategories && popularCategories.length > 0"
       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
     >
       <NuxtLink
-        v-for="category in popularCategories.popularCategories"
+        v-for="category in popularCategories"
         :key="category.id"
         :to="category.href"
         class="group"
