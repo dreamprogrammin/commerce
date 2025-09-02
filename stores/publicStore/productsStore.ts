@@ -81,9 +81,35 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
+  /**
+   * Находит один "Товар дня" - активный товар с максимальным количеством бонусных баллов.
+   */
+  async function fetchFeaturedProduct(): Promise<ProductWithCategory | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, categories(name, slug)')
+        .eq('is_active', true)
+        .not('image_url,', 'is', null)
+        .order('bonus_points_award', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (error && error.code !== 'PGRST116')
+        throw error
+
+      return data
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке товара дня', { description: error.message })
+      return null
+    }
+  }
+
   // Возвращаем только функции, никакого состояния.
   return {
     fetchProducts,
     fetchProductBySlug,
+    fetchFeaturedProduct,
   }
 })
