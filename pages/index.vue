@@ -78,5 +78,7 @@ onMounted(() => {
         <HomeFeaturedProduct />
       </div>
     </div>
+
+    <HomeRecommendedProducts />
   </div>
 </template>
