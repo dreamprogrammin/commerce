@@ -71,18 +71,12 @@ onMounted(() => {
     <!-- Твои остальные компоненты главной страницы -->
     <CommonAppCarousel />
     <HomePopularCategories />
-    <Button
-      variant="outline" @click="() => {
-        toast('Event has been created', {
-          description: 'Sunday, December 03, 2023 at 9:00 AM',
-          action: {
-            label: 'Undo',
-            onClick: () => console.log('Undo'),
-          },
-        })
-      }"
-    >
-      Add to calendar
-    </Button>
+
+    <div class="container py-8 md:py-12">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+        <HomeBonusProgramCard />
+        <HomeFeaturedProduct />
+      </div>
+    </div>
   </div>
 </template>

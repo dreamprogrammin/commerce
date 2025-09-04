@@ -147,3 +147,7 @@ export interface IBreadcrumbItem {
   name: string
   href?: string
 }
+
+export type ChildrenRow = Database['public']['Tables']['children']['Row']
+export type ChildrenInsert = Omit<ChildrenRow, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+export type ChildrenUpdate = Partial<ChildrenInsert>

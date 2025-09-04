@@ -16,6 +16,11 @@
             </nuxt-link>
           </li>
           <li>
+            <nuxt-link to="/profile/children">
+              Дети
+            </nuxt-link>
+          </li>
+          <li>
             <nuxt-link to="/profile/bonus">
               Бонусы
             </nuxt-link>
