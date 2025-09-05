@@ -106,10 +106,35 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
+  async function fetchNewestProducts(limit: number = 10): Promise<ProductRow[]> {
+    try {
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .not('image_url', 'is', null)
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .order('created_at', { ascending: true })
+        .limit(limit)
+
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (e: any) {
+      toast.error('Ошибка при загрузке новинок', { description: e.message })
+      return []
+    }
+  }
+
   // Возвращаем только функции, никакого состояния.
   return {
     fetchProducts,
     fetchProductBySlug,
     fetchFeaturedProduct,
+    fetchNewestProducts,
   }
 })

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ProductRow } from '@/types'
-import ProductCard from '../ProductCard.vue'
 
 defineProps<{
   products: ProductRow[]

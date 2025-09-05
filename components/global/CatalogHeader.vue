@@ -1,12 +1,4 @@
 <script setup lang="ts">
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-
 // НОВЫЙ ПРОПС: Компонент теперь просто принимает готовое название
 const props = defineProps<{
   title: string

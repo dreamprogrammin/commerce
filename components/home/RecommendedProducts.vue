@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProductCard from '@/components/ProductCard.vue' // Переиспользуем нашу карточку!
+import ProductCard from '@/components/global/ProductCard.vue' // Переиспользуем нашу карточку!
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 
 const recommendationsStore = useRecommendationsStore()
@@ -19,7 +19,7 @@ const { data: products, pending: isLoading } = useAsyncData(
     <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-8">
       Вам может понравиться
     </h2>
-    <HomeRecommendedProductsSkeleton v-if="isLoading" />
+    <homeProductCarouselSkeleton v-if="isLoading" />
     <Carousel v-else-if="products && products.length > 0">
       <CarouselContent>
         <CarouselItem v-for="product in products" :key="product.id" class="md:basis-1/3 lg:basis-1/4">
