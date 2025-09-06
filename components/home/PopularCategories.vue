@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import HomeNewArrivals from '@/components/home/HomeNewArrivals.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 
@@ -80,5 +81,6 @@ onMounted(() => {
     </div>
 
     <HomeRecommendedProducts />
+    <HomeNewArrivals />
   </div>
 </template>
