@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import ProductCard from '@/components/global/ProductCard.vue' // Переиспользуем нашу карточку!
+import { useAuthStore } from '@/stores/auth'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 
 const recommendationsStore = useRecommendationsStore()
+const authStore = useAuthStore()
+const { user } = storeToRefs(authStore)
 
 const { data: products, pending: isLoading } = useAsyncData(
   'recommended-products',
@@ -10,7 +13,7 @@ const { data: products, pending: isLoading } = useAsyncData(
     await recommendationsStore.fetchRecommendations()
     return recommendationsStore.recommendedProducts
   },
-  { lazy: true, default: () => [] },
+  { lazy: true, default: () => [], watch: [user] },
 )
 </script>
 

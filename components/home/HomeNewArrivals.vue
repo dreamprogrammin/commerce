@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import ProductCarouselSkeleton from './ProductCarouselSkeleton.vue'
 
 const productsStore = useProductsStore()
 
@@ -25,7 +24,7 @@ const { data: products, pending: isLoading } = useAsyncData(
       </Button>
     </div>
 
-    <HoneProductCarouselSkeleton v-if="isLoading" />
+    <HomeProductCarouselSkeleton v-if="isLoading" />
 
     <Carousel
       v-else-if="products && products.length > 0"
