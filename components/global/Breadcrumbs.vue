@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { CategoryRow } from '@/types' // Импортируем тип для категорий
+import type { IBreadcrumbItem } from '@/types' // Импортируем тип для категорий
 import { ChevronRight } from 'lucide-vue-next'
 
 // Компонент принимает массив `items`, каждый из которых имеет структуру CategoryRow
 defineProps<{
-  items: CategoryRow[]
+  items: IBreadcrumbItem[]
 }>()
 </script>
 

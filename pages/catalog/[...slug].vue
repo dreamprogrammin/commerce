@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { IProductFilters, ProductRow, SortByType } from '@/types'
+import type { LocationQueryValue } from 'vue-router'
+import type { IBreadcrumbItem, IProductFilters, ProductRow, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -26,15 +27,23 @@ interface ActiveFilters {
   price: [number, number]
 }
 const activeFilters = ref<ActiveFilters>({
-  sortBy: 'popularity',
+  sortBy: getSortByFromQuery(route.query.sort_by),
   subCategoryIds: [],
   price: [0, 50000], // Временный диапазон, будет обновлен
 })
 
 // --- 3. Вычисляемые свойства (Computeds) ---
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
-const breadcrumbs = computed(() => categoriesStore.getBreadcrumbs(currentCategorySlug.value))
+const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
+  if (currentCategorySlug.value === 'all') {
+    return [{ id: 'all', name: 'Все товары', href: '/catalog/all' }]
+  }
+  return categoriesStore.getBreadcrumbs(currentCategorySlug.value)
+})
 const title = computed(() => {
+  if (currentCategorySlug.value === 'all') {
+    return 'Все товары'
+  }
   const path = breadcrumbs.value
   if (path && path.length > 0)
     return path[path.length - 1]?.name
@@ -53,6 +62,23 @@ const priceRange = computed(() => {
 
 // --- 4. Функции-обработчики ---
 
+/**
+ * Безопасно извлекает и валидирует параметр сортировки из URL.
+ * @param queryValue - Значение из route.query.
+ * @returns Валидное значение SortByType или 'popularity' по умолчанию.
+ */
+function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[] | undefined): SortByType {
+  if (!queryValue) {
+    return 'popularity'
+  }
+
+  const value = Array.isArray(queryValue) ? queryValue[0] : queryValue
+
+  if (value === 'popularity' || value === 'newest' || value === 'price_asc' || value === 'price_desc') {
+    return value
+  }
+  return 'popularity'
+}
 /**
  * Главная функция загрузки товаров. Управляет локальным состоянием.
  * @param isLoadMore - `true` для дозагрузки, `false` для полной перезагрузки.
@@ -122,7 +148,7 @@ watch(
     if (newSlug) {
       // ПОЛНЫЙ СБРОС ФИЛЬТРОВ К СОСТОЯНИЮ ПО УМОЛЧАНИЮ
       activeFilters.value = {
-        sortBy: 'popularity', // Возвращаем сортировку к дефолтной
+        sortBy: getSortByFromQuery(route.query.sort_by), // Возвращаем сортировку к дефолтной
         subCategoryIds: [],
         price: [0, 50000], // Также сбрасываем цену (важно!)
       }
