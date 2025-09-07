@@ -74,7 +74,7 @@ onMounted(() => {
     </div>
 
     <HomeRecommendedProducts v-if="shouldShowRecommendations" />
-    <HomePopularCategories v-else />
+    <HomePopularProducts v-else />
     <HomeNewArrivals />
   </div>
 </template>
