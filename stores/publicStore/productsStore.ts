@@ -130,11 +130,33 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
+  async function fetchPopularProducts(limit: number = 10): Promise<ProductRow[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .not('image_url', 'is', null)
+        .order('sales_count', { ascending: true })
+        .limit(limit)
+
+      if (error)
+        throw error
+
+      return data || []
+    }
+    catch (e: any) {
+      toast.error('Не удалось загрузить популярные товары', { description: e.message })
+      return []
+    }
+  }
+
   // Возвращаем только функции, никакого состояния.
   return {
     fetchProducts,
     fetchProductBySlug,
     fetchFeaturedProduct,
     fetchNewestProducts,
+    fetchPopularProducts,
   }
 })

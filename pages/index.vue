@@ -1,28 +1,21 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
 import HomeNewArrivals from '@/components/home/HomeNewArrivals.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 
-// --- 1. Инициализация сторов ---
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
+const { isLoggedIn } = storeToRefs(authStore)
 
-// --- 2. Получаем реактивные данные ---
-// `user` - информация об аутентификации из authStore.
-// `isLoggedIn` - удобный computed, который мы добавим.
-const { user, isLoggedIn } = storeToRefs(authStore)
-
-// `isAdmin` - computed из profileStore, который проверяет роль пользователя.
 const { isAdmin } = storeToRefs(profileStore)
 
-// `loadProfile` может понадобиться, если пользователь восстановил сессию
-const { loadProfile } = profileStore
+const hasPersonalizationData = computed(() => {
+  return isLoggedIn.value && profileStore.profile
+})
 
-// `onMounted` убедится, что профиль загружен, если пользователь уже был залогинен
 onMounted(() => {
-  if (user.value && !profileStore.profile) {
-    loadProfile()
+  if (isLoggedIn.value && !profileStore.profile) {
+    profileStore.loadProfile()
   }
 })
 </script>
@@ -80,7 +73,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <HomeRecommendedProducts />
+    <HomeRecommendedProducts v-if="hasPersonalizationData" />
     <HomeNewArrivals />
   </div>
 </template>

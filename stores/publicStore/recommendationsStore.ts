@@ -9,9 +9,13 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
   const isLoading = ref(false)
 
   async function fetchRecommendations() {
+    if (!authStore.user?.id) {
+      recommendedProducts.value = []
+      return
+    }
     isLoading.value = true
     try {
-      const { data, error } = await supabase.rpc('get_recommended_products', {
+      const { data, error } = await supabase.rpc('get_personalized_recommendations', {
         p_user_id: authStore.user?.id,
       })
 
