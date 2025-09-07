@@ -9,8 +9,8 @@ const { isLoggedIn } = storeToRefs(authStore)
 
 const { isAdmin } = storeToRefs(profileStore)
 
-const hasPersonalizationData = computed(() => {
-  return isLoggedIn.value && profileStore.profile
+const shouldShowRecommendations = computed(() => {
+  return isLoggedIn.value && !!profileStore.profile
 })
 
 onMounted(() => {
@@ -73,7 +73,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <HomeRecommendedProducts v-if="hasPersonalizationData" />
+    <HomeRecommendedProducts v-if="shouldShowRecommendations" />
+    <HomePopularCategories v-else />
     <HomeNewArrivals />
   </div>
 </template>
