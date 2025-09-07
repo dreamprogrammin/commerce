@@ -2,22 +2,25 @@
 import HomeNewArrivals from '@/components/home/HomeNewArrivals.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
+import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
-const { isLoggedIn } = storeToRefs(authStore)
+const recommendationsStore = useRecommendationsStore()
+const { isLoggedIn, user } = storeToRefs(authStore)
 
 const { isAdmin } = storeToRefs(profileStore)
+const { hasPersonalizedRecommendations } = storeToRefs(recommendationsStore)
 
 const shouldShowRecommendations = computed(() => {
-  return isLoggedIn.value && !!profileStore.profile
+  return hasPersonalizedRecommendations.value
 })
 
-onMounted(() => {
-  if (isLoggedIn.value && !profileStore.profile) {
-    profileStore.loadProfile()
+watch(user, (newUser) => {
+  if (newUser) {
+    recommendationsStore.fetchRecommendations()
   }
-})
+}, { immediate: true })
 </script>
 
 <template>

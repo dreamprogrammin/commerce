@@ -7,8 +7,10 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
 
   const recommendedProducts = ref<ProductRow[]>([])
   const isLoading = ref(false)
+  const hasPersonalizedRecommendations = ref(false)
 
   async function fetchRecommendations() {
+    hasPersonalizedRecommendations.value = false
     if (!authStore.user?.id) {
       recommendedProducts.value = []
       return
@@ -22,7 +24,12 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
       if (error)
         throw error
 
-      recommendedProducts.value = data || []
+      const result = data || []
+      recommendedProducts.value = result
+
+      if (result.length > 0) {
+        hasPersonalizedRecommendations.value = true
+      }
     }
     catch (e: any) {
       console.error('Ошибка при загрузке рекомендаций:', e)
@@ -36,6 +43,7 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
   return {
     recommendedProducts,
     isLoading,
+    hasPersonalizedRecommendations,
     fetchRecommendations,
   }
 })
