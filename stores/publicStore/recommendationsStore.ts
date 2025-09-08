@@ -1,4 +1,5 @@
 import type { Database, ProductRow } from '@/types'
+import { toast } from 'vue-sonner'
 import { useAuthStore } from '../auth'
 
 export const useRecommendationsStore = defineStore('recommendationsStore', () => {
@@ -8,6 +9,9 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
   const recommendedProducts = ref<ProductRow[]>([])
   const isLoading = ref(false)
   const hasPersonalizedRecommendations = ref(false)
+  const hasBeenFetched = ref(false)
+
+  let fetchedForUserId: string | null = null
 
   async function fetchRecommendations() {
     hasPersonalizedRecommendations.value = false
@@ -40,10 +44,55 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
     }
   }
 
+  async function fetchRecommendationsIfNeeded() {
+    const currentUserId = authStore.user?.id || null
+    if (hasBeenFetched.value && currentUserId === fetchedForUserId)
+      return
+
+    recommendedProducts.value = []
+    hasPersonalizedRecommendations.value = false
+
+    if (!currentUserId) {
+      hasBeenFetched.value = true
+      fetchedForUserId = null
+      return
+    }
+    isLoading.value = true
+    try {
+      const { data, error } = await supabase.rpc('get_personalized_recommendations', {
+        p_user_id: currentUserId,
+      })
+
+      if (error)
+        throw error
+
+      const result = data || []
+      recommendedProducts.value = result
+      hasPersonalizedRecommendations.value = result.length > 0
+
+      hasBeenFetched.value = true
+      fetchedForUserId = currentUserId
+    }
+    catch (e: any) {
+      toast.error('Ошибка при загрузке рекомендаций:', e)
+    }
+    finally {
+      isLoading.value = false
+    }
+  }
+
+  function invalidateRecommendations() {
+    hasBeenFetched.value = false
+    fetchedForUserId = null
+    console.warn('Кэш рекомендаций инвалидирован.')
+  }
+
   return {
     recommendedProducts,
     isLoading,
     hasPersonalizedRecommendations,
     fetchRecommendations,
+    fetchRecommendationsIfNeeded,
+    invalidateRecommendations,
   }
 })
