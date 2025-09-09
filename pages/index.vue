@@ -16,10 +16,11 @@ const shouldShowRecommendations = computed(() => {
   return hasPersonalizedRecommendations.value
 })
 
-watch(user, (newUser) => {
-  if (newUser) {
-    recommendationsStore.fetchRecommendations()
-  }
+recommendationsStore.fetchRecommendationsIfNeeded()
+
+watch(user, () => {
+  recommendationsStore.invalidateRecommendations()
+  recommendationsStore.fetchRecommendationsIfNeeded()
 }, { immediate: true })
 </script>
 

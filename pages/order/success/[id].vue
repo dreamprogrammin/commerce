@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
+import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
+
+const recommendationsStore = useRecommendationsStore()
 
 const route = useRoute()
 const orderId = computed(() => (route.params.id as string).substring(0, 8)) // Показываем только часть ID
+
+onMounted(() => {
+  recommendationsStore.invalidateRecommendations()
+})
 </script>
 
 <template>
