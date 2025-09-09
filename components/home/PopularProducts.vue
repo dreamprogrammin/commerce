@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { useProductsStore } from '@/stores/publicStore/productsStore'
+import type { ProductRow } from '@/types'
 
-const productStore = useProductsStore()
-
-const { data: products, pending: isLoading } = useAsyncData(
-  'popular-categories',
-  () => productStore.fetchPopularProducts(10),
-  { lazy: true, default: () => [] },
-)
+defineProps<{
+  products: ProductRow[]
+  isLoading: boolean
+}>()
 </script>
 
 <template>

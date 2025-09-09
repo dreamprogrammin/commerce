@@ -3,23 +3,18 @@ import HomeNewArrivals from '@/components/home/HomeNewArrivals.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
+import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const recommendationsStore = useRecommendationsStore()
 const personalizationStore = usePersonalizationStore()
+const productsStore = useProductsStore()
 
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
-const { hasPersonalizedRecommendations } = storeToRefs(recommendationsStore)
 const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
-
-const shouldShowRecommendations = computed(() => {
-  return hasPersonalizedRecommendations.value
-})
-
-recommendationsStore.fetchRecommendationsIfNeeded()
 
 const { data: recommendedProducts, pending: isLoadingRecommendations } = useAsyncData(
   'home-recommendations',
@@ -32,6 +27,21 @@ const { data: recommendedProducts, pending: isLoadingRecommendations } = useAsyn
     default: () => [],
   },
 )
+
+const { data: popularProducts, pending: isLoadingPopular } = useAsyncData(
+  'home-popular-products',
+  () => productsStore.fetchPopularProducts(10),
+  {
+    lazy: true,
+    default: () => [],
+  },
+)
+
+const shouldShowRecommendations = computed(() => {
+  return recommendedProducts.value && recommendedProducts.value.length > 0
+})
+
+const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
 </script>
 
 <template>
@@ -77,21 +87,30 @@ const { data: recommendedProducts, pending: isLoadingRecommendations } = useAsyn
       Она динамически переключается в зависимости от пользователя.
     -->
     <ClientOnly>
-      <!-- Пока идет проверка/загрузка рекомендаций, показываем скелетон -->
-      <div v-if="isLoadingRecommendations" class="container py-8 md:py-12">
+      <!-- Пока ЛЮБАЯ из загрузок активна, показываем ОДИН общий скелетон -->
+      <div v-if="isLoading" class="container py-8 md:py-12">
+        <!-- Заголовок меняется в зависимости от того, залогинен ли юзер -->
         <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-8">
-          Подбираем лучшие предложения...
+          {{ isLoggedIn ? 'Подбираем лучшие предложения...' : 'Популярные товары' }}
         </h2>
         <ProductCarouselSkeleton />
       </div>
 
-      <!-- Если загрузка завершена, показываем либо одно, либо другое -->
+      <!-- Если все загрузки завершены, принимаем решение, что показать -->
       <template v-else>
-        <HomeRecommendedProducts v-if="shouldShowRecommendations" :products="recommendedProducts" />
-        <HomePopularProducts v-else />
+        <HomeRecommendedProducts
+          v-if="shouldShowRecommendations"
+          :products="recommendedProducts"
+          :is-loading="isLoadingRecommendations"
+        />
+        <HomePopularProducts
+          v-else
+          :products="popularProducts"
+          :is-loading="isLoadingPopular"
+        />
       </template>
 
-      <!-- Заглушка для серверного рендеринга -->
+      <!-- Заглушка для серверного рендеринга (всегда показываем популярные) -->
       <template #fallback>
         <div class="container py-8 md:py-12">
           <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-8">
@@ -102,7 +121,7 @@ const { data: recommendedProducts, pending: isLoadingRecommendations } = useAsyn
       </template>
     </ClientOnly>
 
-    <!-- Секция Новинок -->
+    <!-- Секция Новинок (самодостаточный компонент) -->
     <HomeNewArrivals />
   </div>
 </template>

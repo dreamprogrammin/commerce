@@ -1,20 +1,10 @@
 <script setup lang="ts">
-import ProductCard from '@/components/global/ProductCard.vue' // Переиспользуем нашу карточку!
-import { useAuthStore } from '@/stores/auth'
-import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
+import type { ProductRow } from '@/types'
 
-const recommendationsStore = useRecommendationsStore()
-const authStore = useAuthStore()
-const { user } = storeToRefs(authStore)
-
-const { data: products, pending: isLoading } = useAsyncData(
-  'recommended-products',
-  async () => {
-    await recommendationsStore.fetchRecommendations()
-    return recommendationsStore.recommendedProducts
-  },
-  { lazy: true, default: () => [], watch: [user] },
-)
+defineProps<{
+  products: ProductRow[]
+  isLoading: boolean
+}>()
 </script>
 
 <template>
