@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
-
-const recommendationsStore = useRecommendationsStore()
+import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 
 const route = useRoute()
-const orderId = computed(() => (route.params.id as string).substring(0, 8)) // Показываем только часть ID
-
+const orderId = computed(() => (route.params.id as string).substring(0, 8)) // Показываем только часть
+const personalizationStore = usePersonalizationStore()
 onMounted(() => {
-  recommendationsStore.invalidateRecommendations()
+  personalizationStore.invalidate()
 })
 </script>
 
