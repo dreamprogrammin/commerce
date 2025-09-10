@@ -59,7 +59,7 @@ export const useChildrenStore = defineStore('childrenStore', () => {
     isLoading.value = true
     try {
       const { error } = await supabase
-        .from('categories')
+        .from('children')
         .update(updatedData)
         .eq('id', id)
       if (error)
@@ -79,7 +79,7 @@ export const useChildrenStore = defineStore('childrenStore', () => {
     isLoading.value = true
     try {
       const { error } = await supabase
-        .from('categories')
+        .from('children')
         .delete()
         .eq('id', id)
 
