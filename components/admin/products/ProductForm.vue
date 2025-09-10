@@ -17,6 +17,9 @@ const form = ref({
   stock_quantity: 0,
   is_active: true,
   bonus_points_award: 0,
+  min_age: null as number | null,
+  max_age: null as number | null,
+  gender: 'unisex' as 'male' | 'female' | 'unisex',
 })
 const imageFile = ref<File | null>(null)
 
@@ -31,6 +34,16 @@ watch(() => props.product, (newProduct) => {
     form.value.stock_quantity = newProduct.stock_quantity
     form.value.is_active = newProduct.is_active
     form.value.bonus_points_award = newProduct.bonus_points_award
+    form.value.min_age = newProduct.min_age
+    form.value.max_age = newProduct.max_age
+    const genderFormDb = newProduct.gender
+
+    if (genderFormDb === 'male' || genderFormDb === 'female' || genderFormDb === 'unisex') {
+      form.value.gender = genderFormDb
+    }
+    else {
+      form.value.gender = 'unisex'
+    }
   }
 }, { immediate: true })
 
@@ -61,6 +74,24 @@ watch(() => props.product, (newProduct) => {
   }
 }, { immediate: true })
 // ======================
+
+const minAgeValue = computed({
+  get() {
+    return form.value.min_age === null ? undefined : form.value.min_age
+  },
+  set(value) {
+    form.value.min_age = (typeof value === 'number') ? value : null
+  },
+})
+
+const maxAgeValue = computed({
+  get() {
+    return form.value.max_age === null ? undefined : form.value.max_age
+  },
+  set(value) {
+    form.value.max_age = (typeof value === 'number') ? value : null
+  },
+})
 
 const categoriesStore = useAdminCategoriesStore()
 onMounted(() => {
@@ -154,16 +185,59 @@ function handleFileChange(event: Event) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Изображение</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Параметры рекомендаций</CardTitle>
+          <CardDescription>
+            Эти поля помогут нам рекомендовать товар нужным пользователям.
+            Оставьте пустыми, если товар универсальный.
+          </CardDescription>
+        </CardHeader>
         <CardContent>
-          <Input type="file" @change="handleFileChange" />
-          <!-- TODO: Добавить превью изображения -->
-        </CardContent>
-      </Card>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label for="min_age">Мин. возраст (в месяцах)</Label>
+              <Input id="min_age" v-model.number="minAgeValue" type="number" placeholder="Например, 36 (3 года)" />
+            </div>
 
-      <Button type="submit" size="lg" class="w-full">
-        Сохранить товар
-      </Button>
+            <div>
+              <Label for="min_age">Макс. возраст (в месяцах)</Label>
+              <Input id="min_age" v-model.number="maxAgeValue" type="number" placeholder="Например, 72 (6 лет)" />
+            </div>
+          </div>
+
+          <div>
+            <Label for="gender">Пол</Label>
+            <Select v-model="form.gender">
+              <SelectTrigger id="gender">
+                <SelectValue placeholder="Выберите пол..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unisex">
+                  Унисекс (для всех)
+                </SelectItem>
+                <SelectItem value="male">
+                  Для мальчиков
+                </SelectItem>
+                <SelectItem value="female">
+                  Для девочек
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+
+        <Card>
+          <CardHeader><CardTitle>Изображение</CardTitle></CardHeader>
+          <CardContent>
+            <Input type="file" @change="handleFileChange" />
+          <!-- TODO: Добавить превью изображения -->
+          </CardContent>
+        </Card>
+
+        <Button type="submit" size="lg" class="w-full">
+          Сохранить товар
+        </Button>
+      </card>
     </div>
   </form>
 </template>
