@@ -15,8 +15,12 @@ onMounted(() => {
   adminProductsStore.fetchProductById(productId)
 })
 
-async function handleUpdate(formData: any, imageFile: File | null) {
-  const updatedProduct = await adminProductsStore.updateProduct(productId, formData, imageFile)
+async function handleUpdate(formData: any, imageFiles: File[], imagesToDelete: string[]) {
+  const updatedProduct = await adminProductsStore.upsertProduct(
+    { id: productId, ...formData },
+    imageFiles,
+    imagesToDelete,
+  )
   if (updatedProduct) {
     router.push('/admin/products')
   }
@@ -32,6 +36,7 @@ async function handleUpdate(formData: any, imageFile: File | null) {
       <div v-if="isLoading">
         Загрузка данных о товаре...
       </div>
+
       <ProductForm v-else :product="currentProduct" @submit="handleUpdate" />
     </div>
   </div>

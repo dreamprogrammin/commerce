@@ -1,4 +1,4 @@
-import type { Database, IProductFilters, ProductRow, ProductWithCategory } from '@/types'
+import type { Database, FullProduct, IProductFilters, ProductRow, ProductWithCategory } from '@/types'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 
@@ -58,22 +58,23 @@ export const useProductsStore = defineStore('productsStore', () => {
    * @param slug - Уникальный URL-идентификатор товара.
    * @returns Promise, который разрешается объектом товара или `null`.
    */
-  async function fetchProductBySlug(slug: string): Promise<ProductWithCategory | null> {
+  async function fetchProductBySlug(slug: string): Promise<FullProduct | null> {
     if (import.meta.dev) {
       await delay(2000)
     }
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, categories(name, slug)')
+        .select('*, categories(name, slug), product_images(*)')
         .eq('slug', slug)
         .eq('is_active', true)
+        .order('display_order', { referencedTable: 'product_images' })
         .single()
 
       if (error && error.code !== 'PGRST116')
         throw error
 
-      return data
+      return data as FullProduct | null
     }
     catch (error: any) {
       toast.error(`Ошибка загрузки товара`, { description: error.message })

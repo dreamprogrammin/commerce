@@ -151,3 +151,14 @@ export interface IBreadcrumbItem {
 export type ChildrenRow = Database['public']['Tables']['children']['Row']
 export type ChildrenInsert = Omit<ChildrenRow, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 export type ChildrenUpdate = Partial<ChildrenInsert>
+
+export type ProductImageRow = Database['public']['Tables']['product_images']['Row']
+
+export type ProductWithGallery = ProductRow & {
+  product_images: ProductImageRow[]
+}
+
+export type FullProduct = ProductRow & {
+  categories: { name: string | null, slug: string | null } | null
+  product_images: ProductImageRow[]
+}

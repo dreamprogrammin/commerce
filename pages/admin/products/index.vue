@@ -55,14 +55,17 @@ onMounted(() => {
             <TableCell>
               <div class="w-16 h-16 bg-muted rounded-md overflow-hidden">
                 <NuxtImg
-                  v-if="product.image_url"
-                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.image_url)"
+                  v-if="product.product_images && product.product_images.length > 0"
+                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.product_images[0]?.image_url || null) || undefined"
                   :alt="product.name"
                   class="w-full h-full object-cover"
                   format="webp"
                   quality="80"
                   type="fetch"
                 />
+                <div v-if="product.product_images && product.product_images.length > 1" class="absolute bottom-0 right-0 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-tl-md">
+                  +{{ product.product_images.length - 1 }}
+                </div>
               </div>
             </TableCell>
             <TableCell class="font-medium">

@@ -1,13 +1,20 @@
-import type { Database, ProductInsert, ProductRow, ProductUpdate, ProductWithCategory } from '@/types'
+import type { Database, FullProduct, ProductInsert, ProductRow, ProductUpdate, ProductWithCategory } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
+
+type ProductUpsert = ProductUpdate & {
+  name: string
+  slug: string
+  price: number
+}
 
 export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
   const { uploadFile, removeFile } = useSupabaseStorage()
 
-  const products = ref<ProductWithCategory[]>([])
-  const currentProduct = ref<ProductRow | null>(null)
+  const products = ref<FullProduct[]>([])
+  const currentProduct = ref<FullProduct | null>(null)
   const isLoading = ref(false)
   const isSaving = ref(false)
 
@@ -16,7 +23,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, categories(name, slug)')
+        .select('*, categories(name, slug), product_images(*)')
         .order('created_at', { ascending: false })
 
       if (error)
@@ -36,7 +43,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, categories(name, slug), product_images(*)')
         .eq('id', id)
         .single()
 
@@ -142,6 +149,75 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
   }
 
+  async function upsertProduct(
+    productData: ProductUpsert,
+    imageFiles: File[],
+    imagesToDelete: string[] = [],
+  ) {
+    isSaving.value = true
+    try {
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .upsert(productData)
+        .select()
+        .single()
+      if (productError)
+        throw productError
+
+      const productId = product.id
+
+      if (imageFiles.length > 0) {
+        const uploadPromises = imageFiles.map(file => uploadFile(file, {
+          bucketName: BUCKET_NAME_PRODUCT,
+          filePathPrefix: `products/${productId}`,
+        }))
+
+        const paths = await Promise.all(uploadPromises)
+
+        const imagesToInsert = paths
+          .filter((path): path is string => !!path)
+          .map((path, index) => ({
+            product_id: productId,
+            image_url: path,
+            display_order: index,
+          }))
+
+        if (imagesToInsert.length > 0) {
+          const { error: imagesError } = await supabase
+            .from('product_images')
+            .insert(imagesToInsert)
+          if (imagesError)
+            throw imagesError
+        }
+      }
+      if (imagesToDelete.length > 0) {
+        const { data: deletedImages, error: deleteDbError } = await supabase
+          .from('product_images')
+          .delete()
+          .in('id', imagesToDelete)
+          .select('image_url')
+
+        if (deleteDbError)
+          throw deleteDbError
+
+        const pathsToRemove = deletedImages.map(img => img.image_url)
+
+        if (pathsToRemove.length > 0) {
+          await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
+        }
+      }
+      toast.success(`Товар "${product.name}" успешно сохранен.`)
+      return product
+    }
+    catch (error: any) {
+      toast.error('Ошибка сохранения товара', { description: error.message })
+      return null
+    }
+    finally {
+      isSaving.value = false
+    }
+  }
+
   return {
     products,
     currentProduct,
@@ -152,5 +228,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     createProduct,
     updateProduct,
     deleteProduct,
+    upsertProduct,
   }
 })

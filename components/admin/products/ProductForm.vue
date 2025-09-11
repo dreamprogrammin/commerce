@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import type { ProductRow } from '@/types'
+import type { FullProduct, ProductImageRow } from '@/types'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { slugify } from '@/utils/slugify'
 
 const props = defineProps<{
-  product?: ProductRow | null // Принимаем product, может быть null при загрузке
+  product?: FullProduct | null // Принимаем product, может быть null при загрузке
 }>()
 const emit = defineEmits(['submit'])
+
+const newImagesFiles = ref<{ file: File, previewUrl: string }[]>([])
+const existingImages = ref<ProductImageRow[]>([])
+const imagesToDelete = ref<string[]>([])
+
+const { getPublicUrl } = useSupabaseStorage()
 
 const form = ref({
   name: '',
@@ -43,6 +51,10 @@ watch(() => props.product, (newProduct) => {
     }
     else {
       form.value.gender = 'unisex'
+    }
+
+    if (newProduct) {
+      existingImages.value = [...(newProduct.product_images || [])]
     }
   }
 }, { immediate: true })
@@ -106,7 +118,28 @@ function autoFillSlug() {
 
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
-  imageFile.value = target.files?.[0] || null
+  if (target.files) {
+    const filesWithPreview = Array.from(target.files).map(file => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }))
+
+    newImagesFiles.value.push(...filesWithPreview)
+    target.value = ''
+  }
+}
+
+function removeNewImage(index: number) {
+  const fileToRemove = newImagesFiles.value[index]
+  if (fileToRemove) {
+    URL.revokeObjectURL(fileToRemove.previewUrl)
+  }
+  newImagesFiles.value.splice(index, 1)
+}
+
+function removeExistingImage(image: ProductImageRow) {
+  imagesToDelete.value.push(image.id)
+  existingImages.value = existingImages.value.filter(img => img.id !== image.id)
 }
 </script>
 
@@ -227,10 +260,47 @@ function handleFileChange(event: Event) {
         </CardContent>
 
         <Card>
-          <CardHeader><CardTitle>Изображение</CardTitle></CardHeader>
-          <CardContent>
-            <Input type="file" @change="handleFileChange" />
-          <!-- TODO: Добавить превью изображения -->
+          <CardHeader><CardTitle>Галерея изображений</CardTitle></CardHeader>
+          <CardContent class="space-y-4">
+            <div v-if="existingImages.length > 0" class="space-y-2">
+              <p class="text-sm font-medium">
+                Текущие изображения
+              </p>
+              <div v-for="image in existingImages" :key="image.id" class="relative group">
+                <NuxtImg
+                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
+                  class="w-full h-24 object-cover rounded-md"
+                  format="webp"
+                  quality="85"
+                  placeholder
+                />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100"
+                  @click="removeExistingImage(image)"
+                >
+                  X
+                </Button>
+              </div>
+            </div>
+
+            <div v-if="newImagesFiles.length > 0" class="space-y-2">
+              <p class="text-sm font-medium">
+                Новые на загрузку
+              </p>
+              <div v-for="(item, index) in newImagesFiles" :key="item.file.name + index" class="relative group">
+                <img :src="item.previewUrl" class="w-full object-cover rounded-md" alt="добавление картинки">
+                <Button variant="destructive" size="icon" class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100" @click="removeNewImage(index)">
+                  X
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <Label for="images">Добавить фото</Label>
+              <Input id="images" type="file" multiple accept="image/*" @change="handleFileChange" />
+            </div>
           </CardContent>
         </Card>
 
