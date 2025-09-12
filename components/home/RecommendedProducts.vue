@@ -21,16 +21,7 @@ defineProps<{
       </Button>
     </div>
     <homeProductCarouselSkeleton v-if="isLoading" />
-    <Carousel v-else-if="products && products.length > 0">
-      <CarouselContent>
-        <CarouselItem v-for="product in products" :key="product.id" class="md:basis-1/3 lg:basis-1/4">
-          <div class="p-1">
-            <ProductCard :product="product" />
-          </div>
-        </CarouselItem>
-      </CarouselContent>
-      <CarouselPrevious />
-      <CarouselNext />
-    </Carousel>
+
+    <ProductCarousel :products="products" title="Вам может понравиться" />
   </div>
 </template>
