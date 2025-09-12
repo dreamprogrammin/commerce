@@ -29,7 +29,6 @@ const form = ref({
   max_age: null as number | null,
   gender: 'unisex' as 'male' | 'female' | 'unisex',
 })
-const imageFile = ref<File | null>(null)
 
 // Синхронизируем форму с пропсами, когда они приходят
 watch(() => props.product, (newProduct) => {
@@ -52,10 +51,26 @@ watch(() => props.product, (newProduct) => {
     else {
       form.value.gender = 'unisex'
     }
-
-    if (newProduct) {
-      existingImages.value = [...(newProduct.product_images || [])]
+    existingImages.value = [...(newProduct.product_images || [])]
+  }
+  else {
+    form.value = {
+      name: '',
+      slug: '',
+      description: '',
+      price: 0,
+      category_id: null,
+      stock_quantity: 0,
+      is_active: true,
+      bonus_points_award: 0,
+      min_age: null,
+      max_age: null,
+      gender: 'unisex',
     }
+
+    existingImages.value = []
+    newImagesFiles.value = []
+    imagesToDelete.value = []
   }
 }, { immediate: true })
 
@@ -141,10 +156,11 @@ function removeExistingImage(image: ProductImageRow) {
   imagesToDelete.value.push(image.id)
   existingImages.value = existingImages.value.filter(img => img.id !== image.id)
 }
+const filesToSubmit = computed(() => newImagesFiles.value.map(item => item.file))
 </script>
 
 <template>
-  <form class="grid grid-cols-1 lg:grid-cols-3 gap-8" @submit.prevent="emit('submit', form, imageFile)">
+  <form class="grid grid-cols-1 lg:grid-cols-3 gap-8" @submit.prevent="emit('submit', form, filesToSubmit, imagesToDelete)">
     <div class="lg:col-span-2 space-y-6">
       <Card>
         <CardHeader><CardTitle>Основная информация</CardTitle></CardHeader>

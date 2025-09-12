@@ -17,7 +17,7 @@ onMounted(() => {
 
 async function handleUpdate(formData: any, imageFiles: File[], imagesToDelete: string[]) {
   const updatedProduct = await adminProductsStore.upsertProduct(
-    { id: productId, ...formData },
+    { id: productId, ...formData.value },
     imageFiles,
     imagesToDelete,
   )
