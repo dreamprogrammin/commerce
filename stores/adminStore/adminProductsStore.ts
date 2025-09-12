@@ -1,4 +1,4 @@
-import type { Database, FullProduct, ProductInsert, ProductRow, ProductUpdate, ProductWithCategory } from '@/types'
+import type { Database, FullProduct, ProductInsert, ProductRow, ProductUpdate } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
