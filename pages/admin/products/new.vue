@@ -6,9 +6,13 @@ definePageMeta({ layout: 'admin' })
 const adminProductsStore = useAdminProductsStore()
 const router = useRouter()
 
-async function handleCreate(formData: any, imageFile: File | null) {
-  const newProduct = await adminProductsStore.createProduct(formData, imageFile)
-  if (newProduct) {
+async function handleCreate(formDataRef: Ref<any>, newImageFiles: File[], imagesToDelete: string[]) {
+  const result = await adminProductsStore.saveProduct( // <-- Вызываем ту же saveProduct
+    formDataRef.value,
+    newImageFiles,
+    imagesToDelete,
+  )
+  if (result) {
     router.push('/admin/products')
   }
 }

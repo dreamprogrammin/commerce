@@ -3,12 +3,6 @@ import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
-type ProductUpsert = ProductUpdate & {
-  name: string
-  slug: string
-  price: number
-}
-
 export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
   const { uploadFile, removeFile } = useSupabaseStorage()
@@ -126,13 +120,16 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
   }
 
-  async function deleteProduct(productToDelete: ProductWithCategory) {
+  async function deleteProduct(productToDelete: FullProduct) {
     // eslint-disable-next-line no-alert
     if (!confirm(`Вы уверены, что хотите удалить товар "${productToDelete.name}"?`))
       return
+
+    isLoading.value = true
     try {
-      if (productToDelete.image_url) {
-        await removeFile('product-images', productToDelete.image_url)
+      if (productToDelete.product_images && productToDelete.product_images.length > 0) {
+        const pathsToRemove = productToDelete.product_images.map(img => img.image_url)
+        await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
       }
       const { error } = await supabase
         .from('products')
@@ -142,72 +139,114 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error)
         throw error
       toast.success(`Товар "${productToDelete.name}" удален.`)
-      await fetchProducts()
+      products.value = products.value.filter(p => p.id !== productToDelete.id)
     }
     catch (error: any) {
       toast.error('Ошибка удаления товара', { description: error.message })
     }
+    finally {
+      isLoading.value = false
+    }
   }
 
-  async function upsertProduct(
-    productData: ProductUpsert,
-    imageFiles: File[],
+  /**
+   * Универсальная функция для создания И обновления товара и его галереи.
+   * @param productData - Данные из формы. Должен содержать `id` для обновления.
+   * @param newImageFiles - Массив новых файлов для загрузки.
+   * @param imagesToDelete - Массив ID существующих изображений для удаления.
+   */
+
+  async function saveProduct(
+    productData: ProductInsert | ProductUpdate,
+    newImageFiles: File[],
     imagesToDelete: string[] = [],
   ) {
     isSaving.value = true
     try {
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .upsert(productData)
-        .select()
-        .single()
-      if (productError)
-        throw productError
+      let savedProduct: { id: string, name: string }
 
-      const productId = product.id
-
-      if (imageFiles.length > 0) {
-        const uploadPromises = imageFiles.map(file => uploadFile(file, {
-          bucketName: BUCKET_NAME_PRODUCT,
-          filePathPrefix: `products/${productId}`,
-        }))
-
-        const paths = await Promise.all(uploadPromises)
-
-        const imagesToInsert = paths
-          .filter((path): path is string => !!path)
-          .map((path, index) => ({
-            product_id: productId,
-            image_url: path,
-            display_order: index,
-          }))
-
-        if (imagesToInsert.length > 0) {
-          const { error: imagesError } = await supabase
-            .from('product_images')
-            .insert(imagesToInsert)
-          if (imagesError)
-            throw imagesError
-        }
+      if ('id' in productData && productData.id) {
+        // --- РЕЖИМ ОБНОВЛЕНИЯ ---
+        const { data, error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', productData.id)
+          .select('id, name')
+          .single()
+        if (error)
+          throw error
+        savedProduct = data
       }
+      else {
+        // --- РЕЖИМ СОЗДАНИЯ ---
+        const { data, error } = await supabase
+          .from('products')
+          .insert(productData as ProductInsert)
+          .select('id, name')
+          .single()
+        if (error)
+          throw error
+        savedProduct = data
+      }
+
+      const productId = savedProduct.id
+
+      // --- ЛОГИКА РАБОТЫ С ИЗОБРАЖЕНИЯМИ ---
+
+      // 1. Удаляем отмеченные изображения
       if (imagesToDelete.length > 0) {
         const { data: deletedImages, error: deleteDbError } = await supabase
           .from('product_images')
           .delete()
           .in('id', imagesToDelete)
           .select('image_url')
-
         if (deleteDbError)
           throw deleteDbError
 
-        const pathsToRemove = deletedImages.map(img => img.image_url)
-
-        if (pathsToRemove.length > 0) {
+        const pathsToRemove = deletedImages.map(img => img.image_url).filter((p): p is string => !!p)
+        if (pathsToRemove.length > 0)
           await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
+      }
+
+      // 2. Загружаем новые изображения
+      if (newImageFiles.length > 0) {
+        // Получаем текущее максимальное значение display_order для этого товара
+        const { data: maxOrder, error: orderError } = await supabase
+          .from('product_images')
+          .select('display_order')
+          .eq('product_id', productId)
+          .order('display_order', { ascending: false })
+          .limit(1)
+          .single()
+        if (orderError && orderError.code !== 'PGRST116')
+          throw orderError
+        const currentMaxOrder = maxOrder?.display_order ?? -1
+
+        // Загружаем файлы
+        const uploadPromises = newImageFiles.map(file => uploadFile(file, {
+          bucketName: BUCKET_NAME_PRODUCT,
+          filePathPrefix: `products/${productId}`,
+        }))
+        const paths = await Promise.all(uploadPromises)
+
+        // Готовим записи для вставки в БД
+        const imagesToInsert = paths
+          .filter((path): path is string => !!path)
+          .map((path, index) => ({
+            product_id: productId,
+            image_url: path,
+            display_order: currentMaxOrder + 1 + index, // Правильно устанавливаем порядок
+          }))
+
+        if (imagesToInsert.length > 0) {
+          const { error: imagesError } = await supabase.from('product_images').insert(imagesToInsert)
+          if (imagesError)
+            throw imagesError
         }
       }
-      toast.success(`Товар "${product.name}" успешно сохранен.`)
-      return product
+
+      toast.success(`Товар "${savedProduct.name}" успешно сохранен.`)
+      return savedProduct
     }
     catch (error: any) {
       toast.error('Ошибка сохранения товара', { description: error.message })
@@ -228,6 +267,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     createProduct,
     updateProduct,
     deleteProduct,
-    upsertProduct,
+    saveProduct,
   }
 })
