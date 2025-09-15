@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ProductImageRow, ProductUpdate } from '@/types'
 import { storeToRefs } from 'pinia'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
@@ -10,16 +11,23 @@ const route = useRoute()
 const router = useRouter()
 const productId = route.params.id as string
 
-// Загружаем данные товара при монтировании
-onMounted(() => {
-  adminProductsStore.fetchProductById(productId)
-})
+useAsyncData(
+  `admin-product-${productId}`,
+  () => adminProductsStore.fetchProductById(productId),
+)
 
-async function handleUpdate(formData: any, imageFiles: File[], imagesToDelete: string[]) {
-  const updatedProduct = await adminProductsStore.saveProduct(
-    { id: productId, ...formData.value },
-    imageFiles,
-    imagesToDelete,
+async function handleUpdate(payload: {
+  data: ProductUpdate
+  newImageFiles: File[]
+  imagesToDelete: string[]
+  existingImages: ProductImageRow[]
+}) {
+  const updatedProduct = await adminProductsStore.updateProduct(
+    productId,
+    payload.data,
+    payload.newImageFiles,
+    payload.imagesToDelete,
+    payload.existingImages,
   )
   if (updatedProduct) {
     router.push('/admin/products')
@@ -33,7 +41,7 @@ async function handleUpdate(formData: any, imageFiles: File[], imagesToDelete: s
       <h1 class="text-3xl font-bold mb-6">
         Редактирование товара
       </h1>
-      <div v-if="isLoading">
+      <div v-if="isLoading && !currentProduct" class="text-center py-20">
         Загрузка данных о товаре...
       </div>
 

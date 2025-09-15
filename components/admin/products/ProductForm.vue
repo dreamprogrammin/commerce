@@ -2,6 +2,7 @@
 import type { FullProduct, ProductImageRow, ProductInsert, ProductUpdate } from '@/types'
 import { computed, onMounted, ref, watch } from 'vue'
 
+import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
@@ -13,8 +14,13 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', payload: {
-    data: ProductInsert | ProductUpdate
+  (e: 'create', payload: {
+    data: ProductInsert
+    newImageFiles: File[]
+  }): void
+
+  (e: 'update', payload: {
+    data: ProductUpdate
     newImageFiles: File[]
     imagesToDelete: string[]
     existingImages: ProductImageRow[]
@@ -127,16 +133,26 @@ function removeExistingImage(image: ProductImageRow) {
 
 // --- 5. ФУНКЦИЯ ОТПРАВКИ ---
 function handleSubmit() {
-  if (!formData.value)
-    return
   const { categories, product_images, ...productData } = formData.value
 
-  emit('submit', {
-    data: productData,
-    newImageFiles: newImageFiles.value.map(item => item.file),
-    imagesToDelete: imagesToDelete.value,
-    existingImages: existingImages.value,
-  })
+  if (props.initialData) {
+    emit('update', {
+      data: productData,
+      newImageFiles: newImageFiles.value.map(item => item.file),
+      imagesToDelete: imagesToDelete.value,
+      existingImages: existingImages.value,
+    })
+  }
+  else {
+    if (!productData.name || !productData.slug) {
+      toast.error('Название и Слаг - обязательные поля')
+      return
+    }
+    emit('create', {
+      data: productData,
+      newImageFiles: newImageFiles.value.map(item => item.file),
+    })
+  }
 }
 </script>
 

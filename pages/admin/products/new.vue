@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ProductInsert } from '@/types'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
@@ -6,13 +7,16 @@ definePageMeta({ layout: 'admin' })
 const adminProductsStore = useAdminProductsStore()
 const router = useRouter()
 
-async function handleCreate(formDataRef: Ref<any>, newImageFiles: File[], imagesToDelete: string[]) {
-  const result = await adminProductsStore.saveProduct( // <-- Вызываем ту же saveProduct
-    formDataRef.value,
-    newImageFiles,
-    imagesToDelete,
+async function handleCreate(payload: {
+  data: ProductInsert
+  newImageFiles: File[]
+}) {
+  const newProduct = await adminProductsStore.createProduct(
+    payload.data,
+    payload.newImageFiles,
   )
-  if (result) {
+
+  if (newProduct) {
     router.push('/admin/products')
   }
 }
@@ -24,6 +28,7 @@ async function handleCreate(formDataRef: Ref<any>, newImageFiles: File[], images
       <h1 class="text-3xl font-bold mb-6">
         Новый товар
       </h1>
+
       <ProductForm @submit="handleCreate" />
     </div>
   </div>
