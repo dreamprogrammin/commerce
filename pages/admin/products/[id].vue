@@ -45,7 +45,7 @@ async function handleUpdate(payload: {
         Загрузка данных о товаре...
       </div>
 
-      <ProductForm v-else :product="currentProduct" @submit="handleUpdate" />
+      <ProductForm v-else :product="currentProduct" @update="handleUpdate" />
     </div>
   </div>
 </template>

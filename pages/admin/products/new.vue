@@ -29,7 +29,7 @@ async function handleCreate(payload: {
         Новый товар
       </h1>
 
-      <ProductForm @submit="handleCreate" />
+      <ProductForm @create="handleCreate" />
     </div>
   </div>
 </template>
