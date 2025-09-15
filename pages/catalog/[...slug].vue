@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
-import type { IBreadcrumbItem, IProductFilters, ProductRow, SortByType } from '@/types'
+import type { IBreadcrumbItem, IProductFilters, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -14,7 +14,7 @@ const categoriesStore = useCategoriesStore()
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ СТРАНИЦЫ ---
 // Все данные, связанные с отображением каталога, теперь живут здесь, а не в сторе.
-const products = ref<ProductRow[]>([])
+const products = ref<ProductWithGallery[]>([])
 const isLoading = ref(true) // Главный флаг для первоначальной загрузки и перезагрузки по фильтрам
 const isLoadingMore = ref(false) // Флаг для кнопки "Показать еще"
 const hasMoreProducts = ref(true)

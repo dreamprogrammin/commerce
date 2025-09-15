@@ -1,4 +1,4 @@
-import type { Database, FullProduct, IProductFilters, ProductRow, ProductWithCategory } from '@/types'
+import type { Database, FullProduct, IProductFilters, ProductRow, ProductWithCategory, ProductWithGallery } from '@/types'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 
@@ -24,7 +24,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     filters: IProductFilters,
     currentPage = 1,
     pageSize = 12,
-  ): Promise<{ products: ProductRow[], hasMore: boolean }> {
+  ): Promise<{ products: ProductWithGallery[], hasMore: boolean }> {
     try {
       const { data, error } = await supabase.rpc('get_filtered_products', {
         p_category_slug: filters.categorySlug,
@@ -39,7 +39,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       if (error)
         throw error
 
-      const newProducts = data || []
+      const newProducts = data as ProductWithGallery[] || []
       // Определяем, есть ли еще страницы для загрузки
       const hasMore = newProducts.length === pageSize
 
