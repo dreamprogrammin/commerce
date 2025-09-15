@@ -1,4 +1,4 @@
-import type { Database, FullProduct, ProductInsert, ProductRow, ProductUpdate } from '@/types'
+import type { Database, FullProduct, ProductImageRow, ProductInsert, ProductUpdate } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -7,10 +7,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
   const { uploadFile, removeFile } = useSupabaseStorage()
 
+  // --- СОСТОЯНИЕ (State) ---
   const products = ref<FullProduct[]>([])
   const currentProduct = ref<FullProduct | null>(null)
   const isLoading = ref(false)
   const isSaving = ref(false)
+
+  // --- ЧТЕНИЕ ДАННЫХ (Read) ---
 
   async function fetchProducts() {
     isLoading.value = true
@@ -19,7 +22,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         .from('products')
         .select('*, categories(name, slug), product_images(*)')
         .order('created_at', { ascending: false })
-
       if (error)
         throw error
       products.value = data || []
@@ -34,13 +36,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
   async function fetchProductById(id: string) {
     isLoading.value = true
+    currentProduct.value = null // Сбрасываем, чтобы избежать показа старых данных
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*, categories(name, slug), product_images(*)')
         .eq('id', id)
         .single()
-
       if (error)
         throw error
       currentProduct.value = data
@@ -53,207 +55,174 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
   }
 
-  async function createProduct(productData: ProductInsert, imageFile?: File | null): Promise<ProductRow | null> {
-    isLoading.value = true
-    try {
-      if (imageFile) {
-        const path = await uploadFile(imageFile, {
-          bucketName: 'product-images',
-          filePathPrefix: `products/${productData.slug || 'product'}`,
-        })
-        if (!path)
-          throw new Error('Ошибка загрузки изображения.')
-        productData.image_url = path
-      }
+  // --- ЗАПИСЬ ДАННЫХ (Write) ---
 
-      const { data, error } = await supabase
+  /**
+   * Создает новый товар и его галерею.
+   */
+  async function createProduct(productData: ProductInsert, newImageFiles: File[]) {
+    isSaving.value = true
+    try {
+      const { data: newProduct, error } = await supabase
         .from('products')
         .insert(productData)
         .select()
         .single()
-
       if (error)
         throw error
-      toast.success(`Товар "${data.name}" успешно создан.`)
-      return data
+
+      // Для нового товара `imagesToDelete` всегда пустой, а `existingImageCount` равен 0.
+      await _manageProductImages(newProduct.id, newImageFiles, [], 0)
+
+      toast.success(`Товар "${newProduct.name}" успешно создан.`)
+      return newProduct
     }
     catch (error: any) {
       toast.error('Ошибка создания товара', { description: error.message })
       return null
     }
     finally {
-      isLoading.value = false
+      isSaving.value = false
     }
   }
 
-  async function updateProduct(productId: string, updates: ProductUpdate, imageFile?: File | null): Promise<ProductRow | null> {
-    isLoading.value = true
+  /**
+   * Обновляет существующий товар и его галерею.
+   */
+  async function updateProduct(
+    productId: string,
+    productData: ProductUpdate,
+    newImageFiles: File[],
+    imagesToDelete: string[],
+    existingImages: ProductImageRow[], // <-- Принимаем сюда актуальные данные
+  ) {
+    isSaving.value = true
     try {
-      if (imageFile) {
-        const path = await uploadFile(imageFile, {
-          bucketName: 'product-images',
-          filePathPrefix: `products/${updates.slug || 'product'}`,
-        })
-        if (!path)
-          throw new Error('Ошибка загрузки изображения.')
-        updates.image_url = path
-      }
-
-      const { data, error } = await supabase
+      const { data: updatedProduct, error } = await supabase
         .from('products')
-        .update(updates)
+        .update(productData)
         .eq('id', productId)
         .select()
         .single()
-
       if (error)
         throw error
-      toast.success(`Товар "${data.name}" успешно обновлен.`)
-      return data
+
+      // Передаем в хелпер ID, новые файлы, ID на удаление и КОЛИЧЕСТВО существующих картинок
+      await _manageProductImages(productId, newImageFiles, imagesToDelete, existingImages.length)
+
+      toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
+      return updatedProduct
     }
     catch (error: any) {
       toast.error('Ошибка обновления товара', { description: error.message })
       return null
     }
     finally {
-      isLoading.value = false
-    }
-  }
-
-  async function deleteProduct(productToDelete: FullProduct) {
-    // eslint-disable-next-line no-alert
-    if (!confirm(`Вы уверены, что хотите удалить товар "${productToDelete.name}"?`))
-      return
-
-    isLoading.value = true
-    try {
-      if (productToDelete.product_images && productToDelete.product_images.length > 0) {
-        const pathsToRemove = productToDelete.product_images.map(img => img.image_url)
-        await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
-      }
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productToDelete.id)
-
-      if (error)
-        throw error
-      toast.success(`Товар "${productToDelete.name}" удален.`)
-      products.value = products.value.filter(p => p.id !== productToDelete.id)
-    }
-    catch (error: any) {
-      toast.error('Ошибка удаления товара', { description: error.message })
-    }
-    finally {
-      isLoading.value = false
+      isSaving.value = false
     }
   }
 
   /**
-   * Универсальная функция для создания И обновления товара и его галереи.
-   * @param productData - Данные из формы. Должен содержать `id` для обновления.
-   * @param newImageFiles - Массив новых файлов для загрузки.
-   * @param imagesToDelete - Массив ID существующих изображений для удаления.
+   * Удаляет товар и все связанные с ним изображения.
    */
+  async function deleteProduct(productToDelete: FullProduct) {
+    // 1. Оптимистичное удаление и сохранение оригинала
+    const originalProducts = [...products.value]
+    products.value = products.value.filter(p => p.id !== productToDelete.id)
 
-  async function saveProduct(
-    productData: ProductInsert | ProductUpdate,
-    newImageFiles: File[],
-    imagesToDelete: string[] = [],
-  ) {
-    isSaving.value = true
+    // 2. Показываем toast.loading
+    const toastId = toast.loading(`Удаление товара "${productToDelete.name}"...`, {
+      action: {
+        label: 'Отмена',
+        onClick: () => { // <-- Исправлено на `onClick`
+          products.value = originalProducts
+          toast.dismiss(toastId)
+        },
+      },
+    })
+
     try {
-      let savedProduct: { id: string, name: string }
-
-      if ('id' in productData && productData.id) {
-        // --- РЕЖИМ ОБНОВЛЕНИЯ ---
-        const { data, error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', productData.id)
-          .select('id, name')
-          .single()
-        if (error)
-          throw error
-        savedProduct = data
-      }
-      else {
-        // --- РЕЖИМ СОЗДАНИЯ ---
-        const { data, error } = await supabase
-          .from('products')
-          .insert(productData as ProductInsert)
-          .select('id, name')
-          .single()
-        if (error)
-          throw error
-        savedProduct = data
-      }
-
-      const productId = savedProduct.id
-
-      // --- ЛОГИКА РАБОТЫ С ИЗОБРАЖЕНИЯМИ ---
-
-      // 1. Удаляем отмеченные изображения
-      if (imagesToDelete.length > 0) {
-        const { data: deletedImages, error: deleteDbError } = await supabase
-          .from('product_images')
-          .delete()
-          .in('id', imagesToDelete)
-          .select('image_url')
-        if (deleteDbError)
-          throw deleteDbError
-
-        const pathsToRemove = deletedImages.map(img => img.image_url).filter((p): p is string => !!p)
-        if (pathsToRemove.length > 0)
-          await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
-      }
-
-      // 2. Загружаем новые изображения
-      if (newImageFiles.length > 0) {
-        // Получаем текущее максимальное значение display_order для этого товара
-        const { data: maxOrder, error: orderError } = await supabase
-          .from('product_images')
-          .select('display_order')
-          .eq('product_id', productId)
-          .order('display_order', { ascending: false })
-          .limit(1)
-          .single()
-        if (orderError && orderError.code !== 'PGRST116')
-          throw orderError
-        const currentMaxOrder = maxOrder?.display_order ?? -1
-
-        // Загружаем файлы
-        const uploadPromises = newImageFiles.map(file => uploadFile(file, {
-          bucketName: BUCKET_NAME_PRODUCT,
-          filePathPrefix: `products/${productId}`,
-        }))
-        const paths = await Promise.all(uploadPromises)
-
-        // Готовим записи для вставки в БД
-        const imagesToInsert = paths
-          .filter((path): path is string => !!path)
-          .map((path, index) => ({
-            product_id: productId,
-            image_url: path,
-            display_order: currentMaxOrder + 1 + index, // Правильно устанавливаем порядок
-          }))
-
-        if (imagesToInsert.length > 0) {
-          const { error: imagesError } = await supabase.from('product_images').insert(imagesToInsert)
-          if (imagesError)
-            throw imagesError
+      // 3. Сначала удаляем файлы из Storage
+      if (productToDelete.product_images && productToDelete.product_images.length > 0) {
+        const pathsToRemove = productToDelete.product_images.map(img => img.image_url)
+        const success = await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
+        if (!success) {
+          throw new Error('Не удалось удалить связанные изображения.')
         }
       }
 
-      toast.success(`Товар "${savedProduct.name}" успешно сохранен.`)
-      return savedProduct
+      // 4. Затем удаляем запись из БД
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productToDelete.id)
+      if (error)
+        throw error
+
+      // 5. Если всё успешно, обновляем toast на "успех"
+      toast.success(`Товар "${productToDelete.name}" успешно удален.`, {
+        id: toastId,
+      })
     }
     catch (error: any) {
-      toast.error('Ошибка сохранения товара', { description: error.message })
-      return null
+      // 6. В случае ошибки, откатываем UI и обновляем toast на "ошибку"
+      toast.error('Ошибка удаления товара', {
+        id: toastId,
+        description: error.message,
+      })
+      // Восстанавливаем исходный список
+      products.value = originalProducts
     }
-    finally {
-      isSaving.value = false
+  }
+  // --- Приватные хелперы ---
+
+  async function _manageProductImages(
+    productId: string,
+    filesToUpload: File[],
+    imageIdsToDelete: string[],
+    currentImageCount: number,
+  ) {
+    // 1. Сначала удаляем отмеченные изображения
+    if (imageIdsToDelete.length > 0) {
+      const { data: deletedImages, error: dbError } = await supabase
+        .from('product_images')
+        .delete()
+        .in('id', imageIdsToDelete)
+        .select('image_url')
+      if (dbError)
+        throw dbError
+
+      const pathsToRemove = deletedImages?.map(img => img.image_url).filter((p): p is string => !!p) || []
+      if (pathsToRemove.length > 0)
+        await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
+    }
+
+    // 2. Затем загружаем и привязываем новые
+    if (filesToUpload.length > 0) {
+      const uploadPromises = filesToUpload.map(file =>
+        uploadFile(file, {
+          bucketName: BUCKET_NAME_PRODUCT,
+          filePathPrefix: `products/${productId}`,
+        }),
+      )
+      const paths = await Promise.all(uploadPromises)
+
+      const imagesToInsert = paths
+        .filter((p): p is string => !!p)
+        .map((path, index) => ({
+          product_id: productId,
+          image_url: path,
+          // ВАЖНО: `display_order` начинается после количества уже существующих картинок
+          display_order: currentImageCount + index,
+        }))
+
+      if (imagesToInsert.length > 0) {
+        const { error } = await supabase
+          .from('product_images')
+          .insert(imagesToInsert)
+        if (error)
+          throw error
+      }
     }
   }
 
@@ -267,6 +236,5 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     createProduct,
     updateProduct,
     deleteProduct,
-    saveProduct,
   }
 })
