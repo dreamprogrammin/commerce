@@ -11,6 +11,13 @@ const { data: product, pending: isLoading } = useAsyncData(
   { lazy: true },
 )
 const { getPublicUrl } = useSupabaseStorage()
+
+const mainImageUrl = computed(() => {
+  if (product.value && product.value.product_images && product.value.product_images.length > 0) {
+    return product.value.product_images[0]?.image_url
+  }
+  return null
+})
 </script>
 
 <template>
@@ -40,8 +47,8 @@ const { getPublicUrl } = useSupabaseStorage()
         <NuxtLink :to="`/catalog/products/${product.slug}`" class="block">
           <div class="w-48 h-48 bg-muted rounded-lg overflow-hidden border">
             <NuxtImg
-              v-if="product.image_url"
-              :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.image_url) ?? ''"
+              v-if="mainImageUrl"
+              :src="getPublicUrl(BUCKET_NAME_PRODUCT, mainImageUrl) ?? ''"
               :alt="product.name"
               placeholder
               quality="80"

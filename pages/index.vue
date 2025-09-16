@@ -113,9 +113,6 @@ const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopu
       <!-- Заглушка для серверного рендеринга (всегда показываем популярные) -->
       <template #fallback>
         <div class="container py-8 md:py-12">
-          <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-8">
-            Популярные товары
-          </h2>
           <ProductCarouselSkeleton />
         </div>
       </template>

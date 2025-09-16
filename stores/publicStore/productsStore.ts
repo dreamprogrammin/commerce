@@ -79,7 +79,7 @@ export const useProductsStore = defineStore('productsStore', () => {
   /**
    * Находит один "Товар дня" - активный товар с максимальным количеством бонусных баллов.
    */
-  async function fetchFeaturedProduct(): Promise<ProductWithCategory | null> {
+  async function fetchFeaturedProduct(): Promise<FullProduct | null> {
     try {
       const { data, error } = await supabase
         .from('products')
