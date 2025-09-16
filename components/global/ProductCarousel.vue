@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ProductRow } from '@/types'
+import type { ProductWithGallery } from '@/types'
 
 const props = defineProps<{
-  products: ProductRow[]
+  products: ProductWithGallery[]
   title?: string
 }>()
 </script>

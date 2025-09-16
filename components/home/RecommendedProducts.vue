@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ProductRow } from '@/types'
+import type { ProductWithGallery } from '@/types'
 
 defineProps<{
-  products: ProductRow[]
+  products: ProductWithGallery[]
   isLoading: boolean
 }>()
 </script>

@@ -2,11 +2,6 @@ import type { Database, FullProduct, IProductFilters, ProductRow, ProductWithCat
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 
-// Этот стор больше не хранит состояние (state) для продуктов.
-// Он работает как типизированный API-клиент.
-// Состояние (products, currentProduct, isLoading) будет храниться
-// локально на страницах, которые его используют.
-// Это решает проблемы с "мельканием" UI и "грязным" состоянием.
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
@@ -15,7 +10,6 @@ export const useProductsStore = defineStore('productsStore', () => {
    * Загружает отфильтрованный и отсортированный список товаров с пагинацией.
    * НЕ изменяет никакое состояние, а просто ВОЗВРАЩАЕТ результат.
    * @param filters - Объект с параметрами фильтрации.
-   * @param loadMore - Флаг, управляющий пагинацией.
    * @param currentPage - Текущая страница для дозагрузки.
    * @param pageSize - Размер страницы.
    * @returns Promise, который разрешается объектом с товарами и флагом `hasMore`.
@@ -89,9 +83,8 @@ export const useProductsStore = defineStore('productsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, categories(name, slug)')
+        .select('*, categories(name, slug), product_images(*)')
         .eq('is_active', true)
-        .not('image_url,', 'is', null)
         .order('bonus_points_award', { ascending: true })
         .limit(1)
         .single()
@@ -107,49 +100,31 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
-  async function fetchNewestProducts(limit: number = 10): Promise<ProductRow[]> {
-    try {
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  async function fetchNewestProducts(limit: number = 10): Promise<ProductWithGallery[]> {
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .not('image_url', 'is', null)
-        .gte('created_at', thirtyDaysAgo.toISOString())
-        .order('created_at', { ascending: true })
-        .limit(limit)
-
-      if (error)
-        throw error
-      return data || []
-    }
-    catch (e: any) {
-      toast.error('Ошибка при загрузке новинок', { description: e.message })
-      return []
-    }
+    const { products } = await fetchProducts(
+      {
+        categorySlug: 'all',
+        sortBy: 'newest',
+      },
+      1,
+      limit,
+    )
+    return products
   }
 
-  async function fetchPopularProducts(limit: number = 10): Promise<ProductRow[]> {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .not('image_url', 'is', null)
-        .order('sales_count', { ascending: true })
-        .limit(limit)
-
-      if (error)
-        throw error
-
-      return data || []
-    }
-    catch (e: any) {
-      toast.error('Не удалось загрузить популярные товары', { description: e.message })
-      return []
-    }
+  async function fetchPopularProducts(limit: number = 10): Promise<ProductWithGallery[]> {
+    const { products } = await fetchProducts(
+      {
+        categorySlug: 'all',
+        sortBy: 'popularity',
+      },
+      1,
+      limit,
+    )
+    return products
   }
 
   // Возвращаем только функции, никакого состояния.

@@ -1,4 +1,4 @@
-import type { Database, ProductRow } from '@/types'
+import type { Database, ProductWithGallery } from '@/types'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '../auth'
 
@@ -6,7 +6,7 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
   const supabase = useSupabaseClient<Database>()
   const authStore = useAuthStore()
 
-  async function fetchRecommendations(): Promise<ProductRow[]> {
+  async function fetchRecommendations(): Promise<ProductWithGallery[]> {
     if (!authStore.user?.id) {
       return []
     }
@@ -18,7 +18,7 @@ export const useRecommendationsStore = defineStore('recommendationsStore', () =>
         })
       if (error)
         throw error
-      return data || []
+      return (data as ProductWithGallery[]) || []
     }
     catch (e: any) {
       toast.error('Ошибка при загрузке рекомендаций', { description: e.message })
