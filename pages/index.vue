@@ -98,15 +98,15 @@ const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopu
 
       <!-- Если все загрузки завершены, принимаем решение, что показать -->
       <template v-else>
-        <HomeRecommendedProducts
+        <HomeProductsCarousel
           v-if="shouldShowRecommendations"
-          :products="recommendedProducts"
-          :is-loading="isLoadingRecommendations"
+          type="recommended"
+          title="Вам может понравится"
         />
-        <HomePopularProducts
+        <HomeProductsCarousel
           v-else
-          :products="popularProducts"
-          :is-loading="isLoadingPopular"
+          type="popular"
+          title="Популярные товары"
         />
       </template>
 
@@ -119,6 +119,6 @@ const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopu
     </ClientOnly>
 
     <!-- Секция Новинок (самодостаточный компонент) -->
-    <HomeNewArrivals />
+    <HomeProductsCarousel type="newest" title="Новые поступления" />
   </div>
 </template>
