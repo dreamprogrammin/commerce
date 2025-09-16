@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import HomeNewArrivals from '@/components/home/HomeNewArrivals.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -29,19 +28,23 @@ const { data: recommendedProducts, pending: isLoadingRecommendations } = useAsyn
 )
 
 const { data: popularProducts, pending: isLoadingPopular } = useAsyncData(
-  'home-popular-products',
+  'home-popular',
   () => productsStore.fetchPopularProducts(10),
-  {
-    lazy: true,
-    default: () => [],
-  },
+  { lazy: true, default: () => [] },
+)
+
+// 3. Загрузка Новинок
+const { data: newestProducts, pending: isLoadingNewest } = useAsyncData(
+  'home-newest',
+  () => productsStore.fetchNewestProducts(10),
+  { lazy: true, default: () => [] },
 )
 
 const shouldShowRecommendations = computed(() => {
   return recommendedProducts.value && recommendedProducts.value.length > 0
 })
 
-const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
+const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
 </script>
 
 <template>
@@ -88,11 +91,9 @@ const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopu
     -->
     <ClientOnly>
       <!-- Пока ЛЮБАЯ из загрузок активна, показываем ОДИН общий скелетон -->
-      <div v-if="isLoading" class="container py-8 md:py-12">
+      <div v-if="isLoadingMainBlock" class="container py-8 md:py-12">
         <!-- Заголовок меняется в зависимости от того, залогинен ли юзер -->
-        <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-8">
-          {{ isLoggedIn ? 'Подбираем лучшие предложения...' : 'Популярные товары' }}
-        </h2>
+        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
       </div>
 
@@ -100,18 +101,23 @@ const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopu
       <template v-else>
         <HomeProductsCarousel
           v-if="shouldShowRecommendations"
-          type="recommended"
-          title="Вам может понравится"
+          :is-loading="isLoadingRecommendations"
+          :products="recommendedProducts"
+          title="Вам может понравиться"
+          see-all-link="/catalog/all?recommended=true"
         />
         <HomeProductsCarousel
           v-else
-          type="popular"
+          :is-loading="isLoadingPopular"
+          :products="popularProducts"
           title="Популярные товары"
+          see-all-link="/catalog/all?sort_by=popularity"
         />
       </template>
 
       <!-- Заглушка для серверного рендеринга (всегда показываем популярные) -->
       <template #fallback>
+        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <div class="container py-8 md:py-12">
           <ProductCarouselSkeleton />
         </div>
@@ -119,6 +125,11 @@ const isLoading = computed(() => isLoadingRecommendations.value || isLoadingPopu
     </ClientOnly>
 
     <!-- Секция Новинок (самодостаточный компонент) -->
-    <HomeProductsCarousel type="newest" title="Новые поступления" />
+    <HomeProductsCarousel
+      :is-loading="isLoadingNewest"
+      :products="newestProducts"
+      title="Новые поступления"
+      see-all-link="/catalog/all?sort_by=newest"
+    />
   </div>
 </template>
