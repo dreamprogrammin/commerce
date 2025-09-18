@@ -41,7 +41,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class-="flex flex-col md:flex-row gap-4">
+  <div class="flex flex-col md:flex-row gap-4">
     <div v-if="images && images.length > 1" class="hidden md:block">
       <Carousel
         class="w-20"
