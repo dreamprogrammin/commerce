@@ -49,7 +49,7 @@ onMounted(() => {
         :opts="{ align: 'start', containScroll: 'keepSnaps' }"
         @init-api="onInitThumb"
       >
-        <CarouselContent class="-mt-2 h-[500px]">
+        <CarouselContent class="-mt-2 flex">
           <CarouselItem
             v-for="(image, index) in images"
             :key="image.id"
