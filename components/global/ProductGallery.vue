@@ -41,25 +41,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <!--
-    Основной контейнер теперь использует Flexbox.
-    `flex-col-reverse` на маленьких экранах (до `md`) разместит миниатюры СНИЗУ.
-    `md:flex-row` на средних и больших экранах разместит их СЛЕВА.
-  -->
-  <div class="flex flex-col-reverse md:flex-row gap-4">
-    <!-- 1. Карусель миниатюр (Вертикальная) -->
-    <div v-if="images && images.length > 1">
+  <div class-="flex flex-col md:flex-row gap-4">
+    <div v-if="images && images.length > 1" class="hidden md:block">
       <Carousel
-        class="w-full md:w-20"
+        class="w-20"
         orientation="vertical"
         :opts="{ align: 'start', containScroll: 'keepSnaps' }"
         @init-api="onInitThumb"
       >
-        <CarouselContent class="-mt-2 h-96 md:h-[500px]">
+        <CarouselContent class="-mt-2 h-[500px]">
           <CarouselItem
             v-for="(image, index) in images"
             :key="image.id"
-            class="pt-2 basis-1/4 md:basis-auto"
+            class="pt-2"
             @click="onThumbClick(index)"
           >
             <div
@@ -79,11 +73,12 @@ onMounted(() => {
       </Carousel>
     </div>
 
-    <!-- 2. Основная карусель (большие изображения) -->
-    <!-- `flex-grow` заставит ее занять все оставшееся пространство -->
-    <div class="flex-grow">
+    <div class="flex-1">
       <Carousel
         class="w-full"
+        :opts="{
+          loop: true,
+        }"
         @init-api="onInitMain"
       >
         <CarouselContent>
@@ -99,6 +94,16 @@ onMounted(() => {
             </div>
           </CarouselItem>
         </CarouselContent>
+
+        <div v-if="images && images.length > 1" class="absolute bottom-4 left-0 right-0 flex justify-center gap-2 md:hidden">
+          <button
+            v-for="(image, index) in images"
+            :key="`dot-${image.id}`"
+            class="w-2 h-2 rounded-full transition-all duration-300"
+            :class="index === selectedIndex ? 'bg-primary scale-125' : 'bg-muted-foreground/50'"
+            @click="onThumbClick(index)"
+          />
+        </div>
       </Carousel>
     </div>
   </div>
