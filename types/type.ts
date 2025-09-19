@@ -158,7 +158,44 @@ export type ProductWithGallery = ProductRow & {
   product_images: ProductImageRow[]
 }
 
+export interface CustomFieldSchema {
+  [key: string]: {
+    label: string
+    type: 'boolean' | 'text' | 'number' | 'select'
+    options?: string[]
+  }
+}
+
+export interface ProductAccessoryLink {
+  accessory: ProductRow & {
+    product_images: ProductImageRow[]
+  }
+}
+
+export type ProductAccessoryRow = Database['public']['Tables']['product_accessories']['Row'] & {
+  products: (ProductRow & {
+    product_images: ProductImageRow[]
+  }) | null
+}
+
+export type ProductTypeRow = Database['public']['Tables']['product_types']['Row'] & {
+  custom_fields_schema: CustomFieldSchema | null
+}
+
 export type FullProduct = ProductRow & {
   categories: { name: string | null, slug: string | null } | null
   product_images: ProductImageRow[]
+  product_types?: ProductTypeRow | null
+  product_accessories?: ProductAccessoryRow[]
+}
+
+export type CustomFieldValue = string | number | boolean | null
+
+export type ProductFormData = Partial<Omit<ProductRow, 'id' | 'created_at' | 'updated_at'>> & {
+  name: string
+  slug: string
+  is_active: boolean
+  price: number
+  stock_quantity: number
+  custom_fields_data: Record<string, CustomFieldValue> | null
 }

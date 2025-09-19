@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FullProduct, ProductImageRow, ProductInsert, ProductUpdate } from '@/types'
+import type { CustomFiledValue, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductRow, ProductUpdate } from '@/types'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { toast } from 'vue-sonner'
@@ -17,6 +17,7 @@ const emit = defineEmits<{
   (e: 'create', payload: {
     data: ProductInsert
     newImageFiles: File[]
+    accessoryIds: string[]
   }): void
 
   (e: 'update', payload: {
@@ -24,15 +25,35 @@ const emit = defineEmits<{
     newImageFiles: File[]
     imagesToDelete: string[]
     existingImages: ProductImageRow[]
+    accessoryIds: string[]
   }): void
 }>()
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ КОМПОНЕНТА ---
-const formData = ref<any>({})
+const formData = ref<ProductFormData>({
+  name: '',
+  slug: '',
+  price: 0,
+  is_active: true,
+  stock_quantity: 0,
+  description: '',
+  category_id: null,
+  bonus_points_award: 0,
+  min_age: null,
+  max_age: null,
+  gender: 'unisex',
+  product_type: null,
+  custom_fields_data: {},
+})
 const newImageFiles = ref<{ file: File, previewUrl: string }[]>([])
 const existingImages = ref<ProductImageRow[]>([])
 const imagesToDelete = ref<string[]>([])
 const selectedBonusPercent = ref(5)
+
+const linkedAccessories = ref<ProductRow[]>([])
+const accessorySearchQuery = ref('')
+const accessorySearchResults = ref<ProductRow[]>([])
+const isSearchingAccessories = ref(false)
 
 const categoriesStore = useAdminCategoriesStore()
 const { getPublicUrl } = useSupabaseStorage()
@@ -48,36 +69,43 @@ const bonusOptions = [
 watch(() => props.initialData, (product) => {
   newImageFiles.value = []
   imagesToDelete.value = []
+  linkedAccessories.value = []
 
-  if (product) {
-    formData.value = JSON.parse(JSON.stringify(product))
-    existingImages.value = [...(product.product_images || [])]
-    if (product.price > 0) {
-      const percent = Math.round((product.bonus_points_award / Number(product.price)) * 100)
-      selectedBonusPercent.value = bonusOptions.find(opt => opt.value === percent)?.value || 5
-    }
-    else {
-      selectedBonusPercent.value = 5
-    }
-  }
-  else {
+  if (product && product.id) {
+    const productCopy = JSON.parse(JSON.stringify(product)) as FullProduct
+
     formData.value = {
-      name: '',
-      slug: '',
-      description: '',
-      price: 0,
-      category_id: null,
-      stock_quantity: 0,
-      is_active: true,
-      bonus_points_award: 0,
-      min_age: null,
-      max_age: null,
-      gender: 'unisex',
+      name: productCopy.name,
+      slug: productCopy.slug,
+      price: productCopy.price,
+      is_active: productCopy.is_active,
+      stock_quantity: productCopy.stock_quantity,
+      description: productCopy.description,
+      category_id: productCopy.category_id,
+      bonus_points_award: productCopy.bonus_points_award,
+      min_age: productCopy.min_age,
+      max_age: productCopy.max_age,
+      gender: productCopy.gender,
+      product_type: productCopy.product_type,
+
+      custom_fields_data: (
+      // Проверяем, что это объект, он не null и не массив
+        typeof productCopy.custom_fields_data === 'object'
+        && productCopy.custom_fields_data !== null
+        && !Array.isArray(productCopy.custom_fields_data)
+      )
+        ? productCopy.custom_fields_data as Record<string, CustomFiledValue> // Если да, то используем его
+        : {},
     }
-    existingImages.value = []
-    selectedBonusPercent.value = 5
+
+    existingImages.value = [...(productCopy.product_images || [])]
+
+    if (productCopy.accessories && productCopy.accessories.length > 0) {
+      linkedAccessories.value = productCopy.accessories
+        .map(link => link)
+    }
   }
-}, { immediate: true })
+})
 
 onMounted(() => {
   categoriesStore.fetchAllCategories()
