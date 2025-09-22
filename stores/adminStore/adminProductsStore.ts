@@ -1,4 +1,4 @@
-import type { Database, FullProduct, ProductImageRow, ProductInsert, ProductUpdate } from '@/types'
+import type { Database, FullProduct, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -40,12 +40,24 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, categories(name, slug), product_images(*)')
+        .select(`
+          *,
+          categories(name, slug),
+          product_images(*),
+          product_types(*),
+          product_accessories(
+            *,
+            accessory:products(
+              id, name, price, slug,
+              product_images(*)
+            )
+          )
+        `)
         .eq('id', id)
         .single()
       if (error)
         throw error
-      currentProduct.value = data
+      currentProduct.value = data as unknown as FullProduct
     }
     catch (error: any) {
       toast.error(`Ошибка загрузки товара с ID: ${id}`, { description: error.message })
@@ -58,21 +70,25 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   // --- ЗАПИСЬ ДАННЫХ (Write) ---
 
   /**
-   * Создает новый товар и его галерею.
+   * ОБНОВЛЕНО: Создает товар, его галерею и связи с аксессуарами.
    */
-  async function createProduct(productData: ProductInsert, newImageFiles: File[]) {
+  async function createProduct(productData: ProductInsert, newImageFiles: File[], accessoryIds: string[]) {
     isSaving.value = true
     try {
+      // 1. Создаем основную запись о товаре
       const { data: newProduct, error } = await supabase
         .from('products')
         .insert(productData)
-        .select()
+        .select('id, name')
         .single()
-      if (error)
+      if (error || !newProduct)
         throw error
 
-      // Для нового товара `imagesToDelete` всегда пустой, а `existingImageCount` равен 0.
-      await _manageProductImages(newProduct.id, newImageFiles, [], 0)
+      // 2. Параллельно запускаем загрузку картинок и сохранение аксессуаров
+      await Promise.all([
+        _manageProductImages(newProduct.id, newImageFiles, [], 0),
+        _manageProductAccessories(newProduct.id, accessoryIds),
+      ])
 
       toast.success(`Товар "${newProduct.name}" успешно создан.`)
       return newProduct
@@ -223,6 +239,67 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         if (error)
           throw error
       }
+    }
+  }
+
+  /**
+   * НОВЫЙ ХЕЛПЕР: Управляет связями товара с аксессуарами.
+   */
+  async function _manageProductAccessories(mainProductId: string, newAccessoryIds: string[]) {
+    // 1. Получаем текущие связи для этого товара
+    const { data: currentLinks, error: fetchError } = await supabase
+      .from('product_accessories')
+      .select('accessory_product_id')
+      .eq('main_product_id', mainProductId)
+    if (fetchError)
+      throw fetchError
+    const currentAccessoryIds = currentLinks.map(link => link.accessory_product_id)
+
+    // 2. Находим ID, которые нужно удалить (есть в старом списке, но нет в новом)
+    const idsToDelete = currentAccessoryIds.filter(id => !newAccessoryIds.includes(id))
+    if (idsToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('product_accessories')
+        .delete()
+        .eq('main_product_id', mainProductId)
+        .in('accessory_product_id', idsToDelete)
+      if (deleteError)
+        throw deleteError
+    }
+
+    // 3. Находим ID, которые нужно добавить (есть в новом списке, но нет в старом)
+    const idsToInsert = newAccessoryIds.filter(id => !currentAccessoryIds.includes(id))
+    if (idsToInsert.length > 0) {
+      const linksToInsert = idsToInsert.map(accId => ({
+        main_product_id: mainProductId,
+        accessory_product_id: accId,
+      }))
+      const { error: insertError } = await supabase
+        .from('product_accessories')
+        .insert(linksToInsert)
+      if (insertError)
+        throw insertError
+    }
+  }
+  /**
+   * НОВАЯ ФУНКЦИЯ: Поиск товаров для добавления в аксессуары.
+   */
+  async function searchProducts(query: string, limit: number = 5): Promise<ProductSearchResult[]> {
+    if (query.length < 2)
+      return []
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price')
+        .ilike('name', `%${query}%`)
+        .limit(limit)
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка поиска товаров', { description: error.message })
+      return []
     }
   }
 

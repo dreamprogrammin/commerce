@@ -173,7 +173,7 @@ export interface ProductAccessoryLink {
 }
 
 export type ProductAccessoryRow = Database['public']['Tables']['product_accessories']['Row'] & {
-  products: (ProductRow & {
+  accessory: (ProductRow & {
     product_images: ProductImageRow[]
   }) | null
 }
@@ -199,3 +199,5 @@ export type ProductFormData = Partial<Omit<ProductRow, 'id' | 'created_at' | 'up
   stock_quantity: number
   custom_fields_data: Record<string, CustomFieldValue> | null
 }
+
+export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
