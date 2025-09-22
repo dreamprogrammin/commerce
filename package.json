@@ -25,6 +25,7 @@
     "clsx": "^2.1.1",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-vue": "^8.6.0",
+    "lodash-es": "^4.17.21",
     "lucide-vue-next": "^0.536.0",
     "nuxt": "^4.0.2",
     "pinia": "^3.0.3",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.2.0",
+    "@types/lodash-es": "^4.17.12",
     "eslint": "^9.32.0",
     "eslint-plugin-format": "^1.0.1",
     "lint-staged": "^16.1.4",

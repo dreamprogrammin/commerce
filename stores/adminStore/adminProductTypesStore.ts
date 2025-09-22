@@ -1,7 +1,7 @@
 import type { Database, ProductTypeRow } from '@/types'
 import { toast } from 'vue-sonner'
 
-export const useProductTypesStore = defineStore('productTypesStore', () => {
+export const useAdminProductTypesStore = defineStore('productTypesStore', () => {
   const supabase = useSupabaseClient<Database>()
 
   const productType = ref<ProductTypeRow[]>([])

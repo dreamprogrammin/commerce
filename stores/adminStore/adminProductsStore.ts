@@ -103,28 +103,33 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   }
 
   /**
-   * Обновляет существующий товар и его галерею.
+   * Обновляет товар, его галерею и связи с аксессуарами.
    */
   async function updateProduct(
     productId: string,
     productData: ProductUpdate,
     newImageFiles: File[],
     imagesToDelete: string[],
-    existingImages: ProductImageRow[], // <-- Принимаем сюда актуальные данные
+    existingImages: ProductImageRow[],
+    accessoryIds: string[],
   ) {
     isSaving.value = true
     try {
+      // 1. Обновляем основную запись
       const { data: updatedProduct, error } = await supabase
         .from('products')
         .update(productData)
         .eq('id', productId)
-        .select()
+        .select('id, name')
         .single()
-      if (error)
+      if (error || !updatedProduct)
         throw error
 
-      // Передаем в хелпер ID, новые файлы, ID на удаление и КОЛИЧЕСТВО существующих картинок
-      await _manageProductImages(productId, newImageFiles, imagesToDelete, existingImages.length)
+      // 2. Параллельно обновляем картинки и аксессуары
+      await Promise.all([
+        _manageProductImages(productId, newImageFiles, imagesToDelete, existingImages.length),
+        _manageProductAccessories(productId, accessoryIds),
+      ])
 
       toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
       return updatedProduct
@@ -306,6 +311,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   return {
     products,
     currentProduct,
+    searchProducts,
     isLoading,
     isSaving,
     fetchProducts,

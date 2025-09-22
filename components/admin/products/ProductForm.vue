@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import type { CustomFiledValue, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductRow, ProductUpdate } from '@/types'
-import { computed, onMounted, ref, watch } from 'vue'
+import type { AccessoryProduct, CustomFieldValue, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductTypeRow, ProductUpdate } from '@/types'
+import { debounce } from 'lodash-es'
 
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
+import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
+import { useAdminProductTypesStore } from '@/stores/adminStore/adminProductTypesStore'
 import { slugify } from '@/utils/slugify'
 
 // --- 1. PROPS & EMITS ---
 const props = defineProps<{
   initialData?: FullProduct | null
 }>()
-
 const emit = defineEmits<{
   (e: 'create', payload: {
     data: ProductInsert
@@ -45,18 +46,6 @@ const formData = ref<ProductFormData>({
   product_type: null,
   custom_fields_data: {},
 })
-const newImageFiles = ref<{ file: File, previewUrl: string }[]>([])
-const existingImages = ref<ProductImageRow[]>([])
-const imagesToDelete = ref<string[]>([])
-const selectedBonusPercent = ref(5)
-
-const linkedAccessories = ref<ProductRow[]>([])
-const accessorySearchQuery = ref('')
-const accessorySearchResults = ref<ProductRow[]>([])
-const isSearchingAccessories = ref(false)
-
-const categoriesStore = useAdminCategoriesStore()
-const { getPublicUrl } = useSupabaseStorage()
 
 const bonusOptions = [
   { label: 'Стандарт (5%)', value: 5 },
@@ -65,7 +54,24 @@ const bonusOptions = [
   { label: 'Подарок (100%)', value: 100 },
 ]
 
-// --- 3. ИНИЦИАЛИЗАЦИЯ ФОРМЫ ---
+// --- 3. ИНИЦИАЛИЗАЦИЯ СТОРОВ И ПЕРЕМЕННЫХ ---
+const categoriesStore = useAdminCategoriesStore()
+const productTypesStore = useAdminProductTypesStore()
+const productStore = useAdminProductsStore()
+const { getPublicUrl } = useSupabaseStorage()
+const { productType } = storeToRefs(productTypesStore)
+
+const newImageFiles = ref<{ file: File, previewUrl: string }[]>([])
+const existingImages = ref<ProductImageRow[]>([])
+const imagesToDelete = ref<string[]>([])
+const selectedBonusPercent = ref(5)
+
+const linkedAccessories = ref<(AccessoryProduct | ProductSearchResult)[]>([])
+const accessorySearchQuery = ref('')
+const accessorySearchResults = ref<ProductSearchResult[]>([])
+const isSearchingAccessories = ref(false)
+
+// --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ПРИ ЗАГРУЗКЕ ---
 watch(() => props.initialData, (product) => {
   newImageFiles.value = []
   imagesToDelete.value = []
@@ -77,38 +83,105 @@ watch(() => props.initialData, (product) => {
     formData.value = {
       name: productCopy.name,
       slug: productCopy.slug,
-      price: productCopy.price,
-      is_active: productCopy.is_active,
-      stock_quantity: productCopy.stock_quantity,
       description: productCopy.description,
+      price: productCopy.price,
       category_id: productCopy.category_id,
+      stock_quantity: productCopy.stock_quantity,
+      is_active: productCopy.is_active,
       bonus_points_award: productCopy.bonus_points_award,
       min_age: productCopy.min_age,
       max_age: productCopy.max_age,
-      gender: productCopy.gender,
+      gender: productCopy.gender as 'unisex' | 'male' | 'female' | null,
       product_type: productCopy.product_type,
-
       custom_fields_data: (
-      // Проверяем, что это объект, он не null и не массив
         typeof productCopy.custom_fields_data === 'object'
         && productCopy.custom_fields_data !== null
         && !Array.isArray(productCopy.custom_fields_data)
       )
-        ? productCopy.custom_fields_data as Record<string, CustomFiledValue> // Если да, то используем его
+        ? productCopy.custom_fields_data as Record<string, CustomFieldValue>
         : {},
     }
 
     existingImages.value = [...(productCopy.product_images || [])]
 
-    if (productCopy.accessories && productCopy.accessories.length > 0) {
-      linkedAccessories.value = productCopy.accessories
-        .map(link => link)
+    if (productCopy.product_accessories && productCopy.product_accessories.length > 0) {
+      linkedAccessories.value = productCopy.product_accessories
+        .map(link => link.accessory)
+        .filter((p): p is AccessoryProduct => p !== null) // filter также помогает TypeScript'у понять тип
     }
+
+    if (productCopy.price > 0) {
+      const percent = Math.round((productCopy.bonus_points_award / Number(productCopy.price)) * 100)
+      selectedBonusPercent.value = bonusOptions.find(opt => opt.value === percent)?.value || 5
+    }
+    else {
+      selectedBonusPercent.value = 5
+    }
+  }
+  else {
+    formData.value = {
+      name: '',
+      slug: '',
+      price: 0,
+      is_active: true,
+      stock_quantity: 0,
+      description: '',
+      category_id: null,
+      bonus_points_award: 0,
+      min_age: null,
+      max_age: null,
+      gender: 'unisex',
+      product_type: null,
+      custom_fields_data: {},
+    }
+    existingImages.value = []
+    selectedBonusPercent.value = 5
   }
 })
 
 onMounted(() => {
   categoriesStore.fetchAllCategories()
+  productTypesStore.fetchAllProductTypes()
+})
+
+// --- 5. РЕАКТИВНОСТЬ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+
+watch(() => formData.value?.product_type, (newTypeSlug) => {
+  // ПРИНУДИТЕЛЬНОЕ УТВЕРЖДЕНИЕ ТИПА ПРЯМО ПЕРЕД ИСПОЛЬЗОВАНИЕМ
+  const typesArray = productType.value as ProductTypeRow[]
+  const selectedType = typesArray.find(type => type.slug === newTypeSlug)
+
+  const schema = selectedType?.custom_fields_schema
+  const newCustomData: Record<string, CustomFieldValue> = (
+    typeof formData.value.custom_fields_data === 'object' && formData.value.custom_fields_data !== null
+  )
+    ? { ...formData.value.custom_fields_data }
+    : {}
+
+  if (schema) {
+    Object.keys(schema).forEach((key) => {
+      const field = schema[key]
+      if (field && !(key in newCustomData)) {
+        newCustomData[key] = field.type === 'boolean' ? false : null
+      }
+    })
+  }
+  formData.value.custom_fields_data = newCustomData
+})
+
+const currentTypeSchema = computed(() => {
+  const currentSlug = formData.value?.product_type
+  if (!currentSlug) {
+    return null
+  }
+
+  // ИСПОЛЬЗУЕМ ТОТ ЖЕ "СИЛОВОЙ" ПОДХОД ЗДЕСЬ
+  const typesArray = productType.value as ProductTypeRow[]
+  const selectedType = typesArray.find(
+    t => t.slug === currentSlug,
+  )
+
+  return selectedType ? selectedType.custom_fields_schema : null
 })
 
 watch([() => formData.value.price, selectedBonusPercent], ([price, percent]) => {
@@ -159,26 +232,54 @@ function removeExistingImage(image: ProductImageRow) {
   existingImages.value = existingImages.value.filter(img => img.id !== image.id)
 }
 
-// --- 5. ФУНКЦИЯ ОТПРАВКИ ---
+// --- 7. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
+
+const debouncedSearch = debounce(async () => {
+  if (accessorySearchQuery.value.length < 2) {
+    accessorySearchResults.value = []
+    return
+  }
+  isSearchingAccessories.value = true
+  accessorySearchResults.value = await productStore.searchProducts(accessorySearchQuery.value, 5)
+  isSearchingAccessories.value = false
+}, 300)
+
+function addAccessory(product: ProductSearchResult) {
+  if (!linkedAccessories.value.some(p => p.id === product.id))
+    linkedAccessories.value.push(product)
+  accessorySearchQuery.value = ''
+  accessorySearchResults.value = []
+}
+function removeAccessory(productId: string) {
+  linkedAccessories.value = linkedAccessories.value.filter(p => p.id !== productId)
+}
+
 function handleSubmit() {
-  const { categories, product_images, ...productData } = formData.value
+  if (!formData.value)
+    return
+  if (!formData.value.name || !formData.value.slug) {
+    toast.error('Название и Слаг - обязательные поля')
+    return
+  }
+
+  const productData = { ...formData.value }
+
+  const accessoryIds = linkedAccessories.value.map(p => p.id)
 
   if (props.initialData) {
     emit('update', {
-      data: productData,
+      data: productData as ProductUpdate,
       newImageFiles: newImageFiles.value.map(item => item.file),
       imagesToDelete: imagesToDelete.value,
       existingImages: existingImages.value,
+      accessoryIds,
     })
   }
   else {
-    if (!productData.name || !productData.slug) {
-      toast.error('Название и Слаг - обязательные поля')
-      return
-    }
     emit('create', {
-      data: productData,
+      data: productData as ProductInsert,
       newImageFiles: newImageFiles.value.map(item => item.file),
+      accessoryIds,
     })
   }
 }

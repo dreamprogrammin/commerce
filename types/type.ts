@@ -173,9 +173,7 @@ export interface ProductAccessoryLink {
 }
 
 export type ProductAccessoryRow = Database['public']['Tables']['product_accessories']['Row'] & {
-  accessory: (ProductRow & {
-    product_images: ProductImageRow[]
-  }) | null
+  accessory: AccessoryProduct | null
 }
 
 export type ProductTypeRow = Database['public']['Tables']['product_types']['Row'] & {
@@ -191,13 +189,23 @@ export type FullProduct = ProductRow & {
 
 export type CustomFieldValue = string | number | boolean | null
 
-export type ProductFormData = Partial<Omit<ProductRow, 'id' | 'created_at' | 'updated_at'>> & {
+export interface ProductFormData {
   name: string
   slug: string
-  is_active: boolean
+  description: string | null
   price: number
+  category_id: string | null
   stock_quantity: number
+  is_active: boolean
+  bonus_points_award: number
+  min_age: number | null
+  max_age: number | null
+  gender: 'unisex' | 'male' | 'female' | null
+  product_type: string | null
   custom_fields_data: Record<string, CustomFieldValue> | null
 }
-
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
+
+export type AccessoryProduct = Pick<ProductRow, 'id' | 'name' | 'price' | 'slug'> & {
+  product_images: ProductImageRow[]
+}
