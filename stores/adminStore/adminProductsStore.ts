@@ -48,7 +48,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           product_accessories(
             *,
             accessory:products(
-              id, name, price, slug,
+              *,
               product_images(*)
             )
           )
