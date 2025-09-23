@@ -59,7 +59,18 @@ export const useProductsStore = defineStore('productsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, categories(name, slug), product_images(*)')
+        .select(`
+          *,
+          categories(name, slug),
+          product_images(*),
+          product_accessories(
+            *,
+            accessory:products(
+              *,
+              product_images(*)
+            )
+          )
+        `)
         .eq('slug', slug)
         .eq('is_active', true)
         .order('display_order', { referencedTable: 'product_images' })

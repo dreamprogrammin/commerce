@@ -16,11 +16,17 @@ useAsyncData(
   () => adminProductsStore.fetchProductById(productId),
 )
 
+/**
+ * Обработчик события @update от компонента ProductForm.
+ * Принимает все данные, необходимые для обновления продукта.
+ */
+
 async function handleUpdate(payload: {
   data: ProductUpdate
   newImageFiles: File[]
   imagesToDelete: string[]
   existingImages: ProductImageRow[]
+  accessoryIds: string[]
 }) {
   const updatedProduct = await adminProductsStore.updateProduct(
     productId,
@@ -28,6 +34,7 @@ async function handleUpdate(payload: {
     payload.newImageFiles,
     payload.imagesToDelete,
     payload.existingImages,
+    payload.accessoryIds,
   )
   if (updatedProduct) {
     router.push('/admin/products')

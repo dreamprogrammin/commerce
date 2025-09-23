@@ -125,5 +125,21 @@ watch(() => product.value?.id, () => {
         <ProductDetailSkeleton />
       </template>
     </ClientOnly>
+    <div v-if="product && product.product_accessories && product.product_accessories.length > 0" class="mt-16 pt-8 border-t">
+      <h2 class="text-2xl font-bold mb-6">
+        С этим товаром покупают
+      </h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <!--
+          Проходим по массиву СВЯЗЕЙ (`product.product_accessories`).
+          Из каждой СВЯЗИ (`link`) мы извлекаем вложенный ТОВАР (`link.accessory`).
+        -->
+        <ProductCard
+          v-for="link in product.product_accessories"
+          :key="link.accessory.id"
+          :product="link.accessory"
+        />
+      </div>
+    </div>
   </div>
 </template>

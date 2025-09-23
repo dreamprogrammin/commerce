@@ -205,6 +205,34 @@ const maxAgeValue = computed({
   },
 })
 
+const descriptionValue = computed({
+  get: () => formData.value.description ?? '',
+  set: (value: string) => {
+    formData.value.description = value === '' ? null : value
+  },
+})
+
+// const categoryIdValue = computed({
+//   get: () => formData.value.category_id ?? undefined, // Select ожидает `undefined` для placeholder
+//   set: (value: string | null) => {
+//     formData.value.category_id = value
+//   },
+// })
+
+// const productTypeValue = computed({
+//   get: () => formData.value.product_type ?? undefined, // Select ожидает `undefined` для placeholder
+//   set: (value: string | null) => {
+//     formData.value.product_type = value
+//   },
+// })
+
+// const genderValue = computed({
+//   get: () => formData.value.gender ?? 'unisex',
+//   set: (value: 'unisex' | 'male' | 'female' | null) => {
+//     formData.value.gender = value
+//   },
+// })
+
 function autoFillSlug() {
   if (formData.value?.name && !formData.value.slug) {
     formData.value.slug = slugify(formData.value.name)
@@ -289,8 +317,11 @@ function handleSubmit() {
   <form v-if="formData" class="grid grid-cols-1 lg:grid-cols-3 gap-8" @submit.prevent="handleSubmit">
     <!-- Левая колонка -->
     <div class="lg:col-span-2 space-y-6">
+      <!-- Основная информация -->
       <Card>
-        <CardHeader><CardTitle>Основная информация</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Основная информация</CardTitle>
+        </CardHeader>
         <CardContent class="space-y-4">
           <div>
             <Label for="name">Название товара *</Label>
@@ -302,13 +333,16 @@ function handleSubmit() {
           </div>
           <div>
             <Label for="description">Описание</Label>
-            <Textarea id="description" v-model="formData.description" />
+            <Textarea id="description" v-model="descriptionValue" />
           </div>
         </CardContent>
       </Card>
 
+      <!-- Цена и бонусы -->
       <Card>
-        <CardHeader><CardTitle>Цена и бонусы</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Цена и бонусы</CardTitle>
+        </CardHeader>
         <CardContent class="space-y-4">
           <div>
             <Label for="price">Цена в ₸ *</Label>
@@ -317,7 +351,9 @@ function handleSubmit() {
           <div class="p-3 bg-muted/50 rounded-md">
             <Label>Процент бонусов</Label>
             <Select v-model.number="selectedBonusPercent">
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="opt in bonusOptions" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
@@ -331,20 +367,62 @@ function handleSubmit() {
         </CardContent>
       </Card>
 
+      <!-- Параметры для рекомендаций -->
       <Card>
         <CardHeader>
-          <CardTitle>Параметры для рекомендаций</CardTitle>
-          <CardDescription>Помогут рекомендовать товар нужным пользователям.</CardDescription>
+          <CardTitle>Параметры и атрибуты</CardTitle>
+          <CardDescription>Помогут рекомендовать товар и добавят доп. информацию.</CardDescription>
         </CardHeader>
-        <CardContent class="space-y-4">
+        <CardContent class="space-y-6">
+          <!-- Выбор типа товара -->
+          <div>
+            <Label for="product_type">Тип товара</Label>
+            <Select v-model="formData.product_type">
+              <SelectTrigger id="product_type">
+                <SelectValue placeholder="Выберите тип" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="typeOption in productTypesStore.productType" :key="typeOption.slug" :value="typeOption.slug">
+                  {{ typeOption.name }}
+                </SelectItem>
+                <SelectItem :value="null" class="italic text-muted-foreground">
+                  (Без типа)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- ДИНАМИЧЕСКИЕ ПОЛЯ -->
+          <div v-if="currentTypeSchema && formData.custom_fields_data" class="space-y-4 p-4 border rounded-md">
+            <div v-for="(field, key) in currentTypeSchema" :key="key">
+              <div v-if="field.type === 'boolean'" class="flex items-center space-x-2">
+                <Switch :id="key.toString()" @update:model-value="formData.custom_fields_data[key]" />
+                <Label :for="key.toString()">{{ field.label }}</Label>
+              </div>
+              <div v-if="field.type === 'text'">
+                <Label :for="key.toString()">{{ field.label }}</Label>
+                <Input
+                  :id="key.toString()"
+                  :model-value="String(formData.custom_fields_data[key] ?? '')"
+                  @update:model-value="newValue => {
+                    if (formData.custom_fields_data) {
+                      formData.custom_fields_data[key] = newValue === '' ? null : newValue
+                    }
+                  }"
+                />
+              </div>
+              <!-- Сюда можно добавить рендеринг других типов полей (number, select) -->
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label for="min_age">Мин. возраст (в месяцах)</Label>
-              <Input id="min_age" v-model.number="minAgeValue" type="number" placeholder="Например, 36" />
+              <Input id="min_age" v-model.number="minAgeValue" type="number" />
             </div>
             <div>
               <Label for="max_age">Макс. возраст (в месяцах)</Label>
-              <Input id="max_age" v-model.number="maxAgeValue" type="number" placeholder="Например, 72" />
+              <Input id="max_age" v-model.number="maxAgeValue" type="number" />
             </div>
           </div>
           <div>
@@ -368,17 +446,56 @@ function handleSubmit() {
           </div>
         </CardContent>
       </Card>
+
+      <!-- УПРАВЛЕНИЕ АКСЕССУАРАМИ -->
+      <Card v-if="formData.custom_fields_data?.needs_batteries === true">
+        <CardHeader>
+          <CardTitle>Сопутствующие товары</CardTitle>
+          <CardDescription>Например, батарейки для этой игрушки.</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div>
+            <Label for="accessory-search">Добавить аксессуар</Label>
+            <Input id="accessory-search" v-model="accessorySearchQuery" placeholder="Начните вводить название..." @input="debouncedSearch" />
+            <div v-if="isSearchingAccessories" class="text-sm text-muted-foreground p-2">
+              Поиск...
+            </div>
+            <div v-if="accessorySearchResults.length > 0" class="border rounded-md mt-1 p-1 space-y-1">
+              <div v-for="product in accessorySearchResults" :key="product.id" class="cursor-pointer hover:bg-muted p-2 rounded-md flex justify-between items-center" @click="addAccessory(product)">
+                <span>{{ product.name }}</span>
+                <span class="text-xs text-muted-foreground">{{ product.price }} ₸</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="linkedAccessories.length > 0" class="space-y-2">
+            <p class="text-sm font-medium">
+              Привязанные аксессуары:
+            </p>
+            <div v-for="acc in linkedAccessories" :key="acc.id" class="flex items-center justify-between bg-muted p-2 rounded-md text-sm">
+              <span>{{ acc.name }}</span>
+              <Button type="button" variant="ghost" size="icon" class="h-6 w-6" @click="removeAccessory(acc.id)">
+                <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
 
     <!-- Правая колонка -->
     <div class="lg:col-span-1 space-y-6">
+      <!-- Организация -->
       <Card>
-        <CardHeader><CardTitle>Организация</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Организация</CardTitle>
+        </CardHeader>
         <CardContent class="space-y-4">
           <div>
             <Label>Категория</Label>
             <Select v-model="formData.category_id">
-              <SelectTrigger><SelectValue placeholder="Выберите категорию" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите категорию" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="cat in categoriesStore.allCategories" :key="cat.id" :value="cat.id">
                   {{ cat.name }}
@@ -391,34 +508,31 @@ function handleSubmit() {
             <Input id="stock" v-model.number="formData.stock_quantity" type="number" />
           </div>
           <div class="flex items-center space-x-2 pt-2">
-            <Switch id="is_active" v-model:checked="formData.is_active" />
+            <Switch id="is_active" @update:model-value="newValue => formData.is_active = newValue" />
             <Label for="is_active">Активен</Label>
           </div>
         </CardContent>
       </Card>
 
+      <!-- Галерея изображений -->
       <Card>
-        <CardHeader><CardTitle>Галерея изображений</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Галерея изображений</CardTitle>
+        </CardHeader>
         <CardContent class="space-y-4">
-          <div v-if="existingImages.length > 0" class="space-y-2">
-            <p class="text-sm font-medium">
-              Текущие изображения
-            </p>
-            <div v-for="image in existingImages" :key="image.id" class="relative group">
-              <NuxtImg :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || ''" class="w-full h-24 object-cover rounded-md" />
+          <div v-if="existingImages.length > 0" class="grid grid-cols-3 gap-2">
+            <div v-for="image in existingImages" :key="image.id" class="relative group aspect-square">
+              <NuxtImg :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || ''" class="w-full h-full object-cover rounded-md" />
               <Button type="button" variant="destructive" size="icon" class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" @click="removeExistingImage(image)">
-                X
+                <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
               </Button>
             </div>
           </div>
-          <div v-if="newImageFiles.length > 0" class="space-y-2">
-            <p class="text-sm font-medium">
-              Новые на загрузку
-            </p>
-            <div v-for="(item, index) in newImageFiles" :key="index" class="relative group">
-              <img :src="item.previewUrl" class="w-full h-24 object-cover rounded-md" alt="Превью нового изображения">
+          <div v-if="newImageFiles.length > 0" class="grid grid-cols-3 gap-2">
+            <div v-for="(item, index) in newImageFiles" :key="index" class="relative group aspect-square">
+              <img :src="item.previewUrl" class="w-full h-full object-cover rounded-md" alt="Превью нового изображения">
               <Button type="button" variant="destructive" size="icon" class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" @click="removeNewImage(index)">
-                X
+                <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
               </Button>
             </div>
           </div>

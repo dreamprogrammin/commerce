@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductWithGallery } from '@/types'
+import type { AccessoryProduct } from '@/types'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -13,7 +13,7 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
  * включая вложенный массив изображений `product_images`.
  */
 const props = defineProps<{
-  product: ProductWithGallery
+  product: AccessoryProduct
 }>()
 
 // --- ИНИЦИАЛИЗАЦИЯ ---

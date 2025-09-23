@@ -7,13 +7,20 @@ definePageMeta({ layout: 'admin' })
 const adminProductsStore = useAdminProductsStore()
 const router = useRouter()
 
+/**
+ * Обработчик события @create от компонента ProductForm.
+ * Принимает все данные, необходимые для создания продукта.
+ */
+
 async function handleCreate(payload: {
   data: ProductInsert
   newImageFiles: File[]
+  accessoryIds: string[]
 }) {
   const newProduct = await adminProductsStore.createProduct(
     payload.data,
     payload.newImageFiles,
+    payload.accessoryIds,
   )
 
   if (newProduct) {

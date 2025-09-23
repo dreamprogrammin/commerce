@@ -206,6 +206,6 @@ export interface ProductFormData {
 }
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
 
-export type AccessoryProduct = Pick<ProductRow, 'id' | 'name' | 'price' | 'slug'> & {
+export type AccessoryProduct = ProductRow & {
   product_images: ProductImageRow[]
 }
