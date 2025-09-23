@@ -134,11 +134,12 @@ watch(() => product.value?.id, () => {
           Проходим по массиву СВЯЗЕЙ (`product.product_accessories`).
           Из каждой СВЯЗИ (`link`) мы извлекаем вложенный ТОВАР (`link.accessory`).
         -->
-        <ProductCard
-          v-for="link in product.product_accessories"
-          :key="link.accessory.id"
-          :product="link.accessory"
-        />
+        <template v-for="link in product.product_accessories" :key="link.accessory_product_id">
+          <ProductCard
+            v-if="link.accessory"
+            :product="link.accessory"
+          />
+        </template>
       </div>
     </div>
   </div>
