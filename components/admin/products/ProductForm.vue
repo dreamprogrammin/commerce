@@ -7,13 +7,13 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
-import { useAdminProductTypesStore } from '@/stores/adminStore/adminProductTypesStore'
 import { slugify } from '@/utils/slugify'
 
 // --- 1. PROPS & EMITS ---
 const props = defineProps<{
   initialData?: FullProduct | null
 }>()
+
 const emit = defineEmits<{
   (e: 'create', payload: {
     data: ProductInsert
@@ -37,14 +37,12 @@ const formData = ref<ProductFormData>({
   price: 0,
   is_active: true,
   stock_quantity: 0,
-  description: '',
+  description: null,
   category_id: null,
   bonus_points_award: 0,
   min_age: null,
   max_age: null,
   gender: 'unisex',
-  product_type: null,
-  custom_fields_data: {},
 })
 
 const bonusOptions = [
@@ -56,16 +54,16 @@ const bonusOptions = [
 
 // --- 3. ИНИЦИАЛИЗАЦИЯ СТОРОВ И ПЕРЕМЕННЫХ ---
 const categoriesStore = useAdminCategoriesStore()
-const productTypesStore = useAdminProductTypesStore()
 const productStore = useAdminProductsStore()
 const { getPublicUrl } = useSupabaseStorage()
-const { productType } = storeToRefs(productTypesStore)
 
+// Переменные для UI
 const newImageFiles = ref<{ file: File, previewUrl: string }[]>([])
 const existingImages = ref<ProductImageRow[]>([])
 const imagesToDelete = ref<string[]>([])
 const selectedBonusPercent = ref(5)
 
+// Переменные для аксессуаров
 const linkedAccessories = ref<(AccessoryProduct | ProductSearchResult)[]>([])
 const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
@@ -92,14 +90,6 @@ watch(() => props.initialData, (product) => {
       min_age: productCopy.min_age,
       max_age: productCopy.max_age,
       gender: productCopy.gender as 'unisex' | 'male' | 'female' | null,
-      product_type: productCopy.product_type,
-      custom_fields_data: (
-        typeof productCopy.custom_fields_data === 'object'
-        && productCopy.custom_fields_data !== null
-        && !Array.isArray(productCopy.custom_fields_data)
-      )
-        ? productCopy.custom_fields_data as Record<string, CustomFieldValue>
-        : {},
     }
 
     existingImages.value = [...(productCopy.product_images || [])]
@@ -107,7 +97,7 @@ watch(() => props.initialData, (product) => {
     if (productCopy.product_accessories && productCopy.product_accessories.length > 0) {
       linkedAccessories.value = productCopy.product_accessories
         .map(link => link.accessory)
-        .filter((p): p is AccessoryProduct => p !== null) // filter также помогает TypeScript'у понять тип
+        .filter((p): p is AccessoryProduct => p !== null)
     }
 
     if (productCopy.price > 0) {
@@ -131,58 +121,17 @@ watch(() => props.initialData, (product) => {
       min_age: null,
       max_age: null,
       gender: 'unisex',
-      product_type: null,
-      custom_fields_data: {},
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
   }
-})
+}, { immediate: true })
 
 onMounted(() => {
   categoriesStore.fetchAllCategories()
-  productTypesStore.fetchAllProductTypes()
 })
 
 // --- 5. РЕАКТИВНОСТЬ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-
-watch(() => formData.value?.product_type, (newTypeSlug) => {
-  // ПРИНУДИТЕЛЬНОЕ УТВЕРЖДЕНИЕ ТИПА ПРЯМО ПЕРЕД ИСПОЛЬЗОВАНИЕМ
-  const typesArray = productType.value as ProductTypeRow[]
-  const selectedType = typesArray.find(type => type.slug === newTypeSlug)
-
-  const schema = selectedType?.custom_fields_schema
-  const newCustomData: Record<string, CustomFieldValue> = (
-    typeof formData.value.custom_fields_data === 'object' && formData.value.custom_fields_data !== null
-  )
-    ? { ...formData.value.custom_fields_data }
-    : {}
-
-  if (schema) {
-    Object.keys(schema).forEach((key) => {
-      const field = schema[key]
-      if (field && !(key in newCustomData)) {
-        newCustomData[key] = field.type === 'boolean' ? false : null
-      }
-    })
-  }
-  formData.value.custom_fields_data = newCustomData
-})
-
-const currentTypeSchema = computed(() => {
-  const currentSlug = formData.value?.product_type
-  if (!currentSlug) {
-    return null
-  }
-
-  // ИСПОЛЬЗУЕМ ТОТ ЖЕ "СИЛОВОЙ" ПОДХОД ЗДЕСЬ
-  const typesArray = productType.value as ProductTypeRow[]
-  const selectedType = typesArray.find(
-    t => t.slug === currentSlug,
-  )
-
-  return selectedType ? selectedType.custom_fields_schema : null
-})
 
 watch([() => formData.value.price, selectedBonusPercent], ([price, percent]) => {
   if (formData.value && price && percent) {
@@ -216,13 +165,6 @@ const descriptionValue = computed({
 //   get: () => formData.value.category_id ?? undefined, // Select ожидает `undefined` для placeholder
 //   set: (value: string | null) => {
 //     formData.value.category_id = value
-//   },
-// })
-
-// const productTypeValue = computed({
-//   get: () => formData.value.product_type ?? undefined, // Select ожидает `undefined` для placeholder
-//   set: (value: string | null) => {
-//     formData.value.product_type = value
 //   },
 // })
 
@@ -367,91 +309,11 @@ function handleSubmit() {
         </CardContent>
       </Card>
 
-      <!-- Параметры для рекомендаций -->
+      <!-- Сопутствующие товары (Аксессуары) -->
       <Card>
         <CardHeader>
-          <CardTitle>Параметры и атрибуты</CardTitle>
-          <CardDescription>Помогут рекомендовать товар и добавят доп. информацию.</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-6">
-          <!-- Выбор типа товара -->
-          <div>
-            <Label for="product_type">Тип товара</Label>
-            <Select v-model="formData.product_type">
-              <SelectTrigger id="product_type">
-                <SelectValue placeholder="Выберите тип" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="typeOption in productTypesStore.productType" :key="typeOption.slug" :value="typeOption.slug">
-                  {{ typeOption.name }}
-                </SelectItem>
-                <SelectItem :value="null" class="italic text-muted-foreground">
-                  (Без типа)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <!-- ДИНАМИЧЕСКИЕ ПОЛЯ -->
-          <div v-if="currentTypeSchema && formData.custom_fields_data" class="space-y-4 p-4 border rounded-md">
-            <div v-for="(field, key) in currentTypeSchema" :key="key">
-              <div v-if="field.type === 'boolean'" class="flex items-center space-x-2">
-                <Switch :id="key.toString()" @update:model-value="formData.custom_fields_data[key]" />
-                <Label :for="key.toString()">{{ field.label }}</Label>
-              </div>
-              <div v-if="field.type === 'text'">
-                <Label :for="key.toString()">{{ field.label }}</Label>
-                <Input
-                  :id="key.toString()"
-                  :model-value="String(formData.custom_fields_data[key] ?? '')"
-                  @update:model-value="newValue => {
-                    if (formData.custom_fields_data) {
-                      formData.custom_fields_data[key] = newValue === '' ? null : newValue
-                    }
-                  }"
-                />
-              </div>
-              <!-- Сюда можно добавить рендеринг других типов полей (number, select) -->
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label for="min_age">Мин. возраст (в месяцах)</Label>
-              <Input id="min_age" v-model.number="minAgeValue" type="number" />
-            </div>
-            <div>
-              <Label for="max_age">Макс. возраст (в месяцах)</Label>
-              <Input id="max_age" v-model.number="maxAgeValue" type="number" />
-            </div>
-          </div>
-          <div>
-            <Label for="gender">Пол</Label>
-            <Select v-model="formData.gender">
-              <SelectTrigger id="gender">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unisex">
-                  Унисекс
-                </SelectItem>
-                <SelectItem value="male">
-                  Для мальчиков
-                </SelectItem>
-                <SelectItem value="female">
-                  Для девочек
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- УПРАВЛЕНИЕ АКСЕССУАРАМИ -->
-      <Card v-if="formData.custom_fields_data?.needs_batteries === true">
-        <CardHeader>
           <CardTitle>Сопутствующие товары</CardTitle>
-          <CardDescription>Например, батарейки для этой игрушки.</CardDescription>
+          <CardDescription>Привяжите аксессуары, например, батарейки или подарочную упаковку.</CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
           <div>
@@ -487,7 +349,7 @@ function handleSubmit() {
       <!-- Организация -->
       <Card>
         <CardHeader>
-          <CardTitle>Организация</CardTitle>
+          <CardTitle>Организация и фильтры</CardTitle>
         </CardHeader>
         <CardContent class="space-y-4">
           <div>
@@ -508,8 +370,37 @@ function handleSubmit() {
             <Input id="stock" v-model.number="formData.stock_quantity" type="number" />
           </div>
           <div class="flex items-center space-x-2 pt-2">
-            <Switch id="is_active" @update:model-value="newValue => formData.is_active = newValue" />
+            <Switch id="is_active" v-model:checked="formData.is_active" />
             <Label for="is_active">Активен</Label>
+          </div>
+          <div class="pt-2">
+            <Label for="gender">Пол</Label>
+            <Select v-model="formData.gender">
+              <SelectTrigger id="gender">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unisex">
+                  Унисекс
+                </SelectItem>
+                <SelectItem value="male">
+                  Для мальчиков
+                </SelectItem>
+                <SelectItem value="female">
+                  Для девочек
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <Label for="min_age">Мин. возраст (мес.)</Label>
+              <Input id="min_age" v-model.number="minAgeValue" type="number" />
+            </div>
+            <div>
+              <Label for="max_age">Макс. возраст (мес.)</Label>
+              <Input id="max_age" v-model.number="maxAgeValue" type="number" />
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -183,27 +183,13 @@ export type ProductTypeRow = Database['public']['Tables']['product_types']['Row'
 export type FullProduct = ProductRow & {
   categories: { name: string | null, slug: string | null } | null
   product_images: ProductImageRow[]
-  product_types?: ProductTypeRow | null
-  product_accessories?: ProductAccessoryRow[]
+  product_accessories?: ProductAccessoryRow[] // Оставляем только это
 }
 
 export type CustomFieldValue = string | number | boolean | null
 
-export interface ProductFormData {
-  name: string
-  slug: string
-  description: string | null
-  price: number
-  category_id: string | null
-  stock_quantity: number
-  is_active: boolean
-  bonus_points_award: number
-  min_age: number | null
-  max_age: number | null
-  gender: 'unisex' | 'male' | 'female' | null
-  product_type: string | null
-  custom_fields_data: Record<string, CustomFieldValue> | null
-}
+export type ProductFormData = Omit<ProductRow, 'id' | 'created_at' | 'updated_at' | 'sales_count'>
+
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
 
 export type AccessoryProduct = ProductRow & {
