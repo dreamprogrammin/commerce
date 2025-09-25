@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AccessoryProduct } from '@/types'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
@@ -8,9 +9,25 @@ const cartStore = useCartStore()
 
 const slug = computed(() => route.params.slug as string)
 
+const similarProducts = ref<AccessoryProduct[]>([])
+
 const { data: product, pending: isLoading } = useAsyncData(
   `product-${slug.value}`,
-  () => productsStore.fetchProductBySlug(slug.value),
+  async () => {
+    // 1. Загружаем основной товар
+    const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
+
+    // 2. Если товар успешно загружен, запускаем загрузку похожих товаров
+    if (fetchedProduct) {
+      similarProducts.value = await productsStore.fetchSimilarProducts(
+        fetchedProduct.category_id,
+        fetchedProduct.id,
+        4, // Загружаем 4 похожих товара
+      )
+    }
+
+    return fetchedProduct
+  },
   {
     watch: [slug],
     lazy: true,
@@ -18,15 +35,8 @@ const { data: product, pending: isLoading } = useAsyncData(
   },
 )
 
-// --- Обработка ошибок и 404 ---
-// Этот watchEffect сработает на сервере и на клиенте, если данные не загрузились.
 watch(isLoading, (newIsLoadingValue) => {
-  // Мы запускаем проверку только тогда, когда загрузка ЗАКОНЧИЛАСЬ
-  // (т.е. newIsLoadingValue стало false).
-  // И если после этого product всё ещё пуст, значит, это реальная ошибка 404.
   if (newIsLoadingValue === false && !product.value) {
-    // showError - это рекомендуемый Nuxt способ вызова ошибки
-    // на стороне клиента асинхронно.
     showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
   }
 })
@@ -118,6 +128,19 @@ watch(() => product.value?.id, () => {
         <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
           ← Вернуться в каталог
         </NuxtLink>
+      </div>
+      <!-- ======== "ПОХОЖИЕ ТОВАРЫ" ======== -->
+      <div v-if="similarProducts.length > 0" class="mt-16 pt-8 border-t">
+        <h2 class="text-2xl font-bold mb-6">
+          Похожие товары
+        </h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <ProductCard
+            v-for="similarItem in similarProducts"
+            :key="similarItem.id"
+            :product="similarItem"
+          />
+        </div>
       </div>
 
       <!-- Fallback для серверного рендеринга -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AccessoryProduct, CustomFieldValue, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductTypeRow, ProductUpdate } from '@/types'
+import type { AccessoryProduct, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate } from '@/types'
 import { debounce } from 'lodash-es'
 
 import { toast } from 'vue-sonner'
