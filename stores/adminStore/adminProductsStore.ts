@@ -41,19 +41,19 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       const { data, error } = await supabase
         .from('products')
         .select(`
+        *,
+        categories(name, slug),
+        product_images(*),
+        product_accessories(
           *,
-          categories(name, slug),
-          product_images(*),
-          product_accessories!product_accessories_accessory_product_id_fkey(
+          accessory:products(
             *,
-            products(
-              *,
-              product_images(*)
-            )
+            product_images(*)
           )
-        `)
+        )
+      `)
         .eq('id', id)
-        .single()
+        .maybeSingle()
       if (error)
         throw error
       currentProduct.value = data as unknown as FullProduct
