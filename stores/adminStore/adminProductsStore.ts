@@ -41,18 +41,17 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       const { data, error } = await supabase
         .from('products')
         .select(`
+        *,
+        categories(name, slug),
+        product_images(*),
+        product_accessories(
           *,
-          categories(name, slug),
-          product_images(*),
-          product_types(*),
-          product_accessories(
+          accessory:products(
             *,
-            accessory:products(
-              *,
-              product_images(*)
-            )
+            product_images(*)
           )
-        `)
+        )
+      `)
         .eq('id', id)
         .single()
       if (error)

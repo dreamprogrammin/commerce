@@ -1,4 +1,4 @@
-import type { Database, FullProduct, IProductFilters, ProductRow, ProductWithCategory, ProductWithGallery } from '@/types'
+import type { AccessoryProduct, Database, FullProduct, IProductFilters, ProductWithGallery } from '@/types'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 
@@ -138,12 +138,46 @@ export const useProductsStore = defineStore('productsStore', () => {
     return products
   }
 
-  // Возвращаем только функции, никакого состояния.
+  /**
+   * Загружает похожие товары на основе той же категории.
+   * @param categoryId - ID категории для поиска.
+   * @param currentProductId - ID текущего товара, чтобы исключить его из списка.
+   * @param limit - Количество товаров для загрузки.
+   * @returns Promise, который разрешается массивом товаров.
+   */
+  async function fetchSimilarProducts(
+    categoryId: string | null,
+    currentProductId: string,
+    limit: number = 4,
+  ): Promise<AccessoryProduct[]> {
+    if (!categoryId)
+      return [] // Если у товара нет категории, ничего не возвращаем
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, product_images(*)')
+        .eq('category_id', categoryId)
+        .eq('is_active', true)
+        .neq('id', currentProductId)
+        .limit(limit)
+
+      if (error)
+        throw error
+
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке похожих товаров', { description: error.message })
+      return []
+    }
+  }
   return {
     fetchProducts,
     fetchProductBySlug,
     fetchFeaturedProduct,
     fetchNewestProducts,
     fetchPopularProducts,
+    fetchSimilarProducts,
   }
 })
