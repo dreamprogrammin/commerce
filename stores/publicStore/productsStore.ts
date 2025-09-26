@@ -1,8 +1,8 @@
-import type { AccessoryProduct, Database, FullProduct, IProductFilters, ProductWithGallery } from '@/types'
+import type { AccessoryProduct, Database, FullProduct, IProductFilters, ProductWithGallery, ProductWithImages } from '@/types'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+// const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
@@ -53,27 +53,16 @@ export const useProductsStore = defineStore('productsStore', () => {
    * @returns Promise, который разрешается объектом товара или `null`.
    */
   async function fetchProductBySlug(slug: string): Promise<FullProduct | null> {
-    if (import.meta.dev) {
-      await delay(2000)
-    }
     try {
       const { data, error } = await supabase
         .from('products')
         .select(`
-        *,
-        categories(name, slug),
-        product_images(*),
-        product_accessories(
           *,
-          accessory:products(
-            *,
-            product_images(*)
-          )
-        )
-      `)
+          categories(name, slug),
+          product_images(*)
+        `)
         .eq('slug', slug)
         .eq('is_active', true)
-        .order('display_order', { referencedTable: 'product_images' })
         .single()
 
       if (error && error.code !== 'PGRST116')
@@ -84,6 +73,26 @@ export const useProductsStore = defineStore('productsStore', () => {
     catch (error: any) {
       toast.error(`Ошибка загрузки товара`, { description: error.message })
       return null
+    }
+  }
+
+  async function fetchProductsByIds(ids: string[]): Promise<ProductWithImages[]> {
+    if (!ids || ids.length === 0)
+      return []
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, product_images(*)')
+        .in('id', ids)
+        .eq('is_active', true)
+
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки связанных товаров', { description: error.message })
+      return []
     }
   }
 
@@ -179,5 +188,6 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchNewestProducts,
     fetchPopularProducts,
     fetchSimilarProducts,
+    fetchProductsByIds,
   }
 })

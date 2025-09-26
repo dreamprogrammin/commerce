@@ -172,18 +172,9 @@ export interface ProductAccessoryLink {
   }
 }
 
-export type ProductAccessoryRow = Database['public']['Tables']['product_accessories']['Row'] & {
-  accessory: AccessoryProduct | null
-}
-
-export type ProductTypeRow = Database['public']['Tables']['product_types']['Row'] & {
-  custom_fields_schema: CustomFieldSchema | null
-}
-
-export type FullProduct = ProductRow & {
+export type FullProduct = ProductWithImages & {
   categories: { name: string | null, slug: string | null } | null
-  product_images: ProductImageRow[]
-  product_accessories?: ProductAccessoryRow[] // Оставляем только это
+  accessories?: ProductWithImages[]
 }
 
 export type CustomFieldValue = string | number | boolean | null
@@ -193,5 +184,9 @@ export type ProductFormData = Omit<ProductRow, 'id' | 'created_at' | 'updated_at
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
 
 export type AccessoryProduct = ProductRow & {
+  product_images: ProductImageRow[]
+}
+
+export type ProductWithImages = ProductRow & {
   product_images: ProductImageRow[]
 }
