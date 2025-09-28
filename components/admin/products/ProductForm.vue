@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AccessoryProduct, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
+import type { FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
 import { debounce } from 'lodash-es'
 
 import { toast } from 'vue-sonner'
@@ -233,8 +233,6 @@ function handleSubmit() {
   }
 
   const productData = { ...formData.value }
-
-  const accessoryIds = linkedAccessories.value.map(p => p.id)
 
   if (props.initialData) {
     emit('update', {
