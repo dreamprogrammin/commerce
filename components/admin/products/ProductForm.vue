@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AccessoryProduct, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate } from '@/types'
+import type { AccessoryProduct, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
 import { debounce } from 'lodash-es'
 
 import { toast } from 'vue-sonner'
@@ -18,7 +18,6 @@ const emit = defineEmits<{
   (e: 'create', payload: {
     data: ProductInsert
     newImageFiles: File[]
-    accessoryIds: string[]
   }): void
 
   (e: 'update', payload: {
@@ -26,12 +25,11 @@ const emit = defineEmits<{
     newImageFiles: File[]
     imagesToDelete: string[]
     existingImages: ProductImageRow[]
-    accessoryIds: string[]
   }): void
 }>()
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ КОМПОНЕНТА ---
-const formData = ref<ProductFormData>({
+const formData = ref<Partial<ProductFormData>>({
   name: '',
   slug: '',
   price: 0,
@@ -43,6 +41,8 @@ const formData = ref<ProductFormData>({
   min_age: null,
   max_age: null,
   gender: 'unisex',
+  accessory_ids: [],
+  is_accessory: false,
 })
 
 const bonusOptions = [
@@ -64,20 +64,20 @@ const imagesToDelete = ref<string[]>([])
 const selectedBonusPercent = ref(5)
 
 // Переменные для аксессуаров
-const linkedAccessories = ref<(AccessoryProduct | ProductSearchResult)[]>([])
+const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([])
 const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
 
 // --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ПРИ ЗАГРУЗКЕ ---
-watch(() => props.initialData, (product) => {
+watch(() => props.initialData, async (product) => {
   newImageFiles.value = []
   imagesToDelete.value = []
   linkedAccessories.value = []
 
   if (product && product.id) {
-    const productCopy = JSON.parse(JSON.stringify(product)) as FullProduct
-
+    // РЕЖИМ РЕДАКТИРОВАНИЯ
+    const productCopy = JSON.parse(JSON.stringify(product))
     formData.value = {
       name: productCopy.name,
       slug: productCopy.slug,
@@ -90,37 +90,37 @@ watch(() => props.initialData, (product) => {
       min_age: productCopy.min_age,
       max_age: productCopy.max_age,
       gender: productCopy.gender as 'unisex' | 'male' | 'female' | null,
+      accessory_ids: productCopy.accessory_ids || [],
+      is_accessory: productCopy.is_accessory || false,
     }
-
     existingImages.value = [...(productCopy.product_images || [])]
 
-    if (productCopy.product_accessories && productCopy.product_accessories.length > 0) {
-      linkedAccessories.value = productCopy.product_accessories
-        .map(link => link.accessory)
-        .filter((p): p is AccessoryProduct => p !== null)
+    // Загружаем полные данные для уже привязанных аксессуаров
+    if (productCopy.accessory_ids && productCopy.accessory_ids.length > 0) {
+      linkedAccessories.value = await productStore.fetchProductsByIds(productCopy.accessory_ids)
     }
 
     if (productCopy.price > 0) {
       const percent = Math.round((productCopy.bonus_points_award / Number(productCopy.price)) * 100)
       selectedBonusPercent.value = bonusOptions.find(opt => opt.value === percent)?.value || 5
     }
-    else {
-      selectedBonusPercent.value = 5
-    }
   }
   else {
+    // РЕЖИМ СОЗДАНИЯ
     formData.value = {
       name: '',
       slug: '',
       price: 0,
       is_active: true,
       stock_quantity: 0,
-      description: '',
+      description: null,
       category_id: null,
       bonus_points_award: 0,
       min_age: null,
       max_age: null,
       gender: 'unisex',
+      accessory_ids: [],
+      is_accessory: false,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -242,14 +242,12 @@ function handleSubmit() {
       newImageFiles: newImageFiles.value.map(item => item.file),
       imagesToDelete: imagesToDelete.value,
       existingImages: existingImages.value,
-      accessoryIds,
     })
   }
   else {
     emit('create', {
       data: productData as ProductInsert,
       newImageFiles: newImageFiles.value.map(item => item.file),
-      accessoryIds,
     })
   }
 }

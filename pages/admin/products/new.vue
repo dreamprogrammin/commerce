@@ -4,23 +4,21 @@ import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 definePageMeta({ layout: 'admin' })
+
 const adminProductsStore = useAdminProductsStore()
 const router = useRouter()
 
 /**
  * Обработчик события @create от компонента ProductForm.
- * Принимает все данные, необходимые для создания продукта.
  */
-
 async function handleCreate(payload: {
   data: ProductInsert
   newImageFiles: File[]
-  accessoryIds: string[]
 }) {
+  // Вызываем обновленный метод стора, который теперь проще
   const newProduct = await adminProductsStore.createProduct(
     payload.data,
     payload.newImageFiles,
-    payload.accessoryIds,
   )
 
   if (newProduct) {
@@ -35,7 +33,6 @@ async function handleCreate(payload: {
       <h1 class="text-3xl font-bold mb-6">
         Новый товар
       </h1>
-
       <ProductForm @create="handleCreate" />
     </div>
   </div>

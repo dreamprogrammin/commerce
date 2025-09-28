@@ -1,95 +1,183 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
-import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
+import type { ProductWithImages } from '@/types'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+import { useProductsStore } from '@/stores/publicStore/productsStore'
 
-definePageMeta({ layout: 'admin' })
+const route = useRoute()
+const productsStore = useProductsStore()
+const cartStore = useCartStore()
 
-const adminProductsStore = useAdminProductsStore()
-const { getPublicUrl } = useSupabaseStorage()
-const router = useRouter()
+const slug = computed(() => route.params.slug as string)
 
-onMounted(() => {
-  adminProductsStore.fetchProducts()
+// Создаем отдельные ref'ы для хранения аксессуаров и похожих товаров
+const accessories = ref<ProductWithImages[]>([])
+const similarProducts = ref<ProductWithImages[]>([])
+
+// `useAsyncData` теперь загружает всё необходимое для страницы
+const { data: product, pending: isLoading } = useAsyncData(
+  `product-${slug.value}`,
+  async () => {
+    // Сбрасываем массивы перед новой загрузкой
+    accessories.value = []
+    similarProducts.value = []
+
+    // 1. Загружаем основной товар
+    const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
+
+    // Если товар не найден, выходим
+    if (!fetchedProduct) {
+      return null
+    }
+
+    // 2. Запускаем параллельную загрузку аксессуаров и похожих товаров
+    await Promise.all([
+      // Загрузка аксессуаров
+      (async () => {
+        if (fetchedProduct.accessory_ids && fetchedProduct.accessory_ids.length > 0) {
+          accessories.value = await productsStore.fetchProductsByIds(fetchedProduct.accessory_ids)
+        }
+      })(),
+      // Загрузка похожих товаров
+      (async () => {
+        if (fetchedProduct.category_id) {
+          const excludeIds = [fetchedProduct.id, ...fetchedProduct.accessory_ids || []]
+          similarProducts.value = await productsStore.fetchSimilarProducts(
+            fetchedProduct.category_id,
+            excludeIds,
+            4,
+          )
+        }
+      })(),
+    ])
+
+    return fetchedProduct
+  },
+  {
+    watch: [slug],
+    lazy: true,
+    default: () => null,
+  },
+)
+
+// --- Обработка 404 ---
+watch(isLoading, (newIsLoadingValue) => {
+  if (newIsLoadingValue === false && !product.value) {
+    showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
+  }
 })
+
+// --- Мета-теги ---
+useHead(() => ({
+  title: product.value?.name || 'Загрузка товара...',
+  meta: [{ name: 'description', content: product.value?.description || `Купить ${product.value?.name || 'товар'} в нашем интернет-магазине.` }],
+}))
+
+// --- Логика корзины ---
+const quantity = ref(1)
+watch(() => product.value?.id, () => {
+  quantity.value = 1
+}, { immediate: true })
 </script>
 
 <template>
-  <div class="container mx-auto p-4 md:p-8">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">
-        Управление товарами
-      </h1>
-      <NuxtLink to="/admin/products/new">
-        <Button>Добавить товар</Button>
-      </NuxtLink>
-    </div>
+  <div class="container py-12">
+    <ClientOnly>
+      <!-- Состояние загрузки -->
+      <ProductDetailSkeleton v-if="isLoading" />
 
-    <div v-if="adminProductsStore.isLoading" class="text-center py-10">
-      Загрузка...
-    </div>
-    <div v-else class="border rounded-lg bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead class="w-[80px]">
-              Фото
-            </TableHead>
-            <TableHead>Название</TableHead>
-            <TableHead>Категория</TableHead>
-            <TableHead>Цена</TableHead>
-            <TableHead>Остаток</TableHead>
-            <TableHead>Статус</TableHead>
-            <TableHead class="text-right">
-              Действия
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow v-if="adminProductsStore.products.length === 0">
-            <TableCell colspan="7" class="h-24 text-center">
-              Товары еще не добавлены.
-            </TableCell>
-          </TableRow>
-          <TableRow v-for="product in adminProductsStore.products" :key="product.id">
-            <TableCell>
-              <div class="w-16 h-16 bg-muted rounded-md overflow-hidden">
-                <NuxtImg
-                  v-if="product.product_images && product.product_images.length > 0"
-                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.product_images[0]?.image_url || null) || undefined"
-                  :alt="product.name"
-                  class="w-full h-full object-cover"
-                  format="webp"
-                  quality="80"
-                  type="fetch"
-                />
-                <div v-if="product.product_images && product.product_images.length > 1" class="absolute bottom-0 right-0 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-tl-md">
-                  +{{ product.product_images.length - 1 }}
-                </div>
-              </div>
-            </TableCell>
-            <TableCell class="font-medium">
-              {{ product.name }}
-            </TableCell>
-            <TableCell>{{ product.categories?.name || 'Без категории' }}</TableCell>
-            <TableCell>{{ product.price }} ₸</TableCell>
-            <TableCell>{{ product.stock_quantity }} шт.</TableCell>
-            <TableCell>
-              <Badge :variant="product.is_active ? 'default' : 'outline'">
-                {{ product.is_active ? 'Активен' : 'Скрыт' }}
-              </Badge>
-            </TableCell>
-            <TableCell class="text-right space-x-2">
-              <Button variant="outline" size="sm" @click="router.push(`/admin/products/${product.id}`)">
-                Редактировать
+      <!-- Основной блок с данными -->
+      <div v-else-if="product">
+        <!-- Сетка для основного товара -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+          <ProductGallery v-if="product.product_images && product.product_images.length > 0" :images="product.product_images" />
+          <div v-else class="aspect-square bg-muted rounded-lg flex items-center justify-center">
+            <p class="text-muted-foreground">
+              Изображения отсутствуют
+            </p>
+          </div>
+
+          <!-- Правая колонка с информацией о товаре -->
+          <div class="space-y-6">
+            <div>
+              <NuxtLink v-if="product.categories" :to="`/catalog/${product.categories.slug}`" class="text-sm text-muted-foreground hover:text-primary transition-colors">
+                {{ product.categories.name }}
+              </NuxtLink>
+              <h1 class="text-3xl lg:text-4xl font-bold mt-1">
+                {{ product.name }}
+              </h1>
+            </div>
+            <p class="text-4xl font-bold">
+              {{ product.price }} ₸
+            </p>
+            <div v-if="product.description" class="prose prose-sm max-w-none text-muted-foreground">
+              <p>{{ product.description }}</p>
+            </div>
+            <div class="p-4 bg-primary/10 text-primary rounded-lg border border-primary/20">
+              При покупке вы получите <span class="font-bold">{{ product.bonus_points_award }} бонусов</span>
+            </div>
+            <div class="flex items-center gap-4 pt-4">
+              <template v-if="product.stock_quantity > 0">
+                <Input v-model.number="quantity" type="number" min="1" :max="product.stock_quantity" class="w-24 text-center" />
+                <Button size="lg" class="flex-grow" @click="cartStore.addItem(product, quantity)">
+                  Добавить в корзину
+                </Button>
+              </template>
+              <Button v-else size="lg" class="flex-grow" disabled>
+                Нет в наличии
               </Button>
-              <Button variant="destructive" size="sm" @click="adminProductsStore.deleteProduct(product)">
-                Удалить
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </div>
+            </div>
+            <p v-if="product.stock_quantity > 0" class="text-sm text-green-600">
+              В наличии: {{ product.stock_quantity }} шт.
+            </p>
+          </div>
+        </div>
+
+        <!-- АКСЕССУАРЫ "С этим товаром покупают" -->
+        <div v-if="accessories.length > 0" class="mt-16 pt-8 border-t">
+          <h2 class="text-2xl font-bold mb-6">
+            С этим товаром покупают
+          </h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <ProductCard
+              v-for="item in accessories"
+              :key="item.id"
+              :product="item"
+            />
+          </div>
+        </div>
+
+        <!-- ПОХОЖИЕ ТОВАРЫ -->
+        <div v-if="similarProducts.length > 0" class="mt-16 pt-8 border-t">
+          <h2 class="text-2xl font-bold mb-6">
+            Похожие товары
+          </h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <ProductCard
+              v-for="item in similarProducts"
+              :key="item.id"
+              :product="item"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Состояние "Товар не найден" -->
+      <div v-else class="text-center py-20">
+        <h1 class="text-2xl font-bold">
+          Товар не найден
+        </h1>
+        <p class="text-muted-foreground mt-2">
+          Возможно, товар был удален или ссылка неверна.
+        </p>
+        <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
+          ← Вернуться в каталог
+        </NuxtLink>
+      </div>
+
+      <!-- Fallback для SSR -->
+      <template #fallback>
+        <ProductDetailSkeleton />
+      </template>
+    </ClientOnly>
   </div>
 </template>

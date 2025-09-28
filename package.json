@@ -23,6 +23,7 @@
     "@vueuse/core": "^13.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "debounce": "^2.2.0",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-vue": "^8.6.0",
     "lodash-es": "^4.17.21",

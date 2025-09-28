@@ -1,4 +1,4 @@
-import type { Database, FullProduct, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate } from '@/types'
+import type { Database, FullProduct, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -56,6 +56,28 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
     finally {
       isLoading.value = false
+    }
+  }
+
+  async function fetchProductsByIds(ids: string[]): Promise<ProductWithImages[]> {
+    if (!ids || ids.length === 0) {
+      return [] // Всегда возвращаем массив
+    }
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, product_images(*)')
+        .in('id', ids)
+
+      if (error)
+        throw error
+
+      // Если `data` равно `null`, мы все равно вернем пустой массив
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки связанных товаров', { description: error.message })
+      return [] // Всегда возвращаем массив в случае ошибки
     }
   }
 
@@ -277,5 +299,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     createProduct,
     updateProduct,
     deleteProduct,
+    fetchProductsByIds,
   }
 })

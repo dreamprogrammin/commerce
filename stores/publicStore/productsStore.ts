@@ -150,13 +150,13 @@ export const useProductsStore = defineStore('productsStore', () => {
   /**
    * Загружает похожие товары на основе той же категории.
    * @param categoryId - ID категории для поиска.
-   * @param currentProductId - ID текущего товара, чтобы исключить его из списка.
+   * @param excludeIds - Массив ID товаров, которые нужно исключить из результатов.
    * @param limit - Количество товаров для загрузки.
    * @returns Promise, который разрешается массивом товаров.
    */
   async function fetchSimilarProducts(
     categoryId: string | null,
-    currentProductId: string,
+    excludeIds: string[],
     limit: number = 4,
   ): Promise<AccessoryProduct[]> {
     if (!categoryId)
@@ -168,7 +168,7 @@ export const useProductsStore = defineStore('productsStore', () => {
         .select('*, product_images(*)')
         .eq('category_id', categoryId)
         .eq('is_active', true)
-        .neq('id', currentProductId)
+        .not('id', 'in', `(${excludeIds.join(',')})`)
         .limit(limit)
 
       if (error)

@@ -5,8 +5,9 @@ import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 definePageMeta({ layout: 'admin' })
+
 const adminProductsStore = useAdminProductsStore()
-const { currentProduct, isLoading } = storeToRefs(adminProductsStore) // Делаем ref'ы из стора реактивными
+const { currentProduct, isLoading } = storeToRefs(adminProductsStore)
 const route = useRoute()
 const router = useRouter()
 const productId = route.params.id as string
@@ -18,24 +19,22 @@ useAsyncData(
 
 /**
  * Обработчик события @update от компонента ProductForm.
- * Принимает все данные, необходимые для обновления продукта.
  */
-
 async function handleUpdate(payload: {
   data: ProductUpdate
   newImageFiles: File[]
   imagesToDelete: string[]
   existingImages: ProductImageRow[]
-  accessoryIds: string[]
 }) {
+  // Вызываем обновленный метод стора
   const updatedProduct = await adminProductsStore.updateProduct(
     productId,
     payload.data,
     payload.newImageFiles,
     payload.imagesToDelete,
     payload.existingImages,
-    payload.accessoryIds,
   )
+
   if (updatedProduct) {
     router.push('/admin/products')
   }
@@ -51,8 +50,11 @@ async function handleUpdate(payload: {
       <div v-if="isLoading && !currentProduct" class="text-center py-20">
         Загрузка данных о товаре...
       </div>
-
-      <ProductForm v-else :product="currentProduct" @update="handleUpdate" />
+      <ProductForm
+        v-else
+        :initial-data="currentProduct"
+        @update="handleUpdate"
+      />
     </div>
   </div>
 </template>
