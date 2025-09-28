@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AccessoryProduct } from '@/types'
+import type { ProductWithImages } from '@/types'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
@@ -7,24 +7,47 @@ const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
 
-const slug = computed(() => route.params.slug as string)
+const accessories = ref<ProductWithImages[]>([])
+const similarProducts = ref<ProductWithImages[]>([])
 
-const similarProducts = ref<AccessoryProduct[]>([])
+const slug = computed(() => route.params.slug as string)
 
 const { data: product, pending: isLoading } = useAsyncData(
   `product-${slug.value}`,
   async () => {
+    // Сбрасываем массивы
+    accessories.value = []
+    similarProducts.value = []
+
     // 1. Загружаем основной товар
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
 
-    // 2. Если товар успешно загружен, запускаем загрузку похожих товаров
-    if (fetchedProduct) {
-      similarProducts.value = await productsStore.fetchSimilarProducts(
-        fetchedProduct.category_id,
-        fetchedProduct.id,
-        4, // Загружаем 4 похожих товара
-      )
+    if (!fetchedProduct) {
+      return null
     }
+
+    // 2. Запускаем ПАРАЛЛЕЛЬНУЮ загрузку аксессуаров и похожих товаров
+    await Promise.all([
+      // Загрузка аксессуаров
+      (async () => {
+        if (fetchedProduct.accessory_ids && fetchedProduct.accessory_ids.length > 0) {
+          accessories.value = await productsStore.fetchProductsByIds(fetchedProduct.accessory_ids)
+        }
+      })(),
+      // Загрузка похожих товаров
+      (async () => {
+        if (fetchedProduct.category_id) {
+          // СОЗДАЕМ ПРАВИЛЬНЫЙ МАССИВ ДЛЯ ИСКЛЮЧЕНИЯ
+          const excludeIds = [fetchedProduct.id, ...fetchedProduct.accessory_ids || []]
+
+          similarProducts.value = await productsStore.fetchSimilarProducts(
+            fetchedProduct.category_id,
+            excludeIds, // <-- ПЕРЕДАЕМ МАССИВ
+            4,
+          )
+        }
+      })(),
+    ])
 
     return fetchedProduct
   },
@@ -148,7 +171,7 @@ watch(() => product.value?.id, () => {
         <ProductDetailSkeleton />
       </template>
     </ClientOnly>
-    <div v-if="product && product.product_accessories && product.product_accessories.length > 0" class="mt-16 pt-8 border-t">
+    <div v-if="accessories.length > 0" class="mt-16 pt-8 border-t">
       <h2 class="text-2xl font-bold mb-6">
         С этим товаром покупают
       </h2>
@@ -157,12 +180,11 @@ watch(() => product.value?.id, () => {
           Проходим по массиву СВЯЗЕЙ (`product.product_accessories`).
           Из каждой СВЯЗИ (`link`) мы извлекаем вложенный ТОВАР (`link.accessory`).
         -->
-        <template v-for="link in product.product_accessories" :key="link.accessory_product_id">
-          <ProductCard
-            v-if="link.accessory"
-            :product="link.accessory"
-          />
-        </template>
+        <ProductCard
+          v-for="item in accessories"
+          :key="item.id"
+          :product="item"
+        />
       </div>
     </div>
   </div>
