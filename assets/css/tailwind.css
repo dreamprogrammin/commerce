@@ -181,6 +181,6 @@
     @apply bg-background text-foreground;
   }
   .app-container {
-    @apply container max-w-screen-xl px-4 mx-auto;
+    @apply container max-w-screen-2xl px-4 mx-6;
   }
 }
