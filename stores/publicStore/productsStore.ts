@@ -157,20 +157,24 @@ export const useProductsStore = defineStore('productsStore', () => {
   async function fetchSimilarProducts(
     categoryId: string | null,
     excludeIds: string[],
-    limit: number = 4,
+    limit?: number,
   ): Promise<AccessoryProduct[]> {
-    if (!categoryId)
-      return [] // Если у товара нет категории, ничего не возвращаем
+    if (!categoryId || !Array.isArray(excludeIds) || excludeIds.length === 0) {
+      return []
+    }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
         .select('*, product_images(*)')
         .eq('category_id', categoryId)
         .eq('is_active', true)
         .not('id', 'in', `(${excludeIds.join(',')})`)
-        .limit(limit)
 
+      if (limit && limit > 0) {
+        query = query.limit(limit)
+      }
+      const { data, error } = await query
       if (error)
         throw error
 
