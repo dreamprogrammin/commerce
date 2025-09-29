@@ -232,6 +232,8 @@ function handleSubmit() {
     return
   }
 
+  formData.value.accessory_ids = linkedAccessories.value.map(p => p.id)
+
   const productData = { ...formData.value }
 
   if (props.initialData) {
