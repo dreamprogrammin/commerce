@@ -83,11 +83,11 @@ onMounted(() => {
       >
         <CarouselContent>
           <CarouselItem v-for="image in images" :key="image.id">
-            <div class="aspect-square bg-muted rounded-lg overflow-hidden border">
+            <div class="aspect-square bg-muted rounded-lg overflow-hidden border h-full">
               <NuxtImg
                 :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
                 :alt="image.alt_text || 'Изображение товара'"
-                width="800" height="800" fit="contain" format="webp" quality="85"
+                fit="contain" format="webp" quality="85"
                 placeholder
                 class="w-full h-full object-cover"
               />
