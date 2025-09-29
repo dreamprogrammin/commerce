@@ -42,18 +42,18 @@ onMounted(() => {
 
 <template>
   <div class="flex flex-col md:flex-row gap-4">
-    <div v-if="images && images.length > 1" class="hidden md:block w-1/3 lg:w-[35%] flex-shrink-0">
+    <div v-if="images && images.length > 1" class="hidden md:block w-1/3 lg:w-[25%] flex-shrink-0">
       <Carousel
         class="w-full"
         orientation="vertical"
-        :opts="{ align: 'start', containScroll: 'keepSnaps' }"
+        :opts="{ align: 'start', containScroll: 'keepSnaps', dragFree: true }"
         @init-api="onInitThumb"
       >
-        <CarouselContent class="-mt-2 flex">
+        <CarouselContent class="-mt-4 h-[450px] lg:h-[550px]">
           <CarouselItem
             v-for="(image, index) in images"
             :key="image.id"
-            class="pt-2"
+            class="pt-4 basis-1/4"
             @click="onThumbClick(index)"
           >
             <div
