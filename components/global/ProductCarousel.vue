@@ -29,8 +29,8 @@ defineProps<{
           </div>
         </CarouselItem>
       </CarouselContent>
-      <CarouselPrevious class="hidden sm:inline-flex" />
-      <CarouselNext class="hidden sm:inline-flex" />
+      <!-- <CarouselPrevious class="hidden sm:inline-flex" />
+      <CarouselNext class="hidden sm:inline-flex" /> -->
     </Carousel>
   </section>
 </template>
