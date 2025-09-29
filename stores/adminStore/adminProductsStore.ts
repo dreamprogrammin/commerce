@@ -260,21 +260,27 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     if (query.length < 2)
       return []
     try {
+    // Шаг 1: Вызываем RPC, чтобы получить все нужные ID категорий
       const { data: categoryData, error: categoryError } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('slug', 'accessories')
-        .single()
+        .rpc('get_category_and_children_ids', {
+          p_category_slug: 'accessories', // <-- Ищем всех детей 'accessories'
+        })
 
-      if (categoryError || !categoryData) {
-        toast.info('Для поиска аксессуаров создайте категорию со слагом \'accessories\'')
+      if (categoryError)
+        throw categoryError
+      if (!categoryData || categoryData.length === 0) {
+        toast.info('Категория \'accessories\' или ее дочерние не найдены.')
         return []
       }
 
+      // Извлекаем ID из результата
+      const categoryIds = categoryData.map(c => c.id)
+
+      // Шаг 2: Ищем товары в этом списке категорий
       const { data, error } = await supabase
         .from('products')
         .select('id, name, price')
-        .eq('category_id', categoryData.id) // <-- Фильтр по категории
+        .in('category_id', categoryIds) // <-- Ищем в массиве ID
         .ilike('name', `%${query}%`)
         .limit(limit)
 
@@ -287,7 +293,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       return []
     }
   }
-
   return {
     products,
     currentProduct,
