@@ -42,7 +42,7 @@ onMounted(() => {
 
 <template>
   <div class="flex flex-col md:flex-row gap-4">
-    <div v-if="images && images.length > 1" class="hidden md:block">
+    <div v-if="images && images.length > 1" class="hidden md:block w-1/3 lg:w-[35%] flex-shrink-0">
       <Carousel
         class="w-20"
         orientation="vertical"
