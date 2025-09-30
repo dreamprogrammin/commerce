@@ -41,6 +41,7 @@
         "npm:@vueuse/core@^13.6.0",
         "npm:class-variance-authority@~0.7.1",
         "npm:clsx@^2.1.1",
+        "npm:debounce@^2.2.0",
         "npm:embla-carousel-autoplay@^8.6.0",
         "npm:embla-carousel-vue@^8.6.0",
         "npm:eslint-plugin-format@^1.0.1",
