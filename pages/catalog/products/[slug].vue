@@ -91,8 +91,8 @@ watch(() => product.value?.id, () => {
 
       <!-- Состояние с данными -->
       <div v-else-if="product">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 h-[80vh]">
-          <div class="lg:col-span-8 h-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+          <div class="lg:col-span-8">
             <ProductGallery
               v-if="product.product_images && product.product_images.length > 0"
               :images="product.product_images"
