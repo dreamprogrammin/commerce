@@ -91,8 +91,8 @@ watch(() => product.value?.id, () => {
 
       <!-- Состояние с данными -->
       <div v-else-if="product">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          <div class="lg:col-span-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          <div class="lg:col-span-8 top-24 h-[600px]">
             <ProductGallery
               v-if="product.product_images && product.product_images.length > 0"
               :images="product.product_images"
@@ -106,8 +106,8 @@ watch(() => product.value?.id, () => {
             </div>
           </div>
           <!-- ПРАВАЯ КОЛОНКА: Информация о товаре (остается без изменений) -->
-          <div class="space-y-6 lg:col-span-4">
-            <div>
+          <div class="lg:col-span-4 sticky top-24">
+            <div class="space-y-6">
               <NuxtLink v-if="product.categories" :to="`/catalog/${product.categories.slug}`" class="text-sm text-muted-foreground hover:text-primary transition-colors">
                 {{ product.categories.name }}
               </NuxtLink>
