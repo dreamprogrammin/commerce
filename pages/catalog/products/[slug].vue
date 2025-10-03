@@ -172,7 +172,7 @@ watch(() => product.value?.id, () => {
                     <Checkbox
                       :id="`acc-${acc.id}`"
                       :checked="selectedAccessoryIds.includes(acc.id)"
-                      @update:checked="(checked) => {
+                      @update:model-value="(checked) => {
                         if (checked) {
                           selectedAccessoryIds.push(acc.id)
                         }
