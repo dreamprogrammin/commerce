@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProductWithImages } from '@/types'
+import { TransitionPresets, useTransition } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -97,6 +98,11 @@ watch(isLoading, (newIsLoadingValue) => {
   if (newIsLoadingValue === false && !product.value) {
     showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
   }
+})
+
+const animatedPrice = useTransition(totalPrice, {
+  duration: 400, // Длительность анимации в миллисекундах
+  transition: TransitionPresets.easeOutCubic, // Тип анимации (плавное затухание)
 })
 
 useHead(() => ({
@@ -226,7 +232,7 @@ watch(() => product.value?.id, () => {
                 <span class="text-lg font-medium">Общая стоимость:</span>
                 <!-- Используем наше новое computed-свойство -->
                 <p class="text-4xl font-bold">
-                  {{ totalPrice }} ₸
+                  {{ Math.round(animatedPrice) }} ₸
                 </p>
               </div>
             </div>
