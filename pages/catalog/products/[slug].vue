@@ -125,13 +125,13 @@ function addToCart() {
 const { start: startPriceAnimation } = useCountUp(priceElement, totalPrice, {
   duration: 0.8,
 })
-watch(product, (newProduct) => {
-  // Запускаем анимацию, когда `product` появился (данные загружены)
-  if (newProduct && priceElement.value) {
-    // `nextTick` гарантирует, что DOM обновился и `priceElement` точно на месте
-    nextTick(() => {
-      startPriceAnimation()
-    })
+watch(priceElement, (newEl) => {
+  // Этот watch сработает, как только Vue отрендерит `<p ref="priceElement">`
+  // и `newEl` перестанет быть `null`.
+  if (newEl) {
+    // В этот момент `totalPrice` тоже уже будет иметь правильное значение.
+    // Просто запускаем анимацию. nextTick здесь не нужен.
+    startPriceAnimation()
   }
 })
 watch(() => product.value?.id, () => {
