@@ -78,6 +78,25 @@ const totalPrice = computed(() => {
 
   return total
 })
+const totalBonuses = computed(() => {
+  if (!product.value)
+    return 0
+
+  // 1. Начинаем с бонусов основного товара
+  let total = Number(product.value.bonus_points_award)
+
+  // 2. Находим выбранные аксессуары
+  const selectedAccessories = accessories.value.filter(acc =>
+    selectedAccessoryIds.value.includes(acc.id),
+  )
+
+  // 3. Прибавляем их бонусы
+  for (const acc of selectedAccessories) {
+    total += Number(acc.bonus_points_award)
+  }
+
+  return total
+})
 
 watch(isLoading, (newIsLoadingValue) => {
   if (newIsLoadingValue === false && !product.value) {
@@ -178,7 +197,7 @@ watch(() => product.value?.id, () => {
                       <Checkbox
                         :id="`acc-${acc.id}`"
                         :checked="selectedAccessoryIds.includes(acc.id)"
-                        @update:checked="(checkedState: boolean | 'indeterminate') => {
+                        @update:model-value="(checkedState) => {
                           if (checkedState === true) {
                             if (!selectedAccessoryIds.includes(acc.id)) {
                               selectedAccessoryIds.push(acc.id)
@@ -226,7 +245,7 @@ watch(() => product.value?.id, () => {
             </div>
 
             <div class="p-4 bg-primary/10 text-primary rounded-lg border border-primary/20">
-              При покупке вы получите <span class="font-bold">{{ product.bonus_points_award }} бонусов</span>
+              При покупке вы получите <span class="font-bold">{{ totalBonuses }} бонусов</span>
             </div>
             <div class="flex items-center gap-4 pt-4">
               <template v-if="product.stock_quantity > 0">
