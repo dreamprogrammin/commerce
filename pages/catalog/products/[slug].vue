@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
+const { getPublicUrl } = useSupabaseStorage()
 
 const accessories = ref<ProductWithImages[]>([])
 const similarProducts = ref<ProductWithImages[]>([])
@@ -157,35 +160,57 @@ watch(() => product.value?.id, () => {
               <p>{{ product.description }}</p>
             </div>
 
-            <div v-if="accessories.length > 0" class="pt-4 border-t">
-              <h3 class="font-semibold mb-3">
-                С этим товаром покупают:
-              </h3>
-              <div class="space-y-3">
-                <!-- Проходим циклом по всем доступным аксессуарам -->
-                <div
-                  v-for="acc in accessories"
-                  :key="acc.id"
-                  class="flex items-center justify-between p-3 rounded-md border has-[[data-state=checked]]:border-primary"
-                >
-                  <div class="flex items-center gap-3">
-                    <Checkbox
-                      :id="`acc-${acc.id}`"
-                      :checked="selectedAccessoryIds.includes(acc.id)"
-                      @update:model-value="(checked) => {
-                        if (checked) {
-                          selectedAccessoryIds.push(acc.id)
-                        }
-                        else {
-                          selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
-                        }
-                      }"
-                    />
-                    <label :for="`acc-${acc.id}`" class="text-sm font-medium leading-none cursor-pointer">
-                      {{ acc.name }}
-                    </label>
+            <div class="space-y-3">
+              <!-- Проходим циклом по всем доступным аксессуарам -->
+              <div v-if="accessories.length > 0" class="pt-4 border-t">
+                <h3 class="font-semibold mb-3">
+                  С этим товаром покупают:
+                </h3>
+                <div class="space-y-3">
+                  <!-- Проходим циклом по всем доступным аксессуарам -->
+                  <div
+                    v-for="acc in accessories"
+                    :key="acc.id"
+                    class="flex items-center justify-between p-2 rounded-md border has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted"
+                  >
+                    <!-- Левая часть: Чекбокс, Картинка, Название -->
+                    <div class="flex items-center gap-3">
+                      <Checkbox
+                        :id="`acc-${acc.id}`"
+                        :checked="selectedAccessoryIds.includes(acc.id)"
+                        @update:checked="(checkedState: boolean | 'indeterminate') => {
+                          if (checkedState === true) {
+                            if (!selectedAccessoryIds.includes(acc.id)) {
+                              selectedAccessoryIds.push(acc.id)
+                            }
+                          }
+                          else if (checkedState === false) {
+                            selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
+                          }
+                        }"
+                      />
+                      <!-- Контейнер для картинки -->
+                      <div class="w-12 h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                        <NuxtImg
+                          v-if="acc.product_images && acc.product_images.length > 0"
+                          :src="getPublicUrl(BUCKET_NAME_PRODUCT, acc.product_images[0]?.image_url || null) || undefined"
+                          :alt="acc.name"
+                          class="w-full h-full object-cover"
+                          format="webp"
+                          quality="80"
+                        />
+                        <!-- Заглушка, если у аксессуара нет фото -->
+                        <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                          Нет фото
+                        </div>
+                      </div>
+                      <label :for="`acc-${acc.id}`" class="text-sm font-medium leading-none cursor-pointer">
+                        {{ acc.name }}
+                      </label>
+                    </div>
+                    <!-- Правая часть: Цена -->
+                    <span class="text-sm font-semibold whitespace-nowrap">+ {{ acc.price }} ₸</span>
                   </div>
-                  <span class="text-sm font-semibold whitespace-nowrap">+ {{ acc.price }} ₸</span>
                 </div>
               </div>
             </div>
