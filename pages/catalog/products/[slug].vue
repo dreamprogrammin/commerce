@@ -123,7 +123,9 @@ function addToCart() {
   toast.success('Товары добавлены в корзину')
 }
 const { start: startPriceAnimation } = useCountUp(priceElement, totalPrice, {
-  duration: 0.8,
+  duration: 1.2,
+  useEasing: false,
+  separator: '',
 })
 watch(priceElement, (newEl) => {
   // Этот watch сработает, как только Vue отрендерит `<p ref="priceElement">`
