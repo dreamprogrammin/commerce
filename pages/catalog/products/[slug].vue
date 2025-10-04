@@ -122,10 +122,18 @@ function addToCart() {
   }
   toast.success('Товары добавлены в корзину')
 }
-useCountUp(priceElement, totalPrice, {
-  duration: 0.8, // Сделаем анимацию быстрее
+const { start: startPriceAnimation } = useCountUp(priceElement, totalPrice, {
+  duration: 0.8,
 })
-
+watch(product, (newProduct) => {
+  // Запускаем анимацию, когда `product` появился (данные загружены)
+  if (newProduct && priceElement.value) {
+    // `nextTick` гарантирует, что DOM обновился и `priceElement` точно на месте
+    nextTick(() => {
+      startPriceAnimation()
+    })
+  }
+})
 watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
