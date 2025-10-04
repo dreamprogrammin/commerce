@@ -11,90 +11,85 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const { getPublicUrl } = useSupabaseStorage()
 
-const accessories = ref<ProductWithImages[]>([])
-const similarProducts = ref<ProductWithImages[]>([])
-
 const slug = computed(() => route.params.slug as string)
 
+// `selectedAccessoryIds` остается здесь, это чисто клиентское UI-состояние
 const selectedAccessoryIds = ref<string[]>([])
 
-const { data: product, pending: isLoading } = useAsyncData(
-  `product-${slug.value}`,
+// --- ИЗМЕНЕНИЕ №1: Логика загрузки инкапсулирована в `useAsyncData` ---
+const { data, pending: isLoading } = useAsyncData(
+  `product-page-${slug.value}`, // Используем более уникальный ключ
   async () => {
-    // Сбрасываем массивы
-    accessories.value = []
-    similarProducts.value = []
+    // Сбрасываем ВЫБРАННЫЕ аксессуары при каждой загрузке
     selectedAccessoryIds.value = []
+
     // 1. Загружаем основной товар
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
 
     if (!fetchedProduct) {
-      return null
+      // Возвращаем объект со структурой, но с null, чтобы избежать ошибок
+      return { product: null, accessories: [], similarProducts: [] }
     }
 
-    // 2. Запускаем ПАРАЛЛЕЛЬНУЮ загрузку аксессуаров и похожих товаров
+    // 2. Создаем локальные переменные для результатов
+    let fetchedAccessories: ProductWithImages[] = []
+    let fetchedSimilarProducts: ProductWithImages[] = []
+
+    // 3. Запускаем параллельную загрузку
     await Promise.all([
-      // Загрузка аксессуаров
       (async () => {
         if (fetchedProduct.accessory_ids && fetchedProduct.accessory_ids.length > 0) {
-          accessories.value = await productsStore.fetchProductsByIds(fetchedProduct.accessory_ids)
+          fetchedAccessories = await productsStore.fetchProductsByIds(fetchedProduct.accessory_ids)
         }
       })(),
-      // Загрузка похожих товаров
       (async () => {
         if (fetchedProduct.category_id) {
-          // СОЗДАЕМ ПРАВИЛЬНЫЙ МАССИВ ДЛЯ ИСКЛЮЧЕНИЯ
           const excludeIds = [fetchedProduct.id, ...fetchedProduct.accessory_ids || []]
-
-          similarProducts.value = await productsStore.fetchSimilarProducts(
+          fetchedSimilarProducts = await productsStore.fetchSimilarProducts(
             fetchedProduct.category_id,
-            excludeIds, // <-- ПЕРЕДАЕМ МАССИВ
+            excludeIds,
           )
         }
       })(),
     ])
 
-    return fetchedProduct
+    // 4. ВОЗВРАЩАЕМ ОДИН БОЛЬШОЙ ОБЪЕКТ со всеми данными
+    return {
+      product: fetchedProduct,
+      accessories: fetchedAccessories,
+      similarProducts: fetchedSimilarProducts,
+    }
   },
   {
     watch: [slug],
     lazy: true,
-    default: () => null,
   },
 )
 
+const product = computed(() => data.value?.product)
+const accessories = computed(() => data.value?.accessories || [])
+const similarProducts = computed(() => data.value?.similarProducts || [])
+
+// --- `totalPrice` и `totalBonuses` теперь используют `computed`-свойства ---
 const totalPrice = computed(() => {
   if (!product.value)
     return 0
   let total = Number(product.value.price)
-
-  const selectedAccessories = accessories.value.filter(acc =>
-    selectedAccessoryIds.value.includes(acc.id),
-  )
-
-  for (const acc of selectedAccessories) {
+  const selected = accessories.value.filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  for (const acc of selected) {
     total += Number(acc.price)
   }
-
   return total
 })
+
 const totalBonuses = computed(() => {
   if (!product.value)
     return 0
-
-  // 1. Начинаем с бонусов основного товара
   let total = Number(product.value.bonus_points_award)
-
-  // 2. Находим выбранные аксессуары
-  const selectedAccessories = accessories.value.filter(acc =>
-    selectedAccessoryIds.value.includes(acc.id),
-  )
-
-  // 3. Прибавляем их бонусы
-  for (const acc of selectedAccessories) {
+  const selected = accessories.value.filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  for (const acc of selected) {
     total += Number(acc.bonus_points_award)
   }
-
   return total
 })
 
@@ -103,37 +98,29 @@ watch(isLoading, (newIsLoadingValue) => {
     showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
   }
 })
-// --- Мета-теги ---
+
 useHead(() => ({
   title: product.value?.name || 'Загрузка товара...',
   meta: [
-    {
-      name: 'description',
-      content: product.value?.description || `Купить ${product.value?.name || 'товар'} в нашем интернет-магазине.`,
-    },
+    { name: 'description', content: product.value?.description || `Купить ${product.value?.name || 'товар'} в нашем интернет-магазине.` },
   ],
 }))
 
-// --- Локальное состояние для корзины ---
 const quantity = ref(1)
+
 function addToCart() {
   if (!product.value)
     return
 
-  // 1. Добавляем основной товар
   cartStore.addItem(product.value, quantity.value)
 
-  // 2. Находим и добавляем все выбранные аксессуары (по 1 шт.)
-  const selectedAccessories = accessories.value.filter(acc =>
-    selectedAccessoryIds.value.includes(acc.id),
-  )
+  const selectedAccessories = accessories.value.filter(acc => selectedAccessoryIds.value.includes(acc.id))
   for (const acc of selectedAccessories) {
     cartStore.addItem(acc, 1)
   }
-
   toast.success('Товары добавлены в корзину')
 }
-// Сбрасываем количество при переходе на другой товар
+
 watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
