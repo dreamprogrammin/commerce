@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ProductWithImages } from '@/types'
-import { TransitionPresets, useTransition } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useCountUp } from '@/composables/useCountUp'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -10,13 +10,14 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
+
 const { getPublicUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
 
 // `selectedAccessoryIds` остается здесь, это чисто клиентское UI-состояние
 const selectedAccessoryIds = ref<string[]>([])
-
+const priceElement = ref<HTMLElement | null>(null)
 // --- ИЗМЕНЕНИЕ №1: Логика загрузки инкапсулирована в `useAsyncData` ---
 const { data, pending: isLoading } = useAsyncData(
   `product-page-${slug.value}`, // Используем более уникальный ключ
@@ -100,11 +101,6 @@ watch(isLoading, (newIsLoadingValue) => {
   }
 })
 
-const animatedPrice = useTransition(totalPrice, {
-  duration: 400, // Длительность анимации в миллисекундах
-  transition: TransitionPresets.easeOutCubic, // Тип анимации (плавное затухание)
-})
-
 useHead(() => ({
   title: product.value?.name || 'Загрузка товара...',
   meta: [
@@ -126,6 +122,9 @@ function addToCart() {
   }
   toast.success('Товары добавлены в корзину')
 }
+useCountUp(priceElement, totalPrice, {
+  duration: 0.8, // Сделаем анимацию быстрее
+})
 
 watch(() => product.value?.id, () => {
   quantity.value = 1
@@ -230,10 +229,9 @@ watch(() => product.value?.id, () => {
             <div class="pt-4 border-t">
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
+                <p ref="priceElement" class="text-4xl font-bold" />
                 <!-- Используем наше новое computed-свойство -->
-                <p class="text-4xl font-bold">
-                  {{ Math.round(animatedPrice) }} ₸
-                </p>
+                <span class="text-4xl font-bold ml-2">₸</span>
               </div>
             </div>
 
