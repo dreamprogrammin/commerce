@@ -3,6 +3,7 @@ import type { ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useAnimatedCounter } from '@/composables/useAnimatedCounter'
+import { useFlipCounter } from '@/composables/useFlipCounter'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -71,6 +72,7 @@ const { data, pending: isLoading } = useAsyncData(
 const product = computed(() => data.value?.product)
 const accessories = computed(() => data.value?.accessories || [])
 const similarProducts = computed(() => data.value?.similarProducts || [])
+const digitColumns = ref<HTMLElement[]>([])
 
 // --- `totalPrice` и `totalBonuses` теперь используют `computed`-свойства ---
 const totalPrice = computed(() => {
@@ -100,6 +102,16 @@ watch(isLoading, (newIsLoadingValue) => {
     showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
   }
 })
+const { animate: animatePrice } = useFlipCounter(totalPrice, digitColumns)
+
+watch(product, (newProduct) => {
+  if (newProduct) {
+    // `nextTick` гарантирует, что v-for отрендерился и `digitColumns` заполнился
+    nextTick(() => {
+      animatePrice(totalPrice.value)
+    })
+  }
+})
 
 useHead(() => ({
   title: product.value?.name || 'Загрузка товара...',
@@ -122,10 +134,10 @@ function addToCart() {
   }
   toast.success('Товары добавлены в корзину')
 }
-const animatedPrice = useAnimatedCounter(totalPrice)
-const formattedAnimatedPrice = computed(() => {
-  return animatedPrice.value.toLocaleString('ru-RU')
-})
+// const animatedPrice = useAnimatedCounter(totalPrice)
+// const formattedAnimatedPrice = computed(() => {
+//   return animatedPrice.value.toLocaleString('ru-RU')
+// })
 watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
@@ -229,9 +241,28 @@ watch(() => product.value?.id, () => {
             <div class="pt-4 border-t">
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
-                <p class="text-4xl font-bold">
-                  {{ formattedAnimatedPrice }} ₸
-                </p>
+                <div class="text-4xl font-bold flex">
+                  <!--
+          `h-[2.5rem]` - высота одной цифры. `overflow-hidden` обрезает все, что не помещается.
+          `line-height` нужен для выравнивания.
+        -->
+                  <div
+                    v-for="i in 5" :key="i"
+                    class="h-[2.5rem] leading-[2.5rem] overflow-hidden"
+                  >
+                    <!--
+            "Лента" со всеми цифрами от 0 до 9.
+            Мы будем анимировать ее `transform: translateY`.
+            Привязываем ref к этой ленте.
+          -->
+                    <div :ref="el => digitColumns[i - 1] = el as HTMLElement">
+                      <div v-for="d in 10" :key="d" class="h-[2.5rem]">
+                        {{ d - 1 }}
+                      </div>
+                    </div>
+                  </div>
+                  <span class="ml-2">₸</span>
+                </div>
               </div>
             </div>
 
