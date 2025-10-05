@@ -2,7 +2,6 @@
 import type { ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useAnimatedCounter } from '@/composables/useAnimatedCounter'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -102,16 +101,8 @@ watch(isLoading, (newIsLoadingValue) => {
     showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
   }
 })
-const { animate: animatePrice } = useFlipCounter(totalPrice, digitColumns)
 
-watch(product, (newProduct) => {
-  if (newProduct) {
-    // `nextTick` гарантирует, что v-for отрендерился и `digitColumns` заполнился
-    nextTick(() => {
-      animatePrice(totalPrice.value)
-    })
-  }
-})
+useFlipCounter(totalPrice, digitColumns)
 
 useHead(() => ({
   title: product.value?.name || 'Загрузка товара...',
