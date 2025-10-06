@@ -233,11 +233,11 @@ watch(() => product.value?.id, () => {
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
                 <div class="text-4xl font-bold flex items-center gap-0.5">
-                  <!-- Колонки для цифр -->
+                  <!-- Колонки для цифр - динамически по длине числа -->
                   <div
-                    v-for="i in 6"
-                    :key="i"
-                    :ref="el => { if (el) digitColumns[i - 1] = el as HTMLElement }"
+                    v-for="(digit, i) in String(Math.round(totalPrice)).split('')"
+                    :key="`digit-${i}`"
+                    :ref="el => { if (el) digitColumns[i] = el as HTMLElement }"
                     class="digit-column"
                   >
                     <!-- Лента с цифрами от 0 до 9 -->
