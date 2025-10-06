@@ -232,14 +232,10 @@ watch(() => product.value?.id, () => {
             <div class="pt-4 border-t">
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
-                <div class="text-4xl font-bold flex">
-                  <!--
-          `h-[2.5rem]` - высота одной цифры. `overflow-hidden` обрезает все, что не помещается.
-          `line-height` нужен для выравнивания.
-        -->
+                <div class="text-4xl font-bold flex items-center">
                   <div
                     v-for="i in 5" :key="i"
-                    class="h-[2.5rem] leading-[2.5rem] overflow-hidden"
+                    class="h-[2.5rem] leading-[2.5rem]"
                   >
                     <!--
             "Лента" со всеми цифрами от 0 до 9.
