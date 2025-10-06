@@ -11,7 +11,9 @@ export function useFlipCounter(
   columnsRef: Ref<HTMLElement[]>,
 ) {
   // Watch'ер, который следит за изменением исходного числа
-  watch(source, (newValue) => {
+  watch(source, (newValue, oldValue) => {
+    if (newValue === oldValue)
+      return
     // `nextTick` гарантирует, что мы работаем с DOM после того, как Vue его обновил.
     nextTick(() => {
       const columns = columnsRef.value

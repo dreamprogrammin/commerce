@@ -96,13 +96,45 @@ const totalBonuses = computed(() => {
   return total
 })
 
-watch(isLoading, (newIsLoadingValue) => {
-  if (newIsLoadingValue === false && !product.value) {
-    showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
+useFlipCounter(totalPrice, digitColumns)
+
+function setInitialPrice(value: number) {
+  const columns = digitColumns.value
+  if (!columns || columns.length === 0)
+    return
+
+  const numDigits = columns.length
+  const targetString = String(Math.round(value)).padStart(numDigits, '0')
+
+  for (let i = 0; i < numDigits; i++) {
+    const column = columns[i]
+    if (column) {
+      const ribbon = column.querySelector('.digit-ribbon') as HTMLElement | null
+      const digit = targetString[i]
+      if (ribbon && digit) {
+        const digitHeight = column.clientHeight
+        const targetY = -Number.parseInt(digit) * digitHeight
+        // `gsap.set` устанавливает значение мгновенно, без анимации
+        gsap.set(ribbon, { y: targetY })
+      }
+    }
+  }
+}
+watch(isLoading, (newIsLoading, oldIsLoading) => {
+  // Проверяем, что загрузка ТОЛЬКО ЧТО ЗАВЕРШИЛАСЬ
+  if (oldIsLoading === true && newIsLoading === false) {
+    // Если товар ЕСТЬ, запускаем анимацию
+    if (product.value) {
+      nextTick(() => {
+        setInitialPrice(totalPrice.value)
+      })
+    }
+    // А если товара НЕТ, показываем 404
+    else {
+      showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
+    }
   }
 })
-
-useFlipCounter(totalPrice, digitColumns)
 
 useHead(() => ({
   title: product.value?.name || 'Загрузка товара...',
