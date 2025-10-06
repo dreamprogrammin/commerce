@@ -232,18 +232,17 @@ watch(() => product.value?.id, () => {
             <div class="pt-4 border-t">
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
-                <div class="text-4xl font-bold flex items-center">
+                <div class="text-4xl font-bold flex items-center gap-0.5">
+                  <!-- Колонки для цифр -->
                   <div
-                    v-for="i in 5" :key="i"
-                    class="h-[2.5rem] leading-[2.5rem]"
+                    v-for="i in 6"
+                    :key="i"
+                    :ref="el => { if (el) digitColumns[i - 1] = el as HTMLElement }"
+                    class="digit-column"
                   >
-                    <!--
-            "Лента" со всеми цифрами от 0 до 9.
-            Мы будем анимировать ее `transform: translateY`.
-            Привязываем ref к этой ленте.
-          -->
-                    <div :ref="el => digitColumns[i - 1] = el as HTMLElement">
-                      <div v-for="d in 10" :key="d" class="h-[2.5rem]">
+                    <!-- Лента с цифрами от 0 до 9 -->
+                    <div class="digit-ribbon">
+                      <div v-for="d in 10" :key="d" class="digit-item">
                         {{ d - 1 }}
                       </div>
                     </div>
@@ -304,3 +303,26 @@ watch(() => product.value?.id, () => {
     </ClientOnly>
   </div>
 </template>
+
+<style scoped>
+.digit-column {
+  height: 2.5rem;
+  line-height: 2.5rem;
+  overflow: hidden;
+  position: relative;
+  width: 1.5rem;
+  text-align: center;
+  border-radius: 0.25rem;
+  transition: background-color 0.3s ease;
+}
+
+.digit-ribbon {
+  position: relative;
+  will-change: transform;
+}
+
+.digit-item {
+  height: 2.5rem;
+  line-height: 2.5rem;
+}
+</style>
