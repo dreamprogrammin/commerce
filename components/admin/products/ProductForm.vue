@@ -368,7 +368,7 @@ function handleSubmit() {
             <Input id="stock" v-model.number="formData.stock_quantity" type="number" />
           </div>
           <div class="flex items-center space-x-2 pt-2">
-            <Switch id="is_active" v-model:checked="formData.is_active" />
+            <Switch id="is_active" v-model:model-value="formData.is_active" />
             <Label for="is_active">Активен</Label>
           </div>
           <div class="pt-2">
