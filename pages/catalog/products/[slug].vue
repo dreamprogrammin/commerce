@@ -193,11 +193,10 @@ watch(() => product.value?.id, () => {
                     }
                   }"
                 >
-                  <!-- Левая часть: Чекбокс, Картинка, Название -->
-                  <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-3" @click.stop>
                     <Checkbox
                       :id="`acc-${acc.id}`"
-                      :checked="selectedAccessoryIds.includes(acc.id)"
+                      :model-value="selectedAccessoryIds.includes(acc.id)"
                       @update:model-value="(checkedState) => {
                         if (checkedState === true) {
                           if (!selectedAccessoryIds.includes(acc.id)) {
@@ -208,7 +207,6 @@ watch(() => product.value?.id, () => {
                           selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
                         }
                       }"
-                      @click.stop
                     />
                     <!-- Контейнер для картинки -->
                     <div class="w-12 h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
@@ -234,7 +232,6 @@ watch(() => product.value?.id, () => {
                 </div>
               </div>
             </div>
-
             <div :key="`price-${product.id}`" class="pt-4 border-t">
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
