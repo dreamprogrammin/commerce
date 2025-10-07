@@ -229,7 +229,7 @@ watch(() => product.value?.id, () => {
               </div>
             </div>
 
-            <div class="pt-4 border-t">
+            <div :key="`price-${product.id}`" class="pt-4 border-t">
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
                 <div class="text-4xl font-bold flex items-center gap-0.5">
