@@ -23,6 +23,15 @@ const { getPublicUrl } = useSupabaseStorage()
 
 // --- COMPUTED-СВОЙСТВА ДЛЯ УПРАВЛЕНИЯ UI ---
 
+const itemInCart = computed(() => {
+  return cartStore.items.find(item => item.product.id === props.product.id)
+})
+
+// `computed` для получения количества этого товара в корзине
+const quantityInCart = computed(() => {
+  return itemInCart.value ? itemInCart.value.quantity : 0
+})
+
 /**
  * @computed hasImages
  * @description Проверяет, есть ли у товара в принципе массив изображений и не пустой ли он.
@@ -165,9 +174,23 @@ function handleMouseLeave() {
         </p>
       </div>
       <div class="mt-auto pt-2">
-        <Button class="w-full" @click="cartStore.addItem(product, 1)">
-          В корзину
+        <!-- Если товара НЕТ в корзине, показываем кнопку "В корзину" -->
+        <Button
+          v-if="!itemInCart"
+          class="w-full"
+          :disabled="product.stock_quantity <= 0"
+          @click="cartStore.addItem(product, 1)"
+        >
+          <span v-if="product.stock_quantity > 0">В корзину</span>
+          <span v-else>Нет в наличии</span>
         </Button>
+
+        <!-- Если товар УЖЕ в корзине, показываем наш счетчик -->
+        <QuantitySelector
+          v-else
+          :product="product"
+          :quantity="quantityInCart"
+        />
       </div>
     </div>
   </div>

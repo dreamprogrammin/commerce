@@ -33,14 +33,16 @@ const quantityOptions = computed(() => {
  * Универсальная функция для обновления количества.
  * @param newQuantity - Новое количество. Может быть строкой из Select или числом из кнопок.
  */
-function updateQuantity(newQuantity: number | string | null) {
-  const numQuantity = Number(newQuantity)
+function updateQuantity(newQuantity: number | string | null) { // <-- Принимаем `null`
+  // Если пришел `null`, считаем это как 0
+  const numQuantity = Number(newQuantity ?? 0)
+
   if (Number.isNaN(numQuantity))
     return
 
   const finalQuantity = Math.min(numQuantity, maxAvailableQuantity.value)
 
-  // В вашем сторе функция называется `updateQuantity`, а не `updateItemQuantity`
+  // `cartStore.updateQuantity` уже умеет обрабатывать 0, вызывая removeItem
   cartStore.updateQuantity(props.product.id, finalQuantity)
 }
 </script>
@@ -59,7 +61,7 @@ function updateQuantity(newQuantity: number | string | null) {
     </Button>
 
     <!-- "Сердце" компонента: Select, который выглядит как текст -->
-    <Select :model-value="String(quantity)" @update:model-value="updateQuantity">
+    <Select :model-value="String(quantity)" @update:model-value="value => updateQuantity(value as string)">
       <SelectTrigger class="flex-1 h-full border-y-0 border-x rounded-none focus:ring-0 focus:ring-offset-0">
         <SelectValue placeholder="Кол-во" />
       </SelectTrigger>
