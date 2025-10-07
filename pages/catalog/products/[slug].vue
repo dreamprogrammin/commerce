@@ -98,41 +98,9 @@ const totalBonuses = computed(() => {
 
 useFlipCounter(totalPrice, digitColumns)
 
-function setInitialPrice(value: number) {
-  const columns = digitColumns.value
-  if (!columns || columns.length === 0)
-    return
-
-  const numDigits = columns.length
-  const targetString = String(Math.round(value)).padStart(numDigits, '0')
-
-  for (let i = 0; i < numDigits; i++) {
-    const column = columns[i]
-    if (column) {
-      const ribbon = column.querySelector('.digit-ribbon') as HTMLElement | null
-      const digit = targetString[i]
-      if (ribbon && digit) {
-        const digitHeight = column.clientHeight
-        const targetY = -Number.parseInt(digit) * digitHeight
-        // `gsap.set` устанавливает значение мгновенно, без анимации
-        gsap.set(ribbon, { y: targetY })
-      }
-    }
-  }
-}
-watch(isLoading, (newIsLoading, oldIsLoading) => {
-  // Проверяем, что загрузка ТОЛЬКО ЧТО ЗАВЕРШИЛАСЬ
-  if (oldIsLoading === true && newIsLoading === false) {
-    // Если товар ЕСТЬ, запускаем анимацию
-    if (product.value) {
-      nextTick(() => {
-        setInitialPrice(totalPrice.value)
-      })
-    }
-    // А если товара НЕТ, показываем 404
-    else {
-      showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
-    }
+watch(isLoading, (newIsLoading) => {
+  if (newIsLoading === false && !product.value) {
+    showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
   }
 })
 
@@ -267,9 +235,9 @@ watch(() => product.value?.id, () => {
                 <div class="text-4xl font-bold flex items-center gap-0.5">
                   <!-- Колонки для цифр - динамически по длине числа -->
                   <div
-                    v-for="i in 6"
-                    :key="i"
-                    :ref="el => { if (el) digitColumns[i - 1] = el as HTMLElement }"
+                    v-for="(digit, i) in String(Math.round(totalPrice)).split('')"
+                    :key="`digit-${i}`"
+                    :ref="el => { if (el) digitColumns[i] = el as HTMLElement }"
                     class="digit-column"
                   >
                     <!-- Лента с цифрами от 0 до 9 -->
