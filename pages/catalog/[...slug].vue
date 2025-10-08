@@ -182,7 +182,7 @@ watchDebounced(
       <aside class="col-span-1 lg:sticky top-24 self-start">
         <FilterSidebar v-model="activeFilters" :price-range="priceRange" :is-loading="isLoading" />
       </aside>
-      <main class="col-span-3">
+      <main class="col-span-3  min-w-0">
         <CatalogHeader v-model:sort-by="activeFilters.sortBy" :title="title ?? ''" />
 
         <ProductGridSkeleton v-if="isLoading" />
