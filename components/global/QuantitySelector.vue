@@ -9,6 +9,8 @@ const props = defineProps<{
 
 const cartStore = useCartStore()
 
+const isDrawerOpen = ref(false)
+
 /**
  * Вычисляет максимальное количество товара, доступное для заказа (80% от остатка).
  * Минимум - 1.
@@ -48,43 +50,73 @@ function updateQuantity(newQuantity: number | string | null) { // <-- Прини
 </script>
 
 <template>
-  <div class-="flex items-center justify-between w-full h-10 border rounded-md">
-    <!-- Кнопка "Минус" -->
-    <Button
-      variant="ghost"
-      size="icon"
-      class="h-full rounded-r-none"
-      :disabled="quantity <= 1"
-      @click="updateQuantity(quantity - 1)"
-    >
-      -
-    </Button>
+  <Drawer v-model:open="isDrawerOpen">
+    <!-- Основной счетчик, который виден всегда -->
+    <div class="flex items-center justify-between w-full h-10 border rounded-md">
+      <!-- Кнопка "Минус" -->
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-full rounded-r-none"
+        :disabled="quantity <= 1"
+        @click="updateQuantity(quantity - 1)"
+      >
+        -
+      </Button>
 
-    <!-- "Сердце" компонента: Select, который выглядит как текст -->
-    <Select :model-value="String(quantity)" @update:model-value="value => updateQuantity(value as string)">
-      <SelectTrigger class="flex-1 h-full border-y-0 border-x rounded-none focus:ring-0 focus:ring-offset-0">
-        <SelectValue placeholder="Кол-во" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem
-          v-for="option in quantityOptions"
-          :key="option"
-          :value="String(option)"
-        >
-          {{ option }} шт.
-        </SelectItem>
-      </SelectContent>
-    </Select>
+      <!--
+        Кнопка-триггер, которая выглядит как цифра.
+        При клике на нее откроется "шторка".
+      -->
+      <DrawerTrigger as-child>
+        <Button variant="ghost" class="flex-1 h-full text-base font-medium rounded-none">
+          {{ quantity }}
+        </Button>
+      </DrawerTrigger>
 
-    <!-- Кнопка "Плюс" -->
-    <Button
-      variant="ghost"
-      size="icon"
-      class="h-full rounded-l-none"
-      :disabled="quantity >= maxAvailableQuantity"
-      @click="updateQuantity(quantity + 1)"
-    >
-      +
-    </Button>
-  </div>
+      <!-- Кнопка "Плюс" -->
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-full rounded-l-none"
+        :disabled="quantity >= maxAvailableQuantity"
+        @click="updateQuantity(quantity + 1)"
+      >
+        +
+      </Button>
+    </div>
+
+    <!-- Содержимое "шторки", которое появляется при клике -->
+    <DrawerContent>
+      <div class="mx-auto w-full max-w-sm">
+        <DrawerHeader>
+          <DrawerTitle>Выберите количество</DrawerTitle>
+        </DrawerHeader>
+        <div class="p-4">
+          <!-- Создаем прокручиваемый список с опциями -->
+          <div class="max-h-60 overflow-y-auto -mx-4">
+            <div class="px-4">
+              <Button
+                v-for="option in quantityOptions"
+                :key="option"
+                variant="ghost"
+                class="w-full justify-center text-lg py-6"
+                :class="{ 'font-bold text-primary': option === quantity }"
+                @click="updateQuantity(option)"
+              >
+                {{ option }}
+              </Button>
+            </div>
+          </div>
+        </div>
+        <DrawerFooter>
+          <DrawerClose as-child>
+            <Button variant="outline">
+              Отмена
+            </Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </div>
+    </DrawerContent>
+  </Drawer>
 </template>
