@@ -96,6 +96,41 @@ const totalBonuses = computed(() => {
   return total
 })
 
+const mainItemInCart = computed(() => {
+  if (!product.value)
+    return undefined
+  return cartStore.items.find(item => item.product.id === product.value?.id)
+})
+
+// `computed` для получения количества ОСНОВНОГО товара в корзине
+const quantityInCart = computed(() => {
+  return mainItemInCart.value ? mainItemInCart.value.quantity : 0
+})
+
+function addToCart() {
+  if (!product.value)
+    return
+
+  // Добавляем основной товар (если его еще нет)
+  if (!mainItemInCart.value) {
+    cartStore.addItem(product.value, 1) // Добавляем 1 шт.
+  }
+
+  // Находим и добавляем все выбранные аксессуары (по 1 шт.)
+  const selectedAccessories = accessories.value.filter(acc =>
+    selectedAccessoryIds.value.includes(acc.id),
+  )
+  for (const acc of selectedAccessories) {
+    // Проверяем, нет ли уже этого аксессуара в корзине, чтобы не дублировать
+    const accInCart = cartStore.items.find(item => item.product.id === acc.id)
+    if (!accInCart) {
+      cartStore.addItem(acc, 1)
+    }
+  }
+
+  toast.success('Товары добавлены в корзину')
+}
+
 useFlipCounter(totalPrice, digitColumns)
 
 watch(isLoading, (newIsLoading) => {
@@ -112,19 +147,6 @@ useHead(() => ({
 }))
 
 const quantity = ref(1)
-
-function addToCart() {
-  if (!product.value)
-    return
-
-  cartStore.addItem(product.value, quantity.value)
-
-  const selectedAccessories = accessories.value.filter(acc => selectedAccessoryIds.value.includes(acc.id))
-  for (const acc of selectedAccessories) {
-    cartStore.addItem(acc, 1)
-  }
-  toast.success('Товары добавлены в корзину')
-}
 // const animatedPrice = useAnimatedCounter(totalPrice)
 // const formattedAnimatedPrice = computed(() => {
 //   return animatedPrice.value.toLocaleString('ru-RU')
@@ -264,18 +286,33 @@ watch(() => product.value?.id, () => {
             </div>
             <div class="flex items-center gap-4 pt-4">
               <template v-if="product.stock_quantity > 0">
-                <Input v-model.number="quantity" type="number" min="1" :max="product.stock_quantity" class="w-24 text-center" />
-                <Button size="lg" class="flex-grow" @click="addToCart">
+                <!--
+            Если ОСНОВНОГО товара НЕТ в корзине, показываем кнопку.
+            Она теперь добавляет и основной товар, и выбранные аксессуары.
+          -->
+                <Button
+                  v-if="!mainItemInCart"
+                  size="lg"
+                  class="flex-grow"
+                  @click="addToCart"
+                >
                   Добавить в корзину
                 </Button>
+                <!--
+            Если ОСНОВНОЙ товар УЖЕ в корзине, показываем счетчик.
+            Он будет управлять количеством ТОЛЬКО основного товара.
+          -->
+                <QuantitySelector
+                  v-else
+                  :product="product"
+                  :quantity="quantityInCart"
+                  class="flex-grow"
+                />
               </template>
               <Button v-else size="lg" class="flex-grow" disabled>
                 Нет в наличии
               </Button>
             </div>
-            <p v-if="product.stock_quantity > 0" class="text-sm text-green-600">
-              В наличии: {{ product.stock_quantity }} шт.
-            </p>
           </div>
         </div>
 
