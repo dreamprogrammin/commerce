@@ -145,52 +145,54 @@ watch(emblaMobileApi, (api) => {
       @mousemove="handleMouseMove"
       @mouseleave="handleMouseLeave"
     >
-      <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
-        <!--
-          Отображается только ОДНО изображение, `src` которого реактивно
-          обновляется благодаря `activeImageUrl`.
-          `:key` помогает Vue плавно анимировать смену изображения.
-        -->
-        <NuxtImg
-          v-if="activeImageUrl"
-          :key="activeImageUrl"
-          :src="activeImageUrl"
-          :alt="product.name"
-          format="webp"
-          quality="80"
-          width="400"
-          height="400"
-          loading="lazy"
-          placeholder
-          class="w-full h-full object-cover transition-opacity duration-200"
-        />
-        <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-          <span>Нет фото</span>
-        </div>
-      </NuxtLink>
+      <template v-if="!isTouchDevice">
+        <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
+          <NuxtImg
+            v-if="activeImageUrl"
+            :key="activeImageUrl"
+            :src="activeImageUrl"
+            :alt="product.name"
+            class="w-full h-full object-cover transition-opacity duration-200"
+            format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+          />
+          <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+            <span>Нет фото</span>
+          </div>
+        </NuxtLink>
+      </template>
 
-      <Carousel
-        v-if="isTouchDevice && hasMultipleImages"
-        class="absolute inset-0 w-full h-full md:hidden"
-        :opts="{ loop: true, align: 'start' }"
-        @init-api="(val) => emblaMobileApi = val"
-        @touchstart.stop
-        @touchmove.stop
-        @touchend.stop
-      >
-        <CarouselContent>
-          <CarouselItem v-for="image in product.product_images" :key="image.id">
-            <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
-              <NuxtImg
-                :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
-                :alt="product.name"
-                class="w-full h-full object-cover"
-                format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
-              />
-            </NuxtLink>
-          </CarouselItem>
-        </CarouselContent>
-      </Carousel>
+      <template v-else>
+        <Carousel
+          v-if="hasMultipleImages"
+          class="w-full h-full"
+          :opts="{ loop: true, align: 'start' }"
+          @touchstart.stop @touchmove.stop @touchend.stop
+          @init-api="(val) => emblaMobileApi = val"
+        >
+          <CarouselContent>
+            <CarouselItem v-for="image in product.product_images" :key="image.id">
+              <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
+                <NuxtImg
+                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
+                  :alt="product.name"
+                  class="w-full h-full object-cover"
+                  format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+                />
+              </NuxtLink>
+            </CarouselItem>
+          </CarouselContent>
+        </Carousel>
+        <!-- Если на мобилке только одна картинка -->
+        <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full">
+          <NuxtImg
+            v-if="activeImageUrl"
+            :src="activeImageUrl"
+            :alt="product.name"
+            class="w-full h-full object-cover"
+            format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+          />
+        </NuxtLink>
+      </template>
 
       <!-- Индикаторы-точки для визуальной обратной связи -->
       <div
