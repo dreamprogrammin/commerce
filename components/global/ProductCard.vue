@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import type { CarouselApi } from '../ui/carousel'
 import type { AccessoryProduct } from '@/types'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
-
 // --- PROPS ---
 
 /**
@@ -21,6 +21,20 @@ const props = defineProps<{
 const cartStore = useCartStore()
 const { getPublicUrl } = useSupabaseStorage()
 
+const isTouchDevice = ref(false)
+onMounted(() => {
+  // `window` доступен только на клиенте, поэтому используем onMounted
+  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+})
+
+const emblaMobileApi = ref<CarouselApi>()
+const mobileSelectedIndex = ref(0)
+
+function onMobileSelect() {
+  if (!emblaMobileApi.value)
+    return
+  mobileSelectedIndex.value = emblaMobileApi.value.selectedScrollSnap()
+}
 // --- COMPUTED-СВОЙСТВА ДЛЯ УПРАВЛЕНИЯ UI ---
 
 const itemInCart = computed(() => {
@@ -109,6 +123,14 @@ function handleMouseMove(event: MouseEvent) {
 function handleMouseLeave() {
   activeImageIndex.value = 0
 }
+
+watch(emblaMobileApi, (api) => {
+  if (api) {
+    onMobileSelect() // Устанавливаем начальное значение
+    api.on('select', onMobileSelect)
+    api.on('reInit', onMobileSelect)
+  }
+})
 </script>
 
 <template>
@@ -147,16 +169,49 @@ function handleMouseLeave() {
         </div>
       </NuxtLink>
 
+      <Carousel
+        v-if="isTouchDevice && hasMultipleImages"
+        class="absolute inset-0 w-full h-full md:hidden"
+        :opts="{ loop: true, align: 'start' }"
+        @init-api="(val) => emblaMobileApi = val"
+        @touchstart.stop
+        @touchmove.stop
+        @touchend.stop
+      >
+        <CarouselContent>
+          <CarouselItem v-for="image in product.product_images" :key="image.id">
+            <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
+              <NuxtImg
+                :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
+                :alt="product.name"
+                class="w-full h-full object-cover"
+                format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+              />
+            </NuxtLink>
+          </CarouselItem>
+        </CarouselContent>
+      </Carousel>
+
       <!-- Индикаторы-точки для визуальной обратной связи -->
       <div
         v-if="hasMultipleImages"
         class="absolute bottom-2 left-0 right-0 h-4 flex justify-center items-center gap-2 pointer-events-none"
       >
-        <div
-          v-for="(image, index) in product.product_images" :key="image.id"
-          class="w-2 h-2 rounded-full transition-all duration-200"
-          :class="index === activeImageIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
-        />
+        <template v-if="!isTouchDevice">
+          <div
+            v-for="(image, index) in product.product_images" :key="image.id"
+            class="w-2 h-2 rounded-full transition-all"
+            :class="index === activeImageIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
+          />
+        </template>
+
+        <template v-else>
+          <div
+            v-for="(image, index) in product.product_images" :key="`dot-${image.id}`"
+            class="w-2 h-2 rounded-full transition-all"
+            :class="index === mobileSelectedIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
+          />
+        </template>
       </div>
     </div>
 
