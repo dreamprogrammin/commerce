@@ -23,7 +23,6 @@ defineProps<{
         class="w-full"
         :opts="{
           align: 'start',
-          loop: products.length > 5,
         }"
       >
         <!--
@@ -31,16 +30,16 @@ defineProps<{
           чтобы первый элемент был выровнен по левому краю.
           `-ml-4` компенсирует `pl-4` на `CarouselItem`.
         -->
-        <CarouselContent class="-ml-4 pl-4 sm:pl-6 lg:pl-8">
+        <CarouselContent class="-ml-1">
           <CarouselItem
             v-for="product in products"
             :key="product.id"
-            class="pl-4
-                   basis-2/3
-                   sm:basis-1/2
-                   md:basis-1/3
-                   lg:basis-1/4
-                   xl:basis-1/5"
+            class="pl-1
+                   basis-[52.63%]
+                   sm:basis-[45%]
+                   md:basis-[30%]
+                   lg:basis-[22%]
+                   xl:basis-[18%]"
           >
             <div class="p-1 h-full">
               <ProductCard :product="product" class="h-full" />
