@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import type { ProductWithImages } from '@/types'
+import type { IBreadcrumbItem, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
+const categoriesStore = useCategoriesStore()
 
 const { getPublicUrl } = useSupabaseStorage()
 
@@ -17,12 +19,12 @@ const slug = computed(() => route.params.slug as string)
 
 // `selectedAccessoryIds` остается здесь, это чисто клиентское UI-состояние
 const selectedAccessoryIds = ref<string[]>([])
-
 // --- ИЗМЕНЕНИЕ №1: Логика загрузки инкапсулирована в `useAsyncData` ---
 const { data, pending: isLoading } = useAsyncData(
   `product-page-${slug.value}`, // Используем более уникальный ключ
   async () => {
     // Сбрасываем ВЫБРАННЫЕ аксессуары при каждой загрузке
+    await categoriesStore.fetchCategoryData()
     selectedAccessoryIds.value = []
 
     // 1. Загружаем основной товар
@@ -73,6 +75,28 @@ const accessories = computed(() => data.value?.accessories || [])
 const similarProducts = computed(() => data.value?.similarProducts || [])
 const digitColumns = ref<HTMLElement[]>([])
 
+const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
+  // Если товар еще не загружен, возвращаем пустой массив
+  if (!product.value) {
+    return []
+  }
+
+  let crumbs: IBreadcrumbItem[] = []
+
+  // 1. Сначала получаем базовую цепочку категорий, если они есть
+  if (product.value.categories?.slug) {
+    crumbs = categoriesStore.getBreadcrumbs(product.value.categories.slug)
+  }
+
+  // 2. Добавляем в конец сам товар. Он не будет ссылкой.
+  crumbs.push({
+    id: product.value.id,
+    name: product.value.name,
+    // `href` не нужен, так как это текущая страница
+  })
+
+  return crumbs
+})
 // --- `totalPrice` и `totalBonuses` теперь используют `computed`-свойства ---
 const totalPrice = computed(() => {
   if (!product.value)
@@ -165,6 +189,7 @@ watch(() => product.value?.id, () => {
 
       <!-- Состояние с данными -->
       <div v-else-if="product">
+        <Breadcrumbs :items="breadcrumbs" class="mb-6" />
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           <div class="lg:col-span-8 top-24">
             <ProductGallery
