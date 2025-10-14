@@ -94,7 +94,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
       <div v-if="isLoadingMainBlock" class="container py-8 md:py-12">
         <!-- Заголовок меняется в зависимости от того, залогинен ли юзер -->
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-        <HomeProductCarouselSkeleton />
+        <ProductCarouselSkeleton />
       </div>
 
       <!-- Если все загрузки завершены, принимаем решение, что показать -->
@@ -119,7 +119,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
       <template #fallback>
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <div class="container py-8 md:py-12">
-          <HomeProductCarouselSkeleton />
+          <ProductCarouselSkeleton />
         </div>
       </template>
     </ClientOnly>
