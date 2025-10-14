@@ -12,6 +12,8 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const currentProduct = ref<FullProduct | null>(null)
   const isLoading = ref(false)
   const isSaving = ref(false)
+  const brands = ref<Brand[]>([])
+  const countries = ref<Country[]>([])
 
   // --- ЧТЕНИЕ ДАННЫХ (Read) ---
 
@@ -78,6 +80,21 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     catch (error: any) {
       toast.error('Ошибка загрузки связанных товаров', { description: error.message })
       return [] // Всегда возвращаем массив в случае ошибки
+    }
+  }
+  // ФУНКЦИЯ: Загрузка всех брендов для выпадающего списка
+  async function fetchAllBrands() {
+    try {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error)
+        throw error
+      brands.value = data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки брендов', { description: error.message })
     }
   }
 

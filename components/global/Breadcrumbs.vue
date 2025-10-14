@@ -15,8 +15,13 @@ const fullPathItems = computed<IBreadcrumbItem[]>(() => {
   return [homeCrumb, ...props.items]
 })
 
-// Последний элемент - это ТЕКУЩАЯ КАТЕГОРИЯ (товар)
-const currentCategory = computed(() => props.items[props.items.length - 1])
+// Предпоследний элемент - это КАТЕГОРИЯ (откуда пришел товар)
+const categoryItem = computed(() => {
+  if (props.items.length < 2) {
+    return null
+  }
+  return props.items[props.items.length - 2]
+})
 </script>
 
 <template>
@@ -62,10 +67,10 @@ const currentCategory = computed(() => props.items[props.items.length - 1])
       <!-- Разделитель -->
       <ChevronRight class="h-4 w-4 text-muted-foreground flex-shrink-0" />
 
-      <!-- Категория товара (текущая страница) -->
-      <span v-if="currentCategory" class="font-medium text-foreground truncate">
-        {{ currentCategory.name }}
-      </span>
+      <!-- Категория товара (а не само название товара) - кликабельная -->
+      <NuxtLink v-if="categoryItem" :to="categoryItem.href" class="font-medium text-foreground truncate hover:text-primary transition-colors">
+        {{ categoryItem.name }}
+      </NuxtLink>
     </div>
   </nav>
 </template>

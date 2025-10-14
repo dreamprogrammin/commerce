@@ -19,7 +19,7 @@ const {
 </script>
 
 <template>
-  <div class="grid grid-cols-12 grid-rows-1 gap-4">
+  <div class="grid grid-cols-12 grid-rows-1 gap-4 pt-7">
     <div v-if="images && images.length > 1" class="hidden md:block col-span-2">
       <Carousel
         class="relative w-full max-w-xs"
