@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
 import { debounce } from 'lodash-es'
-
+import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -15,35 +15,19 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'create', payload: {
-    data: ProductInsert
-    newImageFiles: File[]
-  }): void
-
-  (e: 'update', payload: {
-    data: ProductUpdate
-    newImageFiles: File[]
-    imagesToDelete: string[]
-    existingImages: ProductImageRow[]
-  }): void
+  (e: 'create', payload: { data: ProductInsert, newImageFiles: File[] }): void
+  (e: 'update', payload: { data: ProductUpdate, newImageFiles: File[], imagesToDelete: string[], existingImages: ProductImageRow[] }): void
 }>()
 
-// --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ КОМПОНЕНТА ---
-const formData = ref<Partial<ProductFormData>>({
-  name: '',
-  slug: '',
-  price: 0,
-  is_active: true,
-  stock_quantity: 0,
-  description: null,
-  category_id: null,
-  bonus_points_award: 0,
-  min_age: null,
-  max_age: null,
-  gender: 'unisex',
-  accessory_ids: [],
-  is_accessory: false,
-})
+// --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ ---
+const categoriesStore = useAdminCategoriesStore()
+const productStore = useAdminProductsStore()
+const { getPublicUrl } = useSupabaseStorage()
+
+const { brands, countries, materials } = storeToRefs(productStore)
+
+// --- 3. ЛОКАЛЬНОЕ СОСТОЯНИЕ КОМПОНЕНТА ---
+const formData = ref<Partial<ProductFormData>>({})
 
 const bonusOptions = [
   { label: 'Стандарт (5%)', value: 5 },
@@ -52,61 +36,57 @@ const bonusOptions = [
   { label: 'Подарок (100%)', value: 100 },
 ]
 
-// --- 3. ИНИЦИАЛИЗАЦИЯ СТОРОВ И ПЕРЕМЕННЫХ ---
-const categoriesStore = useAdminCategoriesStore()
-const productStore = useAdminProductsStore()
-const { getPublicUrl } = useSupabaseStorage()
-
-// Переменные для UI
 const newImageFiles = ref<{ file: File, previewUrl: string }[]>([])
 const existingImages = ref<ProductImageRow[]>([])
 const imagesToDelete = ref<string[]>([])
 const selectedBonusPercent = ref(5)
 
-// Переменные для аксессуаров
 const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([])
 const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
 
 // --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ПРИ ЗАГРУЗКЕ ---
-watch(() => props.initialData, async (product) => {
+
+// <-- ИЗМЕНЕНО: Функция теперь принимает правильный тип
+function setupFormData(product: FullProduct | null | undefined) {
   newImageFiles.value = []
   imagesToDelete.value = []
   linkedAccessories.value = []
 
   if (product && product.id) {
-    // РЕЖИМ РЕДАКТИРОВАНИЯ
-    const productCopy = JSON.parse(JSON.stringify(product))
+    // --- РЕЖИИМ РЕДАКТИРОВАНИЯ ---
     formData.value = {
-      name: productCopy.name,
-      slug: productCopy.slug,
-      description: productCopy.description,
-      price: productCopy.price,
-      category_id: productCopy.category_id,
-      stock_quantity: productCopy.stock_quantity,
-      is_active: productCopy.is_active,
-      bonus_points_award: productCopy.bonus_points_award,
-      min_age: productCopy.min_age,
-      max_age: productCopy.max_age,
-      gender: productCopy.gender as 'unisex' | 'male' | 'female' | null,
-      accessory_ids: productCopy.accessory_ids || [],
-      is_accessory: productCopy.is_accessory || false,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      price: product.price,
+      category_id: product.category_id,
+      stock_quantity: product.stock_quantity,
+      is_active: product.is_active,
+      bonus_points_award: product.bonus_points_award,
+      min_age_years: product.min_age_years,
+      max_age_years: product.max_age_years,
+      gender: product.gender as 'unisex' | 'male' | 'female' | null,
+      accessory_ids: product.accessory_ids || [],
+      is_accessory: product.is_accessory || false,
+      sku: product.sku,
+      brand_id: product.brand_id,
+      origin_country_id: product.origin_country_id,
+      discount_percentage: product.discount_percentage || 0,
     }
-    existingImages.value = [...(productCopy.product_images || [])]
+    existingImages.value = [...(product.product_images || [])]
 
-    // Загружаем полные данные для уже привязанных аксессуаров
-    if (productCopy.accessory_ids && productCopy.accessory_ids.length > 0) {
-      linkedAccessories.value = await productStore.fetchProductsByIds(productCopy.accessory_ids)
-    }
+    if (product.accessory_ids && product.accessory_ids.length > 0)
+      productStore.fetchProductsByIds(product.accessory_ids).then(data => linkedAccessories.value = data)
 
-    if (productCopy.price > 0) {
-      const percent = Math.round((productCopy.bonus_points_award / Number(productCopy.price)) * 100)
+    if (product.price > 0 && product.bonus_points_award) {
+      const percent = Math.round((product.bonus_points_award / Number(product.price)) * 100)
       selectedBonusPercent.value = bonusOptions.find(opt => opt.value === percent)?.value || 5
     }
   }
   else {
-    // РЕЖИМ СОЗДАНИЯ
+    // --- РЕЖИМ СОЗДАНИЯ ---
     formData.value = {
       name: '',
       slug: '',
@@ -116,71 +96,51 @@ watch(() => props.initialData, async (product) => {
       description: null,
       category_id: null,
       bonus_points_award: 0,
-      min_age: null,
-      max_age: null,
+      min_age_years: null,
+      max_age_years: null,
       gender: 'unisex',
       accessory_ids: [],
       is_accessory: false,
+      sku: null,
+      brand_id: null,
+      origin_country_id: null,
+      discount_percentage: 0,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
   }
-}, { immediate: true })
+}
+
+// <-- ИЗМЕНЕНО: Используем чистую обертку для вызова setupFormData
+watch(
+  () => props.initialData,
+  (newProduct) => {
+    setupFormData(newProduct)
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
-  categoriesStore.fetchAllCategories()
+  if (categoriesStore.allCategories.length === 0)
+    categoriesStore.fetchAllCategories()
+  if (productStore.brands.length === 0)
+    productStore.fetchAllBrands()
+  if (productStore.countries.length === 0)
+    productStore.fetchAllCountries()
 })
 
 // --- 5. РЕАКТИВНОСТЬ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-
 watch([() => formData.value.price, selectedBonusPercent], ([price, percent]) => {
-  if (formData.value && price && percent) {
-    formData.value.bonus_points_award = Math.round(Number(price) * (percent / 100))
-  }
+  if (formData.value && typeof price === 'number' && typeof percent === 'number')
+    formData.value.bonus_points_award = Math.round(price * (percent / 100))
 })
-
-const minAgeValue = computed({
-  get: () => formData.value.min_age ?? undefined,
-  set: (value) => {
-    if (formData.value)
-      formData.value.min_age = typeof value === 'number' ? value : null
-  },
-})
-const maxAgeValue = computed({
-  get: () => formData.value.max_age ?? undefined,
-  set: (value) => {
-    if (formData.value)
-      formData.value.max_age = typeof value === 'number' ? value : null
-  },
-})
-
-const descriptionValue = computed({
-  get: () => formData.value.description ?? '',
-  set: (value: string) => {
-    formData.value.description = value === '' ? null : value
-  },
-})
-
-// const categoryIdValue = computed({
-//   get: () => formData.value.category_id ?? undefined, // Select ожидает `undefined` для placeholder
-//   set: (value: string | null) => {
-//     formData.value.category_id = value
-//   },
-// })
-
-// const genderValue = computed({
-//   get: () => formData.value.gender ?? 'unisex',
-//   set: (value: 'unisex' | 'male' | 'female' | null) => {
-//     formData.value.gender = value
-//   },
-// })
 
 function autoFillSlug() {
-  if (formData.value?.name && !formData.value.slug) {
+  if (formData.value?.name && !formData.value.slug)
     formData.value.slug = slugify(formData.value.name)
-  }
 }
 
+// --- 6. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ ---
 function handleFilesChange(event: Event) {
   const target = event.target as HTMLInputElement
   if (target.files) {
@@ -203,7 +163,6 @@ function removeExistingImage(image: ProductImageRow) {
 }
 
 // --- 7. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
-
 const debouncedSearch = debounce(async () => {
   if (accessorySearchQuery.value.length < 2) {
     accessorySearchResults.value = []
@@ -220,10 +179,12 @@ function addAccessory(product: ProductSearchResult) {
   accessorySearchQuery.value = ''
   accessorySearchResults.value = []
 }
+
 function removeAccessory(productId: string) {
   linkedAccessories.value = linkedAccessories.value.filter(p => p.id !== productId)
 }
 
+// --- 8. ОТПРАВКА ФОРМЫ ---
 function handleSubmit() {
   if (!formData.value)
     return
@@ -233,6 +194,7 @@ function handleSubmit() {
   }
 
   formData.value.accessory_ids = linkedAccessories.value.map(p => p.id)
+  formData.value.sku = formData.value.sku || null
 
   const productData = { ...formData.value }
 
@@ -251,6 +213,61 @@ function handleSubmit() {
     })
   }
 }
+
+const skuValue = computed({
+  // GET: Когда компонент читает значение
+  get() {
+    // Если в данных null, отдаем компоненту undefined (или пустую строку), что он понимает
+    return formData.value.sku ?? undefined
+  },
+  // SET: Когда компонент записывает новое значение (пользователь печатает)
+  set(value) {
+    if (formData.value) {
+      // Если пришла пустая строка, в наши данные записываем null. Иначе - само значение.
+      formData.value.sku = value || null
+    }
+  },
+})
+
+const descriptionValue = computed({
+  // GET: Когда компонент читает значение
+  get() {
+    // Если в данных null, отдаем компоненту undefined (или пустую строку), что он понимает
+    return formData.value.description ?? undefined
+  },
+  // SET: Когда компонент записывает новое значение (пользователь печатает)
+  set(value) {
+    if (formData.value) {
+      // Если пришла пустая строка, в наши данные записываем null. Иначе - само значение.
+      formData.value.description = value || null
+    }
+  },
+})
+
+const minAgeYearsValue = computed({
+  get() {
+    // Отдаем компоненту `undefined`, если в данных `null`
+    return formData.value.min_age_years ?? undefined
+  },
+  set(value) {
+    if (formData.value) {
+      // Если из инпута приходит не число (например, его очистили),
+      // записываем в наши данные `null`
+      formData.value.min_age_years = typeof value === 'number' ? value : null
+    }
+  },
+})
+
+const maxAgeYearsValue = computed({
+  get() {
+    return formData.value.max_age_years ?? undefined
+  },
+  set(value) {
+    if (formData.value) {
+      formData.value.max_age_years = typeof value === 'number' ? value : null
+    }
+  },
+})
 </script>
 
 <template>
@@ -272,6 +289,10 @@ function handleSubmit() {
             <Input id="slug" v-model="formData.slug" />
           </div>
           <div>
+            <Label for="sku">Артикул (SKU)</Label>
+            <Input id="sku" v-model="skuValue" placeholder="Уникальный код товара" />
+          </div>
+          <div>
             <Label for="description">Описание</Label>
             <Textarea id="description" v-model="descriptionValue" />
           </div>
@@ -281,15 +302,26 @@ function handleSubmit() {
       <!-- Цена и бонусы -->
       <Card>
         <CardHeader>
-          <CardTitle>Цена и бонусы</CardTitle>
+          <CardTitle>Цена, бонусы и скидка</CardTitle>
         </CardHeader>
-        <CardContent class="space-y-4">
+        <CardContent class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label for="price">Цена в ₸ *</Label>
             <Input id="price" v-model.number="formData.price" type="number" />
           </div>
-          <div class="p-3 bg-muted/50 rounded-md">
-            <Label>Процент бонусов</Label>
+          <div>
+            <Label for="discount_percentage">Скидка (%)</Label>
+            <Input
+              id="discount_percentage"
+              v-model.number="formData.discount_percentage"
+              type="number"
+              min="0"
+              max="100"
+              placeholder="0-100"
+            />
+          </div>
+          <div class="p-3 bg-muted/50 rounded-md sm:col-span-2">
+            <Label>Процент начисляемых бонусов</Label>
             <Select v-model.number="selectedBonusPercent">
               <SelectTrigger>
                 <SelectValue />
@@ -301,7 +333,7 @@ function handleSubmit() {
               </SelectContent>
             </Select>
             <p class="text-sm text-muted-foreground mt-2">
-              Будет начислено: <span class="font-bold text-primary">{{ formData.bonus_points_award }} бонусов</span>
+              Будет начислено: <span class="font-bold text-primary">{{ formData.bonus_points_award || 0 }} бонусов</span>
             </p>
           </div>
         </CardContent>
@@ -363,14 +395,68 @@ function handleSubmit() {
               </SelectContent>
             </Select>
           </div>
+
+          <div>
+            <Label>Бренд (опционально)</Label>
+            <Select v-model="formData.brand_id">
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите бренд" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="null">
+                  Без бренда
+                </SelectItem>
+                <SelectItem v-for="brand in brands" :key="brand.id" :value="brand.id">
+                  {{ brand.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Страна происхождения (опционально)</Label>
+            <Select v-model="formData.origin_country_id">
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите страну" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="null">
+                  Не указана
+                </SelectItem>
+                <SelectItem v-for="country in countries" :key="country.id" :value="country.id">
+                  {{ country.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Материал (опционально)</Label>
+            <Select v-model="formData.material_id">
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите материал" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="null">
+                  Не указан
+                </SelectItem>
+                <SelectItem v-for="material in materials" :key="material.id" :value="material.id">
+                  {{ material.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label for="stock">Количество на складе</Label>
             <Input id="stock" v-model.number="formData.stock_quantity" type="number" />
           </div>
+
           <div class="flex items-center space-x-2 pt-2">
             <Switch id="is_active" v-model:model-value="formData.is_active" />
-            <Label for="is_active">Активен</Label>
+            <Label for="is_active">Активен для продажи</Label>
           </div>
+
           <div class="pt-2">
             <Label for="gender">Пол</Label>
             <Select v-model="formData.gender">
@@ -390,14 +476,15 @@ function handleSubmit() {
               </SelectContent>
             </Select>
           </div>
+
           <div class="grid grid-cols-2 gap-4 pt-2">
             <div>
-              <Label for="min_age">Мин. возраст (мес.)</Label>
-              <Input id="min_age" v-model.number="minAgeValue" type="number" />
+              <Label for="min_age_years">Мин. возраст (лет)</Label>
+              <Input id="min_age_years" v-model.number="minAgeYearsValue" type="number" />
             </div>
             <div>
-              <Label for="max_age">Макс. возраст (мес.)</Label>
-              <Input id="max_age" v-model.number="maxAgeValue" type="number" />
+              <Label for="max_age_years">Макс. возраст (лет)</Label>
+              <Input id="max_age_years" v-model.number="maxAgeYearsValue" type="number" />
             </div>
           </div>
         </CardContent>

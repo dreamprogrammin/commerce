@@ -197,7 +197,7 @@ function removeImage() {
           <Input :id="`order-${props.item._tempId || props.item.id}`" v-model.number="display_order" type="number" :disabled="isDeleted" />
         </div>
         <div class="flex items-center space-x-2 pt-5">
-          <Switch :id="`display-${props.item._tempId || props.item.id}`" v-model:checked="display_in_menu" :disabled="props.item._isDeleted" />
+          <Switch :id="`display-${props.item._tempId || props.item.id}`" v-model:model-value="display_in_menu" :disabled="props.item._isDeleted" />
           <Label :for="`display-${props.item._tempId || props.item.id}`">Показывать в меню</Label>
         </div>
       </div>

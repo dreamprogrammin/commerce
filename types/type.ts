@@ -4,6 +4,8 @@ export interface Brand extends Tables<'brands'> {}
 
 export interface Country extends Tables<'countries'> {}
 
+export interface Material extends Tables<'materials'> {}
+
 export interface ParamsSignUp {
   email: string
   password: string
@@ -179,6 +181,10 @@ export interface ProductAccessoryLink {
 export type FullProduct = ProductWithImages & {
   categories: { name: string | null, slug: string | null } | null
   accessories?: ProductWithImages[]
+
+  brands: Brand | null
+  countries: Country | null
+  materials: Material | null
 }
 
 export type CustomFieldValue = string | number | boolean | null
@@ -186,21 +192,22 @@ export type CustomFieldValue = string | number | boolean | null
 export interface ProductFormData {
   name: string
   slug: string
-  price: number
-  is_active: boolean
-  stock_quantity: number
   description: string | null
+  price: number
   category_id: string | null
   bonus_points_award: number
-  min_age: number | null
-  max_age: number | null
-  gender: 'unisex' | 'male' | 'female' | null
-  accessory_ids: string[]
+  stock_quantity: number
+  is_active: boolean
+  gender: string | null
+  accessory_ids: string[] | null
   is_accessory: boolean
+  min_age_years: number | null
+  max_age_years: number | null
   sku: string | null
   brand_id: string | null
-  origin_country_id: number | null // ID страны (integer/serial)
   discount_percentage: number
+  origin_country_id: number | null
+  material_id: number | null
 }
 
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>

@@ -49,11 +49,11 @@ $$;
 
 
 -- Down Migration (Откат изменений) - оставляем как есть
-ALTER TABLE public.products
-DROP COLUMN IF EXISTS origin_country_id,
-DROP COLUMN IF EXISTS discount_percentage,
-DROP COLUMN IF EXISTS brand_id,
-DROP COLUMN IF EXISTS sku;
+-- ALTER TABLE public.products
+-- DROP COLUMN IF EXISTS origin_country_id,
+-- DROP COLUMN IF EXISTS discount_percentage,
+-- DROP COLUMN IF EXISTS brand_id,
+-- DROP COLUMN IF EXISTS sku;
 
-DROP TABLE IF EXISTS public.countries;
-DROP TABLE IF EXISTS public.brands;
+-- DROP TABLE IF EXISTS public.countries;
+-- DROP TABLE IF EXISTS public.brands;

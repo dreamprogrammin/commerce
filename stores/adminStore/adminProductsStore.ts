@@ -3,6 +3,7 @@ import type {
   Country,
   Database,
   FullProduct,
+  Material,
   ProductImageRow,
   ProductInsert,
   ProductSearchResult,
@@ -24,6 +25,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const isSaving = ref(false)
   const brands = ref<Brand[]>([])
   const countries = ref<Country[]>([])
+  const materials = ref<Material[]>([])
 
   // --- ЧТЕНИЕ ДАННЫХ (Read) ---
 
@@ -59,6 +61,21 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
   }
 
+  async function fetchAllMaterials() {
+    try {
+      const { data, error } = await supabase
+        .from('materials')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error)
+        throw error
+      materials.value = data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки материалов', { description: error.message })
+    }
+  }
+
   async function fetchProducts() {
     isLoading.value = true
     try {
@@ -67,8 +84,9 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         .select(`*, 
           categories(name, slug), 
           product_images(*), 
-          brands(name), 
-          countries(name)`,
+          brands(*), 
+          countries(*),
+          materials(*)`,
         )
         .order('created_at', { ascending: false })
       if (error)
@@ -94,7 +112,8 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           categories(name, slug),
           product_images(*),
           brands(*),
-          countries(*)
+          countries(*),
+          materials(*)
         `)
         .eq('id', id)
         .single()
@@ -123,7 +142,8 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           categories(name, slug),
           product_images(*),
           brands(*),
-          countries(*)
+          countries(*),
+          materials(*)
         `)
         .eq('sku', sku.trim())
         .single()
@@ -382,6 +402,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     currentProduct,
     brands,
     countries,
+    materials,
     isLoading,
     isSaving,
     fetchProducts,
@@ -389,6 +410,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     fetchProductBySku,
     fetchAllBrands,
     fetchAllCountries,
+    fetchAllMaterials,
     createProduct,
     updateProduct,
     deleteProduct,
