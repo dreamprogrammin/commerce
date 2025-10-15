@@ -1,4 +1,14 @@
-import type { Database, FullProduct, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
+import type {
+  Brand,
+  Country,
+  Database,
+  FullProduct,
+  ProductImageRow,
+  ProductInsert,
+  ProductSearchResult,
+  ProductUpdate,
+  ProductWithImages,
+} from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -17,12 +27,49 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
   // --- ЧТЕНИЕ ДАННЫХ (Read) ---
 
+  // ФУНКЦИЯ: Загрузка всех брендов для выпадающего списка
+  async function fetchAllBrands() {
+    try {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error)
+        throw error
+      brands.value = data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки брендов', { description: error.message })
+    }
+  }
+
+  // ФУНКЦИЯ: Загрузка всех стран для выпадающего списка
+  async function fetchAllCountries() {
+    try {
+      const { data, error } = await supabase
+        .from('countries')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error)
+        throw error
+      countries.value = data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки стран', { description: error.message })
+    }
+  }
+
   async function fetchProducts() {
     isLoading.value = true
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, categories(name, slug), product_images(*)')
+        .select(`*, 
+          categories(name, slug), 
+          product_images(*), 
+          brands(name), 
+          countries(name)`,
+        )
         .order('created_at', { ascending: false })
       if (error)
         throw error
@@ -45,7 +92,9 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         .select(`
           *,
           categories(name, slug),
-          product_images(*)
+          product_images(*),
+          brands(*),
+          countries(*)
         `)
         .eq('id', id)
         .single()
@@ -55,6 +104,39 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
     catch (error: any) {
       toast.error(`Ошибка загрузки товара с ID: ${id}`, { description: error.message })
+    }
+    finally {
+      isLoading.value = false
+    }
+  }
+
+  // ФУНКЦИЯ: Поиск товара по артикулу (SKU) для страницы создания
+  async function fetchProductBySku(sku: string): Promise<FullProduct | null> {
+    if (!sku)
+      return null
+    isLoading.value = true
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          categories(name, slug),
+          product_images(*),
+          brands(*),
+          countries(*)
+        `)
+        .eq('sku', sku.trim())
+        .single()
+
+      // Ошибка "no rows found" (PGRST116) - это ожидаемый результат, если товара нет
+      if (error && error.code !== 'PGRST116')
+        throw error
+
+      return data as FullProduct | null
+    }
+    catch (error: any) {
+      toast.error('Ошибка поиска по артикулу', { description: error.message })
+      return null
     }
     finally {
       isLoading.value = false
@@ -80,21 +162,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     catch (error: any) {
       toast.error('Ошибка загрузки связанных товаров', { description: error.message })
       return [] // Всегда возвращаем массив в случае ошибки
-    }
-  }
-  // ФУНКЦИЯ: Загрузка всех брендов для выпадающего списка
-  async function fetchAllBrands() {
-    try {
-      const { data, error } = await supabase
-        .from('brands')
-        .select('*')
-        .order('name', { ascending: true })
-      if (error)
-        throw error
-      brands.value = data || []
-    }
-    catch (error: any) {
-      toast.error('Ошибка загрузки брендов', { description: error.message })
     }
   }
 
@@ -313,14 +380,19 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   return {
     products,
     currentProduct,
-    searchProducts,
+    brands,
+    countries,
     isLoading,
     isSaving,
     fetchProducts,
     fetchProductById,
+    fetchProductBySku,
+    fetchAllBrands,
+    fetchAllCountries,
     createProduct,
     updateProduct,
     deleteProduct,
     fetchProductsByIds,
+    searchProducts,
   }
 })

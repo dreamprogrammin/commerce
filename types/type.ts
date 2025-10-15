@@ -1,4 +1,8 @@
-import type { Database } from './supabase'
+import type { Database, Tables, TablesInsert, TablesUpdate } from './supabase'
+
+export interface Brand extends Tables<'brands'> {}
+
+export interface Country extends Tables<'countries'> {}
 
 export interface ParamsSignUp {
   email: string
@@ -179,7 +183,25 @@ export type FullProduct = ProductWithImages & {
 
 export type CustomFieldValue = string | number | boolean | null
 
-export type ProductFormData = Omit<ProductRow, 'id' | 'created_at' | 'updated_at' | 'sales_count'>
+export interface ProductFormData {
+  name: string
+  slug: string
+  price: number
+  is_active: boolean
+  stock_quantity: number
+  description: string | null
+  category_id: string | null
+  bonus_points_award: number
+  min_age: number | null
+  max_age: number | null
+  gender: 'unisex' | 'male' | 'female' | null
+  accessory_ids: string[]
+  is_accessory: boolean
+  sku: string | null
+  brand_id: string | null
+  origin_country_id: number | null // ID страны (integer/serial)
+  discount_percentage: number
+}
 
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
 
@@ -190,3 +212,4 @@ export type AccessoryProduct = ProductRow & {
 export type ProductWithImages = ProductRow & {
   product_images: ProductImageRow[]
 }
+export type { Database, Tables, TablesInsert, TablesUpdate }
