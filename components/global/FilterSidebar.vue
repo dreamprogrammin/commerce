@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Brand } from '@/types'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 const props = defineProps<{
@@ -6,9 +7,11 @@ const props = defineProps<{
     subCategoryIds: string[]
     price: [number, number] | undefined
     sortBy: string
+    brandIds: string[]
   }
   isLoading: boolean
   priceRange: { min: number, max: number }
+  brands: Brand[]
 }>()
 
 const emit = defineEmits<{
@@ -43,6 +46,22 @@ function commitPriceToFilters(newPrice: number[]) {
   }
 }
 
+function updateBrand(checked: boolean, brandId: string) {
+  const newIds = [...props.modelValue.brandIds]
+  if (checked) {
+    if (!newIds.includes(brandId)) {
+      newIds.push(brandId)
+    }
+  }
+  else {
+    const index = newIds.indexOf(brandId)
+    if (index > -1) {
+      newIds.splice(index, 1)
+    }
+  }
+  emit('update:modelValue', { ...props.modelValue, brandIds: newIds })
+}
+
 watch(() => props.priceRange, (newRange) => {
   localPrice.value = [newRange.min, newRange.max]
 }, { deep: true })
@@ -67,6 +86,20 @@ watch(() => props.priceRange, (newRange) => {
           @update:model-value="(checked) => updateSubCategory(!!checked, cat.id)"
         />
         <Label :for="`cat-${cat.id}`" class="font-normal cursor-pointer">{{ cat.name }}</Label>
+      </div>
+    </div>
+
+    <div v-if="brands.length > 0" class="space-y-4 pt-4 border-t">
+      <h4 class="font-semibold">
+        Бренды
+      </h4>
+      <div v-for="brand in brands" :key="brand.id" class="flex items-center space-x-2">
+        <Checkbox
+          :id="`brand-${brand.id}`"
+          :checked="props.modelValue.brandIds.includes(brand.id)"
+          @update:model-value="(checked) => updateBrand(!!checked, brand.id)"
+        />
+        <Label :for="`brand-${brand.id}`" class="font-normal cursor-pointer">{{ brand.name }}</Label>
       </div>
     </div>
 

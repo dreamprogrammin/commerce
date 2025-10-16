@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
+import type { BrandInsert, BrandUpdate, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import { slugify } from '@/utils/slugify'
@@ -22,12 +23,14 @@ const emit = defineEmits<{
 // --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ ---
 const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
+const brandsStore = useAdminBrandsStore()
 const { getPublicUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
 
 // --- 3. ЛОКАЛЬНОЕ СОСТОЯНИЕ КОМПОНЕНТА ---
 const formData = ref<Partial<ProductFormData>>({})
+const isBrandDialogOpen = ref(false)
 
 const bonusOptions = [
   { label: 'Стандарт (5%)', value: 5 },
@@ -120,6 +123,25 @@ watch(
   { immediate: true },
 )
 
+async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
+  const success = await brandsStore.createBrand(payload.data as BrandInsert, payload.file)
+  if (success) {
+    isBrandDialogOpen.value = false // Закрываем окно
+    // `createBrand` уже вызывает `fetchBrands`, так что список обновится.
+    // Теперь нам нужно выбрать только что созданный бренд.
+    // Мы найдем его по имени, так как у нас нет ID.
+    const newBrandName = payload.data.name
+    if (newBrandName) {
+      // Даем Vue время, чтобы обновить список в <Select>
+      await nextTick()
+      const newBrand = brands.value.find(b => b.name === newBrandName)
+      if (newBrand) {
+        formData.value.brand_id = newBrand.id
+      }
+    }
+  }
+}
+
 onMounted(() => {
   if (categoriesStore.allCategories.length === 0)
     categoriesStore.fetchAllCategories()
@@ -127,6 +149,8 @@ onMounted(() => {
     productStore.fetchAllBrands()
   if (productStore.countries.length === 0)
     productStore.fetchAllCountries()
+  if (productStore.materials.length === 0)
+    productStore.fetchAllMaterials()
 })
 
 // --- 5. РЕАКТИВНОСТЬ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
@@ -398,19 +422,22 @@ const maxAgeYearsValue = computed({
 
           <div>
             <Label>Бренд (опционально)</Label>
-            <Select v-model="formData.brand_id">
-              <SelectTrigger>
-                <SelectValue placeholder="Выберите бренд" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem :value="null">
-                  Без бренда
-                </SelectItem>
-                <SelectItem v-for="brand in brands" :key="brand.id" :value="brand.id">
-                  {{ brand.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <Dialog v-model:open="isBrandDialogOpen">
+              <DialogTrigger as-child>
+                <Button type="button" variant="outline" size="sm" class="text-xs">
+                  + Новый бренд
+                </Button>
+              </DialogTrigger>
+              <DialogContent class="sm:max-w-[625px]">
+                <DialogHeader>
+                  <DialogTitle>Создать новый бренд</DialogTitle>
+                  <DialogDescription>
+                    Бренд будет создан и автоматически выбран в форме товара.
+                  </DialogDescription>
+                </DialogHeader>
+                <BrandForm @submit="handleBrandCreate" />
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div>

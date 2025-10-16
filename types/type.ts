@@ -110,6 +110,7 @@ export type SortByType = 'popularity' | 'newest' | 'price_asc' | 'price_desc'
 export interface IProductFilters {
   categorySlug: string
   subCategoryIds?: string[]
+  brandIds?: string[]
   priceMin?: number
   priceMax?: number
   sortBy?: SortByType
@@ -220,3 +221,7 @@ export type ProductWithImages = ProductRow & {
   product_images: ProductImageRow[]
 }
 export type { Database, Tables, TablesInsert, TablesUpdate }
+
+export type BrandInsert = TablesInsert<'brands'>
+
+export type BrandUpdate = TablesUpdate<'brands'>

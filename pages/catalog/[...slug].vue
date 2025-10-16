@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
-import type { IBreadcrumbItem, IProductFilters, ProductWithGallery, SortByType } from '@/types'
+import type { Brand, IBreadcrumbItem, IProductFilters, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -20,15 +20,18 @@ const isLoadingMore = ref(false) // Флаг для кнопки "Показат
 const hasMoreProducts = ref(true)
 const currentPage = ref(1)
 const PAGE_SIZE = 12
+const availableBrands = ref<Brand[]>([])
 
 interface ActiveFilters {
   sortBy: SortByType
   subCategoryIds: string[]
+  brandIds: string[]
   price: [number, number]
 }
 const activeFilters = ref<ActiveFilters>({
   sortBy: getSortByFromQuery(route.query.sort_by),
   subCategoryIds: [],
+  brandIds: [],
   price: [0, 50000], // Временный диапазон, будет обновлен
 })
 
@@ -101,6 +104,7 @@ async function loadProducts(isLoadMore = false) {
     categorySlug: slug,
     sortBy: activeFilters.value.sortBy,
     subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
+    brandIds: activeFilters.value.brandIds.length > 0 ? activeFilters.value.brandIds : undefined,
     priceMin: activeFilters.value.price[0],
     priceMax: activeFilters.value.price[1],
   }
@@ -136,25 +140,30 @@ async function loadMoreProducts() {
 // `useAsyncData` грузит только "легкие" мета-данные на сервере (меню, хлебные крошки).
 await useAsyncData(
   `catalog-meta-${currentCategorySlug.value}`,
-  () => categoriesStore.fetchCategoryData(),
+  async () => {
+    // Используем Promise.all для параллельной загрузки
+    await Promise.all([
+      categoriesStore.fetchCategoryData(),
+      // <-- ИЗМЕНЕНО: Загружаем бренды при первой загрузке страницы
+      productsStore.fetchAllBrands().then(() => {
+        availableBrands.value = productsStore.brands // Копируем в локальное состояние
+      }),
+    ])
+  },
   { watch: [currentCategorySlug] },
 )
-
 // `watch` на `currentCategorySlug` запускает загрузку товаров
 // при первом заходе на страницу и при каждой смене категории.
 watch(
   currentCategorySlug,
   (newSlug) => {
     if (newSlug) {
-      // ПОЛНЫЙ СБРОС ФИЛЬТРОВ К СОСТОЯНИЮ ПО УМОЛЧАНИЮ
       activeFilters.value = {
-        sortBy: getSortByFromQuery(route.query.sort_by), // Возвращаем сортировку к дефолтной
+        sortBy: getSortByFromQuery(route.query.sort_by),
         subCategoryIds: [],
-        price: [0, 50000], // Также сбрасываем цену (важно!)
+        brandIds: [],
+        price: [0, 50000],
       }
-      // После сброса запускаем загрузку.
-      // watchDebounced не сработает, так как мы меняем весь объект,
-      // а не ждем реакции пользователя.
       loadProducts(false)
     }
   },
@@ -180,7 +189,12 @@ watchDebounced(
     <Breadcrumbs :items="breadcrumbs" class="mb-6" />
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <aside class="col-span-1 lg:sticky top-24 self-start">
-        <FilterSidebar v-model="activeFilters" :price-range="priceRange" :is-loading="isLoading" />
+        <FilterSidebar
+          v-model="activeFilters"
+          :price-range="priceRange"
+          :is-loading="isLoading"
+          :brands="availableBrands"
+        />
       </aside>
       <main class="col-span-3  min-w-0">
         <CatalogHeader v-model:sort-by="activeFilters.sortBy" :title="title ?? ''" />

@@ -1,11 +1,30 @@
-import type { AccessoryProduct, Database, FullProduct, IProductFilters, ProductWithGallery, ProductWithImages } from '@/types'
-import { defineStore } from 'pinia'
+import type { AccessoryProduct, Brand, Database, FullProduct, IProductFilters, ProductWithGallery, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 
 // const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
+  const brands = ref<Brand[]>([])
+
+  async function fetchAllBrands() {
+    // Загружаем только если список еще пуст
+    if (brands.value.length > 0)
+      return
+
+    try {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error)
+        throw error
+      brands.value = data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке брендов', { description: error.message })
+    }
+  }
   /**
    * Загружает отфильтрованный и отсортированный список товаров с пагинацией.
    * НЕ изменяет никакое состояние, а просто ВОЗВРАЩАЕТ результат.
@@ -23,6 +42,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       const { data, error } = await supabase.rpc('get_filtered_products', {
         p_category_slug: filters.categorySlug,
         p_subcategory_ids: filters.subCategoryIds,
+        p_brand_ids: filters.brandIds,
         p_price_min: filters.priceMin,
         p_price_max: filters.priceMax,
         p_sort_by: filters.sortBy,
@@ -59,7 +79,8 @@ export const useProductsStore = defineStore('productsStore', () => {
         .select(`
           *,
           categories(name, slug),
-          product_images(*)
+          product_images(*),
+          brands(name,slug)
         `)
         .eq('slug', slug)
         .eq('is_active', true)
@@ -112,7 +133,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       if (error && error.code !== 'PGRST116')
         throw error
 
-      return data
+      return data as FullProduct
     }
     catch (error: any) {
       toast.error('Ошибка при загрузке товара дня', { description: error.message })
@@ -186,6 +207,8 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
   return {
+    brands,
+    fetchAllBrands,
     fetchProducts,
     fetchProductBySlug,
     fetchFeaturedProduct,
