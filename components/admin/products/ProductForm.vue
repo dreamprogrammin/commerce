@@ -9,6 +9,7 @@ import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import { slugify } from '@/utils/slugify'
+import BrandForm from '../brands/BrandForm.vue'
 
 // --- 1. PROPS & EMITS ---
 const props = defineProps<{
