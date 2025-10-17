@@ -20,7 +20,24 @@ const isLoadingMore = ref(false) // Флаг для кнопки "Показат
 const hasMoreProducts = ref(true)
 const currentPage = ref(1)
 const PAGE_SIZE = 12
-const availableBrands = ref<Brand[]>([])
+
+const availableBrands = computed(() => {
+  // 1. Убедимся, что у нас есть полный справочник брендов из стора
+  const allBrands = productsStore.brands
+  if (!allBrands || allBrands.length === 0) {
+    return []
+  }
+
+  // 2. Получаем все brand_id из ТЕКУЩИХ загруженных товаров
+  const brandIdsInProducts = products.value.map(p => p.brand_id)
+
+  // 3. Оставляем только уникальные и не-пустые ID
+  const uniqueBrandIds = [...new Set(brandIdsInProducts.filter(id => id !== null))]
+
+  // 4. Из полного справочника (allBrands) отбираем только те,
+  //    ID которых присутствуют в товарах на странице
+  return allBrands.filter(brand => uniqueBrandIds.includes(brand.id))
+})
 
 interface ActiveFilters {
   sortBy: SortByType
@@ -144,10 +161,7 @@ await useAsyncData(
     // Используем Promise.all для параллельной загрузки
     await Promise.all([
       categoriesStore.fetchCategoryData(),
-      // <-- ИЗМЕНЕНО: Загружаем бренды при первой загрузке страницы
-      productsStore.fetchAllBrands().then(() => {
-        availableBrands.value = productsStore.brands // Копируем в локальное состояние
-      }),
+      productsStore.fetchAllBrands(),
     ])
   },
   { watch: [currentCategorySlug] },

@@ -55,8 +55,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     }
   }
 
-  // -- ЗАПИСЬ --
-  async function createBrand(brandData: BrandInsert, logoFile: File | null) {
+  async function createBrand(brandData: BrandInsert, logoFile: File | null): Promise<Brand | null> {
     isLoading.value = true
     try {
       if (logoFile) {
@@ -70,17 +69,23 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         brandData.logo_url = uploadedPath
       }
 
-      const { error } = await supabase.from('brands').insert(brandData)
-      if (error)
+      const { data: newBrand, error } = await supabase
+        .from('brands')
+        .insert(brandData)
+        .select() // <-- 1. Запрашиваем созданную запись обратно
+        .single() // <-- 2. Указываем, что ожидаем одну запись
+
+      if (error || !newBrand)
         throw error
 
-      toast.success(`Бренд "${brandData.name}" успешно создан.`)
-      await fetchBrands() // Обновляем список
-      return true
+      toast.success(`Бренд "${newBrand.name}" успешно создан.`)
+      await fetchBrands()
+
+      return newBrand
     }
     catch (error: any) {
       toast.error('Ошибка создания бренда', { description: error.message })
-      return false
+      return null
     }
     finally {
       isLoading.value = false

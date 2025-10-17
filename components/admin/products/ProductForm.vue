@@ -49,6 +49,7 @@ const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([])
 const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
+const brandSearchQuery = ref('')
 
 // --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ПРИ ЗАГРУЗКЕ ---
 
@@ -124,22 +125,28 @@ watch(
   { immediate: true },
 )
 
+const filteredBrands = computed(() => {
+  if (!brandSearchQuery.value) {
+    return brands.value
+  }
+  return brands.value.filter(brand =>
+    brand.name.toLowerCase().includes(brandSearchQuery.value.toLowerCase()),
+  )
+})
+
 async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
-  const success = await brandsStore.createBrand(payload.data as BrandInsert, payload.file)
-  if (success) {
-    isBrandDialogOpen.value = false // Закрываем окно
-    // `createBrand` уже вызывает `fetchBrands`, так что список обновится.
-    // Теперь нам нужно выбрать только что созданный бренд.
-    // Мы найдем его по имени, так как у нас нет ID.
-    const newBrandName = payload.data.name
-    if (newBrandName) {
-      // Даем Vue время, чтобы обновить список в <Select>
-      await nextTick()
-      const newBrand = brands.value.find(b => b.name === newBrandName)
-      if (newBrand) {
-        formData.value.brand_id = newBrand.id
-      }
-    }
+  const newBrand = await brandsStore.createBrand(payload.data as BrandInsert, payload.file)
+  if (newBrand) {
+    isBrandDialogOpen.value = false // Закрываем модальное окно
+
+    // Обновляем списки
+    await brandsStore.fetchBrands()
+    await productStore.fetchAllBrands()
+
+    // Автоматически выбираем новый бренд
+    await nextTick()
+    formData.value.brand_id = newBrand.id
+    brandSearchQuery.value = '' // Очищаем поиск
   }
 }
 
@@ -423,20 +430,68 @@ const maxAgeYearsValue = computed({
 
           <div>
             <Label>Бренд (опционально)</Label>
-            <Dialog v-model:open="isBrandDialogOpen">
-              <DialogTrigger as-child>
-                <Button type="button" variant="outline" size="sm" class="text-xs">
-                  + Новый бренд
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  class="w-full justify-between font-normal"
+                >
+                  <span v-if="formData.brand_id">
+                    {{ brands.find(b => b.id === formData.brand_id)?.name }}
+                  </span>
+                  <span v-else class="text-muted-foreground">
+                    Выберите бренд...
+                  </span>
+                  <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
-              </DialogTrigger>
+              </PopoverTrigger>
+              <PopoverContent class="w-[--radix-popover-trigger-width] p-0">
+                <Command v-model:model-value="brandSearchQuery">
+                  <CommandInput placeholder="Поиск или создание бренда..." />
+                  <CommandList>
+                    <CommandEmpty>
+                      <!-- Этот блок показывается, когда поиск ничего не нашел -->
+                      <div
+                        class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                        @click="() => { isBrandDialogOpen = true }"
+                      >
+                        <Plus class="inline-block mr-2 h-4 w-4" />
+                        Создать новый бренд
+                      </div>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      <!-- Опция для сброса значения -->
+                      <CommandItem
+                        value=""
+                        @select="() => { formData.brand_id = null }"
+                      >
+                        <Check :class="!formData.brand_id ? 'opacity-100' : 'opacity-0'" class="mr-2 h-4 w-4" />
+                        Без бренда
+                      </CommandItem>
+                      <!-- Список существующих брендов -->
+                      <CommandItem
+                        v-for="brand in filteredBrands"
+                        :key="brand.id"
+                        :value="brand.name"
+                        @select="() => { formData.brand_id = brand.id }"
+                      >
+                        <Check :class="formData.brand_id === brand.id ? 'opacity-100' : 'opacity-0'" class="mr-2 h-4 w-4" />
+                        {{ brand.name }}
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <!-- Модальное окно для создания бренда (остается без изменений) -->
+            <Dialog v-model:open="isBrandDialogOpen">
               <DialogContent class="sm:max-w-[625px]">
                 <DialogHeader>
                   <DialogTitle>Создать новый бренд</DialogTitle>
-                  <DialogDescription>
-                    Бренд будет создан и автоматически выбран в форме товара.
-                  </DialogDescription>
                 </DialogHeader>
-                <BrandForm @submit="handleBrandCreate" />
+                <BrandForm :initial-name="brandSearchQuery" @submit="handleBrandCreate" />
               </DialogContent>
             </Dialog>
           </div>
