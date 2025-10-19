@@ -4,6 +4,7 @@ import type {
   Database,
   FullProduct,
   Material,
+  ProductAttributeValueInsert,
   ProductImageRow,
   ProductInsert,
   ProductSearchResult,
@@ -185,6 +186,39 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
   }
 
+  async function fetchProductByBarcode(barcode: string): Promise<FullProduct | null> {
+    if (!barcode)
+      return null
+
+    isLoading.value = true
+    try {
+      const { data: singleData, error: singleError } = await supabase
+        .from('products')
+        .select(`
+          *,
+          categories(name, slug),
+          product_images(*),
+          brands(*),
+          countries(*),
+          materials(*)
+        `)
+        .eq('barcode', barcode.trim())
+        .limit(1)
+        .maybeSingle()
+
+      if (singleError)
+        throw singleError
+
+      return singleData as FullProduct | null
+    }
+    catch (error: any) {
+      toast.error('Ошибка поиска по штрихкоду', { description: error.message })
+      return null
+    }
+    finally {
+      isLoading.value = false
+    }
+  }
   // --- ЗАПИСЬ ДАННЫХ (Write) ---
 
   /**
@@ -397,6 +431,76 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       return []
     }
   }
+
+  async function getAttributesForCategory(categoryId: string): Promise<AttributeWithValue[]> {
+    // Эта функция загружает атрибуты, привязанные к категории,
+    // и сразу подгружает их возможные опции для выбора.
+    if (!categoryId)
+      return []
+    try {
+      const { data, error } = await supabase
+        .from('attributes')
+        .select(`
+          *,
+          attribute_options(*),
+          category_attributes!inner(category_id)
+        `)
+        .eq('category_attributes.category_id', categoryId)
+
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки атрибутов для категории', { description: error.message })
+      return []
+    }
+  }
+
+  async function getProductAttributeValues(productId: string) {
+    // Загружает уже сохраненные значения атрибутов для конкретного товара
+    try {
+      const { data, error } = await supabase
+        .from('product_attribute_values')
+        .select('*')
+        .eq('product_id', productId)
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки значений атрибутов товара', { description: error.message })
+      return []
+    }
+  }
+
+  async function saveProductAttributeValues(productId: string, values: ProductAttributeValueInsert[]) {
+    try {
+      // 1. Удаляем все старые значения для этого товара
+      const { error: deleteError } = await supabase
+        .from('product_attribute_values')
+        .delete()
+        .eq('product_id', productId)
+      if (deleteError)
+        throw deleteError
+
+      // 2. Вставляем новые значения (только те, что были выбраны)
+      const valuesToInsert = values
+        .filter(v => v.option_id != null) // Вставляем только если есть значение
+        .map(v => ({ ...v, product_id: productId }))
+
+      if (valuesToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from('product_attribute_values')
+          .insert(valuesToInsert)
+        if (insertError)
+          throw insertError
+      }
+    }
+    catch (error: any) {
+      toast.error('Ошибка сохранения атрибутов товара', { description: error.message })
+    }
+  }
   return {
     products,
     currentProduct,
@@ -411,10 +515,14 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     fetchAllBrands,
     fetchAllCountries,
     fetchAllMaterials,
+    fetchProductByBarcode,
     createProduct,
     updateProduct,
     deleteProduct,
     fetchProductsByIds,
     searchProducts,
+    getAttributesForCategory,
+    getProductAttributeValues,
+    saveProductAttributeValues,
   }
 })

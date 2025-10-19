@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductInsert } from '@/types'
+import type { ProductAttributeValueInsert, ProductInsert } from '@/types'
 import { toast } from 'vue-sonner'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
@@ -11,6 +11,8 @@ const router = useRouter()
 
 const initialSku = ref('')
 const isSearchingSku = ref(false)
+const initialBarcode = ref('')
+const isSearchingBarcode = ref(false)
 
 /**
  * Ищет товар по артикулу (SKU).
@@ -40,12 +42,31 @@ async function searchProductBySku() {
     })
   }
 }
+
+async function searchProductByBarcode() {
+  const barcode = initialBarcode.value.trim()
+  if (!barcode)
+    return
+
+  isSearchingBarcode.value = true
+  const product = await adminProductsStore.fetchProductByBarcode(barcode)
+  isSearchingBarcode.value = false
+
+  if (product) {
+    toast.success(`Товар со штрихкодом "${barcode}" найден.`)
+    router.push(`/admin/products/${product.id}`)
+  }
+  else {
+    toast.info(`Товар со штрихкодом "${barcode}" не найден.`)
+  }
+}
 /**
  * Обработчик события @create от компонента ProductForm.
  */
 async function handleCreate(payload: {
   data: ProductInsert
   newImageFiles: File[]
+  attributeValues: ProductAttributeValueInsert[]
 }) {
   const sku = initialSku.value.trim()
   if (sku && !payload.data.sku) {
@@ -59,6 +80,8 @@ async function handleCreate(payload: {
   )
 
   if (newProduct) {
+    // После создания товара, сохраняем его атрибуты
+    await adminProductsStore.saveProductAttributeValues(newProduct.id, payload.attributeValues)
     router.push('/admin/products')
   }
 }
@@ -103,6 +126,18 @@ async function handleCreate(payload: {
                 Поиск...
               </div>
               <span v-else>Найти</span>
+            </Button>
+          </div>
+          <div class="flex items-end gap-4">
+            <div class="flex-grow">
+              <Label for="barcode-search">Поиск по Штрихкоду</Label>
+              <Input
+                id="barcode-search" v-model="initialBarcode"
+                @keyup.enter="searchProductByBarcode"
+              />
+            </div>
+            <Button type="button" :disabled="isSearchingBarcode || !initialBarcode" @click="searchProductByBarcode">
+              Найти
             </Button>
           </div>
         </CardContent>

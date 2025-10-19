@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductImageRow, ProductUpdate } from '@/types'
+import type { ProductAttributeValueInsert, ProductImageRow, ProductUpdate } from '@/types'
 import { storeToRefs } from 'pinia'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
@@ -25,6 +25,7 @@ async function handleUpdate(payload: {
   newImageFiles: File[]
   imagesToDelete: string[]
   existingImages: ProductImageRow[]
+  attributeValues: ProductAttributeValueInsert[]
 }) {
   // Вызываем обновленный метод стора
   const updatedProduct = await adminProductsStore.updateProduct(
@@ -36,6 +37,8 @@ async function handleUpdate(payload: {
   )
 
   if (updatedProduct) {
+    // После обновления товара, сохраняем его атрибуты
+    await adminProductsStore.saveProductAttributeValues(productId, payload.attributeValues)
     router.push('/admin/products')
   }
 }

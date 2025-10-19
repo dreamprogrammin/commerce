@@ -1,4 +1,4 @@
-import type { AccessoryProduct, Brand, Database, FullProduct, IProductFilters, ProductWithGallery, ProductWithImages } from '@/types'
+import type { AccessoryProduct, AttributeWithValue, Brand, Database, FilteredProductRpcResponse, FullProduct, IProductFilters, ProductWithGallery, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 
 // const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -8,10 +8,8 @@ export const useProductsStore = defineStore('productsStore', () => {
   const brands = ref<Brand[]>([])
 
   async function fetchAllBrands() {
-    // Загружаем только если список еще пуст
     if (brands.value.length > 0)
       return
-
     try {
       const { data, error } = await supabase
         .from('brands')
@@ -48,24 +46,28 @@ export const useProductsStore = defineStore('productsStore', () => {
         p_sort_by: filters.sortBy,
         p_page_size: pageSize,
         p_page_number: currentPage,
+        p_attributes: filters.attributes,
       })
 
       if (error)
         throw error
 
-      const newProducts = data as ProductWithGallery[] || []
-      // Определяем, есть ли еще страницы для загрузки
-      const hasMore = newProducts.length === pageSize
+      // Теперь TypeScript знает, что `data` - это массив `FilteredProductRpcResponse`
+      const rpcResponse = data || []
 
+      const newProducts = rpcResponse.map((p: FilteredProductRpcResponse) => ({
+        ...p,
+        product_images: Array.isArray(p.product_images) ? p.product_images : [],
+      })) as ProductWithGallery[]
+
+      const hasMore = newProducts.length === pageSize
       return { products: newProducts, hasMore }
     }
     catch (error: any) {
       toast.error('Ошибка при загрузке товаров', { description: error.message })
-      // В случае ошибки возвращаем пустой результат
       return { products: [], hasMore: false }
     }
   }
-
   /**
    * Загружает один конкретный товар по его `slug`.
    * НЕ изменяет никакое состояние, а просто ВОЗВРАЩАЕТ результат.
@@ -80,7 +82,10 @@ export const useProductsStore = defineStore('productsStore', () => {
           *,
           categories(name, slug),
           product_images(*),
-          brands(name,slug)
+          brands(*),
+          countries(*),
+          materials(*),
+          product_attribute_values(*, attributes(*, attribute_options(*)))
         `)
         .eq('slug', slug)
         .eq('is_active', true)
@@ -88,12 +93,62 @@ export const useProductsStore = defineStore('productsStore', () => {
 
       if (error && error.code !== 'PGRST116')
         throw error
-
       return data as FullProduct | null
     }
     catch (error: any) {
-      toast.error(`Ошибка загрузки товара`, { description: error.message })
+      toast.error('Ошибка загрузки товара', { description: error.message })
       return null
+    }
+  }
+
+  /**
+   * Загружает бренды, которые доступны в указанной категории.
+   */
+  async function fetchBrandsForCategory(categorySlug: string): Promise<Brand[]> {
+    if (!categorySlug || categorySlug === 'all')
+      return []
+    try {
+      const { data, error } = await supabase.rpc('get_brands_by_category_slug', {
+        p_category_slug: categorySlug,
+      })
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки брендов для категории:', error)
+      return []
+    }
+  }
+
+  /**
+   * Загружает Атрибуты (и их опции), которые привязаны к указанной категории.
+   */
+  async function fetchAttributesForCategory(categorySlug: string): Promise<AttributeWithValue[]> {
+    if (!categorySlug || categorySlug === 'all')
+      return []
+    try {
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', categorySlug)
+        .single()
+      if (categoryError)
+        throw categoryError
+
+      const { data, error } = await supabase
+        .from('attributes')
+        .select('*, attribute_options(*), category_attributes!inner(category_id)')
+        .eq('category_attributes.category_id', categoryData.id)
+        .order('name')
+
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки атрибутов для фильтров:', error)
+      return []
     }
   }
 
@@ -216,5 +271,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchPopularProducts,
     fetchSimilarProducts,
     fetchProductsByIds,
+    fetchBrandsForCategory,
+    fetchAttributesForCategory,
   }
 })

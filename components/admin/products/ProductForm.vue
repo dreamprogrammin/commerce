@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BrandInsert, BrandUpdate, FullProduct, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
+import type { AttributeWithValue, BrandInsert, BrandUpdate, FullProduct, ProductAttributeValueInsert, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
@@ -17,8 +17,20 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'create', payload: { data: ProductInsert, newImageFiles: File[] }): void
-  (e: 'update', payload: { data: ProductUpdate, newImageFiles: File[], imagesToDelete: string[], existingImages: ProductImageRow[] }): void
+  (e: 'create',
+    payload:
+    { data: ProductInsert, newImageFiles: File[], attributeValues: ProductAttributeValueInsert[] }
+  ): void
+  (e: 'update',
+    payload:
+    {
+      data: ProductUpdate
+      newImageFiles: File[]
+      imagesToDelete: string[]
+      existingImages: ProductImageRow[]
+      attributeValues: ProductAttributeValueInsert[]
+    }
+  ): void
 }>()
 
 // --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ ---
@@ -32,6 +44,8 @@ const { brands, countries, materials } = storeToRefs(productStore)
 // --- 3. ЛОКАЛЬНОЕ СОСТОЯНИЕ КОМПОНЕНТА ---
 const formData = ref<Partial<ProductFormData>>({})
 const isBrandDialogOpen = ref(false)
+const categoryAttributes = ref<AttributeWithValue[]>([])
+const productAttributeValues = ref<Record<number, number | null>>({})
 
 const bonusOptions = [
   { label: 'Стандарт (5%)', value: 5 },
@@ -79,6 +93,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       brand_id: product.brand_id,
       origin_country_id: product.origin_country_id,
       discount_percentage: product.discount_percentage || 0,
+      material_id: product.material_id,
+      barcode: product.barcode,
     }
     existingImages.value = [...(product.product_images || [])]
 
@@ -110,6 +126,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       brand_id: null,
       origin_country_id: null,
       discount_percentage: 0,
+      material_id: null,
+      barcode: null,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -149,6 +167,38 @@ async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, fil
     brandSearchQuery.value = '' // Очищаем поиск
   }
 }
+// Эта функция будет вызываться, когда меняется категория товара
+async function handleCategoryChange(categoryId: string | null) {
+  if (!categoryId) {
+    categoryAttributes.value = []
+    return
+  }
+
+  // 1. Загружаем, какие атрибуты нужны для этой категории
+  categoryAttributes.value = await productStore.getAttributesForCategory(categoryId)
+
+  // 2. Инициализируем `productAttributeValues` пустыми значениями
+  const newValues: Record<number, number | null> = {}
+  for (const attr of categoryAttributes.value) {
+    newValues[attr.id] = null
+  }
+
+  // 3. Если это режим редактирования, загружаем и подставляем сохраненные значения
+  if (props.initialData?.id) {
+    const savedValues = await productStore.getProductAttributeValues(props.initialData.id)
+    for (const savedValue of savedValues) {
+      if (savedValue.attribute_id in newValues) {
+        newValues[savedValue.attribute_id] = savedValue.option_id
+      }
+    }
+  }
+  productAttributeValues.value = newValues
+}
+
+// Отслеживаем изменение category_id в нашей основной форме
+watch(() => formData.value.category_id, (newCategoryId) => {
+  handleCategoryChange(newCategoryId)
+}, { immediate: true })
 
 onMounted(() => {
   if (categoriesStore.allCategories.length === 0)
@@ -230,18 +280,25 @@ function handleSubmit() {
 
   const productData = { ...formData.value }
 
+  const valuesToSave = Object.entries(productAttributeValues.value).map(([attrId, optId]) => ({
+    attribute_id: Number(attrId),
+    option_id: optId,
+  }))
+
   if (props.initialData) {
     emit('update', {
       data: productData as ProductUpdate,
       newImageFiles: newImageFiles.value.map(item => item.file),
       imagesToDelete: imagesToDelete.value,
       existingImages: existingImages.value,
+      attributeValues: valuesToSave,
     })
   }
   else {
     emit('create', {
       data: productData as ProductInsert,
       newImageFiles: newImageFiles.value.map(item => item.file),
+      attributeValues: valuesToSave,
     })
   }
 }
@@ -257,6 +314,17 @@ const skuValue = computed({
     if (formData.value) {
       // Если пришла пустая строка, в наши данные записываем null. Иначе - само значение.
       formData.value.sku = value || null
+    }
+  },
+})
+
+const barcodeValue = computed({
+  get() {
+    return formData.value.barcode ?? undefined
+  },
+  set(value) {
+    if (formData.value) {
+      formData.value.barcode = value || null
     }
   },
 })
@@ -325,6 +393,10 @@ const maxAgeYearsValue = computed({
             <Input id="sku" v-model="skuValue" placeholder="Уникальный код товара" />
           </div>
           <div>
+            <Label for="barcode">Штрихкод (Barcode)</Label>
+            <Input id="barcode" v-model="barcodeValue" placeholder="Например, 4601234567890" />
+          </div>
+          <div>
             <Label for="description">Описание</Label>
             <Textarea id="description" v-model="descriptionValue" />
           </div>
@@ -367,6 +439,42 @@ const maxAgeYearsValue = computed({
             <p class="text-sm text-muted-foreground mt-2">
               Будет начислено: <span class="font-bold text-primary">{{ formData.bonus_points_award || 0 }} бонусов</span>
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card v-if="categoryAttributes.length > 0">
+        <CardHeader>
+          <CardTitle>Характеристики</CardTitle>
+          <CardDescription>
+            Заполните значения для фильтров, привязанных к выбранной категории.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div v-for="attribute in categoryAttributes" :key="attribute.id">
+            <Label>{{ attribute.name }}</Label>
+            <!-- Отображаем Select для атрибутов типа 'select' или 'color' -->
+            <Select
+              v-if="attribute.display_type === 'select' || attribute.display_type === 'color'"
+              v-model="productAttributeValues[attribute.id]"
+            >
+              <SelectTrigger>
+                <SelectValue :placeholder="`Выберите ${attribute.name.toLowerCase()}`" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="null">
+                  Не выбрано
+                </SelectItem>
+                <SelectItem
+                  v-for="option in attribute.attribute_options"
+                  :key="option.id"
+                  :value="option.id"
+                >
+                  {{ option.value }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <!-- Здесь можно будет добавить другие типы, например Input для 'range' -->
           </div>
         </CardContent>
       </Card>

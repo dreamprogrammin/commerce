@@ -105,6 +105,11 @@ export type Product = ProductRow & {
   images: string[]
 }
 
+export interface AttributeFilter {
+  slug: string
+  option_ids: number[]
+}
+
 export type SortByType = 'popularity' | 'newest' | 'price_asc' | 'price_desc'
 
 export interface IProductFilters {
@@ -114,6 +119,7 @@ export interface IProductFilters {
   priceMin?: number
   priceMax?: number
   sortBy?: SortByType
+  attributes?: AttributeFilter[]
 }
 
 export interface ICartItem {
@@ -209,6 +215,7 @@ export interface ProductFormData {
   discount_percentage: number
   origin_country_id: number | null
   material_id: number | null
+  barcode: string | null
 }
 
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
@@ -225,3 +232,18 @@ export type { Database, Tables, TablesInsert, TablesUpdate }
 export type BrandInsert = TablesInsert<'brands'>
 
 export type BrandUpdate = TablesUpdate<'brands'>
+export interface Attribute extends Tables<'attributes'> {}
+export interface AttributeInsert extends TablesInsert<'attributes'> {}
+export interface AttributeUpdate extends TablesUpdate<'attributes'> {}
+
+export interface AttributeOption extends Tables<'attribute_options'> {}
+export interface AttributeOptionInsert extends TablesInsert<'attribute_options'> {}
+
+export interface AttributeWithValue extends Tables<'attributes'> {
+  attribute_options: Tables<'attribute_options'>[]
+}
+
+export type ProductAttributeValue = Tables<'product_attribute_values'>
+export type ProductAttributeValueInsert = TablesInsert<'product_attribute_values'>
+
+export type FilteredProductRpcResponse = Database['public']['Functions']['get_filtered_products']['Returns'][number]
