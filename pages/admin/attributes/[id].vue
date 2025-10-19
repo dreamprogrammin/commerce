@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Attribute, AttributeOption, AttributeOptionInsert, ProductUpdate } from '@/types'
+import type { Attribute, AttributeOption, AttributeOptionInsert } from '@/types'
 import { storeToRefs } from 'pinia'
 import { useAdminAttributesStore } from '@/stores/adminStore/adminAttributesStore'
 
@@ -16,6 +16,17 @@ const currentAttribute = ref<Attribute | null>(null)
 const options = ref<AttributeOption[]>([])
 const linkedCategoryIds = ref<string[]>([])
 const newOptionValue = ref('')
+
+function updateLinkedCategoriesSelection(checked: boolean, categoryId: string) {
+  const newIds = new Set(linkedCategoryIds.value)
+  if (checked) {
+    newIds.add(categoryId)
+  }
+  else {
+    newIds.delete(categoryId)
+  }
+  linkedCategoryIds.value = Array.from(newIds)
+}
 
 // Загрузка всех данных при открытии страницы
 onMounted(async () => {
@@ -113,8 +124,11 @@ async function handleSaveCategoryLinks() {
           <div v-for="category in categories" :key="category.id" class="flex items-center space-x-2">
             <Checkbox
               :id="`cat-${category.id}`"
-              v-model="linkedCategoryIds"
-              :value="category.id"
+              :checked="linkedCategoryIds.includes(category.id)"
+              @update:model-value="(checkedState) => {
+                // Вызываем функцию, которая обновит наш массив
+                updateLinkedCategoriesSelection(!!checkedState, category.id)
+              }"
             />
             <label :for="`cat-${category.id}`" class="text-sm font-medium leading-none">
               {{ category.name }}

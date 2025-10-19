@@ -1,22 +1,32 @@
 <script setup lang="ts">
-import type { ProductAttributeValueInsert, ProductImageRow, ProductUpdate } from '@/types'
-import { storeToRefs } from 'pinia'
+import type { AttributeValuePayload, ProductImageRow, ProductUpdate } from '@/types'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 definePageMeta({ layout: 'admin' })
 
 const adminProductsStore = useAdminProductsStore()
-const { currentProduct, isLoading } = storeToRefs(adminProductsStore)
 const route = useRoute()
 const router = useRouter()
 const productId = route.params.id as string
 
-useAsyncData(
+const { data: currentProduct, pending: isLoading, error } = await useAsyncData(
   `admin-product-${productId}`,
-  () => adminProductsStore.fetchProductById(productId),
+  async () => {
+    const product = await adminProductsStore.fetchProductById(productId)
+    // Если товар не найден, "выбрасываем" ошибку, которую Nuxt поймает
+    if (!currentProduct) {
+      throw createError({ statusCode: 404, statusMessage: 'Товар не найден' })
+    }
+    return product
+  },
 )
 
+if (error.value) {
+  // Можно показать страницу 404 или перенаправить
+  console.error('Ошибка загрузки товара:', error.value)
+  router.replace('/admin/products')
+}
 /**
  * Обработчик события @update от компонента ProductForm.
  */
@@ -25,9 +35,8 @@ async function handleUpdate(payload: {
   newImageFiles: File[]
   imagesToDelete: string[]
   existingImages: ProductImageRow[]
-  attributeValues: ProductAttributeValueInsert[]
+  attributeValues: AttributeValuePayload[]
 }) {
-  // Вызываем обновленный метод стора
   const updatedProduct = await adminProductsStore.updateProduct(
     productId,
     payload.data,
@@ -37,8 +46,12 @@ async function handleUpdate(payload: {
   )
 
   if (updatedProduct) {
-    // После обновления товара, сохраняем его атрибуты
-    await adminProductsStore.saveProductAttributeValues(productId, payload.attributeValues)
+    const valuesToSave = payload.attributeValues.map(value => ({
+      ...value,
+      product_id: productId,
+    }))
+    await adminProductsStore.saveProductAttributeValues(productId, valuesToSave)
+
     router.push('/admin/products')
   }
 }
@@ -50,14 +63,17 @@ async function handleUpdate(payload: {
       <h1 class="text-3xl font-bold mb-6">
         Редактирование товара
       </h1>
-      <div v-if="isLoading && !currentProduct" class="text-center py-20">
+      <div v-if="isLoading" class="text-center py-20">
         Загрузка данных о товаре...
       </div>
       <ProductForm
-        v-else
+        v-else-if="currentProduct"
         :initial-data="currentProduct"
         @update="handleUpdate"
       />
+      <div v-else class="text-center py-20 text-destructive">
+        <p>Не удалось загрузить товар. Возможно, он был удален.</p>
+      </div>
     </div>
   </div>
 </template>

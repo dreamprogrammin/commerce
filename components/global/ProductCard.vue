@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CarouselApi } from '../ui/carousel'
-import type { AccessoryProduct } from '@/types'
+import type { BaseProduct } from '@/types'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -13,7 +13,7 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
  * включая вложенный массив изображений `product_images`.
  */
 const props = defineProps<{
-  product: AccessoryProduct
+  product: BaseProduct
 }>()
 
 // --- ИНИЦИАЛИЗАЦИЯ ---
@@ -47,13 +47,6 @@ const quantityInCart = computed(() => {
 })
 
 /**
- * @computed hasImages
- * @description Проверяет, есть ли у товара в принципе массив изображений и не пустой ли он.
- * @returns {boolean}
- */
-const hasImages = computed(() => Array.isArray(props.product.product_images) && props.product.product_images.length > 0)
-
-/**
  * @computed hasMultipleImages
  * @description Проверяет, содержит ли галерея товара более одного изображения.
  * Используется для включения интерактивных фич (карусель, скролл).
@@ -77,12 +70,11 @@ const activeImageIndex = ref(0)
  * @returns {string | null} Полный URL изображения или `null`, если изображений нет.
  */
 const activeImageUrl = computed(() => {
-  if (hasImages.value) {
-    const imageUrl = props.product.product_images[activeImageIndex.value]?.image_url
-    // Превращаем `undefined` в `null` для совместимости с `getPublicUrl`
-    return getPublicUrl(BUCKET_NAME_PRODUCT, imageUrl || null)
-  }
-  return null
+  // 1. Безопасно получаем `imageUrl`. Если `product_images` - null, результат будет `undefined`.
+  const imageUrl = props.product.product_images?.[activeImageIndex.value]?.image_url
+
+  // 2. Если `imageUrl` в итоге `undefined` (или `null`), `getPublicUrl` получит `null`.
+  return getPublicUrl(BUCKET_NAME_PRODUCT, imageUrl || null)
 })
 
 /**
@@ -170,7 +162,10 @@ watch(emblaMobileApi, (api) => {
           @init-api="(val) => emblaMobileApi = val"
         >
           <CarouselContent>
-            <CarouselItem v-for="image in product.product_images" :key="image.id">
+            <CarouselItem
+              v-for="(image, index) in product.product_images"
+              :key="index"
+            >
               <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
                 <NuxtImg
                   :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
@@ -201,7 +196,7 @@ watch(emblaMobileApi, (api) => {
       >
         <template v-if="!isTouchDevice">
           <div
-            v-for="(image, index) in product.product_images" :key="image.id"
+            v-for="(_, index) in product.product_images" :key="index"
             class="w-2 h-2 rounded-full transition-all"
             :class="index === activeImageIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
           />
@@ -209,7 +204,7 @@ watch(emblaMobileApi, (api) => {
 
         <template v-else>
           <div
-            v-for="(image, index) in product.product_images" :key="`dot-${image.id}`"
+            v-for="(_, index) in product.product_images" :key="`dot-${index}`"
             class="w-2 h-2 rounded-full transition-all"
             :class="index === mobileSelectedIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
           />
@@ -226,7 +221,7 @@ watch(emblaMobileApi, (api) => {
         <p class="text-lg font-bold">
           {{ product.price }} ₸
         </p>
-        <p v-if="product.bonus_points_award > 0" class="text-xs text-primary">
+        <p v-if="product.bonus_points_award && product.bonus_points_award > 0" class="text-xs text-primary">
           +{{ product.bonus_points_award }} бонусов
         </p>
       </div>
@@ -235,10 +230,10 @@ watch(emblaMobileApi, (api) => {
         <Button
           v-if="!itemInCart"
           class="w-full"
-          :disabled="product.stock_quantity <= 0"
+          :disabled="!product.stock_quantity || product.stock_quantity <= 0"
           @click="cartStore.addItem(product, 1)"
         >
-          <span v-if="product.stock_quantity > 0">В корзину</span>
+          <span v-if="product.stock_quantity && product.stock_quantity > 0">В корзину</span>
           <span v-else>Нет в наличии</span>
         </Button>
 

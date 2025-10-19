@@ -6,6 +6,8 @@ export interface Country extends Tables<'countries'> {}
 
 export interface Material extends Tables<'materials'> {}
 
+export type AttributeValuePayload = Omit<ProductAttributeValueInsert, 'product_id'>
+
 export interface ParamsSignUp {
   email: string
   password: string
@@ -247,3 +249,36 @@ export type ProductAttributeValue = Tables<'product_attribute_values'>
 export type ProductAttributeValueInsert = TablesInsert<'product_attribute_values'>
 
 export type FilteredProductRpcResponse = Database['public']['Functions']['get_filtered_products']['Returns'][number]
+
+export interface BrandForFilter {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface ColorOptionMeta {
+  hex: string
+}
+type RecommendedProductRpcResponse = Database['public']['Functions']['get_personalized_recommendations']['Returns'][number]
+
+export interface RecommendedProduct extends Omit<RecommendedProductRpcResponse, 'product_images'> {
+  product_images: {
+    id: string
+    image_url: string
+    display_order: number
+    alt_text: string | null
+  }[]
+}
+
+export interface BaseProduct {
+  id: string
+  name: string
+  slug: string
+  price: number
+  // Упрощаем тип для изображений, нам нужен только URL
+  product_images: { image_url: string | null }[] | null
+  discount_percentage?: number | null // Скидка опциональна
+  // Добавьте сюда любые другие поля, которые вы используете в ProductCard
+  bonus_points_award?: number | null
+  stock_quantity?: number | null
+}

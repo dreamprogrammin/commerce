@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ProductWithGallery } from '@/types'
+import type { BaseProduct } from '@/types'
 
 const props = defineProps<{
-  products: ProductWithGallery[] | null
+  products: BaseProduct[] | null
   isLoading: boolean
   title: string
   seeAllLink: string // И ссылку "Смотреть все" тоже принимаем

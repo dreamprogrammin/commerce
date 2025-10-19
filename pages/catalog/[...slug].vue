@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
-import type { AttributeFilter, AttributeWithValue, Brand, IBreadcrumbItem, IProductFilters, ProductWithGallery, SortByType } from '@/types'
+import type { AttributeFilter, AttributeWithValue, BrandForFilter, IBreadcrumbItem, IProductFilters, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -22,20 +22,17 @@ const hasMoreProducts = ref(true)
 const currentPage = ref(1)
 const PAGE_SIZE = 12
 const availableFilters = ref<AttributeWithValue[]>([])
-
-const availableBrands = ref<Brand[]>([])
+const availableBrands = ref<BrandForFilter[]>([])
 
 interface ActiveFilters {
   sortBy: SortByType
   subCategoryIds: string[]
-  brandIds: string[]
   price: [number, number]
-  attributes: Record<string, number[]>
+  attributes: Record<string, (string | number)[]>
 }
 const activeFilters = ref<ActiveFilters>({
   sortBy: getSortByFromQuery(route.query.sort_by),
   subCategoryIds: [],
-  brandIds: [],
   price: [0, 50000], // Временный диапазон, будет обновлен
   attributes: {},
 })
@@ -58,15 +55,7 @@ const title = computed(() => {
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 // Вычисляемый диапазон цен на основе УЖЕ загруженных товаров
-const priceRange = computed(() => {
-  if (products.value.length === 0)
-    return { min: 0, max: 50000 }
-  const prices = products.value.map(p => Number(p.price))
-  return {
-    min: Math.floor(Math.min(...prices)),
-    max: Math.ceil(Math.max(...prices)),
-  }
-})
+const priceRange = ref({ min: 0, max: 50000 })
 
 // --- 4. Функции-обработчики ---
 
@@ -88,30 +77,21 @@ function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[
   return 'popularity'
 }
 
-async function loadFilterData() {
-  const slug = currentCategorySlug.value
-
-  // <-- ИЗМЕНЕНО: Загружаем и бренды, и атрибуты для фильтров
+async function loadFilterData(slug: string) {
+  // Теперь загружаем и сохраняем данные раздельно
   const [brands, attributes] = await Promise.all([
     productsStore.fetchBrandsForCategory(slug),
     productsStore.fetchAttributesForCategory(slug),
   ])
 
-  // Превращаем бренды в такой же формат, как и другие атрибуты
-  const brandsAsAttribute: AttributeWithValue = {
-    id: 0, // Псевдо-ID
-    name: 'Бренды',
-    slug: 'brand', // Специальный слаг для брендов
-    display_type: 'select',
-    attribute_options: brands.map(b => ({ id: b.id, attribute_id: 0, value: b.name, meta: null })),
+  availableBrands.value = brands
+  availableFilters.value = attributes
+
+  // Сбрасываем activeFilters
+  const newAttributeFilters: Record<string, any[]> = {
+    brand: [], // <-- Добавляем 'brand' сюда
   }
-
-  // Собираем все фильтры вместе: сначала бренды, потом остальные
-  availableFilters.value = brands.length > 0 ? [brandsAsAttribute, ...attributes] : attributes
-
-  // Сбрасываем значения атрибутов в activeFilters
-  const newAttributeFilters: Record<string, any[]> = {}
-  for (const attr of availableFilters.value) {
+  for (const attr of attributes) {
     newAttributeFilters[attr.slug] = []
   }
   activeFilters.value.attributes = newAttributeFilters
@@ -140,22 +120,23 @@ async function loadProducts(isLoadMore = false) {
 
   // 2. Готовим фильтры по остальным атрибутам для RPC
   const attributeFilters: AttributeFilter[] = Object.entries(activeFilters.value.attributes)
-    // Исключаем 'brand', так как мы обрабатываем его отдельно
-    .filter(([slug]) => slug !== 'brand')
+    .filter(([slug]) => slug !== 'brand') // Исключаем 'brand'
     .filter(([, optionIds]) => optionIds.length > 0)
     .map(([slug, optionIds]) => ({ slug, option_ids: optionIds as number[] }))
 
   // 3. Формируем финальный объект фильтров для передачи в Pinia Store
+
   const filters: IProductFilters = {
-    categorySlug: slug,
+    categorySlug: currentCategorySlug.value,
     sortBy: activeFilters.value.sortBy,
     subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
-    brandIds: brandIds.length > 0 ? brandIds : undefined, // Передаем brandIds в RPC
+    brandIds: brandIds.length > 0 ? brandIds : undefined,
     priceMin: activeFilters.value.price[0],
     priceMax: activeFilters.value.price[1],
-    attributes: attributeFilters.length > 0 ? attributeFilters : undefined, // Передаем остальные атрибуты
+    attributes: attributeFilters.length > 0 ? attributeFilters : undefined,
   }
 
+  console.log('Отправляю в RPC следующие фильтры:', filters)
   try {
     const { products: newProducts, hasMore } = await productsStore.fetchProducts(filters, currentPage.value, PAGE_SIZE)
 
@@ -174,6 +155,7 @@ async function loadProducts(isLoadMore = false) {
       const newMin = Math.floor(Math.min(...prices))
       const newMax = Math.ceil(Math.max(...prices))
       priceRange.value = { min: newMin, max: newMax }
+      activeFilters.value.price = [newMin, newMax]
       // Не сбрасываем `activeFilters.value.price` здесь, чтобы сохранить выбор пользователя
     }
 
@@ -215,7 +197,7 @@ watch(
       }
       Promise.all([
         loadProducts(false),
-        loadFilterData(),
+        loadFilterData(newSlug),
       ])
     }
   },
@@ -229,12 +211,19 @@ watchDebounced(activeFilters, () => {
 
 <template>
   <div class="container py-8">
-    <Breadcrumbs :items="breadcrumbs" class="mb-6" />
+    <ClientOnly>
+      <Breadcrumbs :items="breadcrumbs" class="mb-6" />
+
+      <template #fallback>
+        <div class="mb-6 h-6 w-1/3 rounded-lg bg-gray-200 animate-pulse" />
+      </template>
+    </ClientOnly>
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <aside class="col-span-1 lg:sticky top-24 self-start">
         <DynamicFilters
           v-model="activeFilters"
           :available-filters="availableFilters"
+          :available-brands="availableBrands"
           :price-range="priceRange"
           :is-loading="isLoading"
         />

@@ -1,6 +1,7 @@
-import type { Database, ICartItem, ICheckoutData, ProductRow } from '@/types'
+import type { BaseProduct, Database, ICartItem, ICheckoutData, ProductRow } from '@/types'
 import { toast } from 'vue-sonner'
 import { useProfileStore } from '../core/profileStore'
+import { useProductsStore } from './productsStore'
 
 const CART_STORAGE_KEY = 'krakenshop-cart-v1'
 
@@ -13,6 +14,7 @@ export const useCartStore = defineStore('cartStore', () => {
   const items = ref<ICartItem[]>([])
   const isProcessing = ref(false)
   const bonusesToSpend = ref(0)
+  const productsStore = useProductsStore()
 
   // УБИРАЕМ всю логику hydrateFromStorage() и watch() - плагин все сделает сам
 
@@ -31,33 +33,30 @@ export const useCartStore = defineStore('cartStore', () => {
     return finalTotal > 0 ? Number(finalTotal.toFixed(2)) : 0
   })
 
-  async function addItem(product: ProductRow, quantity: number = 1) {
-    const currentUser = await ensureUserSession()
+  async function addItem(product: BaseProduct, quantity: number) {
+    // 1. Проверяем, есть ли товар уже в корзине
+    const existingItem = items.value.find(item => item.product.id === product.id)
 
-    if (!currentUser) {
-      toast.error('Не удалось добавить товар', { description: 'Пожалуйста, обновите страницу и попробуйте снова.' })
-      return
-    }
-
-    if (quantity <= 0)
-      return
-
-    const existingItemIndex = items.value.findIndex(i => i.product.id === product.id)
-
-    if (existingItemIndex > -1) {
-      items.value = items.value.map((item, index) =>
-        index === existingItemIndex
-          ? { ...item, quantity: item.quantity + quantity }
-          : item,
-      )
+    if (existingItem) {
+      existingItem.quantity += quantity
+      toast.success(`"${product.name}" (+${quantity})`)
     }
     else {
-      items.value = [...items.value, { product, quantity }]
+      // 2. Если товара нет, загружаем его ПОЛНУЮ версию
+      //    Это гарантирует, что в корзине всегда будет полный объект ProductRow
+      const fullProduct = await productsStore.getProductById(product.id)
+
+      if (fullProduct) {
+        // 3. Добавляем в корзину ПОЛНЫЙ объект
+        items.value.push({ product: fullProduct, quantity })
+        toast.success(`"${fullProduct.name}" добавлен в корзину!`)
+      }
+      else {
+        // 4. Обрабатываем ошибку, если не удалось загрузить товар
+        toast.error('Не удалось добавить товар в корзину')
+      }
     }
-
-    toast.success(`"${product.name}" (x${quantity}) добавлен в корзину`)
   }
-
   function removeItem(productId: string) {
     items.value = items.value.filter(i => i.product.id !== productId)
     toast.info('Товар удален из корзины')
@@ -120,6 +119,11 @@ export const useCartStore = defineStore('cartStore', () => {
     }
     isProcessing.value = true
     try {
+      const currentUser = await ensureUserSession()
+      if (!currentUser) {
+        // Если сессию создать не удалось, прерываем оформление
+        throw new Error('Не удалось создать сессию для оформления заказа.')
+      }
       const { data: newOrderId, error } = await supabase.rpc('create_order', {
         p_cart_items: items.value.map(i => ({ product_id: i.product.id, quantity: i.quantity })),
         p_delivery_method: orderData.deliveryMethod,

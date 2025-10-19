@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AttributeWithValue, BrandInsert, BrandUpdate, FullProduct, ProductAttributeValueInsert, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
+import type { AttributeValuePayload, AttributeWithValue, BrandInsert, BrandUpdate, FullProduct, ProductAttributeValueInsert, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
@@ -19,7 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'create',
     payload:
-    { data: ProductInsert, newImageFiles: File[], attributeValues: ProductAttributeValueInsert[] }
+    { data: ProductInsert, newImageFiles: File[], attributeValues: AttributeValuePayload[] }
   ): void
   (e: 'update',
     payload:
@@ -28,7 +28,7 @@ const emit = defineEmits<{
       newImageFiles: File[]
       imagesToDelete: string[]
       existingImages: ProductImageRow[]
-      attributeValues: ProductAttributeValueInsert[]
+      attributeValues: AttributeValuePayload[]
     }
   ): void
 }>()
@@ -169,7 +169,7 @@ async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, fil
 }
 // Эта функция будет вызываться, когда меняется категория товара
 async function handleCategoryChange(categoryId: string | null) {
-  if (!categoryId) {
+  if (!categoryId) { // Эта проверка теперь ловит и null, и undefined
     categoryAttributes.value = []
     return
   }
@@ -197,7 +197,8 @@ async function handleCategoryChange(categoryId: string | null) {
 
 // Отслеживаем изменение category_id в нашей основной форме
 watch(() => formData.value.category_id, (newCategoryId) => {
-  handleCategoryChange(newCategoryId)
+  const categoryIdForHandler = newCategoryId === undefined ? null : newCategoryId
+  handleCategoryChange(categoryIdForHandler)
 }, { immediate: true })
 
 onMounted(() => {
@@ -551,7 +552,6 @@ const maxAgeYearsValue = computed({
                   <span v-else class="text-muted-foreground">
                     Выберите бренд...
                   </span>
-                  <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent class="w-[--radix-popover-trigger-width] p-0">
@@ -564,7 +564,6 @@ const maxAgeYearsValue = computed({
                         class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
                         @click="() => { isBrandDialogOpen = true }"
                       >
-                        <Plus class="inline-block mr-2 h-4 w-4" />
                         Создать новый бренд
                       </div>
                     </CommandEmpty>
@@ -574,7 +573,6 @@ const maxAgeYearsValue = computed({
                         value=""
                         @select="() => { formData.brand_id = null }"
                       >
-                        <Check :class="!formData.brand_id ? 'opacity-100' : 'opacity-0'" class="mr-2 h-4 w-4" />
                         Без бренда
                       </CommandItem>
                       <!-- Список существующих брендов -->

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { ProductRow } from '@/types'
+import type { BaseProduct } from '@/types'
 import { useMediaQuery } from '@vueuse/core'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
 const props = defineProps<{
-  product: ProductRow
+  product: BaseProduct
   quantity: number
 }>()
 const isOpen = ref(false)

@@ -1,4 +1,4 @@
-import type { AccessoryProduct, AttributeWithValue, Brand, Database, FilteredProductRpcResponse, FullProduct, IProductFilters, ProductWithGallery, ProductWithImages } from '@/types'
+import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, Database, FilteredProductRpcResponse, FullProduct, IProductFilters, ProductRow, ProductWithGallery, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 
 // const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -104,7 +104,7 @@ export const useProductsStore = defineStore('productsStore', () => {
   /**
    * Загружает бренды, которые доступны в указанной категории.
    */
-  async function fetchBrandsForCategory(categorySlug: string): Promise<Brand[]> {
+  async function fetchBrandsForCategory(categorySlug: string): Promise<BrandForFilter[]> {
     if (!categorySlug || categorySlug === 'all')
       return []
     try {
@@ -113,6 +113,8 @@ export const useProductsStore = defineStore('productsStore', () => {
       })
       if (error)
         throw error
+
+      // TypeScript теперь будет счастлив, так как data соответствует BrandForFilter[]
       return data || []
     }
     catch (error: any) {
@@ -120,7 +122,6 @@ export const useProductsStore = defineStore('productsStore', () => {
       return []
     }
   }
-
   /**
    * Загружает Атрибуты (и их опции), которые привязаны к указанной категории.
    */
@@ -261,6 +262,23 @@ export const useProductsStore = defineStore('productsStore', () => {
       return []
     }
   }
+
+  async function getProductById(productId: string): Promise<ProductRow | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*') // Загружаем все поля
+        .eq('id', productId)
+        .single()
+      if (error)
+        throw error
+      return data
+    }
+    catch (error) {
+      console.error('Ошибка загрузки продукта по ID', error)
+      return null
+    }
+  }
   return {
     brands,
     fetchAllBrands,
@@ -273,5 +291,6 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchProductsByIds,
     fetchBrandsForCategory,
     fetchAttributesForCategory,
+    getProductById,
   }
 })

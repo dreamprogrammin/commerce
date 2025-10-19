@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductAttributeValueInsert, ProductInsert } from '@/types'
+import type { AttributeValuePayload, ProductInsert } from '@/types'
 import { toast } from 'vue-sonner'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
@@ -66,7 +66,7 @@ async function searchProductByBarcode() {
 async function handleCreate(payload: {
   data: ProductInsert
   newImageFiles: File[]
-  attributeValues: ProductAttributeValueInsert[]
+  attributeValues: AttributeValuePayload[]
 }) {
   const sku = initialSku.value.trim()
   if (sku && !payload.data.sku) {
@@ -80,8 +80,12 @@ async function handleCreate(payload: {
   )
 
   if (newProduct) {
-    // После создания товара, сохраняем его атрибуты
-    await adminProductsStore.saveProductAttributeValues(newProduct.id, payload.attributeValues)
+    const valuesToSave = payload.attributeValues.map(value => ({
+      ...value,
+      product_id: newProduct.id, // Используем ID из `newProduct`
+    }))
+    await adminProductsStore.saveProductAttributeValues(newProduct.id, valuesToSave)
+
     router.push('/admin/products')
   }
 }

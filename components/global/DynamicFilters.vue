@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PropType } from 'vue'
-import type { AttributeWithValue, IBreadcrumbItem } from '@/types' // Убедитесь, что типы импортированы
+import type { AttributeWithValue, BrandForFilter, ColorOptionMeta } from '@/types' // Убедитесь, что типы импортированы
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 // --- 1. PROPS & EMITS ---
@@ -24,6 +24,10 @@ const props = defineProps({
   // Принимаем наш новый динамический список фильтров
   availableFilters: {
     type: Array as PropType<AttributeWithValue[]>,
+    default: () => [],
+  },
+  availableBrands: {
+    type: Array as PropType<BrandForFilter[]>,
     default: () => [],
   },
 })
@@ -114,6 +118,22 @@ watch(() => props.priceRange, (newRange) => {
       </div>
     </div>
 
+    <div v-if="availableBrands.length > 0" class="space-y-4 pt-4 border-t">
+      <h4 class="font-semibold">
+        Бренды
+      </h4>
+      <div class="space-y-2">
+        <div v-for="brand in availableBrands" :key="brand.id" class="flex items-center space-x-2">
+          <Checkbox
+            :id="`brand-${brand.id}`"
+            :checked="modelValue.attributes.brand?.includes(brand.id)"
+            @update:model-value="(checkedState) => updateAttribute(!!checkedState, 'brand', brand.id)"
+          />
+          <Label :for="`brand-${brand.id}`" class="font-normal cursor-pointer">{{ brand.name }}</Label>
+        </div>
+      </div>
+    </div>
+
     <!-- 2. ДИНАМИЧЕСКИЕ ФИЛЬТРЫ (Атрибуты) -->
     <div
       v-for="filter in availableFilters"
@@ -134,7 +154,7 @@ watch(() => props.priceRange, (newRange) => {
           <Checkbox
             :id="`attr-${option.id}`"
             :checked="modelValue.attributes[filter.slug]?.includes(option.id)"
-            @update:checked="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
+            @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
           />
           <Label :for="`attr-${option.id}`" class="font-normal cursor-pointer">{{ option.value }}</Label>
         </div>
@@ -147,13 +167,17 @@ watch(() => props.priceRange, (newRange) => {
           :key="option.id"
           type="button"
           :title="option.value"
-          :style="{ backgroundColor: option.meta?.hex }"
+          :style="{ backgroundColor: ((option.meta as unknown) as ColorOptionMeta)?.hex }"
+
           class="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
           :class="{
             'border-primary ring-2 ring-primary ring-offset-2': modelValue.attributes[filter.slug]?.includes(option.id),
             'border-border': !modelValue.attributes[filter.slug]?.includes(option.id),
           }"
-          @click="() => updateAttribute(true, filter.slug, option.id)"
+          @click="() => {
+            const isCurrentlyChecked = modelValue.attributes[filter.slug]?.includes(option.id);
+            updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
+          }"
         />
         <!-- Примечание: для цветов лучше использовать не toggle, а просто выбор. Повторный клик не будет отменять. -->
         <!-- Если нужна отмена, логику `updateAttribute` нужно будет усложнить -->
