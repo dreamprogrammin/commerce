@@ -103,28 +103,36 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
   }
 
-  async function fetchProductById(id: string) {
+  async function fetchProductById(id: string): Promise<FullProduct | null> {
     isLoading.value = true
-    currentProduct.value = null // Сбрасываем, чтобы избежать показа старых данных
+    currentProduct.value = null // Сбрасываем для чистоты
     try {
       const { data, error } = await supabase
         .from('products')
         .select(`
-          *,
-          categories(name, slug),
-          product_images(*),
-          brands(*),
-          countries(*),
-          materials(*)
-        `)
+        *,
+        categories(name, slug),
+        product_images(*),
+        brands(*),
+        countries(*),
+        materials(*),
+        product_attribute_values!left(*, attributes!left(*, attribute_options!left(*)))
+      `)
         .eq('id', id)
         .single()
-      if (error)
+
+      if (error && error.code !== 'PGRST116')
         throw error
+
+      // 1. Устанавливаем значение в сторе (если это нужно где-то еще)
       currentProduct.value = data as FullProduct | null
+
+      // 2. ВОЗВРАЩАЕМ результат для использования в `useAsyncData`
+      return data as FullProduct | null
     }
     catch (error: any) {
       toast.error(`Ошибка загрузки товара с ID: ${id}`, { description: error.message })
+      return null // <-- Возвращаем null в случае ошибки
     }
     finally {
       isLoading.value = false

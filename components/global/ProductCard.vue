@@ -137,78 +137,98 @@ watch(emblaMobileApi, (api) => {
       @mousemove="handleMouseMove"
       @mouseleave="handleMouseLeave"
     >
-      <template v-if="!isTouchDevice">
-        <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
-          <NuxtImg
-            v-if="activeImageUrl"
-            :key="activeImageUrl"
-            :src="activeImageUrl"
-            :alt="product.name"
-            class="w-full h-full object-cover transition-opacity duration-200"
-            format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
-          />
-          <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-            <span>Нет фото</span>
-          </div>
-        </NuxtLink>
-      </template>
+      <ClientOnly>
+        <!-- Рендеринг для НЕ-тач устройств (десктоп) -->
+        <template v-if="!isTouchDevice">
+          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
+            <NuxtImg
+              v-if="activeImageUrl"
+              :key="activeImageUrl"
+              :src="activeImageUrl"
+              :alt="product.name"
+              class="w-full h-full object-cover transition-opacity duration-200"
+              format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+            />
+            <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+              <span>Нет фото</span>
+            </div>
+          </NuxtLink>
+        </template>
 
-      <template v-else>
-        <Carousel
-          v-if="hasMultipleImages"
-          class="w-full h-full"
-          :opts="{ loop: true, align: 'start' }"
-          @touchstart.stop @touchmove.stop @touchend.stop
-          @init-api="(val) => emblaMobileApi = val"
-        >
-          <CarouselContent>
-            <CarouselItem
-              v-for="(image, index) in product.product_images"
-              :key="index"
-            >
-              <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
-                <NuxtImg
-                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
-                  :alt="product.name"
-                  class="w-full h-full object-cover"
-                  format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
-                />
-              </NuxtLink>
-            </CarouselItem>
-          </CarouselContent>
-        </Carousel>
-        <!-- Если на мобилке только одна картинка -->
-        <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full">
-          <NuxtImg
-            v-if="activeImageUrl"
-            :src="activeImageUrl"
-            :alt="product.name"
-            class="w-full h-full object-cover"
-            format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
-          />
-        </NuxtLink>
-      </template>
+        <!-- Рендеринг для тач-устройств (мобильные) -->
+        <template v-else>
+          <Carousel
+            v-if="hasMultipleImages"
+            class="w-full h-full"
+            :opts="{ loop: true, align: 'start' }"
+            @touchstart.stop @touchmove.stop @touchend.stop
+            @init-api="(val) => emblaMobileApi = val"
+          >
+            <CarouselContent>
+              <CarouselItem v-for="(image, index) in product.product_images" :key="index">
+                <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
+                  <NuxtImg
+                    :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
+                    :alt="product.name"
+                    class="w-full h-full object-cover"
+                    format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+                  />
+                </NuxtLink>
+              </CarouselItem>
+            </CarouselContent>
+          </Carousel>
+          <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full">
+            <NuxtImg
+              v-if="activeImageUrl"
+              :src="activeImageUrl"
+              :alt="product.name"
+              class="w-full h-full object-cover"
+              format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+            />
+          </NuxtLink>
+        </template>
+
+        <!-- #fallback будет отрендерен на сервере и во время гидратации -->
+        <template #fallback>
+          <!-- Простой, универсальный рендеринг для SSR: просто первое изображение -->
+          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
+            <NuxtImg
+              v-if="activeImageUrl"
+              :src="activeImageUrl"
+              :alt="product.name"
+              class="w-full h-full object-cover"
+              format="webp" quality="80" width="400" height="400" loading="lazy" placeholder
+            />
+            <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+              <span>Нет фото</span>
+            </div>
+          </NuxtLink>
+        </template>
+      </ClientOnly>
 
       <!-- Индикаторы-точки для визуальной обратной связи -->
       <div
         v-if="hasMultipleImages"
         class="absolute bottom-2 left-0 right-0 h-4 flex justify-center items-center gap-2 pointer-events-none"
       >
-        <template v-if="!isTouchDevice">
-          <div
-            v-for="(_, index) in product.product_images" :key="index"
-            class="w-2 h-2 rounded-full transition-all"
-            :class="index === activeImageIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
-          />
-        </template>
-
-        <template v-else>
-          <div
-            v-for="(_, index) in product.product_images" :key="`dot-${index}`"
-            class="w-2 h-2 rounded-full transition-all"
-            :class="index === mobileSelectedIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
-          />
-        </template>
+        <!-- Этот блок тоже можно обернуть в ClientOnly, если он вызывает проблемы,
+         но обычно он безопасен -->
+        <ClientOnly>
+          <template v-if="!isTouchDevice">
+            <div
+              v-for="(_, index) in product.product_images" :key="index"
+              class="w-2 h-2 rounded-full transition-all"
+              :class="index === activeImageIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
+            />
+          </template>
+          <template v-else>
+            <div
+              v-for="(_, index) in product.product_images" :key="`dot-${index}`"
+              class="w-2 h-2 rounded-full transition-all"
+              :class="index === mobileSelectedIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
+            />
+          </template>
+        </ClientOnly>
       </div>
     </div>
 

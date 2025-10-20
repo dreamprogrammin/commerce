@@ -136,7 +136,6 @@ async function loadProducts(isLoadMore = false) {
     attributes: attributeFilters.length > 0 ? attributeFilters : undefined,
   }
 
-  console.log('Отправляю в RPC следующие фильтры:', filters)
   try {
     const { products: newProducts, hasMore } = await productsStore.fetchProducts(filters, currentPage.value, PAGE_SIZE)
 
@@ -155,7 +154,7 @@ async function loadProducts(isLoadMore = false) {
       const newMin = Math.floor(Math.min(...prices))
       const newMax = Math.ceil(Math.max(...prices))
       priceRange.value = { min: newMin, max: newMax }
-      activeFilters.value.price = [newMin, newMax]
+      // activeFilters.value.price = [newMin, newMax]
       // Не сбрасываем `activeFilters.value.price` здесь, чтобы сохранить выбор пользователя
     }
 
@@ -188,25 +187,28 @@ watch(
   currentCategorySlug,
   (newSlug) => {
     if (newSlug) {
-      // <-- ИЗМЕНЕНО: Сбрасываем фильтры правильно
+      // 1. Просто сбрасываем объект фильтров.
+      // Это действие само по себе вызовет `watchDebounced`
       activeFilters.value = {
         sortBy: getSortByFromQuery(route.query.sort_by),
         subCategoryIds: [],
         price: [0, 50000],
         attributes: {},
       }
-      Promise.all([
-        loadProducts(false),
-        loadFilterData(newSlug),
-      ])
+      // 2. И отдельно загружаем данные для сайдбара
+      loadFilterData(newSlug)
     }
   },
   { immediate: true },
 )
 
-watchDebounced(activeFilters, () => {
-  loadProducts(false)
-}, { debounce: 500, deep: true })
+watchDebounced(
+  activeFilters,
+  () => {
+    loadProducts(false)
+  },
+  { debounce: 500, deep: true },
+)
 </script>
 
 <template>
