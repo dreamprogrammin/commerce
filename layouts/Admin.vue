@@ -54,6 +54,20 @@ const { handleOut } = useAuth()
         >
           Управление товарами
         </NuxtLink>
+        <NuxtLink
+          to="/admin/brands"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          Добавление бренда
+        </NuxtLink>
+        <NuxtLink
+          to="/admin/attributes"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          Управление атрибутами
+        </NuxtLink>
       </nav>
     </aside>
 
