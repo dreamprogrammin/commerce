@@ -22,6 +22,23 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
     }
   }
 
+  async function fetchAttributeById(id: number): Promise<Attribute | null> {
+    try {
+      const { data, error } = await supabase
+        .from('attributes')
+        .select('*')
+        .eq('id', id)
+        .single()
+      if (error)
+        throw error
+      return data
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки атрибута по ID', error)
+      return null
+    }
+  }
+
   async function fetchAttributes() {
     isLoading.value = true
     try {
@@ -148,6 +165,7 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
     attributes,
     isLoading,
     fetchAttributes,
+    fetchAttributeById,
     createAttribute,
     fetchOptionsForAttribute,
     addOptionToAttribute,

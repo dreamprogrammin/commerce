@@ -34,6 +34,9 @@ onMounted(() => {
             <TableHead>Название атрибута</TableHead>
             <TableHead>Слаг</TableHead>
             <TableHead>Тип отображения</TableHead>
+            <TableHead class="text-right">
+              Действия
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -43,7 +46,13 @@ onMounted(() => {
             </TableCell>
             <TableCell>{{ attr.slug }}</TableCell>
             <TableCell>{{ attr.display_type }}</TableCell>
-            <!-- TODO: Кнопки Редактировать/Удалить -->
+            <TableCell class="text-right">
+              <Button as-child variant="outline" size="sm">
+                <NuxtLink :to="`/admin/attributes/${attr.id}`">
+                  Настроить
+                </NuxtLink>
+              </Button>
+            </TableCell>
           </TableRow>
         </TableBody>
       </Table>
