@@ -1,8 +1,8 @@
-import type { Attribute, AttributeInsert, AttributeOption, AttributeOptionInsert, AttributeUpdate, CategoryRow } from '@/types'
+import type { Attribute, AttributeInsert, AttributeOptionInsert, CategoryRow, Database, SimpleAttributeOption } from '@/types'
 import { toast } from 'vue-sonner'
 
 export const useAdminAttributesStore = defineStore('adminAttributesStore', () => {
-  const supabase = useSupabaseClient()
+  const supabase = useSupabaseClient<Database>()
 
   const attributes = ref<Attribute[]>([])
   const categories = ref<CategoryRow[]>([])
@@ -79,7 +79,7 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
 
   // -- ОПЦИИ АТРИБУТОВ (значения для select) --
 
-  async function fetchOptionsForAttribute(attributeId: number): Promise<AttributeOption[]> {
+  async function fetchOptionsForAttribute(attributeId: number): Promise<SimpleAttributeOption[]> {
     try {
       const { data, error } = await supabase
         .from('attribute_options')
@@ -88,7 +88,7 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
         .order('value')
       if (error)
         throw error
-      return data || []
+      return (data as unknown as SimpleAttributeOption[]) || []
     }
     catch (error: any) {
       toast.error('Ошибка загрузки опций', { description: error.message })
@@ -96,7 +96,7 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
     }
   }
 
-  async function addOptionToAttribute(optionData: AttributeOptionInsert): Promise<AttributeOption | null> {
+  async function addOptionToAttribute(optionData: AttributeOptionInsert): Promise<SimpleAttributeOption | null> {
     try {
       const { data, error } = await supabase
         .from('attribute_options')
@@ -106,7 +106,7 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
       if (error)
         throw error
       toast.success(`Опция "${data.value}" добавлена.`)
-      return data
+      return data as unknown as SimpleAttributeOption
     }
     catch (error: any) {
       toast.error('Ошибка добавления опции', { description: error.message })
@@ -159,6 +159,24 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
     }
   }
 
+  async function deleteOption(optionId: number): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('attribute_options')
+        .delete()
+        .eq('id', optionId)
+      if (error)
+        throw error
+
+      toast.success('Опция успешно удалена.')
+      return true
+    }
+    catch (error: any) {
+      toast.error('Ошибка удаления опции', { description: error.message })
+      return false
+    }
+  }
+
   // (Здесь позже можно добавить update/delete для атрибутов и опций)
 
   return {
@@ -173,5 +191,6 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
     fetchAllCategories,
     getLinkedCategoryIds,
     updateLinkedCategories,
+    deleteOption,
   }
 })

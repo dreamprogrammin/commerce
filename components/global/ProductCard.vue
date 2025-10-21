@@ -77,6 +77,29 @@ const activeImageUrl = computed(() => {
   return getPublicUrl(BUCKET_NAME_PRODUCT, imageUrl || null)
 })
 
+const priceDetails = computed(() => {
+  const originalPrice = Number(props.product.price)
+  const discountPercent = Number(props.product.discount_percentage)
+
+  const hasDiscount = discountPercent > 0 && discountPercent <= 100
+
+  if (!hasDiscount) {
+    return {
+      hasDiscount: false,
+      finalPrice: originalPrice,
+    }
+  }
+
+  const finalPrice = originalPrice - (originalPrice * discountPercent / 100)
+
+  return {
+    hasDiscount: true,
+    finalPrice: Math.round(finalPrice),
+    originalPrice,
+    percent: Math.round(discountPercent), // <-- ДОБАВЛЯЕМ ЭТУ СТРОКУ
+  }
+})
+
 /**
  * Обработчик события `mousemove`.
  * Вычисляет, над каким "сегментом" изображения находится курсор,
@@ -137,6 +160,14 @@ watch(emblaMobileApi, (api) => {
       @mousemove="handleMouseMove"
       @mouseleave="handleMouseLeave"
     >
+      <div
+        v-if="priceDetails.hasDiscount"
+        class="absolute top-2 right-2 z-10"
+      >
+        <div class="bg-destructive text-destructive-foreground font-bold text-xs px-2 py-1 rounded-full">
+          -{{ priceDetails.percent }}%
+        </div>
+      </div>
       <ClientOnly>
         <!-- Рендеринг для НЕ-тач устройств (десктоп) -->
         <template v-if="!isTouchDevice">
@@ -234,13 +265,33 @@ watch(emblaMobileApi, (api) => {
 
     <!-- Блок с информацией о товаре -->
     <div class="p-4 space-y-2 flex-grow flex flex-col">
+      <div v-if="product.brands" class="h-4">
+        <NuxtLink
+          :to="`/brand/${product.brands.slug}`"
+          class="text-xs text-muted-foreground hover:text-primary transition-colors"
+          @click.stop
+        >
+          >
+          {{ product.brands.name }}
+        </NuxtLink>
+      </div>
       <h3 class="font-semibold truncate h-6">
         {{ product.name }}
       </h3>
       <div class="flex items-baseline justify-between">
-        <p class="text-lg font-bold">
-          {{ product.price }} ₸
-        </p>
+        <!-- Блок с ценой -->
+        <div class="flex items-baseline gap-2">
+          <!-- Новая цена (всегда показывается) -->
+          <p class="text-lg font-bold">
+            {{ priceDetails.finalPrice }} ₸
+          </p>
+          <!-- Старая зачеркнутая цена (показывается только если есть скидка) -->
+          <p v-if="priceDetails.hasDiscount" class="text-sm text-muted-foreground line-through">
+            {{ priceDetails.originalPrice }} ₸
+          </p>
+        </div>
+
+        <!-- Бонусы (остаются без изменений) -->
         <p v-if="product.bonus_points_award && product.bonus_points_award > 0" class="text-xs text-primary">
           +{{ product.bonus_points_award }} бонусов
         </p>

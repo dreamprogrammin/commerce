@@ -281,4 +281,13 @@ export interface BaseProduct {
   // Добавьте сюда любые другие поля, которые вы используете в ProductCard
   bonus_points_award?: number | null
   stock_quantity?: number | null
+
+  brands?: Brand | null
+}
+
+export interface SimpleAttributeOption {
+  id: number
+  attribute_id: number
+  value: string
+  meta: Record<string, unknown> | null // Используем простой объект вместо `Json`
 }
