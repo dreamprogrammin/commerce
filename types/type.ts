@@ -121,6 +121,8 @@ export interface IProductFilters {
   priceMin?: number
   priceMax?: number
   sortBy?: SortByType
+  materialIds?: string[]
+  countryIds?: string[]
   attributes?: AttributeFilter[]
 }
 
@@ -169,9 +171,9 @@ export type ChildrenUpdate = Partial<ChildrenInsert>
 
 export type ProductImageRow = Database['public']['Tables']['product_images']['Row']
 
-export type ProductWithGallery = ProductRow & {
+export type ProductWithGallery = Omit<ProductRow, 'brand_id'> & {
   product_images: ProductImageRow[]
-  brands?: Brand | null
+  brands?: SimpleBrand | null
 }
 
 export interface CustomFieldSchema {
@@ -195,6 +197,8 @@ export type FullProduct = ProductWithImages & {
   brands: Brand | null
   countries: Country | null
   materials: Material | null
+
+  product_attribute_values: ProductAttributeValueWithDetails[] | null
 }
 
 export type CustomFieldValue = string | number | boolean | null
@@ -291,4 +295,37 @@ export interface SimpleAttributeOption {
   attribute_id: number
   value: string
   meta: Record<string, unknown> | null // Используем простой объект вместо `Json`
+}
+
+export interface CatalogProduct extends Omit<FilteredProductRpcResponse, 'product_images'> {
+  // Упрощаем и типизируем product_images (оно приходит как Json)
+  product_images: {
+    id: string
+    image_url: string
+    display_order: number
+    alt_text: string | null
+  }[]
+}
+
+export interface AttributeWithValue extends Tables<'attributes'> {
+  attribute_options: Tables<'attribute_options'>[]
+}
+
+export type CategoryPriceRangeRpcResponse = Database['public']['Functions']['get_category_price_range']['Returns'][number]
+
+export type SimpleBrand = Pick<Tables<'brands'>, 'id' | 'name' | 'slug'>
+
+export type ProductAttributeValueWithDetails = Tables<'product_attribute_values'> & {
+  attributes: (Tables<'attributes'> & {
+    attribute_options: Tables<'attribute_options'>[]
+  }) | null
+}
+
+export type ProductListAdmin = ProductRow & {
+  categories: { name: string | null, slug: string | null } | null
+  product_images: ProductImageRow[] | null
+  brands: Brand | null
+  countries: Country | null
+  materials: Material | null
+  // Нет product_attribute_values!
 }

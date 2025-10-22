@@ -306,15 +306,15 @@ watch(() => product.value?.id, () => {
               </div>
             </div>
 
+            <div class="pt-6 mt-6 border-t">
+              <ProductFeatures :product="product" />
+            </div>
+
             <div class="p-4 bg-primary/10 text-primary rounded-lg border border-primary/20">
               При покупке вы получите <span class="font-bold">{{ totalBonuses }} бонусов</span>
             </div>
             <div class="flex items-center gap-4 pt-4">
               <template v-if="product.stock_quantity > 0">
-                <!--
-            Если ОСНОВНОГО товара НЕТ в корзине, показываем кнопку.
-            Она теперь добавляет и основной товар, и выбранные аксессуары.
-          -->
                 <Button
                   v-if="!mainItemInCart"
                   size="lg"
@@ -323,10 +323,6 @@ watch(() => product.value?.id, () => {
                 >
                   Добавить в корзину
                 </Button>
-                <!--
-            Если ОСНОВНОЙ товар УЖЕ в корзине, показываем счетчик.
-            Он будет управлять количеством ТОЛЬКО основного товара.
-          -->
                 <QuantitySelector
                   v-else
                   :product="product"

@@ -8,6 +8,7 @@ import type {
   ProductAttributeValueInsert,
   ProductImageRow,
   ProductInsert,
+  ProductListAdmin,
   ProductSearchResult,
   ProductUpdate,
   ProductWithImages,
@@ -21,7 +22,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const { uploadFile, removeFile } = useSupabaseStorage()
 
   // --- СОСТОЯНИЕ (State) ---
-  const products = ref<FullProduct[]>([])
+  const products = ref<ProductListAdmin[]>([])
   const currentProduct = ref<FullProduct | null>(null)
   const isLoading = ref(false)
   const isSaving = ref(false)
@@ -88,12 +89,12 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           product_images(*), 
           brands(*), 
           countries(*),
-          materials(*)`,
+          materials(*)`, // <-- УЖЕ НЕ НУЖНО ДОБАВЛЯТЬ product_attribute_values
         )
         .order('created_at', { ascending: false })
       if (error)
         throw error
-      products.value = data || []
+      products.value = (data as ProductListAdmin[]) || [] // <-- Приводим к новому типу
     }
     catch (error: any) {
       toast.error('Ошибка загрузки товаров', { description: error.message })

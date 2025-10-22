@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
-import type { AttributeFilter, AttributeWithValue, BrandForFilter, IBreadcrumbItem, IProductFilters, ProductWithGallery, SortByType } from '@/types'
+import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -23,17 +23,26 @@ const currentPage = ref(1)
 const PAGE_SIZE = 12
 const availableFilters = ref<AttributeWithValue[]>([])
 const availableBrands = ref<BrandForFilter[]>([])
+const availableMaterials = ref<Material[]>([])
+const availableCountries = ref<Country[]>([])
+const isInitialLoad = ref(true)
 
 interface ActiveFilters {
   sortBy: SortByType
   subCategoryIds: string[]
   price: [number, number]
+  brandIds: string[] // Бренд теперь обрабатывается отдельно от attributes
+  materialIds: string[] // Новый
+  countryIds: string[] // Новый
   attributes: Record<string, (string | number)[]>
 }
 const activeFilters = ref<ActiveFilters>({
   sortBy: getSortByFromQuery(route.query.sort_by),
   subCategoryIds: [],
   price: [0, 50000], // Временный диапазон, будет обновлен
+  brandIds: [],
+  materialIds: [],
+  countryIds: [],
   attributes: {},
 })
 
@@ -79,22 +88,44 @@ function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[
 
 async function loadFilterData(slug: string) {
   // Теперь загружаем и сохраняем данные раздельно
-  const [brands, attributes] = await Promise.all([
+  const [brands, attributes, materials, countries, priceRangeData] = await Promise.all([
     productsStore.fetchBrandsForCategory(slug),
     productsStore.fetchAttributesForCategory(slug),
+    productsStore.fetchAllMaterials(), // <-- НОВЫЙ ВЫЗОВ
+    productsStore.fetchAllCountries(), // <-- НОВЫЙ ВЫЗОВ
+    productsStore.fetchPriceRangeForCategory(slug),
   ])
 
   availableBrands.value = brands
   availableFilters.value = attributes
+  availableMaterials.value = materials // <-- Сохраняем
+  availableCountries.value = countries // <-- Сохраняем
 
-  // Сбрасываем activeFilters
-  const newAttributeFilters: Record<string, any[]> = {
-    brand: [], // <-- Добавляем 'brand' сюда
-  }
+  // 1. Устанавливаем Price Range для UI
+  const priceMin = priceRangeData.min_price
+  const priceMax = priceRangeData.max_price
+  priceRange.value = { min: priceMin, max: priceMax }
+
+  // 2. Инициализируем динамические атрибуты для сброса
+  const newAttributeFilters: Record<string, any[]> = {}
   for (const attr of attributes) {
     newAttributeFilters[attr.slug] = []
   }
-  activeFilters.value.attributes = newAttributeFilters
+
+  // 3. АТОМАРНЫЙ СБРОС ACTIVEFILTERS
+  // Устанавливаем все фильтры сразу, используя корректные начальные значения
+  activeFilters.value = {
+    sortBy: getSortByFromQuery(route.query.sort_by),
+    subCategoryIds: [],
+    price: [priceMin, priceMax], // <-- Используем актуальный диапазон цен
+    brandIds: [],
+    materialIds: [],
+    countryIds: [],
+    attributes: newAttributeFilters, // <-- Используем корректный, только что созданный объект
+  }
+
+  // 4. Запускаем первую загрузку товаров (используя ТОЛЬКО ЧТО СБРОШЕННЫЕ ФИЛЬТРЫ)
+  await loadProducts(false)
 }
 
 /**
@@ -115,24 +146,34 @@ async function loadProducts(isLoadMore = false) {
     products.value = []
   }
 
-  // 1. Извлекаем brandIds из нового объекта `attributes`
-  const brandIds = (activeFilters.value.attributes.brand as string[]) || []
+  // === 1. BrandIds, MaterialIds, CountryIds БЕРУТСЯ НАПРЯМУЮ ===
+  // Теперь они берутся из активных фильтров, а не из activeFilters.attributes
+  const brandIds = activeFilters.value.brandIds
+  const materialIds = activeFilters.value.materialIds
+  const countryIds = activeFilters.value.countryIds
 
-  // 2. Готовим фильтры по остальным атрибутам для RPC
+  // === 2. Готовим фильтры по остальным атрибутам для RPC ===
+  // ЭТОТ ЭТАП ОСТАЕТСЯ, Т.К. ОН РАБОТАЕТ ТОЛЬКО С Color/Size/etc.
   const attributeFilters: AttributeFilter[] = Object.entries(activeFilters.value.attributes)
-    .filter(([slug]) => slug !== 'brand') // Исключаем 'brand'
+    // .filter(([slug]) => slug !== 'brand') // <-- Больше не нужно, т.к. 'brand' нет в attributes!
     .filter(([, optionIds]) => optionIds.length > 0)
     .map(([slug, optionIds]) => ({ slug, option_ids: optionIds as number[] }))
 
-  // 3. Формируем финальный объект фильтров для передачи в Pinia Store
-
+  // === 3. Формируем финальный объект фильтров для передачи в Pinia Store ===
   const filters: IProductFilters = {
     categorySlug: currentCategorySlug.value,
     sortBy: activeFilters.value.sortBy,
     subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
+
+    // === ОБНОВЛЕННЫЕ ПРЯМЫЕ ФИЛЬТРЫ ===
     brandIds: brandIds.length > 0 ? brandIds : undefined,
+    materialIds: materialIds.length > 0 ? materialIds : undefined,
+    countryIds: countryIds.length > 0 ? countryIds : undefined,
+
     priceMin: activeFilters.value.price[0],
     priceMax: activeFilters.value.price[1],
+
+    // === ДИНАМИЧЕСКИЕ АТРИБУТЫ ===
     attributes: attributeFilters.length > 0 ? attributeFilters : undefined,
   }
 
@@ -187,15 +228,7 @@ watch(
   currentCategorySlug,
   (newSlug) => {
     if (newSlug) {
-      // 1. Просто сбрасываем объект фильтров.
-      // Это действие само по себе вызовет `watchDebounced`
-      activeFilters.value = {
-        sortBy: getSortByFromQuery(route.query.sort_by),
-        subCategoryIds: [],
-        price: [0, 50000],
-        attributes: {},
-      }
-      // 2. И отдельно загружаем данные для сайдбара
+      // 1. Вызываем только загрузку мета-данных и сброс
       loadFilterData(newSlug)
     }
   },
@@ -205,6 +238,14 @@ watch(
 watchDebounced(
   activeFilters,
   () => {
+    // Пропускаем первое срабатывание (или срабатывание при сбросе),
+    // когда activeFilters был только что инициализирован в loadFilterData
+    if (isInitialLoad.value) {
+      isInitialLoad.value = false // Сбрасываем флаг после первого 'холостого' прохода
+      return
+    }
+
+    // Здесь происходит реальный запрос после изменения фильтров пользователем
     loadProducts(false)
   },
   { debounce: 500, deep: true },
@@ -227,6 +268,8 @@ watchDebounced(
           :available-filters="availableFilters"
           :available-brands="availableBrands"
           :price-range="priceRange"
+          :available-materials="availableMaterials"
+          :available-countries="availableCountries"
           :is-loading="isLoading"
         />
       </aside>

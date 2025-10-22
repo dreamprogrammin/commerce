@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PropType } from 'vue'
-import type { AttributeWithValue, BrandForFilter, ColorOptionMeta } from '@/types' // Убедитесь, что типы импортированы
+import type { AttributeWithValue, BrandForFilter, ColorOptionMeta, Country, Material } from '@/types' // Убедитесь, что типы импортированы
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 // --- 1. PROPS & EMITS ---
@@ -10,8 +10,9 @@ const props = defineProps({
     type: Object as PropType<{
       subCategoryIds: string[]
       price: [number, number]
-      // `attributes` - это объект, где ключ - слаг атрибута (например, 'brand', 'color'),
-      // а значение - массив ID выбранных опций
+      brandIds: string[] // Прямой массив ID
+      materialIds: string[] // Прямой массив ID
+      countryIds: string[] // Прямой массив ID
       attributes: Record<string, (string | number)[]>
     }>,
     required: true,
@@ -21,13 +22,21 @@ const props = defineProps({
     type: Object as PropType<{ min: number, max: number }>,
     required: true,
   },
-  // Принимаем наш новый динамический список фильтров
-  availableFilters: {
-    type: Array as PropType<AttributeWithValue[]>,
-    default: () => [],
-  },
   availableBrands: {
     type: Array as PropType<BrandForFilter[]>,
+    default: () => [],
+  },
+  // === НОВЫЕ ПРОПСЫ ===
+  availableMaterials: {
+    type: Array as PropType<Material[]>, // Используем ваш тип Material
+    default: () => [],
+  },
+  availableCountries: {
+    type: Array as PropType<Country[]>, // Используем ваш тип Country
+    default: () => [],
+  },
+  availableFilters: {
+    type: Array as PropType<AttributeWithValue[]>,
     default: () => [],
   },
 })
@@ -57,17 +66,19 @@ function updateSubCategory(checked: boolean, catId: string) {
   emit('update:modelValue', { ...props.modelValue, subCategoryIds: Array.from(newIds) })
 }
 
-// УНИВЕРСАЛЬНАЯ функция для обновления ЛЮБОГО атрибута
+/**
+ * УНИВЕРСАЛЬНАЯ функция для обновления ЛЮБОГО ДИНАМИЧЕСКОГО АТРИБУТА (Color, Size, etc.)
+ */
 function updateAttribute(checked: boolean, attributeSlug: string, optionId: string | number) {
-  const currentSelection = props.modelValue.attributes[attributeSlug] || []
-  const newSelection = new Set(currentSelection)
+  const stringId = String(optionId)
 
-  if (checked) {
-    newSelection.add(optionId)
-  }
-  else {
-    newSelection.delete(optionId)
-  }
+  // Явно указываем, что тут массив строк
+  const currentSelection: string[] = (props.modelValue.attributes[attributeSlug] || []).map(String)
+  const newSelection = new Set<string>(currentSelection)
+
+  if (checked)
+    newSelection.add(stringId)
+  else newSelection.delete(stringId)
 
   emit('update:modelValue', {
     ...props.modelValue,
@@ -75,6 +86,26 @@ function updateAttribute(checked: boolean, attributeSlug: string, optionId: stri
       ...props.modelValue.attributes,
       [attributeSlug]: Array.from(newSelection),
     },
+  })
+}
+
+/**
+ * НОВАЯ УНИВЕРСАЛЬНАЯ функция для обновления ПРЯМЫХ ID (Brand, Material, Country)
+ */
+function updateDirectFilter(checked: boolean, key: 'brandIds' | 'materialIds' | 'countryIds', id: string | number) {
+  // Конвертируем ID в строку перед использованием в Set
+  const stringId = String(id)
+
+  const currentSelection: string[] = (props.modelValue[key] || []).map(String) // Убеждаемся, что все - строки
+  const newSelection = new Set<string>(currentSelection) // Явно типизируем Set<string>
+
+  if (checked)
+    newSelection.add(stringId)
+  else newSelection.delete(stringId)
+
+  emit('update:modelValue', {
+    ...props.modelValue,
+    [key]: Array.from(newSelection), // Возвращаем массив строк
   })
 }
 
@@ -126,10 +157,42 @@ watch(() => props.priceRange, (newRange) => {
         <div v-for="brand in availableBrands" :key="brand.id" class="flex items-center space-x-2">
           <Checkbox
             :id="`brand-${brand.id}`"
-            :checked="modelValue.attributes.brand?.includes(brand.id)"
-            @update:model-value="(checkedState) => updateAttribute(!!checkedState, 'brand', brand.id)"
+            :checked="modelValue.brandIds?.includes(brand.id)"
+            @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'brandIds', brand.id)"
           />
           <Label :for="`brand-${brand.id}`" class="font-normal cursor-pointer">{{ brand.name }}</Label>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="availableMaterials.length > 0" class="space-y-4 pt-4 border-t">
+      <h4 class="font-semibold">
+        Материал
+      </h4>
+      <div class="space-y-2">
+        <div v-for="material in availableMaterials" :key="material.id" class="flex items-center space-x-2">
+          <Checkbox
+            :id="`material-${material.id}`"
+            :checked="modelValue.materialIds?.includes(String(material.id))"
+            @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'materialIds', material.id)"
+          />
+          <Label :for="`material-${material.id}`" class="font-normal cursor-pointer">{{ material.name }}</Label>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="availableCountries.length > 0" class="space-y-4 pt-4 border-t">
+      <h4 class="font-semibold">
+        Страна происхождения
+      </h4>
+      <div class="space-y-2">
+        <div v-for="country in availableCountries" :key="country.id" class="flex items-center space-x-2">
+          <Checkbox
+            :id="`country-${country.id}`"
+            :checked="modelValue.materialIds?.includes(String(country.id))"
+            @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'countryIds', country.id)"
+          />
+          <Label :for="`country-${country.id}`" class="font-normal cursor-pointer">{{ country.name }}</Label>
         </div>
       </div>
     </div>

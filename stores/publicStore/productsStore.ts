@@ -1,4 +1,4 @@
-import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, Database, FilteredProductRpcResponse, FullProduct, IProductFilters, ProductRow, ProductWithGallery, ProductWithImages } from '@/types'
+import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, CategoryPriceRangeRpcResponse, Country, Database, FullProduct, IProductFilters, Material, ProductRow, ProductWithGallery, ProductWithImages, SimpleBrand } from '@/types'
 import { toast } from 'vue-sonner'
 
 // const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -46,6 +46,8 @@ export const useProductsStore = defineStore('productsStore', () => {
         p_sort_by: filters.sortBy,
         p_page_size: pageSize,
         p_page_number: currentPage,
+        p_country_ids: filters.countryIds,
+        p_material_ids: filters.materialIds,
         p_attributes: filters.attributes,
       })
 
@@ -63,15 +65,10 @@ export const useProductsStore = defineStore('productsStore', () => {
                 id: p.brand_id,
                 name: p.brand_name,
                 slug: p.brand_slug,
-                // Заглушки, чтобы соответствовать полному типу Brand
-                created_at: '',
-                updated_at: '',
-                description: null,
-                logo_url: null,
-              }
+              } as SimpleBrand
             : null,
         }
-      }) as ProductWithGallery[]
+      }) as unknown as ProductWithGallery[]
 
       const hasMore = newProducts.length === pageSize
       return { products: newProducts, hasMore }
@@ -292,6 +289,69 @@ export const useProductsStore = defineStore('productsStore', () => {
       return null
     }
   }
+
+  /**
+   * Загружает минимальную и максимальную цену для товаров в категории и ее потомках.
+   */
+  async function fetchPriceRangeForCategory(categorySlug: string): Promise<CategoryPriceRangeRpcResponse> {
+    if (!categorySlug || categorySlug === 'all') {
+      return { min_price: 0, max_price: 50000 } // Возвращаем дефолтный диапазон для "Все товары"
+    }
+
+    try {
+      // Здесь мы должны использовать тип CategoryPriceRangeRpcResponse, который вы сгенерировали
+      const { data, error } = await supabase
+        .rpc('get_category_price_range', { p_category_slug: categorySlug })
+        .returns<{ min_price: number, max_price: number }[]>() // Приводим к конкретному типу возврата
+
+      if (error)
+        throw error
+
+      // RPC возвращает массив из 1 элемента, поэтому берем первый
+      const range = data && data.length > 0 ? data[0] : null
+
+      return {
+        min_price: Number(range?.min_price || 0),
+        max_price: Number(range?.max_price || 50000), // Используем 50000 как fallback, если нет товаров
+      }
+    }
+    catch (error: any) {
+      console.error('Ошибка при получении диапазона цен:', error)
+      toast.error('Ошибка при загрузке диапазона цен', { description: error.message })
+      return { min_price: 0, max_price: 50000 } // Fallback при ошибке
+    }
+  }
+  /**
+   * Загружает список всех материалов.
+   */
+  async function fetchAllMaterials(): Promise<Material[]> {
+    try {
+      const { data, error } = await supabase.from('materials').select('*').order('name')
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке материалов', { description: error.message })
+      return []
+    }
+  }
+
+  /**
+   * Загружает список всех стран.
+   */
+  async function fetchAllCountries(): Promise<Country[]> {
+    try {
+      const { data, error } = await supabase.from('countries').select('*').order('name')
+      if (error)
+        throw error
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке стран', { description: error.message })
+      return []
+    }
+  }
   return {
     brands,
     fetchAllBrands,
@@ -305,5 +365,8 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchBrandsForCategory,
     fetchAttributesForCategory,
     getProductById,
+    fetchPriceRangeForCategory,
+    fetchAllMaterials,
+    fetchAllCountries,
   }
 })
