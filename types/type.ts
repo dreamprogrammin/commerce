@@ -286,8 +286,7 @@ export interface BaseProduct {
   // Добавьте сюда любые другие поля, которые вы используете в ProductCard
   bonus_points_award?: number | null
   stock_quantity?: number | null
-
-  brands?: Brand | null
+  brands?: SimpleBrand | null
 }
 
 export interface SimpleAttributeOption {

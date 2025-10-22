@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FullProduct } from '@/types'
+import type { ProductListAdmin } from '@/types'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -24,7 +24,7 @@ onMounted(() => {
 })
 
 // Функция для подтверждения удаления
-function confirmDelete(product: FullProduct) {
+function confirmDelete(product: ProductListAdmin) {
   if (toast.info(`Вы уверены, что хотите удалить товар "${product.name}"? Это действие необратимо.`)) {
     adminProductsStore.deleteProduct(product)
   }

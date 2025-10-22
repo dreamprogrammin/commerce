@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ProductWithGallery } from '@/types'
+import type { BaseProduct } from '@/types'
 
 defineProps<{
-  products: ProductWithGallery[]
+  products: BaseProduct[]
 }>()
 </script>
 

@@ -301,7 +301,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   /**
    * Удаляет товар и все связанные с ним изображения.
    */
-  async function deleteProduct(productToDelete: FullProduct) {
+  async function deleteProduct(productToDelete: ProductListAdmin) {
     // 1. Оптимистичное удаление и сохранение оригинала
     const originalProducts = [...products.value]
     products.value = products.value.filter(p => p.id !== productToDelete.id)

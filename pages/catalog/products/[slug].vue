@@ -203,6 +203,19 @@ watch(() => product.value?.id, () => {
                 Изображения отсутствуют
               </p>
             </div>
+
+            <div class="mt-16 pt-8 border-t">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Левая колонка для Описания -->
+                <div class="md:col-span-2">
+                  <ProductDescription v-if="product.description" :description="product.description" />
+                </div>
+                <!-- Правая колонка для Характеристик -->
+                <div>
+                  <ProductFeatures :product="product" />
+                </div>
+              </div>
+            </div>
           </div>
           <!-- ПРАВАЯ КОЛОНКА: Информация о товаре (остается без изменений) -->
           <div class="lg:col-span-4 sticky top-24">
@@ -217,9 +230,6 @@ watch(() => product.value?.id, () => {
             <p class="text-4xl font-bold">
               {{ product.price }} ₸
             </p>
-            <div v-if="product.description" class="prose prose-sm max-w-none text-muted-foreground">
-              <p>{{ product.description }}</p>
-            </div>
 
             <div v-if="accessories.length > 0" class="pt-4 border-t">
               <h3 class="font-semibold mb-3">
@@ -304,10 +314,6 @@ watch(() => product.value?.id, () => {
                   <span class="ml-2">₸</span>
                 </div>
               </div>
-            </div>
-
-            <div class="pt-6 mt-6 border-t">
-              <ProductFeatures :product="product" />
             </div>
 
             <div class="p-4 bg-primary/10 text-primary rounded-lg border border-primary/20">
