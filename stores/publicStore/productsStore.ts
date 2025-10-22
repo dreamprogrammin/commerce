@@ -37,7 +37,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     pageSize = 12,
   ): Promise<{ products: ProductWithGallery[], hasMore: boolean }> {
     try {
-      const { data, error } = await supabase.rpc('get_filtered_products', {
+      const { data: rpcResponse, error } = await supabase.rpc('get_filtered_products', {
         p_category_slug: filters.categorySlug,
         p_subcategory_ids: filters.subCategoryIds,
         p_brand_ids: filters.brandIds,
@@ -53,12 +53,25 @@ export const useProductsStore = defineStore('productsStore', () => {
         throw error
 
       // Теперь TypeScript знает, что `data` - это массив `FilteredProductRpcResponse`
-      const rpcResponse = data || []
-
-      const newProducts = rpcResponse.map((p: FilteredProductRpcResponse) => ({
-        ...p,
-        product_images: Array.isArray(p.product_images) ? p.product_images : [],
-      })) as ProductWithGallery[]
+      const newProducts = (rpcResponse || []).map((p) => {
+        // `p` теперь содержит p.brand_name и p.brand_slug
+        return {
+          ...p,
+          product_images: Array.isArray(p.product_images) ? p.product_images : [],
+          brands: p.brand_name
+            ? {
+                id: p.brand_id,
+                name: p.brand_name,
+                slug: p.brand_slug,
+                // Заглушки, чтобы соответствовать полному типу Brand
+                created_at: '',
+                updated_at: '',
+                description: null,
+                logo_url: null,
+              }
+            : null,
+        }
+      }) as ProductWithGallery[]
 
       const hasMore = newProducts.length === pageSize
       return { products: newProducts, hasMore }

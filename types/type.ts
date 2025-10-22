@@ -171,6 +171,7 @@ export type ProductImageRow = Database['public']['Tables']['product_images']['Ro
 
 export type ProductWithGallery = ProductRow & {
   product_images: ProductImageRow[]
+  brands?: Brand | null
 }
 
 export interface CustomFieldSchema {

@@ -107,17 +107,22 @@ const priceDetails = computed(() => {
  * @param {MouseEvent} event - Событие движения мыши.
  */
 function handleMouseMove(event: MouseEvent) {
-  // Логика работает, только если есть несколько картинок
-  if (!hasMultipleImages.value)
+  // Логика работает, только если есть несколько картинок и это не тач-устройство
+  if (!hasMultipleImages.value || isTouchDevice.value || !props.product.product_images) {
     return
+  }
 
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
+
+  // ВОТ ЭТА СТРОКА БЫЛА ПРОПУЩЕНА
   const x = event.clientX - rect.left
+
   const width = rect.width
 
-  if (width === 0 || !props.product.product_images)
+  if (width === 0) {
     return
+  }
 
   const segmentWidth = width / props.product.product_images.length
   const newIndex = Math.min(
@@ -164,7 +169,7 @@ watch(emblaMobileApi, (api) => {
         v-if="priceDetails.hasDiscount"
         class="absolute top-2 right-2 z-10"
       >
-        <div class="bg-destructive text-destructive-foreground font-bold text-xs px-2 py-1 rounded-full">
+        <div class="bg-destructive text-white font-bold text-xs px-2 py-1 rounded-full">
           -{{ priceDetails.percent }}%
         </div>
       </div>
@@ -271,7 +276,6 @@ watch(emblaMobileApi, (api) => {
           class="text-xs text-muted-foreground hover:text-primary transition-colors"
           @click.stop
         >
-          >
           {{ product.brands.name }}
         </NuxtLink>
       </div>

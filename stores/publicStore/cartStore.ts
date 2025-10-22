@@ -1,4 +1,4 @@
-import type { BaseProduct, Database, ICartItem, ICheckoutData, ProductRow } from '@/types'
+import type { BaseProduct, Database, ICartItem, ICheckoutData } from '@/types'
 import { toast } from 'vue-sonner'
 import { useProfileStore } from '../core/profileStore'
 import { useProductsStore } from './productsStore'
