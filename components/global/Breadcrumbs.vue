@@ -65,7 +65,6 @@ const categoryItem = computed(() => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuLabel>Промежуточные разделы</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem v-for="item in dropdownItems" :key="item.id" as-child>
               <NuxtLink :to="item.href">
