@@ -173,6 +173,9 @@ watch(emblaMobileApi, (api) => {
           -{{ priceDetails.percent }}%
         </div>
       </div>
+      <div class="absolute top-2 left-2 z-10">
+        <ProductWishlistButton :product-id="product.id" :product-name="product.name" />
+      </div>
       <ClientOnly>
         <!-- Рендеринг для НЕ-тач устройств (десктоп) -->
         <template v-if="!isTouchDevice">
@@ -302,22 +305,31 @@ watch(emblaMobileApi, (api) => {
       </div>
       <div class="mt-auto pt-2">
         <!-- Если товара НЕТ в корзине, показываем кнопку "В корзину" -->
-        <Button
-          v-if="!itemInCart"
-          class="w-full"
-          :disabled="!product.stock_quantity || product.stock_quantity <= 0"
-          @click="cartStore.addItem(product, 1)"
-        >
-          <span v-if="product.stock_quantity && product.stock_quantity > 0">В корзину</span>
-          <span v-else>Нет в наличии</span>
-        </Button>
+        <ClientOnly>
+          <!-- Если товара НЕТ в корзине, показываем кнопку "В корзину" -->
+          <Button
+            v-if="!itemInCart"
+            class="w-full"
+            :disabled="!product.stock_quantity || product.stock_quantity <= 0"
+            @click="cartStore.addItem(product as BaseProduct, 1)"
+          >
+            <span v-if="product.stock_quantity && product.stock_quantity > 0">В корзину</span>
+            <span v-else>Нет в наличии</span>
+          </Button>
 
-        <!-- Если товар УЖЕ в корзине, показываем наш счетчик -->
-        <QuantitySelector
-          v-else
-          :product="product"
-          :quantity="quantityInCart"
-        />
+          <!-- Если товар УЖЕ в корзине, показываем наш счетчик -->
+          <QuantitySelector
+            v-else
+            :product="product"
+            :quantity="quantityInCart"
+          />
+          <!-- Fallback для Server Side Render (просто кнопка) -->
+          <template #fallback>
+            <Button class="w-full" disabled>
+              Загрузка...
+            </Button>
+          </template>
+        </ClientOnly>
       </div>
     </div>
   </div>

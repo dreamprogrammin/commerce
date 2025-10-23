@@ -9,6 +9,7 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
+const router = useRouter()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
@@ -319,27 +320,45 @@ watch(() => product.value?.id, () => {
             <div class="p-4 bg-primary/10 text-primary rounded-lg border border-primary/20">
               При покупке вы получите <span class="font-bold">{{ totalBonuses }} бонусов</span>
             </div>
-            <div class="flex items-center gap-4 pt-4">
-              <template v-if="product.stock_quantity > 0">
-                <Button
-                  v-if="!mainItemInCart"
-                  size="lg"
-                  class="flex-grow"
-                  @click="addToCart"
-                >
-                  Добавить в корзину
+            <ClientOnly>
+              <div class="flex items-center gap-4 pt-4">
+                <template v-if="product.stock_quantity > 0">
+                  <!-- СЦЕНАРИЙ 1: Товар еще НЕ в корзине -->
+                  <Button
+                    v-if="!mainItemInCart"
+                    size="lg"
+                    class="flex-grow"
+                    @click="addToCart"
+                  >
+                    Добавить в корзину
+                  </Button>
+
+                  <!-- СЦЕНАРИЙ 2: Товар УЖЕ в корзине -->
+                  <template v-else>
+                    <!-- Левая часть: Кнопка "Перейти в корзину" -->
+                    <Button
+                      size="lg"
+                      class="flex-grow"
+                      variant="outline"
+                      @click="router.push('/cart')"
+                    >
+                      Перейти в корзину
+                    </Button>
+
+                    <!-- Правая часть: Счетчик (контролирует количество) -->
+                    <QuantitySelector
+                      :product="product"
+                      :quantity="quantityInCart"
+                      class="w-1/3"
+                    />
+                  </template>
+                </template>
+
+                <Button v-else size="lg" class="flex-grow" disabled>
+                  Нет в наличии
                 </Button>
-                <QuantitySelector
-                  v-else
-                  :product="product"
-                  :quantity="quantityInCart"
-                  class="flex-grow"
-                />
-              </template>
-              <Button v-else size="lg" class="flex-grow" disabled>
-                Нет в наличии
-              </Button>
-            </div>
+              </div>
+            </ClientOnly>
           </div>
         </div>
 

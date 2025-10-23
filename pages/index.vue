@@ -4,28 +4,41 @@ import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
+import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const recommendationsStore = useRecommendationsStore()
 const personalizationStore = usePersonalizationStore()
 const productsStore = useProductsStore()
+const wishlistStore = useWishlistStore()
 
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
 const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
 
-const { data: recommendedProducts, pending: isLoadingRecommendations } = useAsyncData(
+const { data: mainPersonalData, pending: isLoadingRecommendations } = useAsyncData(
   'home-recommendations',
   async () => {
-    return await recommendationsStore.fetchRecommendations()
+    const [recommended, wishlist] = await Promise.all([
+      recommendationsStore.fetchRecommendations(),
+      isLoggedIn.value ? wishlistStore.fetchWishlistProducts() : [],
+    ])
+
+    return {
+      recommended: recommended || [],
+      wishlist: Array.isArray(wishlist) ? wishlist : [],
+    }
   },
   {
-    watch: [user, personalizationTrigger],
+    watch: [user, personalizationTrigger, isLoggedIn],
     lazy: true,
-    default: () => [],
+    default: () => ({ recommended: [], wishlist: [] }),
   },
 )
+
+const recommendedProducts = computed(() => mainPersonalData.value.recommended)
+const wishlistProducts = computed(() => mainPersonalData.value.wishlist)
 
 const { data: popularProducts, pending: isLoadingPopular } = useAsyncData(
   'home-popular',
@@ -39,10 +52,6 @@ const { data: newestProducts, pending: isLoadingNewest } = useAsyncData(
   () => productsStore.fetchNewestProducts(10),
   { lazy: true, default: () => [] },
 )
-
-const shouldShowRecommendations = computed(() => {
-  return recommendedProducts.value && recommendedProducts.value.length > 0
-})
 
 const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
 </script>
@@ -99,19 +108,35 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
 
       <!-- Если все загрузки завершены, принимаем решение, что показать -->
       <template v-else>
+        <!-- Секция 1: ИЗБРАННОЕ (САМЫЙ ВЫСОКИЙ ПРИОРИТЕТ ДЛЯ ЛОЯЛЬНЫХ) -->
+        <!-- Секция 1: ИЗБРАННОЕ -->
         <HomeProductsCarousel
-          v-if="shouldShowRecommendations"
+          v-if="isLoggedIn && wishlistProducts.length > 0"
+          :is-loading="isLoadingRecommendations"
+          :products="wishlistProducts"
+          title="Ваше избранное"
+          see-all-link="/profile/wishlist"
+          class="mt-16 pt-8 border-t"
+        />
+
+        <!-- Секция 2: РЕКОМЕНДАЦИИ -->
+        <HomeProductsCarousel
+          v-if="recommendedProducts && recommendedProducts.length > 0"
           :is-loading="isLoadingRecommendations"
           :products="recommendedProducts"
           title="Вам может понравиться"
           see-all-link="/catalog/all?recommended=true"
+          :class="{ 'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0 }"
         />
+
+        <!-- Секция 3: Популярные товары (как резерв) -->
         <HomeProductsCarousel
           v-else
           :is-loading="isLoadingPopular"
           :products="popularProducts"
           title="Популярные товары"
           see-all-link="/catalog/all?sort_by=popularity"
+          class="mt-16 pt-8 border-t"
         />
       </template>
 

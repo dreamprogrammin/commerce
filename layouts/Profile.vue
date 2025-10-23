@@ -11,7 +11,7 @@
             </nuxt-link>
           </li>
           <li>
-            <nuxt-link to="/profile/favorites">
+            <nuxt-link to="/profile/wishlist">
               Избранное
             </nuxt-link>
           </li>

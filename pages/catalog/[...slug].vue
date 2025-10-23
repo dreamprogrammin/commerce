@@ -256,7 +256,9 @@ watchDebounced(
   <div class="container py-8">
     <ClientOnly>
       <Breadcrumbs :items="breadcrumbs" class="mb-6" />
-
+      <h1 class="text-3xl font-bold mb-6 capitalize">
+        {{ title }}
+      </h1>
       <template #fallback>
         <div class="mb-6 h-6 w-1/3 rounded-lg bg-gray-200 animate-pulse" />
       </template>
@@ -274,7 +276,7 @@ watchDebounced(
         />
       </aside>
       <main class="col-span-3  min-w-0">
-        <CatalogHeader v-model:sort-by="activeFilters.sortBy" :title="title ?? ''" />
+        <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
 
         <ProductGridSkeleton v-if="isLoading" />
         <div v-else-if="products.length > 0" class="space-y-8">

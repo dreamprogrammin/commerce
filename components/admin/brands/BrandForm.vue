@@ -1,103 +1,91 @@
 <script setup lang="ts">
-import type { Brand, BrandInsert, BrandUpdate } from '@/types'
+import type { BrandInsert, BrandUpdate } from '@/types'
+import { ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { slugify } from '@/utils/slugify'
 
 const props = defineProps<{
-  initialData?: Brand | null
+  initialData?: BrandInsert | BrandUpdate | null
+  initialName?: string // Для автозаполнения из комбобокса
 }>()
 
 const emit = defineEmits<{
   (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null }): void
 }>()
 
-const formData = ref<Partial<BrandInsert | BrandUpdate>>({})
-const logoFile = ref<File | null>(null)
-const logoPreview = ref<string | null>(null)
+const formData = ref<Partial<BrandInsert | BrandUpdate>>({
+  name: props.initialName || props.initialData?.name || '',
+  slug: props.initialData?.slug || '',
+  description: props.initialData?.description || null,
+  logo_url: props.initialData?.logo_url || null,
+})
 
-watch(() => props.initialData, (brand) => {
-  if (brand) {
-    formData.value = { ...brand }
-    logoPreview.value = null
-    logoFile.value = null
+const newLogoFile = ref<File | null>(null)
+
+function autoFillSlug() {
+  if (formData.value.name) {
+    formData.value.slug = slugify(formData.value.name)
   }
-  else {
-    formData.value = { name: '', slug: '', description: '', logo_url: null }
-  }
-}, { immediate: true })
+}
 
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (file) {
-    logoFile.value = file
-    logoPreview.value = URL.createObjectURL(file)
-  }
-}
-
-function autoFillSlug() {
-  if (formData.value.name && !formData.value.slug)
-    formData.value.slug = slugify(formData.value.name)
+  newLogoFile.value = target.files?.[0] || null
 }
 
 function handleSubmit() {
-  emit('submit', { data: formData.value, file: logoFile.value })
+  if (!formData.value.name || !formData.value.slug) {
+    toast.error('Название и Слаг - обязательные поля')
+    return
+  }
+
+  emit('submit', {
+    data: formData.value as BrandInsert | BrandUpdate,
+    file: newLogoFile.value,
+  })
 }
 
 const descriptionValue = computed({
-  get() {
-    return formData.value.description ?? ''
-  },
-  set(value) {
-    if (formData.value) {
-      formData.value.description = value || null
-    }
+  // GET: Когда компонент читает значение
+  get: () => formData.value.description ?? '', // Преобразуем null в '' (пустую строку)
+
+  // SET: Когда пользователь вводит значение
+  set: (value: string) => {
+    // Преобразуем пустую строку обратно в null для базы данных,
+    // иначе в БД будет сохраняться '' вместо NULL
+    formData.value.description = value === '' ? null : value
   },
 })
 </script>
 
 <template>
-  <form class="space-y-6" @submit.prevent="handleSubmit">
-    <Card>
-      <CardHeader>
-        <CardTitle>Основная информация</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <div>
-          <Label for="name">Название бренда *</Label>
-          <Input id="name" v-model="formData.name" required @blur="autoFillSlug" />
-        </div>
-        <div>
-          <Label for="slug">Слаг (URL) *</Label>
-          <Input id="slug" v-model="formData.slug" required />
-        </div>
-        <div>
-          <Label for="description">Описание</Label>
-          <Textarea id="description" v-model="descriptionValue" />
-        </div>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader>
-        <CardTitle>Логотип</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div v-if="logoPreview" class="mb-4">
-          <p class="text-sm mb-2">
-            Превью нового логотипа:
-          </p>
-          <img :src="logoPreview" alt="Превью" class="w-24 h-24 object-contain border rounded-md">
-        </div>
-        <div>
-          <Label for="logo">Загрузить новый логотип</Label>
-          <Input id="logo" type="file" accept="image/*" @change="handleFileChange" />
-          <p class="text-sm text-muted-foreground mt-1">
-            (старый логотип, если он есть, будет заменен)
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+  <form class="space-y-4" @submit.prevent="handleSubmit">
+    <div>
+      <Label for="brand-name">Название бренда *</Label>
+      <Input id="brand-name" v-model="formData.name" @blur="autoFillSlug" />
+    </div>
+    <div>
+      <Label for="brand-slug">Слаг (URL) *</Label>
+      <Input id="brand-slug" v-model="formData.slug" />
+    </div>
+    <div>
+      <Label for="brand-description">Описание</Label>
+      <Textarea id="brand-description" v-model="descriptionValue" />
+    </div>
 
-    <Button type="submit" size="lg">
+    <!-- Логотип -->
+    <div class="space-y-2 pt-4">
+      <Label>Логотип</Label>
+      <div v-if="formData.logo_url" class="flex items-center gap-3">
+        <NuxtImg :src="formData.logo_url" alt="Текущий логотип" class="w-12 h-12 object-contain border rounded" />
+        <p class="text-sm text-muted-foreground">
+          Текущий логотип будет заменен.
+        </p>
+      </div>
+      <Input type="file" accept="image/*" @change="handleFileChange" />
+    </div>
+
+    <Button type="submit" class="w-full">
       Сохранить бренд
     </Button>
   </form>

@@ -1,28 +1,77 @@
-<!-- pages/admin/brands/new.vue -->
 <script setup lang="ts">
-import type { BrandInsert, BrandUpdate } from '@/types'
-import BrandForm from '@/components/admin/brands/BrandForm.vue'
+import type { Brand } from '@/types'
+import { storeToRefs } from 'pinia'
+import { toast } from 'vue-sonner'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 
 definePageMeta({ layout: 'admin' })
 
 const brandsStore = useAdminBrandsStore()
-const router = useRouter()
+const { brands, isLoading } = storeToRefs(brandsStore)
 
-async function handleCreate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
-  const success = await brandsStore.createBrand(payload.data as BrandInsert, payload.file)
-  if (success)
-    router.push('/admin/brands')
+onMounted(() => {
+  brandsStore.fetchBrands()
+})
+
+// Логика удаления
+async function confirmDelete(brand: Brand) {
+  if (toast.info(`Вы уверены, что хотите удалить бренд "${brand.name}"? Это действие необратимо и может повлиять на товары.`)) {
+    await brandsStore.deleteBrand(brand)
+  }
 }
 </script>
 
 <template>
-  <div class="p-4 md:p-8">
-    <div class="max-w-4xl mx-auto">
-      <h1 class="text-3xl font-bold mb-6">
-        Новый бренд
+  <div class="container mx-auto p-8">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">
+        Управление брендами
       </h1>
-      <BrandForm @submit="handleCreate" />
+      <NuxtLink to="/admin/brands/new">
+        <Button>Добавить новый бренд</Button>
+      </NuxtLink>
+    </div>
+
+    <div v-if="isLoading">
+      Загрузка...
+    </div>
+    <div v-else class="border rounded-lg bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Название</TableHead>
+            <TableHead>Слаг (URL)</TableHead>
+            <TableHead class="text-right">
+              Действия
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-if="brands.length === 0">
+            <TableCell colspan="3" class="h-24 text-center">
+              Бренды не найдены.
+            </TableCell>
+          </TableRow>
+          <TableRow v-for="brand in brands" :key="brand.id">
+            <TableCell class="font-medium">
+              {{ brand.name }}
+            </TableCell>
+            <TableCell class="text-muted-foreground">
+              {{ brand.slug }}
+            </TableCell>
+            <TableCell class="text-right space-x-2">
+              <NuxtLink :to="`/admin/brands/${brand.id}`">
+                <Button variant="outline" size="sm">
+                  Редактировать
+                </Button>
+              </NuxtLink>
+              <Button variant="destructive" size="sm" @click="confirmDelete(brand)">
+                Удалить
+              </Button>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
   </div>
 </template>
