@@ -2,8 +2,17 @@ import type { Database, IUploadFileOptions } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
 
+export interface ImageTransformOptions {
+  width?: number
+  height?: number
+  quality?: number
+  format?: 'webp' | 'avif' | 'jpeg' | 'png'
+  resize?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside'
+}
+
 export function useSupabaseStorage() {
   const supabase = useSupabaseClient<Database>()
+  const config = useRuntimeConfig()
   const isLoading = ref(false)
   const uploadError = ref<string | null>(null)
 
@@ -98,6 +107,9 @@ export function useSupabaseStorage() {
     }
   }
 
+  /**
+   * Получить публичный URL без трансформации (оригинальное изображение)
+   */
   function getPublicUrl(
     bucketName: string,
     filePath: string | null,
@@ -119,11 +131,67 @@ export function useSupabaseStorage() {
     }
   }
 
+  /**
+   * Получить оптимизированный URL с трансформацией через Supabase Image Transformation API
+   * @param bucketName - название бакета
+   * @param filePath - путь к файлу
+   * @param options - опции трансформации (width, height, quality, format, resize)
+   * @returns оптимизированный URL или null
+   */
+  function getOptimizedUrl(
+    bucketName: string,
+    filePath: string | null,
+    options: ImageTransformOptions = {},
+  ): string | null {
+    if (!filePath || !filePath.trim()) {
+      return null
+    }
+
+    try {
+      const {
+        width,
+        height,
+        quality = 80,
+        format = 'webp',
+        resize = 'cover',
+      } = options
+
+      // Формируем параметры
+      const params: string[] = []
+
+      if (width)
+        params.push(`width=${width}`)
+      if (height)
+        params.push(`height=${height}`)
+      if (quality)
+        params.push(`quality=${quality}`)
+      if (format)
+        params.push(`format=${format}`)
+      if (resize)
+        params.push(`resize=${resize}`)
+
+      const queryString = params.length > 0 ? `?${params.join('&')}` : ''
+
+      // Используем Supabase Image Transformation API
+      const baseUrl = `${config.public.supabase.url}/storage/v1/render/image/public/${bucketName}`
+      return `${baseUrl}/${filePath}${queryString}`
+    }
+    catch (e) {
+      console.error(
+        `Error getting optimized URL for "${filePath}" in bucket "${bucketName}":`,
+        e,
+      )
+      // Fallback на обычный публичный URL
+      return getPublicUrl(bucketName, filePath)
+    }
+  }
+
   return {
     isLoading,
     uploadError,
     uploadFile,
     removeFile,
     getPublicUrl,
+    getOptimizedUrl, // 👈 Новый метод для оптимизации
   }
 }
