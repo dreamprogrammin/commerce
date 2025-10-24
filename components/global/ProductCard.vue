@@ -180,12 +180,8 @@ const activeImageUrl = computed(() => {
                 <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
                   <!-- 👇 Оптимизированные изображения в карусели -->
                   <img
-                    :src="getImageUrl(BUCKET_NAME_PRODUCT, image.image_url, {
-                      width: 400,
-                      height: 400,
-                      quality: 80,
-                      format: 'webp',
-                    }) || undefined"
+                    v-if="activeImageUrl"
+                    :src="activeImageUrl"
                     :alt="product.name"
                     class="w-full h-full object-cover"
                     loading="lazy"

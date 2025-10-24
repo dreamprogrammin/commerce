@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
 const popularCategoriesStore = usePopularCategoriesStore()
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 
 const { data: popularCategories, pending: isLoading } = useAsyncData(
   'home-popular-categories',
@@ -14,18 +15,14 @@ const { data: popularCategories, pending: isLoading } = useAsyncData(
   },
 )
 
-// Функция для получения оптимизированного URL изображения категории
+// Функция для получения URL изображения категории
+// Автоматически использует оптимизацию или оригинал в зависимости от конфига
 function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return '/images/placeholder.svg'
 
-  return getOptimizedUrl(BUCKET_NAME_CATEGORY, imageUrl, {
-    width: 300,
-    height: 200,
-    quality: 80,
-    format: 'webp',
-    resize: 'cover',
-  }) || '/images/placeholder.svg'
+  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_IMAGE)
+    || '/images/placeholder.svg'
 }
 </script>
 
