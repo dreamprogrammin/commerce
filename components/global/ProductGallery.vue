@@ -41,6 +41,7 @@ const {
               <NuxtImg
                 :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
                 alt="Миниатюра товара"
+                provider="supabase"
                 class="w-full h-full object-cover rounded-lg"
               />
             </div>
@@ -63,6 +64,7 @@ const {
           <CarouselItem v-for="(image, index) in images" :key="image.id" class="h-full">
             <div class="bg-muted rounded-lg overflow-hidden w-full flex items-center justify-center h-full">
               <NuxtImg
+                provider="supabase"
                 :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
                 :alt="image.alt_text || `Изображение товара ${index + 1}`"
                 class="w-full h-full object-cover"

@@ -11,8 +11,16 @@ export default defineNuxtConfig({
     '@nuxt/image',
   ],
   image: {
-    provider: 'ipx', // 👈 Добавьте эту строку - бесплатный провайдер
-    domains: ['gvsdevsvzgcivpphcuai.supabase.co'], // 👈 Уберите https://
+    // Настройка кастомного провайдера для Supabase
+    providers: {
+      supabase: {
+        provider: '~/providers/supabase.ts',
+        options: {
+          baseURL: `${import.meta.env.NUXT_PUBLIC_SUPABASE_URL}/storage/v1/render/image/public`,
+        },
+      },
+    },
+    domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
   },
   supabase: {
     redirect: false,

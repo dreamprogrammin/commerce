@@ -77,6 +77,7 @@ const {
             placeholder
             loading="lazy"
             format="webp"
+            provider="supabase"
             quality="85"
           />
 

@@ -108,6 +108,7 @@ function playAutoplay() {
                     class="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
                     format="webp"
                     placeholder
+                    provider="supabase"
                     quality="80"
                     loading="lazy"
                   />

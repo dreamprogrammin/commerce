@@ -687,7 +687,7 @@ const maxAgeYearsValue = computed({
         <CardContent class="space-y-4">
           <div v-if="existingImages.length > 0" class="grid grid-cols-3 gap-2">
             <div v-for="image in existingImages" :key="image.id" class="relative group aspect-square">
-              <NuxtImg :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || ''" class="w-full h-full object-cover rounded-md" />
+              <NuxtImg provider="supabase" :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || ''" class="w-full h-full object-cover rounded-md" />
               <Button type="button" variant="destructive" size="icon" class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" @click="removeExistingImage(image)">
                 <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
               </Button>

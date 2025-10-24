@@ -85,6 +85,7 @@ function confirmDelete(product: ProductListAdmin) {
                   class="w-full h-full object-cover"
                   format="webp"
                   quality="80"
+                  provider="supabase"
                 />
                 <div v-if="product.product_images && product.product_images.length > 1" class="absolute bottom-0 right-0 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-tl-md">
                   +{{ product.product_images.length - 1 }}

@@ -277,6 +277,7 @@ watch(() => product.value?.id, () => {
                         :alt="acc.name"
                         class="w-full h-full object-cover"
                         format="webp"
+                        provider="supabase"
                         quality="80"
                       />
                       <!-- Заглушка, если у аксессуара нет фото -->

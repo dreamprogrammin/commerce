@@ -183,6 +183,7 @@ watch(emblaMobileApi, (api) => {
             <NuxtImg
               v-if="activeImageUrl"
               :key="activeImageUrl"
+              provider="supabase"
               :src="activeImageUrl"
               :alt="product.name"
               class="w-full h-full object-cover transition-opacity duration-200"
@@ -207,6 +208,7 @@ watch(emblaMobileApi, (api) => {
               <CarouselItem v-for="(image, index) in product.product_images" :key="index">
                 <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
                   <NuxtImg
+                    provider="supabase"
                     :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
                     :alt="product.name"
                     class="w-full h-full object-cover"
@@ -233,6 +235,7 @@ watch(emblaMobileApi, (api) => {
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
             <NuxtImg
               v-if="activeImageUrl"
+              provider="supabase"
               :src="activeImageUrl"
               :alt="product.name"
               class="w-full h-full object-cover"

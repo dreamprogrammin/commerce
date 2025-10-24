@@ -54,6 +54,7 @@ const { data: popularCategories, pending: isLoading } = useAsyncData(
               class="w-full h-32 object-cover"
               loading="lazy"
               placeholder
+              provider="supabase"
               format="webp"
               quality="80"
             />

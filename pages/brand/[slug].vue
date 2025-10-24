@@ -85,6 +85,7 @@ useHead({
         :alt="brand.name"
         class="h-24 mx-auto mb-4 object-contain"
         placeholder
+        provider="supabase"
       />
       <h1 class="text-4xl font-bold">
         {{ brand.name }}

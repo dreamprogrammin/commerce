@@ -48,6 +48,7 @@ const mainImageUrl = computed(() => {
           <div class="w-48 h-48 bg-muted rounded-lg overflow-hidden border">
             <NuxtImg
               v-if="mainImageUrl"
+              provider="supabase"
               :src="getPublicUrl(BUCKET_NAME_PRODUCT, mainImageUrl) ?? ''"
               :alt="product.name"
               placeholder

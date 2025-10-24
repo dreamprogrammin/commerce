@@ -182,6 +182,7 @@ defineExpose({ closeAllPopups })
                             :alt="childItem.name"
                             format="webp"
                             quality="85"
+                            provider="supabase"
                             loading="lazy"
                             class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
                           />

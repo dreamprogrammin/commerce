@@ -69,6 +69,7 @@ const {
             class="mt-2 border p-2 rounded-md inline-block relative"
           >
             <NuxtImg
+              provider="supabase"
               :src="imagePreviewUrl || formData.image_url!"
               alt="Превью"
               class="max-w-[200px] max-h-[100px] object-contain rounded"
