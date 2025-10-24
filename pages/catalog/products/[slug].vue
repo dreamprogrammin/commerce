@@ -14,7 +14,7 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
 
-const { getPublicUrl } = useSupabaseStorage()
+const { getOptimizedUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
 
@@ -98,6 +98,7 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
 
   return crumbs
 })
+
 // --- `totalPrice` и `totalBonuses` теперь используют `computed`-свойства ---
 const totalPrice = computed(() => {
   if (!product.value)
@@ -156,6 +157,20 @@ function addToCart() {
   toast.success('Товары добавлены в корзину')
 }
 
+// Функция для получения оптимизированного изображения аксессуара
+function getAccessoryImageUrl(imageUrl: string | null) {
+  if (!imageUrl)
+    return null
+
+  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
+    width: 80,
+    height: 80,
+    quality: 75,
+    format: 'webp',
+    resize: 'cover',
+  })
+}
+
 useFlipCounter(totalPrice, digitColumns)
 
 watch(isLoading, (newIsLoading) => {
@@ -172,10 +187,7 @@ useHead(() => ({
 }))
 
 const quantity = ref(1)
-// const animatedPrice = useAnimatedCounter(totalPrice)
-// const formattedAnimatedPrice = computed(() => {
-//   return animatedPrice.value.toLocaleString('ru-RU')
-// })
+
 watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
@@ -271,15 +283,13 @@ watch(() => product.value?.id, () => {
                     </div>
                     <!-- Контейнер для картинки -->
                     <div class="w-12 h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                      <NuxtImg
+                      <img
                         v-if="acc.product_images && acc.product_images.length > 0"
-                        :src="getPublicUrl(BUCKET_NAME_PRODUCT, acc.product_images[0]?.image_url || null) || undefined"
+                        :src="getAccessoryImageUrl(acc.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
                         :alt="acc.name"
                         class="w-full h-full object-cover"
-                        format="webp"
-                        provider="supabase"
-                        quality="80"
-                      />
+                        loading="lazy"
+                      >
                       <!-- Заглушка, если у аксессуара нет фото -->
                       <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
                         Нет фото

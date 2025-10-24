@@ -9,7 +9,7 @@ import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 definePageMeta({ layout: 'admin' })
 
 const adminProductsStore = useAdminProductsStore()
-const { getPublicUrl } = useSupabaseStorage()
+const { getOptimizedUrl } = useSupabaseStorage()
 const router = useRouter()
 
 // Получаем реактивные ссылки на состояние из стора
@@ -25,9 +25,23 @@ onMounted(() => {
 
 // Функция для подтверждения удаления
 function confirmDelete(product: ProductListAdmin) {
-  if (toast.info(`Вы уверены, что хотите удалить товар "${product.name}"? Это действие необратимо.`)) {
+  if (toast.warning(`Вы уверены, что хотите удалить товар "${product.name}"? Это действие необратимо.`)) {
     adminProductsStore.deleteProduct(product)
   }
+}
+
+// Функция для получения оптимизированного изображения товара
+function getProductImageUrl(imageUrl: string | null) {
+  if (!imageUrl)
+    return null
+
+  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
+    width: 100,
+    height: 100,
+    quality: 75,
+    format: 'webp',
+    resize: 'cover',
+  })
 }
 </script>
 
@@ -78,16 +92,17 @@ function confirmDelete(product: ProductListAdmin) {
           <TableRow v-for="product in products" :key="product.id">
             <TableCell>
               <div class="w-16 h-16 bg-muted rounded-md overflow-hidden relative">
-                <NuxtImg
+                <img
                   v-if="product.product_images && product.product_images.length > 0"
-                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.product_images[0]?.image_url || null) || undefined"
+                  :src="getProductImageUrl(product.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
                   :alt="product.name"
                   class="w-full h-full object-cover"
-                  format="webp"
-                  quality="80"
-                  provider="supabase"
-                />
-                <div v-if="product.product_images && product.product_images.length > 1" class="absolute bottom-0 right-0 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-tl-md">
+                  loading="lazy"
+                >
+                <div
+                  v-if="product.product_images && product.product_images.length > 1"
+                  class="absolute bottom-0 right-0 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-tl-md"
+                >
                   +{{ product.product_images.length - 1 }}
                 </div>
               </div>

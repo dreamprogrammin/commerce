@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { CarouselApi } from '../ui/carousel'
 import Autoplay from 'embla-carousel-autoplay'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSlides } from '@/composables/slides/useSlides'
+import { BUCKET_NAME_SLIDES } from '@/constants' // Добавьте константу для bucket слайдов
 import Skeleton from '../ui/skeleton/Skeleton.vue'
 
 const { isLoading, slides, error } = useSlides()
+const { getOptimizedUrl } = useSupabaseStorage()
 
 const autoplayPlugin = Autoplay({
   delay: 4000,
@@ -25,10 +28,31 @@ function stopAutoplay() {
 function playAutoplay() {
   emblaApi.value?.plugins()?.autoplay?.play()
 }
+
+// 👇 Функция для получения оптимизированного URL слайда
+function getSlideImageUrl(imageUrl: string | null) {
+  if (!imageUrl)
+    return undefined
+
+  // Если это уже полный URL (начинается с http), используем его напрямую
+  if (imageUrl.startsWith('http')) {
+    return imageUrl
+  }
+
+  // Иначе получаем оптимизированный URL из Supabase
+  return getOptimizedUrl(BUCKET_NAME_SLIDES, imageUrl, {
+    width: 1920,
+    height: 800,
+    quality: 85,
+    format: 'webp',
+    resize: 'cover',
+  })
+}
 </script>
 
 <template>
   <div class="w-full">
+    <!-- Состояние загрузки -->
     <div v-if="isLoading">
       <Carousel
         class="w-full"
@@ -59,6 +83,7 @@ function playAutoplay() {
       </Carousel>
     </div>
 
+    <!-- Состояние ошибки -->
     <div
       v-else-if="error"
       class="w-full aspect-[16/7] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center"
@@ -71,6 +96,7 @@ function playAutoplay() {
       </p>
     </div>
 
+    <!-- Карусель с слайдами -->
     <Carousel
       v-else-if="slides && slides.length > 0"
       class="w-full"
@@ -101,17 +127,13 @@ function playAutoplay() {
                 <CardContent
                   class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
                 >
-                  <NuxtImg
+                  <img
                     v-if="slide.image_url"
-                    :src="slide.image_url"
+                    :src="getSlideImageUrl(slide.image_url) || undefined"
                     :alt="slide.title"
                     class="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
-                    format="webp"
-                    placeholder
-                    provider="supabase"
-                    quality="80"
                     loading="lazy"
-                  />
+                  >
                   <div
                     v-else
                     class="w-full h-full bg-gradient-to-br from-primary to-secondary"
@@ -126,6 +148,7 @@ function playAutoplay() {
       <CarouselNext class="absolute right-4 hidden sm:inline-flex" />
     </Carousel>
 
+    <!-- Пустое состояние -->
     <div
       v-else
       class="w-full aspect-[16/7] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed"

@@ -1,7 +1,8 @@
 import type { Database, SlideInsert, SlideRow, SlideUpdate } from '@/types'
-import slugify from 'slugify'
-import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+
+const BUCKET_NAME = 'slides-images'
 
 interface UseSlideFromOptions {
   onSuccess?: () => void
@@ -12,10 +13,12 @@ export function useSlideForm(
   options: UseSlideFromOptions,
 ) {
   const supabase = useSupabaseClient<Database>()
+  const { uploadFile, removeFile } = useSupabaseStorage()
 
   const isSaving = ref(false)
   const imageFile = ref<File | null>(null)
   const imagePreviewUrl = ref<string | null>(null)
+  const oldImagePath = ref<string | null>(null)
   const formData = ref<SlideInsert | SlideUpdate>({})
 
   const isEditMode = computed(() => !!initialData.value)
@@ -23,11 +26,14 @@ export function useSlideForm(
   function initialize() {
     imageFile.value = null
     imagePreviewUrl.value = null
+    oldImagePath.value = null
 
     if (isEditMode.value && initialData.value) {
       formData.value = {
         ...initialData.value,
       }
+      // Сохраняем старый путь к изображению для последующего удаления
+      oldImagePath.value = initialData.value.image_url || null
     }
     else {
       formData.value = {
@@ -64,30 +70,30 @@ export function useSlideForm(
     const toastId = toast.loading('Сохранение данных...')
 
     try {
-      let finalImageUrl = formData.value.image_url
+      let finalImagePath = formData.value.image_url
 
+      // Если выбран новый файл изображения
       if (imageFile.value) {
-        const sanitizedFileName = slugify(imageFile.value.name, {
-          lower: true,
-          strict: true,
-          locale: 'ru',
+        // Загружаем новое изображение через useSupabaseStorage
+        const uploadedPath = await uploadFile(imageFile.value, {
+          bucketName: BUCKET_NAME,
+          filePathPrefix: '', // Без префикса, файлы в корне бакета
+          upsert: false, // Всегда создаем новый файл с уникальным именем
         })
-        const fileName = `${uuidv4()}-${sanitizedFileName}`
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('slides-images')
-          .upload(fileName, imageFile.value, { upsert: isEditMode.value })
 
-        if (uploadError)
-          throw uploadError
+        if (!uploadedPath) {
+          throw new Error('Не удалось загрузить изображение')
+        }
 
-        finalImageUrl = supabase.storage
-          .from('slides-images')
-          .getPublicUrl(uploadData.path)
-          .data
-          .publicUrl
+        finalImagePath = uploadedPath
+
+        // Если это редактирование и было старое изображение, удаляем его
+        if (isEditMode.value && oldImagePath.value && oldImagePath.value !== finalImagePath) {
+          await removeFile(BUCKET_NAME, oldImagePath.value)
+        }
       }
 
-      const dataToSave = { ...formData.value, image_url: finalImageUrl }
+      const dataToSave = { ...formData.value, image_url: finalImagePath }
 
       if (isEditMode.value) {
         const { error } = await supabase
@@ -120,18 +126,21 @@ export function useSlideForm(
       isSaving.value = false
     }
   }
+
   const ctaTextValue = computed({
     get: () => formData.value.cta_text as string,
     set: (value: string) => {
       formData.value.cta_text = value
     },
   })
+
   const ctaLinkValue = computed({
     get: () => formData.value.cta_link as string,
     set: (value: string) => {
       formData.value.cta_link = value
     },
   })
+
   const descriptionValue = computed({
     get: () => formData.value.description as string,
     set: (value: string) => {

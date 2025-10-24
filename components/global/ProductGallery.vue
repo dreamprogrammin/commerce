@@ -6,7 +6,9 @@ import { BUCKET_NAME_PRODUCT } from '@/constants'
 const props = defineProps<{
   images: ProductImageRow[]
 }>()
-const { getPublicUrl } = useSupabaseStorage()
+
+// 👇 Используем getOptimizedUrl вместо getPublicUrl
+const { getOptimizedUrl } = useSupabaseStorage()
 const { images: imagesRef } = toRefs(props)
 
 const {
@@ -16,10 +18,25 @@ const {
   onInitThumb,
   onThumbClick,
 } = useProductGallery(imagesRef, 4)
+
+// 👇 Функция для получения оптимизированного URL
+function getImageUrl(imagePath: string | null, options: { width: number, height: number }) {
+  if (!imagePath)
+    return undefined
+
+  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imagePath, {
+    width: options.width,
+    height: options.height,
+    quality: 85,
+    format: 'webp',
+    resize: 'cover',
+  })
+}
 </script>
 
 <template>
   <div class="grid grid-cols-12 grid-rows-1 gap-4 pt-7">
+    <!-- 1. КОЛОНКА С МИНИАТЮРАМИ -->
     <div v-if="images && images.length > 1" class="hidden md:block col-span-2">
       <Carousel
         class="relative w-full max-w-xs"
@@ -36,14 +53,18 @@ const {
           >
             <div
               class="aspect-square p-2 rounded-lg overflow-hidden border-2 transition-opacity"
-              :class="{ 'border-primary opacity-100': index === selectedIndex, 'border-transparent opacity-60': index !== selectedIndex }"
+              :class="{
+                'border-primary opacity-100': index === selectedIndex,
+                'border-transparent opacity-60': index !== selectedIndex,
+              }"
             >
-              <NuxtImg
-                :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
+              <!-- 👇 Убрали provider="supabase" и используем оптимизированный URL -->
+              <img
+                :src="getImageUrl(image.image_url, { width: 150, height: 150 }) || undefined"
                 alt="Миниатюра товара"
-                provider="supabase"
                 class="w-full h-full object-cover rounded-lg"
-              />
+                loading="lazy"
+              >
             </div>
           </CarouselItem>
         </CarouselContent>
@@ -63,12 +84,13 @@ const {
         <CarouselContent class="h-[600px]">
           <CarouselItem v-for="(image, index) in images" :key="image.id" class="h-full">
             <div class="bg-muted rounded-lg overflow-hidden w-full flex items-center justify-center h-full">
-              <NuxtImg
-                provider="supabase"
-                :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || undefined"
+              <!-- 👇 Убрали provider="supabase" и используем оптимизированный URL -->
+              <img
+                :src="getImageUrl(image.image_url, { width: 800, height: 800 }) || undefined"
                 :alt="image.alt_text || `Изображение товара ${index + 1}`"
                 class="w-full h-full object-cover"
-              />
+                loading="lazy"
+              >
             </div>
           </CarouselItem>
         </CarouselContent>

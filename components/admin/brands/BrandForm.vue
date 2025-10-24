@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { BrandInsert, BrandUpdate } from '@/types'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_BRANDS } from '@/constants' // Убедитесь, что константа существует
 import { slugify } from '@/utils/slugify'
 
 const props = defineProps<{
@@ -13,6 +15,8 @@ const emit = defineEmits<{
   (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null }): void
 }>()
 
+const { getOptimizedUrl } = useSupabaseStorage()
+
 const formData = ref<Partial<BrandInsert | BrandUpdate>>({
   name: props.initialName || props.initialData?.name || '',
   slug: props.initialData?.slug || '',
@@ -21,6 +25,7 @@ const formData = ref<Partial<BrandInsert | BrandUpdate>>({
 })
 
 const newLogoFile = ref<File | null>(null)
+const logoPreviewUrl = ref<string | null>(null)
 
 function autoFillSlug() {
   if (formData.value.name) {
@@ -30,7 +35,17 @@ function autoFillSlug() {
 
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
-  newLogoFile.value = target.files?.[0] || null
+  const file = target.files?.[0] || null
+
+  newLogoFile.value = file
+
+  // Создаем превью для нового файла
+  if (file) {
+    logoPreviewUrl.value = URL.createObjectURL(file)
+  }
+  else {
+    logoPreviewUrl.value = null
+  }
 }
 
 function handleSubmit() {
@@ -46,15 +61,32 @@ function handleSubmit() {
 }
 
 const descriptionValue = computed({
-  // GET: Когда компонент читает значение
-  get: () => formData.value.description ?? '', // Преобразуем null в '' (пустую строку)
-
-  // SET: Когда пользователь вводит значение
+  get: () => formData.value.description ?? '',
   set: (value: string) => {
-    // Преобразуем пустую строку обратно в null для базы данных,
-    // иначе в БД будет сохраняться '' вместо NULL
     formData.value.description = value === '' ? null : value
   },
+})
+
+// Computed для отображения логотипа
+const displayLogoUrl = computed(() => {
+  // Если выбран новый файл, показываем его превью
+  if (logoPreviewUrl.value) {
+    return logoPreviewUrl.value
+  }
+
+  // Если есть существующий логотип, оптимизируем его
+  const logoUrl = formData.value.logo_url
+  if (logoUrl && typeof logoUrl === 'string') {
+    return getOptimizedUrl(BUCKET_NAME_BRANDS, logoUrl, {
+      width: 200,
+      height: 200,
+      quality: 85,
+      format: 'webp',
+      resize: 'contain',
+    })
+  }
+
+  return null
 })
 </script>
 
@@ -76,10 +108,15 @@ const descriptionValue = computed({
     <!-- Логотип -->
     <div class="space-y-2 pt-4">
       <Label>Логотип</Label>
-      <div v-if="formData.logo_url" class="flex items-center gap-3">
-        <NuxtImg :src="formData.logo_url" alt="Текущий логотип" class="w-12 h-12 object-contain border rounded" />
+      <div v-if="displayLogoUrl" class="flex items-center gap-3 mb-2">
+        <img
+          :src="displayLogoUrl"
+          alt="Логотип бренда"
+          class="w-12 h-12 object-contain border rounded bg-muted"
+          loading="lazy"
+        >
         <p class="text-sm text-muted-foreground">
-          Текущий логотип будет заменен.
+          {{ newLogoFile ? 'Новый логотип (будет загружен)' : 'Текущий логотип' }}
         </p>
       </div>
       <Input type="file" accept="image/*" @change="handleFileChange" />

@@ -1,8 +1,12 @@
 import type { Database, SlideRow } from '@/types'
 import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+
+const BUCKET_NAME = 'slides-images'
 
 export function useAdminSlides() {
   const supabase = useSupabaseClient<Database>()
+  const { removeFile } = useSupabaseStorage()
 
   const asyncData = useAsyncData(
     'admin-all-slides',
@@ -34,27 +38,33 @@ export function useAdminSlides() {
     isFormOpen.value = true
   }
 
-  async function handleDelete(slide: SlideRow) {
-    if (!confirm(`Вы уверены, что хотите удалить слайд "${slide.title}"?`)) {
+  async function handleDelete(slideId: string) {
+    // Находим слайд по ID
+    const slide = asyncData.data.value?.find(s => s.id === slideId)
+
+    if (!slide) {
+      toast.error('Слайд не найден')
+      return
+    }
+
+    if (!toast.warning(`Вы уверены, что хотите удалить слайд "${slide.title}"?`)) {
       return
     }
 
     const toastId = toast.loading('Удаление слайда...')
 
     try {
+      // Удаляем изображение через useSupabaseStorage, если оно есть
       if (slide.image_url) {
-        const filePath = new URL(slide.image_url).pathname.split(
-          '/slides-images/',
-        )[1]
-        if (filePath) {
-          await supabase.storage.from('slides-images').remove([filePath])
-        }
+        await removeFile(BUCKET_NAME, slide.image_url)
       }
 
+      // Удаляем запись из базы данных
       const { error: dbError } = await supabase
         .from('slides')
         .delete()
         .eq('id', slide.id)
+
       if (dbError)
         throw dbError
 

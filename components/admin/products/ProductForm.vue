@@ -37,7 +37,7 @@ const emit = defineEmits<{
 const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
 const brandsStore = useAdminBrandsStore()
-const { getPublicUrl } = useSupabaseStorage()
+const { getOptimizedUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
 
@@ -67,14 +67,13 @@ const brandSearchQuery = ref('')
 
 // --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ПРИ ЗАГРУЗКЕ ---
 
-// <-- ИЗМЕНЕНО: Функция теперь принимает правильный тип
 function setupFormData(product: FullProduct | null | undefined) {
   newImageFiles.value = []
   imagesToDelete.value = []
   linkedAccessories.value = []
 
   if (product && product.id) {
-    // --- РЕЖИИМ РЕДАКТИРОВАНИЯ ---
+    // --- РЕЖИМ РЕДАКТИРОВАНИЯ ---
     formData.value = {
       name: product.name,
       slug: product.slug,
@@ -134,7 +133,6 @@ function setupFormData(product: FullProduct | null | undefined) {
   }
 }
 
-// <-- ИЗМЕНЕНО: Используем чистую обертку для вызова setupFormData
 watch(
   () => props.initialData,
   (newProduct) => {
@@ -155,35 +153,30 @@ const filteredBrands = computed(() => {
 async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
   const newBrand = await brandsStore.createBrand(payload.data as BrandInsert, payload.file)
   if (newBrand) {
-    isBrandDialogOpen.value = false // Закрываем модальное окно
+    isBrandDialogOpen.value = false
 
-    // Обновляем списки
     await brandsStore.fetchBrands()
     await productStore.fetchAllBrands()
 
-    // Автоматически выбираем новый бренд
     await nextTick()
     formData.value.brand_id = newBrand.id
-    brandSearchQuery.value = '' // Очищаем поиск
+    brandSearchQuery.value = ''
   }
 }
-// Эта функция будет вызываться, когда меняется категория товара
+
 async function handleCategoryChange(categoryId: string | null) {
-  if (!categoryId) { // Эта проверка теперь ловит и null, и undefined
+  if (!categoryId) {
     categoryAttributes.value = []
     return
   }
 
-  // 1. Загружаем, какие атрибуты нужны для этой категории
   categoryAttributes.value = await productStore.getAttributesForCategory(categoryId)
 
-  // 2. Инициализируем `productAttributeValues` пустыми значениями
   const newValues: Record<number, number | null> = {}
   for (const attr of categoryAttributes.value) {
     newValues[attr.id] = null
   }
 
-  // 3. Если это режим редактирования, загружаем и подставляем сохраненные значения
   if (props.initialData?.id) {
     const savedValues = await productStore.getProductAttributeValues(props.initialData.id)
     for (const savedValue of savedValues) {
@@ -195,7 +188,6 @@ async function handleCategoryChange(categoryId: string | null) {
   productAttributeValues.value = newValues
 }
 
-// Отслеживаем изменение category_id в нашей основной форме
 watch(() => formData.value.category_id, (newCategoryId) => {
   const categoryIdForHandler = newCategoryId === undefined ? null : newCategoryId
   handleCategoryChange(categoryIdForHandler)
@@ -243,6 +235,17 @@ function removeNewImage(index: number) {
 function removeExistingImage(image: ProductImageRow) {
   imagesToDelete.value.push(image.id)
   existingImages.value = existingImages.value.filter(img => img.id !== image.id)
+}
+
+// Функция для получения оптимизированного URL существующих изображений
+function getExistingImageUrl(imageUrl: string) {
+  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
+    width: 300,
+    height: 300,
+    quality: 80,
+    format: 'webp',
+    resize: 'cover',
+  }) || ''
 }
 
 // --- 7. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
@@ -305,15 +308,11 @@ function handleSubmit() {
 }
 
 const skuValue = computed({
-  // GET: Когда компонент читает значение
   get() {
-    // Если в данных null, отдаем компоненту undefined (или пустую строку), что он понимает
     return formData.value.sku ?? undefined
   },
-  // SET: Когда компонент записывает новое значение (пользователь печатает)
   set(value) {
     if (formData.value) {
-      // Если пришла пустая строка, в наши данные записываем null. Иначе - само значение.
       formData.value.sku = value || null
     }
   },
@@ -331,15 +330,11 @@ const barcodeValue = computed({
 })
 
 const descriptionValue = computed({
-  // GET: Когда компонент читает значение
   get() {
-    // Если в данных null, отдаем компоненту undefined (или пустую строку), что он понимает
     return formData.value.description ?? undefined
   },
-  // SET: Когда компонент записывает новое значение (пользователь печатает)
   set(value) {
     if (formData.value) {
-      // Если пришла пустая строка, в наши данные записываем null. Иначе - само значение.
       formData.value.description = value || null
     }
   },
@@ -347,13 +342,10 @@ const descriptionValue = computed({
 
 const minAgeYearsValue = computed({
   get() {
-    // Отдаем компоненту `undefined`, если в данных `null`
     return formData.value.min_age_years ?? undefined
   },
   set(value) {
     if (formData.value) {
-      // Если из инпута приходит не число (например, его очистили),
-      // записываем в наши данные `null`
       formData.value.min_age_years = typeof value === 'number' ? value : null
     }
   },
@@ -454,7 +446,6 @@ const maxAgeYearsValue = computed({
         <CardContent class="space-y-4">
           <div v-for="attribute in categoryAttributes" :key="attribute.id">
             <Label>{{ attribute.name }}</Label>
-            <!-- Отображаем Select для атрибутов типа 'select' или 'color' -->
             <Select
               v-if="attribute.display_type === 'select' || attribute.display_type === 'color'"
               v-model="productAttributeValues[attribute.id]"
@@ -475,7 +466,6 @@ const maxAgeYearsValue = computed({
                 </SelectItem>
               </SelectContent>
             </Select>
-            <!-- Здесь можно будет добавить другие типы, например Input для 'range' -->
           </div>
         </CardContent>
       </Card>
@@ -559,7 +549,6 @@ const maxAgeYearsValue = computed({
                   <CommandInput placeholder="Поиск или создание бренда..." />
                   <CommandList>
                     <CommandEmpty>
-                      <!-- Этот блок показывается, когда поиск ничего не нашел -->
                       <div
                         class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
                         @click="() => { isBrandDialogOpen = true }"
@@ -568,14 +557,12 @@ const maxAgeYearsValue = computed({
                       </div>
                     </CommandEmpty>
                     <CommandGroup>
-                      <!-- Опция для сброса значения -->
                       <CommandItem
                         value=""
                         @select="() => { formData.brand_id = null }"
                       >
                         Без бренда
                       </CommandItem>
-                      <!-- Список существующих брендов -->
                       <CommandItem
                         v-for="brand in filteredBrands"
                         :key="brand.id"
@@ -591,7 +578,6 @@ const maxAgeYearsValue = computed({
               </PopoverContent>
             </Popover>
 
-            <!-- Модальное окно для создания бренда (остается без изменений) -->
             <Dialog v-model:open="isBrandDialogOpen">
               <DialogContent class="sm:max-w-[625px]">
                 <DialogHeader>
@@ -687,7 +673,12 @@ const maxAgeYearsValue = computed({
         <CardContent class="space-y-4">
           <div v-if="existingImages.length > 0" class="grid grid-cols-3 gap-2">
             <div v-for="image in existingImages" :key="image.id" class="relative group aspect-square">
-              <NuxtImg provider="supabase" :src="getPublicUrl(BUCKET_NAME_PRODUCT, image.image_url) || ''" class="w-full h-full object-cover rounded-md" />
+              <img
+                :src="getExistingImageUrl(image.image_url)"
+                class="w-full h-full object-cover rounded-md"
+                loading="lazy"
+                alt="Изображение товара"
+              >
               <Button type="button" variant="destructive" size="icon" class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" @click="removeExistingImage(image)">
                 <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
               </Button>

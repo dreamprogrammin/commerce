@@ -32,7 +32,8 @@ const activeMenuValue = ref<string | undefined>()
 const isSearchOpen = ref(false)
 
 const categoriesStore = useCategoriesStore()
-const { getPublicUrl } = useSupabaseStorage()
+// 👇 Используем getOptimizedUrl вместо getPublicUrl
+const { getOptimizedUrl } = useSupabaseStorage()
 const BUCKET_NAME = 'category-images'
 
 const menuTree = computed(() => categoriesStore.menuTree)
@@ -74,6 +75,20 @@ onUnmounted(() => {
 function closeAllPopups() {
   activeMenuValue.value = undefined
   isSearchOpen.value = false
+}
+
+// 👇 Функция для получения оптимизированного URL категории
+function getCategoryImageUrl(imageUrl: string | null) {
+  if (!imageUrl)
+    return undefined
+
+  return getOptimizedUrl(BUCKET_NAME, imageUrl, {
+    width: 300,
+    height: 200,
+    quality: 85,
+    format: 'webp',
+    resize: 'cover',
+  })
 }
 
 defineExpose({ closeAllPopups })
@@ -174,18 +189,13 @@ defineExpose({ closeAllPopups })
                           v-if="childItem.image_url"
                           class="mb-2 overflow-hidden rounded-md"
                         >
-                          <NuxtImg
-                            :src="
-                              getPublicUrl(BUCKET_NAME, childItem.image_url)
-                                || undefined
-                            "
+                          <!-- 👇 Заменили NuxtImg на обычный img с оптимизированным URL -->
+                          <img
+                            :src="getCategoryImageUrl(childItem.image_url) || undefined"
                             :alt="childItem.name"
-                            format="webp"
-                            quality="85"
-                            provider="supabase"
                             loading="lazy"
                             class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
-                          />
+                          >
                         </div>
                         <div
                           class="text-sm font-semibold leading-tight text-foreground"

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import SlidesForm from '@/components/admin/slides/ SlidesForm.vue'
 import { useAdminSlides } from '@/composables/admin/useAdminSlides'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_SLIDES } from '@/constants'
 
 definePageMeta({
   layout: 'admin',
 })
+
 const {
   slides,
   error,
@@ -16,6 +19,22 @@ const {
   handleDelete,
   handleFormSaved,
 } = useAdminSlides()
+
+const { getOptimizedUrl } = useSupabaseStorage()
+
+// Функция для получения оптимизированного изображения слайда
+function getSlideImageUrl(imageUrl: string | null) {
+  if (!imageUrl)
+    return null
+
+  return getOptimizedUrl(BUCKET_NAME_SLIDES, imageUrl, {
+    width: 600,
+    height: 338, // 16:9 aspect ratio
+    quality: 85,
+    format: 'webp',
+    resize: 'cover',
+  })
+}
 </script>
 
 <template>
@@ -38,9 +57,9 @@ const {
 
     <div
       v-else-if="error"
-      class="my-6 p-4 bg-destructive/10 text-destructive border rounded-md-shadow"
+      class="my-6 p-4 bg-destructive/10 text-destructive border rounded-md shadow"
     >
-      <strong>Ошибка загрузки:</strong>{{ error.message }}
+      <strong>Ошибка загрузки:</strong> {{ error.message }}
     </div>
 
     <div
@@ -55,9 +74,7 @@ const {
         <CardHeader>
           <div class="flex justify-between items-start gap-2">
             <CardTitle class="text-lg leading-tight">
-              {{
-                slide.title
-              }}
+              {{ slide.title }}
             </CardTitle>
             <Badge :variant="slide.is_active ? 'default' : 'outline'">
               {{ slide.is_active ? "Активен" : "Скрыт" }}
@@ -69,21 +86,17 @@ const {
         </CardHeader>
 
         <CardContent class="flex-grow">
-          <NuxtImg
+          <img
             v-if="slide.image_url"
-            :src="slide.image_url ?? undefined"
+            :src="getSlideImageUrl(slide.image_url) || '/images/placeholder.svg'"
             :alt="slide.title"
             class="rounded-md object-cover aspect-video w-full bg-muted"
-            placeholder
             loading="lazy"
-            format="webp"
-            provider="supabase"
-            quality="85"
-          />
+          >
 
           <div
             v-else
-            class="rounded-md aspect-video w-full bg-muted flex items-center justify-center"
+            class="rounded-md aspect-video w-full bg-muted flex items-center justify-center text-muted-foreground"
           >
             Картинки нет
           </div>
@@ -93,7 +106,7 @@ const {
           <Button variant="outline" size="sm" @click="openFormForEdit(slide)">
             Редактировать
           </Button>
-          <Button variant="destructive" size="sm" @click="handleDelete">
+          <Button variant="destructive" size="sm" @click="handleDelete(slide.id)">
             Удалить
           </Button>
         </CardFooter>
@@ -116,5 +129,3 @@ const {
     />
   </div>
 </template>
-
-<style scoped></style>

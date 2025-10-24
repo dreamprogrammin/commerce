@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { SlideRow } from '@/types'
 import { useSlideForm } from '@/composables/admin/useSlideForm'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_SLIDES } from '@/constants' // Убедитесь, что константа существует
 
 const props = defineProps<{
   initialData: SlideRow | null
@@ -29,6 +31,30 @@ const {
   onSuccess: () => {
     emit('saved')
   },
+})
+
+const { getOptimizedUrl } = useSupabaseStorage()
+
+// Computed свойство для оптимизированного превью изображения
+const optimizedPreviewUrl = computed(() => {
+  // Если есть локальное превью (File object), используем его
+  if (imagePreviewUrl.value) {
+    return imagePreviewUrl.value
+  }
+
+  // Если есть существующее изображение в БД, оптимизируем его
+  const imageUrl = formData.value.image_url
+  if (imageUrl && typeof imageUrl === 'string') {
+    return getOptimizedUrl(BUCKET_NAME_SLIDES, imageUrl, {
+      width: 400,
+      height: 200,
+      quality: 80,
+      format: 'webp',
+      resize: 'contain',
+    })
+  }
+
+  return null
 })
 </script>
 
@@ -65,27 +91,23 @@ const {
             @change="handleImageChange"
           />
           <div
-            v-if="imagePreviewUrl || formData.image_url"
+            v-if="optimizedPreviewUrl"
             class="mt-2 border p-2 rounded-md inline-block relative"
           >
-            <NuxtImg
-              provider="supabase"
-              :src="imagePreviewUrl || formData.image_url!"
+            <img
+              :src="optimizedPreviewUrl"
               alt="Превью"
               class="max-w-[200px] max-h-[100px] object-contain rounded"
-              placeholder
-              format="webp"
-              quality="80"
               loading="lazy"
-            />
+            >
             <Button
               variant="destructive"
               size="icon"
-              class="absolute -top-2 right-2 h-6 w-6 rounded-fill"
+              class="absolute -top-2 -right-2 h-6 w-6 rounded-full"
               type="button"
               @click="removeImage"
             >
-              Удалить
+              ×
             </Button>
           </div>
         </div>
@@ -96,7 +118,7 @@ const {
         </div>
 
         <div>
-          <Label for="cta_link">Текст на кнопке</Label>
+          <Label for="cta_link">Ссылка кнопки</Label>
           <Input
             id="cta_link"
             v-model="ctaLinkValue"
@@ -106,7 +128,7 @@ const {
 
         <div class="grid grid-cols-2 gap-4 items-center">
           <div>
-            <Label for="display_order">Порядок сортировка</Label>
+            <Label for="display_order">Порядок сортировки</Label>
             <Input
               id="display_order"
               v-model.number="formData.display_order"

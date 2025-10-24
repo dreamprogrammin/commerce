@@ -1,12 +1,12 @@
-<!-- pages/brand/[slug].vue -->
 <script setup lang="ts">
 import type { IBreadcrumbItem, ProductWithGallery } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
 const productsStore = useProductsStore()
-const { getPublicUrl } = useSupabaseStorage()
+const { getOptimizedUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 
 // -- Локальное состояние страницы --
@@ -52,12 +52,26 @@ watchEffect(async () => {
 // 3. Собираем "хлебные крошки" (Breadcrumbs)
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   const crumbs: IBreadcrumbItem[] = [
-    { id: 'brands', name: 'Бренды', href: '/brands' }, // Ссылка на будущую страницу всех брендов
+    { id: 'brands', name: 'Бренды', href: '/brands' },
   ]
   if (brand.value) {
     crumbs.push({ id: brand.value.id, name: brand.value.name, href: `/brand/${brand.value.slug}` })
   }
   return crumbs
+})
+
+// Оптимизированный URL логотипа бренда
+const brandLogoUrl = computed(() => {
+  if (!brand.value?.logo_url)
+    return null
+
+  return getOptimizedUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, {
+    width: 300,
+    height: 150,
+    quality: 90,
+    format: 'webp',
+    resize: 'contain',
+  })
 })
 
 // Устанавливаем заголовок страницы для SEO
@@ -79,14 +93,13 @@ useHead({
       Загрузка...
     </div>
     <div v-else-if="brand" class="mb-12 text-center border-b pb-8">
-      <NuxtImg
-        v-if="brand.logo_url"
-        :src="getPublicUrl('brand-logos', brand.logo_url) || undefined"
+      <img
+        v-if="brandLogoUrl"
+        :src="brandLogoUrl"
         :alt="brand.name"
         class="h-24 mx-auto mb-4 object-contain"
-        placeholder
-        provider="supabase"
-      />
+        loading="eager"
+      >
       <h1 class="text-4xl font-bold">
         {{ brand.name }}
       </h1>

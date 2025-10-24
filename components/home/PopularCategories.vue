@@ -4,15 +4,29 @@ import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
 const popularCategoriesStore = usePopularCategoriesStore()
-const { getPublicUrl } = useSupabaseStorage()
+const { getOptimizedUrl } = useSupabaseStorage()
 
 const { data: popularCategories, pending: isLoading } = useAsyncData(
-  'home-popular-categories', // Уникальный ключ для этой операции
+  'home-popular-categories',
   async () => {
     await popularCategoriesStore.fetchPopularCategories()
     return popularCategoriesStore.popularCategories
   },
 )
+
+// Функция для получения оптимизированного URL изображения категории
+function getCategoryImageUrl(imageUrl: string | null) {
+  if (!imageUrl)
+    return '/images/placeholder.svg'
+
+  return getOptimizedUrl(BUCKET_NAME_CATEGORY, imageUrl, {
+    width: 300,
+    height: 200,
+    quality: 80,
+    format: 'webp',
+    resize: 'cover',
+  }) || '/images/placeholder.svg'
+}
 </script>
 
 <template>
@@ -45,19 +59,12 @@ const { data: popularCategories, pending: isLoading } = useAsyncData(
           class="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
         >
           <CardContent class="p-0 flex flex-col items-center text-center">
-            <NuxtImg
-              :src="
-                getPublicUrl(BUCKET_NAME_CATEGORY, category.image_url || null)
-                  || '/images/placeholder.svg'
-              "
+            <img
+              :src="getCategoryImageUrl(category.image_url || null)"
               :alt="category.name"
               class="w-full h-32 object-cover"
               loading="lazy"
-              placeholder
-              provider="supabase"
-              format="webp"
-              quality="80"
-            />
+            >
             <p class="font-semibold p-3 text-sm md:text-base">
               {{ category.name }}
             </p>
