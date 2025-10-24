@@ -1,13 +1,14 @@
 import type { Database, IUploadFileOptions } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
+import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
 
 export interface ImageTransformOptions {
   width?: number
   height?: number
   quality?: number
   format?: 'webp' | 'avif' | 'jpeg' | 'png'
-  resize?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside'
+  resize?: 'cover' | 'contain' | 'fill'
 }
 
 export function useSupabaseStorage() {
@@ -186,12 +187,47 @@ export function useSupabaseStorage() {
     }
   }
 
+  /**
+   * 🎯 УНИВЕРСАЛЬНАЯ ФУНКЦИЯ для получения URL изображения
+   * Автоматически использует оптимизацию или обычный URL в зависимости от конфига
+   *
+   * @param bucketName - название бакета
+   * @param filePath - путь к файлу
+   * @param options - опции трансформации (игнорируются если оптимизация отключена)
+   * @returns URL изображения
+   *
+   * @example
+   * // С оптимизацией (если включена в config/images.ts)
+   * const url = getImageUrl('products', 'image.jpg', { width: 400, quality: 80 })
+   *
+   * // Без параметров (вернет оригинал если оптимизация отключена)
+   * const url = getImageUrl('products', 'image.jpg')
+   */
+  function getImageUrl(
+    bucketName: string,
+    filePath: string | null,
+    options?: ImageTransformOptions,
+  ): string | null {
+    if (!filePath || !filePath.trim()) {
+      return null
+    }
+
+    // ✅ Проверяем глобальный флаг из конфига
+    if (IMAGE_OPTIMIZATION_ENABLED && options) {
+      return getOptimizedUrl(bucketName, filePath, options)
+    }
+
+    // ⚠️ Оптимизация отключена или нет параметров - возвращаем оригинал
+    return getPublicUrl(bucketName, filePath)
+  }
+
   return {
     isLoading,
     uploadError,
     uploadFile,
     removeFile,
-    getPublicUrl,
-    getOptimizedUrl, // 👈 Новый метод для оптимизации
+    getPublicUrl, // Всегда возвращает оригинальный URL
+    getOptimizedUrl, // Всегда оптимизирует (игнорирует флаг)
+    getImageUrl, // 🎯 Умная функция - рекомендуется использовать везде
   }
 }

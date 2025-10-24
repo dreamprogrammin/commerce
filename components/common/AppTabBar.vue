@@ -8,6 +8,8 @@ import {
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { HeaderOverlayKey } from '@/types/app'
 
@@ -33,8 +35,7 @@ const isSearchOpen = ref(false)
 
 const categoriesStore = useCategoriesStore()
 // 👇 Используем getOptimizedUrl вместо getPublicUrl
-const { getOptimizedUrl } = useSupabaseStorage()
-const BUCKET_NAME = 'category-images'
+const { getImageUrl } = useSupabaseStorage()
 
 const menuTree = computed(() => categoriesStore.menuTree)
 
@@ -79,18 +80,8 @@ function closeAllPopups() {
 
 // 👇 Функция для получения оптимизированного URL категории
 function getCategoryImageUrl(imageUrl: string | null) {
-  if (!imageUrl)
-    return undefined
-
-  return getOptimizedUrl(BUCKET_NAME, imageUrl, {
-    width: 300,
-    height: 200,
-    quality: 85,
-    format: 'webp',
-    resize: 'cover',
-  })
+  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_IMAGE)
 }
-
 defineExpose({ closeAllPopups })
 </script>
 

@@ -4,6 +4,7 @@ import type { BaseProduct } from '@/types'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
@@ -12,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
-const { getOptimizedUrl } = useSupabaseStorage() // 👈 Используем новый метод
+const { getImageUrl } = useSupabaseStorage() // 👈 Используем новый метод
 
 const isTouchDevice = ref(false)
 onMounted(() => {
@@ -43,21 +44,21 @@ const activeImageIndex = ref(0)
 /**
  * Получаем оптимизированный URL с трансформацией
  */
-const activeImageUrl = computed(() => {
-  const imageUrl = props.product.product_images?.[activeImageIndex.value]?.image_url
+// const activeImageUrl = computed(() => {
+//   const imageUrl = props.product.product_images?.[activeImageIndex.value]?.image_url
 
-  if (!imageUrl)
-    return null
+//   if (!imageUrl)
+//     return null
 
-  // 👇 Используем getOptimizedUrl с параметрами оптимизации
-  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-    width: 400,
-    height: 400,
-    quality: 80,
-    format: 'webp',
-    resize: 'cover',
-  })
-})
+//   // 👇 Используем getOptimizedUrl с параметрами оптимизации
+//   return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
+//     width: 400,
+//     height: 400,
+//     quality: 80,
+//     format: 'webp',
+//     resize: 'cover',
+//   })
+// })
 
 const priceDetails = computed(() => {
   const originalPrice = Number(props.product.price)
@@ -118,6 +119,14 @@ watch(emblaMobileApi, (api) => {
     api.on('reInit', onMobileSelect)
   }
 })
+
+const activeImageUrl = computed(() => {
+  const imageUrl = props.product.product_images?.[activeImageIndex.value]?.image_url
+  if (!imageUrl)
+    return null
+
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.PRODUCT_CARD)
+})
 </script>
 
 <template>
@@ -171,7 +180,7 @@ watch(emblaMobileApi, (api) => {
                 <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
                   <!-- 👇 Оптимизированные изображения в карусели -->
                   <img
-                    :src="getOptimizedUrl(BUCKET_NAME_PRODUCT, image.image_url, {
+                    :src="getImageUrl(BUCKET_NAME_PRODUCT, image.image_url, {
                       width: 400,
                       height: 400,
                       quality: 80,

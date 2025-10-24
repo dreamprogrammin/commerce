@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProductImageRow } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const props = defineProps<{
@@ -8,7 +9,7 @@ const props = defineProps<{
 }>()
 
 // 👇 Используем getOptimizedUrl вместо getPublicUrl
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 const { images: imagesRef } = toRefs(props)
 
 const {
@@ -20,17 +21,12 @@ const {
 } = useProductGallery(imagesRef, 4)
 
 // 👇 Функция для получения оптимизированного URL
-function getImageUrl(imagePath: string | null, options: { width: number, height: number }) {
-  if (!imagePath)
-    return undefined
+function getThumbUrl(imagePath: string) {
+  return getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.PRODUCT_GALLERY_THUMB)
+}
 
-  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imagePath, {
-    width: options.width,
-    height: options.height,
-    quality: 85,
-    format: 'webp',
-    resize: 'cover',
-  })
+function getMainUrl(imagePath: string) {
+  return getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.PRODUCT_GALLERY_MAIN)
 }
 </script>
 
@@ -60,7 +56,7 @@ function getImageUrl(imagePath: string | null, options: { width: number, height:
             >
               <!-- 👇 Убрали provider="supabase" и используем оптимизированный URL -->
               <img
-                :src="getImageUrl(image.image_url, { width: 150, height: 150 }) || undefined"
+                :src="getThumbUrl(image.image_url) || undefined"
                 alt="Миниатюра товара"
                 class="w-full h-full object-cover rounded-lg"
                 loading="lazy"
@@ -86,7 +82,7 @@ function getImageUrl(imagePath: string | null, options: { width: number, height:
             <div class="bg-muted rounded-lg overflow-hidden w-full flex items-center justify-center h-full">
               <!-- 👇 Убрали provider="supabase" и используем оптимизированный URL -->
               <img
-                :src="getImageUrl(image.image_url, { width: 800, height: 800 }) || undefined"
+                :src="getMainUrl(image.image_url) || undefined"
                 :alt="image.alt_text || `Изображение товара ${index + 1}`"
                 class="w-full h-full object-cover"
                 loading="lazy"

@@ -3,11 +3,12 @@ import type { CarouselApi } from '../ui/carousel'
 import Autoplay from 'embla-carousel-autoplay'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSlides } from '@/composables/slides/useSlides'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants' // Добавьте константу для bucket слайдов
 import Skeleton from '../ui/skeleton/Skeleton.vue'
 
 const { isLoading, slides, error } = useSlides()
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 
 const autoplayPlugin = Autoplay({
   delay: 4000,
@@ -30,23 +31,15 @@ function playAutoplay() {
 }
 
 // 👇 Функция для получения оптимизированного URL слайда
-function getSlideImageUrl(imageUrl: string | null) {
+function getSlideUrl(imageUrl: string | null) {
   if (!imageUrl)
     return undefined
 
-  // Если это уже полный URL (начинается с http), используем его напрямую
-  if (imageUrl.startsWith('http')) {
+  // Если уже полный URL
+  if (imageUrl.startsWith('http'))
     return imageUrl
-  }
 
-  // Иначе получаем оптимизированный URL из Supabase
-  return getOptimizedUrl(BUCKET_NAME_SLIDES, imageUrl, {
-    width: 1920,
-    height: 800,
-    quality: 85,
-    format: 'webp',
-    resize: 'cover',
-  })
+  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.SLIDER_BANNER)
 }
 </script>
 
@@ -129,7 +122,7 @@ function getSlideImageUrl(imageUrl: string | null) {
                 >
                   <img
                     v-if="slide.image_url"
-                    :src="getSlideImageUrl(slide.image_url) || undefined"
+                    :src="getSlideUrl(slide.image_url) || undefined"
                     :alt="slide.title"
                     class="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
                     loading="lazy"
