@@ -11,7 +11,8 @@ export default defineNuxtConfig({
     '@nuxt/image',
   ],
   image: {
-    domains: ['https://gvsdevsvzgcivpphcuai.supabase.co'],
+    provider: 'ipx', // 👈 Добавьте эту строку - бесплатный провайдер
+    domains: ['gvsdevsvzgcivpphcuai.supabase.co'], // 👈 Уберите https://
   },
   supabase: {
     redirect: false,
