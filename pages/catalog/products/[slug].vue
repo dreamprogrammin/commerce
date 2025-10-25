@@ -3,6 +3,7 @@ import type { IBreadcrumbItem, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -14,33 +15,27 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
 
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
 
-// `selectedAccessoryIds` остается здесь, это чисто клиентское UI-состояние
 const selectedAccessoryIds = ref<string[]>([])
-// --- ИЗМЕНЕНИЕ №1: Логика загрузки инкапсулирована в `useAsyncData` ---
+
 const { data, pending: isLoading } = useAsyncData(
-  `product-page-${slug.value}`, // Используем более уникальный ключ
+  `product-page-${slug.value}`,
   async () => {
-    // Сбрасываем ВЫБРАННЫЕ аксессуары при каждой загрузке
     await categoriesStore.fetchCategoryData()
     selectedAccessoryIds.value = []
 
-    // 1. Загружаем основной товар
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
 
     if (!fetchedProduct) {
-      // Возвращаем объект со структурой, но с null, чтобы избежать ошибок
       return { product: null, accessories: [], similarProducts: [] }
     }
 
-    // 2. Создаем локальные переменные для результатов
     let fetchedAccessories: ProductWithImages[] = []
     let fetchedSimilarProducts: ProductWithImages[] = []
 
-    // 3. Запускаем параллельную загрузку
     await Promise.all([
       (async () => {
         if (fetchedProduct.accessory_ids && fetchedProduct.accessory_ids.length > 0) {
@@ -58,7 +53,6 @@ const { data, pending: isLoading } = useAsyncData(
       })(),
     ])
 
-    // 4. ВОЗВРАЩАЕМ ОДИН БОЛЬШОЙ ОБЪЕКТ со всеми данными
     return {
       product: fetchedProduct,
       accessories: fetchedAccessories,
@@ -77,29 +71,24 @@ const similarProducts = computed(() => data.value?.similarProducts || [])
 const digitColumns = ref<HTMLElement[]>([])
 
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
-  // Если товар еще не загружен, возвращаем пустой массив
   if (!product.value) {
     return []
   }
 
   let crumbs: IBreadcrumbItem[] = []
 
-  // 1. Сначала получаем базовую цепочку категорий, если они есть
   if (product.value.categories?.slug) {
     crumbs = categoriesStore.getBreadcrumbs(product.value.categories.slug)
   }
 
-  // 2. Добавляем в конец сам товар. Он не будет ссылкой.
   crumbs.push({
     id: product.value.id,
     name: product.value.name,
-    // `href` не нужен, так как это текущая страница
   })
 
   return crumbs
 })
 
-// --- `totalPrice` и `totalBonuses` теперь используют `computed`-свойства ---
 const totalPrice = computed(() => {
   if (!product.value)
     return 0
@@ -128,7 +117,6 @@ const mainItemInCart = computed(() => {
   return cartStore.items.find(item => item.product.id === product.value?.id)
 })
 
-// `computed` для получения количества ОСНОВНОГО товара в корзине
 const quantityInCart = computed(() => {
   return mainItemInCart.value ? mainItemInCart.value.quantity : 0
 })
@@ -137,17 +125,14 @@ function addToCart() {
   if (!product.value)
     return
 
-  // Добавляем основной товар (если его еще нет)
   if (!mainItemInCart.value) {
-    cartStore.addItem(product.value, 1) // Добавляем 1 шт.
+    cartStore.addItem(product.value, 1)
   }
 
-  // Находим и добавляем все выбранные аксессуары (по 1 шт.)
   const selectedAccessories = accessories.value.filter(acc =>
     selectedAccessoryIds.value.includes(acc.id),
   )
   for (const acc of selectedAccessories) {
-    // Проверяем, нет ли уже этого аксессуара в корзине, чтобы не дублировать
     const accInCart = cartStore.items.find(item => item.product.id === acc.id)
     if (!accInCart) {
       cartStore.addItem(acc, 1)
@@ -157,18 +142,11 @@ function addToCart() {
   toast.success('Товары добавлены в корзину')
 }
 
-// Функция для получения оптимизированного изображения аксессуара
 function getAccessoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
 
-  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-    width: 80,
-    height: 80,
-    quality: 75,
-    format: 'webp',
-    resize: 'cover',
-  })
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
 }
 
 useFlipCounter(totalPrice, digitColumns)
@@ -195,12 +173,9 @@ watch(() => product.value?.id, () => {
 
 <template>
   <div class="container py-12">
-    <!-- Используем ClientOnly для идеальной гидратации и управления состояниями -->
     <ClientOnly>
-      <!-- Состояние загрузки -->
       <ProductDetailSkeleton v-if="isLoading" />
 
-      <!-- Состояние с данными -->
       <div v-else-if="product">
         <Breadcrumbs :items="breadcrumbs" class="mb-6" />
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
@@ -210,7 +185,6 @@ watch(() => product.value?.id, () => {
               :images="product.product_images"
             />
 
-            <!-- Заглушка, если у товара вообще нет фото -->
             <div v-else class="bg-muted rounded-lg flex items-center justify-center h-full">
               <p class="text-muted-foreground">
                 Изображения отсутствуют
@@ -219,18 +193,16 @@ watch(() => product.value?.id, () => {
 
             <div class="mt-16 pt-8 border-t">
               <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Левая колонка для Описания -->
                 <div class="md:col-span-2">
                   <ProductDescription v-if="product.description" :description="product.description" />
                 </div>
-                <!-- Правая колонка для Характеристик -->
                 <div>
                   <ProductFeatures :product="product" />
                 </div>
               </div>
             </div>
           </div>
-          <!-- ПРАВАЯ КОЛОНКА: Информация о товаре (остается без изменений) -->
+
           <div class="lg:col-span-4 sticky top-24">
             <div class="space-y-6">
               <NuxtLink v-if="product.categories" :to="`/catalog/${product.categories.slug}`" class="text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -263,7 +235,6 @@ watch(() => product.value?.id, () => {
                     }
                   }"
                 >
-                  <!-- Левая часть: Чекбокс, Картинка, Название -->
                   <div class="flex items-center gap-3">
                     <div @click.stop>
                       <Checkbox
@@ -281,7 +252,6 @@ watch(() => product.value?.id, () => {
                         }"
                       />
                     </div>
-                    <!-- Контейнер для картинки -->
                     <div class="w-12 h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
                       <img
                         v-if="acc.product_images && acc.product_images.length > 0"
@@ -290,7 +260,6 @@ watch(() => product.value?.id, () => {
                         class="w-full h-full object-cover"
                         loading="lazy"
                       >
-                      <!-- Заглушка, если у аксессуара нет фото -->
                       <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
                         Нет фото
                       </div>
@@ -299,7 +268,6 @@ watch(() => product.value?.id, () => {
                       {{ acc.name }}
                     </span>
                   </div>
-                  <!-- Правая часть: Цена -->
                   <span class="text-sm font-semibold whitespace-nowrap">+ {{ acc.price }} ₸</span>
                 </div>
               </div>
@@ -309,14 +277,12 @@ watch(() => product.value?.id, () => {
               <div class="flex justify-between items-baseline">
                 <span class="text-lg font-medium">Общая стоимость:</span>
                 <div class="text-4xl font-bold flex items-center gap-0.5">
-                  <!-- Колонки для цифр - динамически по длине числа -->
                   <div
                     v-for="(digit, i) in String(Math.round(totalPrice)).split('')"
                     :key="`digit-${i}`"
                     :ref="el => { if (el) digitColumns[i] = el as HTMLElement }"
                     class="digit-column"
                   >
-                    <!-- Лента с цифрами от 0 до 9 -->
                     <div class="digit-ribbon">
                       <div v-for="d in 10" :key="d" class="digit-item">
                         {{ d - 1 }}
@@ -334,7 +300,6 @@ watch(() => product.value?.id, () => {
             <ClientOnly>
               <div class="flex items-center gap-4 pt-4">
                 <template v-if="product.stock_quantity > 0">
-                  <!-- СЦЕНАРИЙ 1: Товар еще НЕ в корзине -->
                   <Button
                     v-if="!mainItemInCart"
                     size="lg"
@@ -344,9 +309,7 @@ watch(() => product.value?.id, () => {
                     Добавить в корзину
                   </Button>
 
-                  <!-- СЦЕНАРИЙ 2: Товар УЖЕ в корзине -->
                   <template v-else>
-                    <!-- Левая часть: Кнопка "Перейти в корзину" -->
                     <Button
                       size="lg"
                       class="flex-grow"
@@ -356,7 +319,6 @@ watch(() => product.value?.id, () => {
                       Перейти в корзину
                     </Button>
 
-                    <!-- Правая часть: Счетчик (контролирует количество) -->
                     <QuantitySelector
                       :product="product"
                       :quantity="quantityInCart"
@@ -373,9 +335,7 @@ watch(() => product.value?.id, () => {
           </div>
         </div>
 
-        <!-- ======== "ПОХОЖИЕ ТОВАРЫ" ======== -->
         <ProductCarousel v-if="similarProducts.length > 0" :products="similarProducts" class="mt-16 pt-8 border-t">
-          <!-- Используем слот `header` для передачи нашего заголовка -->
           <template #header>
             <h2 class="text-2xl font-bold mb-6">
               Похожие товары
@@ -384,7 +344,6 @@ watch(() => product.value?.id, () => {
         </ProductCarousel>
       </div>
 
-      <!-- Состояние "Товар не найден" -->
       <div v-else class="text-center py-20">
         <h1 class="text-2xl font-bold">
           Товар не найден
@@ -397,7 +356,6 @@ watch(() => product.value?.id, () => {
         </NuxtLink>
       </div>
 
-      <!-- Fallback для серверного рендеринга -->
       <template #fallback>
         <ProductDetailSkeleton />
       </template>

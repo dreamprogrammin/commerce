@@ -3,51 +3,40 @@ import type { ProductListAdmin } from '@/types'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 definePageMeta({ layout: 'admin' })
 
 const adminProductsStore = useAdminProductsStore()
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 const router = useRouter()
 
-// Получаем реактивные ссылки на состояние из стора
 const { products, isLoading } = storeToRefs(adminProductsStore)
 
-// Загружаем список всех товаров при первом открытии страницы
 onMounted(() => {
-  // Вызываем `fetchProducts` только если список еще не загружен
   if (products.value.length === 0) {
     adminProductsStore.fetchProducts()
   }
 })
 
-// Функция для подтверждения удаления
 function confirmDelete(product: ProductListAdmin) {
   if (toast.warning(`Вы уверены, что хотите удалить товар "${product.name}"? Это действие необратимо.`)) {
     adminProductsStore.deleteProduct(product)
   }
 }
 
-// Функция для получения оптимизированного изображения товара
 function getProductImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
 
-  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-    width: 100,
-    height: 100,
-    quality: 75,
-    format: 'webp',
-    resize: 'cover',
-  })
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
 }
 </script>
 
 <template>
   <div class="container mx-auto p-4 md:p-8">
-    <!-- Шапка страницы -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold">
         Управление товарами
@@ -57,12 +46,10 @@ function getProductImageUrl(imageUrl: string | null) {
       </NuxtLink>
     </div>
 
-    <!-- Состояние загрузки -->
     <div v-if="isLoading" class="text-center py-10">
       Загрузка...
     </div>
 
-    <!-- Таблица с товарами -->
     <div v-else class="border rounded-lg bg-card">
       <Table>
         <TableHeader>
@@ -81,14 +68,12 @@ function getProductImageUrl(imageUrl: string | null) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          <!-- Состояние, когда товаров нет -->
           <TableRow v-if="products.length === 0">
             <TableCell colspan="7" class="h-24 text-center">
               Товары еще не добавлены.
             </TableCell>
           </TableRow>
 
-          <!-- Рендерим строки таблицы для каждого товара -->
           <TableRow v-for="product in products" :key="product.id">
             <TableCell>
               <div class="w-16 h-16 bg-muted rounded-md overflow-hidden relative">

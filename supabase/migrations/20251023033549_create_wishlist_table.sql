@@ -29,4 +29,4 @@ USING (auth.uid() = user_id);
 
 DROP TABLE public.wishlist;
 
-*/y
+*/

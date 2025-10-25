@@ -2,6 +2,7 @@
 import SlidesForm from '@/components/admin/slides/ SlidesForm.vue'
 import { useAdminSlides } from '@/composables/admin/useAdminSlides'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 
 definePageMeta({
@@ -20,20 +21,13 @@ const {
   handleFormSaved,
 } = useAdminSlides()
 
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 
-// Функция для получения оптимизированного изображения слайда
 function getSlideImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
 
-  return getOptimizedUrl(BUCKET_NAME_SLIDES, imageUrl, {
-    width: 600,
-    height: 338, // 16:9 aspect ratio
-    quality: 85,
-    format: 'webp',
-    resize: 'cover',
-  })
+  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.SLIDER_BANNER)
 }
 </script>
 
@@ -45,7 +39,6 @@ function getSlideImageUrl(imageUrl: string | null) {
       <h1 class="text-3xl font-bold text-foreground">
         Управление слайдами
       </h1>
-
       <Button @click="openFormForNew">
         Добавить слайд
       </Button>
@@ -93,7 +86,6 @@ function getSlideImageUrl(imageUrl: string | null) {
             class="rounded-md object-cover aspect-video w-full bg-muted"
             loading="lazy"
           >
-
           <div
             v-else
             class="rounded-md aspect-video w-full bg-muted flex items-center justify-center text-muted-foreground"

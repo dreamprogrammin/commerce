@@ -4,6 +4,7 @@ import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
@@ -37,7 +38,8 @@ const emit = defineEmits<{
 const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
 const brandsStore = useAdminBrandsStore()
-const { getOptimizedUrl } = useSupabaseStorage()
+// 👇 Используем универсальную функцию getImageUrl
+const { getImageUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
 
@@ -237,15 +239,8 @@ function removeExistingImage(image: ProductImageRow) {
   existingImages.value = existingImages.value.filter(img => img.id !== image.id)
 }
 
-// Функция для получения оптимизированного URL существующих изображений
 function getExistingImageUrl(imageUrl: string) {
-  return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-    width: 300,
-    height: 300,
-    quality: 80,
-    format: 'webp',
-    resize: 'cover',
-  }) || ''
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL) || ''
 }
 
 // --- 7. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
@@ -671,6 +666,7 @@ const maxAgeYearsValue = computed({
           <CardTitle>Галерея изображений</CardTitle>
         </CardHeader>
         <CardContent class="space-y-4">
+          <!-- 👇 Существующие изображения с оптимизацией через getImageUrl -->
           <div v-if="existingImages.length > 0" class="grid grid-cols-3 gap-2">
             <div v-for="image in existingImages" :key="image.id" class="relative group aspect-square">
               <img
@@ -684,6 +680,7 @@ const maxAgeYearsValue = computed({
               </Button>
             </div>
           </div>
+          <!-- 👇 Новые изображения (локальные preview) -->
           <div v-if="newImageFiles.length > 0" class="grid grid-cols-3 gap-2">
             <div v-for="(item, index) in newImageFiles" :key="index" class="relative group aspect-square">
               <img :src="item.previewUrl" class="w-full h-full object-cover rounded-md" alt="Превью нового изображения">

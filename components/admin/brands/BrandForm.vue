@@ -3,7 +3,7 @@ import type { BrandInsert, BrandUpdate } from '@/types'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS } from '@/constants' // Убедитесь, что константа существует
+import { BUCKET_NAME_BRANDS } from '@/constants'
 import { slugify } from '@/utils/slugify'
 
 const props = defineProps<{
@@ -15,7 +15,8 @@ const emit = defineEmits<{
   (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null }): void
 }>()
 
-const { getOptimizedUrl } = useSupabaseStorage()
+// 👇 Используем универсальную функцию getImageUrl
+const { getImageUrl } = useSupabaseStorage()
 
 const formData = ref<Partial<BrandInsert | BrandUpdate>>({
   name: props.initialName || props.initialData?.name || '',
@@ -36,7 +37,6 @@ function autoFillSlug() {
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0] || null
-
   newLogoFile.value = file
 
   // Создаем превью для нового файла
@@ -67,26 +67,39 @@ const descriptionValue = computed({
   },
 })
 
-// Computed для отображения логотипа
+// 👇 Computed для отображения логотипа с использованием getImageUrl
 const displayLogoUrl = computed(() => {
-  // Если выбран новый файл, показываем его превью
+  // Если выбран новый файл, показываем его превью (локальный blob URL)
   if (logoPreviewUrl.value) {
     return logoPreviewUrl.value
   }
 
-  // Если есть существующий логотип, оптимизируем его
+  // Если есть существующий логотип в БД - используем оптимизацию
   const logoUrl = formData.value.logo_url
   if (logoUrl && typeof logoUrl === 'string') {
-    return getOptimizedUrl(BUCKET_NAME_BRANDS, logoUrl, {
+    // Можно использовать предустановку или кастомные параметры
+    // Вариант 1: Кастомные параметры (для логотипов лучше contain)
+    return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, {
       width: 200,
       height: 200,
       quality: 85,
       format: 'webp',
       resize: 'contain',
     })
+
+    // Вариант 2: Можно добавить в config/images.ts:
+    // BRAND_LOGO: { width: 200, height: 200, quality: 85, format: 'webp', resize: 'contain' }
+    // И использовать: IMAGE_SIZES.BRAND_LOGO
   }
 
   return null
+})
+
+// Очистка preview URL при размонтировании
+onBeforeUnmount(() => {
+  if (logoPreviewUrl.value) {
+    URL.revokeObjectURL(logoPreviewUrl.value)
+  }
 })
 </script>
 
@@ -96,16 +109,18 @@ const displayLogoUrl = computed(() => {
       <Label for="brand-name">Название бренда *</Label>
       <Input id="brand-name" v-model="formData.name" @blur="autoFillSlug" />
     </div>
+
     <div>
       <Label for="brand-slug">Слаг (URL) *</Label>
       <Input id="brand-slug" v-model="formData.slug" />
     </div>
+
     <div>
       <Label for="brand-description">Описание</Label>
       <Textarea id="brand-description" v-model="descriptionValue" />
     </div>
 
-    <!-- Логотип -->
+    <!-- 👇 Логотип с оптимизацией через getImageUrl -->
     <div class="space-y-2 pt-4">
       <Label>Логотип</Label>
       <div v-if="displayLogoUrl" class="flex items-center gap-3 mb-2">

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { slugify } from '@/utils/slugify'
 
@@ -27,7 +28,8 @@ const RecursiveCategoryFormNode = defineAsyncComponent(
 )
 
 const isChildrenVisible = ref(true)
-const { getOptimizedUrl } = useSupabaseStorage()
+// 👇 Используем универсальную функцию getImageUrl
+const { getImageUrl } = useSupabaseStorage()
 
 const name = computed({
   get: () => props.item.name,
@@ -72,22 +74,18 @@ const isDeleted = computed({
   set: value => emit('update:item', { ...props.item, _isDeleted: value }),
 })
 
-// Computed для отображения оптимизированного изображения
+// 👇 Computed для отображения оптимизированного изображения
+// Теперь использует универсальную функцию с предустановкой
 const displayImageUrl = computed(() => {
-  // Если есть превью нового файла
+  // Если есть превью нового файла (локальный blob URL)
   if (props.item._imagePreview) {
     return props.item._imagePreview
   }
 
-  // Если есть существующее изображение в БД
+  // Если есть существующее изображение в БД - используем оптимизацию
   if (props.item.image_url) {
-    return getOptimizedUrl(BUCKET_NAME_CATEGORY, props.item.image_url, {
-      width: 300,
-      height: 160,
-      quality: 85,
-      format: 'webp',
-      resize: 'contain',
-    })
+    // Используем предустановку CATEGORY_IMAGE
+    return getImageUrl(BUCKET_NAME_CATEGORY, props.item.image_url, IMAGE_SIZES.CATEGORY_IMAGE)
   }
 
   return null
@@ -122,6 +120,7 @@ function removeImage() {
       class="border p-4 rounded-lg space-y-4 bg-muted/40 relative shadow-sm"
       :style="{ marginLeft: `${level * 25}px` }"
     >
+      <!-- Кнопки управления -->
       <div class="absolute top-2 right-2 flex items-center gap-2 z-10">
         <Button
           v-if="isDeleted"
@@ -152,6 +151,7 @@ function removeImage() {
         Редактирование категории (Уровень {{ level + 2 }})
       </p>
 
+      <!-- Основные поля -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
         <div>
           <Label :for="`name-${props.item._tempId || props.item.id}`">Название *</Label>
@@ -194,6 +194,7 @@ function removeImage() {
         />
       </div>
 
+      <!-- Порядок и видимость -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
         <div>
           <Label :for="`order-${props.item._tempId || props.item.id}`">Порядок в меню</Label>
@@ -214,6 +215,7 @@ function removeImage() {
         </div>
       </div>
 
+      <!-- 👇 Изображение с оптимизацией через getImageUrl -->
       <div>
         <Label :for="`image-${props.item._tempId || props.item.id}`">Изображение для меню</Label>
         <Input
@@ -249,6 +251,7 @@ function removeImage() {
         </div>
       </div>
 
+      <!-- Подкатегории -->
       <div v-if="props.item.children && props.item.children.length > 0" class="pt-3 mt-3 border-t">
         <div class="flex items-center justify-between">
           <h4 class="font-semibold text-sm text-muted-foreground">

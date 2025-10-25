@@ -2,7 +2,8 @@
 import type { SlideRow } from '@/types'
 import { useSlideForm } from '@/composables/admin/useSlideForm'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_SLIDES } from '@/constants' // Убедитесь, что константа существует
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_SLIDES } from '@/constants'
 
 const props = defineProps<{
   initialData: SlideRow | null
@@ -33,25 +34,16 @@ const {
   },
 })
 
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 
-// Computed свойство для оптимизированного превью изображения
 const optimizedPreviewUrl = computed(() => {
-  // Если есть локальное превью (File object), используем его
   if (imagePreviewUrl.value) {
     return imagePreviewUrl.value
   }
 
-  // Если есть существующее изображение в БД, оптимизируем его
   const imageUrl = formData.value.image_url
   if (imageUrl && typeof imageUrl === 'string') {
-    return getOptimizedUrl(BUCKET_NAME_SLIDES, imageUrl, {
-      width: 400,
-      height: 200,
-      quality: 80,
-      format: 'webp',
-      resize: 'contain',
-    })
+    return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.SLIDER_BANNER)
   }
 
   return null
