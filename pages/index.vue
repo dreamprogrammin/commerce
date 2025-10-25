@@ -59,7 +59,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
 <template>
   <div>
     <!-- Блок приветствия/авторизации -->
-    <div class="container py-4">
+    <div class="app-container py-4">
       <ClientOnly>
         <div v-if="isLoggedIn" class="p-4 bg-blue-50 border border-blue-200 rounded-md">
           <NuxtLink v-if="isAdmin" to="/admin" class="font-semibold text-primary hover:underline">
@@ -83,11 +83,11 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
     </div>
 
     <!-- Основной контент главной страницы -->
-    <CommonAppCarousel />
-    <HomePopularCategories />
+    <CommonAppCarousel class="app-container" />
+    <HomePopularCategories class="app-container" />
 
     <!-- Секция с карточками Бонусов и Товара дня -->
-    <div class="container py-8 md:py-12">
+    <div class="app-container py-8 md:py-12">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
         <HomeBonusProgramCard />
         <HomeFeaturedProduct />
@@ -100,7 +100,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
     -->
     <ClientOnly>
       <!-- Пока ЛЮБАЯ из загрузок активна, показываем ОДИН общий скелетон -->
-      <div v-if="isLoadingMainBlock" class="container py-8 md:py-12">
+      <div v-if="isLoadingMainBlock" class="app-container py-8 md:py-12">
         <!-- Заголовок меняется в зависимости от того, залогинен ли юзер -->
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
@@ -143,7 +143,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
       <!-- Заглушка для серверного рендеринга (всегда показываем популярные) -->
       <template #fallback>
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-        <div class="container py-8 md:py-12">
+        <div class="app-container py-8 md:py-12">
           <ProductCarouselSkeleton />
         </div>
       </template>

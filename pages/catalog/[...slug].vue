@@ -253,7 +253,7 @@ watchDebounced(
 </script>
 
 <template>
-  <div class="container py-8">
+  <div class="app-container py-8">
     <ClientOnly>
       <Breadcrumbs :items="breadcrumbs" class="mb-6" />
       <h1 class="text-3xl font-bold mb-6 capitalize">
