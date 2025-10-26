@@ -44,7 +44,7 @@ const isDesktop = useMediaQuery('(min-width: 1024px)')
             <CarouselItem
               v-for="product in products"
               :key="product.id"
-              class="pl-1
+              class="pl-4
                    basis-[52.63%]
                    sm:basis-[45%]
                    md:basis-[30%]
