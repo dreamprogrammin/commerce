@@ -26,10 +26,12 @@ export function useSlides() {
     },
     {
       lazy: true,
+      default: () => [], // 👈 Добавьте default
     },
   )
 
-  const isLoading = computed(() => asyncData.status.value === 'pending')
+  // 👇 Правильная проверка для lazy: true
+  const isLoading = computed(() => asyncData.pending.value)
 
   return {
     slides: asyncData.data,

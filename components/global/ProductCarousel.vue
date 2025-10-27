@@ -6,14 +6,17 @@ defineProps<{
   products: BaseProduct[] | null
   title?: string
 }>()
-
-const isDesktop = useMediaQuery('(min-width: 1024px)')
+const isDesktop = ref(false)
+onMounted(() => {
+  // Устанавливаем isDesktop только на клиенте
+  isDesktop.value = window.matchMedia('(min-width: 1024px)').matches
+})
 </script>
 
 <template>
   <section v-if="products && products.length > 0" class="py-8 md:py-12">
     <!-- `container` нужен только для заголовка -->
-    <div class="app-container">
+    <div class="app-container mx-auto">
       <slot name="header" />
     </div>
 
@@ -24,13 +27,12 @@ const isDesktop = useMediaQuery('(min-width: 1024px)')
     <div class="overflow-hidden">
       <div
         class="
-          pl-0 sm:pl-6 lg:pl-8
-          -mr-2 sm:-mr-6 lg:mx-auto
+          pl-0 -mr-2 sm:-mr-6 lg:mx-auto
         "
-        :class="{ container: isDesktop }"
       >
         <Carousel
           class="w-full"
+          :class="{ 'app-container': isDesktop }"
           :opts="{
             align: 'start',
           }"
@@ -44,7 +46,7 @@ const isDesktop = useMediaQuery('(min-width: 1024px)')
             <CarouselItem
               v-for="product in products"
               :key="product.id"
-              class="pl-4
+              class="pl-4 md:pl-0
                    basis-[52.63%]
                    sm:basis-[45%]
                    md:basis-[30%]

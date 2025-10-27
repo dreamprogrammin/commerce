@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
       Используем `flex`, чтобы имитировать поведение карусели.
       `pl-*` имитируют отступы контейнера.
     -->
-    <div class="flex -ml-2 pl-2 sm:pl-6 lg:pl-12">
+    <div class="flex -ml-2 pl-0">
       <!-- Рендерим 6 карточек-заглушек, чтобы заполнить даже большие экраны -->
       <div
         v-for="n in 6"

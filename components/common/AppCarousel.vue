@@ -1,14 +1,39 @@
 <script setup lang="ts">
 import type { CarouselApi } from '../ui/carousel'
+import type { SlideRow } from '@/types'
 import Autoplay from 'embla-carousel-autoplay'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useSlides } from '@/composables/slides/useSlides'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_SLIDES } from '@/constants' // Добавьте константу для bucket слайдов
-import Skeleton from '../ui/skeleton/Skeleton.vue'
+import { BUCKET_NAME_SLIDES } from '@/constants'
 
-const { isLoading, slides, error } = useSlides()
+const props = defineProps<{
+  slides: SlideRow[]
+  isLoading: boolean
+  error: any
+}>()
+
+const isDesktop = ref(false)
+onMounted(() => {
+  // Устанавливаем isDesktop только на клиенте
+  isDesktop.value = window.matchMedia('(min-width: 1024px)').matches
+})
+
 const { getImageUrl } = useSupabaseStorage()
+
+// 👇 Добавляем минимальную задержку для показа скелета
+const showSkeleton = ref(true)
+const minLoadingTime = 300 // миллисекунды
+
+onMounted(() => {
+  setTimeout(() => {
+    showSkeleton.value = false
+  }, minLoadingTime)
+})
+
+// Или используйте computed с задержкой
+const isActuallyLoading = computed(() => {
+  return props.isLoading || showSkeleton.value
+})
 
 const autoplayPlugin = Autoplay({
   delay: 4000,
@@ -30,12 +55,10 @@ function playAutoplay() {
   emblaApi.value?.plugins()?.autoplay?.play()
 }
 
-// 👇 Функция для получения оптимизированного URL слайда
 function getSlideUrl(imageUrl: string | null) {
   if (!imageUrl)
     return undefined
 
-  // Если уже полный URL
   if (imageUrl.startsWith('http'))
     return imageUrl
 
@@ -45,41 +68,13 @@ function getSlideUrl(imageUrl: string | null) {
 
 <template>
   <div class="w-full">
-    <!-- Состояние загрузки -->
-    <div v-if="isLoading">
-      <Carousel
-        class="w-full"
-        :opts="{
-          align: 'start',
-          loop: false,
-        }"
-      >
-        <CarouselContent class="-ml-4">
-          <CarouselItem
-            v-for="i in 2"
-            :key="i"
-            class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8"
-          >
-            <div class="p-1">
-              <Card
-                class="overflow-hidden border-none shadow-xl rounded-2xl group py-0"
-              >
-                <CardContent
-                  class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
-                >
-                  <Skeleton class="w-full h-full" />
-                </CardContent>
-              </Card>
-            </div>
-          </CarouselItem>
-        </CarouselContent>
-      </Carousel>
+    <div v-if="isActuallyLoading" class="app-container">
+      <Skeleton class="h-[35vh] md:h-[65vh] w-full rounded-2xl" />
     </div>
 
-    <!-- Состояние ошибки -->
     <div
       v-else-if="error"
-      class="w-full aspect-[16/7] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center"
+      class="app-container w-full aspect-[16/7] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center"
     >
       <h3 class="mt-4 text-lg font-semibold">
         Не удалось загрузить слайдер
@@ -89,10 +84,10 @@ function getSlideUrl(imageUrl: string | null) {
       </p>
     </div>
 
-    <!-- Карусель с слайдами -->
     <Carousel
-      v-else-if="slides && slides.length > 0"
+      v-else-if="slides.length > 0"
       class="w-full"
+      :class="{ 'app-container': isDesktop }"
       :plugins="[autoplayPlugin]"
       :opts="{
         align: 'start',
@@ -102,24 +97,20 @@ function getSlideUrl(imageUrl: string | null) {
       @mouseenter="stopAutoplay"
       @mouseleave="playAutoplay"
     >
-      <CarouselContent class="-ml-4">
+      <CarouselContent class="ml-0 md:-ml-5">
         <CarouselItem
           v-for="slide in slides"
           :key="slide.id"
-          class="pl-4 basis-4/5 md:basis-5/6 lg:basis-7/8"
+          class="pl-3 basis-4/5 md:basis-5/6 lg:basis-7/8 lg:pl-4 md:pl-4"
         >
           <div class="p-1">
-            <Card
-              class="overflow-hidden border-none shadow-xl rounded-2xl group py-0"
-            >
+            <Card class="overflow-hidden border-none rounded-2xl group py-0">
               <NuxtLink
                 :to="slide.cta_link || ''"
                 :external="!!slide.cta_link?.startsWith('http')"
                 class="block"
               >
-                <CardContent
-                  class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0"
-                >
+                <CardContent class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0">
                   <img
                     v-if="slide.image_url"
                     :src="getSlideUrl(slide.image_url) || undefined"
@@ -137,14 +128,15 @@ function getSlideUrl(imageUrl: string | null) {
           </div>
         </CarouselItem>
       </CarouselContent>
-      <CarouselPrevious class="absolute left-4 hidden sm:inline-flex" />
-      <CarouselNext class="absolute right-4 hidden sm:inline-flex" />
+      <ClientOnly>
+        <CarouselPrevious class="absolute left-4 hidden sm:inline-flex" />
+        <CarouselNext class="absolute right-4 hidden sm:inline-flex" />
+      </ClientOnly>
     </Carousel>
 
-    <!-- Пустое состояние -->
     <div
       v-else
-      class="w-full aspect-[16/7] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed"
+      class="app-container w-full aspect-[16/7] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed"
     >
       <p class="text-muted-foreground">
         Нет активных слайдов для отображения.
@@ -152,7 +144,3 @@ function getSlideUrl(imageUrl: string | null) {
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Ваши стили */
-</style>

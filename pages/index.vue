@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSlides } from '@/composables/slides/useSlides'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -12,6 +13,7 @@ const recommendationsStore = useRecommendationsStore()
 const personalizationStore = usePersonalizationStore()
 const productsStore = useProductsStore()
 const wishlistStore = useWishlistStore()
+const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
 
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
@@ -82,11 +84,15 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
       </ClientOnly>
     </div>
 
-    <!-- Основной контент главной страницы -->
-    <CommonAppCarousel class="app-container" />
+    <!-- Слайдер - упрощенная логика -->
+    <CommonAppCarousel
+      :is-loading="isLoadingSlides"
+      :error="slidesError"
+      :slides="slides || []"
+    />
+
     <HomePopularCategories class="app-container" />
 
-    <!-- Секция с карточками Бонусов и Товара дня -->
     <div class="app-container py-8 md:py-12">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
         <HomeBonusProgramCard />
@@ -94,22 +100,13 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
       </div>
     </div>
 
-    <!--
-      Секция Рекомендаций / Популярных товаров.
-      Она динамически переключается в зависимости от пользователя.
-    -->
     <ClientOnly>
-      <!-- Пока ЛЮБАЯ из загрузок активна, показываем ОДИН общий скелетон -->
       <div v-if="isLoadingMainBlock" class="app-container py-8 md:py-12">
-        <!-- Заголовок меняется в зависимости от того, залогинен ли юзер -->
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
       </div>
 
-      <!-- Если все загрузки завершены, принимаем решение, что показать -->
       <template v-else>
-        <!-- Секция 1: ИЗБРАННОЕ (САМЫЙ ВЫСОКИЙ ПРИОРИТЕТ ДЛЯ ЛОЯЛЬНЫХ) -->
-        <!-- Секция 1: ИЗБРАННОЕ -->
         <HomeProductsCarousel
           v-if="isLoggedIn && wishlistProducts.length > 0"
           :is-loading="isLoadingRecommendations"
@@ -119,7 +116,6 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
           class="mt-16 pt-8 border-t"
         />
 
-        <!-- Секция 2: РЕКОМЕНДАЦИИ -->
         <HomeProductsCarousel
           v-if="recommendedProducts && recommendedProducts.length > 0"
           :is-loading="isLoadingRecommendations"
@@ -129,7 +125,6 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
           :class="{ 'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0 }"
         />
 
-        <!-- Секция 3: Популярные товары (как резерв) -->
         <HomeProductsCarousel
           v-else
           :is-loading="isLoadingPopular"
@@ -140,21 +135,35 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
         />
       </template>
 
-      <!-- Заглушка для серверного рендеринга (всегда показываем популярные) -->
       <template #fallback>
-        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <div class="app-container py-8 md:py-12">
+          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
         </div>
       </template>
     </ClientOnly>
 
-    <!-- Секция Новинок (самодостаточный компонент) -->
-    <HomeProductsCarousel
-      :is-loading="isLoadingNewest"
-      :products="newestProducts"
-      title="Новые поступления"
-      see-all-link="/catalog/all?sort_by=newest"
-    />
+    <ClientOnly>
+      <HomeProductsCarousel
+        v-if="newestProducts && newestProducts.length > 0"
+        :is-loading="isLoadingNewest"
+        :products="newestProducts"
+        title="Новые поступления"
+        see-all-link="/catalog/all?sort_by=newest"
+        class="pt-4 border-t"
+      />
+      <div v-else-if="isLoadingNewest" class="app-container py-8 md:py-12">
+        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
+        <ProductCarouselSkeleton />
+      </div>
+
+      <!-- Fallback для SSR -->
+      <template #fallback>
+        <div class="app-container py-8 md:py-12">
+          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
+          <ProductCarouselSkeleton />
+        </div>
+      </template>
+    </ClientOnly>
   </div>
 </template>
