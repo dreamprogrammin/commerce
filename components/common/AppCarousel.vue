@@ -6,34 +6,19 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 
-const props = defineProps<{
+defineProps<{
   slides: SlideRow[]
   isLoading: boolean
   error: any
 }>()
 
 const isDesktop = ref(false)
+
 onMounted(() => {
-  // Устанавливаем isDesktop только на клиенте
   isDesktop.value = window.matchMedia('(min-width: 1024px)').matches
 })
 
 const { getImageUrl } = useSupabaseStorage()
-
-// 👇 Добавляем минимальную задержку для показа скелета
-const showSkeleton = ref(true)
-const minLoadingTime = 300 // миллисекунды
-
-onMounted(() => {
-  setTimeout(() => {
-    showSkeleton.value = false
-  }, minLoadingTime)
-})
-
-// Или используйте computed с задержкой
-const isActuallyLoading = computed(() => {
-  return props.isLoading || showSkeleton.value
-})
 
 const autoplayPlugin = Autoplay({
   delay: 4000,
@@ -68,7 +53,7 @@ function getSlideUrl(imageUrl: string | null) {
 
 <template>
   <div class="w-full">
-    <div v-if="isActuallyLoading" class="app-container">
+    <div v-if="isLoading" class="app-container py-4">
       <Skeleton class="h-[35vh] md:h-[65vh] w-full rounded-2xl" />
     </div>
 
@@ -116,7 +101,7 @@ function getSlideUrl(imageUrl: string | null) {
                     :src="getSlideUrl(slide.image_url) || undefined"
                     :alt="slide.title"
                     class="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
-                    loading="lazy"
+                    loading="eager"
                   >
                   <div
                     v-else
@@ -128,6 +113,7 @@ function getSlideUrl(imageUrl: string | null) {
           </div>
         </CarouselItem>
       </CarouselContent>
+
       <ClientOnly>
         <CarouselPrevious class="absolute left-4 hidden sm:inline-flex" />
         <CarouselNext class="absolute right-4 hidden sm:inline-flex" />
