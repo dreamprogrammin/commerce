@@ -14,11 +14,11 @@ const route = useRoute()
 const productsStore = useProductsStore()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
+
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ СТРАНИЦЫ ---
-// Все данные, связанные с отображением каталога, теперь живут здесь, а не в сторе.
 const products = ref<ProductWithGallery[]>([])
-const isLoading = ref(true) // Главный флаг для первоначальной загрузки и перезагрузки по фильтрам
-const isLoadingMore = ref(false) // Флаг для кнопки "Показать еще"
+const isLoading = ref(true)
+const isLoadingMore = ref(false)
 const hasMoreProducts = ref(true)
 const currentPage = ref(1)
 const PAGE_SIZE = 12
@@ -27,27 +27,29 @@ const availableBrands = ref<BrandForFilter[]>([])
 const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isInitialLoad = ref(true)
+const priceRange = ref({ min: 0, max: 50000 })
 
 interface ActiveFilters {
   sortBy: SortByType
   subCategoryIds: string[]
   price: [number, number]
-  brandIds: string[] // Бренд теперь обрабатывается отдельно от attributes
-  materialIds: string[] // Новый
-  countryIds: string[] // Новый
+  brandIds: string[]
+  materialIds: string[]
+  countryIds: string[]
   attributes: Record<string, (string | number)[]>
 }
+
 const activeFilters = ref<ActiveFilters>({
   sortBy: getSortByFromQuery(route.query.sort_by),
   subCategoryIds: [],
-  price: [0, 50000], // Временный диапазон, будет обновлен
+  price: [0, 50000],
   brandIds: [],
   materialIds: [],
   countryIds: [],
   attributes: {},
 })
 
-// --- 3. Вычисляемые свойства (Computeds) ---
+// --- 3. Вычисляемые свойства ---
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? 'all')
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (currentCategorySlug.value === 'all') {
@@ -64,74 +66,52 @@ const title = computed(() => {
     return path[path.length - 1]?.name
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
-// Вычисляемый диапазон цен на основе УЖЕ загруженных товаров
-const priceRange = ref({ min: 0, max: 50000 })
 
 // --- 4. Функции-обработчики ---
 
-/**
- * Безопасно извлекает и валидирует параметр сортировки из URL.
- * @param queryValue - Значение из route.query.
- * @returns Валидное значение SortByType или 'popularity' по умолчанию.
- */
 function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[] | undefined): SortByType {
   if (!queryValue) {
     return 'popularity'
   }
-
   const value = Array.isArray(queryValue) ? queryValue[0] : queryValue
-
   if (value === 'popularity' || value === 'newest' || value === 'price_asc' || value === 'price_desc') {
     return value
   }
   return 'popularity'
 }
 
-async function loadFilterData(slug: string) {
-  // Теперь загружаем и сохраняем данные раздельно
-  const [brands, attributes, materials, countries, priceRangeData] = await Promise.all([
-    productsStore.fetchBrandsForCategory(slug),
-    productsStore.fetchAttributesForCategory(slug),
-    productsStore.fetchAllMaterials(), // <-- НОВЫЙ ВЫЗОВ
-    productsStore.fetchAllCountries(), // <-- НОВЫЙ ВЫЗОВ
-    productsStore.fetchPriceRangeForCategory(slug),
-  ])
-
+/**
+ * Инициализирует фильтры с загруженными данными
+ */
+function initializeFiltersWithData(brands: BrandForFilter[], attributes: AttributeWithValue[], materials: Material[], countries: Country[], priceRangeData: any) {
   availableBrands.value = brands
   availableFilters.value = attributes
-  availableMaterials.value = materials // <-- Сохраняем
-  availableCountries.value = countries // <-- Сохраняем
+  availableMaterials.value = materials
+  availableCountries.value = countries
 
-  // 1. Устанавливаем Price Range для UI
   const priceMin = priceRangeData.min_price
   const priceMax = priceRangeData.max_price
   priceRange.value = { min: priceMin, max: priceMax }
 
-  // 2. Инициализируем динамические атрибуты для сброса
+  // Инициализируем динамические атрибуты
   const newAttributeFilters: Record<string, any[]> = {}
   for (const attr of attributes) {
     newAttributeFilters[attr.slug] = []
   }
 
-  // 3. АТОМАРНЫЙ СБРОС ACTIVEFILTERS
-  // Устанавливаем все фильтры сразу, используя корректные начальные значения
   activeFilters.value = {
     sortBy: getSortByFromQuery(route.query.sort_by),
     subCategoryIds: [],
-    price: [priceMin, priceMax], // <-- Используем актуальный диапазон цен
+    price: [priceMin, priceMax],
     brandIds: [],
     materialIds: [],
     countryIds: [],
-    attributes: newAttributeFilters, // <-- Используем корректный, только что созданный объект
+    attributes: newAttributeFilters,
   }
-
-  // 4. Запускаем первую загрузку товаров (используя ТОЛЬКО ЧТО СБРОШЕННЫЕ ФИЛЬТРЫ)
-  await loadProducts(false)
 }
 
 /**
- * Главная функция загрузки товаров. Управляет локальным состоянием.
- * @param isLoadMore - `true` для дозагрузки, `false` для полной перезагрузки.
+ * Главная функция загрузки товаров
  */
 async function loadProducts(isLoadMore = false) {
   const slug = currentCategorySlug.value
@@ -147,34 +127,23 @@ async function loadProducts(isLoadMore = false) {
     products.value = []
   }
 
-  // === 1. BrandIds, MaterialIds, CountryIds БЕРУТСЯ НАПРЯМУЮ ===
-  // Теперь они берутся из активных фильтров, а не из activeFilters.attributes
   const brandIds = activeFilters.value.brandIds
   const materialIds = activeFilters.value.materialIds
   const countryIds = activeFilters.value.countryIds
 
-  // === 2. Готовим фильтры по остальным атрибутам для RPC ===
-  // ЭТОТ ЭТАП ОСТАЕТСЯ, Т.К. ОН РАБОТАЕТ ТОЛЬКО С Color/Size/etc.
   const attributeFilters: AttributeFilter[] = Object.entries(activeFilters.value.attributes)
-    // .filter(([slug]) => slug !== 'brand') // <-- Больше не нужно, т.к. 'brand' нет в attributes!
     .filter(([, optionIds]) => optionIds.length > 0)
     .map(([slug, optionIds]) => ({ slug, option_ids: optionIds as number[] }))
 
-  // === 3. Формируем финальный объект фильтров для передачи в Pinia Store ===
   const filters: IProductFilters = {
     categorySlug: currentCategorySlug.value,
     sortBy: activeFilters.value.sortBy,
     subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
-
-    // === ОБНОВЛЕННЫЕ ПРЯМЫЕ ФИЛЬТРЫ ===
     brandIds: brandIds.length > 0 ? brandIds : undefined,
     materialIds: materialIds.length > 0 ? materialIds : undefined,
     countryIds: countryIds.length > 0 ? countryIds : undefined,
-
     priceMin: activeFilters.value.price[0],
     priceMax: activeFilters.value.price[1],
-
-    // === ДИНАМИЧЕСКИЕ АТРИБУТЫ ===
     attributes: attributeFilters.length > 0 ? attributeFilters : undefined,
   }
 
@@ -190,14 +159,11 @@ async function loadProducts(isLoadMore = false) {
 
     hasMoreProducts.value = hasMore
 
-    // Обновляем диапазон цен только при первой загрузке (не при "Показать еще")
     if (!isLoadMore && newProducts.length > 0) {
       const prices = newProducts.map(p => Number(p.price))
       const newMin = Math.floor(Math.min(...prices))
       const newMax = Math.ceil(Math.max(...prices))
       priceRange.value = { min: newMin, max: newMax }
-      // activeFilters.value.price = [newMin, newMax]
-      // Не сбрасываем `activeFilters.value.price` здесь, чтобы сохранить выбор пользователя
     }
 
     currentPage.value++
@@ -208,59 +174,74 @@ async function loadProducts(isLoadMore = false) {
   }
 }
 
-/**
- * Обертка для кнопки "Показать еще".
- */
 async function loadMoreProducts() {
   await loadProducts(true)
 }
 
-// --- 5. Логика загрузки данных и реакции на изменения ---
-
-// `useAsyncData` грузит товары на сервере
-await useAsyncData(
-  `catalog-products-${currentCategorySlug.value}`,
+// --- 5. SSR ЗАГРУЗКА ДАННЫХ (СЕРВЕРНАЯ СТОРОНА) ---
+// ⭐ ГЛАВНОЕ ИЗМЕНЕНИЕ: Всё загружается на сервере в одном useAsyncData
+const { data: catalogData } = await useAsyncData(
+  `catalog-data-${currentCategorySlug.value}`,
   async () => {
+    // Загружаем категории на сервере
     await categoriesStore.fetchCategoryData()
 
+    // Загружаем фильтры НА СЕРВЕРЕ параллельно
     const slug = currentCategorySlug.value
 
-    const initialFilters: IProductFilters = {
-      categorySlug: slug,
-      sortBy: getSortByFromQuery(route.query.sort_by),
+    if (slug === 'all') {
+      // Для "все товары" грузим всё
+      const [brands, attributes, materials, countries, priceRange] = await Promise.all([
+        productsStore.fetchBrandsForCategory(slug),
+        productsStore.fetchAttributesForCategory(slug),
+        productsStore.fetchAllMaterials(),
+        productsStore.fetchAllCountries(),
+        productsStore.fetchPriceRangeForCategory(slug),
+      ])
+      return { brands, attributes, materials, countries, priceRange }
     }
-
-    const { products: initialProducts, hasMore } = await productsStore.fetchProducts(initialFilters, 1, PAGE_SIZE)
-
-    return { initialProducts, hasMore }
+    else {
+      // Для конкретной категории
+      const [brands, attributes, materials, countries, priceRange] = await Promise.all([
+        productsStore.fetchBrandsForCategory(slug),
+        productsStore.fetchAttributesForCategory(slug),
+        productsStore.fetchAllMaterials(),
+        productsStore.fetchAllCountries(),
+        productsStore.fetchPriceRangeForCategory(slug),
+      ])
+      return { brands, attributes, materials, countries, priceRange }
+    }
   },
-  { watch: [currentCategorySlug] },
+  { watch: [currentCategorySlug], lazy: false }, // lazy: false = загружается на сервере
 )
 
-// `watch` на `currentCategorySlug` запускает загрузку фильтров и товаров
-// при первом заходе на страницу и при каждой смене категории.
+// Инициализируем фильтры, когда данные загрузились
 watch(
-  currentCategorySlug,
-  (newSlug) => {
-    if (newSlug) {
-      // 1. Вызываем только загрузку мета-данных и сброс
-      loadFilterData(newSlug)
+  catalogData,
+  (data) => {
+    if (data) {
+      initializeFiltersWithData(
+        data.brands,
+        data.attributes,
+        data.materials,
+        data.countries,
+        data.priceRange,
+      )
+      // Загружаем товары после инициализации фильтров
+      loadProducts(false)
     }
   },
   { immediate: true },
 )
 
+// Реактивная загрузка товаров при изменении фильтров
 watchDebounced(
   activeFilters,
   () => {
-    // Пропускаем первое срабатывание (или срабатывание при сбросе),
-    // когда activeFilters был только что инициализирован в loadFilterData
     if (isInitialLoad.value) {
-      isInitialLoad.value = false // Сбрасываем флаг после первого 'холостого' прохода
+      isInitialLoad.value = false
       return
     }
-
-    // Здесь происходит реальный запрос после изменения фильтров пользователем
     loadProducts(false)
   },
   { debounce: 500, deep: true },
@@ -278,6 +259,7 @@ watchDebounced(
         <div class="mb-6 h-6 w-1/3 rounded-lg bg-gray-200 animate-pulse" />
       </template>
     </ClientOnly>
+
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <aside class="col-span-1 lg:sticky top-24 self-start">
         <DynamicFilters
@@ -290,7 +272,8 @@ watchDebounced(
           :is-loading="isLoading"
         />
       </aside>
-      <main class="col-span-3  min-w-0">
+
+      <main class="col-span-3 min-w-0">
         <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
 
         <ProductGridSkeleton v-if="isLoading" />
