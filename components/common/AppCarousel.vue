@@ -5,6 +5,7 @@ import Autoplay from 'embla-carousel-autoplay'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
+import { carouselContainerVariants } from '@/lib/variants'
 
 defineProps<{
   slides: SlideRow[]
@@ -12,14 +13,8 @@ defineProps<{
   error: any
 }>()
 
-const isDesktop = ref(false)
-
-onMounted(() => {
-  isDesktop.value = window.matchMedia('(min-width: 1024px)').matches
-})
-
 const { getImageUrl } = useSupabaseStorage()
-
+const containerClass = carouselContainerVariants({ contained: true })
 const autoplayPlugin = Autoplay({
   delay: 4000,
   stopOnInteraction: false,
@@ -54,11 +49,11 @@ function getSlideUrl(imageUrl: string | null) {
 <template>
   <div class="w-full">
     <!-- 🎨 Скелетон карусели с выглядывающим вторым слайдом -->
-    <div v-if="isLoading" class="w-full px-4 sm:px-6 lg:app-container">
+    <div v-if="isLoading" :class="containerClass">
       <div class="py-4">
         <div class="flex gap-3 md:gap-4 overflow-hidden">
           <!-- Главный видимый слайд -->
-          <div class="flex-shrink-0 w-[80%] md:w-[83.33%] lg:w-[87.5%]">
+          <div class="flex-shrink-0 w-[80%] md:w-[83.33%] lg:w-[87.5%] pl-3 lg:pl-0">
             <Skeleton class="h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] w-full rounded-2xl" />
           </div>
 
@@ -86,7 +81,7 @@ function getSlideUrl(imageUrl: string | null) {
     <!-- Основная карусель -->
     <ClientOnly v-else-if="slides.length > 0">
       <Carousel
-        class="w-full px-4 sm:px-6 lg:app-container"
+        :class="containerClass"
         :plugins="[autoplayPlugin]"
         :opts="{
           align: 'start',
@@ -134,10 +129,10 @@ function getSlideUrl(imageUrl: string | null) {
 
       <!-- Fallback для SSR -->
       <template #fallback>
-        <div class="w-full px-4 sm:px-6 lg:app-container">
+        <div :class="containerClass">
           <div class="py-4">
             <div class="flex gap-3 md:gap-4 overflow-hidden">
-              <div class="flex-shrink-0 w-[80%] md:w-[83.33%] lg:w-[87.5%]">
+              <div class="flex-shrink-0 w-[80%] md:w-[83.33%] lg:w-[87.5%] pl-3 lg:pl-0">
                 <Skeleton class="h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] w-full rounded-2xl" />
               </div>
               <div class="flex-shrink-0 w-[20%] md:w-[16.67%] lg:w-[12.5%]">
