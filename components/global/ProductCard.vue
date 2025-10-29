@@ -13,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
-const { getImageUrl } = useSupabaseStorage() // 👈 Используем новый метод
+const { getImageUrl } = useSupabaseStorage()
 
 const isTouchDevice = ref(false)
 onMounted(() => {
@@ -37,28 +37,11 @@ const quantityInCart = computed(() => {
   return itemInCart.value ? itemInCart.value.quantity : 0
 })
 
-const hasMultipleImages = computed(() => Array.isArray(props.product.product_images) && props.product.product_images.length > 1)
+const hasMultipleImages = computed(() =>
+  Array.isArray(props.product.product_images) && props.product.product_images.length > 1,
+)
 
 const activeImageIndex = ref(0)
-
-/**
- * Получаем оптимизированный URL с трансформацией
- */
-// const activeImageUrl = computed(() => {
-//   const imageUrl = props.product.product_images?.[activeImageIndex.value]?.image_url
-
-//   if (!imageUrl)
-//     return null
-
-//   // 👇 Используем getOptimizedUrl с параметрами оптимизации
-//   return getOptimizedUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-//     width: 400,
-//     height: 400,
-//     quality: 80,
-//     format: 'webp',
-//     resize: 'cover',
-//   })
-// })
 
 const priceDetails = computed(() => {
   const originalPrice = Number(props.product.price)
@@ -120,6 +103,7 @@ watch(emblaMobileApi, (api) => {
   }
 })
 
+// Для десктопа (активное изображение при наведении)
 const activeImageUrl = computed(() => {
   const imageUrl = props.product.product_images?.[activeImageIndex.value]?.image_url
   if (!imageUrl)
@@ -127,6 +111,15 @@ const activeImageUrl = computed(() => {
 
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.PRODUCT_CARD)
 })
+
+// 👇 Функция для получения URL по индексу (для мобильной карусели)
+function getImageUrlByIndex(index: number) {
+  const imageUrl = props.product.product_images?.[index]?.image_url
+  if (!imageUrl)
+    return null
+
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.PRODUCT_CARD)
+}
 </script>
 
 <template>
@@ -151,7 +144,6 @@ const activeImageUrl = computed(() => {
         <!-- Рендеринг для НЕ-тач устройств (десктоп) -->
         <template v-if="!isTouchDevice">
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
-            <!-- 👇 Просто используем img с оптимизированным URL -->
             <img
               v-if="activeImageUrl"
               :key="activeImageUrl"
@@ -178,13 +170,12 @@ const activeImageUrl = computed(() => {
             @init-api="(val) => emblaMobileApi = val"
           >
             <CarouselContent>
-              <CarouselItem v-for="(image, index) in product.product_images" :key="index">
+              <CarouselItem v-for="(_, index) in product.product_images" :key="index">
                 <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full aspect-square">
-                  <!-- 👇 Оптимизированные изображения в карусели -->
+                  <!-- 👇 Используем функцию с правильным индексом -->
                   <img
-                    v-if="activeImageUrl"
-                    :src="activeImageUrl"
-                    :alt="product.name"
+                    :src="getImageUrlByIndex(index) || '/images/placeholder.svg'"
+                    :alt="`${product.name} - изображение ${index + 1}`"
                     class="w-full h-full object-cover"
                     loading="lazy"
                   >
@@ -192,6 +183,8 @@ const activeImageUrl = computed(() => {
               </CarouselItem>
             </CarouselContent>
           </Carousel>
+
+          <!-- Одно изображение на мобилке -->
           <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full">
             <img
               v-if="activeImageUrl"
@@ -200,6 +193,9 @@ const activeImageUrl = computed(() => {
               class="w-full h-full object-cover"
               loading="lazy"
             >
+            <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+              <span>Нет фото</span>
+            </div>
           </NuxtLink>
         </template>
 
@@ -228,14 +224,16 @@ const activeImageUrl = computed(() => {
         <ClientOnly>
           <template v-if="!isTouchDevice">
             <div
-              v-for="(_, index) in product.product_images" :key="index"
+              v-for="(_, index) in product.product_images"
+              :key="index"
               class="w-2 h-2 rounded-full transition-all"
               :class="index === activeImageIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
             />
           </template>
           <template v-else>
             <div
-              v-for="(_, index) in product.product_images" :key="`dot-${index}`"
+              v-for="(_, index) in product.product_images"
+              :key="`dot-${index}`"
               class="w-2 h-2 rounded-full transition-all"
               :class="index === mobileSelectedIndex ? 'bg-white scale-125 shadow-md' : 'bg-white/50'"
             />
