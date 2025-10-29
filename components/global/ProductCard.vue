@@ -172,7 +172,9 @@ const activeImageUrl = computed(() => {
             v-if="hasMultipleImages"
             class="w-full h-full"
             :opts="{ loop: true, align: 'start' }"
-            @touchstart.stop @touchmove.stop @touchend.stop
+            @touchstart.stop
+            @touchmove.stop
+            @touchend.stop
             @init-api="(val) => emblaMobileApi = val"
           >
             <CarouselContent>

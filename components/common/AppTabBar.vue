@@ -10,6 +10,7 @@ import {
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { HeaderOverlayKey } from '@/types/app'
 
@@ -29,6 +30,8 @@ const searchSuggestions = [
 ]
 
 const headerOverlay = inject(HeaderOverlayKey)
+
+const containerClass = carouselContainerVariants({ contained: 'always' })
 
 const activeMenuValue = ref<string | undefined>()
 const isSearchOpen = ref(false)
@@ -107,7 +110,7 @@ defineExpose({ closeAllPopups })
         </button>
       </PopoverTrigger>
       <PopoverContent class="p-4 min-w-screen rounded-b-md">
-        <div class="w-full app-container">
+        <div :class="`w-full ${containerClass}`">
           <div class="relative mb-4">
             <Input
               id="search-input"

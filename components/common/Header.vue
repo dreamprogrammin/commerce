@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { HeaderOverlay } from '@/types/app'
+import { carouselContainerVariants } from '@/lib/variants'
 import { HeaderOverlayKey } from '@/types/app'
 
 const isHeaderOverlayVisible = ref(false)
+
+const containerClass = carouselContainerVariants({ contained: 'always' })
 
 function showHeaderOverlay(): void {
   isHeaderOverlayVisible.value = true
@@ -28,7 +31,7 @@ function handleOverlayClick() {
 <template>
   <header class="header z-[50] bg-amber-200 relative shadow-sm">
     <CommonHeaderTop />
-    <div class="app-container">
+    <div :class="containerClass">
       <CommonHeaderBottom />
       <CommonAppTabBar />
     </div>

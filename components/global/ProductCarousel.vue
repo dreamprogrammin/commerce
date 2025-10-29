@@ -1,22 +1,20 @@
 <script setup lang="ts">
 import type { BaseProduct } from '@/types'
-import { useMediaQuery } from '@vueuse/core'
+import { carouselContainerVariants } from '@/lib/variants'
 
 defineProps<{
   products: BaseProduct[] | null
   title?: string
 }>()
-const isDesktop = ref(false)
-onMounted(() => {
-  // Устанавливаем isDesktop только на клиенте
-  isDesktop.value = window.matchMedia('(min-width: 1024px)').matches
-})
+
+const headerContainerClass = carouselContainerVariants({ contained: 'always' })
+const carouselContainerClass = carouselContainerVariants({ contained: 'desktop' })
 </script>
 
 <template>
   <section v-if="products && products.length > 0" class="py-8 md:py-12">
     <!-- `container` нужен только для заголовка -->
-    <div class="app-container mx-auto">
+    <div :class="headerContainerClass">
       <slot name="header" />
     </div>
 
@@ -32,7 +30,7 @@ onMounted(() => {
       >
         <Carousel
           class="w-full"
-          :class="{ 'app-container': isDesktop }"
+          :class="carouselContainerClass"
           :opts="{
             align: 'start',
           }"

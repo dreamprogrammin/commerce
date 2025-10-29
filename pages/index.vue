@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useSlides } from '@/composables/slides/useSlides'
+import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -18,6 +19,8 @@ const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
 const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
+
+const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 
 const { data: mainPersonalData, pending: isLoadingRecommendations } = useAsyncData(
   'home-recommendations',
@@ -48,7 +51,6 @@ const { data: popularProducts, pending: isLoadingPopular } = useAsyncData(
   { lazy: true, default: () => [] },
 )
 
-// 3. Загрузка Новинок
 const { data: newestProducts, pending: isLoadingNewest } = useAsyncData(
   'home-newest',
   () => productsStore.fetchNewestProducts(10),
@@ -61,7 +63,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
 <template>
   <div>
     <!-- Блок приветствия/авторизации -->
-    <div class="app-container py-4">
+    <div :class="alwaysContainedClass" class="py-4">
       <ClientOnly>
         <div v-if="isLoggedIn" class="p-4 bg-blue-50 border border-blue-200 rounded-md">
           <NuxtLink v-if="isAdmin" to="/admin" class="font-semibold text-primary hover:underline">
@@ -84,29 +86,36 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
       </ClientOnly>
     </div>
 
-    <!-- Слайдер - упрощенная логика -->
+    <!-- Слайдер -->
     <CommonAppCarousel
       :is-loading="isLoadingSlides"
       :error="slidesError"
       :slides="slides || []"
     />
 
-    <HomePopularCategories class="app-container" />
+    <!-- Популярные категории -->
+    <div :class="alwaysContainedClass">
+      <HomePopularCategories />
+    </div>
 
-    <div class="app-container py-8 md:py-12">
+    <!-- Карточки бонусов и избранного -->
+    <div :class="alwaysContainedClass" class="py-8 md:py-12">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
         <HomeBonusProgramCard />
         <HomeFeaturedProduct />
       </div>
     </div>
 
+    <!-- Карусели товаров -->
     <ClientOnly>
-      <div v-if="isLoadingMainBlock" class="app-container py-8 md:py-12">
+      <!-- Скелетон -->
+      <div v-if="isLoadingMainBlock" :class="alwaysContainedClass" class="py-8 md:py-12">
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
       </div>
 
       <template v-else>
+        <!-- Избранное -->
         <HomeProductsCarousel
           v-if="isLoggedIn && wishlistProducts.length > 0"
           :is-loading="isLoadingRecommendations"
@@ -116,6 +125,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
           class="mt-16 pt-8 border-t"
         />
 
+        <!-- Рекомендации -->
         <HomeProductsCarousel
           v-if="recommendedProducts && recommendedProducts.length > 0"
           :is-loading="isLoadingRecommendations"
@@ -125,6 +135,7 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
           :class="{ 'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0 }"
         />
 
+        <!-- Популярные товары (fallback) -->
         <HomeProductsCarousel
           v-else
           :is-loading="isLoadingPopular"
@@ -135,14 +146,16 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
         />
       </template>
 
+      <!-- Fallback для SSR -->
       <template #fallback>
-        <div class="app-container py-8 md:py-12">
+        <div :class="alwaysContainedClass" class="py-8 md:py-12">
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
         </div>
       </template>
     </ClientOnly>
 
+    <!-- Новые поступления -->
     <ClientOnly>
       <HomeProductsCarousel
         v-if="newestProducts && newestProducts.length > 0"
@@ -152,14 +165,16 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
         see-all-link="/catalog/all?sort_by=newest"
         class="pt-4 border-t"
       />
-      <div v-else-if="isLoadingNewest" class="app-container py-8 md:py-12">
+
+      <!-- Скелетон для новинок -->
+      <div v-else-if="isLoadingNewest" :class="alwaysContainedClass" class="py-8 md:py-12">
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
       </div>
 
       <!-- Fallback для SSR -->
       <template #fallback>
-        <div class="app-container py-8 md:py-12">
+        <div :class="alwaysContainedClass" class="py-8 md:py-12">
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
         </div>

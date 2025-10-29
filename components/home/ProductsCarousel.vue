@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import type { BaseProduct } from '@/types'
+import { carouselContainerVariants } from '@/lib/variants'
 
 const props = defineProps<{
   products: BaseProduct[] | null
   isLoading: boolean
   title: string
-  seeAllLink: string // И ссылку "Смотреть все" тоже принимаем
+  seeAllLink: string
 }>()
+
+// Используем единый стиль контейнеров
+const containerClass = carouselContainerVariants({ contained: 'desktop' })
 </script>
 
-<!-- components/HomeProductsCarousel.vue -->
 <template>
   <section class="py-4">
     <!-- 1. Если идет загрузка, показываем скелетон -->
-    <div v-if="isLoading" class="app-container">
+    <div v-if="isLoading" :class="containerClass">
       <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-8">
         {{ props.title }}
       </h2>
@@ -36,7 +39,6 @@ const props = defineProps<{
       </template>
     </ProductCarousel>
 
-    <!-- 3. Если загрузка завершена, но товаров нет, НЕ показываем ничего (это резерв) -->
-    <!-- Блок v-else здесь не нужен -->
+    <!-- 3. Если загрузка завершена, но товаров нет, НЕ показываем ничего -->
   </section>
 </template>

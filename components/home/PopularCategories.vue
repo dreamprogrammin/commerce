@@ -15,8 +15,6 @@ const { data: popularCategories, pending: isLoading } = useAsyncData(
   },
 )
 
-// Функция для получения URL изображения категории
-// Автоматически использует оптимизацию или оригинал в зависимости от конфига
 function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return '/images/placeholder.svg'
@@ -27,7 +25,8 @@ function getCategoryImageUrl(imageUrl: string | null) {
 </script>
 
 <template>
-  <div class="container py-8 md:py-12">
+  <!-- Убрали внешний container, он теперь в родителе -->
+  <div class="py-8 md:py-12">
     <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-center mb-8">
       Популярные категории
     </h2>

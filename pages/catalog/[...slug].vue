@@ -5,6 +5,7 @@ import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
+import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
@@ -12,7 +13,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 const route = useRoute()
 const productsStore = useProductsStore()
 const categoriesStore = useCategoriesStore()
-
+const containerClass = carouselContainerVariants({ contained: 'always' })
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ СТРАНИЦЫ ---
 // Все данные, связанные с отображением каталога, теперь живут здесь, а не в сторе.
 const products = ref<ProductWithGallery[]>([])
@@ -253,7 +254,7 @@ watchDebounced(
 </script>
 
 <template>
-  <div class="app-container py-8">
+  <div :class="`${containerClass} py-8`">
     <ClientOnly>
       <Breadcrumbs :items="breadcrumbs" class="mb-6" />
       <h1 class="text-3xl font-bold mb-6 capitalize">

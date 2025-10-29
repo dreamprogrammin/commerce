@@ -14,7 +14,8 @@ defineProps<{
 }>()
 
 const { getImageUrl } = useSupabaseStorage()
-const containerClass = carouselContainerVariants({ contained: true })
+const carouselContainerClass = carouselContainerVariants({ contained: 'desktop' })
+const containerClass = carouselContainerVariants({ contained: 'always' })
 const autoplayPlugin = Autoplay({
   delay: 4000,
   stopOnInteraction: false,
@@ -49,7 +50,7 @@ function getSlideUrl(imageUrl: string | null) {
 <template>
   <div class="w-full">
     <!-- 🎨 Скелетон карусели с выглядывающим вторым слайдом -->
-    <div v-if="isLoading" :class="containerClass">
+    <div v-if="isLoading" :class="carouselContainerClass">
       <div class="py-4">
         <div class="flex gap-3 md:gap-4 overflow-hidden">
           <!-- Главный видимый слайд -->
@@ -68,7 +69,7 @@ function getSlideUrl(imageUrl: string | null) {
     <!-- Ошибка загрузки -->
     <div
       v-else-if="error"
-      class="app-container w-full aspect-[16/7] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center"
+      :class="`${containerClass} w-full aspect-[16/7] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center`"
     >
       <h3 class="mt-4 text-lg font-semibold">
         Не удалось загрузить слайдер
@@ -81,7 +82,7 @@ function getSlideUrl(imageUrl: string | null) {
     <!-- Основная карусель -->
     <ClientOnly v-else-if="slides.length > 0">
       <Carousel
-        :class="containerClass"
+        :class="carouselContainerClass"
         :plugins="[autoplayPlugin]"
         :opts="{
           align: 'start',
@@ -147,7 +148,7 @@ function getSlideUrl(imageUrl: string | null) {
     <!-- Пустое состояние -->
     <div
       v-else
-      class="app-container w-full aspect-[16/7] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed"
+      :class="`${containerClass} w-full aspect-[16/7] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"
     >
       <p class="text-muted-foreground">
         Нет активных слайдов для отображения.
