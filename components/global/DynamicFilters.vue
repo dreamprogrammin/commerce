@@ -189,7 +189,7 @@ watch(() => props.priceRange, (newRange) => {
         <div v-for="country in availableCountries" :key="country.id" class="flex items-center space-x-2">
           <Checkbox
             :id="`country-${country.id}`"
-            :checked="modelValue.materialIds?.includes(String(country.id))"
+            :checked="modelValue.countryIds?.includes(String(country.id))"
             @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'countryIds', country.id)"
           />
           <Label :for="`country-${country.id}`" class="font-normal cursor-pointer">{{ country.name }}</Label>
