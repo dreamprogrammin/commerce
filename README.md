@@ -78,3 +78,4 @@ Check out the [deployment documentation](https://nuxt.com/docs/getting-started/d
 
 - [Система контейнеров (Variants)](./docs/VARIANTS.md)
 - [Оптимизация изображений](./docs/IMAGES.md)
+- [Настройка Vue Query для кэширования](./docs/VUE_QUERY_SETUP.md)
