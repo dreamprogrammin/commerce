@@ -5,6 +5,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -14,7 +15,7 @@ const router = useRouter()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
-
+const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
@@ -44,6 +45,17 @@ const { data, pending: isLoading } = useAsyncData(
       })(),
       (async () => {
         if (fetchedProduct.category_id) {
+          // ✅ Загружаем и кэшируем бренды и атрибуты для похожих товаров
+          const categorySlug = fetchedProduct.categories?.slug
+          if (categorySlug) {
+            await Promise.all([
+              productsStore.fetchBrandsForCategory(categorySlug),
+              productsStore.fetchAttributesForCategory(categorySlug),
+              productsStore.fetchAllMaterials(),
+              productsStore.fetchAllCountries(),
+            ])
+          }
+
           const excludeIds = [fetchedProduct.id, ...fetchedProduct.accessory_ids || []]
           fetchedSimilarProducts = await productsStore.fetchSimilarProducts(
             fetchedProduct.category_id,
@@ -172,7 +184,7 @@ watch(() => product.value?.id, () => {
 </script>
 
 <template>
-  <div class="container py-12">
+  <div :class="`${containerClass} py-12`">
     <ClientOnly>
       <ProductDetailSkeleton v-if="isLoading" />
 
@@ -334,14 +346,6 @@ watch(() => product.value?.id, () => {
             </ClientOnly>
           </div>
         </div>
-
-        <ProductCarousel v-if="similarProducts.length > 0" :products="similarProducts" class="mt-16 pt-8 border-t">
-          <template #header>
-            <h2 class="text-2xl font-bold mb-6">
-              Похожие товары
-            </h2>
-          </template>
-        </ProductCarousel>
       </div>
 
       <div v-else class="text-center py-20">
@@ -361,6 +365,13 @@ watch(() => product.value?.id, () => {
       </template>
     </ClientOnly>
   </div>
+  <ProductCarousel v-if="similarProducts.length > 0" :products="similarProducts" class="mt-16 pt-8 border-t">
+    <template #header>
+      <h2 class="text-2xl font-bold mb-6">
+        Похожие товары
+      </h2>
+    </template>
+  </ProductCarousel>
 </template>
 
 <style scoped>
