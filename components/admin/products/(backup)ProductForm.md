@@ -4,14 +4,12 @@ import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
-import { formatFileSize, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
-
 import BrandForm from '../brands/BrandForm.vue'
 
 // --- 1. PROPS & EMITS ---
@@ -40,6 +38,7 @@ const emit = defineEmits<{
 const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
 const brandsStore = useAdminBrandsStore()
+// 👇 Используем универсальную функцию getImageUrl
 const { getImageUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
@@ -49,7 +48,6 @@ const formData = ref<Partial<ProductFormData>>({})
 const isBrandDialogOpen = ref(false)
 const categoryAttributes = ref<AttributeWithValue[]>([])
 const productAttributeValues = ref<Record<number, number | null>>({})
-const isProcessingImages = ref(false)
 
 const bonusOptions = [
   { label: 'Стандарт (5%)', value: 5 },
@@ -219,66 +217,13 @@ function autoFillSlug() {
     formData.value.slug = slugify(formData.value.name)
 }
 
-// --- 6. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ С ОПТИМИЗАЦИЕЙ ---
-
-async function handleFilesChange(event: Event) {
+// --- 6. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ ---
+function handleFilesChange(event: Event) {
   const target = event.target as HTMLInputElement
-  if (!target.files || target.files.length === 0)
-    return
-
-  const filesToProcess = Array.from(target.files)
-  isProcessingImages.value = true
-  const toastId = toast.loading(`Обработка ${filesToProcess.length} изображений...`)
-
-  try {
-    const processedFiles = await Promise.all(
-      filesToProcess.map(async (file) => {
-        // 🎯 РЕЖИМ 1: Бесплатный тариф (IMAGE_OPTIMIZATION_ENABLED = false)
-        if (!IMAGE_OPTIMIZATION_ENABLED && shouldOptimizeImage(file)) {
-          try {
-            const result = await optimizeImageBeforeUpload(file)
-            toast.success(
-              `${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (экономия ${result.savings.toFixed(0)}%)`,
-              { id: toastId },
-            )
-            return {
-              file: result.file,
-              previewUrl: URL.createObjectURL(result.file),
-            }
-          }
-          catch (error) {
-            console.error(`Ошибка оптимизации ${file.name}:`, error)
-            toast.error(`Ошибка обработки ${file.name}`, { id: toastId })
-            return {
-              file,
-              previewUrl: URL.createObjectURL(file),
-            }
-          }
-        }
-
-        // 🎯 РЕЖИМ 2: Платный тариф или файл маленький
-        return {
-          file,
-          previewUrl: URL.createObjectURL(file),
-        }
-      }),
-    )
-
-    newImageFiles.value.push(...processedFiles)
-
-    const mode = IMAGE_OPTIMIZATION_ENABLED ? '🚀 Supabase Transform' : '💾 Pre-optimized'
-    toast.success(`${processedFiles.length} изображений добавлено (${mode})`, {
-      id: toastId,
-    })
-
+  if (target.files) {
+    const filesWithPreview = Array.from(target.files).map(file => ({ file, previewUrl: URL.createObjectURL(file) }))
+    newImageFiles.value.push(...filesWithPreview)
     target.value = ''
-  }
-  catch (error) {
-    toast.error('Ошибка при обработке файлов', { id: toastId })
-    console.error('Ошибка handleFilesChange:', error)
-  }
-  finally {
-    isProcessingImages.value = false
   }
 }
 
@@ -719,15 +664,9 @@ const maxAgeYearsValue = computed({
       <Card>
         <CardHeader>
           <CardTitle>Галерея изображений</CardTitle>
-          <CardDescription v-if="IMAGE_OPTIMIZATION_ENABLED">
-            🚀 Режим: Supabase Transform (платный)
-          </CardDescription>
-          <CardDescription v-else>
-            💾 Режим: Pre-optimized (бесплатный)
-          </CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
-          <!-- Существующие изображения -->
+          <!-- 👇 Существующие изображения с оптимизацией через getImageUrl -->
           <div v-if="existingImages.length > 0" class="grid grid-cols-3 gap-2">
             <div v-for="image in existingImages" :key="image.id" class="relative group aspect-square">
               <img
@@ -741,8 +680,7 @@ const maxAgeYearsValue = computed({
               </Button>
             </div>
           </div>
-
-          <!-- Новые изображения -->
+          <!-- 👇 Новые изображения (локальные preview) -->
           <div v-if="newImageFiles.length > 0" class="grid grid-cols-3 gap-2">
             <div v-for="(item, index) in newImageFiles" :key="index" class="relative group aspect-square">
               <img :src="item.previewUrl" class="w-full h-full object-cover rounded-md" alt="Превью нового изображения">
@@ -751,26 +689,14 @@ const maxAgeYearsValue = computed({
               </Button>
             </div>
           </div>
-
-          <!-- Input для загрузки файлов -->
           <div>
             <Label for="images">Добавить фото</Label>
-            <Input
-              id="images"
-              type="file"
-              multiple
-              accept="image/*"
-              :disabled="isProcessingImages"
-              @change="handleFilesChange"
-            />
-            <p v-if="isProcessingImages" class="text-sm text-muted-foreground mt-2">
-              ⏳ Обработка изображений...
-            </p>
+            <Input id="images" type="file" multiple accept="image/*" @change="handleFilesChange" />
           </div>
         </CardContent>
       </Card>
 
-      <Button type="submit" size="lg" class="w-full" :disabled="isProcessingImages">
+      <Button type="submit" size="lg" class="w-full">
         Сохранить товар
       </Button>
     </div>
