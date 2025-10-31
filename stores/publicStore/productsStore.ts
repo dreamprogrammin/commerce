@@ -1,15 +1,28 @@
 import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, CategoryPriceRangeRpcResponse, Country, Database, FullProduct, IProductFilters, Material, ProductRow, ProductWithGallery, ProductWithImages, SimpleBrand } from '@/types'
 import { toast } from 'vue-sonner'
 
-// const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
+  // ============================================
+  // 🔥 STATE - КЭШИРОВАНИЕ МЕТАДАННЫХ
+  // ============================================
   const brands = ref<Brand[]>([])
+  const brandsByCategory = ref<Record<string, BrandForFilter[]>>({})
+  const attributesByCategory = ref<Record<string, AttributeWithValue[]>>({})
+  const allMaterials = ref<Material[]>([])
+  const allCountries = ref<Country[]>([])
+  const priceRangeByCategory = ref<Record<string, { min_price: number, max_price: number }>>({})
+
+  // ============================================
+  // 📦 МЕТОДЫ С КЭШИРОВАНИЕМ
+  // ============================================
 
   async function fetchAllBrands() {
-    if (brands.value.length > 0)
+    if (brands.value.length > 0) {
+      console.log('✅ All brands from cache')
       return
+    }
     try {
       const { data, error } = await supabase
         .from('brands')
@@ -23,14 +36,194 @@ export const useProductsStore = defineStore('productsStore', () => {
       toast.error('Ошибка при загрузке брендов', { description: error.message })
     }
   }
-  /**
-   * Загружает отфильтрованный и отсортированный список товаров с пагинацией.
-   * НЕ изменяет никакое состояние, а просто ВОЗВРАЩАЕТ результат.
-   * @param filters - Объект с параметрами фильтрации.
-   * @param currentPage - Текущая страница для дозагрузки.
-   * @param pageSize - Размер страницы.
-   * @returns Promise, который разрешается объектом с товарами и флагом `hasMore`.
-   */
+
+  async function fetchBrandsForCategory(categorySlug: string): Promise<BrandForFilter[]> {
+    if (!categorySlug || categorySlug === 'all')
+      return []
+
+    // Проверяем кэш
+    if (brandsByCategory.value[categorySlug]) {
+      console.log('✅ Brands from cache:', categorySlug)
+      return brandsByCategory.value[categorySlug]
+    }
+
+    console.log('🌐 Fetching brands from server:', categorySlug)
+
+    try {
+      const { data, error } = await supabase.rpc('get_brands_by_category_slug', {
+        p_category_slug: categorySlug,
+      })
+      if (error)
+        throw error
+
+      brandsByCategory.value[categorySlug] = data || []
+      return data || []
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки брендов для категории:', error)
+      return []
+    }
+  }
+
+  async function fetchAttributesForCategory(categorySlug: string): Promise<AttributeWithValue[]> {
+    if (!categorySlug || categorySlug === 'all')
+      return []
+
+    // Проверяем кэш
+    if (attributesByCategory.value[categorySlug]) {
+      console.log('✅ Attributes from cache:', categorySlug)
+      return attributesByCategory.value[categorySlug]
+    }
+
+    console.log('🌐 Fetching attributes from server:', categorySlug)
+
+    try {
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', categorySlug)
+        .single()
+      if (categoryError)
+        throw categoryError
+
+      const { data, error } = await supabase
+        .from('attributes')
+        .select('*, attribute_options(*), category_attributes!inner(category_id)')
+        .eq('category_attributes.category_id', categoryData.id)
+        .order('name')
+
+      if (error)
+        throw error
+
+      attributesByCategory.value[categorySlug] = data || []
+      return data || []
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки атрибутов для фильтров:', error)
+      return []
+    }
+  }
+
+  async function fetchAllMaterials(): Promise<Material[]> {
+    if (allMaterials.value.length > 0) {
+      console.log('✅ Materials from cache')
+      return allMaterials.value
+    }
+
+    console.log('🌐 Fetching materials from server')
+
+    try {
+      const { data, error } = await supabase.from('materials').select('*').order('name')
+      if (error)
+        throw error
+      allMaterials.value = data || []
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке материалов', { description: error.message })
+      return []
+    }
+  }
+
+  async function fetchAllCountries(): Promise<Country[]> {
+    if (allCountries.value.length > 0) {
+      console.log('✅ Countries from cache')
+      return allCountries.value
+    }
+
+    console.log('🌐 Fetching countries from server')
+
+    try {
+      const { data, error } = await supabase.from('countries').select('*').order('name')
+      if (error)
+        throw error
+      allCountries.value = data || []
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке стран', { description: error.message })
+      return []
+    }
+  }
+
+  async function fetchPriceRangeForCategory(categorySlug: string): Promise<{ min_price: number, max_price: number }> {
+    if (!categorySlug || categorySlug === 'all') {
+      return { min_price: 0, max_price: 50000 }
+    }
+
+    // Проверяем кэш
+    if (priceRangeByCategory.value[categorySlug]) {
+      console.log('✅ Price range from cache:', categorySlug)
+      return priceRangeByCategory.value[categorySlug]
+    }
+
+    console.log('🌐 Fetching price range from server:', categorySlug)
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_category_price_range', { p_category_slug: categorySlug })
+        .overrideTypes<{ min_price: number, max_price: number }[]>()
+
+      if (error)
+        throw error
+
+      const range = data && data.length > 0 ? data[0] : null
+      const result = {
+        min_price: Number(range?.min_price || 0),
+        max_price: Number(range?.max_price || 50000),
+      }
+
+      priceRangeByCategory.value[categorySlug] = result
+      return result
+    }
+    catch (error: any) {
+      console.error('Ошибка при получении диапазона цен:', error)
+      toast.error('Ошибка при загрузке диапазона цен', { description: error.message })
+      return { min_price: 0, max_price: 50000 }
+    }
+  }
+
+  // ============================================
+  // 🧹 УПРАВЛЕНИЕ КЭШЕМ
+  // ============================================
+
+  function clearCache() {
+    brandsByCategory.value = {}
+    attributesByCategory.value = {}
+    allMaterials.value = []
+    allCountries.value = []
+    priceRangeByCategory.value = {}
+    brands.value = []
+    console.log('🧹 All cache cleared')
+  }
+
+  function clearCategoryCache(categorySlug: string) {
+    delete brandsByCategory.value[categorySlug]
+    delete attributesByCategory.value[categorySlug]
+    delete priceRangeByCategory.value[categorySlug]
+    console.log('🧹 Cache cleared for category:', categorySlug)
+  }
+
+  function invalidateBrandsCache() {
+    brandsByCategory.value = {}
+    brands.value = []
+    console.log('🧹 Brands cache invalidated')
+  }
+
+  function invalidateMaterialsCache() {
+    allMaterials.value = []
+    console.log('🧹 Materials cache invalidated')
+  }
+
+  function invalidateCountriesCache() {
+    allCountries.value = []
+    console.log('🧹 Countries cache invalidated')
+  }
+
+  // ============================================
+  // 📊 МЕТОДЫ БЕЗ КЭШИРОВАНИЯ (товары)
+  // ============================================
+
   async function fetchProducts(
     filters: IProductFilters,
     currentPage = 1,
@@ -54,9 +247,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       if (error)
         throw error
 
-      // Теперь TypeScript знает, что `data` - это массив `FilteredProductRpcResponse`
       const newProducts = (rpcResponse || []).map((p) => {
-        // `p` теперь содержит p.brand_name и p.brand_slug
         return {
           ...p,
           product_images: Array.isArray(p.product_images) ? p.product_images : [],
@@ -78,12 +269,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       return { products: [], hasMore: false }
     }
   }
-  /**
-   * Загружает один конкретный товар по его `slug`.
-   * НЕ изменяет никакое состояние, а просто ВОЗВРАЩАЕТ результат.
-   * @param slug - Уникальный URL-идентификатор товара.
-   * @returns Promise, который разрешается объектом товара или `null`.
-   */
+
   async function fetchProductBySlug(slug: string): Promise<FullProduct | null> {
     try {
       const { data, error } = await supabase
@@ -111,58 +297,6 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
-  /**
-   * Загружает бренды, которые доступны в указанной категории.
-   */
-  async function fetchBrandsForCategory(categorySlug: string): Promise<BrandForFilter[]> {
-    if (!categorySlug || categorySlug === 'all')
-      return []
-    try {
-      const { data, error } = await supabase.rpc('get_brands_by_category_slug', {
-        p_category_slug: categorySlug,
-      })
-      if (error)
-        throw error
-
-      // TypeScript теперь будет счастлив, так как data соответствует BrandForFilter[]
-      return data || []
-    }
-    catch (error: any) {
-      console.error('Ошибка загрузки брендов для категории:', error)
-      return []
-    }
-  }
-  /**
-   * Загружает Атрибуты (и их опции), которые привязаны к указанной категории.
-   */
-  async function fetchAttributesForCategory(categorySlug: string): Promise<AttributeWithValue[]> {
-    if (!categorySlug || categorySlug === 'all')
-      return []
-    try {
-      const { data: categoryData, error: categoryError } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('slug', categorySlug)
-        .single()
-      if (categoryError)
-        throw categoryError
-
-      const { data, error } = await supabase
-        .from('attributes')
-        .select('*, attribute_options(*), category_attributes!inner(category_id)')
-        .eq('category_attributes.category_id', categoryData.id)
-        .order('name')
-
-      if (error)
-        throw error
-      return data || []
-    }
-    catch (error: any) {
-      console.error('Ошибка загрузки атрибутов для фильтров:', error)
-      return []
-    }
-  }
-
   async function fetchProductsByIds(ids: string[]): Promise<ProductWithImages[]> {
     if (!ids || ids.length === 0)
       return []
@@ -183,9 +317,6 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
-  /**
-   * Находит один "Товар дня" - активный товар с максимальным количеством бонусных баллов.
-   */
   async function fetchFeaturedProduct(): Promise<FullProduct | null> {
     try {
       const { data, error } = await supabase
@@ -208,9 +339,6 @@ export const useProductsStore = defineStore('productsStore', () => {
   }
 
   async function fetchNewestProducts(limit: number = 10): Promise<ProductWithGallery[]> {
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
     const { products } = await fetchProducts(
       {
         categorySlug: 'all',
@@ -234,13 +362,6 @@ export const useProductsStore = defineStore('productsStore', () => {
     return products
   }
 
-  /**
-   * Загружает похожие товары на основе той же категории.
-   * @param categoryId - ID категории для поиска.
-   * @param excludeIds - Массив ID товаров, которые нужно исключить из результатов.
-   * @param limit - Количество товаров для загрузки.
-   * @returns Promise, который разрешается массивом товаров.
-   */
   async function fetchSimilarProducts(
     categoryId: string | null,
     excludeIds: string[],
@@ -277,7 +398,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*') // Загружаем все поля
+        .select('*')
         .eq('id', productId)
         .single()
       if (error)
@@ -290,70 +411,20 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
-  /**
-   * Загружает минимальную и максимальную цену для товаров в категории и ее потомках.
-   */
-  async function fetchPriceRangeForCategory(categorySlug: string): Promise<CategoryPriceRangeRpcResponse> {
-    if (!categorySlug || categorySlug === 'all') {
-      return { min_price: 0, max_price: 50000 } // Возвращаем дефолтный диапазон для "Все товары"
-    }
+  // ============================================
+  // 📤 RETURN
+  // ============================================
 
-    try {
-      // Здесь мы должны использовать тип CategoryPriceRangeRpcResponse, который вы сгенерировали
-      const { data, error } = await supabase
-        .rpc('get_category_price_range', { p_category_slug: categorySlug })
-        .returns<{ min_price: number, max_price: number }[]>() // Приводим к конкретному типу возврата
-
-      if (error)
-        throw error
-
-      // RPC возвращает массив из 1 элемента, поэтому берем первый
-      const range = data && data.length > 0 ? data[0] : null
-
-      return {
-        min_price: Number(range?.min_price || 0),
-        max_price: Number(range?.max_price || 50000), // Используем 50000 как fallback, если нет товаров
-      }
-    }
-    catch (error: any) {
-      console.error('Ошибка при получении диапазона цен:', error)
-      toast.error('Ошибка при загрузке диапазона цен', { description: error.message })
-      return { min_price: 0, max_price: 50000 } // Fallback при ошибке
-    }
-  }
-  /**
-   * Загружает список всех материалов.
-   */
-  async function fetchAllMaterials(): Promise<Material[]> {
-    try {
-      const { data, error } = await supabase.from('materials').select('*').order('name')
-      if (error)
-        throw error
-      return data || []
-    }
-    catch (error: any) {
-      toast.error('Ошибка при загрузке материалов', { description: error.message })
-      return []
-    }
-  }
-
-  /**
-   * Загружает список всех стран.
-   */
-  async function fetchAllCountries(): Promise<Country[]> {
-    try {
-      const { data, error } = await supabase.from('countries').select('*').order('name')
-      if (error)
-        throw error
-      return data || []
-    }
-    catch (error: any) {
-      toast.error('Ошибка при загрузке стран', { description: error.message })
-      return []
-    }
-  }
   return {
+    // State
     brands,
+    brandsByCategory,
+    attributesByCategory,
+    allMaterials,
+    allCountries,
+    priceRangeByCategory,
+
+    // Методы
     fetchAllBrands,
     fetchProducts,
     fetchProductBySlug,
@@ -368,5 +439,12 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchPriceRangeForCategory,
     fetchAllMaterials,
     fetchAllCountries,
+
+    // Управление кэшем
+    clearCache,
+    clearCategoryCache,
+    invalidateBrandsCache,
+    invalidateMaterialsCache,
+    invalidateCountriesCache,
   }
 })

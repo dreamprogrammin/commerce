@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.get_attributes_for_category_slug(text) CASCADE;
