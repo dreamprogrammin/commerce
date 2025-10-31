@@ -144,17 +144,13 @@ function getImageUrlByIndex(index: number) {
         <!-- Рендеринг для НЕ-тач устройств (десктоп) -->
         <template v-if="!isTouchDevice">
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
-            <img
-              v-if="activeImageUrl"
-              :key="activeImageUrl"
+            <ProgressiveImage
               :src="activeImageUrl"
               :alt="product.name"
-              class="w-full h-full object-cover transition-opacity duration-200"
-              loading="lazy"
-            >
-            <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-              <span>Нет фото</span>
-            </div>
+              aspect-ratio="square"
+              object-fit="cover"
+              placeholder-type="shimmer"
+            />
           </NuxtLink>
         </template>
 
