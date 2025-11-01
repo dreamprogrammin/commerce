@@ -104,6 +104,15 @@ export const IMAGE_SIZES = {
     width: 1920,
     height: 500,
   },
+
+  /**
+   * Для слайдера/карусели баннеров
+   * Используется: SlidesCarousel, BannerSlider
+   */
+  SLIDER_BANNER: {
+    width: 1920,
+    height: 600,
+  },
 }
 
 /**
