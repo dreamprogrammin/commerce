@@ -79,13 +79,13 @@ const optimizedImageUrl = computed(() => {
     })
 
     if (url) {
-      // Добавляем timestamp для обхода Cloudflare
+      // ✅ ВСЕГДА добавляем timestamp для обхода Cloudflare
       const separator = url.includes('?') ? '&' : '?'
       return `${url}${separator}t=${Date.now()}`
     }
   }
 
-  // Иначе используем прямой URL
+  // 🛡️ Иначе используем прямой URL с timestamp
   const separator = imageUrl.value.includes('?') ? '&' : '?'
   return `${imageUrl.value}${separator}t=${Date.now()}`
 })
@@ -160,7 +160,7 @@ const isDev = computed(() => import.meta.env.DEV)
 
 if (isDev.value) {
   watchEffect(() => {
-    console.warn('🖼️ ProgressiveImage debug:', {
+    console.log('🖼️ ProgressiveImage debug:', {
       src: imageUrl.value,
       isLoaded: isLoaded.value,
       isError: isError.value,

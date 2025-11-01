@@ -61,6 +61,15 @@ export const IMAGE_SIZES = {
   },
 
   /**
+   * Карточка товара в сетке (синоним CARD для совместимости)
+   * Используется: ProductCard компонент
+   */
+  PRODUCT_CARD: {
+    width: 400,
+    height: 400,
+  },
+
+  /**
    * Полная версия в модальном окне, слайдере
    * Используется: ProductModal, ImageGallery, Lightbox
    */

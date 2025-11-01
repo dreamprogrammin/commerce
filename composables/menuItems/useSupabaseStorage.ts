@@ -76,7 +76,7 @@ export function useSupabaseStorage() {
       : uniqueFileName
 
     try {
-      console.warn(`📤 Загружаем файл: ${uniqueFileName} → ${options.bucketName}/${filePath}`)
+      console.log(`📤 Загружаем файл: ${uniqueFileName} → ${options.bucketName}/${filePath}`)
 
       const { data, error } = await supabase.storage
         .from(options.bucketName)
@@ -89,7 +89,7 @@ export function useSupabaseStorage() {
       if (error)
         throw error
 
-      console.warn(`✅ Файл успешно загружен: ${data.path}`)
+      console.log(`✅ Файл успешно загружен: ${data.path}`)
       toast.success('Файл загружен', {
         description: `${file.name} успешно загружен`,
       })
@@ -137,7 +137,7 @@ export function useSupabaseStorage() {
       return true
 
     try {
-      console.warn(`🗑️ Удаляем файлы из ${bucketName}: ${validPathsToRemove.join(', ')}`)
+      console.log(`🗑️ Удаляем файлы из ${bucketName}: ${validPathsToRemove.join(', ')}`)
 
       const { error } = await supabase.storage
         .from(bucketName)
@@ -161,7 +161,7 @@ export function useSupabaseStorage() {
         cacheKeysToDelete.forEach(key => imageUrlCache.delete(key))
       })
 
-      console.warn(`✅ Файлы успешно удалены`)
+      console.log(`✅ Файлы успешно удалены`)
       return true
     }
     catch (e: any) {
@@ -201,7 +201,7 @@ export function useSupabaseStorage() {
       const url = data?.publicUrl || null
 
       if (url) {
-        console.warn(`🌍 Public URL (${bucketName}): ${url}`)
+        console.log(`🌍 Public URL (${bucketName}): ${url}`)
       }
 
       return url
@@ -271,7 +271,7 @@ export function useSupabaseStorage() {
       const baseUrl = `${config.public.supabase.url}/storage/v1/render/image/public/${bucketName}`
       const url = `${baseUrl}/${filePath}${queryString}`
 
-      console.warn(`🚀 Optimized URL (${format} ${width}x${height}): ${url}`)
+      console.log(`🚀 Optimized URL (${format} ${width}x${height}): ${url}`)
 
       return url
     }
@@ -331,12 +331,12 @@ export function useSupabaseStorage() {
    *
    * ✅ Кеширует результаты для оптимизации производительности
    * ✅ Поддерживает обе стратегии: локальная оптимизация и облачная трансформация
-   * ✅ Добавляет timestamp для обхода Cloudflare
+   * ✅ 🛡️ ДОБАВЛЯЕТ TIMESTAMP для обхода Cloudflare bot detection
    *
    * @param bucketName - название бакета
    * @param filePath - путь к файлу
    * @param options - опции трансформации (игнорируются если оптимизация отключена)
-   * @returns URL изображения
+   * @returns URL изображения с timestamp для Cloudflare
    *
    * @example
    * // С оптимизацией (если включена в config/images.ts)
@@ -364,8 +364,10 @@ export function useSupabaseStorage() {
     if (imageUrlCache.has(cacheKey)) {
       const cachedUrl = imageUrlCache.get(cacheKey)
       if (cachedUrl) {
-        console.warn(`💾 Используем закешированный URL: ${cacheKey}`)
-        return cachedUrl
+        console.log(`💾 Используем закешированный URL: ${cacheKey}`)
+        // 🛡️ Добавляем timestamp даже для кешированного URL
+        const separator = cachedUrl.includes('?') ? '&' : '?'
+        return `${cachedUrl}${separator}t=${Date.now()}`
       }
     }
 
@@ -375,20 +377,26 @@ export function useSupabaseStorage() {
     if (IMAGE_OPTIMIZATION_ENABLED && options) {
       // 🚀 РЕЖИМ 1: Платный тариф - используем Supabase трансформацию
       url = getOptimizedUrl(bucketName, filePath, options)
-      console.warn(`🚀 Режим: Supabase Transform (платный)`)
+      console.log(`🚀 Режим: Supabase Transform (платный)`)
     }
     else {
       // 💾 РЕЖИМ 2: Бесплатный тариф - возвращаем оригинал (уже оптимизирован локально)
       url = getPublicUrl(bucketName, filePath)
-      console.warn(`💾 Режим: Pre-optimized (бесплатный)`)
+      console.log(`💾 Режим: Pre-optimized (бесплатный)`)
     }
 
-    // Кешируем результат
+    // Кешируем результат БЕЗ timestamp (timestamp добавляется при возврате)
     if (url) {
       imageUrlCache.set(cacheKey, url)
     }
 
-    return url
+    // 🛡️ ВАЖНО: Добавляем timestamp для обхода Cloudflare bot detection
+    if (url) {
+      const separator = url.includes('?') ? '&' : '?'
+      return `${url}${separator}t=${Date.now()}`
+    }
+
+    return null
   }
 
   /**
@@ -401,7 +409,7 @@ export function useSupabaseStorage() {
   function clearImageCache(): void {
     const sizeBefore = imageUrlCache.size
     imageUrlCache.clear()
-    console.warn(`🧹 Кеш очищен (было ${sizeBefore} элементов)`)
+    console.log(`🧹 Кеш очищен (было ${sizeBefore} элементов)`)
   }
 
   /**
