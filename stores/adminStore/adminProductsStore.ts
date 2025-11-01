@@ -15,7 +15,9 @@ import type {
 } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { formatFileSize, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
 
 export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
@@ -89,12 +91,12 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           product_images(*), 
           brands(*), 
           countries(*),
-          materials(*)`, // <-- УЖЕ НЕ НУЖНО ДОБАВЛЯТЬ product_attribute_values
+          materials(*)`,
         )
         .order('created_at', { ascending: false })
       if (error)
         throw error
-      products.value = (data as ProductListAdmin[]) || [] // <-- Приводим к новому типу
+      products.value = (data as ProductListAdmin[]) || []
     }
     catch (error: any) {
       toast.error('Ошибка загрузки товаров', { description: error.message })
@@ -106,7 +108,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
   async function fetchProductById(id: string): Promise<FullProduct | null> {
     isLoading.value = true
-    currentProduct.value = null // Сбрасываем для чистоты
+    currentProduct.value = null
     try {
       const { data, error } = await supabase
         .from('products')
@@ -125,22 +127,19 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error && error.code !== 'PGRST116')
         throw error
 
-      // 1. Устанавливаем значение в сторе (если это нужно где-то еще)
       currentProduct.value = data as FullProduct | null
 
-      // 2. ВОЗВРАЩАЕМ результат для использования в `useAsyncData`
       return data as FullProduct | null
     }
     catch (error: any) {
       toast.error(`Ошибка загрузки товара с ID: ${id}`, { description: error.message })
-      return null // <-- Возвращаем null в случае ошибки
+      return null
     }
     finally {
       isLoading.value = false
     }
   }
 
-  // ФУНКЦИЯ: Поиск товара по артикулу (SKU) для страницы создания
   async function fetchProductBySku(sku: string): Promise<FullProduct | null> {
     if (!sku)
       return null
@@ -159,7 +158,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         .eq('sku', sku.trim())
         .single()
 
-      // Ошибка "no rows found" (PGRST116) - это ожидаемый результат, если товара нет
       if (error && error.code !== 'PGRST116')
         throw error
 
@@ -176,7 +174,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
   async function fetchProductsByIds(ids: string[]): Promise<ProductWithImages[]> {
     if (!ids || ids.length === 0) {
-      return [] // Всегда возвращаем массив
+      return []
     }
     try {
       const { data, error } = await supabase
@@ -187,12 +185,11 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error)
         throw error
 
-      // Если `data` равно `null`, мы все равно вернем пустой массив
       return data || []
     }
     catch (error: any) {
       toast.error('Ошибка загрузки связанных товаров', { description: error.message })
-      return [] // Всегда возвращаем массив в случае ошибки
+      return []
     }
   }
 
@@ -229,12 +226,16 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       isLoading.value = false
     }
   }
+
   // --- ЗАПИСЬ ДАННЫХ (Write) ---
 
   /**
-   * ОБНОВЛЕНО: Создает товар, его галерею и связи с аксессуарами.
+   * Создает товар, его галерею и связи с аксессуарами.
    */
-  async function createProduct(productData: ProductInsert, newImageFiles: File[]) {
+  async function createProduct(
+    productData: ProductInsert,
+    newImageFiles: File[],
+  ) {
     isSaving.value = true
     try {
       const { data: newProduct, error } = await supabase
@@ -246,7 +247,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error || !newProduct)
         throw error
 
-      // Управляем только картинками
+      // 🎯 Управляем картинками с оптимизацией
       await _manageProductImages(newProduct.id, newImageFiles, [], 0)
 
       toast.success(`Товар "${newProduct.name}" успешно создан.`)
@@ -275,7 +276,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     try {
       const { data: updatedProduct, error } = await supabase
         .from('products')
-        .update(productData) // `productData` уже содержит `accessory_ids`
+        .update(productData)
         .eq('id', productId)
         .select('id, name')
         .single()
@@ -283,7 +284,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error || !updatedProduct)
         throw error
 
-      // Управляем только картинками
+      // 🎯 Управляем картинками с оптимизацией
       await _manageProductImages(productId, newImageFiles, imagesToDelete, existingImages.length)
 
       toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
@@ -302,15 +303,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
    * Удаляет товар и все связанные с ним изображения.
    */
   async function deleteProduct(productToDelete: ProductListAdmin) {
-    // 1. Оптимистичное удаление и сохранение оригинала
     const originalProducts = [...products.value]
     products.value = products.value.filter(p => p.id !== productToDelete.id)
 
-    // 2. Показываем toast.loading
     const toastId = toast.loading(`Удаление товара "${productToDelete.name}"...`, {
       action: {
         label: 'Отмена',
-        onClick: () => { // <-- Исправлено на `onClick`
+        onClick: () => {
           products.value = originalProducts
           toast.dismiss(toastId)
         },
@@ -318,7 +317,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     })
 
     try {
-      // 3. Сначала удаляем файлы из Storage
       if (productToDelete.product_images && productToDelete.product_images.length > 0) {
         const pathsToRemove = productToDelete.product_images.map(img => img.image_url)
         const success = await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
@@ -327,7 +325,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         }
       }
 
-      // 4. Затем удаляем запись из БД
       const { error } = await supabase
         .from('products')
         .delete()
@@ -335,30 +332,35 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error)
         throw error
 
-      // 5. Если всё успешно, обновляем toast на "успех"
       toast.success(`Товар "${productToDelete.name}" успешно удален.`, {
         id: toastId,
       })
     }
     catch (error: any) {
-      // 6. В случае ошибки, откатываем UI и обновляем toast на "ошибку"
       toast.error('Ошибка удаления товара', {
         id: toastId,
         description: error.message,
       })
-      // Восстанавливаем исходный список
       products.value = originalProducts
     }
   }
+
   // --- Приватные хелперы ---
 
+  /**
+   * 🎯 ОБНОВЛЕНО: Управление изображениями с поддержкой оптимизации
+   *
+   * Теперь обрабатывает файлы в зависимости от режима:
+   * - Бесплатный (IMAGE_OPTIMIZATION_ENABLED = false): локально оптимизирует
+   * - Платный (IMAGE_OPTIMIZATION_ENABLED = true): загружает оригиналы
+   */
   async function _manageProductImages(
     productId: string,
     filesToUpload: File[],
     imageIdsToDelete: string[],
     currentImageCount: number,
   ) {
-    // 1. Сначала удаляем отмеченные изображения
+    // 1️⃣ Сначала удаляем отмеченные изображения
     if (imageIdsToDelete.length > 0) {
       const { data: deletedImages, error: dbError } = await supabase
         .from('product_images')
@@ -373,9 +375,32 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
     }
 
-    // 2. Затем загружаем и привязываем новые
+    // 2️⃣ Затем обрабатываем и загружаем новые изображения
     if (filesToUpload.length > 0) {
-      const uploadPromises = filesToUpload.map(file =>
+      const processedFiles = await Promise.all(
+        filesToUpload.map(async (file) => {
+          // 🎯 РЕЖИМ 1: Бесплатный тариф - локально оптимизируем
+          if (!IMAGE_OPTIMIZATION_ENABLED && shouldOptimizeImage(file)) {
+            try {
+              const result = await optimizeImageBeforeUpload(file)
+              console.warn(
+                `✅ Оптимизирован: ${file.name} (${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)})`,
+              )
+              return result.file
+            }
+            catch (error) {
+              console.warn(`⚠️ Ошибка оптимизации ${file.name}, загружаем оригинал:`, error)
+              return file
+            }
+          }
+
+          // 🎯 РЕЖИМ 2: Платный тариф или маленький файл - загружаем как есть
+          return file
+        }),
+      )
+
+      // 3️⃣ Загружаем обработанные файлы в Supabase
+      const uploadPromises = processedFiles.map(file =>
         uploadFile(file, {
           bucketName: BUCKET_NAME_PRODUCT,
           filePathPrefix: `products/${productId}`,
@@ -388,7 +413,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         .map((path, index) => ({
           product_id: productId,
           image_url: path,
-          // ВАЖНО: `display_order` начинается после количества уже существующих картинок
           display_order: currentImageCount + index,
         }))
 
@@ -401,17 +425,17 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       }
     }
   }
+
   /**
-   * НОВАЯ ФУНКЦИЯ: Поиск товаров для добавления в аксессуары.
+   * Поиск товаров для добавления в аксессуары.
    */
   async function searchProducts(query: string, limit: number = 5): Promise<ProductSearchResult[]> {
     if (query.length < 2)
       return []
     try {
-    // Шаг 1: Вызываем RPC, чтобы получить все нужные ID категорий
       const { data: categoryData, error: categoryError } = await supabase
         .rpc('get_category_and_children_ids', {
-          p_category_slug: 'accessories', // <-- Ищем всех детей 'accessories'
+          p_category_slug: 'accessories',
         })
 
       if (categoryError)
@@ -421,14 +445,12 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         return []
       }
 
-      // Извлекаем ID из результата
       const categoryIds = categoryData.map(c => c.id)
 
-      // Шаг 2: Ищем товары в этом списке категорий
       const { data, error } = await supabase
         .from('products')
         .select('id, name, price')
-        .in('category_id', categoryIds) // <-- Ищем в массиве ID
+        .in('category_id', categoryIds)
         .ilike('name', `%${query}%`)
         .limit(limit)
 
@@ -443,8 +465,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   }
 
   async function getAttributesForCategory(categoryId: string): Promise<AttributeWithValue[]> {
-    // Эта функция загружает атрибуты, привязанные к категории,
-    // и сразу подгружает их возможные опции для выбора.
     if (!categoryId)
       return []
     try {
@@ -468,7 +488,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   }
 
   async function getProductAttributeValues(productId: string) {
-    // Загружает уже сохраненные значения атрибутов для конкретного товара
     try {
       const { data, error } = await supabase
         .from('product_attribute_values')
@@ -486,7 +505,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
   async function saveProductAttributeValues(productId: string, values: ProductAttributeValueInsert[]) {
     try {
-      // 1. Удаляем все старые значения для этого товара
       const { error: deleteError } = await supabase
         .from('product_attribute_values')
         .delete()
@@ -494,9 +512,8 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (deleteError)
         throw deleteError
 
-      // 2. Вставляем новые значения (только те, что были выбраны)
       const valuesToInsert = values
-        .filter(v => v.option_id != null) // Вставляем только если есть значение
+        .filter(v => v.option_id != null)
         .map(v => ({ ...v, product_id: productId }))
 
       if (valuesToInsert.length > 0) {
@@ -511,6 +528,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       toast.error('Ошибка сохранения атрибутов товара', { description: error.message })
     }
   }
+
   return {
     products,
     currentProduct,

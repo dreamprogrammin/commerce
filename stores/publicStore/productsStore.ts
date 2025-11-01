@@ -1,4 +1,4 @@
-import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, CategoryPriceRangeRpcResponse, Country, Database, FullProduct, IProductFilters, Material, ProductRow, ProductWithGallery, ProductWithImages, SimpleBrand } from '@/types'
+import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, Country, Database, FullProduct, IProductFilters, Material, ProductRow, ProductWithGallery, ProductWithImages, SimpleBrand } from '@/types'
 import { toast } from 'vue-sonner'
 
 export const useProductsStore = defineStore('productsStore', () => {
@@ -20,7 +20,7 @@ export const useProductsStore = defineStore('productsStore', () => {
 
   async function fetchAllBrands() {
     if (brands.value.length > 0) {
-      console.log('✅ All brands from cache')
+      console.warn('✅ All brands from cache')
       return
     }
     try {
@@ -43,11 +43,11 @@ export const useProductsStore = defineStore('productsStore', () => {
 
     // Проверяем кэш
     if (brandsByCategory.value[categorySlug]) {
-      console.log('✅ Brands from cache:', categorySlug)
+      console.warn('✅ Brands from cache:', categorySlug)
       return brandsByCategory.value[categorySlug]
     }
 
-    console.log('🌐 Fetching brands from server:', categorySlug)
+    console.warn('🌐 Fetching brands from server:', categorySlug)
 
     try {
       const { data, error } = await supabase.rpc('get_brands_by_category_slug', {
@@ -71,11 +71,11 @@ export const useProductsStore = defineStore('productsStore', () => {
 
     // Проверяем кэш
     if (attributesByCategory.value[categorySlug]) {
-      console.log('✅ Attributes from cache:', categorySlug)
+      console.warn('✅ Attributes from cache:', categorySlug)
       return attributesByCategory.value[categorySlug]
     }
 
-    console.log('🌐 Fetching attributes from server:', categorySlug)
+    console.warn('🌐 Fetching attributes from server:', categorySlug)
 
     try {
       const { data: categoryData, error: categoryError } = await supabase
@@ -106,11 +106,11 @@ export const useProductsStore = defineStore('productsStore', () => {
 
   async function fetchAllMaterials(): Promise<Material[]> {
     if (allMaterials.value.length > 0) {
-      console.log('✅ Materials from cache')
+      console.warn('✅ Materials from cache')
       return allMaterials.value
     }
 
-    console.log('🌐 Fetching materials from server')
+    console.warn('🌐 Fetching materials from server')
 
     try {
       const { data, error } = await supabase.from('materials').select('*').order('name')
@@ -127,11 +127,11 @@ export const useProductsStore = defineStore('productsStore', () => {
 
   async function fetchAllCountries(): Promise<Country[]> {
     if (allCountries.value.length > 0) {
-      console.log('✅ Countries from cache')
+      console.warn('✅ Countries from cache')
       return allCountries.value
     }
 
-    console.log('🌐 Fetching countries from server')
+    console.warn('🌐 Fetching countries from server')
 
     try {
       const { data, error } = await supabase.from('countries').select('*').order('name')
@@ -153,11 +153,11 @@ export const useProductsStore = defineStore('productsStore', () => {
 
     // Проверяем кэш
     if (priceRangeByCategory.value[categorySlug]) {
-      console.log('✅ Price range from cache:', categorySlug)
+      console.warn('✅ Price range from cache:', categorySlug)
       return priceRangeByCategory.value[categorySlug]
     }
 
-    console.log('🌐 Fetching price range from server:', categorySlug)
+    console.warn('🌐 Fetching price range from server:', categorySlug)
 
     try {
       const { data, error } = await supabase
@@ -194,30 +194,30 @@ export const useProductsStore = defineStore('productsStore', () => {
     allCountries.value = []
     priceRangeByCategory.value = {}
     brands.value = []
-    console.log('🧹 All cache cleared')
+    console.warn('🧹 All cache cleared')
   }
 
   function clearCategoryCache(categorySlug: string) {
     delete brandsByCategory.value[categorySlug]
     delete attributesByCategory.value[categorySlug]
     delete priceRangeByCategory.value[categorySlug]
-    console.log('🧹 Cache cleared for category:', categorySlug)
+    console.warn('🧹 Cache cleared for category:', categorySlug)
   }
 
   function invalidateBrandsCache() {
     brandsByCategory.value = {}
     brands.value = []
-    console.log('🧹 Brands cache invalidated')
+    console.warn('🧹 Brands cache invalidated')
   }
 
   function invalidateMaterialsCache() {
     allMaterials.value = []
-    console.log('🧹 Materials cache invalidated')
+    console.warn('🧹 Materials cache invalidated')
   }
 
   function invalidateCountriesCache() {
     allCountries.value = []
-    console.log('🧹 Countries cache invalidated')
+    console.warn('🧹 Countries cache invalidated')
   }
 
   // ============================================
