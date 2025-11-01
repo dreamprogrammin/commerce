@@ -331,12 +331,12 @@ export function useSupabaseStorage() {
    *
    * ✅ Кеширует результаты для оптимизации производительности
    * ✅ Поддерживает обе стратегии: локальная оптимизация и облачная трансформация
-   * ✅ 🛡️ ДОБАВЛЯЕТ TIMESTAMP для обхода Cloudflare bot detection
+   * ✅ 🛡️ Добавляет timestamp ОДИН РАЗ при первой загрузке (не на каждый вызов)
    *
    * @param bucketName - название бакета
    * @param filePath - путь к файлу
    * @param options - опции трансформации (игнорируются если оптимизация отключена)
-   * @returns URL изображения с timestamp для Cloudflare
+   * @returns URL изображения (кешированный, одинаковый для одного файла)
    *
    * @example
    * // С оптимизацией (если включена в config/images.ts)
@@ -344,9 +344,6 @@ export function useSupabaseStorage() {
    *
    * // Без параметров (вернет оригинал если оптимизация отключена)
    * const url = getImageUrl('products', 'products/123/image.jpg')
-   *
-   * // Используется везде в приложении
-   * <img :src="getImageUrl('products', imagePath, { width: 200 })" />
    */
   function getImageUrl(
     bucketName: string,
@@ -360,14 +357,14 @@ export function useSupabaseStorage() {
     // Генерируем ключ кеша
     const cacheKey = `${bucketName}:${filePath}:${JSON.stringify(options || {})}`
 
-    // Проверяем кеш
+    // 💾 Проверяем кеш - ВОЗВРАЩАЕМ ОДИНАКОВЫЙ URL для одного файла
     if (imageUrlCache.has(cacheKey)) {
       const cachedUrl = imageUrlCache.get(cacheKey)
       if (cachedUrl) {
         console.log(`💾 Используем закешированный URL: ${cacheKey}`)
-        // 🛡️ Добавляем timestamp даже для кешированного URL
-        const separator = cachedUrl.includes('?') ? '&' : '?'
-        return `${cachedUrl}${separator}t=${Date.now()}`
+        // ✅ ВАЖНО: Возвращаем ОДИНАКОВЫЙ кешированный URL, без нового timestamp
+        // Это позволяет браузеру использовать свой кеш и не переzагружать
+        return cachedUrl
       }
     }
 
@@ -385,15 +382,17 @@ export function useSupabaseStorage() {
       console.log(`💾 Режим: Pre-optimized (бесплатный)`)
     }
 
-    // Кешируем результат БЕЗ timestamp (timestamp добавляется при возврате)
-    if (url) {
-      imageUrlCache.set(cacheKey, url)
-    }
-
-    // 🛡️ ВАЖНО: Добавляем timestamp для обхода Cloudflare bot detection
+    // 🛡️ Добавляем timestamp ОДИН РАЗ при первой загрузке
+    // Это обходит Cloudflare bot detection, но браузер может кешировать результат
     if (url) {
       const separator = url.includes('?') ? '&' : '?'
-      return `${url}${separator}t=${Date.now()}`
+      const urlWithTimestamp = `${url}${separator}t=${Date.now()}`
+
+      // Кешируем URL с timestamp
+      imageUrlCache.set(cacheKey, urlWithTimestamp)
+
+      console.log(`🆕 Новый URL с timestamp: ${cacheKey}`)
+      return urlWithTimestamp
     }
 
     return null

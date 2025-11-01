@@ -61,7 +61,7 @@ const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
 
 /**
  * 🛡️ Получить оптимизированный URL с кешем для обхода Cloudflare
- * Добавляет timestamp для каждого запроса чтобы избежать bot detection
+ * Timestamp УЖЕ добавляется в getImageUrl(), не добавляем снова!
  */
 const optimizedImageUrl = computed(() => {
   if (!shouldLoad.value || !imageUrl.value) {
@@ -78,16 +78,12 @@ const optimizedImageUrl = computed(() => {
       resize: 'cover',
     })
 
-    if (url) {
-      // ✅ ВСЕГДА добавляем timestamp для обхода Cloudflare
-      const separator = url.includes('?') ? '&' : '?'
-      return `${url}${separator}t=${Date.now()}`
-    }
+    // ✅ URL уже содержит timestamp из getImageUrl()
+    return url
   }
 
-  // 🛡️ Иначе используем прямой URL с timestamp
-  const separator = imageUrl.value.includes('?') ? '&' : '?'
-  return `${imageUrl.value}${separator}t=${Date.now()}`
+  // ✅ Прямой URL уже содержит timestamp из getImageUrl()
+  return imageUrl.value
 })
 
 /**
@@ -215,7 +211,7 @@ if (isDev.value) {
     -->
     <img
       ref="imageRef"
-      :src="optimizedImageUrl"
+      :src="optimizedImageUrl || undefined"
       :alt="alt"
       class="w-full h-full transition-opacity duration-300"
       :class="[
