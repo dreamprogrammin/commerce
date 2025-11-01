@@ -156,7 +156,9 @@ const placeholderStyle = computed(() => {
 /**
  * Логирование для отладки в dev режиме
  */
-if (import.meta.dev) {
+const isDev = computed(() => import.meta.env.DEV)
+
+if (isDev.value) {
   watchEffect(() => {
     console.warn('🖼️ ProgressiveImage debug:', {
       src: imageUrl.value,
@@ -192,7 +194,7 @@ if (import.meta.dev) {
 
       <!-- Индикатор режима (только в dev) -->
       <div
-        v-if="import.meta.dev"
+        v-if="isDev"
         class="absolute bottom-2 left-2 text-xs bg-black/50 text-white px-2 py-1 rounded font-mono"
       >
         <div v-if="IMAGE_OPTIMIZATION_ENABLED">
@@ -253,7 +255,7 @@ if (import.meta.dev) {
 
       <!-- Отладочная информация (dev mode) -->
       <span
-        v-if="import.meta.dev"
+        v-if="isDev"
         class="text-xs text-muted-foreground mt-2 font-mono"
       >
         {{ src }}
