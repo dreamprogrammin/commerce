@@ -1,17 +1,28 @@
 <script setup lang="ts">
-import type { AttributeValuePayload, AttributeWithValue, BrandInsert, BrandUpdate, FullProduct, ProductAttributeValueInsert, ProductFormData, ProductImageRow, ProductInsert, ProductSearchResult, ProductUpdate, ProductWithImages } from '@/types'
+import type {
+  AttributeValuePayload,
+  AttributeWithValue,
+  BrandInsert,
+  BrandUpdate,
+  FullProduct,
+  ProductFormData,
+  ProductImageRow,
+  ProductInsert,
+  ProductSearchResult,
+  ProductUpdate,
+  ProductWithImages,
+} from '@/types'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
+import { getOptimizationMode, IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import { formatFileSize, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
-
 import BrandForm from '../brands/BrandForm.vue'
 
 // --- 1. PROPS & EMITS ---
@@ -20,13 +31,17 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'create',
-    payload:
-    { data: ProductInsert, newImageFiles: File[], attributeValues: AttributeValuePayload[] }
+  (
+    e: 'create',
+    payload: {
+      data: ProductInsert
+      newImageFiles: File[]
+      attributeValues: AttributeValuePayload[]
+    }
   ): void
-  (e: 'update',
-    payload:
-    {
+  (
+    e: 'update',
+    payload: {
       data: ProductUpdate
       newImageFiles: File[]
       imagesToDelete: string[]
@@ -36,7 +51,7 @@ const emit = defineEmits<{
   ): void
 }>()
 
-// --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ ---
+// --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ И COMPOSABLES ---
 const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
 const brandsStore = useAdminBrandsStore()
@@ -44,7 +59,7 @@ const { getImageUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
 
-// --- 3. ЛОКАЛЬНОЕ СОСТОЯНИЕ КОМПОНЕНТА ---
+// --- 3. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
 const formData = ref<Partial<ProductFormData>>({})
 const isBrandDialogOpen = ref(false)
 const categoryAttributes = ref<AttributeWithValue[]>([])
@@ -69,15 +84,18 @@ const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
 const brandSearchQuery = ref('')
 
-// --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ПРИ ЗАГРУЗКЕ ---
+// --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ---
 
+/**
+ * Инициализирует форму с данными товара или пустыми значениями
+ */
 function setupFormData(product: FullProduct | null | undefined) {
   newImageFiles.value = []
   imagesToDelete.value = []
   linkedAccessories.value = []
 
   if (product && product.id) {
-    // --- РЕЖИМ РЕДАКТИРОВАНИЯ ---
+    // ✏️ РЕЖИМ РЕДАКТИРОВАНИЯ
     formData.value = {
       name: product.name,
       slug: product.slug,
@@ -101,8 +119,9 @@ function setupFormData(product: FullProduct | null | undefined) {
     }
     existingImages.value = [...(product.product_images || [])]
 
-    if (product.accessory_ids && product.accessory_ids.length > 0)
+    if (product.accessory_ids && product.accessory_ids.length > 0) {
       productStore.fetchProductsByIds(product.accessory_ids).then(data => linkedAccessories.value = data)
+    }
 
     if (product.price > 0 && product.bonus_points_award) {
       const percent = Math.round((product.bonus_points_award / Number(product.price)) * 100)
@@ -110,7 +129,7 @@ function setupFormData(product: FullProduct | null | undefined) {
     }
   }
   else {
-    // --- РЕЖИМ СОЗДАНИЯ ---
+    // ✨ РЕЖИМ СОЗДАНИЯ
     formData.value = {
       name: '',
       slug: '',
@@ -139,12 +158,15 @@ function setupFormData(product: FullProduct | null | undefined) {
 
 watch(
   () => props.initialData,
-  (newProduct) => {
-    setupFormData(newProduct)
-  },
+  newProduct => setupFormData(newProduct),
   { immediate: true },
 )
 
+// --- 5. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ ---
+
+/**
+ * Фильтрует бренды по поисковому запросу
+ */
 const filteredBrands = computed(() => {
   if (!brandSearchQuery.value) {
     return brands.value
@@ -154,6 +176,16 @@ const filteredBrands = computed(() => {
   )
 })
 
+/**
+ * Информация о текущем режиме оптимизации
+ */
+const optimizationMode = computed(() => getOptimizationMode())
+
+// --- 6. ОБРАБОТЧИКИ СОБЫТИЙ ---
+
+/**
+ * Обработка создания нового бренда
+ */
 async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
   const newBrand = await brandsStore.createBrand(payload.data as BrandInsert, payload.file)
   if (newBrand) {
@@ -168,6 +200,10 @@ async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, fil
   }
 }
 
+/**
+ * Обработка смены категории
+ * Загружает атрибуты для новой категории
+ */
 async function handleCategoryChange(categoryId: string | null) {
   if (!categoryId) {
     categoryAttributes.value = []
@@ -197,58 +233,72 @@ watch(() => formData.value.category_id, (newCategoryId) => {
   handleCategoryChange(categoryIdForHandler)
 }, { immediate: true })
 
-onMounted(() => {
-  if (categoriesStore.allCategories.length === 0)
-    categoriesStore.fetchAllCategories()
-  if (productStore.brands.length === 0)
-    productStore.fetchAllBrands()
-  if (productStore.countries.length === 0)
-    productStore.fetchAllCountries()
-  if (productStore.materials.length === 0)
-    productStore.fetchAllMaterials()
-})
-
-// --- 5. РЕАКТИВНОСТЬ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-watch([() => formData.value.price, selectedBonusPercent], ([price, percent]) => {
-  if (formData.value && typeof price === 'number' && typeof percent === 'number')
-    formData.value.bonus_points_award = Math.round(price * (percent / 100))
-})
-
+/**
+ * Автоматически заполняет slug на основе названия
+ */
 function autoFillSlug() {
-  if (formData.value?.name && !formData.value.slug)
+  if (formData.value?.name && !formData.value.slug) {
     formData.value.slug = slugify(formData.value.name)
+  }
 }
 
-// --- 6. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ С ОПТИМИЗАЦИЕЙ ---
+/**
+ * Обновляет бонус поинты при изменении цены или процента
+ */
+watch(
+  [() => formData.value.price, selectedBonusPercent],
+  ([price, percent]) => {
+    if (formData.value && typeof price === 'number' && typeof percent === 'number') {
+      formData.value.bonus_points_award = Math.round(price * (percent / 100))
+    }
+  },
+)
 
+// --- 7. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ ---
+
+/**
+ * 🎯 Обработка загрузки изображений с оптимизацией
+ *
+ * Поддерживает две стратегии:
+ * 1. Бесплатный тариф - локальная оптимизация через Canvas
+ * 2. Платный тариф - загрузка оригиналов для облачной трансформации
+ */
 async function handleFilesChange(event: Event) {
   const target = event.target as HTMLInputElement
-  if (!target.files || target.files.length === 0)
+  if (!target.files || target.files.length === 0) {
     return
+  }
 
   const filesToProcess = Array.from(target.files)
   isProcessingImages.value = true
-  const toastId = toast.loading(`Обработка ${filesToProcess.length} изображений...`)
+  const toastId = toast.loading(
+    `📦 Обработка ${filesToProcess.length} изображений (${optimizationMode.value.icon} ${optimizationMode.value.mode})...`,
+  )
 
   try {
     const processedFiles = await Promise.all(
       filesToProcess.map(async (file) => {
-        // 🎯 РЕЖИМ 1: Бесплатный тариф (IMAGE_OPTIMIZATION_ENABLED = false)
+        // 💾 РЕЖИМ 1: Бесплатный тариф - локальная оптимизация
         if (!IMAGE_OPTIMIZATION_ENABLED && shouldOptimizeImage(file)) {
           try {
             const result = await optimizeImageBeforeUpload(file)
-            toast.success(
-              `${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (экономия ${result.savings.toFixed(0)}%)`,
-              { id: toastId },
+            const savings = result.savings.toFixed(0)
+            const originalSize = formatFileSize(result.originalSize)
+            const optimizedSize = formatFileSize(result.optimizedSize)
+
+            console.warn(
+              `✅ Оптимизирован: ${file.name} (${originalSize} → ${optimizedSize}, экономия ${savings}%)`,
             )
+
             return {
               file: result.file,
               previewUrl: URL.createObjectURL(result.file),
             }
           }
           catch (error) {
-            console.error(`Ошибка оптимизации ${file.name}:`, error)
-            toast.error(`Ошибка обработки ${file.name}`, { id: toastId })
+            console.error(`❌ Ошибка оптимизации ${file.name}:`, error)
+            toast.error(`⚠️ Ошибка обработки ${file.name}, используем оригинал`)
+
             return {
               file,
               previewUrl: URL.createObjectURL(file),
@@ -256,7 +306,11 @@ async function handleFilesChange(event: Event) {
           }
         }
 
-        // 🎯 РЕЖИМ 2: Платный тариф или файл маленький
+        // 🚀 РЕЖИМ 2: Платный тариф или маленький файл - загружаем как есть
+        console.warn(
+          `📤 Файл маленький или платный тариф: ${file.name} (${formatFileSize(file.size)})`,
+        )
+
         return {
           file,
           previewUrl: URL.createObjectURL(file),
@@ -266,15 +320,26 @@ async function handleFilesChange(event: Event) {
 
     newImageFiles.value.push(...processedFiles)
 
-    const mode = IMAGE_OPTIMIZATION_ENABLED ? '🚀 Supabase Transform' : '💾 Pre-optimized'
-    toast.success(`${processedFiles.length} изображений добавлено (${mode})`, {
-      id: toastId,
-    })
+    // 📊 Расчет общей экономии трафика
+    const totalSavings = processedFiles.reduce((sum, item, idx) => {
+      const original = filesToProcess[idx]
+      if (!original)
+        return sum
+      const savings = Math.max(0, original.size - item.file.size)
+      return sum + savings
+    }, 0)
+
+    const mode = `${optimizationMode.value.icon} ${optimizationMode.value.mode}`
+    const message = totalSavings > 0
+      ? `✅ ${processedFiles.length} изображений обработано (экономия ${formatFileSize(totalSavings)}) ${mode}`
+      : `✅ ${processedFiles.length} изображений добавлено ${mode}`
+
+    toast.success(message, { id: toastId })
 
     target.value = ''
   }
   catch (error) {
-    toast.error('Ошибка при обработке файлов', { id: toastId })
+    toast.error('❌ Ошибка при обработке файлов', { id: toastId })
     console.error('Ошибка handleFilesChange:', error)
   }
   finally {
@@ -282,50 +347,80 @@ async function handleFilesChange(event: Event) {
   }
 }
 
+/**
+ * Удалить новое (еще не загруженное) изображение
+ */
 function removeNewImage(index: number) {
   const fileToRemove = newImageFiles.value[index]
-  if (fileToRemove)
+  if (fileToRemove) {
     URL.revokeObjectURL(fileToRemove.previewUrl)
+  }
   newImageFiles.value.splice(index, 1)
 }
 
+/**
+ * Пометить существующее изображение на удаление
+ */
 function removeExistingImage(image: ProductImageRow) {
   imagesToDelete.value.push(image.id)
   existingImages.value = existingImages.value.filter(img => img.id !== image.id)
 }
 
+/**
+ * Получить оптимизированный URL для существующего изображения
+ */
 function getExistingImageUrl(imageUrl: string) {
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL) || ''
 }
 
-// --- 7. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
+// --- 8. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
+
+/**
+ * Поиск аксессуаров с debounce
+ */
 const debouncedSearch = debounce(async () => {
   if (accessorySearchQuery.value.length < 2) {
     accessorySearchResults.value = []
     return
   }
   isSearchingAccessories.value = true
-  accessorySearchResults.value = await productStore.searchProducts(accessorySearchQuery.value, 5)
+  accessorySearchResults.value = await productStore.searchProducts(
+    accessorySearchQuery.value,
+    5,
+  )
   isSearchingAccessories.value = false
 }, 300)
 
+/**
+ * Добавить аксессуар к товару
+ */
 function addAccessory(product: ProductSearchResult) {
-  if (!linkedAccessories.value.some(p => p.id === product.id))
+  if (!linkedAccessories.value.some(p => p.id === product.id)) {
     linkedAccessories.value.push(product)
+  }
   accessorySearchQuery.value = ''
   accessorySearchResults.value = []
 }
 
+/**
+ * Удалить аксессуар от товара
+ */
 function removeAccessory(productId: string) {
   linkedAccessories.value = linkedAccessories.value.filter(p => p.id !== productId)
 }
 
-// --- 8. ОТПРАВКА ФОРМЫ ---
+// --- 9. ОТПРАВКА ФОРМЫ ---
+
+/**
+ * Валидация и отправка формы
+ */
 function handleSubmit() {
-  if (!formData.value)
+  if (!formData.value) {
     return
+  }
+
   if (!formData.value.name || !formData.value.slug) {
-    toast.error('Название и Слаг - обязательные поля')
+    toast.error('❌ Название и Слаг - обязательные поля')
     return
   }
 
@@ -356,6 +451,25 @@ function handleSubmit() {
     })
   }
 }
+
+// --- 10. ИНИЦИАЛИЗАЦИЯ НА МОНТИРОВАНИИ ---
+
+onMounted(() => {
+  if (categoriesStore.allCategories.length === 0) {
+    categoriesStore.fetchAllCategories()
+  }
+  if (productStore.brands.length === 0) {
+    productStore.fetchAllBrands()
+  }
+  if (productStore.countries.length === 0) {
+    productStore.fetchAllCountries()
+  }
+  if (productStore.materials.length === 0) {
+    productStore.fetchAllMaterials()
+  }
+})
+
+// --- 11. COMPUTED ДЛЯ ДВУСТОРОННЕЙ ПРИВЯЗКИ ---
 
 const skuValue = computed({
   get() {
@@ -415,9 +529,9 @@ const maxAgeYearsValue = computed({
 
 <template>
   <form v-if="formData" class="grid grid-cols-1 lg:grid-cols-3 gap-8" @submit.prevent="handleSubmit">
-    <!-- Левая колонка -->
+    <!-- 📍 Левая колонка: Основная информация и контент -->
     <div class="lg:col-span-2 space-y-6">
-      <!-- Основная информация -->
+      <!-- ℹ️ Основная информация -->
       <Card>
         <CardHeader>
           <CardTitle>Основная информация</CardTitle>
@@ -425,28 +539,50 @@ const maxAgeYearsValue = computed({
         <CardContent class="space-y-4">
           <div>
             <Label for="name">Название товара *</Label>
-            <Input id="name" v-model="formData.name" @blur="autoFillSlug" />
+            <Input
+              id="name"
+              v-model="formData.name"
+              placeholder="Например: Развивающая игрушка для младенцев"
+              @blur="autoFillSlug"
+            />
           </div>
           <div>
             <Label for="slug">Слаг (URL) *</Label>
-            <Input id="slug" v-model="formData.slug" />
+            <Input
+              id="slug"
+              v-model="formData.slug"
+              placeholder="razvivayushchaya-igrushka"
+            />
           </div>
           <div>
             <Label for="sku">Артикул (SKU)</Label>
-            <Input id="sku" v-model="skuValue" placeholder="Уникальный код товара" />
+            <Input
+              id="sku"
+              v-model="skuValue"
+              placeholder="Уникальный код товара"
+            />
           </div>
           <div>
             <Label for="barcode">Штрихкод (Barcode)</Label>
-            <Input id="barcode" v-model="barcodeValue" placeholder="Например, 4601234567890" />
+            <Input
+              id="barcode"
+              v-model="barcodeValue"
+              placeholder="Например, 4601234567890"
+            />
           </div>
           <div>
             <Label for="description">Описание</Label>
-            <Textarea id="description" v-model="descriptionValue" />
+            <Textarea
+              id="description"
+              v-model="descriptionValue"
+              placeholder="Подробное описание товара, его особенности и преимущества..."
+              rows="5"
+            />
           </div>
         </CardContent>
       </Card>
 
-      <!-- Цена и бонусы -->
+      <!-- 💰 Цена и бонусы -->
       <Card>
         <CardHeader>
           <CardTitle>Цена, бонусы и скидка</CardTitle>
@@ -454,7 +590,13 @@ const maxAgeYearsValue = computed({
         <CardContent class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label for="price">Цена в ₸ *</Label>
-            <Input id="price" v-model.number="formData.price" type="number" />
+            <Input
+              id="price"
+              v-model.number="formData.price"
+              type="number"
+              placeholder="0"
+              min="0"
+            />
           </div>
           <div>
             <Label for="discount_percentage">Скидка (%)</Label>
@@ -480,12 +622,16 @@ const maxAgeYearsValue = computed({
               </SelectContent>
             </Select>
             <p class="text-sm text-muted-foreground mt-2">
-              Будет начислено: <span class="font-bold text-primary">{{ formData.bonus_points_award || 0 }} бонусов</span>
+              Будет начислено:
+              <span class="font-bold text-primary">
+                {{ formData.bonus_points_award || 0 }} бонусов
+              </span>
             </p>
           </div>
         </CardContent>
       </Card>
 
+      <!-- 🏷️ Характеристики -->
       <Card v-if="categoryAttributes.length > 0">
         <CardHeader>
           <CardTitle>Характеристики</CardTitle>
@@ -520,21 +666,33 @@ const maxAgeYearsValue = computed({
         </CardContent>
       </Card>
 
-      <!-- Сопутствующие товары (Аксессуары) -->
+      <!-- 🛍️ Сопутствующие товары (Аксессуары) -->
       <Card>
         <CardHeader>
           <CardTitle>Сопутствующие товары</CardTitle>
-          <CardDescription>Привяжите аксессуары, например, батарейки или подарочную упаковку.</CardDescription>
+          <CardDescription>
+            Привяжите аксессуары, например, батарейки или подарочную упаковку.
+          </CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
           <div>
             <Label for="accessory-search">Добавить аксессуар</Label>
-            <Input id="accessory-search" v-model="accessorySearchQuery" placeholder="Начните вводить название..." @input="debouncedSearch" />
+            <Input
+              id="accessory-search"
+              v-model="accessorySearchQuery"
+              placeholder="Начните вводить название..."
+              @input="debouncedSearch"
+            />
             <div v-if="isSearchingAccessories" class="text-sm text-muted-foreground p-2">
-              Поиск...
+              ⏳ Поиск...
             </div>
             <div v-if="accessorySearchResults.length > 0" class="border rounded-md mt-1 p-1 space-y-1">
-              <div v-for="product in accessorySearchResults" :key="product.id" class="cursor-pointer hover:bg-muted p-2 rounded-md flex justify-between items-center" @click="addAccessory(product)">
+              <div
+                v-for="product in accessorySearchResults"
+                :key="product.id"
+                class="cursor-pointer hover:bg-muted p-2 rounded-md flex justify-between items-center transition"
+                @click="addAccessory(product)"
+              >
                 <span>{{ product.name }}</span>
                 <span class="text-xs text-muted-foreground">{{ product.price }} ₸</span>
               </div>
@@ -542,12 +700,23 @@ const maxAgeYearsValue = computed({
           </div>
           <div v-if="linkedAccessories.length > 0" class="space-y-2">
             <p class="text-sm font-medium">
-              Привязанные аксессуары:
+              ✅ Привязанные аксессуары ({{ linkedAccessories.length }}):
             </p>
             <div v-for="acc in linkedAccessories" :key="acc.id" class="flex items-center justify-between bg-muted p-2 rounded-md text-sm">
               <span>{{ acc.name }}</span>
-              <Button type="button" variant="ghost" size="icon" class="h-6 w-6" @click="removeAccessory(acc.id)">
-                <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                class="h-6 w-6"
+                @click="removeAccessory(acc.id)"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15">
+                  <path
+                    fill="currentColor"
+                    d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z"
+                  />
+                </svg>
               </Button>
             </div>
           </div>
@@ -555,12 +724,12 @@ const maxAgeYearsValue = computed({
       </Card>
     </div>
 
-    <!-- Правая колонка -->
+    <!-- 🎨 Правая колонка: Фильтры и медиа -->
     <div class="lg:col-span-1 space-y-6">
-      <!-- Организация -->
+      <!-- 🏢 Организация и фильтры -->
       <Card>
         <CardHeader>
-          <CardTitle>Организация и фильтры</CardTitle>
+          <CardTitle>Организация</CardTitle>
         </CardHeader>
         <CardContent class="space-y-4">
           <div>
@@ -570,7 +739,11 @@ const maxAgeYearsValue = computed({
                 <SelectValue placeholder="Выберите категорию" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="cat in categoriesStore.allCategories" :key="cat.id" :value="cat.id">
+                <SelectItem
+                  v-for="cat in categoriesStore.allCategories"
+                  :key="cat.id"
+                  :value="cat.id"
+                >
                   {{ cat.name }}
                 </SelectItem>
               </SelectContent>
@@ -586,7 +759,7 @@ const maxAgeYearsValue = computed({
                   role="combobox"
                   class="w-full justify-between font-normal"
                 >
-                  <span v-if="formData.brand_id">
+                  <span v-if="formData.brand_id" class="truncate">
                     {{ brands.find(b => b.id === formData.brand_id)?.name }}
                   </span>
                   <span v-else class="text-muted-foreground">
@@ -603,7 +776,7 @@ const maxAgeYearsValue = computed({
                         class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
                         @click="() => { isBrandDialogOpen = true }"
                       >
-                        Создать новый бренд
+                        ➕ Создать новый бренд
                       </div>
                     </CommandEmpty>
                     <CommandGroup>
@@ -619,7 +792,10 @@ const maxAgeYearsValue = computed({
                         :value="brand.name"
                         @select="() => { formData.brand_id = brand.id }"
                       >
-                        <Check :class="formData.brand_id === brand.id ? 'opacity-100' : 'opacity-0'" class="mr-2 h-4 w-4" />
+                        <Check
+                          :class="formData.brand_id === brand.id ? 'opacity-100' : 'opacity-0'"
+                          class="mr-2 h-4 w-4"
+                        />
                         {{ brand.name }}
                       </CommandItem>
                     </CommandGroup>
@@ -648,7 +824,11 @@ const maxAgeYearsValue = computed({
                 <SelectItem :value="null">
                   Не указана
                 </SelectItem>
-                <SelectItem v-for="country in countries" :key="country.id" :value="country.id">
+                <SelectItem
+                  v-for="country in countries"
+                  :key="country.id"
+                  :value="country.id"
+                >
                   {{ country.name }}
                 </SelectItem>
               </SelectContent>
@@ -665,7 +845,11 @@ const maxAgeYearsValue = computed({
                 <SelectItem :value="null">
                   Не указан
                 </SelectItem>
-                <SelectItem v-for="material in materials" :key="material.id" :value="material.id">
+                <SelectItem
+                  v-for="material in materials"
+                  :key="material.id"
+                  :value="material.id"
+                >
                   {{ material.name }}
                 </SelectItem>
               </SelectContent>
@@ -674,12 +858,20 @@ const maxAgeYearsValue = computed({
 
           <div>
             <Label for="stock">Количество на складе</Label>
-            <Input id="stock" v-model.number="formData.stock_quantity" type="number" />
+            <Input
+              id="stock"
+              v-model.number="formData.stock_quantity"
+              type="number"
+              placeholder="0"
+              min="0"
+            />
           </div>
 
           <div class="flex items-center space-x-2 pt-2">
             <Switch id="is_active" v-model:model-value="formData.is_active" />
-            <Label for="is_active">Активен для продажи</Label>
+            <Label for="is_active" class="mb-0 cursor-pointer">
+              ✨ Активен для продажи
+            </Label>
           </div>
 
           <div class="pt-2">
@@ -690,13 +882,13 @@ const maxAgeYearsValue = computed({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unisex">
-                  Унисекс
+                  👥 Унисекс
                 </SelectItem>
                 <SelectItem value="male">
-                  Для мальчиков
+                  👦 Для мальчиков
                 </SelectItem>
                 <SelectItem value="female">
-                  Для девочек
+                  👧 Для девочек
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -705,56 +897,123 @@ const maxAgeYearsValue = computed({
           <div class="grid grid-cols-2 gap-4 pt-2">
             <div>
               <Label for="min_age_years">Мин. возраст (лет)</Label>
-              <Input id="min_age_years" v-model.number="minAgeYearsValue" type="number" />
+              <Input
+                id="min_age_years"
+                v-model.number="minAgeYearsValue"
+                type="number"
+                placeholder="0"
+                min="0"
+                max="100"
+              />
             </div>
             <div>
               <Label for="max_age_years">Макс. возраст (лет)</Label>
-              <Input id="max_age_years" v-model.number="maxAgeYearsValue" type="number" />
+              <Input
+                id="max_age_years"
+                v-model.number="maxAgeYearsValue"
+                type="number"
+                placeholder="100"
+                min="0"
+                max="100"
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <!-- Галерея изображений -->
+      <!-- 🖼️ Галерея изображений -->
       <Card>
         <CardHeader>
           <CardTitle>Галерея изображений</CardTitle>
-          <CardDescription v-if="IMAGE_OPTIMIZATION_ENABLED">
-            🚀 Режим: Supabase Transform (платный)
-          </CardDescription>
-          <CardDescription v-else>
-            💾 Режим: Pre-optimized (бесплатный)
+          <CardDescription>
+            <div class="flex items-center gap-2 mt-1">
+              <span :class="optimizationMode.icon">
+                {{ optimizationMode.mode }}
+              </span>
+              <span class="text-xs text-muted-foreground">
+                ({{ optimizationMode.description }})
+              </span>
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
-          <!-- Существующие изображения -->
-          <div v-if="existingImages.length > 0" class="grid grid-cols-3 gap-2">
-            <div v-for="image in existingImages" :key="image.id" class="relative group aspect-square">
-              <img
-                :src="getExistingImageUrl(image.image_url)"
-                class="w-full h-full object-cover rounded-md"
-                loading="lazy"
-                alt="Изображение товара"
+          <!-- ✏️ Существующие изображения -->
+          <div v-if="existingImages.length > 0">
+            <p class="text-sm font-medium mb-2">
+              Текущие изображения ({{ existingImages.length }})
+            </p>
+            <div class="grid grid-cols-3 gap-2">
+              <div
+                v-for="image in existingImages"
+                :key="image.id"
+                class="relative group aspect-square"
               >
-              <Button type="button" variant="destructive" size="icon" class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" @click="removeExistingImage(image)">
-                <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
-              </Button>
+                <img
+                  :src="getExistingImageUrl(image.image_url)"
+                  class="w-full h-full object-cover rounded-md"
+                  loading="lazy"
+                  alt="Изображение товара"
+                >
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  @click="removeExistingImage(image)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 15 15">
+                    <path
+                      fill="currentColor"
+                      d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z"
+                    />
+                  </svg>
+                </Button>
+              </div>
             </div>
           </div>
 
-          <!-- Новые изображения -->
-          <div v-if="newImageFiles.length > 0" class="grid grid-cols-3 gap-2">
-            <div v-for="(item, index) in newImageFiles" :key="index" class="relative group aspect-square">
-              <img :src="item.previewUrl" class="w-full h-full object-cover rounded-md" alt="Превью нового изображения">
-              <Button type="button" variant="destructive" size="icon" class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" @click="removeNewImage(index)">
-                <svg width="15" height="15" viewBox="0 0 15 15"><path fill="currentColor" d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z" /></svg>
-              </Button>
+          <!-- ➕ Новые изображения -->
+          <div v-if="newImageFiles.length > 0">
+            <p class="text-sm font-medium mb-2">
+              Новые изображения ({{ newImageFiles.length }})
+            </p>
+            <div class="grid grid-cols-3 gap-2">
+              <div
+                v-for="(item, index) in newImageFiles"
+                :key="index"
+                class="relative group aspect-square"
+              >
+                <img
+                  :src="item.previewUrl"
+                  class="w-full h-full object-cover rounded-md"
+                  alt="Превью нового изображения"
+                >
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  @click="removeNewImage(index)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 15 15">
+                    <path
+                      fill="currentColor"
+                      d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z"
+                    />
+                  </svg>
+                </Button>
+              </div>
             </div>
           </div>
 
-          <!-- Input для загрузки файлов -->
+          <!-- 📤 Input для загрузки файлов -->
           <div>
-            <Label for="images">Добавить фото</Label>
+            <Label for="images">
+              {{ newImageFiles.length > 0 || existingImages.length > 0
+                ? 'Добавить еще фото'
+                : 'Добавить фото'
+              }}
+            </Label>
             <Input
               id="images"
               type="file"
@@ -763,15 +1022,25 @@ const maxAgeYearsValue = computed({
               :disabled="isProcessingImages"
               @change="handleFilesChange"
             />
-            <p v-if="isProcessingImages" class="text-sm text-muted-foreground mt-2">
+            <div v-if="isProcessingImages" class="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+              <div class="w-4 h-4 border-2 border-muted-foreground border-t-primary rounded-full animate-spin" />
               ⏳ Обработка изображений...
+            </div>
+            <p class="text-xs text-muted-foreground mt-2">
+              💡 Совет: загружайте изображения высокого качества, система автоматически их оптимизирует
             </p>
           </div>
         </CardContent>
       </Card>
 
-      <Button type="submit" size="lg" class="w-full" :disabled="isProcessingImages">
-        Сохранить товар
+      <!-- ✅ Кнопка отправки -->
+      <Button
+        type="submit"
+        size="lg"
+        class="w-full"
+        :disabled="isProcessingImages"
+      >
+        {{ props.initialData ? '💾 Обновить товар' : '✨ Создать товар' }}
       </Button>
     </div>
   </form>

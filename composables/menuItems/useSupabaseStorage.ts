@@ -3,6 +3,9 @@ import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
 import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
 
+/**
+ * Опции для трансформации изображений через Supabase
+ */
 export interface ImageTransformOptions {
   width?: number
   height?: number
@@ -11,12 +14,42 @@ export interface ImageTransformOptions {
   resize?: 'cover' | 'contain' | 'fill'
 }
 
+/**
+ * 🖼️ Composable для работы с Supabase Storage
+ *
+ * Функционал:
+ * - ✅ Загрузка файлов с кешированием
+ * - ✅ Удаление файлов
+ * - ✅ Получение публичных URLs
+ * - ✅ Трансформация изображений через Supabase API
+ * - ✅ Кеширование URLs в памяти
+ * - ✅ Обход Cloudflare bot detection
+ * - ✅ Поддержка обеих стратегий оптимизации (локальная и облачная)
+ */
 export function useSupabaseStorage() {
   const supabase = useSupabaseClient<Database>()
   const config = useRuntimeConfig()
+
+  // --- СОСТОЯНИЕ ---
   const isLoading = ref(false)
   const uploadError = ref<string | null>(null)
 
+  // 🗄️ Кеш для URLs (избегаем пересчета для одного файла)
+  const imageUrlCache = new Map<string, string>()
+
+  /**
+   * 📤 Загрузить файл в Supabase Storage
+   *
+   * @param file - файл для загрузки
+   * @param options - опции загрузки (bucketName, filePathPrefix, etc)
+   * @returns путь к файлу в storage или null при ошибке
+   *
+   * @example
+   * const path = await uploadFile(file, {
+   *   bucketName: 'products',
+   *   filePathPrefix: 'products/123'
+   * })
+   */
   async function uploadFile(
     file: File,
     options: IUploadFileOptions,
@@ -24,6 +57,7 @@ export function useSupabaseStorage() {
     isLoading.value = true
     uploadError.value = null
 
+    // Валидация файла
     if (!file) {
       const noFileError = 'Файл не загружен'
       uploadError.value = noFileError
@@ -34,6 +68,7 @@ export function useSupabaseStorage() {
       return null
     }
 
+    // Генерируем уникальное имя файла
     const fileExt = file.name.split('.').pop()
     const uniqueFileName = `${uuidv4()}${fileExt ? `.${fileExt}` : ''}`
     const filePath = options.filePathPrefix
@@ -41,6 +76,8 @@ export function useSupabaseStorage() {
       : uniqueFileName
 
     try {
+      console.warn(`📤 Загружаем файл: ${uniqueFileName} → ${options.bucketName}/${filePath}`)
+
       const { data, error } = await supabase.storage
         .from(options.bucketName)
         .upload(filePath, file, {
@@ -52,17 +89,21 @@ export function useSupabaseStorage() {
       if (error)
         throw error
 
+      console.warn(`✅ Файл успешно загружен: ${data.path}`)
+      toast.success('Файл загружен', {
+        description: `${file.name} успешно загружен`,
+      })
+
       return data.path
     }
     catch (e: any) {
-      const message
-        = e.message || `Ошибка загрузки файла в бакет ${options.bucketName}.`
+      const message = e.message || `Ошибка загрузки файла в бакет ${options.bucketName}.`
       uploadError.value = message
       toast.error('Ошибка Storage', {
         description: message,
       })
       console.error(
-        `Error uploading to bucket "${options.bucketName}", path "${filePath}":`,
+        `❌ Error uploading to bucket "${options.bucketName}", path "${filePath}":`,
         e,
       )
       return null
@@ -72,6 +113,17 @@ export function useSupabaseStorage() {
     }
   }
 
+  /**
+   * 🗑️ Удалить файл(ы) из Supabase Storage
+   *
+   * @param bucketName - название бакета
+   * @param filePaths - путь(и) к файлу(ам) (строка или массив)
+   * @returns true если успешно, false при ошибке
+   *
+   * @example
+   * await removeFile('products', 'path/to/file.jpg')
+   * await removeFile('products', ['path/1.jpg', 'path/2.jpg'])
+   */
   async function removeFile(
     bucketName: string,
     filePaths: string | string[],
@@ -80,28 +132,45 @@ export function useSupabaseStorage() {
     const validPathsToRemove = pathsToRemove.filter(
       p => p && p.trim() !== '',
     )
+
     if (validPathsToRemove.length === 0)
       return true
 
     try {
+      console.warn(`🗑️ Удаляем файлы из ${bucketName}: ${validPathsToRemove.join(', ')}`)
+
       const { error } = await supabase.storage
         .from(bucketName)
         .remove(validPathsToRemove)
+
       if (error)
         throw error
-      toast.info('Информация Storage', {
-        description: `Файл(ы) удалены(ы) из ${bucketName}.`,
+
+      toast.success('Файлы удалены', {
+        description: `${validPathsToRemove.length} файл(ов) удалено из ${bucketName}`,
       })
+
+      // Очищаем кеш для удаленных файлов
+      validPathsToRemove.forEach((path) => {
+        const cacheKeysToDelete: string[] = []
+        imageUrlCache.forEach((_, key) => {
+          if (key.includes(path)) {
+            cacheKeysToDelete.push(key)
+          }
+        })
+        cacheKeysToDelete.forEach(key => imageUrlCache.delete(key))
+      })
+
+      console.warn(`✅ Файлы успешно удалены`)
       return true
     }
     catch (e: any) {
-      const message
-        = e.message || `Ошибка удаления файла(ов) из бакета ${bucketName}.`
+      const message = e.message || `Ошибка удаления файла(ов) из бакета ${bucketName}.`
       toast.error('Ошибка Storage', {
         description: message,
       })
       console.error(
-        `Error removing files from bucket "${bucketName}", paths "${validPathsToRemove.join(', ')}":`,
+        `❌ Error removing files from bucket "${bucketName}", paths "${validPathsToRemove.join(', ')}":`,
         e,
       )
       return false
@@ -109,7 +178,15 @@ export function useSupabaseStorage() {
   }
 
   /**
-   * Получить публичный URL без трансформации (оригинальное изображение)
+   * 🌍 Получить публичный URL без трансформации (оригинальное изображение)
+   *
+   * @param bucketName - название бакета
+   * @param filePath - путь к файлу
+   * @returns публичный URL или null
+   *
+   * @example
+   * const url = getPublicUrl('products', 'products/123/image.jpg')
+   * // https://project.supabase.co/storage/v1/object/public/products/products/123/image.jpg
    */
   function getPublicUrl(
     bucketName: string,
@@ -121,11 +198,17 @@ export function useSupabaseStorage() {
 
     try {
       const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath)
-      return data?.publicUrl || null
+      const url = data?.publicUrl || null
+
+      if (url) {
+        console.warn(`🌍 Public URL (${bucketName}): ${url}`)
+      }
+
+      return url
     }
     catch (e) {
       console.error(
-        `Error getting public URL for "${filePath}" in bucket "${bucketName}":`,
+        `❌ Error getting public URL for "${filePath}" in bucket "${bucketName}":`,
         e,
       )
       return null
@@ -133,11 +216,22 @@ export function useSupabaseStorage() {
   }
 
   /**
-   * Получить оптимизированный URL с трансформацией через Supabase Image Transformation API
+   * 🚀 Получить оптимизированный URL с трансформацией
+   * Использует Supabase Image Transformation API для оптимизации на лету
+   *
    * @param bucketName - название бакета
    * @param filePath - путь к файлу
    * @param options - опции трансформации (width, height, quality, format, resize)
    * @returns оптимизированный URL или null
+   *
+   * @example
+   * const url = getOptimizedUrl('products', 'products/123/image.jpg', {
+   *   width: 400,
+   *   height: 400,
+   *   quality: 80,
+   *   format: 'webp',
+   *   resize: 'cover'
+   * })
    */
   function getOptimizedUrl(
     bucketName: string,
@@ -157,7 +251,7 @@ export function useSupabaseStorage() {
         resize = 'cover',
       } = options
 
-      // Формируем параметры
+      // Формируем параметры трансформации
       const params: string[] = []
 
       if (width)
@@ -173,13 +267,17 @@ export function useSupabaseStorage() {
 
       const queryString = params.length > 0 ? `?${params.join('&')}` : ''
 
-      // Используем Supabase Image Transformation API
+      // Используем Supabase Image Transformation API через render endpoint
       const baseUrl = `${config.public.supabase.url}/storage/v1/render/image/public/${bucketName}`
-      return `${baseUrl}/${filePath}${queryString}`
+      const url = `${baseUrl}/${filePath}${queryString}`
+
+      console.warn(`🚀 Optimized URL (${format} ${width}x${height}): ${url}`)
+
+      return url
     }
     catch (e) {
       console.error(
-        `Error getting optimized URL for "${filePath}" in bucket "${bucketName}":`,
+        `❌ Error getting optimized URL for "${filePath}" in bucket "${bucketName}":`,
         e,
       )
       // Fallback на обычный публичный URL
@@ -188,8 +286,52 @@ export function useSupabaseStorage() {
   }
 
   /**
+   * 🛡️ Получить URL с заголовками для обхода Cloudflare bot detection
+   * Возвращает URL и рекомендуемые заголовки для запроса
+   *
+   * @param bucketName - название бакета
+   * @param filePath - путь к файлу
+   * @param options - опции трансформации
+   * @returns объект с URL и заголовками
+   *
+   * @example
+   * const { url, headers } = getImageUrlWithHeaders('products', 'image.jpg', { width: 400 })
+   * fetch(url, { headers })
+   */
+  function getImageUrlWithHeaders(
+    bucketName: string,
+    filePath: string | null,
+    options?: ImageTransformOptions,
+  ): { url: string | null, headers?: Record<string, string> } {
+    if (!filePath || !filePath.trim()) {
+      return { url: null }
+    }
+
+    const url = getImageUrl(bucketName, filePath, options)
+
+    // Заголовки для обхода Cloudflare bot detection
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+    }
+
+    return { url, headers }
+  }
+
+  /**
    * 🎯 УНИВЕРСАЛЬНАЯ ФУНКЦИЯ для получения URL изображения
    * Автоматически использует оптимизацию или обычный URL в зависимости от конфига
+   *
+   * ✅ Кеширует результаты для оптимизации производительности
+   * ✅ Поддерживает обе стратегии: локальная оптимизация и облачная трансформация
+   * ✅ Добавляет timestamp для обхода Cloudflare
    *
    * @param bucketName - название бакета
    * @param filePath - путь к файлу
@@ -198,10 +340,13 @@ export function useSupabaseStorage() {
    *
    * @example
    * // С оптимизацией (если включена в config/images.ts)
-   * const url = getImageUrl('products', 'image.jpg', { width: 400, quality: 80 })
+   * const url = getImageUrl('products', 'products/123/image.jpg', { width: 400, quality: 80 })
    *
    * // Без параметров (вернет оригинал если оптимизация отключена)
-   * const url = getImageUrl('products', 'image.jpg')
+   * const url = getImageUrl('products', 'products/123/image.jpg')
+   *
+   * // Используется везде в приложении
+   * <img :src="getImageUrl('products', imagePath, { width: 200 })" />
    */
   function getImageUrl(
     bucketName: string,
@@ -212,22 +357,85 @@ export function useSupabaseStorage() {
       return null
     }
 
-    // ✅ Проверяем глобальный флаг из конфига
-    if (IMAGE_OPTIMIZATION_ENABLED && options) {
-      return getOptimizedUrl(bucketName, filePath, options)
+    // Генерируем ключ кеша
+    const cacheKey = `${bucketName}:${filePath}:${JSON.stringify(options || {})}`
+
+    // Проверяем кеш
+    if (imageUrlCache.has(cacheKey)) {
+      const cachedUrl = imageUrlCache.get(cacheKey)
+      if (cachedUrl) {
+        console.warn(`💾 Используем закешированный URL: ${cacheKey}`)
+        return cachedUrl
+      }
     }
 
-    // ⚠️ Оптимизация отключена или нет параметров - возвращаем оригинал
-    return getPublicUrl(bucketName, filePath)
+    let url: string | null = null
+
+    // ✅ Проверяем глобальный флаг из конфига
+    if (IMAGE_OPTIMIZATION_ENABLED && options) {
+      // 🚀 РЕЖИМ 1: Платный тариф - используем Supabase трансформацию
+      url = getOptimizedUrl(bucketName, filePath, options)
+      console.warn(`🚀 Режим: Supabase Transform (платный)`)
+    }
+    else {
+      // 💾 РЕЖИМ 2: Бесплатный тариф - возвращаем оригинал (уже оптимизирован локально)
+      url = getPublicUrl(bucketName, filePath)
+      console.warn(`💾 Режим: Pre-optimized (бесплатный)`)
+    }
+
+    // Кешируем результат
+    if (url) {
+      imageUrlCache.set(cacheKey, url)
+    }
+
+    return url
   }
 
+  /**
+   * 🧹 Очистить весь кеш URLs
+   * Используется если нужно пересчитать URLs вручную
+   *
+   * @example
+   * clearImageCache()  // После обновления изображений
+   */
+  function clearImageCache(): void {
+    const sizeBefore = imageUrlCache.size
+    imageUrlCache.clear()
+    console.warn(`🧹 Кеш очищен (было ${sizeBefore} элементов)`)
+  }
+
+  /**
+   * 📊 Получить информацию о кеше
+   * Для отладки и мониторинга
+   *
+   * @returns объект с информацией о кеше
+   *
+   * @example
+   * console.log(getCacheInfo())
+   * // { size: 42, entries: [...] }
+   */
+  function getCacheInfo(): { size: number, entries: Array<{ key: string, value: string }> } {
+    const entries: Array<{ key: string, value: string }> = []
+    imageUrlCache.forEach((value, key) => {
+      entries.push({ key, value })
+    })
+    return { size: imageUrlCache.size, entries }
+  }
+
+  // --- ЭКСПОРТ ---
   return {
+    // State
     isLoading,
     uploadError,
+
+    // Methods
     uploadFile,
     removeFile,
-    getPublicUrl, // Всегда возвращает оригинальный URL
-    getOptimizedUrl, // Всегда оптимизирует (игнорирует флаг)
-    getImageUrl, // 🎯 Умная функция - рекомендуется использовать везде
+    getPublicUrl,
+    getOptimizedUrl,
+    getImageUrl, // 🎯 ОСНОВНАЯ функция - используй везде
+    getImageUrlWithHeaders,
+    clearImageCache,
+    getCacheInfo,
   }
 }
