@@ -256,14 +256,16 @@ export function useSupabaseStorage() {
 
     let url: string | null = null
 
-    // 🎯 ВЫБОР РЕЖИМА
-    if (IMAGE_OPTIMIZATION_ENABLED && options) {
-      // ✅ ПЛАТНЫЙ РЕЖИМ: Supabase Transformation
-      url = getOptimizedUrl(bucketName, filePath, options)
-      console.log(`🚀 Режим: Supabase Transform (${options.width}x${options.height}, ${options.format})`)
+    // 🎯 КРИТИЧНО: Проверяем ТОЛЬКО флаг, не options!
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      // ✅ ПЛАТНЫЙ РЕЖИМ: Supabase Transformation (даже если нет options)
+      url = options
+        ? getOptimizedUrl(bucketName, filePath, options)
+        : getPublicUrl(bucketName, filePath)
+      console.log(`🚀 Режим: Supabase Transform`)
     }
     else {
-      // ✅ БЕСПЛАТНЫЙ РЕЖИМ: API Proxy
+      // ✅ БЕСПЛАТНЫЙ РЕЖИМ: API Proxy (независимо от options)
       url = getProxyUrl(bucketName, filePath)
       console.log(`🛡️ Режим: API Proxy → ${url}`)
     }

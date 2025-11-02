@@ -4,7 +4,7 @@ import type { BaseProduct } from '@/types'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
@@ -124,10 +124,6 @@ const priceDetails = computed(() => {
     originalPrice,
     percent: Math.round(discountPercent),
   }
-})
-
-onMounted(() => {
-  console.log('🔍 IMAGE_OPTIMIZATION_ENABLED:', IMAGE_OPTIMIZATION_ENABLED)
 })
 </script>
 
