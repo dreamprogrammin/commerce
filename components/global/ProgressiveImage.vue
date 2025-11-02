@@ -3,38 +3,16 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useProgressiveImage } from '@/composables/useProgressiveImage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
 
-/**
- * Props для компонента ProgressiveImage
- */
 interface Props {
-  /** URL изображения */
   src: string | null | undefined
-
-  /** Alt текст */
   alt: string
-
-  /** Aspect ratio: 'square', 'video', 'portrait' */
   aspectRatio?: 'square' | 'video' | 'portrait'
-
-  /** Как заполняется контейнер: cover, contain, fill */
   objectFit?: 'cover' | 'contain' | 'fill'
-
-  /** Тип плейсхолдера: shimmer, blur, color */
   placeholderType?: 'shimmer' | 'blur' | 'color'
-
-  /** Цвет для плейсхолдера (градиент) */
   placeholderColor?: string
-
-  /** Bucket name для хранилища (опционально для трансформации) */
   bucketName?: string
-
-  /** Путь к файлу в bucket (опционально для трансформации) */
   filePath?: string
-
-  /** Использовать трансформацию размеров */
   useTransform?: boolean
-
-  /** 🎯 Использовать eager loading (без lazy loading) для видимых элементов */
   eager?: boolean
 }
 
@@ -46,7 +24,6 @@ const props = withDefaults(defineProps<Props>(), {
   useTransform: true,
 })
 
-// --- COMPOSABLES ---
 const { getImageUrl } = useSupabaseStorage()
 const imageUrl = toRef(props, 'src')
 const {
@@ -57,117 +34,59 @@ const {
   onLoad,
   onError,
   retryCount,
-} = useProgressiveImage(imageUrl)
+  isLoading, // 🆕 Используем индикатор загрузки
+} = useProgressiveImage(imageUrl, { eager: props.eager })
 
-// --- СОСТОЯНИЕ ---
 const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
 
 /**
- * 🛡️ Получить оптимизированный URL с кешем для обхода Cloudflare
- * Timestamp УЖЕ добавляется в getImageUrl(), не добавляем снова!
+ * 🛡️ Оптимизированный URL (кешированный, стабильный)
  */
 const optimizedImageUrl = computed(() => {
   if (!shouldLoad.value || !imageUrl.value) {
     return undefined
   }
 
-  // Если есть bucket и filePath - используем трансформацию
   if (props.bucketName && props.filePath && props.useTransform) {
-    const url = getImageUrl(props.bucketName, props.filePath, {
+    return getImageUrl(props.bucketName, props.filePath, {
       width: IMAGE_SIZES.CARD.width,
       height: IMAGE_SIZES.CARD.height,
       quality: 80,
       format: 'webp',
       resize: 'cover',
     })
-
-    // ✅ URL уже содержит timestamp из getImageUrl()
-    return url
   }
 
-  // ✅ Прямой URL уже содержит timestamp из getImageUrl()
   return imageUrl.value
 })
 
-/**
- * CSS классы для различных aspect ratios
- */
 const aspectRatioClass = computed(() => {
   switch (props.aspectRatio) {
-    case 'video':
-      return 'aspect-video'
-    case 'portrait':
-      return 'aspect-[3/4]'
+    case 'video': return 'aspect-video'
+    case 'portrait': return 'aspect-[3/4]'
     case 'square':
-    default:
-      return 'aspect-square'
+    default: return 'aspect-square'
   }
 })
 
-/**
- * CSS классы для object-fit
- */
 const objectFitClass = computed(() => {
   switch (props.objectFit) {
-    case 'contain':
-      return 'object-contain'
-    case 'fill':
-      return 'object-fill'
+    case 'contain': return 'object-contain'
+    case 'fill': return 'object-fill'
     case 'cover':
-    default:
-      return 'object-cover'
+    default: return 'object-cover'
   }
 })
 
-/**
- * CSS классы для плейсхолдера
- */
-const placeholderClass = computed(() => {
-  const classes = ['absolute', 'inset-0', 'transition-opacity', 'duration-300']
-
-  switch (props.placeholderType) {
-    case 'shimmer':
-      classes.push('bg-gradient-to-br', 'animate-pulse')
-      break
-    case 'blur':
-      classes.push('backdrop-blur-xl')
-      break
-    case 'color':
-      classes.push('bg-muted')
-      break
-  }
-
-  return classes
-})
+const isDev = computed(() => import.meta.env.DEV)
 
 /**
- * Стиль для плейсхолдера (если используется gradient)
- */
-const placeholderStyle = computed(() => {
-  if (props.placeholderType === 'shimmer') {
-    return {
-      backgroundImage: `linear-gradient(to bottom right, ${props.placeholderColor})`,
-    }
-  }
-  return {}
-})
-
-// ✅ isDev определен локально в компоненте
-const isDev = computed(() => import.meta.env.DEV) // в ProgressiveImage.vue
-// Не нужно передавать из composable
-
-// --- LIFECYCLE HOOKS ---
-
-/**
- * 🎯 Добавляем элемент <link rel="preload"> для критичных изображений
- * Это говорит браузеру начать загрузку ДО того как произойдет render
+ * 🎯 Preload для критичных изображений
  */
 function addPreloadLink() {
-  if (!optimizedImageUrl.value || !props.eager) {
+  if (!optimizedImageUrl.value || !props.eager)
     return
-  }
 
-  // Проверяем, не добавили ли уже
   const existing = document.querySelector(`link[href="${optimizedImageUrl.value}"]`)
   if (existing)
     return
@@ -178,8 +97,11 @@ function addPreloadLink() {
   link.href = optimizedImageUrl.value
   link.crossOrigin = 'anonymous'
 
+  // High priority для eager изображений
+  link.setAttribute('fetchpriority', 'high')
+
   document.head.appendChild(link)
-  console.log('📋 Добавили preload для:', optimizedImageUrl.value)
+  console.log('📋 Preload добавлен')
 }
 
 watch(optimizedImageUrl, () => {
@@ -192,106 +114,123 @@ watch(optimizedImageUrl, () => {
     class="relative overflow-hidden bg-muted"
     :class="aspectRatioClass"
   >
-    <!--
-      📋 ПЛЕЙСХОЛДЕР
-      Показывается пока изображение загружается или если произошла ошибка
-      Независимо от режима оптимизации
-    -->
+    <!-- 📋 ПЛЕЙСХОЛДЕР -->
     <div
       v-if="showPlaceholder"
-      :class="placeholderClass"
-      :style="placeholderStyle"
+      class="absolute inset-0 bg-gradient-to-br animate-pulse transition-opacity duration-300"
+      :class="placeholderColor"
     >
-      <!-- Спиннер загрузки -->
-      <div class="absolute inset-0 flex items-center justify-center">
-        <div class="w-8 h-8 border-4 border-muted-foreground/20 border-t-muted-foreground/60 rounded-full animate-spin" />
+      <!-- Спиннер загрузки (только если реально грузится) -->
+      <div
+        v-if="isLoading"
+        class="absolute inset-0 flex items-center justify-center"
+      >
+        <div class="relative">
+          <!-- Внешнее кольцо (медленное) -->
+          <div class="w-12 h-12 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />
+          <!-- Внутреннее кольцо (быстрое) -->
+          <div
+            class="absolute inset-0 w-12 h-12 border-4 border-transparent border-b-muted-foreground/40 rounded-full animate-spin"
+            style="animation-duration: 0.8s"
+          />
+        </div>
       </div>
 
       <!-- Индикатор режима (только в dev) -->
       <div
         v-if="isDev"
-        class="absolute bottom-2 left-2 text-xs bg-black/50 text-white px-2 py-1 rounded font-mono"
+        class="absolute bottom-2 left-2 text-[10px] bg-black/60 text-white px-2 py-1 rounded font-mono backdrop-blur-sm"
       >
-        <div v-if="IMAGE_OPTIMIZATION_ENABLED">
-          🚀 Supabase Transform
+        <div class="flex items-center gap-1">
+          <span v-if="IMAGE_OPTIMIZATION_ENABLED">🚀</span>
+          <span v-else>💾</span>
+          <span v-if="isLoading" class="animate-pulse">⏳</span>
         </div>
-        <div v-else>
-          💾 Pre-optimized
-        </div>
-        <div v-if="retryCount > 0" class="text-yellow-300">
-          ⚠️ Retry: {{ retryCount }}/3
+        <div v-if="retryCount > 0" class="text-yellow-300 text-[9px]">
+          Retry {{ retryCount }}
         </div>
       </div>
     </div>
 
-    <!--
-      🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ
-      Использует оптимизированный URL с timestamp для обхода Cloudflare
-    -->
+    <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ -->
     <img
       ref="imageRef"
       :src="optimizedImageUrl || undefined"
       :alt="alt"
-      class="w-full h-full transition-opacity duration-300"
+      class="w-full h-full transition-opacity duration-500"
       :class="[
         isLoaded ? 'opacity-100' : 'opacity-0',
         objectFitClass,
       ]"
       loading="lazy"
       crossorigin="anonymous"
+      decoding="async"
+      :fetchpriority="eager ? 'high' : 'auto'"
       @load="onLoad"
       @error="onError"
     >
 
-    <!--
-      ❌ FALLBACK ПРИ ОШИБКЕ
-      Показывается если не удалось загрузить изображение после всех retry
-    -->
+    <!-- ❌ FALLBACK ПРИ ОШИБКЕ -->
     <div
       v-if="isError"
-      class="absolute inset-0 flex flex-col items-center justify-center bg-muted text-muted-foreground"
+      class="absolute inset-0 flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm text-muted-foreground"
     >
       <!-- Иконка ошибки -->
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        class="w-12 h-12 mb-2 opacity-50"
+        class="w-10 h-10 mb-2 opacity-40"
         viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
       >
-        <path
-          fill="currentColor"
-          d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
-        />
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
       </svg>
 
-      <!-- Текст ошибки -->
-      <span class="text-xs text-center px-2">
-        Не удалось загрузить изображение
+      <span class="text-xs text-center px-2 opacity-60">
+        Не загрузилось
       </span>
 
-      <!-- Отладочная информация (dev mode) -->
+      <!-- Debug info -->
       <span
         v-if="isDev"
-        class="text-xs text-muted-foreground mt-2 font-mono"
+        class="text-[9px] text-muted-foreground/60 mt-1 font-mono px-2 text-center break-all max-w-full"
       >
-        {{ src }}
+        {{ optimizedImageUrl?.split('/').pop()?.slice(0, 20) }}...
       </span>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Плавная анимация появления плейсхолдера */
+/* Плавная анимация появления */
+img {
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Shimmer эффект для плейсхолдера */
 @keyframes shimmer {
   0% {
-    background-position: -1000px 0;
+    background-position: -200% center;
   }
   100% {
-    background-position: 1000px 0;
+    background-position: 200% center;
   }
 }
 
-/* Опционально: можешь добавить более сложную shimmer анимацию */
-.shimmer-animation {
-  animation: shimmer 2s infinite;
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 </style>

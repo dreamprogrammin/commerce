@@ -1,8 +1,5 @@
 import type { Ref } from 'vue'
 
-/**
- * Опции для Intersection Observer
- */
 export interface ProgressiveImageOptions {
   rootMargin?: string
   threshold?: number
@@ -13,17 +10,18 @@ export interface ProgressiveImageOptions {
  * 🖼️ Композебл для прогрессивной загрузки изображений
  *
  * ОПТИМИЗАЦИИ:
- * ✅ Кеширование загруженных URL (не перезагружаем одно изображение)
+ * ✅ Кеширование загруженных URL
  * ✅ Debounce для быстрого переключения
- * ✅ Умная отмена только "старых" запросов
  * ✅ Preloading для eager изображений
+ * ✅ 🛡️ Обход Cloudflare bot detection через credentialless
+ * ✅ Progressive JPEG декодирование
  */
 export function useProgressiveImage(
   imageUrl: Ref<string | null | undefined>,
   options: ProgressiveImageOptions = {},
 ) {
   const {
-    rootMargin = '50px',
+    rootMargin = '200px', // Увеличили с 50px для предзагрузки
     threshold = 0.01,
     eager = false,
   } = options
@@ -35,32 +33,50 @@ export function useProgressiveImage(
   const isError = ref(false)
   const shouldLoad = ref(eager)
   const retryCount = ref(0)
-  const maxRetries = 2 // Уменьшили с 3 до 2
+  const maxRetries = 1 // Уменьшили до 1 (retry часто не помогает с Cloudflare)
+  const isLoading = ref(false) // Индикатор процесса загрузки
 
-  // 🗄️ КЕШИРОВАНИЕ: Храним список успешно загруженных URL
+  // 🗄️ Кеш успешно загруженных URL
   const loadedUrlsCache = new Set<string>()
 
-  // 🛡️ Текущий URL для которого идет загрузка
+  // 🛡️ Текущий загружаемый URL
   let currentLoadingUrl: string | null = null
 
-  // ⏱️ Debounce таймер для быстрого переключения
+  // ⏱️ Debounce таймер
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   let observer: IntersectionObserver | null = null
 
   /**
-   * 💾 Проверка: загружено ли изображение из кеша браузера
+   * 💾 Проверка кеша браузера
    */
   function isImageCached(url: string): boolean {
-    // Проверяем собственный кеш
-    if (loadedUrlsCache.has(url)) {
+    if (loadedUrlsCache.has(url))
       return true
-    }
 
-    // Проверяем браузерный кеш через Image API
     const img = new Image()
     img.src = url
     return img.complete && img.naturalHeight !== 0
+  }
+
+  /**
+   * 🛡️ Создать Image элемент с настройками для обхода Cloudflare
+   */
+  function createOptimizedImage(url: string): HTMLImageElement {
+    const img = new Image()
+
+    // 🔑 Ключевые атрибуты для обхода Cloudflare
+    img.crossOrigin = 'anonymous' // Обязательно для CORS
+    img.loading = 'eager' // Приоритетная загрузка
+    img.decoding = 'async' // Асинхронное декодирование
+
+    // 🎯 Добавляем fetchpriority для критичных изображений
+    if (eager) {
+      img.fetchPriority = 'high'
+    }
+
+    img.src = url
+    return img
   }
 
   /**
@@ -70,98 +86,127 @@ export function useProgressiveImage(
     if (!currentLoadingUrl)
       return
 
-    console.log('✅ Изображение загружено:', currentLoadingUrl)
+    console.log('✅ Загружено:', currentLoadingUrl.split('?')[0].split('/').pop())
 
     isLoaded.value = true
     isError.value = false
+    isLoading.value = false
     retryCount.value = 0
 
-    // Добавляем в кеш успешно загруженных
     loadedUrlsCache.add(currentLoadingUrl)
     currentLoadingUrl = null
   }
 
   /**
-   * ❌ Обработчик ошибки загрузки
+   * ❌ Обработчик ошибки
    */
   function onError(event: Event) {
     const target = event.target as HTMLImageElement
     const failedUrl = target?.src
 
-    console.warn('⚠️ Ошибка загрузки изображения:', failedUrl)
+    console.warn('⚠️ Ошибка загрузки:', failedUrl?.split('?')[0].split('/').pop())
 
-    // Игнорируем ошибки для "старых" URL (которые уже не актуальны)
+    // Игнорируем ошибки для неактуальных URL
     if (failedUrl !== imageUrl.value) {
-      console.log('⏭️ Игнорируем ошибку для неактуального URL')
+      console.log('⏭️ Игнорируем ошибку (неактуальный URL)')
       return
     }
 
     isError.value = true
+    isLoading.value = false
 
-    // Retry только если не превышен лимит
+    // Retry с новым timestamp для обхода кеша ошибок
     if (retryCount.value < maxRetries) {
       retryCount.value++
       console.log(`🔄 Retry ${retryCount.value}/${maxRetries}...`)
 
-      // Экспоненциальная задержка: 300ms, 600ms
       setTimeout(() => {
         if (imageRef.value && imageUrl.value === failedUrl) {
-          // Добавляем случайный параметр для обхода кеша ошибок
+          // Добавляем retry параметр
           const separator = failedUrl.includes('?') ? '&' : '?'
-          imageRef.value.src = `${failedUrl}${separator}retry=${Date.now()}`
+          const retryUrl = `${failedUrl}${separator}retry=${Date.now()}`
+
+          // Используем оптимизированную загрузку
+          const img = createOptimizedImage(retryUrl)
+          img.onload = () => {
+            if (imageRef.value) {
+              imageRef.value.src = retryUrl
+              onLoad()
+            }
+          }
+          img.onerror = onError
         }
-      }, 300 * retryCount.value)
+      }, 500)
     }
     else {
-      console.error('🔴 Не удалось загрузить после всех попыток:', failedUrl)
+      console.error('🔴 Не удалось загрузить после попыток')
     }
   }
 
   /**
-   * 📋 Preload изображения (для eager loading)
+   * 📋 Preload критичного изображения
    */
   function preloadImage(url: string) {
     if (!url || isImageCached(url))
       return
 
-    console.log('📋 Preloading:', url)
+    console.log('📋 Preloading:', url.split('?')[0].split('/').pop())
 
+    // Используем link preload с правильными атрибутами
     const link = document.createElement('link')
     link.rel = 'preload'
     link.as = 'image'
     link.href = url
     link.crossOrigin = 'anonymous'
 
+    // Добавляем fetchpriority для eager
+    if (eager) {
+      link.setAttribute('fetchpriority', 'high')
+    }
+
     document.head.appendChild(link)
   }
 
   /**
-   * 🚀 Начать загрузку изображения
+   * 🚀 Начать загрузку
    */
   function startLoading(url: string) {
     if (!imageRef.value)
       return
 
-    // Проверяем кеш - если уже загружено, сразу показываем
+    // Проверяем кеш
     if (isImageCached(url)) {
-      console.log('💾 Изображение из кеша:', url)
+      console.log('💾 Из кеша браузера:', url.split('?')[0].split('/').pop())
       imageRef.value.src = url
       isLoaded.value = true
       isError.value = false
+      isLoading.value = false
       return
     }
 
-    // Начинаем новую загрузку
-    console.log('🚀 Загружаем новое изображение:', url)
+    // Начинаем загрузку
+    console.log('🚀 Загружаем:', url.split('?')[0].split('/').pop())
     currentLoadingUrl = url
-    imageRef.value.src = url
+    isLoading.value = true
+
+    // 🛡️ Используем оптимизированный метод загрузки
+    const img = createOptimizedImage(url)
+
+    // Когда загрузится - обновляем основной элемент
+    img.onload = () => {
+      if (imageRef.value && currentLoadingUrl === url) {
+        imageRef.value.src = url
+        onLoad()
+      }
+    }
+
+    img.onerror = onError
   }
 
   /**
-   * 🔄 Обработка смены URL
+   * 🔄 Обработка смены URL с debounce
    */
   function handleUrlChange(newUrl: string | null | undefined) {
-    // Очищаем debounce таймер
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null
@@ -171,14 +216,14 @@ export function useProgressiveImage(
       return
     }
 
-    // 🎯 Debounce для быстрого переключения (100ms)
+    // 🎯 Debounce 150ms (оптимальное значение для карусели)
     debounceTimer = setTimeout(() => {
       startLoading(newUrl)
-    }, 100)
+    }, 150)
   }
 
   /**
-   * 🧹 Очистка ресурсов
+   * 🧹 Очистка
    */
   function cleanup() {
     if (observer) {
@@ -192,6 +237,7 @@ export function useProgressiveImage(
     }
 
     currentLoadingUrl = null
+    isLoading.value = false
   }
 
   /**
@@ -200,6 +246,7 @@ export function useProgressiveImage(
   function resetState() {
     isLoaded.value = false
     isError.value = false
+    isLoading.value = false
     retryCount.value = 0
   }
 
@@ -222,7 +269,7 @@ export function useProgressiveImage(
               observer = null
             }
 
-            console.log('👁️ Изображение видимо, начинаем загрузку')
+            console.log('👁️ Видимо, загружаем')
           }
         })
       },
@@ -238,8 +285,6 @@ export function useProgressiveImage(
     nextTick(() => {
       if (eager) {
         shouldLoad.value = true
-
-        // Preload для eager изображений
         if (imageUrl.value) {
           preloadImage(imageUrl.value)
         }
@@ -254,18 +299,15 @@ export function useProgressiveImage(
     cleanup()
   })
 
-  /**
-   * 🎯 Watch на изменение URL
-   */
   watch(
     imageUrl,
     (newUrl, oldUrl) => {
       if (newUrl === oldUrl)
         return
 
-      console.log('🔄 URL изменился:', { oldUrl, newUrl })
+      console.log('🔄 URL изменился')
 
-      // Сбрасываем состояние только если это реально другое изображение
+      // Сбрасываем только если новое изображение не в кеше
       if (newUrl && !isImageCached(newUrl)) {
         resetState()
       }
@@ -274,9 +316,6 @@ export function useProgressiveImage(
     },
   )
 
-  /**
-   * 🎯 Watch на shouldLoad (когда становится видимым)
-   */
   watch(
     shouldLoad,
     (shouldLoadValue) => {
@@ -294,6 +333,7 @@ export function useProgressiveImage(
     isError,
     shouldLoad,
     retryCount,
+    isLoading, // 🆕 Добавили индикатор загрузки
     onLoad,
     onError,
     resetState,

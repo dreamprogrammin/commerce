@@ -1,7 +1,11 @@
 import type { Database, IUploadFileOptions } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
-import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
+import {
+  CLOUDFLARE_BYPASS,
+  IMAGE_OPTIMIZATION_ENABLED,
+  OPTIMIZATION_CONFIG,
+} from '@/config/images'
 
 export interface ImageTransformOptions {
   width?: number
@@ -12,12 +16,21 @@ export interface ImageTransformOptions {
 }
 
 /**
- * 🖼️ Composable для работы с Supabase Storage
+ * 🖼️ УНИВЕРСАЛЬНЫЙ Composable для работы с Supabase Storage
  *
- * КЛЮЧЕВЫЕ ОПТИМИЗАЦИИ:
- * ✅ Кеширование URLs БЕЗ timestamp (стабильные URL)
- * ✅ Timestamp добавляется ОДИН РАЗ при создании URL
- * ✅ Браузер может кешировать изображения нормально
+ * 🎯 АВТОМАТИЧЕСКИ ПЕРЕКЛЮЧАЕТСЯ между режимами:
+ *
+ * БЕСПЛАТНЫЙ ТАРИФ (IMAGE_OPTIMIZATION_ENABLED = false):
+ *   ✅ API Proxy для обхода Cloudflare
+ *   ✅ Оригинальные изображения (предоптимизированные)
+ *   ✅ Стабильное кеширование
+ *
+ * ПЛАТНЫЙ ТАРИФ (IMAGE_OPTIMIZATION_ENABLED = true):
+ *   ✅ Supabase Image Transformation API
+ *   ✅ Трансформация на лету (resize, format, quality)
+ *   ✅ Автоматический WebP/AVIF
+ *
+ * Просто измените IMAGE_OPTIMIZATION_ENABLED в config/images.ts!
  */
 export function useSupabaseStorage() {
   const supabase = useSupabaseClient<Database>()
@@ -26,10 +39,12 @@ export function useSupabaseStorage() {
   const isLoading = ref(false)
   const uploadError = ref<string | null>(null)
 
-  // 🗄️ КЕШИРОВАНИЕ: Map<cacheKey, stableUrl>
-  // ВАЖНО: URL кешируется ОДИН РАЗ с timestamp и больше не меняется
+  // 🗄️ Кеш URLs (стабильные, не меняются при повторных вызовах)
   const imageUrlCache = new Map<string, string>()
 
+  /**
+   * 📤 Загрузить файл в Supabase Storage
+   */
   async function uploadFile(
     file: File,
     options: IUploadFileOptions,
@@ -52,7 +67,7 @@ export function useSupabaseStorage() {
       : uniqueFileName
 
     try {
-      console.log(`📤 Загружаем: ${uniqueFileName} → ${options.bucketName}/${filePath}`)
+      console.log(`📤 Загружаем: ${uniqueFileName} → ${options.bucketName}`)
 
       const { data, error } = await supabase.storage
         .from(options.bucketName)
@@ -66,7 +81,7 @@ export function useSupabaseStorage() {
         throw error
 
       console.log(`✅ Файл загружен: ${data.path}`)
-      toast.success('Файл загружен', { description: `${file.name} успешно загружен` })
+      toast.success('Файл загружен', { description: `${file.name} успешно` })
 
       return data.path
     }
@@ -82,6 +97,9 @@ export function useSupabaseStorage() {
     }
   }
 
+  /**
+   * 🗑️ Удалить файл(ы)
+   */
   async function removeFile(
     bucketName: string,
     filePaths: string | string[],
@@ -93,14 +111,14 @@ export function useSupabaseStorage() {
       return true
 
     try {
-      console.log(`🗑️ Удаляем из ${bucketName}: ${validPaths.join(', ')}`)
+      console.log(`🗑️ Удаляем из ${bucketName}: ${validPaths.length} файлов`)
 
       const { error } = await supabase.storage.from(bucketName).remove(validPaths)
       if (error)
         throw error
 
       toast.success('Файлы удалены', {
-        description: `${validPaths.length} файл(ов) удалено`,
+        description: `${validPaths.length} файл(ов)`,
       })
 
       // Очищаем кеш
@@ -113,17 +131,19 @@ export function useSupabaseStorage() {
         keysToDelete.forEach(key => imageUrlCache.delete(key))
       })
 
-      console.log(`✅ Файлы удалены`)
       return true
     }
     catch (e: any) {
       const message = e.message || `Ошибка удаления из ${bucketName}`
       toast.error('Ошибка Storage', { description: message })
-      console.error(`❌ Ошибка удаления из "${bucketName}":`, e)
+      console.error(`❌ Ошибка удаления:`, e)
       return false
     }
   }
 
+  /**
+   * 🌍 Получить публичный URL (без трансформации)
+   */
   function getPublicUrl(
     bucketName: string,
     filePath: string | null,
@@ -136,11 +156,14 @@ export function useSupabaseStorage() {
       return data?.publicUrl || null
     }
     catch (e) {
-      console.error(`❌ Ошибка получения public URL "${filePath}":`, e)
+      console.error(`❌ Ошибка получения public URL:`, e)
       return null
     }
   }
 
+  /**
+   * 🚀 Получить URL с Supabase трансформацией (платный режим)
+   */
   function getOptimizedUrl(
     bucketName: string,
     filePath: string | null,
@@ -172,22 +195,44 @@ export function useSupabaseStorage() {
 
       const queryString = params.length > 0 ? `?${params.join('&')}` : ''
       const baseUrl = `${config.public.supabase.url}/storage/v1/render/image/public/${bucketName}`
-      const url = `${baseUrl}/${filePath}${queryString}`
 
-      console.log(`🚀 Optimized URL (${format} ${width}x${height})`)
-      return url
+      return `${baseUrl}/${filePath}${queryString}`
     }
     catch (e) {
-      console.error(`❌ Ошибка получения optimized URL "${filePath}":`, e)
+      console.error(`❌ Ошибка optimized URL:`, e)
       return getPublicUrl(bucketName, filePath)
     }
   }
 
   /**
-   * 🎯 ГЛАВНАЯ ФУНКЦИЯ: Получить URL изображения
+   * 🛡️ Получить URL через API Proxy (бесплатный режим)
+   */
+  function getProxyUrl(
+    bucketName: string,
+    filePath: string | null,
+  ): string | null {
+    if (!filePath?.trim())
+      return null
+
+    // Формируем URL через наш API proxy
+    return `${CLOUDFLARE_BYPASS.PROXY_PATH}/${bucketName}/${filePath}`
+  }
+
+  /**
+   * 🎯 ГЛАВНАЯ ФУНКЦИЯ: Универсальный получатель URL
    *
-   * КРИТИЧНО: URL кешируется ОДИН РАЗ и больше не меняется!
-   * Это позволяет браузеру нормально кешировать изображения.
+   * Автоматически выбирает режим:
+   * - БЕСПЛАТНЫЙ: API Proxy
+   * - ПЛАТНЫЙ: Supabase Transformation
+   *
+   * @example
+   * // Бесплатный режим
+   * getImageUrl('products', 'path/to/image.jpg')
+   * // → /api/image-proxy/products/path/to/image.jpg
+   *
+   * // Платный режим
+   * getImageUrl('products', 'path/to/image.jpg', { width: 400, quality: 80 })
+   * // → https://.../storage/v1/render/image/public/products/path.jpg?width=400&quality=80
    */
   function getImageUrl(
     bucketName: string,
@@ -198,44 +243,48 @@ export function useSupabaseStorage() {
       return null
 
     // Генерируем ключ кеша
-    const cacheKey = `${bucketName}:${filePath}:${JSON.stringify(options || {})}`
+    const cacheKey = `${bucketName}:${filePath}:${JSON.stringify(options || {})}:${IMAGE_OPTIMIZATION_ENABLED}`
 
-    // 💾 Проверяем кеш - ВОЗВРАЩАЕМ ТОТ ЖЕ URL
+    // 💾 Проверяем кеш
     if (imageUrlCache.has(cacheKey)) {
       const cachedUrl = imageUrlCache.get(cacheKey)
       if (cachedUrl) {
-        console.log(`💾 Из кеша: ${cacheKey.slice(0, 50)}...`)
+        // console.log(`💾 Кеш: ${bucketName}/${filePath.split('/').pop()}`)
         return cachedUrl
       }
     }
 
     let url: string | null = null
 
-    // Выбираем режим оптимизации
+    // 🎯 ВЫБОР РЕЖИМА
     if (IMAGE_OPTIMIZATION_ENABLED && options) {
+      // ✅ ПЛАТНЫЙ РЕЖИМ: Supabase Transformation
       url = getOptimizedUrl(bucketName, filePath, options)
-      console.log(`🚀 Supabase Transform`)
+      console.log(`🚀 Режим: Supabase Transform (${options.width}x${options.height}, ${options.format})`)
     }
     else {
-      url = getPublicUrl(bucketName, filePath)
-      console.log(`💾 Pre-optimized`)
+      // ✅ БЕСПЛАТНЫЙ РЕЖИМ: API Proxy
+      url = getProxyUrl(bucketName, filePath)
+      console.log(`🛡️ Режим: API Proxy (обход Cloudflare)`)
     }
 
-    // ✅ Добавляем timestamp ОДИН РАЗ при первом создании URL
+    // ✅ Добавляем timestamp ОДИН РАЗ для cache busting
     if (url) {
       const separator = url.includes('?') ? '&' : '?'
       const stableUrl = `${url}${separator}t=${Date.now()}`
 
-      // Кешируем URL навсегда (пока не очистим кеш вручную)
+      // Кешируем навсегда
       imageUrlCache.set(cacheKey, stableUrl)
 
-      console.log(`🆕 Новый URL создан и закеширован`)
       return stableUrl
     }
 
     return null
   }
 
+  /**
+   * 🛡️ Получить URL с заголовками (для fetch запросов)
+   */
   function getImageUrlWithHeaders(
     bucketName: string,
     filePath: string | null,
@@ -246,41 +295,86 @@ export function useSupabaseStorage() {
 
     const url = getImageUrl(bucketName, filePath, options)
 
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Cache-Control': 'max-age=31536000', // Кешируем на год
-      'Connection': 'keep-alive',
-    }
+    // Заголовки только для прямых запросов (не для proxy)
+    const headers = IMAGE_OPTIMIZATION_ENABLED
+      ? CLOUDFLARE_BYPASS.HEADERS
+      : undefined
 
     return { url, headers }
   }
 
+  /**
+   * 🧹 Очистить кеш (при переключении режима или обновлении изображений)
+   */
   function clearImageCache(): void {
     const sizeBefore = imageUrlCache.size
     imageUrlCache.clear()
-    console.log(`🧹 Кеш очищен (${sizeBefore} элементов)`)
+    console.log(`🧹 Кеш очищен (${sizeBefore} URLs)`)
+    toast.info('Кеш очищен', { description: `${sizeBefore} URLs` })
   }
 
-  function getCacheInfo(): { size: number, entries: Array<{ key: string, value: string }> } {
+  /**
+   * 📊 Информация о кеше (для отладки)
+   */
+  function getCacheInfo(): {
+    size: number
+    mode: string
+    entries: Array<{ key: string, value: string }>
+  } {
     const entries: Array<{ key: string, value: string }> = []
     imageUrlCache.forEach((value, key) => {
       entries.push({ key, value })
     })
-    return { size: imageUrlCache.size, entries }
+
+    return {
+      size: imageUrlCache.size,
+      mode: IMAGE_OPTIMIZATION_ENABLED ? 'Supabase Transform' : 'API Proxy',
+      entries,
+    }
+  }
+
+  /**
+   * 🔄 Переключить режим (для тестирования)
+   * ВНИМАНИЕ: Требует перезагрузки страницы для применения
+   */
+  function toggleOptimizationMode(): void {
+    console.warn('⚠️ Для переключения режима измените IMAGE_OPTIMIZATION_ENABLED в config/images.ts')
+    console.log(`Текущий режим: ${IMAGE_OPTIMIZATION_ENABLED ? 'Платный (Transform)' : 'Бесплатный (Proxy)'}`)
+  }
+
+  // 📊 Логирование текущего режима при инициализации
+  if (import.meta.env.DEV) {
+    console.log(`
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🖼️  РЕЖИМ ИЗОБРАЖЕНИЙ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${IMAGE_OPTIMIZATION_ENABLED
+    ? '🚀 ПЛАТНЫЙ: Supabase Image Transformation\n   ✅ Трансформация на лету\n   ✅ WebP/AVIF автоматически\n   ✅ Resize, качество, формат'
+    : '🛡️  БЕСПЛАТНЫЙ: API Proxy + Pre-optimized\n   ✅ Обход Cloudflare\n   ✅ Кеширование на год\n   ✅ Без трансформаций'
+}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    `)
   }
 
   return {
+    // State
     isLoading,
     uploadError,
+
+    // Methods
     uploadFile,
     removeFile,
+
+    // URL генераторы
     getPublicUrl,
     getOptimizedUrl,
-    getImageUrl, // 🎯 Используй везде эту функцию
+    getProxyUrl,
+    getImageUrl, // 🎯 ОСНОВНОЙ - используй везде
     getImageUrlWithHeaders,
+
+    // Утилиты
     clearImageCache,
     getCacheInfo,
+    toggleOptimizationMode,
   }
 }
