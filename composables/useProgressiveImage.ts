@@ -4,29 +4,19 @@ import type { Ref } from 'vue'
  * Опции для Intersection Observer
  */
 export interface ProgressiveImageOptions {
-  rootMargin?: string // Отступ для срабатывания (по умолчанию '50px')
-  threshold?: number // Порог видимости (0.01 = 1%)
-  eager?: boolean // 🎯 Загружать сразу без lazy loading (для видимых элементов)
+  rootMargin?: string
+  threshold?: number
+  eager?: boolean
 }
 
 /**
  * 🖼️ Композебл для прогрессивной загрузки изображений
  *
- * Особенности:
- * - Lazy loading через Intersection Observer
- * - Shimmer плейсхолдер во время загрузки
- * - Обработка ошибок загрузки
- * - Автоматический retry при сбое
- * - Поддержка кеша браузера
- * - 🛡️ Отмена предыдущих запросов при смене URL
- *
- * @param imageUrl - реактивная ссылка на URL изображения
- * @param options - опции (rootMargin, threshold)
- * @returns объект с состоянием и методами
- *
- * @example
- * const imageUrl = toRef(props, 'src')
- * const { imageRef, isLoaded, isError, shouldLoad, onLoad, onError } = useProgressiveImage(imageUrl)
+ * ОПТИМИЗАЦИИ:
+ * ✅ Кеширование загруженных URL (не перезагружаем одно изображение)
+ * ✅ Debounce для быстрого переключения
+ * ✅ Умная отмена только "старых" запросов
+ * ✅ Preloading для eager изображений
  */
 export function useProgressiveImage(
   imageUrl: Ref<string | null | undefined>,
@@ -35,106 +25,160 @@ export function useProgressiveImage(
   const {
     rootMargin = '50px',
     threshold = 0.01,
-    eager = false, // 🎯 По умолчанию lazy loading
+    eager = false,
   } = options
 
   // --- СОСТОЯНИЕ ---
   const imageRef = ref<HTMLImageElement>()
-  const isVisible = ref(false) // Видимо ли изображение в viewport
-  const isLoaded = ref(false) // Загруженное ли изображение
-  const isError = ref(false) // Произошла ли ошибка при загрузке
-  const shouldLoad = ref(eager) // 🎯 Если eager=true, загружаем сразу
-  const retryCount = ref(0) // Количество попыток retry
-  const maxRetries = 3 // Максимальное количество попыток
+  const isVisible = ref(false)
+  const isLoaded = ref(false)
+  const isError = ref(false)
+  const shouldLoad = ref(eager)
+  const retryCount = ref(0)
+  const maxRetries = 2 // Уменьшили с 3 до 2
 
-  // 🛡️ AbortController для отмены предыдущего запроса
-  let abortController: AbortController | null = null
+  // 🗄️ КЕШИРОВАНИЕ: Храним список успешно загруженных URL
+  const loadedUrlsCache = new Set<string>()
+
+  // 🛡️ Текущий URL для которого идет загрузка
+  let currentLoadingUrl: string | null = null
+
+  // ⏱️ Debounce таймер для быстрого переключения
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   let observer: IntersectionObserver | null = null
 
   /**
-   * Обработчик успешной загрузки изображения
+   * 💾 Проверка: загружено ли изображение из кеша браузера
+   */
+  function isImageCached(url: string): boolean {
+    // Проверяем собственный кеш
+    if (loadedUrlsCache.has(url)) {
+      return true
+    }
+
+    // Проверяем браузерный кеш через Image API
+    const img = new Image()
+    img.src = url
+    return img.complete && img.naturalHeight !== 0
+  }
+
+  /**
+   * ✅ Обработчик успешной загрузки
    */
   function onLoad() {
+    if (!currentLoadingUrl)
+      return
+
+    console.log('✅ Изображение загружено:', currentLoadingUrl)
+
     isLoaded.value = true
     isError.value = false
     retryCount.value = 0
 
-    // 🛡️ Отменяем AbortController после успешной загрузки
-    abortController = null
+    // Добавляем в кеш успешно загруженных
+    loadedUrlsCache.add(currentLoadingUrl)
+    currentLoadingUrl = null
   }
 
   /**
-   * Обработчик ошибки загрузки изображения
+   * ❌ Обработчик ошибки загрузки
    */
-  function onError() {
-    isError.value = true
+  function onError(event: Event) {
+    const target = event.target as HTMLImageElement
+    const failedUrl = target?.src
 
-    // 🛡️ Если это отмена (AbortError) - игнорируем, это нормально
-    if (abortController?.signal.aborted) {
-      console.log('⏹️ Загрузка отменена (переключили изображение)')
+    console.warn('⚠️ Ошибка загрузки изображения:', failedUrl)
+
+    // Игнорируем ошибки для "старых" URL (которые уже не актуальны)
+    if (failedUrl !== imageUrl.value) {
+      console.log('⏭️ Игнорируем ошибку для неактуального URL')
       return
     }
 
-    // Пытаемся повторить загрузку несколько раз
+    isError.value = true
+
+    // Retry только если не превышен лимит
     if (retryCount.value < maxRetries) {
       retryCount.value++
-      console.warn(
-        `⚠️ Ошибка загрузки (попытка ${retryCount.value}/${maxRetries}), пытаемся еще раз...`,
-        imageUrl.value,
-      )
+      console.log(`🔄 Retry ${retryCount.value}/${maxRetries}...`)
 
-      // Добавляем задержку перед retry
+      // Экспоненциальная задержка: 300ms, 600ms
       setTimeout(() => {
-        if (imageRef.value && imageUrl.value) {
-          // 🛡️ Просто переустанавливаем src (без параметров)
-          // Это заставит браузер перезагрузить изображение
-          imageRef.value.src = imageUrl.value
+        if (imageRef.value && imageUrl.value === failedUrl) {
+          // Добавляем случайный параметр для обхода кеша ошибок
+          const separator = failedUrl.includes('?') ? '&' : '?'
+          imageRef.value.src = `${failedUrl}${separator}retry=${Date.now()}`
         }
-      }, 500 * retryCount.value) // Экспоненциальная задержка
+      }, 300 * retryCount.value)
     }
     else {
-      console.error('🔴 Не удалось загрузить изображение после всех попыток:', imageUrl.value)
+      console.error('🔴 Не удалось загрузить после всех попыток:', failedUrl)
     }
   }
 
   /**
-   * Инициализация Intersection Observer
-   * Запускает загрузку когда изображение попадает в viewport + rootMargin
+   * 📋 Preload изображения (для eager loading)
    */
-  function initializeObserver() {
+  function preloadImage(url: string) {
+    if (!url || isImageCached(url))
+      return
+
+    console.log('📋 Preloading:', url)
+
+    const link = document.createElement('link')
+    link.rel = 'preload'
+    link.as = 'image'
+    link.href = url
+    link.crossOrigin = 'anonymous'
+
+    document.head.appendChild(link)
+  }
+
+  /**
+   * 🚀 Начать загрузку изображения
+   */
+  function startLoading(url: string) {
     if (!imageRef.value)
       return
 
-    observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            // Элемент стал видимым
-            isVisible.value = true
-            shouldLoad.value = true
+    // Проверяем кеш - если уже загружено, сразу показываем
+    if (isImageCached(url)) {
+      console.log('💾 Изображение из кеша:', url)
+      imageRef.value.src = url
+      isLoaded.value = true
+      isError.value = false
+      return
+    }
 
-            // Отключаем observer после первого срабатывания
-            if (observer) {
-              observer.disconnect()
-              observer = null
-            }
-
-            console.log('👁️ Изображение видимо, начинаем загрузку:', imageUrl.value)
-          }
-        })
-      },
-      {
-        rootMargin,
-        threshold,
-      },
-    )
-
-    observer.observe(imageRef.value)
+    // Начинаем новую загрузку
+    console.log('🚀 Загружаем новое изображение:', url)
+    currentLoadingUrl = url
+    imageRef.value.src = url
   }
 
   /**
-   * Очистка: отключаем observer при размонтировании
+   * 🔄 Обработка смены URL
+   */
+  function handleUrlChange(newUrl: string | null | undefined) {
+    // Очищаем debounce таймер
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+
+    if (!newUrl || !shouldLoad.value) {
+      return
+    }
+
+    // 🎯 Debounce для быстрого переключения (100ms)
+    debounceTimer = setTimeout(() => {
+      startLoading(newUrl)
+    }, 100)
+  }
+
+  /**
+   * 🧹 Очистка ресурсов
    */
   function cleanup() {
     if (observer) {
@@ -142,128 +186,114 @@ export function useProgressiveImage(
       observer = null
     }
 
-    if (imageRef.value) {
-      imageRef.value = undefined
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
     }
 
-    // 🛡️ Отменяем текущий запрос при размонтировании
-    if (abortController) {
-      abortController.abort()
-      abortController = null
-    }
+    currentLoadingUrl = null
   }
 
   /**
-   * Сброс состояния
-   * Используется когда URL меняется
+   * 🔄 Сброс состояния
    */
   function resetState() {
     isLoaded.value = false
     isError.value = false
     retryCount.value = 0
-    shouldLoad.value = false
+  }
 
-    // 🛡️ ВАЖНО: Отменяем предыдущий запрос при смене URL
-    if (abortController) {
-      console.log('🛡️ Отменяем предыдущий запрос (смена URL)')
-      abortController.abort()
-      abortController = null
-    }
+  /**
+   * 👁️ Инициализация Intersection Observer
+   */
+  function initializeObserver() {
+    if (!imageRef.value || eager)
+      return
+
+    observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            isVisible.value = true
+            shouldLoad.value = true
+
+            if (observer) {
+              observer.disconnect()
+              observer = null
+            }
+
+            console.log('👁️ Изображение видимо, начинаем загрузку')
+          }
+        })
+      },
+      { rootMargin, threshold },
+    )
+
+    observer.observe(imageRef.value)
   }
 
   // --- ЖИЗНЕННЫЙ ЦИКЛ ---
 
-  /**
-   * При монтировании: инициализируем observer (если не eager)
-   */
   onMounted(() => {
     nextTick(() => {
-      // 🎯 Если eager=true, не используем observer, просто загружаем сразу
       if (eager) {
         shouldLoad.value = true
-        console.log('⚡ Eager loading: загружаем сразу без observer')
+
+        // Preload для eager изображений
+        if (imageUrl.value) {
+          preloadImage(imageUrl.value)
+        }
       }
       else {
-        // Обычный lazy loading
         initializeObserver()
       }
     })
   })
 
-  /**
-   * При размонтировании: очищаем ресурсы
-   */
   onBeforeUnmount(() => {
     cleanup()
   })
 
   /**
-   * Когда URL меняется: сбрасываем состояние и перезапускаем observer
+   * 🎯 Watch на изменение URL
    */
   watch(
     imageUrl,
     (newUrl, oldUrl) => {
-      // Если URL не изменился - выходим
       if (newUrl === oldUrl)
         return
 
-      console.log('🔄 URL изображения изменился:', { oldUrl, newUrl })
+      console.log('🔄 URL изменился:', { oldUrl, newUrl })
 
-      // 🛡️ Сбрасываем состояние и отменяем предыдущий запрос
-      resetState()
-
-      // Если уже был observer - очищаем его
-      if (observer) {
-        observer.disconnect()
-        observer = null
+      // Сбрасываем состояние только если это реально другое изображение
+      if (newUrl && !isImageCached(newUrl)) {
+        resetState()
       }
 
-      // 🎯 Если eager=true, загружаем сразу без observer
-      if (eager) {
-        shouldLoad.value = true
-        console.log('⚡ Eager loading: загружаем сразу при смене URL')
-      }
-      else {
-        // Переинициализируем observer для нового URL
-        nextTick(() => {
-          if (imageRef.value) {
-            initializeObserver()
-          }
-        })
-      }
+      handleUrlChange(newUrl)
     },
   )
 
   /**
-   * Если URL меняется но shouldLoad уже true (например при быстром переключении),
-   * не перезагружаем - используем закешированное значение
+   * 🎯 Watch на shouldLoad (когда становится видимым)
    */
   watch(
-    [imageUrl, shouldLoad],
-    ([newUrl, shouldLoadValue]) => {
-      if (shouldLoadValue && newUrl) {
-        // Обновляем src только если нужно загружать
-        if (imageRef.value && imageRef.value.src !== newUrl) {
-          // 🛡️ Создаем новый AbortController для отслеживания этого запроса
-          abortController = new AbortController()
-
-          imageRef.value.src = newUrl
-        }
+    shouldLoad,
+    (shouldLoadValue) => {
+      if (shouldLoadValue && imageUrl.value) {
+        handleUrlChange(imageUrl.value)
       }
     },
+    { immediate: true },
   )
 
-  // --- ЭКСПОРТ ---
   return {
-    // Refs
     imageRef,
     isVisible,
     isLoaded,
     isError,
     shouldLoad,
     retryCount,
-
-    // Methods
     onLoad,
     onError,
     resetState,
