@@ -33,6 +33,9 @@ interface Props {
 
   /** Использовать трансформацию размеров */
   useTransform?: boolean
+
+  /** 🎯 Использовать eager loading (без lazy loading) для видимых элементов */
+  eager?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -211,7 +214,7 @@ if (isDev.value) {
     -->
     <img
       ref="imageRef"
-      :src="optimizedImageUrl || undefined"
+      :src="optimizedImageUrl"
       :alt="alt"
       class="w-full h-full transition-opacity duration-300"
       :class="[

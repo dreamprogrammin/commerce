@@ -154,12 +154,14 @@ const priceDetails = computed(() => {
         <!-- 🖥️ ДЕСКТОП: Наведение мышью меняет изображение -->
         <template v-if="!isTouchDevice">
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
+            <!-- 🎯 Используем eager=true для активного изображения (всегда видимо) -->
             <ProgressiveImage
               :src="activeImageUrl"
               :alt="`${product.name}`"
               aspect-ratio="square"
               object-fit="cover"
               placeholder-type="shimmer"
+              eager
             />
           </NuxtLink>
         </template>
@@ -184,13 +186,14 @@ const priceDetails = computed(() => {
                   :to="`/catalog/products/${product.slug}`"
                   class="block h-full aspect-square"
                 >
-                  <!-- 🎯 Используем ProgressiveImage для всех изображений -->
+                  <!-- 🎯 Используем eager=true для карусели (видимый слайд всегда показан) -->
                   <ProgressiveImage
                     :src="getImageUrlByIndex(index)"
                     :alt="`${product.name} - фото ${index + 1}`"
                     aspect-ratio="square"
                     object-fit="cover"
                     placeholder-type="shimmer"
+                    eager
                   />
                 </NuxtLink>
               </CarouselItem>
@@ -199,6 +202,7 @@ const priceDetails = computed(() => {
 
           <!-- 📷 Одно изображение на мобилке -->
           <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full">
+            <!-- 🎯 Используем eager=true для одного изображения -->
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
@@ -206,6 +210,7 @@ const priceDetails = computed(() => {
               aspect-ratio="square"
               object-fit="cover"
               placeholder-type="shimmer"
+              eager
             />
             <div
               v-else
@@ -219,6 +224,7 @@ const priceDetails = computed(() => {
         <!-- ⚙️ Fallback для SSR -->
         <template #fallback>
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
+            <!-- 🎯 Используем eager=true для fallback -->
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
@@ -226,6 +232,7 @@ const priceDetails = computed(() => {
               aspect-ratio="square"
               object-fit="cover"
               placeholder-type="shimmer"
+              eager
             />
             <div
               v-else

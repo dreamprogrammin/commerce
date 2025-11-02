@@ -6,6 +6,7 @@ import type { Ref } from 'vue'
 export interface ProgressiveImageOptions {
   rootMargin?: string // Отступ для срабатывания (по умолчанию '50px')
   threshold?: number // Порог видимости (0.01 = 1%)
+  eager?: boolean // 🎯 Загружать сразу без lazy loading (для видимых элементов)
 }
 
 /**
