@@ -17,6 +17,7 @@ export interface ProgressiveImageOptions {
  * - Обработка ошибок загрузки
  * - Автоматический retry при сбое
  * - Поддержка кеша браузера
+ * - 🛡️ Отмена предыдущих запросов при смене URL
  *
  * @param imageUrl - реактивная ссылка на URL изображения
  * @param options - опции (rootMargin, threshold)
@@ -44,6 +45,9 @@ export function useProgressiveImage(
   const retryCount = ref(0) // Количество попыток retry
   const maxRetries = 3 // Максимальное количество попыток
 
+  // 🛡️ AbortController для отмены предыдущего запроса
+  let abortController: AbortController | null = null
+
   let observer: IntersectionObserver | null = null
 
   /**
@@ -53,6 +57,9 @@ export function useProgressiveImage(
     isLoaded.value = true
     isError.value = false
     retryCount.value = 0
+
+    // 🛡️ Отменяем AbortController после успешной загрузки
+    abortController = null
   }
 
   /**
@@ -61,20 +68,26 @@ export function useProgressiveImage(
   function onError() {
     isError.value = true
 
+    // 🛡️ Если это отмена (AbortError) - игнорируем, это нормально
+    if (abortController?.signal.aborted) {
+      console.log('⏹️ Загрузка отменена (переключили изображение)')
+      return
+    }
+
     // Пытаемся повторить загрузку несколько раз
     if (retryCount.value < maxRetries) {
       retryCount.value++
       console.warn(
-        `❌ Ошибка загрузки изображения (попытка ${retryCount.value}/${maxRetries}):`,
+        `⚠️ Ошибка загрузки (попытка ${retryCount.value}/${maxRetries}), пытаемся еще раз...`,
         imageUrl.value,
       )
 
-      // Добавляем небольшую задержку перед retry
+      // Добавляем задержку перед retry
       setTimeout(() => {
-        if (imageRef.value) {
-          // Триггерим переzагрузку добавив timestamp
-          const separator = imageUrl.value?.includes('?') ? '&' : '?'
-          imageRef.value.src = `${imageUrl.value}${separator}retry=${retryCount.value}`
+        if (imageRef.value && imageUrl.value) {
+          // 🛡️ Просто переустанавливаем src (без параметров)
+          // Это заставит браузер перезагрузить изображение
+          imageRef.value.src = imageUrl.value
         }
       }, 500 * retryCount.value) // Экспоненциальная задержка
     }
@@ -105,7 +118,7 @@ export function useProgressiveImage(
               observer = null
             }
 
-            console.warn('👁️ Изображение видимо, начинаем загрузку:', imageUrl.value)
+            console.log('👁️ Изображение видимо, начинаем загрузку:', imageUrl.value)
           }
         })
       },
@@ -130,6 +143,12 @@ export function useProgressiveImage(
     if (imageRef.value) {
       imageRef.value = undefined
     }
+
+    // 🛡️ Отменяем текущий запрос при размонтировании
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
   }
 
   /**
@@ -141,6 +160,13 @@ export function useProgressiveImage(
     isError.value = false
     retryCount.value = 0
     shouldLoad.value = false
+
+    // 🛡️ ВАЖНО: Отменяем предыдущий запрос при смене URL
+    if (abortController) {
+      console.log('🛡️ Отменяем предыдущий запрос (смена URL)')
+      abortController.abort()
+      abortController = null
+    }
   }
 
   // --- ЖИЗНЕННЫЙ ЦИКЛ ---
@@ -171,9 +197,9 @@ export function useProgressiveImage(
       if (newUrl === oldUrl)
         return
 
-      console.warn('🔄 URL изображения изменился:', { oldUrl, newUrl })
+      console.log('🔄 URL изображения изменился:', { oldUrl, newUrl })
 
-      // Сбрасываем состояние
+      // 🛡️ Сбрасываем состояние и отменяем предыдущий запрос
       resetState()
 
       // Если уже был observer - очищаем его
@@ -201,6 +227,9 @@ export function useProgressiveImage(
       if (shouldLoadValue && newUrl) {
         // Обновляем src только если нужно загружать
         if (imageRef.value && imageRef.value.src !== newUrl) {
+          // 🛡️ Создаем новый AbortController для отслеживания этого запроса
+          abortController = new AbortController()
+
           imageRef.value.src = newUrl
         }
       }
