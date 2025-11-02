@@ -265,7 +265,7 @@ export function useSupabaseStorage() {
     else {
       // ✅ БЕСПЛАТНЫЙ РЕЖИМ: API Proxy
       url = getProxyUrl(bucketName, filePath)
-      console.log(`🛡️ Режим: API Proxy (обход Cloudflare)`)
+      console.log(`🛡️ Режим: API Proxy → ${url}`)
     }
 
     // ✅ Добавляем timestamp ОДИН РАЗ для cache busting
@@ -276,6 +276,7 @@ export function useSupabaseStorage() {
       // Кешируем навсегда
       imageUrlCache.set(cacheKey, stableUrl)
 
+      console.log(`🆕 Новый URL: ${stableUrl}`)
       return stableUrl
     }
 
