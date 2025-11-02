@@ -152,23 +152,39 @@ const placeholderStyle = computed(() => {
   return {}
 })
 
-/**
- * Логирование для отладки в dev режиме
- */
-const isDev = computed(() => import.meta.env.DEV)
+// ✅ isDev определен локально в компоненте
+const isDev = computed(() => import.meta.env.DEV) // в ProgressiveImage.vue
+// Не нужно передавать из composable
 
-if (isDev.value) {
-  watchEffect(() => {
-    console.log('🖼️ ProgressiveImage debug:', {
-      src: imageUrl.value,
-      isLoaded: isLoaded.value,
-      isError: isError.value,
-      shouldLoad: shouldLoad.value,
-      retryCount: retryCount.value,
-      mode: IMAGE_OPTIMIZATION_ENABLED ? '🚀 Transform' : '💾 Pre-optimized',
-    })
-  })
+// --- LIFECYCLE HOOKS ---
+
+/**
+ * 🎯 Добавляем элемент <link rel="preload"> для критичных изображений
+ * Это говорит браузеру начать загрузку ДО того как произойдет render
+ */
+function addPreloadLink() {
+  if (!optimizedImageUrl.value || !props.eager) {
+    return
+  }
+
+  // Проверяем, не добавили ли уже
+  const existing = document.querySelector(`link[href="${optimizedImageUrl.value}"]`)
+  if (existing)
+    return
+
+  const link = document.createElement('link')
+  link.rel = 'preload'
+  link.as = 'image'
+  link.href = optimizedImageUrl.value
+  link.crossOrigin = 'anonymous'
+
+  document.head.appendChild(link)
+  console.log('📋 Добавили preload для:', optimizedImageUrl.value)
 }
+
+watch(optimizedImageUrl, () => {
+  addPreloadLink()
+}, { immediate: true })
 </script>
 
 <template>
@@ -214,7 +230,7 @@ if (isDev.value) {
     -->
     <img
       ref="imageRef"
-      :src="optimizedImageUrl"
+      :src="optimizedImageUrl || undefined"
       :alt="alt"
       class="w-full h-full transition-opacity duration-300"
       :class="[
