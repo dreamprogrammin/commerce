@@ -33,7 +33,7 @@
  *   // Используем локальную оптимизацию
  * }
  */
-export const IMAGE_OPTIMIZATION_ENABLED = true
+export const IMAGE_OPTIMIZATION_ENABLED = false
 
 /**
  * 📏 Размеры изображений для разных сценариев
