@@ -35,6 +35,7 @@ export function useProgressiveImage(
   const {
     rootMargin = '50px',
     threshold = 0.01,
+    eager = false, // 🎯 По умолчанию lazy loading
   } = options
 
   // --- СОСТОЯНИЕ ---
@@ -42,7 +43,7 @@ export function useProgressiveImage(
   const isVisible = ref(false) // Видимо ли изображение в viewport
   const isLoaded = ref(false) // Загруженное ли изображение
   const isError = ref(false) // Произошла ли ошибка при загрузке
-  const shouldLoad = ref(false) // Нужно ли начинать загрузку
+  const shouldLoad = ref(eager) // 🎯 Если eager=true, загружаем сразу
   const retryCount = ref(0) // Количество попыток retry
   const maxRetries = 3 // Максимальное количество попыток
 
@@ -173,11 +174,19 @@ export function useProgressiveImage(
   // --- ЖИЗНЕННЫЙ ЦИКЛ ---
 
   /**
-   * При монтировании: инициализируем observer
+   * При монтировании: инициализируем observer (если не eager)
    */
   onMounted(() => {
     nextTick(() => {
-      initializeObserver()
+      // 🎯 Если eager=true, не используем observer, просто загружаем сразу
+      if (eager) {
+        shouldLoad.value = true
+        console.log('⚡ Eager loading: загружаем сразу без observer')
+      }
+      else {
+        // Обычный lazy loading
+        initializeObserver()
+      }
     })
   })
 
@@ -209,12 +218,19 @@ export function useProgressiveImage(
         observer = null
       }
 
-      // Переинициализируем observer для нового URL
-      nextTick(() => {
-        if (imageRef.value) {
-          initializeObserver()
-        }
-      })
+      // 🎯 Если eager=true, загружаем сразу без observer
+      if (eager) {
+        shouldLoad.value = true
+        console.log('⚡ Eager loading: загружаем сразу при смене URL')
+      }
+      else {
+        // Переинициализируем observer для нового URL
+        nextTick(() => {
+          if (imageRef.value) {
+            initializeObserver()
+          }
+        })
+      }
     },
   )
 
