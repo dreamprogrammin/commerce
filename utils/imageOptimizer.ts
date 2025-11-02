@@ -1,15 +1,8 @@
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_QUALITY, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
+
 /**
- * 🖼️ Утилита для оптимизации изображений ПЕРЕД загрузкой в Supabase
- * Используется только когда IMAGE_OPTIMIZATION_ENABLED = false (бесплатный тариф)
+ * 🎨 Результат оптимизации изображения
  */
-
-export interface ImageOptimizationOptions {
-  maxWidth?: number
-  maxHeight?: number
-  quality?: number // 0.0 - 1.0
-  format?: 'webp' | 'jpeg' | 'png'
-}
-
 export interface OptimizationResult {
   file: File
   originalSize: number
@@ -18,140 +11,294 @@ export interface OptimizationResult {
 }
 
 /**
- * Оптимизирует изображение перед загрузкой
+ * 📊 Информация о режиме оптимизации
+ */
+export interface OptimizationInfo {
+  name: string
+  icon: string
+  description: string
+  recommendation: string
+}
+
+/**
+ * 🎯 Получить информацию о текущем режиме оптимизации
+ *
+ * @returns объект с информацией о режиме
+ *
+ * @example
+ * const info = getOptimizationInfo()
+ * console.log(info.name) // "Бесплатный тариф"
+ * console.log(info.icon) // "🛡️"
+ */
+export function getOptimizationInfo(): OptimizationInfo {
+  if (IMAGE_OPTIMIZATION_ENABLED) {
+    return {
+      name: 'Платный тариф',
+      icon: '🚀',
+      description: 'Supabase Image Transformation (трансформация на лету)',
+      recommendation: 'Загружайте оригиналы высокого качества - Supabase оптимизирует их автоматически',
+    }
+  }
+
+  return {
+    name: 'Бесплатный тариф',
+    icon: '🛡️',
+    description: 'Локальная оптимизация через Canvas API',
+    recommendation: 'Изображения оптимизируются локально перед загрузкой',
+  }
+}
+
+/**
+ * 📏 Форматирует размер файла в читаемый вид
+ *
+ * @param bytes - размер в байтах
+ * @returns строка типа "1.5 MB" или "350 KB"
+ *
+ * @example
+ * formatFileSize(1500000) // "1.43 MB"
+ * formatFileSize(50000)   // "48.8 KB"
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0)
+    return '0 B'
+
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+  return `${(bytes / k ** i).toFixed(1)} ${sizes[i]}`
+}
+
+/**
+ * 🎯 Проверяет нужна ли оптимизация для файла
+ *
+ * Логика:
+ * - Если платный тариф (IMAGE_OPTIMIZATION_ENABLED = true) → НЕ оптимизируем (загружаем оригиналы)
+ * - Если бесплатный тариф → оптимизируем файлы > 500KB
+ *
+ * @param file - файл для проверки
+ * @returns true если нужна локальная оптимизация
+ *
+ * @example
+ * const file = new File([blob], 'image.jpg')
+ * if (shouldOptimizeImage(file)) {
+ *   await optimizeImageBeforeUpload(file)
+ * }
+ */
+export function shouldOptimizeImage(file: File): boolean {
+  // 🚀 Платный тариф - НЕ оптимизируем (Supabase сделает это сам)
+  if (IMAGE_OPTIMIZATION_ENABLED) {
+    return false
+  }
+
+  // 🛡️ Бесплатный тариф - оптимизируем файлы > 500KB
+  const threshold = 500 * 1024 // 500KB
+  return file.size > threshold
+}
+
+/**
+ * 🎨 Оптимизирует изображение перед загрузкой
+ *
+ * Использует Canvas API для:
+ * - Изменения размера (если больше рекомендуемого)
+ * - Конвертации в WebP (меньший размер)
+ * - Сжатия с настраиваемым качеством
+ *
+ * @param file - исходный файл изображения
+ * @param maxWidth - максимальная ширина (по умолчанию 2000px)
+ * @param maxHeight - максимальная высота (по умолчанию 2000px)
+ * @param quality - качество сжатия (0-1, по умолчанию 0.85)
+ * @returns Promise с результатом оптимизации
+ *
+ * @example
+ * const result = await optimizeImageBeforeUpload(file)
+ * console.log(`Экономия: ${result.savings}%`)
+ * // Загружаем result.file вместо оригинала
  */
 export async function optimizeImageBeforeUpload(
   file: File,
-  options: ImageOptimizationOptions = {},
+  maxWidth = OPTIMIZATION_RECOMMENDATIONS.RECOMMENDED_UPLOAD_DIMENSIONS.width,
+  maxHeight = OPTIMIZATION_RECOMMENDATIONS.RECOMMENDED_UPLOAD_DIMENSIONS.height,
+  quality = IMAGE_QUALITY.HIGH / 100, // 85 / 100 = 0.85
 ): Promise<OptimizationResult> {
-  const {
-    maxWidth = 800,
-    maxHeight = 800,
-    quality = 0.85,
-    format = 'webp',
-  } = options
+  const originalSize = file.size
 
   return new Promise((resolve, reject) => {
+    const img = new Image()
     const reader = new FileReader()
-    const originalSize = file.size
 
     reader.onload = (e) => {
-      const img = new Image()
+      img.src = e.target?.result as string
+    }
 
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'))
+    }
 
-        if (!ctx) {
-          reject(new Error('Не удалось получить canvas context'))
-          return
-        }
-
+    img.onload = () => {
+      try {
+        // Вычисляем новые размеры (пропорционально)
         let { width, height } = img
 
-        // Расчет новых размеров с сохранением пропорций
-        if (width > height) {
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width
-            width = maxWidth
-          }
-        }
-        else {
-          if (height > maxHeight) {
-            width = (width * maxHeight) / height
-            height = maxHeight
-          }
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height)
+          width = Math.floor(width * ratio)
+          height = Math.floor(height * ratio)
         }
 
+        // Создаем canvas
+        const canvas = document.createElement('canvas')
         canvas.width = width
         canvas.height = height
 
-        // Улучшаем качество рендеринга
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'))
+          return
+        }
+
+        // Рисуем изображение с оптимальным качеством
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
-
-        // Рисуем изображение
         ctx.drawImage(img, 0, 0, width, height)
 
-        // Определяем MIME type
-        const mimeType = format === 'webp' ? 'image/webp' : `image/${format}`
-
-        // Конвертируем в blob
+        // Конвертируем в WebP (или JPEG если WebP не поддерживается)
         canvas.toBlob(
           (blob) => {
             if (!blob) {
-              reject(new Error('Не удалось оптимизировать изображение'))
+              reject(new Error('Failed to create blob'))
               return
             }
 
             const optimizedSize = blob.size
-            const savings = ((1 - optimizedSize / originalSize) * 100)
+            const savings = ((originalSize - optimizedSize) / originalSize) * 100
 
-            // Создаем новый файл с правильным расширением
-            const extension = format === 'webp' ? '.webp' : `.${format}`
-            const newFileName = file.name.replace(/\.[^.]+$/, extension)
-
+            // Создаем новый файл
             const optimizedFile = new File(
               [blob],
-              newFileName,
-              {
-                type: mimeType,
-                lastModified: Date.now(),
-              },
+              file.name.replace(/\.[^.]+$/, '.webp'), // Меняем расширение на .webp
+              { type: 'image/webp' },
             )
 
             resolve({
               file: optimizedFile,
               originalSize,
               optimizedSize,
-              savings,
+              savings: Math.max(0, savings),
             })
           },
-          mimeType,
+          'image/webp',
           quality,
         )
       }
-
-      img.onerror = () => reject(new Error('Не удалось загрузить изображение'))
-      img.src = e.target?.result as string
+      catch (error) {
+        reject(error)
+      }
     }
 
-    reader.onerror = () => reject(new Error('Не удалось прочитать файл'))
+    img.onerror = () => {
+      reject(new Error('Failed to load image'))
+    }
+
     reader.readAsDataURL(file)
   })
 }
 
 /**
- * Форматирует размер файла для отображения
+ * 📊 Валидация файла изображения
+ *
+ * Проверяет:
+ * - Является ли файл изображением
+ * - Не превышает ли максимальный размер
+ * - Поддерживается ли формат
+ *
+ * @param file - файл для проверки
+ * @returns объект с результатом валидации
+ *
+ * @example
+ * const validation = validateImageFile(file)
+ * if (!validation.isValid) {
+ *   toast.error(validation.error)
+ * }
  */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0)
-    return '0 Bytes'
+export function validateImageFile(file: File): {
+  isValid: boolean
+  error?: string
+} {
+  // Проверяем тип
+  if (!file.type.startsWith('image/')) {
+    return {
+      isValid: false,
+      error: 'Файл должен быть изображением',
+    }
+  }
 
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  // Проверяем поддерживаемые форматы
+  const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  if (!supportedFormats.includes(file.type)) {
+    return {
+      isValid: false,
+      error: `Формат ${file.type} не поддерживается. Используйте: JPEG, PNG, WebP`,
+    }
+  }
 
-  return `${Math.round((bytes / k ** i) * 100) / 100} ${sizes[i]}`
+  // Проверяем размер
+  const maxSizeBytes = OPTIMIZATION_RECOMMENDATIONS.MAX_ORIGINAL_SIZE_MB * 1024 * 1024
+  if (file.size > maxSizeBytes) {
+    return {
+      isValid: false,
+      error: `Файл слишком большой (${formatFileSize(file.size)}). Максимум: ${OPTIMIZATION_RECOMMENDATIONS.MAX_ORIGINAL_SIZE_MB}MB`,
+    }
+  }
+
+  return { isValid: true }
 }
 
 /**
- * Пакетная оптимизация нескольких изображений
+ * 🎯 Пакетная оптимизация изображений
+ *
+ * @param files - массив файлов для оптимизации
+ * @param onProgress - callback для отслеживания прогресса
+ * @returns Promise с массивом результатов
+ *
+ * @example
+ * const results = await optimizeImagesBatch(files, (current, total) => {
+ *   console.log(`Обработано ${current} из ${total}`)
+ * })
  */
-export async function optimizeMultipleImages(
+export async function optimizeImagesBatch(
   files: File[],
-  options: ImageOptimizationOptions = {},
+  onProgress?: (current: number, total: number) => void,
 ): Promise<OptimizationResult[]> {
   const results: OptimizationResult[] = []
 
-  for (const file of files) {
-    try {
-      const result = await optimizeImageBeforeUpload(file, options)
-      results.push(result)
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+
+    // Проверяем что файл существует
+    if (!file) {
+      console.warn(`File at index ${i} is undefined, skipping`)
+      continue
     }
-    catch (error) {
-      console.error(`Ошибка оптимизации ${file.name}:`, error)
-      // В случае ошибки возвращаем оригинальный файл
+
+    if (shouldOptimizeImage(file)) {
+      try {
+        const result = await optimizeImageBeforeUpload(file)
+        results.push(result)
+      }
+      catch (error) {
+        console.error(`Failed to optimize ${file.name}:`, error)
+        // Добавляем оригинал если не удалось оптимизировать
+        results.push({
+          file,
+          originalSize: file.size,
+          optimizedSize: file.size,
+          savings: 0,
+        })
+      }
+    }
+    else {
+      // Файл не требует оптимизации
       results.push({
         file,
         originalSize: file.size,
@@ -159,17 +306,9 @@ export async function optimizeMultipleImages(
         savings: 0,
       })
     }
+
+    onProgress?.(i + 1, files.length)
   }
 
   return results
-}
-
-/**
- * Проверяет, нужно ли оптимизировать изображение
- */
-export function shouldOptimizeImage(file: File, maxSize: number = 500 * 1024): boolean {
-  // Оптимизируем, если:
-  // 1. Файл больше maxSize (по умолчанию 500KB)
-  // 2. Это не WebP формат
-  return file.size > maxSize || !file.type.includes('webp')
 }

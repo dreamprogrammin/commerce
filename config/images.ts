@@ -176,8 +176,34 @@ export const OPTIMIZATION_RECOMMENDATIONS = {
   },
 
   // Поддерживаемые форматы для загрузки
-  SUPPORTED_UPLOAD_FORMATS: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+  SUPPORTED_UPLOAD_FORMATS: [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+  ] as const,
 } as const
+
+/**
+ * 🎯 Получить информацию о текущем режиме оптимизации
+ *
+ * @returns объект с описанием текущего режима
+ */
+export function getOptimizationMode() {
+  if (IMAGE_OPTIMIZATION_ENABLED) {
+    return {
+      mode: 'Платный',
+      icon: '🚀',
+      description: 'Supabase Transform (трансформация на лету)',
+    }
+  }
+
+  return {
+    mode: 'Бесплатный',
+    icon: '🛡️',
+    description: 'Локальная оптимизация + API Proxy',
+  }
+}
 
 /**
  * 🚀 ЭКСПОРТ ДЛЯ УДОБНОГО ИСПОЛЬЗОВАНИЯ
@@ -191,4 +217,5 @@ export default {
   CLOUDFLARE_BYPASS,
   IMAGE_PRESETS,
   OPTIMIZATION_RECOMMENDATIONS,
+  getOptimizationMode,
 } as const

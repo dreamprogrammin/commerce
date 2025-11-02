@@ -16,12 +16,17 @@ import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { getOptimizationMode, IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
-import { formatFileSize, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
+import {
+  formatFileSize,
+  getOptimizationInfo,
+  optimizeImageBeforeUpload,
+  shouldOptimizeImage,
+} from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
 
@@ -84,11 +89,11 @@ const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
 const brandSearchQuery = ref('')
 
+// 🎯 Информация об оптимизации
+const optimizationInfo = computed(() => getOptimizationInfo())
+
 // --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ---
 
-/**
- * Инициализирует форму с данными товара или пустыми значениями
- */
 function setupFormData(product: FullProduct | null | undefined) {
   newImageFiles.value = []
   imagesToDelete.value = []
@@ -164,9 +169,6 @@ watch(
 
 // --- 5. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ ---
 
-/**
- * Фильтрует бренды по поисковому запросу
- */
 const filteredBrands = computed(() => {
   if (!brandSearchQuery.value) {
     return brands.value
@@ -176,34 +178,20 @@ const filteredBrands = computed(() => {
   )
 })
 
-/**
- * Информация о текущем режиме оптимизации
- */
-const optimizationMode = computed(() => getOptimizationMode())
-
 // --- 6. ОБРАБОТЧИКИ СОБЫТИЙ ---
 
-/**
- * Обработка создания нового бренда
- */
 async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
   const newBrand = await brandsStore.createBrand(payload.data as BrandInsert, payload.file)
   if (newBrand) {
     isBrandDialogOpen.value = false
-
     await brandsStore.fetchBrands()
     await productStore.fetchAllBrands()
-
     await nextTick()
     formData.value.brand_id = newBrand.id
     brandSearchQuery.value = ''
   }
 }
 
-/**
- * Обработка смены категории
- * Загружает атрибуты для новой категории
- */
 async function handleCategoryChange(categoryId: string | null) {
   if (!categoryId) {
     categoryAttributes.value = []
@@ -233,18 +221,12 @@ watch(() => formData.value.category_id, (newCategoryId) => {
   handleCategoryChange(categoryIdForHandler)
 }, { immediate: true })
 
-/**
- * Автоматически заполняет slug на основе названия
- */
 function autoFillSlug() {
   if (formData.value?.name && !formData.value.slug) {
     formData.value.slug = slugify(formData.value.name)
   }
 }
 
-/**
- * Обновляет бонус поинты при изменении цены или процента
- */
 watch(
   [() => formData.value.price, selectedBonusPercent],
   ([price, percent]) => {
@@ -257,11 +239,11 @@ watch(
 // --- 7. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ ---
 
 /**
- * 🎯 Обработка загрузки изображений с оптимизацией
+ * 🎯 Обработка загрузки изображений с универсальной оптимизацией
  *
- * Поддерживает две стратегии:
- * 1. Бесплатный тариф - локальная оптимизация через Canvas
- * 2. Платный тариф - загрузка оригиналов для облачной трансформации
+ * Автоматически выбирает стратегию:
+ * - Бесплатный: локальная оптимизация
+ * - Платный: загрузка оригиналов
  */
 async function handleFilesChange(event: Event) {
   const target = event.target as HTMLInputElement
@@ -271,23 +253,21 @@ async function handleFilesChange(event: Event) {
 
   const filesToProcess = Array.from(target.files)
   isProcessingImages.value = true
+
   const toastId = toast.loading(
-    `📦 Обработка ${filesToProcess.length} изображений (${optimizationMode.value.icon} ${optimizationMode.value.mode})...`,
+    `${optimizationInfo.value.icon} Обработка ${filesToProcess.length} изображений (${optimizationInfo.value.name})...`,
   )
 
   try {
     const processedFiles = await Promise.all(
       filesToProcess.map(async (file) => {
-        // 💾 РЕЖИМ 1: Бесплатный тариф - локальная оптимизация
-        if (!IMAGE_OPTIMIZATION_ENABLED && shouldOptimizeImage(file)) {
+        // 🎯 Проверяем нужна ли оптимизация (автоматически по конфигу)
+        if (shouldOptimizeImage(file)) {
           try {
             const result = await optimizeImageBeforeUpload(file)
-            const savings = result.savings.toFixed(0)
-            const originalSize = formatFileSize(result.originalSize)
-            const optimizedSize = formatFileSize(result.optimizedSize)
 
-            console.warn(
-              `✅ Оптимизирован: ${file.name} (${originalSize} → ${optimizedSize}, экономия ${savings}%)`,
+            console.log(
+              `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%)`,
             )
 
             return {
@@ -297,7 +277,7 @@ async function handleFilesChange(event: Event) {
           }
           catch (error) {
             console.error(`❌ Ошибка оптимизации ${file.name}:`, error)
-            toast.error(`⚠️ Ошибка обработки ${file.name}, используем оригинал`)
+            toast.warning(`Ошибка обработки ${file.name}, используем оригинал`)
 
             return {
               file,
@@ -306,10 +286,8 @@ async function handleFilesChange(event: Event) {
           }
         }
 
-        // 🚀 РЕЖИМ 2: Платный тариф или маленький файл - загружаем как есть
-        console.warn(
-          `📤 Файл маленький или платный тариф: ${file.name} (${formatFileSize(file.size)})`,
-        )
+        // Файл маленький или платный тариф - загружаем как есть
+        console.log(`📤 ${file.name}: ${formatFileSize(file.size)} (без оптимизации)`)
 
         return {
           file,
@@ -320,36 +298,30 @@ async function handleFilesChange(event: Event) {
 
     newImageFiles.value.push(...processedFiles)
 
-    // 📊 Расчет общей экономии трафика
+    // 📊 Расчет экономии
     const totalSavings = processedFiles.reduce((sum, item, idx) => {
       const original = filesToProcess[idx]
       if (!original)
         return sum
-      const savings = Math.max(0, original.size - item.file.size)
-      return sum + savings
+      return sum + Math.max(0, original.size - item.file.size)
     }, 0)
 
-    const mode = `${optimizationMode.value.icon} ${optimizationMode.value.mode}`
     const message = totalSavings > 0
-      ? `✅ ${processedFiles.length} изображений обработано (экономия ${formatFileSize(totalSavings)}) ${mode}`
-      : `✅ ${processedFiles.length} изображений добавлено ${mode}`
+      ? `✅ ${processedFiles.length} изображений (↓${formatFileSize(totalSavings)}) ${optimizationInfo.value.icon}`
+      : `✅ ${processedFiles.length} изображений ${optimizationInfo.value.icon}`
 
     toast.success(message, { id: toastId })
-
     target.value = ''
   }
   catch (error) {
     toast.error('❌ Ошибка при обработке файлов', { id: toastId })
-    console.error('Ошибка handleFilesChange:', error)
+    console.error('handleFilesChange error:', error)
   }
   finally {
     isProcessingImages.value = false
   }
 }
 
-/**
- * Удалить новое (еще не загруженное) изображение
- */
 function removeNewImage(index: number) {
   const fileToRemove = newImageFiles.value[index]
   if (fileToRemove) {
@@ -358,16 +330,14 @@ function removeNewImage(index: number) {
   newImageFiles.value.splice(index, 1)
 }
 
-/**
- * Пометить существующее изображение на удаление
- */
 function removeExistingImage(image: ProductImageRow) {
   imagesToDelete.value.push(image.id)
   existingImages.value = existingImages.value.filter(img => img.id !== image.id)
 }
 
 /**
- * Получить оптимизированный URL для существующего изображения
+ * 🎯 Получить оптимизированный URL для существующего изображения
+ * Автоматически использует правильный режим из конфига
  */
 function getExistingImageUrl(imageUrl: string) {
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL) || ''
@@ -375,9 +345,6 @@ function getExistingImageUrl(imageUrl: string) {
 
 // --- 8. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
 
-/**
- * Поиск аксессуаров с debounce
- */
 const debouncedSearch = debounce(async () => {
   if (accessorySearchQuery.value.length < 2) {
     accessorySearchResults.value = []
@@ -391,9 +358,6 @@ const debouncedSearch = debounce(async () => {
   isSearchingAccessories.value = false
 }, 300)
 
-/**
- * Добавить аксессуар к товару
- */
 function addAccessory(product: ProductSearchResult) {
   if (!linkedAccessories.value.some(p => p.id === product.id)) {
     linkedAccessories.value.push(product)
@@ -402,18 +366,12 @@ function addAccessory(product: ProductSearchResult) {
   accessorySearchResults.value = []
 }
 
-/**
- * Удалить аксессуар от товара
- */
 function removeAccessory(productId: string) {
   linkedAccessories.value = linkedAccessories.value.filter(p => p.id !== productId)
 }
 
 // --- 9. ОТПРАВКА ФОРМЫ ---
 
-/**
- * Валидация и отправка формы
- */
 function handleSubmit() {
   if (!formData.value) {
     return
@@ -452,7 +410,7 @@ function handleSubmit() {
   }
 }
 
-// --- 10. ИНИЦИАЛИЗАЦИЯ НА МОНТИРОВАНИИ ---
+// --- 10. ИНИЦИАЛИЗАЦИЯ ---
 
 onMounted(() => {
   if (categoriesStore.allCategories.length === 0) {
@@ -472,9 +430,7 @@ onMounted(() => {
 // --- 11. COMPUTED ДЛЯ ДВУСТОРОННЕЙ ПРИВЯЗКИ ---
 
 const skuValue = computed({
-  get() {
-    return formData.value.sku ?? undefined
-  },
+  get() { return formData.value.sku ?? undefined },
   set(value) {
     if (formData.value) {
       formData.value.sku = value || null
@@ -483,9 +439,7 @@ const skuValue = computed({
 })
 
 const barcodeValue = computed({
-  get() {
-    return formData.value.barcode ?? undefined
-  },
+  get() { return formData.value.barcode ?? undefined },
   set(value) {
     if (formData.value) {
       formData.value.barcode = value || null
@@ -494,9 +448,7 @@ const barcodeValue = computed({
 })
 
 const descriptionValue = computed({
-  get() {
-    return formData.value.description ?? undefined
-  },
+  get() { return formData.value.description ?? undefined },
   set(value) {
     if (formData.value) {
       formData.value.description = value || null
@@ -505,9 +457,7 @@ const descriptionValue = computed({
 })
 
 const minAgeYearsValue = computed({
-  get() {
-    return formData.value.min_age_years ?? undefined
-  },
+  get() { return formData.value.min_age_years ?? undefined },
   set(value) {
     if (formData.value) {
       formData.value.min_age_years = typeof value === 'number' ? value : null
@@ -516,9 +466,7 @@ const minAgeYearsValue = computed({
 })
 
 const maxAgeYearsValue = computed({
-  get() {
-    return formData.value.max_age_years ?? undefined
-  },
+  get() { return formData.value.max_age_years ?? undefined },
   set(value) {
     if (formData.value) {
       formData.value.max_age_years = typeof value === 'number' ? value : null
@@ -666,7 +614,7 @@ const maxAgeYearsValue = computed({
         </CardContent>
       </Card>
 
-      <!-- 🛍️ Сопутствующие товары (Аксессуары) -->
+      <!-- 🛍️ Сопутствующие товары -->
       <Card>
         <CardHeader>
           <CardTitle>Сопутствующие товары</CardTitle>
@@ -724,9 +672,9 @@ const maxAgeYearsValue = computed({
       </Card>
     </div>
 
-    <!-- 🎨 Правая колонка: Фильтры и медиа -->
+    <!-- 🎨 Правая колонка -->
     <div class="lg:col-span-1 space-y-6">
-      <!-- 🏢 Организация и фильтры -->
+      <!-- 🏢 Организация -->
       <Card>
         <CardHeader>
           <CardTitle>Организация</CardTitle>
@@ -815,7 +763,7 @@ const maxAgeYearsValue = computed({
           </div>
 
           <div>
-            <Label>Страна происхождения (опционально)</Label>
+            <Label>Страна происхождения</Label>
             <Select v-model="formData.origin_country_id">
               <SelectTrigger>
                 <SelectValue placeholder="Выберите страну" />
@@ -836,7 +784,7 @@ const maxAgeYearsValue = computed({
           </div>
 
           <div>
-            <Label>Материал (опционально)</Label>
+            <Label>Материал</Label>
             <Select v-model="formData.material_id">
               <SelectTrigger>
                 <SelectValue placeholder="Выберите материал" />
@@ -927,13 +875,13 @@ const maxAgeYearsValue = computed({
           <CardTitle>Галерея изображений</CardTitle>
           <CardDescription>
             <div class="flex items-center gap-2 mt-1">
-              <span :class="optimizationMode.icon">
-                {{ optimizationMode.mode }}
-              </span>
-              <span class="text-xs text-muted-foreground">
-                ({{ optimizationMode.description }})
+              <span class="text-sm">
+                {{ optimizationInfo.icon }} {{ optimizationInfo.name }}
               </span>
             </div>
+            <p class="text-xs text-muted-foreground mt-1">
+              {{ optimizationInfo.description }}
+            </p>
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
@@ -1024,10 +972,10 @@ const maxAgeYearsValue = computed({
             />
             <div v-if="isProcessingImages" class="flex items-center gap-2 text-sm text-muted-foreground mt-2">
               <div class="w-4 h-4 border-2 border-muted-foreground border-t-primary rounded-full animate-spin" />
-              ⏳ Обработка изображений...
+              {{ optimizationInfo.icon }} Обработка изображений...
             </div>
             <p class="text-xs text-muted-foreground mt-2">
-              💡 Совет: загружайте изображения высокого качества, система автоматически их оптимизирует
+              💡 {{ optimizationInfo.recommendation }}
             </p>
           </div>
         </CardContent>
