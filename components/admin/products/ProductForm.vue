@@ -23,12 +23,19 @@ import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStor
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import {
   formatFileSize,
+  generateBlurPlaceholder,
   getOptimizationInfo,
   optimizeImageBeforeUpload,
   shouldOptimizeImage,
 } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
+
+interface NewImageFile {
+  file: File
+  previewUrl: string
+  blurDataUrl?: string
+}
 
 // --- 1. PROPS & EMITS ---
 const props = defineProps<{
@@ -40,7 +47,7 @@ const emit = defineEmits<{
     e: 'create',
     payload: {
       data: ProductInsert
-      newImageFiles: File[]
+      newImageFiles: NewImageFile[]
       attributeValues: AttributeValuePayload[]
     }
   ): void
@@ -48,7 +55,7 @@ const emit = defineEmits<{
     e: 'update',
     payload: {
       data: ProductUpdate
-      newImageFiles: File[]
+      newImageFiles: NewImageFile[]
       imagesToDelete: string[]
       existingImages: ProductImageRow[]
       attributeValues: AttributeValuePayload[]
@@ -78,11 +85,7 @@ const bonusOptions = [
   { label: 'Подарок (100%)', value: 100 },
 ]
 
-const newImageFiles = ref<{
-  file: File
-  previewUrl: string
-  blurDataUrl?: string // 🆕 Blur placeholder
-}[]>([])
+const newImageFiles = ref<NewImageFile[]>([])
 const existingImages = ref<ProductImageRow[]>([])
 const imagesToDelete = ref<string[]>([])
 const selectedBonusPercent = ref(5)
@@ -243,11 +246,7 @@ watch(
 // --- 7. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ ---
 
 /**
- * 🎯 Обработка загрузки изображений с универсальной оптимизацией
- *
- * Автоматически выбирает стратегию:
- * - Бесплатный: локальная оптимизация
- * - Платный: загрузка оригиналов
+ * 🎯 Обработка загрузки изображений с сохранением blur
  */
 async function handleFilesChange(event: Event) {
   const target = event.target as HTMLInputElement
@@ -259,24 +258,25 @@ async function handleFilesChange(event: Event) {
   isProcessingImages.value = true
 
   const toastId = toast.loading(
-    `${optimizationInfo.value.icon} Обработка ${filesToProcess.length} изображений (${optimizationInfo.value.name})...`,
+    `${optimizationInfo.value.icon} Обработка ${filesToProcess.length} изображений...`,
   )
 
   try {
     const processedFiles = await Promise.all(
       filesToProcess.map(async (file) => {
-        // 🎯 Проверяем нужна ли оптимизация (автоматически по конфигу)
+        // 🎯 Проверяем нужна ли оптимизация
         if (shouldOptimizeImage(file)) {
           try {
             const result = await optimizeImageBeforeUpload(file)
 
             console.log(
-              `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%)`,
+              `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) + ${result.blurPlaceholder ? 'LQIP ✨' : 'no blur'}`,
             )
 
             return {
               file: result.file,
               previewUrl: URL.createObjectURL(result.file),
+              blurDataUrl: result.blurPlaceholder, // 🎯 СОХРАНЯЕМ BLUR
             }
           }
           catch (error) {
@@ -286,34 +286,36 @@ async function handleFilesChange(event: Event) {
             return {
               file,
               previewUrl: URL.createObjectURL(file),
+              blurDataUrl: undefined, // Нет blur при ошибке
             }
           }
         }
 
-        // Файл маленький или платный тариф - загружаем как есть
-        console.log(`📤 ${file.name}: ${formatFileSize(file.size)} (без оптимизации)`)
+        // Файл маленький или платный тариф - но всё равно генерируем blur
+        try {
+          const blurResult = await generateBlurPlaceholder(file)
+          console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
 
-        return {
-          file,
-          previewUrl: URL.createObjectURL(file),
+          return {
+            file,
+            previewUrl: URL.createObjectURL(file),
+            blurDataUrl: blurResult.dataUrl, // 🎯 BLUR для маленьких файлов тоже
+          }
+        }
+        catch (error) {
+          console.warn(`⚠️ Не удалось сгенерировать blur для ${file.name}`)
+          return {
+            file,
+            previewUrl: URL.createObjectURL(file),
+            blurDataUrl: undefined,
+          }
         }
       }),
     )
 
     newImageFiles.value.push(...processedFiles)
 
-    // 📊 Расчет экономии
-    const totalSavings = processedFiles.reduce((sum, item, idx) => {
-      const original = filesToProcess[idx]
-      if (!original)
-        return sum
-      return sum + Math.max(0, original.size - item.file.size)
-    }, 0)
-
-    const message = totalSavings > 0
-      ? `✅ ${processedFiles.length} изображений (↓${formatFileSize(totalSavings)}) ${optimizationInfo.value.icon}`
-      : `✅ ${processedFiles.length} изображений ${optimizationInfo.value.icon}`
-
+    const message = `✅ ${processedFiles.length} изображений загружено ${optimizationInfo.value.icon}`
     toast.success(message, { id: toastId })
     target.value = ''
   }
@@ -399,7 +401,7 @@ function handleSubmit() {
   if (props.initialData) {
     emit('update', {
       data: productData as ProductUpdate,
-      newImageFiles: newImageFiles.value.map(item => item.file),
+      newImageFiles: newImageFiles.value,
       imagesToDelete: imagesToDelete.value,
       existingImages: existingImages.value,
       attributeValues: valuesToSave,
@@ -408,7 +410,7 @@ function handleSubmit() {
   else {
     emit('create', {
       data: productData as ProductInsert,
-      newImageFiles: newImageFiles.value.map(item => item.file),
+      newImageFiles: newImageFiles.value,
       attributeValues: valuesToSave,
     })
   }
