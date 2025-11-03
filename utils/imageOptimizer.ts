@@ -29,100 +29,39 @@ export async function generateBlurPlaceholder(
   quality = 0.5,
 ): Promise<BlurPlaceholderResult> {
   return new Promise((resolve, reject) => {
-    const img = new Image()
     const reader = new FileReader()
 
-    // 🔧 Обработчик загрузки файла
     reader.onload = (e) => {
-      const result = e.target?.result
-      if (!result) {
-        reject(new Error('Failed to read file'))
-        return
-      }
+      const img = new Image()
 
-      img.src = result as string
-    }
-
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'))
-    }
-
-    // 🔧 Обработчик загрузки изображения
-    img.onload = () => {
-      try {
-        // Вычисляем пропорциональные размеры
-        let { width, height } = img
-
-        if (width > height) {
-          if (width > maxSize) {
-            height = Math.round((height * maxSize) / width)
-            width = maxSize
-          }
-        }
-        else {
-          if (height > maxSize) {
-            width = Math.round((width * maxSize) / height)
-            height = maxSize
-          }
-        }
-
-        // Создаем крошечный canvas
+      img.onload = () => {
         const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
+        const size = maxSize
+        canvas.width = size
+        canvas.height = size
 
-        const ctx = canvas.getContext('2d', {
-          willReadFrequently: false,
-          alpha: false, // 🔧 Отключаем альфа-канал для JPEG
-        })
-
+        const ctx = canvas.getContext('2d')
         if (!ctx) {
-          reject(new Error('Failed to get canvas context'))
+          reject(new Error('No context'))
           return
         }
 
-        // Рисуем с максимальным размытием
-        ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = 'low'
-        ctx.drawImage(img, 0, 0, width, height)
+        ctx.drawImage(img, 0, 0, size, size)
 
-        // 🔧 Синхронная конвертация в data URL
-        let dataUrl: string
         try {
-          dataUrl = canvas.toDataURL('image/jpeg', quality)
+          const dataUrl = canvas.toDataURL('image/jpeg', quality)
+          resolve({ dataUrl, width: size, height: size })
         }
-        catch (error) {
-          reject(new Error('Failed to convert canvas to data URL'))
-          return
+        catch (err) {
+          reject(err)
         }
-
-        // Проверяем что data URL валидный
-        if (!dataUrl || !dataUrl.startsWith('data:image')) {
-          reject(new Error('Invalid data URL generated'))
-          return
-        }
-
-        // 🔧 Очищаем ресурсы
-        canvas.width = 0
-        canvas.height = 0
-        img.src = '' // Очищаем src
-
-        resolve({
-          dataUrl,
-          width,
-          height,
-        })
       }
-      catch (error) {
-        reject(error)
-      }
+
+      img.onerror = reject
+      img.src = e.target?.result as string
     }
 
-    img.onerror = () => {
-      reject(new Error('Failed to load image'))
-    }
-
-    // Начинаем чтение файла
+    reader.onerror = reject
     reader.readAsDataURL(file)
   })
 }
