@@ -19,11 +19,6 @@ export interface BlurPlaceholderResult {
  * @param maxSize - максимальный размер стороны (по умолчанию 20px)
  * @param quality - качество сжатия (по умолчанию 0.5)
  * @returns Promise с base64 data URL
- *
- * @example
- * const blur = await generateBlurPlaceholder(file)
- * // blur.dataUrl = "data:image/jpeg;base64,/9j/4AAQ..."
- * // Размер: ~1-3 KB
  */
 export async function generateBlurPlaceholder(
   file: File,
@@ -32,15 +27,7 @@ export async function generateBlurPlaceholder(
 ): Promise<BlurPlaceholderResult> {
   return new Promise((resolve, reject) => {
     const img = new Image()
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      img.src = e.target?.result as string
-    }
-
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'))
-    }
+    const objectUrl = URL.createObjectURL(file) // 🔧 Используем объектный URL
 
     img.onload = () => {
       try {
@@ -65,36 +52,50 @@ export async function generateBlurPlaceholder(
         canvas.width = width
         canvas.height = height
 
-        const ctx = canvas.getContext('2d')
+        const ctx = canvas.getContext('2d', { willReadFrequently: false }) // 🔧 Оптимизация
         if (!ctx) {
+          URL.revokeObjectURL(objectUrl) // 🔧 Очищаем
           reject(new Error('Failed to get canvas context'))
           return
         }
 
         // Рисуем с максимальным размытием
         ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = 'low' // Специально low для blur эффекта
+        ctx.imageSmoothingQuality = 'low'
         ctx.drawImage(img, 0, 0, width, height)
 
-        // Конвертируем в data URL (JPEG для меньшего размера)
-        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        // Конвертируем в data URL
+        try {
+          const dataUrl = canvas.toDataURL('image/jpeg', quality)
 
-        resolve({
-          dataUrl,
-          width,
-          height,
-        })
+          // 🔧 Очищаем ресурсы
+          URL.revokeObjectURL(objectUrl)
+          canvas.width = 0
+          canvas.height = 0
+
+          resolve({
+            dataUrl,
+            width,
+            height,
+          })
+        }
+        catch (canvasError) {
+          URL.revokeObjectURL(objectUrl)
+          reject(canvasError)
+        }
       }
       catch (error) {
+        URL.revokeObjectURL(objectUrl)
         reject(error)
       }
     }
 
     img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
       reject(new Error('Failed to load image'))
     }
 
-    reader.readAsDataURL(file)
+    img.src = objectUrl // 🔧 Используем объектный URL вместо FileReader
   })
 }
 
