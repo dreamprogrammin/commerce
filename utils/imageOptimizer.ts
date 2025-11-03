@@ -20,6 +20,9 @@ export interface BlurPlaceholderResult {
  * @param quality - качество сжатия (по умолчанию 0.5)
  * @returns Promise с base64 data URL
  */
+/**
+ * 🎨 Генерирует blur placeholder для LQIP (Low-Quality Image Placeholder)
+ */
 export async function generateBlurPlaceholder(
   file: File,
   maxSize = 20,
@@ -27,8 +30,24 @@ export async function generateBlurPlaceholder(
 ): Promise<BlurPlaceholderResult> {
   return new Promise((resolve, reject) => {
     const img = new Image()
-    const objectUrl = URL.createObjectURL(file) // 🔧 Используем объектный URL
+    const reader = new FileReader()
 
+    // 🔧 Обработчик загрузки файла
+    reader.onload = (e) => {
+      const result = e.target?.result
+      if (!result) {
+        reject(new Error('Failed to read file'))
+        return
+      }
+
+      img.src = result as string
+    }
+
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'))
+    }
+
+    // 🔧 Обработчик загрузки изображения
     img.onload = () => {
       try {
         // Вычисляем пропорциональные размеры
@@ -52,9 +71,12 @@ export async function generateBlurPlaceholder(
         canvas.width = width
         canvas.height = height
 
-        const ctx = canvas.getContext('2d', { willReadFrequently: false }) // 🔧 Оптимизация
+        const ctx = canvas.getContext('2d', {
+          willReadFrequently: false,
+          alpha: false, // 🔧 Отключаем альфа-канал для JPEG
+        })
+
         if (!ctx) {
-          URL.revokeObjectURL(objectUrl) // 🔧 Очищаем
           reject(new Error('Failed to get canvas context'))
           return
         }
@@ -64,41 +86,46 @@ export async function generateBlurPlaceholder(
         ctx.imageSmoothingQuality = 'low'
         ctx.drawImage(img, 0, 0, width, height)
 
-        // Конвертируем в data URL
+        // 🔧 Синхронная конвертация в data URL
+        let dataUrl: string
         try {
-          const dataUrl = canvas.toDataURL('image/jpeg', quality)
-
-          // 🔧 Очищаем ресурсы
-          URL.revokeObjectURL(objectUrl)
-          canvas.width = 0
-          canvas.height = 0
-
-          resolve({
-            dataUrl,
-            width,
-            height,
-          })
+          dataUrl = canvas.toDataURL('image/jpeg', quality)
         }
-        catch (canvasError) {
-          URL.revokeObjectURL(objectUrl)
-          reject(canvasError)
+        catch (error) {
+          reject(new Error('Failed to convert canvas to data URL'))
+          return
         }
+
+        // Проверяем что data URL валидный
+        if (!dataUrl || !dataUrl.startsWith('data:image')) {
+          reject(new Error('Invalid data URL generated'))
+          return
+        }
+
+        // 🔧 Очищаем ресурсы
+        canvas.width = 0
+        canvas.height = 0
+        img.src = '' // Очищаем src
+
+        resolve({
+          dataUrl,
+          width,
+          height,
+        })
       }
       catch (error) {
-        URL.revokeObjectURL(objectUrl)
         reject(error)
       }
     }
 
     img.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
       reject(new Error('Failed to load image'))
     }
 
-    img.src = objectUrl // 🔧 Используем объектный URL вместо FileReader
+    // Начинаем чтение файла
+    reader.readAsDataURL(file)
   })
 }
-
 /**
  * 🎨 Результат оптимизации изображения
  */
@@ -221,31 +248,45 @@ export async function optimizeImageBeforeUpload(
   file: File,
   maxWidth = OPTIMIZATION_RECOMMENDATIONS.RECOMMENDED_UPLOAD_DIMENSIONS.width,
   maxHeight = OPTIMIZATION_RECOMMENDATIONS.RECOMMENDED_UPLOAD_DIMENSIONS.height,
-  quality = IMAGE_QUALITY.HIGH / 100, // 85 / 100 = 0.85
+  quality = IMAGE_QUALITY.HIGH / 100,
   generateBlur = true,
 ): Promise<OptimizationResult> {
   const originalSize = file.size
 
-  // 🎨 Генерируем blur placeholder параллельно
-  const blurPromise = generateBlur
-    ? generateBlurPlaceholder(file).catch(() => null)
-    : Promise.resolve(null)
+  // 🎨 Генерируем blur placeholder ПОСЛЕДОВАТЕЛЬНО (не параллельно)
+  let blurResult: BlurPlaceholderResult | null = null
+
+  if (generateBlur) {
+    try {
+      blurResult = await generateBlurPlaceholder(file)
+      console.log('✅ Blur generated:', `${blurResult.dataUrl.slice(0, 50)}...`)
+    }
+    catch (error) {
+      console.warn('⚠️ Failed to generate blur:', error)
+      blurResult = null
+    }
+  }
 
   return new Promise((resolve, reject) => {
     const img = new Image()
     const reader = new FileReader()
 
     reader.onload = (e) => {
-      img.src = e.target?.result as string
+      const result = e.target?.result
+      if (!result) {
+        reject(new Error('Failed to read file'))
+        return
+      }
+      img.src = result as string
     }
 
     reader.onerror = () => {
       reject(new Error('Failed to read file'))
     }
 
-    img.onload = async () => {
+    img.onload = () => {
       try {
-        // Вычисляем новые размеры (пропорционально)
+        // Вычисляем новые размеры
         let { width, height } = img
 
         if (width > maxWidth || height > maxHeight) {
@@ -259,20 +300,24 @@ export async function optimizeImageBeforeUpload(
         canvas.width = width
         canvas.height = height
 
-        const ctx = canvas.getContext('2d')
+        const ctx = canvas.getContext('2d', {
+          alpha: true, // Для WebP нужен альфа-канал
+          willReadFrequently: false,
+        })
+
         if (!ctx) {
           reject(new Error('Failed to get canvas context'))
           return
         }
 
-        // Рисуем изображение с оптимальным качеством
+        // Рисуем изображение
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
         ctx.drawImage(img, 0, 0, width, height)
 
-        // Конвертируем в WebP (или JPEG если WebP не поддерживается)
+        // Конвертируем в WebP
         canvas.toBlob(
-          async (blob) => {
+          (blob) => {
             if (!blob) {
               reject(new Error('Failed to create blob'))
               return
@@ -284,12 +329,14 @@ export async function optimizeImageBeforeUpload(
             // Создаем новый файл
             const optimizedFile = new File(
               [blob],
-              file.name.replace(/\.[^.]+$/, '.webp'), // Меняем расширение на .webp
+              file.name.replace(/\.[^.]+$/, '.webp'),
               { type: 'image/webp' },
             )
 
-            // Ждем blur placeholder
-            const blurResult = await blurPromise
+            // 🔧 Очищаем canvas
+            canvas.width = 0
+            canvas.height = 0
+            img.src = ''
 
             resolve({
               file: optimizedFile,
