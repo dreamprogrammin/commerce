@@ -24,7 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
   useTransform: true,
 })
 
-const { getImageUrl } = useSupabaseStorage()
+const { getImageUrl, clearImageCache } = useSupabaseStorage()
 const imageUrl = toRef(props, 'src')
 const {
   imageRef,
@@ -107,6 +107,7 @@ function addPreloadLink() {
 watch(optimizedImageUrl, () => {
   addPreloadLink()
 }, { immediate: true })
+clearImageCache()
 </script>
 
 <template>
