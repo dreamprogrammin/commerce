@@ -28,7 +28,7 @@ export interface OptimizationInfo {
  * @example
  * const info = getOptimizationInfo()
  * console.log(info.name) // "Бесплатный тариф"
- * console.log(info.icon) // "🛡️"
+ * console.log(info.icon) // "💾"
  */
 export function getOptimizationInfo(): OptimizationInfo {
   if (IMAGE_OPTIMIZATION_ENABLED) {
@@ -42,9 +42,9 @@ export function getOptimizationInfo(): OptimizationInfo {
 
   return {
     name: 'Бесплатный тариф',
-    icon: '🛡️',
+    icon: '💾',
     description: 'Локальная оптимизация через Canvas API',
-    recommendation: 'Изображения оптимизируются локально перед загрузкой',
+    recommendation: 'Изображения оптимизируются локально перед загрузкой для экономии трафика',
   }
 }
 

@@ -24,7 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
   useTransform: true,
 })
 
-const { getImageUrl, clearImageCache } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 const imageUrl = toRef(props, 'src')
 const {
   imageRef,
@@ -33,14 +33,12 @@ const {
   shouldLoad,
   onLoad,
   onError,
-  retryCount,
-  isLoading, // 🆕 Используем индикатор загрузки
 } = useProgressiveImage(imageUrl, { eager: props.eager })
 
 const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
 
 /**
- * 🛡️ Оптимизированный URL (кешированный, стабильный)
+ * Оптимизированный URL (кешированный, стабильный)
  */
 const optimizedImageUrl = computed(() => {
   if (!shouldLoad.value || !imageUrl.value) {
@@ -79,35 +77,6 @@ const objectFitClass = computed(() => {
 })
 
 const isDev = computed(() => import.meta.env.DEV)
-
-/**
- * 🎯 Preload для критичных изображений
- */
-function addPreloadLink() {
-  if (!optimizedImageUrl.value || !props.eager)
-    return
-
-  const existing = document.querySelector(`link[href="${optimizedImageUrl.value}"]`)
-  if (existing)
-    return
-
-  const link = document.createElement('link')
-  link.rel = 'preload'
-  link.as = 'image'
-  link.href = optimizedImageUrl.value
-  link.crossOrigin = 'anonymous'
-
-  // High priority для eager изображений
-  link.setAttribute('fetchpriority', 'high')
-
-  document.head.appendChild(link)
-  console.log('📋 Preload добавлен')
-}
-
-watch(optimizedImageUrl, () => {
-  addPreloadLink()
-}, { immediate: true })
-clearImageCache()
 </script>
 
 <template>
@@ -121,19 +90,10 @@ clearImageCache()
       class="absolute inset-0 bg-gradient-to-br animate-pulse transition-opacity duration-300"
       :class="placeholderColor"
     >
-      <!-- Спиннер загрузки (только если реально грузится) -->
-      <div
-        v-if="isLoading"
-        class="absolute inset-0 flex items-center justify-center"
-      >
+      <!-- Спиннер загрузки -->
+      <div class="absolute inset-0 flex items-center justify-center">
         <div class="relative">
-          <!-- Внешнее кольцо (медленное) -->
-          <div class="w-12 h-12 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />
-          <!-- Внутреннее кольцо (быстрое) -->
-          <div
-            class="absolute inset-0 w-12 h-12 border-4 border-transparent border-b-muted-foreground/40 rounded-full animate-spin"
-            style="animation-duration: 0.8s"
-          />
+          <div class="w-10 h-10 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />
         </div>
       </div>
 
@@ -142,14 +102,8 @@ clearImageCache()
         v-if="isDev"
         class="absolute bottom-2 left-2 text-[10px] bg-black/60 text-white px-2 py-1 rounded font-mono backdrop-blur-sm"
       >
-        <div class="flex items-center gap-1">
-          <span v-if="IMAGE_OPTIMIZATION_ENABLED">🚀</span>
-          <span v-else>💾</span>
-          <span v-if="isLoading" class="animate-pulse">⏳</span>
-        </div>
-        <div v-if="retryCount > 0" class="text-yellow-300 text-[9px]">
-          Retry {{ retryCount }}
-        </div>
+        <span v-if="IMAGE_OPTIMIZATION_ENABLED">🚀</span>
+        <span v-else>💾</span>
       </div>
     </div>
 
@@ -164,7 +118,6 @@ clearImageCache()
         objectFitClass,
       ]"
       loading="lazy"
-      crossorigin="anonymous"
       decoding="async"
       :fetchpriority="eager ? 'high' : 'auto'"
       @load="onLoad"
@@ -176,7 +129,6 @@ clearImageCache()
       v-if="isError"
       class="absolute inset-0 flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm text-muted-foreground"
     >
-      <!-- Иконка ошибки -->
       <svg
         xmlns="http://www.w3.org/2000/svg"
         class="w-10 h-10 mb-2 opacity-40"
@@ -193,32 +145,13 @@ clearImageCache()
       <span class="text-xs text-center px-2 opacity-60">
         Не загрузилось
       </span>
-
-      <!-- Debug info -->
-      <span
-        v-if="isDev"
-        class="text-[9px] text-muted-foreground/60 mt-1 font-mono px-2 text-center break-all max-w-full"
-      >
-        {{ optimizedImageUrl?.split('/').pop()?.slice(0, 20) }}...
-      </span>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Плавная анимация появления */
 img {
   transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Shimmer эффект для плейсхолдера */
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
 }
 
 .animate-pulse {

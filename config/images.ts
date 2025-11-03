@@ -99,22 +99,14 @@ export const OPTIMIZATION_CONFIG = {
 } as const
 
 /**
- * 🛡️ Настройки для обхода Cloudflare (бесплатный режим)
+ * 🛡️ Настройки кеширования
  */
-export const CLOUDFLARE_BYPASS = {
-  // Использовать API proxy
-  USE_PROXY: !IMAGE_OPTIMIZATION_ENABLED,
+export const CACHE_CONFIG = {
+  // Кеш в браузере
+  MAX_AGE_SECONDS: 31536000, // 1 год
 
-  // Базовый путь для proxy
-  PROXY_PATH: '/api/image-proxy',
-
-  // Заголовки для запросов
-  HEADERS: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Cache-Control': 'max-age=31536000',
-  },
+  // Debounce для карусели
+  DEBOUNCE_MS: 150,
 } as const
 
 /**
@@ -200,8 +192,8 @@ export function getOptimizationMode() {
 
   return {
     mode: 'Бесплатный',
-    icon: '🛡️',
-    description: 'Локальная оптимизация + API Proxy',
+    icon: '💾',
+    description: 'Локальная оптимизация при загрузке',
   }
 }
 
@@ -214,7 +206,7 @@ export default {
   IMAGE_QUALITY,
   IMAGE_FORMATS,
   OPTIMIZATION_CONFIG,
-  CLOUDFLARE_BYPASS,
+  CACHE_CONFIG,
   IMAGE_PRESETS,
   OPTIMIZATION_RECOMMENDATIONS,
   getOptimizationMode,
