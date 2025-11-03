@@ -8,8 +8,9 @@ interface Props {
   alt: string
   aspectRatio?: 'square' | 'video' | 'portrait'
   objectFit?: 'cover' | 'contain' | 'fill'
-  placeholderType?: 'shimmer' | 'blur' | 'color'
+  placeholderType?: 'shimmer' | 'blur' | 'color' | 'lqip' // 🆕 Добавили LQIP
   placeholderColor?: string
+  blurDataUrl?: string | null // 🆕 Base64 blur preview
   bucketName?: string
   filePath?: string
   useTransform?: boolean
@@ -19,8 +20,9 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   aspectRatio: 'square',
   objectFit: 'cover',
-  placeholderType: 'shimmer',
+  placeholderType: 'lqip', // 🎯 По умолчанию LQIP
   placeholderColor: 'from-muted via-muted/70 to-muted',
+  blurDataUrl: null,
   useTransform: true,
 })
 
@@ -87,14 +89,72 @@ const isDev = computed(() => import.meta.env.DEV)
     <!-- 📋 ПЛЕЙСХОЛДЕР -->
     <div
       v-if="showPlaceholder"
-      class="absolute inset-0 bg-gradient-to-br animate-pulse transition-opacity duration-300"
-      :class="placeholderColor"
+      class="absolute inset-0 transition-opacity duration-300"
+      :class="{
+        'bg-gradient-to-br animate-pulse': placeholderType === 'shimmer',
+        'backdrop-blur-xl bg-muted/30': placeholderType === 'blur',
+        'bg-muted': placeholderType === 'color',
+      }"
     >
-      <!-- Спиннер загрузки -->
-      <div class="absolute inset-0 flex items-center justify-center">
-        <div class="relative">
-          <div class="w-10 h-10 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />
-        </div>
+      <!-- 🎨 LQIP - Blur Preview (как на Medium.com) -->
+      <div
+        v-if="placeholderType === 'lqip' && blurDataUrl"
+        class="absolute inset-0"
+      >
+        <!-- Крошечное blur изображение -->
+        <img
+          :src="blurDataUrl"
+          :alt="alt"
+          class="w-full h-full object-cover blur-2xl scale-110 opacity-60"
+          aria-hidden="true"
+        >
+        <!-- Overlay для красоты -->
+        <div class="absolute inset-0 bg-gradient-to-br from-transparent via-black/5 to-black/10" />
+      </div>
+
+      <!-- Fallback если нет blurDataUrl -->
+      <div
+        v-else-if="placeholderType === 'lqip'"
+        class="absolute inset-0 bg-gradient-to-br animate-pulse"
+        :class="placeholderColor"
+      />
+
+      <!-- Shimmer градиент -->
+      <div
+        v-if="placeholderType === 'shimmer'"
+        class="absolute inset-0 bg-gradient-to-br"
+        :class="placeholderColor"
+      />
+
+      <!-- Blur эффект с паттерном -->
+      <div
+        v-if="placeholderType === 'blur'"
+        class="absolute inset-0 flex items-center justify-center"
+      >
+        <svg class="w-full h-full opacity-20" viewBox="0 0 100 100">
+          <defs>
+            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <circle cx="5" cy="5" r="2" fill="currentColor" class="text-muted-foreground" />
+            </pattern>
+          </defs>
+          <rect width="100" height="100" fill="url(#grid)" />
+        </svg>
+      </div>
+
+      <!-- Маленький спиннер (только для LQIP и blur) -->
+      <div
+        v-if="placeholderType === 'lqip' || placeholderType === 'blur'"
+        class="absolute inset-0 flex items-center justify-center"
+      >
+        <div class="w-6 h-6 border-2 border-white/40 border-t-white/80 rounded-full animate-spin" />
+      </div>
+
+      <!-- Обычный спиннер для shimmer/color -->
+      <div
+        v-if="placeholderType === 'shimmer' || placeholderType === 'color'"
+        class="absolute inset-0 flex items-center justify-center"
+      >
+        <div class="w-10 h-10 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />
       </div>
 
       <!-- Индикатор режима (только в dev) -->
@@ -104,6 +164,7 @@ const isDev = computed(() => import.meta.env.DEV)
       >
         <span v-if="IMAGE_OPTIMIZATION_ENABLED">🚀</span>
         <span v-else>💾</span>
+        <span v-if="placeholderType === 'lqip'" class="ml-1">LQIP</span>
       </div>
     </div>
 

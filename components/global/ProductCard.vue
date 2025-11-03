@@ -160,7 +160,8 @@ const priceDetails = computed(() => {
               :alt="`${product.name}`"
               aspect-ratio="square"
               object-fit="cover"
-              placeholder-type="shimmer"
+              placeholder-type="lqip"
+              :blur-data-url="product.product_images?.[activeImageIndex]?.blur_placeholder"
               eager
             />
           </NuxtLink>
@@ -179,7 +180,7 @@ const priceDetails = computed(() => {
           >
             <CarouselContent>
               <CarouselItem
-                v-for="(_, index) in product.product_images"
+                v-for="(image, index) in product.product_images"
                 :key="`carousel-${index}`"
               >
                 <NuxtLink
@@ -192,7 +193,8 @@ const priceDetails = computed(() => {
                     :alt="`${product.name} - фото ${index + 1}`"
                     aspect-ratio="square"
                     object-fit="cover"
-                    placeholder-type="shimmer"
+                    placeholder-type="lqip"
+                    :blur-data-url="image.blur_placeholder"
                     eager
                   />
                 </NuxtLink>

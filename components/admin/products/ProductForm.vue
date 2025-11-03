@@ -78,7 +78,11 @@ const bonusOptions = [
   { label: 'Подарок (100%)', value: 100 },
 ]
 
-const newImageFiles = ref<{ file: File, previewUrl: string }[]>([])
+const newImageFiles = ref<{
+  file: File
+  previewUrl: string
+  blurDataUrl?: string // 🆕 Blur placeholder
+}[]>([])
 const existingImages = ref<ProductImageRow[]>([])
 const imagesToDelete = ref<string[]>([])
 const selectedBonusPercent = ref(5)

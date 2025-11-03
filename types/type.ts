@@ -281,7 +281,10 @@ export interface BaseProduct {
   slug: string
   price: number
   // Упрощаем тип для изображений, нам нужен только URL
-  product_images: { image_url: string | null }[] | null
+  product_images: {
+    image_url: string | null
+    blur_placeholder?: string | null
+  }[] | null
   discount_percentage?: number | null // Скидка опциональна
   // Добавьте сюда любые другие поля, которые вы используете в ProductCard
   bonus_points_award?: number | null
@@ -327,4 +330,8 @@ export type ProductListAdmin = ProductRow & {
   countries: Country | null
   materials: Material | null
   // Нет product_attribute_values!
+}
+
+export type ProductImage = Database['public']['Tables']['product_images']['Row'] & {
+  blur_placeholder?: string | null // 🆕 Добавьте вручную если не сгенерировалось
 }
