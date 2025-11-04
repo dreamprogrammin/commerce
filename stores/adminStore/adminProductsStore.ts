@@ -17,7 +17,13 @@ import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
-import { formatFileSize, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
+import { formatFileSize, generateBlurPlaceholder, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
+
+// 🆕 Интерфейс для изображения с blur
+interface ImageWithBlur {
+  file: File
+  blurDataUrl?: string
+}
 
 export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
@@ -34,7 +40,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
   // --- ЧТЕНИЕ ДАННЫХ (Read) ---
 
-  // ФУНКЦИЯ: Загрузка всех брендов для выпадающего списка
   async function fetchAllBrands() {
     try {
       const { data, error } = await supabase
@@ -50,7 +55,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
   }
 
-  // ФУНКЦИЯ: Загрузка всех стран для выпадающего списка
   async function fetchAllCountries() {
     try {
       const { data, error } = await supabase
@@ -230,11 +234,11 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   // --- ЗАПИСЬ ДАННЫХ (Write) ---
 
   /**
-   * Создает товар, его галерею и связи с аксессуарами.
+   * 🆕 Создает товар с поддержкой blur placeholder
    */
   async function createProduct(
     productData: ProductInsert,
-    newImageFiles: File[],
+    newImageFiles: ImageWithBlur[], // 🎯 Изменено: принимаем blur
   ) {
     isSaving.value = true
     try {
@@ -247,7 +251,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error || !newProduct)
         throw error
 
-      // 🎯 Управляем картинками с оптимизацией
+      // 🎯 Управляем картинками с blur
       await _manageProductImages(newProduct.id, newImageFiles, [], 0)
 
       toast.success(`Товар "${newProduct.name}" успешно создан.`)
@@ -263,12 +267,12 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   }
 
   /**
-   * Обновляет товар, его галерею и связи с аксессуарами.
+   * 🆕 Обновляет товар с поддержкой blur placeholder
    */
   async function updateProduct(
     productId: string,
     productData: ProductUpdate,
-    newImageFiles: File[],
+    newImageFiles: ImageWithBlur[], // 🎯 Изменено: принимаем blur
     imagesToDelete: string[],
     existingImages: ProductImageRow[],
   ) {
@@ -284,7 +288,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error || !updatedProduct)
         throw error
 
-      // 🎯 Управляем картинками с оптимизацией
+      // 🎯 Управляем картинками с blur
       await _manageProductImages(productId, newImageFiles, imagesToDelete, existingImages.length)
 
       toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
@@ -348,19 +352,19 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   // --- Приватные хелперы ---
 
   /**
-   * 🎯 ОБНОВЛЕНО: Управление изображениями с поддержкой оптимизации
+   * 🎯 ОБНОВЛЕНО: Управление изображениями с поддержкой blur placeholder
    *
-   * Теперь обрабатывает файлы в зависимости от режима:
-   * - Бесплатный (IMAGE_OPTIMIZATION_ENABLED = false): локально оптимизирует
-   * - Платный (IMAGE_OPTIMIZATION_ENABLED = true): загружает оригиналы
+   * Обрабатывает файлы в зависимости от режима:
+   * - Бесплатный: локально оптимизирует + генерирует blur
+   * - Платный: загружает оригиналы + генерирует blur
    */
   async function _manageProductImages(
     productId: string,
-    filesToUpload: File[],
+    imagesToUpload: ImageWithBlur[], // 🎯 Изменено: принимаем blur
     imageIdsToDelete: string[],
     currentImageCount: number,
   ) {
-    // 1️⃣ Сначала удаляем отмеченные изображения
+    // 1️⃣ Удаляем отмеченные изображения
     if (imageIdsToDelete.length > 0) {
       const { data: deletedImages, error: dbError } = await supabase
         .from('product_images')
@@ -375,53 +379,69 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
     }
 
-    // 2️⃣ Затем обрабатываем и загружаем новые изображения
-    if (filesToUpload.length > 0) {
-      const processedFiles = await Promise.all(
-        filesToUpload.map(async (file) => {
-          // 🎯 РЕЖИМ 1: Бесплатный тариф - локально оптимизируем
-          if (!IMAGE_OPTIMIZATION_ENABLED && shouldOptimizeImage(file)) {
-            try {
-              const result = await optimizeImageBeforeUpload(file)
-              console.warn(
-                `✅ Оптимизирован: ${file.name} (${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)})`,
-              )
-              return result.file
-            }
-            catch (error) {
-              console.warn(`⚠️ Ошибка оптимизации ${file.name}, загружаем оригинал:`, error)
-              return file
-            }
+    // 2️⃣ Обрабатываем и загружаем новые изображения
+    if (imagesToUpload.length > 0) {
+      for (let i = 0; i < imagesToUpload.length; i++) {
+        const { file, blurDataUrl } = imagesToUpload[i]
+
+        // 🎯 Оптимизация если нужно (бесплатный тариф)
+        let fileToUpload = file
+        let finalBlur = blurDataUrl
+
+        if (!IMAGE_OPTIMIZATION_ENABLED && shouldOptimizeImage(file)) {
+          try {
+            const result = await optimizeImageBeforeUpload(file)
+            fileToUpload = result.file
+            finalBlur = result.blurPlaceholder || blurDataUrl // Используем blur из оптимизации
+
+            console.log(
+              `✅ Оптимизирован: ${file.name} (${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)}) + ${finalBlur ? 'LQIP ✨' : 'no blur'}`,
+            )
           }
+          catch (error) {
+            console.warn(`⚠️ Ошибка оптимизации ${file.name}, загружаем оригинал:`, error)
+          }
+        }
 
-          // 🎯 РЕЖИМ 2: Платный тариф или маленький файл - загружаем как есть
-          return file
-        }),
-      )
+        // 🆕 Если blur нет, генерируем его
+        if (!finalBlur) {
+          try {
+            const blurResult = await generateBlurPlaceholder(file)
+            finalBlur = blurResult.dataUrl
+            console.log(`✨ Blur сгенерирован для ${file.name}`)
+          }
+          catch (error) {
+            console.warn(`⚠️ Не удалось сгенерировать blur для ${file.name}:`, error)
+          }
+        }
 
-      // 3️⃣ Загружаем обработанные файлы в Supabase
-      const uploadPromises = processedFiles.map(file =>
-        uploadFile(file, {
+        // 3️⃣ Загружаем файл в Storage
+        const filePath = await uploadFile(fileToUpload, {
           bucketName: BUCKET_NAME_PRODUCT,
           filePathPrefix: `products/${productId}`,
-        }),
-      )
-      const paths = await Promise.all(uploadPromises)
+        })
 
-      const imagesToInsert = paths
-        .filter((p): p is string => !!p)
-        .map((path, index) => ({
-          product_id: productId,
-          image_url: path,
-          display_order: currentImageCount + index,
-        }))
+        if (!filePath) {
+          console.error(`❌ Не удалось загрузить ${file.name}`)
+          continue
+        }
 
-      if (imagesToInsert.length > 0) {
-        const { error } = await supabase
+        // 4️⃣ Сохраняем в БД С blur_placeholder
+        const { error: imageError } = await supabase
           .from('product_images')
-          .insert(imagesToInsert)
-        if (error)
-          throw error
+          .insert({
+            product_id: productId,
+            image_url: filePath,
+            display_order: currentImageCount + i,
+            blur_placeholder: finalBlur || null, // 🎯 СОХРАНЯЕМ BLUR
+          })
+
+        if (imageError) {
+          console.error(`❌ Ошибка сохранения метаданных изображения:`, imageError)
+        }
+        else {
+          console.log(`✅ Сохранено изображение с blur (${finalBlur ? finalBlur.length : 0} chars)`)
+        }
       }
     }
   }
