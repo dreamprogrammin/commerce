@@ -95,6 +95,7 @@ const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
 const brandSearchQuery = ref('')
+const fileInputKey = ref(0)
 
 // 🎯 Информация об оптимизации
 const optimizationInfo = computed(() => getOptimizationInfo())
@@ -264,19 +265,19 @@ async function handleFilesChange(event: Event) {
   try {
     const processedFiles = await Promise.all(
       filesToProcess.map(async (file) => {
-        // 🎯 Проверяем нужна ли оптимизация
+        // Проверяем нужна ли оптимизация
         if (shouldOptimizeImage(file)) {
           try {
             const result = await optimizeImageBeforeUpload(file)
 
             console.log(
-              `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) + ${result.blurPlaceholder ? 'LQIP ✨' : 'no blur'}`,
+              `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
             )
 
             return {
               file: result.file,
               previewUrl: URL.createObjectURL(result.file),
-              blurDataUrl: result.blurPlaceholder, // 🎯 СОХРАНЯЕМ BLUR
+              blurDataUrl: result.blurPlaceholder,
             }
           }
           catch (error) {
@@ -286,12 +287,12 @@ async function handleFilesChange(event: Event) {
             return {
               file,
               previewUrl: URL.createObjectURL(file),
-              blurDataUrl: undefined, // Нет blur при ошибке
+              blurDataUrl: undefined,
             }
           }
         }
 
-        // Файл маленький или платный тариф - но всё равно генерируем blur
+        // Файл маленький - генерируем только blur
         try {
           const blurResult = await generateBlurPlaceholder(file)
           console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
@@ -299,7 +300,7 @@ async function handleFilesChange(event: Event) {
           return {
             file,
             previewUrl: URL.createObjectURL(file),
-            blurDataUrl: blurResult.dataUrl, // 🎯 BLUR для маленьких файлов тоже
+            blurDataUrl: blurResult.dataUrl,
           }
         }
         catch (error) {
@@ -315,9 +316,13 @@ async function handleFilesChange(event: Event) {
 
     newImageFiles.value.push(...processedFiles)
 
-    const message = `✅ ${processedFiles.length} изображений загружено ${optimizationInfo.value.icon}`
-    toast.success(message, { id: toastId })
-    target.value = ''
+    toast.success(
+      `✅ ${processedFiles.length} изображений загружено ${optimizationInfo.value.icon}`,
+      { id: toastId },
+    )
+
+    // 🎯 Пересоздаём input для очистки
+    fileInputKey.value++
   }
   catch (error) {
     toast.error('❌ Ошибка при обработке файлов', { id: toastId })
@@ -970,6 +975,7 @@ const maxAgeYearsValue = computed({
             </Label>
             <Input
               id="images"
+              :key="fileInputKey"
               type="file"
               multiple
               accept="image/*"
