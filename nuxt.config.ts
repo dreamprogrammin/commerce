@@ -9,6 +9,7 @@ export default defineNuxtConfig({
     'shadcn-nuxt',
     'pinia-plugin-persistedstate/nuxt',
     '@nuxt/image',
+    '@nuxt/icon',
   ],
   // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
   nitro: {

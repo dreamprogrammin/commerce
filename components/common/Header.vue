@@ -30,7 +30,7 @@ function handleOverlayClick() {
 
 <template>
   <header class="header z-[50] bg-amber-200 relative shadow-sm">
-    <CommonHeaderTop />
+    <CommonHeaderTop :class="containerClass" />
     <div :class="containerClass">
       <CommonHeaderBottom />
       <CommonAppTabBar />

@@ -12,6 +12,7 @@ const { children, isLoading } = storeToRefs(childrenStore)
 useAsyncData('children-list', () => childrenStore.fetchChildren())
 
 const isDialogOpen = ref(false)
+const childToDelete = ref<ChildrenRow | null>(null)
 const editingChild = ref<ChildrenRow | null>(null)
 const formData = ref<{ name: string, gender: 'male' | 'female', birth_date: string }>({
   name: '',
@@ -35,12 +36,13 @@ function openForEdit(child: ChildrenRow) {
   isDialogOpen.value = true
 }
 
-async function handleDelete(childId: string) {
-  if (toast.info('Вы уверены, что хотите удалить данные об этом ребенке?')) {
-    await childrenStore.deleteChild(childId)
-  }
+async function handleDeleteConfirm() {
+  if (!childToDelete.value)
+    return
+  await childrenStore.deleteChild(childToDelete.value.id)
+  toast.success(`Данные о ребенке "${childToDelete.value.name}" удалены.`)
+  childToDelete.value = null // Сбрасываем состояние
 }
-
 // --- Обработка отправки формы ---
 async function handleSubmit() {
   if (editingChild.value) {
@@ -93,30 +95,89 @@ function calculateAge(birthDate: string): number {
       </p>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <Card v-for="child in children" :key="child.id">
-        <CardHeader>
-          <CardTitle class="flex items-center justify-between">
-            <span>{{ child.name }}</span>
-            <span class="text-sm font-normal text-muted-foreground">
-              {{ calculateAge(child.birth_date) }} лет
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent class="flex items-center justify-between">
-          <span class="text-muted-foreground capitalize">{{ child.gender === 'male' ? 'Мальчик' : 'Девочка' }}</span>
-          <div class="flex gap-2">
-            <Button variant="outline" size="sm" @click="openForEdit(child)">
-              Редактировать
-            </Button>
-            <Button variant="destructive" size="sm" @click="handleDelete(child.id)">
-              Удалить
-            </Button>
+    <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card
+        v-for="child in children"
+        :key="child.id"
+        class="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300"
+      >
+        <!-- Горизонтальная карточка как удостоверение -->
+        <div class="flex items-stretch min-h-[280px]">
+          <!-- Левая часть: информация -->
+          <div class="flex-1 flex flex-col p-6">
+            <div class="flex-grow space-y-4">
+              <div class="space-y-1">
+                <p class="text-sm text-muted-foreground font-medium uppercase tracking-wide">
+                  Имя ребенка
+                </p>
+                <CardTitle class="text-3xl font-bold">
+                  {{ child.name }}
+                </CardTitle>
+              </div>
+
+              <div class="space-y-3 pt-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-muted-foreground font-medium w-24">Пол:</span>
+                  <Badge variant="secondary" class="text-sm px-3 py-1">
+                    {{ child.gender === 'male' ? 'Мальчик' : 'Девочка' }}
+                  </Badge>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-muted-foreground font-medium w-24">Возраст:</span>
+                  <Badge variant="outline" class="text-sm px-3 py-1">
+                    {{ calculateAge(child.birth_date) }} лет
+                  </Badge>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-muted-foreground font-medium w-24">Дата рожд.:</span>
+                  <span class="text-sm">{{ new Date(child.birth_date).toLocaleDateString('ru-RU') }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Кнопки -->
+            <div class="flex gap-2 mt-6 pt-4 border-t">
+              <Button variant="outline" class="flex-1" size="sm" @click="openForEdit(child)">
+                Изменить
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger as-child>
+                  <Button variant="destructive" class="flex-1" size="sm" @click="childToDelete = child">
+                    Удалить
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Это действие необратимо. Все данные о ребенке "{{ child.name }}" будут удалены.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel @click="childToDelete = null">
+                      Отмена
+                    </AlertDialogCancel>
+                    <AlertDialogAction @click="handleDeleteConfirm">
+                      Да, удалить
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
-        </CardContent>
+
+          <!-- Правая часть: большая иконка -->
+          <div class="w-48 bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center border-l">
+            <Icon
+              :name="child.gender === 'male' ? 'fluent-emoji-flat:boy' : 'fluent-emoji-flat:girl'"
+              class="w-32 h-32"
+            />
+          </div>
+        </div>
       </Card>
     </div>
-
     <!-- Диалоговое окно для формы -->
     <Dialog v-model:open="isDialogOpen">
       <DialogContent>

@@ -28,12 +28,12 @@ useSeoMeta({
 
 <template>
   <div>
-    <main>
-      <NuxtLayout>
-        <NuxtPage />
-        <Toaster />
-      </NuxtLayout>
-    </main>
+    <CommonHeader />
+
+    <NuxtLayout>
+      <NuxtPage />
+      <Toaster />
+    </NuxtLayout>
 
     <ClientOnly>
       <AuthLoginModal v-if="modalStore.showLoginModal" />

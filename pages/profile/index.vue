@@ -1,7 +1,6 @@
 <script setup lang="ts">
+import { Hourglass, Star } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 
@@ -54,25 +53,72 @@ onMounted(async () => {
     <div v-else>
       <!-- Загрузка -->
       <div v-if="isLoading" class="space-y-4">
-        <Skeleton class="h-8 w-1/2" />
-        <Skeleton class="h-4 w-3/4" />
-        <Skeleton class="h-4 w-2/3" />
+        <Skeleton class="h-40 w-full" />
+        <Skeleton class="h-32 w-full" />
       </div>
 
       <!-- Профиль загружен -->
-      <div v-else-if="profile" class="space-y-4">
-        <h2 class="text-2xl font-semibold">
+      <div v-else-if="profile" class="space-y-6">
+        <h1 class="text-3xl font-bold">
           Добро пожаловать, {{ fullName }}!
-        </h2>
+        </h1>
 
-        <div class="space-y-2">
-          <p><strong>Email:</strong> {{ user.email }}</p>
-          <p><strong>Телефон:</strong> {{ profile.phone || 'Не указан' }}</p>
-          <p><strong>Доступно бонусов:</strong> {{ bonusBalance }} ✨</p>
-          <p v-if="pendingBonuses > 0" class="text-sm text-muted-foreground">
-            Ожидает начисления: {{ pendingBonuses }} бонусов
-          </p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Личные данные</CardTitle>
+            <CardDescription>Ваша основная информация</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div class="flex justify-between items-center">
+              <span class="text-muted-foreground">Email</span>
+              <span>{{ user.email }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-muted-foreground">Телефон</span>
+              <span>{{ profile.phone || 'Не указан' }}</span>
+            </div>
+            <Button variant="outline" class="mt-4">
+              Редактировать
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Мои бонусы</CardTitle>
+            <CardDescription>Управляйте своими бонусами и скидками</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2">
+                <Star class="w-5 h-5 text-yellow-500" />
+                <span class="font-medium">Доступно к списанию</span>
+              </div>
+              <Badge variant="secondary" class="text-lg">
+                {{ bonusBalance }}
+              </Badge>
+            </div>
+            <div v-if="pendingBonuses > 0" class="flex justify-between items-center">
+              <div class="flex items-center gap-2 text-muted-foreground">
+                <Hourglass class="w-5 h-5" />
+                <span>Ожидает начисления</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <CircleHelp class="w-4 h-4" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Бонусы станут активны через 14 дней после получения заказа.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Badge variant="outline" class="text-md">
+                {{ pendingBonuses }}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
 
         <div class="flex gap-4 mt-6">
           <Button variant="outline" @click="profileStore.loadProfile()">
