@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { carouselContainerVariants } from '@/lib/variants'
-import { useProfileStore } from '@/stores/core/profileStore' // 👈 Импортируем Profile Store
+import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 
 const authStore = useAuthStore()
-const profileStore = useProfileStore() // 👈 Инициализируем
-const { fullName } = storeToRefs(profileStore) // 👈 Получаем fullName
-
+const profileStore = useProfileStore()
+const { fullName } = storeToRefs(profileStore)
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
-// Создаем массив для навигации, чтобы легко им управлять
+
 const navItems = [
   { to: '/profile', icon: 'lucide:user', label: 'Мой профиль' },
   { to: '/profile/children', icon: 'lucide:smile', label: 'Мои дети' },
@@ -25,29 +24,41 @@ const navItems = [
     <div class="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-8">
       <!-- Боковая панель -->
       <aside class="flex flex-col space-y-6">
-        <div>
-          <Avatar>
-            <!-- Здесь может быть AvatarImage, если у вас есть URL аватара -->
-            <AvatarFallback>{{ fullName.charAt(0) || 'П' }}</AvatarFallback>
-          </Avatar>
-          <span class="font-semibold text-lg">{{ fullName }}</span>
+        <div class="space-y-4">
+          <div class="flex items-center gap-3">
+            <Avatar>
+              <AvatarFallback>
+                <ClientOnly fallback="П">
+                  {{ fullName.charAt(0) || 'П' }}
+                </ClientOnly>
+              </AvatarFallback>
+            </Avatar>
+            <span class="font-semibold text-lg">
+              <ClientOnly fallback="Загрузка...">
+                {{ fullName || 'Пользователь' }}
+              </ClientOnly>
+            </span>
+          </div>
+
           <nav class="flex flex-col space-y-1">
             <NuxtLink
               v-for="item in navItems"
               :key="item.to"
-              v-slot="{ isActive }"
               :to="item.to"
             >
-              <Button
-                :variant="isActive ? 'secondary' : 'ghost'"
-                class="w-full justify-start"
-              >
-                <Icon :name="item.icon" class="w-4 h-4 mr-2" />
-                {{ item.label }}
-              </Button>
+              <template #default="{ isActive }">
+                <Button
+                  :variant="isActive ? 'secondary' : 'ghost'"
+                  class="w-full justify-start"
+                >
+                  <Icon :name="item.icon" class="w-4 h-4 mr-2" />
+                  {{ item.label }}
+                </Button>
+              </template>
             </NuxtLink>
           </nav>
         </div>
+
         <!-- Кнопка выхода -->
         <div class="mt-auto pt-4 border-t">
           <Button
