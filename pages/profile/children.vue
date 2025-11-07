@@ -114,6 +114,29 @@ function formatAge(birthDate: string): string {
     return `${ageMonths} ${monthsStr}`
   }
 }
+const nameInputClass = computed(() => {
+  // Если мы добавляем нового ребенка, не применяем никаких кастомных классов
+  if (!editingChild.value) {
+    return ''
+  }
+
+  // Если редактируем мальчика, возвращаем классы для СВЕТЛО-ГОЛУБОГО ФОНА
+  if (formData.value.gender === 'male') {
+    // bg-sky-50 - очень светлый голубой для светлой темы
+    // dark:bg-sky-950 - очень темный голубой (почти черный) для темной темы
+    return 'bg-sky-50 dark:bg-sky-950'
+  }
+
+  // Если редактируем девочку, возвращаем классы для СВЕТЛО-РОЗОВОГО ФОНА
+  if (formData.value.gender === 'female') {
+    // bg-pink-50 - очень светлый розовый для светлой темы
+    // dark:bg-pink-950 - очень темный розовый для темной темы
+    return 'bg-pink-50 dark:bg-pink-950'
+  }
+
+  // На всякий случай, если пол не определен
+  return ''
+})
 </script>
 
 <template>
@@ -239,7 +262,7 @@ function formatAge(birthDate: string): string {
 
     <!-- Диалог добавления/редактирования -->
     <Dialog v-model:open="isDialogOpen">
-      <DialogContent class="sm:max-w-[500px]">
+      <DialogContent class="sm:max-w-[500px]" @open-auto-focus.prevent>
         <DialogHeader>
           <DialogTitle class="text-2xl">
             {{ editingChild ? 'Редактировать данные' : 'Добавить ребенка' }}
@@ -256,6 +279,7 @@ function formatAge(birthDate: string): string {
               v-model="formData.name"
               placeholder="Введите имя"
               class="h-11"
+              :class="nameInputClass"
               required
             />
           </div>
@@ -334,7 +358,7 @@ function formatAge(birthDate: string): string {
 
     <!-- Диалог подтверждения удаления -->
     <AlertDialog v-model:open="isDeleteConfirmOpen">
-      <AlertDialogContent>
+      <AlertDialogContent @open-auto-focus.prevent>
         <AlertDialogHeader>
           <div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
             <Icon name="mdi:alert-circle" class="w-8 h-8 text-destructive" />
