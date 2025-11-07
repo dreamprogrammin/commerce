@@ -161,104 +161,109 @@ const nameInputClass = computed(() => {
     </div>
 
     <!-- Состояние загрузки -->
-    <div v-if="isLoading && children.length === 0" class="text-center py-16">
-      <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-muted/50">
-        <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        <p class="text-muted-foreground font-medium">
-          Загрузка данных...
-        </p>
-      </div>
-    </div>
-
-    <!-- Пустое состояние -->
-    <Card v-else-if="children.length === 0" class="border-dashed border-2">
-      <div class="text-center py-16 px-6">
-        <div class="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10">
-          <Icon name="fluent-emoji-flat:family" class="text-5xl" />
+    <ClientOnly>
+      <div v-if="isLoading && children.length === 0" class="text-center py-16">
+        <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-muted/50">
+          <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p class="text-muted-foreground font-medium">
+            Загрузка данных...
+          </p>
         </div>
-        <h2 class="text-2xl font-bold mb-3">
-          У вас пока нет детей в списке
-        </h2>
-        <p class="text-muted-foreground mb-6 max-w-md mx-auto">
-          Добавьте информацию о детях, чтобы получать персонализированные рекомендации товаров и услуг
-        </p>
-        <Button size="lg" class="shadow-sm" @click="openForNew">
-          <PlusCircle class="w-5 h-5 mr-2" />
-          Добавить первого ребенка
-        </Button>
       </div>
-    </Card>
 
-    <!-- Список детей -->
-    <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <Card
-        v-for="(child, index) in children"
-        :key="child.id"
-        class="child-card cursor-pointer overflow-hidden p-0 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
-        :style="{ animationDelay: `${index * 100}ms` }"
-        :class="{ 'animate-fade-in': showCards }"
-        @click="openForEdit(child)"
-      >
-        <div class="p-5 sm:p-6 relative">
-          <!-- Тонкий цветной оверлей -->
-          <div
-            class="color-overlay absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-300"
-            :class="child.gender === 'male' ? 'bg-blue-500/8' : 'bg-pink-500/8'"
-          />
+      <!-- Пустое состояние -->
+      <Card v-else-if="children.length === 0" class="border-dashed border-2">
+        <div class="text-center py-16 px-6">
+          <div class="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10">
+            <Icon name="fluent-emoji-flat:family" class="text-5xl" />
+          </div>
+          <h2 class="text-2xl font-bold mb-3">
+            У вас пока нет детей в списке
+          </h2>
+          <p class="text-muted-foreground mb-6 max-w-md mx-auto">
+            Добавьте информацию о детях, чтобы получать персонализированные рекомендации товаров и услуг
+          </p>
+          <Button size="lg" class="shadow-sm" @click="openForNew">
+            <PlusCircle class="w-5 h-5 mr-2" />
+            Добавить первого ребенка
+          </Button>
+        </div>
+      </Card>
 
-          <div class="flex items-center gap-4 relative z-10">
-            <!-- Аватар -->
-            <div class="relative">
-              <div
-                class="child-avatar flex items-center justify-center w-16 h-16 rounded-2xl ring-2 ring-offset-2 ring-offset-background transition-transform duration-300"
-                :class="child.gender === 'male'
-                  ? 'bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 ring-blue-500/20'
-                  : 'bg-gradient-to-br from-pink-100 to-pink-200 dark:from-pink-900 dark:to-pink-800 ring-pink-500/20'"
-              >
-                <Icon
-                  :name="child.gender === 'male' ? 'fluent-emoji-flat:boy' : 'fluent-emoji-flat:girl'"
-                  class="text-5xl"
-                />
-              </div>
-            </div>
+      <!-- Список детей -->
+      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card
+          v-for="(child, index) in children"
+          :key="child.id"
+          class="child-card cursor-pointer overflow-hidden p-0 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+          :style="{ animationDelay: `${index * 100}ms` }"
+          :class="{ 'animate-fade-in': showCards }"
+          @click="openForEdit(child)"
+        >
+          <div class="p-5 sm:p-6 relative">
+            <!-- Тонкий цветной оверлей -->
+            <div
+              class="color-overlay absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-300"
+              :class="child.gender === 'male' ? 'bg-blue-500/8' : 'bg-pink-500/8'"
+            />
 
-            <!-- Информация -->
-            <div class="flex-grow min-w-0">
-              <div class="flex items-center gap-2 mb-1">
-                <h3 class="font-bold text-lg text-card-foreground truncate">
-                  {{ child.name }}
-                </h3>
-                <span
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+            <div class="flex items-center gap-4 relative z-10">
+              <!-- Аватар -->
+              <div class="relative">
+                <div
+                  class="child-avatar flex items-center justify-center w-16 h-16 rounded-2xl ring-2 ring-offset-2 ring-offset-background transition-transform duration-300"
                   :class="child.gender === 'male'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300'"
+                    ? 'bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 ring-blue-500/20'
+                    : 'bg-gradient-to-br from-pink-100 to-pink-200 dark:from-pink-900 dark:to-pink-800 ring-pink-500/20'"
                 >
-                  {{ child.gender === 'male' ? 'Мальчик' : 'Девочка' }}
-                </span>
-              </div>
-              <div class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <div class="flex items-center gap-1.5">
-                  <Icon name="mdi:cake-variant" class="text-base" />
-                  <span class="font-medium">{{ formatAge(child.birth_date) }}</span>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <Icon name="mdi:calendar" class="text-base" />
-                  <span>{{ new Date(child.birth_date).toLocaleDateString('ru-RU') }}</span>
+                  <Icon
+                    :name="child.gender === 'male' ? 'fluent-emoji-flat:boy' : 'fluent-emoji-flat:girl'"
+                    class="text-5xl"
+                  />
                 </div>
               </div>
-            </div>
 
-            <!-- Кнопка -->
-            <div class="flex-shrink-0">
-              <div class="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center">
-                <ChevronRight class="chevron-icon w-5 h-5 text-muted-foreground transition-transform duration-300" />
+              <!-- Информация -->
+              <div class="flex-grow min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <h3 class="font-bold text-lg text-card-foreground truncate">
+                    {{ child.name }}
+                  </h3>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <div class="flex items-center gap-1.5">
+                    <Icon name="mdi:cake-variant" class="text-base" />
+                    <span class="font-medium">{{ formatAge(child.birth_date) }}</span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <Icon name="mdi:calendar" class="text-base" />
+                    <span>{{ new Date(child.birth_date).toLocaleDateString('ru-RU') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Кнопка -->
+              <div class="flex-shrink-0">
+                <div class="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center">
+                  <ChevronRight class="chevron-icon w-5 h-5 text-muted-foreground transition-transform duration-300" />
+                </div>
               </div>
             </div>
           </div>
+        </Card>
+      </div>
+
+      <template #fallback>
+        <div class="text-center py-16">
+          <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-muted/50">
+            <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p class="text-muted-foreground font-medium">
+              Загрузка данных...
+            </p>
+          </div>
         </div>
-      </Card>
-    </div>
+      </template>
+    </ClientOnly>
 
     <!-- Диалог добавления/редактирования -->
     <Dialog v-model:open="isDialogOpen">
