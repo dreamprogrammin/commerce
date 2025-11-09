@@ -129,6 +129,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       discount_percentage: product.discount_percentage || 0,
       material_id: product.material_id,
       barcode: product.barcode,
+      is_featured: product.is_featured || false,
+      featured_order: product.featured_order || 0,
     }
     existingImages.value = [...(product.product_images || [])]
 
@@ -163,6 +165,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       discount_percentage: 0,
       material_id: null,
       barcode: null,
+      is_featured: false,
+      featured_order: 0,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -707,6 +711,27 @@ const maxAgeYearsValue = computed({
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div class="flex items-center space-x-2 pt-2">
+            <Switch id="is_featured" v-model:model-value="formData.is_featured" />
+            <Label for="is_featured" class="mb-0 cursor-pointer">
+              🎁 Товар дня (показывать в карусели)
+            </Label>
+          </div>
+
+          <div v-if="formData.is_featured" class="pt-2">
+            <Label for="featured_order">Порядок в карусели</Label>
+            <Input
+              id="featured_order"
+              v-model.number="formData.featured_order"
+              type="number"
+              placeholder="0 - первый, 1 - второй..."
+              min="0"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Чем меньше число, тем раньше показывается
+            </p>
           </div>
 
           <div>

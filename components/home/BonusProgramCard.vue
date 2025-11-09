@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { Gift, History, LogIn } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 
@@ -11,8 +8,6 @@ const modalStore = useModalStore()
 
 const { profile, isLoading, bonusBalance, isLoggedIn } = storeToRefs(profileStore)
 
-// Эта логика на клиенте остается, она нужна для обновления данных
-// после того, как сессия восстановилась.
 onMounted(() => {
   if (isLoggedIn.value && !profile.value) {
     profileStore.loadProfile()
@@ -21,106 +16,171 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="container py-8 md:py-16">
-    <div class="max-w-4xl mx-auto">
-      <Card
-        class="bg-gradient-to-br from-primary/10 via-background to-background dark:from-primary/20 dark:via-background text-center shadow-lg border-2 border-primary/20"
-      >
-        <CardHeader class="items-center">
-          <div class="p-4 bg-background rounded-full mb-4 ring-2 ring-yellow-400/50">
-            <Gift class="w-10 h-10 text-primary" />
+  <Card class="relative overflow-hidden border-2 border-blue-200 dark:border-blue-800 hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-blue-50/50 via-purple-50/30 to-pink-50/50 dark:from-blue-950/20 dark:via-purple-950/20 dark:to-pink-950/20">
+    <!-- Мягкие декоративные элементы -->
+    <div class="absolute top-0 right-0 w-40 h-40 bg-blue-200/30 dark:bg-blue-800/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+    <div class="absolute bottom-0 left-0 w-32 h-32 bg-pink-200/30 dark:bg-pink-800/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+
+    <!-- Маленькие звёздочки для детского настроения -->
+    <div class="absolute top-6 right-12">
+      <Icon name="lucide:sparkle" class="w-4 h-4 text-yellow-400/60" />
+    </div>
+    <div class="absolute bottom-20 right-8">
+      <Icon name="lucide:star" class="w-3 h-3 text-blue-400/60" />
+    </div>
+
+    <!-- Контент -->
+    <div class="relative">
+      <CardHeader class="space-y-3 pb-4">
+        <!-- Иконка и заголовок -->
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 p-2.5 bg-gradient-to-br from-blue-300 to-purple-300 rounded-2xl shadow-sm">
+            <Icon name="lucide:gift" class="w-5 h-5 text-white" />
           </div>
-          <CardTitle class="text-2xl md:text-3xl">
-            Наша Бонусная Программа
-          </CardTitle>
-          <CardDescription class="text-base">
-            Копите и тратьте бонусы на свои мечты!
-          </CardDescription>
-        </CardHeader>
+          <div class="flex-1">
+            <CardTitle class="text-lg font-bold text-gray-800 dark:text-gray-100">
+              Копилка бонусов 🎁
+            </CardTitle>
+            <CardDescription class="mt-0.5 text-sm">
+              Получай подарки за покупки
+            </CardDescription>
+          </div>
+        </div>
 
-        <CardContent class="text-lg space-y-4">
-          <p>
-            Получайте <span class="font-bold">кэшбек</span> с каждой покупки и
-            используйте его для оплаты следующих заказов.
-          </p>
-          <p class="font-extrabold text-primary text-2xl tracking-tight">
-            1 бонус = 1 тенге
-          </p>
+        <!-- Основное преимущество -->
+        <div class="p-3 bg-white/80 dark:bg-gray-900/50 backdrop-blur-sm rounded-xl border-2 border-blue-100 dark:border-blue-900/50">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 bg-gradient-to-br from-yellow-200 to-orange-200 dark:from-yellow-900/40 dark:to-orange-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+              <Icon name="lucide:coins" class="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground font-medium">
+                Просто и понятно
+              </p>
+              <p class="text-lg font-bold text-blue-600 dark:text-blue-400">
+                1 бонус = 1 ₸
+              </p>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
 
-          <!--
-            Оборачиваем в ClientOnly ВЕСЬ БЛОК, который зависит от состояния пользователя.
-            Это решит все ошибки гидратации внутри CardContent и CardFooter.
-          -->
-          <ClientOnly>
-            <div v-if="isLoggedIn" class="mt-6 pt-6 border-t border-dashed">
-              <div v-if="isLoading" class="h-16 flex items-center justify-center">
-                <div class="w-8 h-8 border-4 border-dashed rounded-full animate-spin border-primary" />
-              </div>
-              <div v-else-if="profile">
-                <p class="text-muted-foreground">
-                  На вашем счету:
+      <CardContent class="space-y-3 pb-4">
+        <!-- Преимущества с мягкими цветами -->
+        <div class="space-y-2">
+          <div class="flex items-center gap-2.5 p-2 bg-white/60 dark:bg-gray-900/40 rounded-lg hover:bg-white/80 dark:hover:bg-gray-900/60 transition-colors">
+            <div class="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+              <Icon name="lucide:heart" class="w-4 h-4 text-green-600 dark:text-green-400" />
+            </div>
+            <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Кэшбек с каждой покупки ✨
+            </p>
+          </div>
+          <div class="flex items-center gap-2.5 p-2 bg-white/60 dark:bg-gray-900/40 rounded-lg hover:bg-white/80 dark:hover:bg-gray-900/60 transition-colors">
+            <div class="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+              <Icon name="lucide:smile" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Оплата до 100% бонусами 🎈
+            </p>
+          </div>
+          <div class="flex items-center gap-2.5 p-2 bg-white/60 dark:bg-gray-900/40 rounded-lg hover:bg-white/80 dark:hover:bg-gray-900/60 transition-colors">
+            <div class="w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+              <Icon name="lucide:star" class="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Бонусы не сгорают 🌟
+            </p>
+          </div>
+        </div>
+
+        <!-- Баланс пользователя -->
+        <ClientOnly>
+          <div v-if="isLoggedIn" class="mt-4">
+            <div v-if="isLoading" class="h-20 flex items-center justify-center">
+              <Icon name="lucide:loader-2" class="w-6 h-6 animate-spin text-blue-400" />
+            </div>
+            <div v-else-if="profile" class="p-4 bg-gradient-to-br from-blue-400 to-purple-400 rounded-2xl shadow-md">
+              <p class="text-xs font-semibold text-white/80 mb-1">
+                Ваша копилка
+              </p>
+              <div class="flex items-baseline gap-2">
+                <p class="text-3xl font-bold text-white">
+                  {{ bonusBalance }}
                 </p>
-                <p class="text-4xl font-bold text-amber-500 flex items-center justify-center gap-2">
-                  {{ bonusBalance }} ✨
-                  <span class="text-2xl font-normal text-muted-foreground">бонусов</span>
+                <span class="text-sm text-white/90 font-medium">бонусов</span>
+              </div>
+            </div>
+          </div>
+
+          <template #fallback>
+            <div class="mt-4 p-4 bg-white/80 dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-blue-200 dark:border-blue-800">
+              <div class="text-center">
+                <Icon name="lucide:gift" class="w-6 h-6 text-blue-300 dark:text-blue-600 mx-auto mb-1" />
+                <p class="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  Войдите, чтобы начать копить! 🎉
                 </p>
               </div>
             </div>
+          </template>
+        </ClientOnly>
+      </CardContent>
 
-            <!--
-              Fallback - это то, что будет отрендерено на сервере и показано
-              до того, как клиентский JS "оживит" компонент.
-              Мы покажем нейтральное приглашение, которое верно для всех.
-            -->
-            <template #fallback>
-              <div class="mt-6 pt-6 border-t border-dashed">
-                <p class="h-16 flex items-center justify-center text-muted-foreground">
-                  Авторизуйтесь, чтобы увидеть ваш баланс
-                </p>
-              </div>
-            </template>
-          </ClientOnly>
-        </CardContent>
-
-        <CardFooter class="flex flex-col items-center gap-4 pt-6">
-          <!-- Оборачиваем в ClientOnly и этот блок с кнопками -->
-          <ClientOnly>
-            <!-- Кнопка для залогиненного пользователя (будет отрендерена на клиенте) -->
-            <NuxtLink v-if="isLoggedIn" to="/profile/bonuses">
-              <Button size="lg" variant="default">
-                <History class="w-4 h-4 mr-2" />
-                История начислений
+      <CardFooter class="flex-col gap-2 pt-3 border-t border-blue-100 dark:border-blue-900">
+        <ClientOnly>
+          <!-- Для авторизованных -->
+          <div v-if="isLoggedIn" class="w-full space-y-2">
+            <NuxtLink to="/profile/bonuses" class="block">
+              <Button size="default" class="w-full bg-gradient-to-r from-blue-400 to-purple-400 hover:from-blue-500 hover:to-purple-500 text-white font-semibold shadow-sm hover:shadow-md transition-all rounded-xl text-sm">
+                <Icon name="lucide:history" class="w-4 h-4 mr-2" />
+                История бонусов
               </Button>
             </NuxtLink>
-
-            <!-- Кнопка для гостя (будет отрендерена на клиенте) -->
-            <div v-else>
-              <Button size="lg" variant="default" @click="modalStore.openLoginModal()">
-                <LogIn class="w-4 h-4 mr-2" />
-                Войти и начать копить
+            <NuxtLink to="/bonus-program-rules">
+              <Button variant="ghost" size="sm" class="w-full text-muted-foreground hover:text-foreground text-xs rounded-lg">
+                Правила программы
+                <Icon name="lucide:arrow-right" class="w-3 h-3 ml-2" />
               </Button>
-            </div>
+            </NuxtLink>
+          </div>
 
-            <!-- Fallback для кнопок -->
-            <template #fallback>
-              <!-- Показываем на сервере универсальную кнопку, ведущую на страницу входа -->
+          <!-- Для гостей -->
+          <div v-else class="w-full space-y-2">
+            <Button
+              size="default"
+              class="w-full bg-gradient-to-r from-blue-400 to-purple-400 hover:from-blue-500 hover:to-purple-500 text-white font-semibold shadow-sm hover:shadow-md transition-all rounded-xl text-sm"
+              @click="modalStore.openLoginModal()"
+            >
+              <Icon name="lucide:log-in" class="w-4 h-4 mr-2" />
+              Войти и начать копить
+            </Button>
+            <NuxtLink to="/bonus-program-rules">
+              <Button variant="ghost" size="sm" class="w-full text-muted-foreground hover:text-foreground text-xs rounded-lg">
+                Как работает программа?
+                <Icon name="lucide:arrow-right" class="w-3 h-3 ml-2" />
+              </Button>
+            </NuxtLink>
+          </div>
+
+          <!-- Fallback для SSR -->
+          <template #fallback>
+            <div class="w-full space-y-2">
               <NuxtLink to="/profile">
-                <Button size="lg" variant="default">
-                  <LogIn class="w-4 h-4 mr-2" />
-                  Войти или Зарегистрироваться
+                <Button size="default" class="w-full bg-gradient-to-r from-blue-400 to-purple-400 hover:from-blue-500 hover:to-purple-500 text-white font-semibold shadow-sm rounded-xl text-sm">
+                  <Icon name="lucide:log-in" class="w-4 h-4 mr-2" />
+                  Войти или зарегистрироваться
                 </Button>
               </NuxtLink>
-            </template>
-          </ClientOnly>
-
-          <!-- Эта ссылка не зависит от состояния пользователя, ее можно оставить как есть -->
-          <NuxtLink to="/bonus-program-rules">
-            <Button variant="link" class="text-muted-foreground">
-              Подробнее о правилах программы
-            </Button>
-          </NuxtLink>
-        </CardFooter>
-      </Card>
+              <NuxtLink to="/bonus-program-rules">
+                <Button variant="ghost" size="sm" class="w-full text-muted-foreground hover:text-foreground text-xs rounded-lg">
+                  Правила программы
+                  <Icon name="lucide:arrow-right" class="w-3 h-3 ml-2" />
+                </Button>
+              </NuxtLink>
+            </div>
+          </template>
+        </ClientOnly>
+      </CardFooter>
     </div>
-  </section>
+  </Card>
 </template>

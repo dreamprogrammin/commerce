@@ -199,6 +199,8 @@ export type FullProduct = ProductWithImages & {
   materials: Material | null
 
   product_attribute_values: ProductAttributeValueWithDetails[] | null
+  is_featured?: boolean
+  featured_order?: number
 }
 
 export type CustomFieldValue = string | number | boolean | null
@@ -223,6 +225,8 @@ export interface ProductFormData {
   origin_country_id: number | null
   material_id: number | null
   barcode: string | null
+  is_featured?: boolean
+  featured_order?: number
 }
 
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
@@ -335,3 +339,7 @@ export type ProductListAdmin = ProductRow & {
 export type ProductImage = Database['public']['Tables']['product_images']['Row'] & {
   blur_placeholder?: string | null // 🆕 Добавьте вручную если не сгенерировалось
 }
+
+export type Banner = Database['public']['Tables']['banners']['Row']
+export type BannerInsert = Database['public']['Tables']['banners']['Insert']
+export type BannerUpdate = Database['public']['Tables']['banners']['Update']

@@ -48,6 +48,18 @@ export const IMAGE_SIZES = {
     height: 600,
   },
 
+  // Слайдер баннеров на главной
+  SLIDER_BANNER: {
+    width: 1920,
+    height: 600,
+  },
+
+  // Баннеры на главной (после слайдера)
+  BANNER: {
+    width: 1200,
+    height: 400,
+  },
+
   // Мобильные версии
   MOBILE: {
     width: 640,
@@ -140,6 +152,22 @@ export const IMAGE_PRESETS = {
   // Hero баннер
   HERO_BANNER: {
     ...IMAGE_SIZES.HERO,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'cover' as const,
+  },
+
+  // Слайдер баннер
+  SLIDER_BANNER: {
+    ...IMAGE_SIZES.SLIDER_BANNER,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'cover' as const,
+  },
+
+  // Баннер
+  BANNER: {
+    ...IMAGE_SIZES.BANNER,
     quality: IMAGE_QUALITY.HIGH,
     format: IMAGE_FORMATS.MODERN,
     resize: 'cover' as const,

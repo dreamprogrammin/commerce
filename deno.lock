@@ -31,11 +31,13 @@
     "packageJson": {
       "dependencies": [
         "npm:@antfu/eslint-config@^5.2.0",
+        "npm:@nuxt/icon@2.1.0",
         "npm:@nuxt/image@^1.11.0",
         "npm:@nuxtjs/supabase@^1.6.1",
         "npm:@pinia/nuxt@~0.11.2",
         "npm:@supabase/supabase-js@^2.56.0",
         "npm:@tailwindcss/vite@^4.1.11",
+        "npm:@tanstack/vue-query@^5.90.5",
         "npm:@tanstack/vue-table@^8.21.3",
         "npm:@types/lodash-es@^4.17.12",
         "npm:@vueuse/core@^13.6.0",

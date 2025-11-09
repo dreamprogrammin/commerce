@@ -317,24 +317,38 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
-  async function fetchFeaturedProduct(): Promise<FullProduct | null> {
+  async function fetchFeaturedProducts(limit: number = 5): Promise<FullProduct[]> {
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*, categories(name, slug), product_images(*)')
         .eq('is_active', true)
-        .order('bonus_points_award', { ascending: true })
-        .limit(1)
-        .single()
+        .eq('is_featured', true) // 🎯 Только избранные
+        .order('featured_order', { ascending: true }) // 🎯 По порядку
+        .limit(limit)
 
-      if (error && error.code !== 'PGRST116')
+      if (error)
         throw error
 
-      return data as FullProduct
+      // 🔄 Fallback: если избранных нет - берём по бонусам
+      if (!data || data.length === 0) {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('products')
+          .select('*, categories(name, slug), product_images(*)')
+          .eq('is_active', true)
+          .order('bonus_points_award', { ascending: false })
+          .limit(limit)
+
+        if (fallbackError)
+          throw fallbackError
+        return (fallbackData as FullProduct[]) || []
+      }
+
+      return (data as FullProduct[]) || []
     }
     catch (error: any) {
-      toast.error('Ошибка при загрузке товара дня', { description: error.message })
-      return null
+      toast.error('Ошибка при загрузке товаров дня', { description: error.message })
+      return []
     }
   }
 
@@ -428,7 +442,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchAllBrands,
     fetchProducts,
     fetchProductBySlug,
-    fetchFeaturedProduct,
+    fetchFeaturedProducts,
     fetchNewestProducts,
     fetchPopularProducts,
     fetchSimilarProducts,

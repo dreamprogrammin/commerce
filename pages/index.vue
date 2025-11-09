@@ -93,6 +93,11 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
       :slides="slides || []"
     />
 
+    <!-- 🆕 Баннеры (сразу после слайдера) -->
+    <div :class="alwaysContainedClass">
+      <HomeBanners />
+    </div>
+
     <!-- Популярные категории -->
     <div :class="alwaysContainedClass">
       <HomePopularCategories />
