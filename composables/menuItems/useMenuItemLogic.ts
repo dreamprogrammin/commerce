@@ -1,4 +1,4 @@
-import { BUCKET_NAME } from '~/constants'
+import { BUCKET_NAME } from '@/constants'
 import { useSupabaseStorage } from './useSupabaseStorage'
 
 export function useMenuItemLogic() {

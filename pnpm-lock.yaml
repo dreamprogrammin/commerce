@@ -114,6 +114,9 @@ importers:
       '@antfu/eslint-config':
         specifier: ^5.2.0
         version: 5.2.1(@vue/compiler-sfc@3.5.19)(eslint-plugin-format@1.0.1(eslint@9.34.0(jiti@2.5.1)))(eslint@9.34.0(jiti@2.5.1))(typescript@5.9.2)
+      '@iconify-json/lucide':
+        specifier: ^1.2.73
+        version: 1.2.73
       '@types/lodash-es':
         specifier: ^4.17.12
         version: 4.17.12
@@ -775,6 +778,9 @@ packages:
   '@humanwhocodes/retry@0.4.3':
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
+
+  '@iconify-json/lucide@1.2.73':
+    resolution: {integrity: sha512-++HFkqDNu4jqG5+vYT+OcVj9OiuPCw9wQuh8G5QWQnBRSJ9eKwSStiU8ORgOoK07xJsm/0VIHySMniXUUXP9Gw==}
 
   '@iconify/collections@1.0.614':
     resolution: {integrity: sha512-j+5AM/tcMXicNktY1N6ZfnRH8WrK4NurONe2LejP2eQi6aN7R+IH7tDax+7CJAIf+G25pRxlFOTDv4+X7FmerA==}
@@ -6306,6 +6312,10 @@ snapshots:
   '@humanwhocodes/retry@0.3.1': {}
 
   '@humanwhocodes/retry@0.4.3': {}
+
+  '@iconify-json/lucide@1.2.73':
+    dependencies:
+      '@iconify/types': 2.0.0
 
   '@iconify/collections@1.0.614':
     dependencies:

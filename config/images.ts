@@ -18,7 +18,7 @@
  *   - Трансформация на лету (resize, format, quality)
  *   - Автоматический WebP/AVIF
  */
-export const IMAGE_OPTIMIZATION_ENABLED = false // 🎯 Меняйте на true для платного
+export const IMAGE_OPTIMIZATION_ENABLED = false // 🎯 false = бесплатный (прямые ссылки), true = платный (render API)
 
 /**
  * 📐 Размеры изображений для разных контекстов
