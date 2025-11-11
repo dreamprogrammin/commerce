@@ -136,15 +136,15 @@ function getSlideUrl(imageUrl: string | null): string | null {
                 >
                   <!-- 🎯 Контейнер изображения с ProgressiveImage -->
                   <CardContent class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0 overflow-hidden">
-                    <!-- ✅ Используем ProgressiveImage с blur_placeholder -->
+                    <!-- ✅ Используем ProgressiveImage с blur_placeholder из БД -->
                     <ProgressiveImage
                       v-if="slide.image_url"
                       :src="getSlideUrl(slide.image_url)"
-                      :blur-data-url="slide.blur_placeholder || undefined"
+                      :blur-data-url="slide.blur_placeholder"
                       :alt="slide.title || 'Слайд'"
                       aspect-ratio="video"
                       object-fit="cover"
-                      placeholder-type="blur"
+                      :placeholder-type="slide.blur_placeholder ? 'blur' : 'shimmer'"
                       class="w-full h-full group-hover:scale-105 transition-transform duration-500 ease-in-out"
                     />
 
