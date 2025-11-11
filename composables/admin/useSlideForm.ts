@@ -1,11 +1,25 @@
 import type { Database, SlideInsert, SlideRow, SlideUpdate } from '@/types'
+import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import {
+  formatFileSize,
+  generateBlurPlaceholder,
+  getOptimizationInfo,
+  optimizeImageBeforeUpload,
+  shouldOptimizeImage,
+} from '@/utils/imageOptimizer'
 
 const BUCKET_NAME = 'slides-images'
 
 interface UseSlideFromOptions {
   onSuccess?: () => void
+}
+
+interface NewImageFile {
+  file: File
+  previewUrl: string
+  blurDataUrl?: string
 }
 
 export function useSlideForm(
@@ -16,30 +30,44 @@ export function useSlideForm(
   const { uploadFile, removeFile } = useSupabaseStorage()
 
   const isSaving = ref(false)
-  const imageFile = ref<File | null>(null)
   const imagePreviewUrl = ref<string | null>(null)
-  const oldImagePath = ref<string | null>(null)
-  const formData = ref<SlideInsert | SlideUpdate>({})
+  const newImageFile = ref<NewImageFile | null>(null)
+  const imageToDelete = ref<string | null>(null)
+  const isProcessingImage = ref(false)
+
+  const optimizationInfo = computed(() => getOptimizationInfo())
+
+  const formData = ref<SlideInsert | SlideUpdate>({
+    title: '',
+    description: '',
+    image_url: null,
+    blur_placeholder: null, // 🆕 Добавляем blur
+    cta_link: '',
+    cta_text: '',
+    is_active: true,
+    display_order: 0,
+  })
 
   const isEditMode = computed(() => !!initialData.value)
 
   function initialize() {
-    imageFile.value = null
+    newImageFile.value = null
     imagePreviewUrl.value = null
-    oldImagePath.value = null
+    imageToDelete.value = null
 
     if (isEditMode.value && initialData.value) {
       formData.value = {
         ...initialData.value,
       }
       // Сохраняем старый путь к изображению для последующего удаления
-      oldImagePath.value = initialData.value.image_url || null
+      imageToDelete.value = initialData.value.image_url || null
     }
     else {
       formData.value = {
         title: '',
         description: '',
         image_url: null,
+        blur_placeholder: null,
         cta_link: '',
         cta_text: '',
         is_active: true,
@@ -49,19 +77,87 @@ export function useSlideForm(
   }
 
   function removeImage() {
-    imageFile.value = null
-    imagePreviewUrl.value = null
+    if (newImageFile.value) {
+      URL.revokeObjectURL(newImageFile.value.previewUrl)
+      newImageFile.value = null
+    }
 
     if (formData.value.image_url) {
+      imageToDelete.value = formData.value.image_url
       formData.value.image_url = null
+      formData.value.blur_placeholder = null // 🆕 Удаляем blur
     }
+
+    imagePreviewUrl.value = null
   }
 
-  function handleImageChange(event: Event) {
+  /**
+   * 🎯 Обработка загрузки изображения с генерацией blur
+   */
+  async function handleImageChange(event: Event) {
     const target = event.target as HTMLInputElement
-    if (target.files && target.files[0]) {
-      imageFile.value = target.files[0]
-      imagePreviewUrl.value = URL.createObjectURL(target.files[0])
+    if (!target.files || target.files.length === 0) {
+      return
+    }
+
+    const file = target.files[0]
+
+    // 🔒 Проверка на существование файла
+    if (!file) {
+      return
+    }
+
+    isProcessingImage.value = true
+
+    const toastId = toast.loading(
+      `${optimizationInfo.value.icon} Обработка изображения...`,
+    )
+
+    try {
+    // Проверяем нужна ли оптимизация
+      if (shouldOptimizeImage(file)) {
+        const result = await optimizeImageBeforeUpload(file)
+
+        console.log(
+          `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
+        )
+
+        newImageFile.value = {
+          file: result.file,
+          previewUrl: URL.createObjectURL(result.file),
+          blurDataUrl: result.blurPlaceholder,
+        }
+      }
+      else {
+      // Файл маленький - генерируем только blur
+        const blurResult = await generateBlurPlaceholder(file)
+        console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
+
+        newImageFile.value = {
+          file,
+          previewUrl: URL.createObjectURL(file),
+          blurDataUrl: blurResult.dataUrl,
+        }
+      }
+
+      imagePreviewUrl.value = newImageFile.value.previewUrl
+
+      // Помечаем старое изображение на удаление
+      if (formData.value.image_url && isEditMode.value) {
+        imageToDelete.value = formData.value.image_url
+      }
+
+      toast.success(
+        `✅ Изображение загружено ${optimizationInfo.value.icon}`,
+        { id: toastId },
+      )
+    }
+    catch (error) {
+      toast.error('❌ Ошибка при обработке файла', { id: toastId })
+      console.error('handleImageChange error:', error)
+    }
+    finally {
+      isProcessingImage.value = false
     }
   }
 
@@ -71,14 +167,18 @@ export function useSlideForm(
 
     try {
       let finalImagePath = formData.value.image_url
+      let finalBlurDataUrl = formData.value.blur_placeholder
 
-      // Если выбран новый файл изображения
-      if (imageFile.value) {
-        // Загружаем новое изображение через useSupabaseStorage
-        const uploadedPath = await uploadFile(imageFile.value, {
+      // 📤 Загружаем новое изображение если есть
+      if (newImageFile.value) {
+        const fileName = `${uuidv4()}.webp`
+
+        // Загружаем через useSupabaseStorage с использованием fileName
+        const uploadedPath = await uploadFile(newImageFile.value.file, {
           bucketName: BUCKET_NAME,
-          filePathPrefix: '', // Без префикса, файлы в корне бакета
-          upsert: false, // Всегда создаем новый файл с уникальным именем
+          filePathPrefix: fileName, // 🔧 Используем сгенерированное имя
+          upsert: false,
+          contentType: 'image/webp',
         })
 
         if (!uploadedPath) {
@@ -86,14 +186,19 @@ export function useSlideForm(
         }
 
         finalImagePath = uploadedPath
+        finalBlurDataUrl = newImageFile.value.blurDataUrl || null
 
-        // Если это редактирование и было старое изображение, удаляем его
-        if (isEditMode.value && oldImagePath.value && oldImagePath.value !== finalImagePath) {
-          await removeFile(BUCKET_NAME, oldImagePath.value)
+        // 🗑️ Удаляем старое изображение
+        if (isEditMode.value && imageToDelete.value && imageToDelete.value !== finalImagePath) {
+          await removeFile(BUCKET_NAME, imageToDelete.value)
         }
       }
 
-      const dataToSave = { ...formData.value, image_url: finalImagePath }
+      const dataToSave = {
+        ...formData.value,
+        image_url: finalImagePath,
+        blur_placeholder: finalBlurDataUrl,
+      }
 
       if (isEditMode.value) {
         const { error } = await supabase
@@ -155,6 +260,8 @@ export function useSlideForm(
     isSaving,
     isEditMode,
     imagePreviewUrl,
+    isProcessingImage, // 🆕 Экспортируем для UI
+    optimizationInfo, // 🆕 Экспортируем для отображения информации
     handleSubmit,
     removeImage,
     handleImageChange,

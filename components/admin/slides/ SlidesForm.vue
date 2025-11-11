@@ -22,6 +22,8 @@ const {
   isSaving,
   isEditMode,
   imagePreviewUrl,
+  isProcessingImage,
+  optimizationInfo,
   handleSubmit,
   removeImage,
   handleImageChange,
@@ -76,12 +78,25 @@ const optimizedPreviewUrl = computed(() => {
 
         <div>
           <Label for="image">Изображение</Label>
+          <div class="flex items-center gap-2 mt-1 mb-2">
+            <span class="text-xs text-muted-foreground">
+              {{ optimizationInfo.icon }} {{ optimizationInfo.name }}
+            </span>
+          </div>
           <Input
             id="image"
             type="file"
             accept="image/*"
+            :disabled="isProcessingImage"
             @change="handleImageChange"
           />
+          <div v-if="isProcessingImage" class="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+            <div class="w-4 h-4 border-2 border-muted-foreground border-t-primary rounded-full animate-spin" />
+            {{ optimizationInfo.icon }} Обработка изображения...
+          </div>
+          <p class="text-xs text-muted-foreground mt-1">
+            💡 {{ optimizationInfo.recommendation }}
+          </p>
           <div
             v-if="optimizedPreviewUrl"
             class="mt-2 border p-2 rounded-md inline-block relative"
@@ -138,7 +153,7 @@ const optimizedPreviewUrl = computed(() => {
           <Button type="button" variant="outline" @click="open = false">
             Отмена
           </Button>
-          <Button type="submit" :disabled="isSaving">
+          <Button type="submit" :disabled="isSaving || isProcessingImage">
             {{ isSaving ? "Сохранение..." : "Сохранить" }}
           </Button>
         </DialogFooter>

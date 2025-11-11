@@ -1,5 +1,14 @@
 import type { Database, SlideRow } from '@/types'
 
+/**
+ * 🎬 Композабл для работы со слайдами карусели
+ *
+ * Особенности:
+ * - Загружает только активные слайды с blur_placeholder
+ * - Сортирует по display_order
+ * - Поддерживает SSR с lazy loading
+ * - Автоматически обрабатывает ошибки
+ */
 export function useSlides() {
   const supabase = useSupabaseClient<Database>()
   const key = 'global-slides'
@@ -9,12 +18,24 @@ export function useSlides() {
     async () => {
       const { data, error } = await supabase
         .from('slides')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          image_url,
+          blur_placeholder,
+          cta_link,
+          cta_text,
+          is_active,
+          display_order,
+          created_at,
+          updated_at
+        `)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
 
       if (error) {
-        console.error('Ошибка при загрузке слайдов', error)
+        console.error('❌ Ошибка при загрузке слайдов:', error)
         throw createError({
           statusCode: 500,
           statusMessage: 'Не удалось загрузить слайды',
@@ -22,21 +43,61 @@ export function useSlides() {
         })
       }
 
+      // 🎯 Логируем информацию о загруженных слайдах (только в dev)
+      if (import.meta.dev && data) {
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎬 СЛАЙДЫ ЗАГРУЖЕНЫ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Всего: ${data.length} активных слайдов
+${data.map((slide, i) => `  ${i + 1}. ${slide.title}
+     ${slide.image_url ? '✅ Изображение' : '❌ Нет изображения'}
+     ${slide.blur_placeholder ? '✨ LQIP' : '⚠️ Без LQIP'}
+     ${slide.cta_link ? `🔗 ${slide.cta_link}` : ''}`).join('\n')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+      }
+
       return data || []
     },
     {
       lazy: true,
-      default: () => [], // 👈 Добавьте default
+      default: () => [],
     },
   )
 
-  // 👇 Правильная проверка для lazy: true
   const isLoading = computed(() => asyncData.pending.value)
 
+  /**
+   * 🔄 Обновить слайды (например, после изменения в админке)
+   */
+  async function refresh() {
+    await asyncData.refresh()
+  }
+
+  /**
+   * 📊 Статистика по слайдам
+   */
+  const stats = computed(() => {
+    const slides = asyncData.data.value || []
+    return {
+      total: slides.length,
+      withImages: slides.filter(s => s.image_url).length,
+      withBlur: slides.filter(s => s.blur_placeholder).length,
+      withCTA: slides.filter(s => s.cta_link).length,
+    }
+  })
+
   return {
+    // 📊 Данные
     slides: asyncData.data,
     error: asyncData.error,
-    refresh: asyncData.refresh,
     isLoading,
+    stats,
+
+    // 🔄 Методы
+    refresh,
+
+    // 🎯 Утилиты
+    isEmpty: computed(() => (asyncData.data.value?.length || 0) === 0),
+    hasError: computed(() => !!asyncData.error.value),
   }
 }

@@ -67,7 +67,6 @@ function getSlideUrl(imageUrl: string | null): string | null {
     return imageUrl
 
   // Если это путь в Storage - оптимизируем через getImageUrl
-  // 🛡️ timestamp добавляется автоматически в getImageUrl
   return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.HERO)
 }
 </script>
@@ -137,10 +136,11 @@ function getSlideUrl(imageUrl: string | null): string | null {
                 >
                   <!-- 🎯 Контейнер изображения с ProgressiveImage -->
                   <CardContent class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0 overflow-hidden">
-                    <!-- ✅ Используем ProgressiveImage для оптимизации и lazy loading -->
+                    <!-- ✅ Используем ProgressiveImage с blur_placeholder -->
                     <ProgressiveImage
                       v-if="slide.image_url"
                       :src="getSlideUrl(slide.image_url)"
+                      :blur-data-url="slide.blur_placeholder || undefined"
                       :alt="slide.title || 'Слайд'"
                       aspect-ratio="video"
                       object-fit="cover"
