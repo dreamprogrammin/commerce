@@ -135,14 +135,13 @@ function getSlideUrl(imageUrl: string | null): string | null {
                   class="block"
                 >
                   <!-- 🎯 Контейнер изображения с ProgressiveImage -->
-                  <CardContent class="relative flex aspect-[21/9] items-center justify-center p-0 overflow-hidden">
+                  <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-[16/9] md:aspect-[19/6] lg:aspect-[21/9]">
                     <!-- ✅ Используем ProgressiveImage с blur_placeholder из БД -->
                     <ProgressiveImage
                       v-if="slide.image_url"
                       :src="getSlideUrl(slide.image_url)"
                       :blur-data-url="slide.blur_placeholder"
                       :alt="slide.title || 'Слайд'"
-                      aspect-ratio="21/9"
                       object-fit="cover"
                       :placeholder-type="slide.blur_placeholder ? 'blur' : 'shimmer'"
                       class="w-full h-full"
