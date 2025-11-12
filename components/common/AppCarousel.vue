@@ -80,14 +80,14 @@ function getSlideUrl(imageUrl: string | null): string | null {
           <!-- Главный видимый слайд -->
           <div class="flex-shrink-0 w-[80%] md:w-[83.33%] lg:w-[87.5%] pl-3 lg:pl-0">
             <Skeleton
-              class="h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] w-full rounded-2xl"
+              class="w-full aspect-[21/9] rounded-2xl"
             />
           </div>
 
           <!-- Частично видимый следующий слайд -->
           <div class="flex-shrink-0 w-[20%] md:w-[16.67%] lg:w-[12.5%]">
             <Skeleton
-              class="h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] w-full rounded-2xl opacity-60"
+              class="w-full aspect-[21/9] rounded-2xl opacity-60"
             />
           </div>
         </div>
@@ -97,7 +97,7 @@ function getSlideUrl(imageUrl: string | null): string | null {
     <!-- ❌ ОШИБКА ЗАГРУЗКИ -->
     <div
       v-else-if="error"
-      :class="`${containerClass} w-full aspect-[16/7] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center`"
+      :class="`${containerClass} w-full aspect-[21/9] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center`"
     >
       <h3 class="mt-4 text-lg font-semibold">
         ⚠️ Не удалось загрузить слайдер
@@ -124,7 +124,7 @@ function getSlideUrl(imageUrl: string | null): string | null {
           <CarouselItem
             v-for="slide in slides"
             :key="slide.id"
-            class="pl-3 basis-4/5 md:basis-5/6 lg:basis-7/8 lg:pl-4 md:pl-4"
+            class="pl-3 basis-4/5 md:basis-5/6 lg:basis-6/9 lg:pl-4 md:pl-4"
           >
             <div class="p-1">
               <Card class="overflow-hidden border-none rounded-2xl group py-0">
@@ -135,17 +135,17 @@ function getSlideUrl(imageUrl: string | null): string | null {
                   class="block"
                 >
                   <!-- 🎯 Контейнер изображения с ProgressiveImage -->
-                  <CardContent class="relative flex h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] items-center justify-center p-0 overflow-hidden">
+                  <CardContent class="relative flex aspect-[21/9] items-center justify-center p-0 overflow-hidden">
                     <!-- ✅ Используем ProgressiveImage с blur_placeholder из БД -->
                     <ProgressiveImage
                       v-if="slide.image_url"
                       :src="getSlideUrl(slide.image_url)"
                       :blur-data-url="slide.blur_placeholder"
                       :alt="slide.title || 'Слайд'"
-                      aspect-ratio="video"
+                      aspect-ratio="21/9"
                       object-fit="cover"
                       :placeholder-type="slide.blur_placeholder ? 'blur' : 'shimmer'"
-                      class="w-full h-full group-hover:scale-105 transition-transform duration-500 ease-in-out"
+                      class="w-full h-full"
                     />
 
                     <!-- Градиент fallback если нет изображения -->
@@ -172,12 +172,12 @@ function getSlideUrl(imageUrl: string | null): string | null {
             <div class="flex gap-3 md:gap-4 overflow-hidden">
               <div class="flex-shrink-0 w-[80%] md:w-[83.33%] lg:w-[87.5%] pl-3 lg:pl-0">
                 <Skeleton
-                  class="h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] w-full rounded-2xl"
+                  class="w-full aspect-[21/9] rounded-2xl"
                 />
               </div>
               <div class="flex-shrink-0 w-[20%] md:w-[16.67%] lg:w-[12.5%]">
                 <Skeleton
-                  class="h-[35vh] md:h-[65vh] min-h-[250px] max-h-[400px] w-full rounded-2xl opacity-60"
+                  class="w-full aspect-[21/9] rounded-2xl opacity-60"
                 />
               </div>
             </div>
@@ -189,7 +189,7 @@ function getSlideUrl(imageUrl: string | null): string | null {
     <!-- 📭 ПУСТОЕ СОСТОЯНИЕ -->
     <div
       v-else
-      :class="`${containerClass} w-full aspect-[16/7] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"
+      :class="`${containerClass} w-full aspect-[21/9] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"
     >
       <p class="text-muted-foreground">
         📭 Нет активных слайдов для отображения.

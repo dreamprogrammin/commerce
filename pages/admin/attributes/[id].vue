@@ -163,7 +163,7 @@ function clearCategorySelection() {
             <div v-for="category in categories" :key="category.id" class="flex items-center space-x-2">
               <Checkbox
                 :id="`cat-${category.id}`"
-                :checked="linkedCategoryIds.includes(category.id)"
+                :model-value="linkedCategoryIds.includes(category.id)"
                 @update:model-value="(checkedState) => updateLinkedCategoriesSelection(!!checkedState, category.id)"
               />
               <label :for="`cat-${category.id}`" class="text-sm font-medium leading-none cursor-pointer">
