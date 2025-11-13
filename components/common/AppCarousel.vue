@@ -70,18 +70,22 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
     <div v-if="isLoading" :class="carouselContainerClass">
       <div class="py-4">
         <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
-          <!-- Главный видимый слайд -->
-          <div class="flex-shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:basis-7/8 lg:pl-4 md:pl-4">
-            <Skeleton
-              class="w-full rounded-2xl aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]"
-            />
+          <!-- Главный видимый слайд-скелетон -->
+          <div class="flex-shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+            <div class="p-1">
+              <Skeleton
+                class="w-full h-auto rounded-2xl aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]"
+              />
+            </div>
           </div>
 
           <!-- Частично видимый следующий слайд -->
-          <div class="flex-shrink-0 w-[20%] md:w-[16.67%] lg:w-[12.5%]">
-            <Skeleton
-              class="w-full rounded-2xl aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]"
-            />
+          <div class="flex-shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+            <div class="p-1">
+              <Skeleton
+                class="w-full h-auto rounded-2xl aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]"
+              />
+            </div>
           </div>
         </div>
       </div>
