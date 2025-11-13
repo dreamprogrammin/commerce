@@ -40,12 +40,28 @@ function handleOverlayClick() {
 
       <!-- Десктопная версия (скрыта на мобильных) -->
       <div class="hidden lg:block">
-        <CommonAppTabBar ref="desktopTabBarRef" />
+        <!-- ✨ 1. Оборачиваем компонент в ClientOnly -->
+        <ClientOnly>
+          <CommonAppTabBar ref="desktopTabBarRef" />
+
+          <!-- ✨ 2. Добавляем fallback-скелетон, чтобы не было скачка контента -->
+          <template #fallback>
+            <!-- Этот скелетон имитирует высоту вашего TabBar -->
+            <div class="h-10 w-full bg-muted/50 rounded-md animate-pulse" />
+          </template>
+        </ClientOnly>
       </div>
 
       <!-- Мобильная версия (показывается только на мобильных) -->
       <div class="block lg:hidden py-3">
-        <CommonAppTabBarMobile ref="mobileTabBarRef" />
+        <!-- ✨ 3. Делаем то же самое для мобильной версии -->
+        <ClientOnly>
+          <CommonAppTabBarMobile ref="mobileTabBarRef" />
+
+          <template #fallback>
+            <div class="h-10 w-full bg-muted/50 rounded-md animate-pulse" />
+          </template>
+        </ClientOnly>
       </div>
     </div>
   </header>
@@ -61,7 +77,7 @@ function handleOverlayClick() {
   >
     <div
       v-if="isHeaderOverlayVisible"
-      class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[40]"
+      class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
       @click="handleOverlayClick"
     />
   </Transition>

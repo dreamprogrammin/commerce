@@ -220,7 +220,6 @@ function calculateDiscount(price: number, discount: number) {
 
         <!-- Navigation -->
         <div v-if="productsList.length > 1" class="flex items-center justify-center gap-2 sm:gap-3 pb-3 sm:pb-4">
-          <CarouselPrevious class="relative translate-y-0 h-7 w-7 sm:h-8 sm:w-8 rounded-lg" />
           <div class="flex gap-1 sm:gap-1.5">
             <button
               v-for="(_, index) in productsList"
@@ -230,7 +229,6 @@ function calculateDiscount(price: number, discount: number) {
               @click="emblaApi?.scrollTo(index)"
             />
           </div>
-          <CarouselNext class="relative translate-y-0 h-7 w-7 sm:h-8 sm:w-8 rounded-lg" />
         </div>
       </Carousel>
     </div>

@@ -71,19 +71,19 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
       <div class="py-4">
         <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
           <!-- Главный видимый слайд-скелетон -->
-          <div class="flex-shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+          <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
             <div class="p-1">
               <Skeleton
-                class="w-full h-auto rounded-2xl aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]"
+                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
               />
             </div>
           </div>
 
           <!-- Частично видимый следующий слайд -->
-          <div class="flex-shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+          <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
             <div class="p-1">
               <Skeleton
-                class="w-full h-auto rounded-2xl aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]"
+                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
               />
             </div>
           </div>
@@ -94,7 +94,7 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
     <!-- ❌ ОШИБКА ЗАГРУЗКИ -->
     <div
       v-else-if="error"
-      :class="`${containerClass} w-full aspect-[21/9] bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center`"
+      :class="`${containerClass} w-full aspect-21/9 bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center`"
     >
       <h3 class="mt-4 text-lg font-semibold">
         ⚠️ Не удалось загрузить слайдер
@@ -132,7 +132,7 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                   class="block"
                 >
                   <!-- 🎯 Контейнер изображения с ResponsiveImage -->
-                  <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]">
+                  <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-3/2 md:aspect-19/6 lg:aspect-21/9">
                     <!-- ✅ Используем ResponsiveImage с <picture> для art direction -->
                     <ResponsiveImage
                       v-if="slide.image_url"
@@ -149,7 +149,7 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                     <!-- Градиент fallback если нет изображения -->
                     <div
                       v-else
-                      class="w-full h-full bg-gradient-to-br from-primary to-secondary"
+                      class="w-full h-full bg-linear-to-br from-primary to-secondary"
                     />
                   </CardContent>
                 </NuxtLink>
@@ -165,18 +165,25 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
 
       <!-- ⚙️ Fallback для SSR -->
       <template #fallback>
-        <div :class="containerClass">
+        <div :class="carouselContainerClass">
           <div class="py-4">
-            <div class="flex gap-3 md:gap-4 overflow-hidden">
-              <div class="flex-shrink-0 w-[80%] md:w-[83.33%] lg:w-[87.5%] pl-3 lg:pl-0">
-                <Skeleton
-                  class="w-full aspect-[21/9] rounded-2xl"
-                />
+            <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
+              <!-- Главный видимый слайд-скелетон -->
+              <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+                <div class="p-1">
+                  <Skeleton
+                    class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
+                  />
+                </div>
               </div>
-              <div class="flex-shrink-0 w-[20%] md:w-[16.67%] lg:w-[12.5%]">
-                <Skeleton
-                  class="w-full aspect-[21/9] rounded-2xl opacity-60"
-                />
+
+              <!-- Частично видимый следующий слайд -->
+              <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+                <div class="p-1">
+                  <Skeleton
+                    class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -187,7 +194,7 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
     <!-- 📭 ПУСТОЕ СОСТОЯНИЕ -->
     <div
       v-else
-      :class="`${containerClass} w-full aspect-[21/9] bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"
+      :class="`${containerClass} w-full aspect-21/9 bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"
     >
       <p class="text-muted-foreground">
         📭 Нет активных слайдов для отображения.
