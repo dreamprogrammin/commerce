@@ -33,33 +33,25 @@ function handleOverlayClick() {
 </script>
 
 <template>
-  <header class="header z-[50] bg-white dark:bg-gray-900 relative shadow-sm border-b border-gray-100 dark:border-gray-800/50">
+  <header class="header z-[50] bg-blue-500 dark:bg-gray-900 relative border-b border-gray-200 dark:border-gray-800">
     <CommonHeaderTop :class="containerClass" />
     <div :class="containerClass">
       <CommonHeaderBottom />
-
       <!-- Десктопная версия (скрыта на мобильных) -->
-      <div class="hidden lg:block">
-        <!-- ✨ 1. Оборачиваем компонент в ClientOnly -->
+      <div class="hidden lg:block py-2">
         <ClientOnly>
           <CommonAppTabBar ref="desktopTabBarRef" />
-
-          <!-- ✨ 2. Добавляем fallback-скелетон, чтобы не было скачка контента -->
           <template #fallback>
-            <!-- Этот скелетон имитирует высоту вашего TabBar -->
-            <div class="h-10 w-full bg-muted/50 rounded-md animate-pulse" />
+            <div class="h-11 w-full bg-gray-50 dark:bg-gray-800 rounded-xl animate-pulse" />
           </template>
         </ClientOnly>
       </div>
-
       <!-- Мобильная версия (показывается только на мобильных) -->
       <div class="block lg:hidden py-3">
-        <!-- ✨ 3. Делаем то же самое для мобильной версии -->
         <ClientOnly>
           <CommonAppTabBarMobile ref="mobileTabBarRef" />
-
           <template #fallback>
-            <div class="h-10 w-full bg-muted/50 rounded-md animate-pulse" />
+            <div class="h-10 w-full bg-gray-50 dark:bg-gray-800 rounded-xl animate-pulse" />
           </template>
         </ClientOnly>
       </div>
@@ -77,7 +69,7 @@ function handleOverlayClick() {
   >
     <div
       v-if="isHeaderOverlayVisible"
-      class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+      class="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
       @click="handleOverlayClick"
     />
   </Transition>
