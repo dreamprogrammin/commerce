@@ -37,7 +37,6 @@ const activeMenuValue = ref<string | undefined>()
 const isSearchOpen = ref(false)
 
 const categoriesStore = useCategoriesStore()
-// 👇 Используем getOptimizedUrl вместо getPublicUrl
 const { getImageUrl } = useSupabaseStorage()
 
 const menuTree = computed(() => categoriesStore.menuTree)
@@ -81,64 +80,54 @@ function closeAllPopups() {
   isSearchOpen.value = false
 }
 
-// 👇 Функция для получения оптимизированного URL категории
 function getCategoryImageUrl(imageUrl: string | null) {
-  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_IMAGE)
+  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_MENU)
 }
 defineExpose({ closeAllPopups })
 </script>
 
 <template>
-  <div class="flex w-full items-center">
+  <div class="flex w-full items-center gap-3">
     <Popover v-model:open="isSearchOpen">
       <PopoverTrigger as-child>
         <button
-          class="flex-1 w-full justify-start bg-background border border-input hover:bg-accent hover:text-accent-foreground p-0 h-10 rounded-md px-4 relative mr-1"
+          class="group flex-1 w-full justify-start bg-transparent hover:bg-gray-50/50 dark:hover:bg-gray-800/30 p-0 h-11 rounded-2xl px-5 relative transition-all duration-500 ease-out border border-transparent hover:border-gray-200/50 dark:hover:border-gray-700/50"
         >
           <div class="relative w-full items-center flex">
-            <span
-              class="absolute start-0 inset-y-0 flex items-center justify-center px-3"
-            >
-              <Search class="size-4 text-muted-foreground" />
+            <span class="absolute start-0 inset-y-0 flex items-center justify-center px-2">
+              <Search class="size-[18px] text-gray-400 dark:text-gray-500 transition-all duration-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 group-hover:scale-110" />
             </span>
-            <span
-              class="pl-10 pr-4 text-sm text-muted-foreground w-full text-left"
-            >
-              Поиск товаров...
+            <span class="pl-9 pr-4 text-[13px] text-gray-400 dark:text-gray-500 w-full text-left font-normal tracking-wide group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors duration-500">
+              Поиск товаров
             </span>
           </div>
         </button>
       </PopoverTrigger>
-      <PopoverContent class="p-4 min-w-screen rounded-b-md">
+      <PopoverContent class="p-0 min-w-screen rounded-3xl border border-gray-100 dark:border-gray-800/50 shadow-2xl shadow-gray-900/5 dark:shadow-black/20 overflow-hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl">
         <div :class="`w-full ${containerClass}`">
-          <div class="relative mb-4">
+          <div class="relative mb-6 p-6 sm:p-8 pb-0">
             <Input
               id="search-input"
               type="text"
-              placeholder="Введите запрос для поиска..."
-              class="pl-10"
+              placeholder="Что ищете?"
+              class="pl-12 h-14 text-base rounded-2xl border-0 bg-gray-50/80 dark:bg-gray-800/50 focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-gray-900/5 dark:focus:ring-white/10 transition-all duration-300 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               autofocus
             />
-            <span
-              class="absolute start-0 inset-y-0 flex items-center justify-center px-3"
-            >
-              <Search class="size-4 text-muted-foreground" />
+            <span class="absolute start-6 sm:start-8 top-6 sm:top-8 inset-y-0 flex items-center justify-center px-2">
+              <Search class="size-5 text-gray-400 dark:text-gray-500" />
             </span>
           </div>
 
-          <!-- Секции с предложениями -->
-          <div class="space-y-4">
+          <div class="space-y-8 px-6 sm:px-8 pb-6 sm:pb-8">
             <div v-for="section in searchSuggestions" :key="section.title">
-              <div class="flex items-center gap-2 mb-2">
-                <h4 class="text-sm font-medium">
-                  {{ section.title }}
-                </h4>
-              </div>
-              <div class="grid grid-cols-2 gap-2">
+              <h4 class="text-[11px] uppercase tracking-widest font-semibold text-gray-500 dark:text-gray-400 mb-3">
+                {{ section.title }}
+              </h4>
+              <div class="flex flex-wrap gap-2">
                 <div
                   v-for="item in section.items"
                   :key="item"
-                  class="block select-none rounded-md p-2 text-sm leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer"
+                  class="inline-flex select-none rounded-full px-4 py-2 text-[13px] font-medium leading-none no-underline outline-none transition-all duration-300 cursor-pointer bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-transparent hover:border-gray-200/50 dark:hover:border-gray-700/50"
                 >
                   {{ item }}
                 </div>
@@ -152,7 +141,7 @@ defineExpose({ closeAllPopups })
     <NavigationMenu
       v-model="activeMenuValue"
       class="static flex-1"
-      :delay-duration="100"
+      :delay-duration="150"
     >
       <NavigationMenuList class="flex w-full items-center justify-start gap-1">
         <template v-for="rootItem in menuTree" :key="rootItem.id">
@@ -160,52 +149,51 @@ defineExpose({ closeAllPopups })
             <template v-if="rootItem.children && rootItem.children.length > 0">
               <NuxtLink :to="rootItem.href" as-child>
                 <NavigationMenuTrigger
-                  :class="`${navigationMenuTriggerStyle()}`"
+                  :class="`${navigationMenuTriggerStyle()} font-medium text-[13px] tracking-wide hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-all duration-500 rounded-2xl text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-transparent hover:border-gray-200/30 dark:hover:border-gray-700/30 px-4`"
                 >
                   {{ rootItem.name }}
                 </NavigationMenuTrigger>
               </NuxtLink>
 
               <NavigationMenuContent>
-                <div class="p-4 min-w-screen">
-                  <ul class="grid grid-cols-4 gap-x-6 gap-y-4">
+                <div class="p-8 sm:p-10 md:p-12 min-w-screen bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl">
+                  <ul class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
                     <li
                       v-for="childItem in rootItem.children"
                       :key="childItem.id"
-                      class="space-y-1"
+                      class="space-y-3"
                     >
                       <NuxtLink
                         :to="childItem.href"
-                        class="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                        class="group block select-none rounded-3xl p-4 leading-none no-underline outline-none transition-all duration-500 hover:shadow-xl hover:shadow-gray-900/5 dark:hover:shadow-black/20 border border-transparent hover:border-gray-200/40 dark:hover:border-gray-700/40 bg-transparent hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
                         @click="activeMenuValue = undefined"
                       >
                         <div
                           v-if="childItem.image_url"
-                          class="mb-2 overflow-hidden rounded-md"
+                          class="mb-4 overflow-hidden rounded-2xl border border-gray-100/50 dark:border-gray-800/50"
                         >
-                          <!-- 👇 Заменили NuxtImg на обычный img с оптимизированным URL -->
                           <img
                             :src="getCategoryImageUrl(childItem.image_url) || undefined"
                             :alt="childItem.name"
                             loading="lazy"
-                            class="h-24 w-full object-cover transition-transform duration-300 hover:scale-105"
+                            class="h-32 sm:h-36 md:h-40 w-full object-cover transition-all duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100"
                           >
                         </div>
                         <div
-                          class="text-sm font-semibold leading-tight text-foreground"
+                          class="text-[15px] font-semibold leading-tight text-gray-800 dark:text-gray-200 mb-2 group-hover:text-gray-900 dark:group-hover:text-white transition-colors duration-500"
                         >
                           {{ childItem.name }}
                         </div>
                         <p
                           v-if="childItem.description"
-                          class="text-xs line-clamp-2 leading-snug text-muted-foreground"
+                          class="text-[12px] line-clamp-2 leading-relaxed text-gray-500 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors duration-500"
                         >
                           {{ childItem.description }}
                         </p>
                       </NuxtLink>
                       <ul
                         v-if="childItem.children && childItem.children.length > 0"
-                        class="mt-2 ml-3 space-y-1 list-none"
+                        class="mt-2 ml-1 space-y-0.5 list-none"
                       >
                         <li
                           v-for="grandChildItem in childItem.children"
@@ -213,7 +201,7 @@ defineExpose({ closeAllPopups })
                         >
                           <NuxtLink
                             :to="grandChildItem.href"
-                            class="block select-none rounded-md py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors hover:bg-accent/50 focus:bg-accent/50 text-muted-foreground hover:text-foreground"
+                            class="block select-none rounded-xl py-2 px-3 text-[13px] leading-snug no-underline outline-none transition-all duration-300 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-gray-800/30 font-normal"
                             @click="activeMenuValue = undefined"
                           >
                             {{ grandChildItem.name }}
@@ -227,15 +215,16 @@ defineExpose({ closeAllPopups })
                       rootItem.children.length === 0
                         && !categoriesStore.isLoading
                     "
-                    class="py-10 text-center text-sm text-muted-foreground"
+                    class="py-20 text-center text-[13px] text-gray-400 dark:text-gray-500 font-normal tracking-wide"
                   >
-                    Скоро здесь появятся подкатегории...
+                    Скоро здесь появятся подкатегории
                   </div>
                   <div
                     v-if="categoriesStore.isLoading"
-                    class="py-10 text-center text-sm text-muted-foreground"
+                    class="py-20 text-center text-[13px] text-gray-400 dark:text-gray-500 font-normal tracking-wide flex items-center justify-center gap-3"
                   >
-                    Загрузка...
+                    <div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 dark:border-gray-600 border-t-gray-900 dark:border-t-white" />
+                    Загрузка
                   </div>
                 </div>
               </NavigationMenuContent>
@@ -243,7 +232,7 @@ defineExpose({ closeAllPopups })
             <NuxtLink
               v-else
               :to="rootItem.href"
-              :class="navigationMenuTriggerStyle()"
+              :class="`${navigationMenuTriggerStyle()} font-medium text-[13px] tracking-wide hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-all duration-500 rounded-2xl text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-transparent hover:border-gray-200/30 dark:hover:border-gray-700/30 px-4`"
             >
               {{ rootItem.name }}
             </NuxtLink>

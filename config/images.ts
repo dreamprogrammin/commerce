@@ -65,6 +65,10 @@ export const IMAGE_SIZES = {
     width: 640,
     height: 640,
   },
+  CATEGORY_MENU: {
+    width: 250,
+    height: 150,
+  },
 } as const
 
 /**
@@ -179,6 +183,12 @@ export const IMAGE_PRESETS = {
     quality: IMAGE_QUALITY.MEDIUM,
     format: IMAGE_FORMATS.MODERN,
     resize: 'cover' as const,
+  },
+  CATEGORY_MENU: {
+    ...IMAGE_SIZES.CATEGORY_MENU, // Используем размеры, которые мы добавили
+    quality: IMAGE_QUALITY.MEDIUM, // Качество 75 - идеально для превью
+    format: IMAGE_FORMATS.MODERN, // WebP
+    resize: 'cover' as const, // Обрезать, чтобы заполнить контейнер
   },
 } as const
 

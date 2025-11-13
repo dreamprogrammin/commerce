@@ -19,7 +19,7 @@ function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return '/images/placeholder.svg'
 
-  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_IMAGE)
+  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_MENU)
     || '/images/placeholder.svg'
 }
 </script>
