@@ -29,6 +29,11 @@ function getSlideImageUrl(imageUrl: string | null) {
 
   return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.SLIDER_BANNER)
 }
+function getSlideImageUrlMobile(imageUrl: string | null) {
+  if (!imageUrl)
+    return null
+  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.THUMBNAIL) // Самый маленький размер
+}
 </script>
 
 <template>
@@ -79,18 +84,47 @@ function getSlideImageUrl(imageUrl: string | null) {
         </CardHeader>
 
         <CardContent class="flex-grow">
-          <img
-            v-if="slide.image_url"
-            :src="getSlideImageUrl(slide.image_url) || '/images/placeholder.svg'"
-            :alt="slide.title"
-            class="rounded-md object-cover aspect-video w-full bg-muted"
-            loading="lazy"
-          >
-          <div
-            v-else
-            class="rounded-md aspect-video w-full bg-muted flex items-center justify-center text-muted-foreground"
-          >
-            Картинки нет
+          <!-- ✨ Контейнер для двух изображений -->
+          <div class="grid grid-cols-2 gap-2">
+            <!-- 🖥️ Превью для десктопа -->
+            <div>
+              <p class="text-xs text-center text-muted-foreground mb-1">
+                Десктоп (21:9)
+              </p>
+              <img
+                v-if="slide.image_url"
+                :src="getSlideImageUrl(slide.image_url) || '/images/placeholder.svg'"
+                :alt="`Десктоп: ${slide.title}`"
+                class="rounded-md object-cover aspect-video w-full bg-muted"
+                loading="lazy"
+              >
+              <div
+                v-else
+                class="rounded-md aspect-video w-full bg-muted flex items-center justify-center text-muted-foreground text-sm"
+              >
+                Нет фото
+              </div>
+            </div>
+
+            <!-- 📱 Превью для мобильных -->
+            <div>
+              <p class="text-xs text-center text-muted-foreground mb-1">
+                Мобильный (3:2)
+              </p>
+              <img
+                v-if="slide.image_url_mobile"
+                :src="getSlideImageUrlMobile(slide.image_url_mobile) || '/images/placeholder.svg'"
+                :alt="`Мобильный: ${slide.title}`"
+                class="rounded-md object-cover aspect-[3/2] w-full bg-muted"
+                loading="lazy"
+              >
+              <div
+                v-else
+                class="rounded-md aspect-[3/2] w-full bg-muted flex items-center justify-center text-muted-foreground text-sm"
+              >
+                Нет фото
+              </div>
+            </div>
           </div>
         </CardContent>
 

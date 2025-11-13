@@ -51,23 +51,16 @@ function playAutoplay() {
   emblaApi.value?.plugins()?.autoplay?.play()
 }
 
-/**
- * 🎯 Получить оптимизированный URL слайда
- *
- * Поддерживает:
- * - Внешние URL (не трогаем)
- * - URL из Supabase Storage (оптимизируем через getImageUrl)
- */
 function getSlideUrl(imageUrl: string | null): string | null {
-  if (!imageUrl)
-    return null
-
-  // Если это полный URL (внешний источник) - возвращаем как есть
-  if (imageUrl.startsWith('http'))
+  if (!imageUrl || imageUrl.startsWith('http'))
     return imageUrl
+  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.SLIDER_BANNER)
+}
 
-  // Если это путь в Storage - оптимизируем через getImageUrl
-  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.HERO)
+function getSlideUrlMobile(imageUrl: string | null): string | null {
+  if (!imageUrl || imageUrl.startsWith('http'))
+    return imageUrl
+  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.MOBILE)
 }
 </script>
 
@@ -134,17 +127,19 @@ function getSlideUrl(imageUrl: string | null): string | null {
                   :external="!!slide.cta_link?.startsWith('http')"
                   class="block"
                 >
-                  <!-- 🎯 Контейнер изображения с ProgressiveImage -->
+                  <!-- 🎯 Контейнер изображения с ResponsiveImage -->
                   <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-[3/2] md:aspect-[19/6] lg:aspect-[21/9]">
-                    <!-- ✅ Используем ProgressiveImage с blur_placeholder из БД -->
-                    <ProgressiveImage
+                    <!-- ✅ Используем ResponsiveImage с <picture> для art direction -->
+                    <ResponsiveImage
                       v-if="slide.image_url"
                       :src="getSlideUrl(slide.image_url)"
+                      :src-mobile="slide.image_url_mobile ? getSlideUrlMobile(slide.image_url_mobile) : undefined"
                       :blur-data-url="slide.blur_placeholder"
                       :alt="slide.title || 'Слайд'"
                       object-fit="cover"
-                      :placeholder-type="slide.blur_placeholder ? 'blur' : 'shimmer'"
+                      :placeholder-type="slide.blur_placeholder ? 'lqip' : 'shimmer'"
                       class="w-full h-full"
+                      :eager="true"
                     />
 
                     <!-- Градиент fallback если нет изображения -->

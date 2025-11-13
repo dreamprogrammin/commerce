@@ -1,32 +1,27 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useImageState } from '@/composables/useImageState'
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
+import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
 
 interface Props {
   src: string | null | undefined
+  srcMobile?: string | null | undefined
   alt: string
   aspectRatio?: 'square' | 'video' | 'portrait' | '21/9'
   objectFit?: 'cover' | 'contain' | 'fill'
-  placeholderType?: 'shimmer' | 'blur' | 'color' | 'lqip' // 🆕 Добавили LQIP
+  placeholderType?: 'shimmer' | 'blur' | 'color' | 'lqip'
   placeholderColor?: string
-  blurDataUrl?: string | null // 🆕 Base64 blur preview
-  bucketName?: string
-  filePath?: string
-  useTransform?: boolean
+  blurDataUrl?: string | null
   eager?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   aspectRatio: 'square',
   objectFit: 'cover',
-  placeholderType: 'lqip', // 🎯 По умолчанию LQIP
+  placeholderType: 'lqip',
   placeholderColor: 'from-muted via-muted/70 to-muted',
   blurDataUrl: null,
-  useTransform: true,
 })
 
-const { getImageUrl } = useSupabaseStorage()
 const imageUrl = toRef(props, 'src')
 const {
   imageRef,
@@ -38,27 +33,6 @@ const {
 } = useImageState(imageUrl, { eager: props.eager })
 
 const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
-
-/**
- * Оптимизированный URL (кешированный, стабильный)
- */
-const optimizedImageUrl = computed(() => {
-  if (!shouldLoad.value || !imageUrl.value) {
-    return undefined
-  }
-
-  if (props.bucketName && props.filePath && props.useTransform) {
-    return getImageUrl(props.bucketName, props.filePath, {
-      width: IMAGE_SIZES.CARD.width,
-      height: IMAGE_SIZES.CARD.height,
-      quality: 80,
-      format: 'webp',
-      resize: 'cover',
-    })
-  }
-
-  return imageUrl.value
-})
 
 const aspectRatioClass = computed(() => {
   switch (props.aspectRatio) {
@@ -97,19 +71,17 @@ const isDev = computed(() => import.meta.env.DEV)
         'bg-muted': placeholderType === 'color',
       }"
     >
-      <!-- 🎨 LQIP - Blur Preview (как на Medium.com) -->
+      <!-- 🎨 LQIP - Blur Preview -->
       <div
         v-if="placeholderType === 'lqip' && blurDataUrl"
         class="absolute inset-0"
       >
-        <!-- Крошечное blur изображение -->
         <img
           :src="blurDataUrl"
           :alt="alt"
           class="w-full h-full object-cover blur-2xl scale-110 opacity-60"
           aria-hidden="true"
         >
-        <!-- Overlay для красоты -->
         <div class="absolute inset-0 bg-gradient-to-br from-transparent via-black/5 to-black/10" />
       </div>
 
@@ -142,7 +114,7 @@ const isDev = computed(() => import.meta.env.DEV)
         </svg>
       </div>
 
-      <!-- Маленький спиннер (только для LQIP и blur) -->
+      <!-- Спиннер -->
       <div
         v-if="placeholderType === 'lqip' || placeholderType === 'blur'"
         class="absolute inset-0 flex items-center justify-center"
@@ -150,7 +122,6 @@ const isDev = computed(() => import.meta.env.DEV)
         <div class="w-6 h-6 border-2 border-white/40 border-t-white/80 rounded-full animate-spin" />
       </div>
 
-      <!-- Обычный спиннер для shimmer/color -->
       <div
         v-if="placeholderType === 'shimmer' || placeholderType === 'color'"
         class="absolute inset-0 flex items-center justify-center"
@@ -169,22 +140,32 @@ const isDev = computed(() => import.meta.env.DEV)
       </div>
     </div>
 
-    <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ -->
-    <img
-      ref="imageRef"
-      :src="optimizedImageUrl || undefined"
-      :alt="alt"
-      class="w-full h-full transition-opacity duration-500"
-      :class="[
-        isLoaded ? 'opacity-100' : 'opacity-0',
-        objectFitClass,
-      ]"
-      loading="lazy"
-      decoding="async"
-      :fetchpriority="eager ? 'high' : 'auto'"
-      @load="onLoad"
-      @error="onError"
-    >
+    <!-- 🖼️ PICTURE С ART DIRECTION -->
+    <picture v-if="shouldLoad && src">
+      <!-- Мобильная версия (если есть) -->
+      <source
+        v-if="srcMobile"
+        :srcset="srcMobile"
+        media="(max-width: 768px)"
+      >
+
+      <!-- Десктопная версия -->
+      <img
+        ref="imageRef"
+        :src="src"
+        :alt="alt"
+        class="w-full h-full transition-opacity duration-500"
+        :class="[
+          isLoaded ? 'opacity-100' : 'opacity-0',
+          objectFitClass,
+        ]"
+        loading="lazy"
+        decoding="async"
+        :fetchpriority="eager ? 'high' : 'auto'"
+        @load="onLoad"
+        @error="onError"
+      >
+    </picture>
 
     <!-- ❌ FALLBACK ПРИ ОШИБКЕ -->
     <div

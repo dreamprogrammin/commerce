@@ -15,7 +15,7 @@ export interface ProgressiveImageOptions {
  * ✅ Preloading для eager изображений
  * ✅ Браузерное кеширование
  */
-export function useProgressiveImage(
+export function useImageState(
   imageUrl: Ref<string | null | undefined>,
   options: ProgressiveImageOptions = {},
 ) {

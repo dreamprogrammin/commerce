@@ -30,10 +30,16 @@ export function useSlideForm(
   const { uploadFile, removeFile } = useSupabaseStorage()
 
   const isSaving = ref(false)
+  const isProcessingImage = ref(false)
+  // ✨ Состояние для ДЕСКТОПНОГО изображения
   const imagePreviewUrl = ref<string | null>(null)
   const newImageFile = ref<NewImageFile | null>(null)
   const imageToDelete = ref<string | null>(null)
-  const isProcessingImage = ref(false)
+
+  // 🆕 Состояние для МОБИЛЬНОГО изображения
+  const imagePreviewUrlMobile = ref<string | null>(null)
+  const newImageFileMobile = ref<NewImageFile | null>(null)
+  const imageToDeleteMobile = ref<string | null>(null)
 
   const optimizationInfo = computed(() => getOptimizationInfo())
 
@@ -41,7 +47,9 @@ export function useSlideForm(
     title: '',
     description: '',
     image_url: null,
-    blur_placeholder: null, // 🆕 Добавляем blur
+    blur_placeholder: null,
+    image_url_mobile: null,
+    blur_placeholder_mobile: null,
     cta_link: '',
     cta_text: '',
     is_active: true,
@@ -51,9 +59,14 @@ export function useSlideForm(
   const isEditMode = computed(() => !!initialData.value)
 
   function initialize() {
+    // ... сброс десктопных полей
     newImageFile.value = null
     imagePreviewUrl.value = null
     imageToDelete.value = null
+    // 🆕 Сброс мобильных полей
+    newImageFileMobile.value = null
+    imagePreviewUrlMobile.value = null
+    imageToDeleteMobile.value = null
 
     if (isEditMode.value && initialData.value) {
       formData.value = {
@@ -61,6 +74,7 @@ export function useSlideForm(
       }
       // Сохраняем старый путь к изображению для последующего удаления
       imageToDelete.value = initialData.value.image_url || null
+      imageToDeleteMobile.value = initialData.value.image_url_mobile || null // 🆕
     }
     else {
       formData.value = {
@@ -68,6 +82,8 @@ export function useSlideForm(
         description: '',
         image_url: null,
         blur_placeholder: null,
+        image_url_mobile: null,
+        blur_placeholder_mobile: null,
         cta_link: '',
         cta_text: '',
         is_active: true,
@@ -81,14 +97,25 @@ export function useSlideForm(
       URL.revokeObjectURL(newImageFile.value.previewUrl)
       newImageFile.value = null
     }
-
     if (formData.value.image_url) {
       imageToDelete.value = formData.value.image_url
       formData.value.image_url = null
-      formData.value.blur_placeholder = null // 🆕 Удаляем blur
+      formData.value.blur_placeholder = null
     }
-
     imagePreviewUrl.value = null
+  }
+
+  function removeImageMobile() {
+    if (newImageFileMobile.value) {
+      URL.revokeObjectURL(newImageFileMobile.value.previewUrl)
+      newImageFileMobile.value = null
+    }
+    if (formData.value.image_url_mobile) {
+      imageToDeleteMobile.value = formData.value.image_url_mobile
+      formData.value.image_url_mobile = null
+      formData.value.blur_placeholder_mobile = null
+    }
+    imagePreviewUrlMobile.value = null
   }
 
   /**
@@ -161,6 +188,41 @@ export function useSlideForm(
     }
   }
 
+  async function handleImageChangeMobile(event: Event) {
+    const target = event.target as HTMLInputElement
+    if (!target.files || target.files.length === 0)
+      return
+    const file = target.files[0]
+    if (!file)
+      return
+
+    isProcessingImage.value = true
+    const toastId = toast.loading(`${optimizationInfo.value.icon} Обработка мобильного изображения...`)
+
+    try {
+      if (shouldOptimizeImage(file)) {
+        const result = await optimizeImageBeforeUpload(file)
+        newImageFileMobile.value = { file: result.file, previewUrl: URL.createObjectURL(result.file), blurDataUrl: result.blurPlaceholder }
+      }
+      else {
+        const blurResult = await generateBlurPlaceholder(file)
+        newImageFileMobile.value = { file, previewUrl: URL.createObjectURL(file), blurDataUrl: blurResult.dataUrl }
+      }
+      imagePreviewUrlMobile.value = newImageFileMobile.value.previewUrl
+      if (formData.value.image_url_mobile && isEditMode.value) {
+        imageToDeleteMobile.value = formData.value.image_url_mobile
+      }
+      toast.success(`✅ Мобильное изображение загружено ${optimizationInfo.value.icon}`, { id: toastId })
+    }
+    catch (error) {
+      toast.error('❌ Ошибка при обработке файла', { id: toastId })
+      console.error('handleImageChangeMobile error:', error)
+    }
+    finally {
+      isProcessingImage.value = false
+    }
+  }
+
   async function handleSubmit() {
     isSaving.value = true
     const toastId = toast.loading('Сохранение данных...')
@@ -168,29 +230,30 @@ export function useSlideForm(
     try {
       let finalImagePath = formData.value.image_url
       let finalBlurDataUrl = formData.value.blur_placeholder
+      let finalImagePathMobile = formData.value.image_url_mobile
+      let finalBlurDataUrlMobile = formData.value.blur_placeholder_mobile
 
-      // 📤 Загружаем новое изображение если есть
+      // 📤 Загружаем новое ДЕСКТОПНОЕ изображение если есть
       if (newImageFile.value) {
-        const fileName = `${uuidv4()}.webp`
-
-        // Загружаем через useSupabaseStorage с использованием fileName
-        const uploadedPath = await uploadFile(newImageFile.value.file, {
-          bucketName: BUCKET_NAME,
-          filePathPrefix: fileName, // 🔧 Используем сгенерированное имя
-          upsert: false,
-          contentType: 'image/webp',
-        })
-
-        if (!uploadedPath) {
-          throw new Error('Не удалось загрузить изображение')
-        }
-
+        const uploadedPath = await uploadFile(newImageFile.value.file, { bucketName: BUCKET_NAME })
+        if (!uploadedPath)
+          throw new Error('Не удалось загрузить десктопное изображение')
         finalImagePath = uploadedPath
         finalBlurDataUrl = newImageFile.value.blurDataUrl || null
-
-        // 🗑️ Удаляем старое изображение
-        if (isEditMode.value && imageToDelete.value && imageToDelete.value !== finalImagePath) {
+        if (isEditMode.value && imageToDelete.value) {
           await removeFile(BUCKET_NAME, imageToDelete.value)
+        }
+      }
+
+      // 🆕 📤 Загружаем новое МОБИЛЬНОЕ изображение если есть
+      if (newImageFileMobile.value) {
+        const uploadedPath = await uploadFile(newImageFileMobile.value.file, { bucketName: BUCKET_NAME })
+        if (!uploadedPath)
+          throw new Error('Не удалось загрузить мобильное изображение')
+        finalImagePathMobile = uploadedPath
+        finalBlurDataUrlMobile = newImageFileMobile.value.blurDataUrl || null
+        if (isEditMode.value && imageToDeleteMobile.value) {
+          await removeFile(BUCKET_NAME, imageToDeleteMobile.value)
         }
       }
 
@@ -198,6 +261,8 @@ export function useSlideForm(
         ...formData.value,
         image_url: finalImagePath,
         blur_placeholder: finalBlurDataUrl,
+        image_url_mobile: finalImagePathMobile, // 🆕
+        blur_placeholder_mobile: finalBlurDataUrlMobile, // 🆕
       }
 
       if (isEditMode.value) {
@@ -260,13 +325,17 @@ export function useSlideForm(
     isSaving,
     isEditMode,
     imagePreviewUrl,
-    isProcessingImage, // 🆕 Экспортируем для UI
-    optimizationInfo, // 🆕 Экспортируем для отображения информации
+    isProcessingImage,
+    optimizationInfo,
     handleSubmit,
     removeImage,
     handleImageChange,
     ctaTextValue,
     ctaLinkValue,
     descriptionValue,
+    // 🆕 Экспортируем все для мобильного изображения
+    imagePreviewUrlMobile,
+    handleImageChangeMobile,
+    removeImageMobile,
   }
 }

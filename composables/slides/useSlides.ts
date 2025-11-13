@@ -24,6 +24,8 @@ export function useSlides() {
           description,
           image_url,
           blur_placeholder,
+          image_url_mobile,
+          blur_placeholder_mobile, 
           cta_link,
           cta_text,
           is_active,

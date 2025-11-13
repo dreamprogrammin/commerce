@@ -54,9 +54,18 @@ export function useAdminSlides() {
     const toastId = toast.loading('Удаление слайда...')
 
     try {
+      const pathsToDelete: string[] = []
       // Удаляем изображение через useSupabaseStorage, если оно есть
       if (slide.image_url) {
-        await removeFile(BUCKET_NAME, slide.image_url)
+        pathsToDelete.push(slide.image_url)
+      }
+
+      if (slide.image_url_mobile) {
+        pathsToDelete.push(slide.image_url_mobile)
+      }
+
+      if (pathsToDelete.length > 0) {
+        await removeFile(BUCKET_NAME, pathsToDelete)
       }
 
       // Удаляем запись из базы данных
