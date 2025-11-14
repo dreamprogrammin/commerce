@@ -33,7 +33,7 @@ function handleOverlayClick() {
 </script>
 
 <template>
-  <header class="header z-[50] bg-blue-500 dark:bg-gray-900 relative border-b border-gray-200 dark:border-gray-800">
+  <header class="header z-[50] bg-white md:bg-blue-500 dark:bg-gray-900 relative border-b border-gray-200 dark:border-gray-800">
     <CommonHeaderTop :class="containerClass" />
     <div :class="containerClass">
       <CommonHeaderBottom />

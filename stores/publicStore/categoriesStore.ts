@@ -1,10 +1,11 @@
-import type { CategoryMenuItem, CategoryRow, Database } from '@/types'
+import type { AdditionalMenuItem, CategoryMenuItem, CategoryRow, Database } from '@/types'
 
 export const useCategoriesStore = defineStore('categories', () => {
   const supabase = useSupabaseClient<Database>()
 
   const allCategories = ref<CategoryRow[]>([])
   const menuTree = ref<CategoryMenuItem[]>([])
+  const additionalMenuItems = ref<AdditionalMenuItem[]>([])
   const isLoading = ref(false)
 
   const categoriesById = computed(() => new Map(allCategories.value.map(cat => [cat.id, cat])))
@@ -69,9 +70,48 @@ export const useCategoriesStore = defineStore('categories', () => {
     }
   }
 
+  async function fetchAdditionalMenuItems(): Promise<AdditionalMenuItem[]> {
+    if (additionalMenuItems.value.length > 0)
+      return additionalMenuItems.value
+
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'additional_menu_items')
+        .single()
+
+      if (error) {
+        console.warn('Дополнительные пункты меню не найдены:', error)
+        additionalMenuItems.value = []
+        return []
+      }
+
+      // Правильное приведение типа из Json
+      const items = Array.isArray(data?.value)
+        ? (data.value as unknown as AdditionalMenuItem[])
+        : []
+
+      // Сортируем по display_order если есть
+      items.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+
+      additionalMenuItems.value = items
+      return items
+    }
+    catch (e) {
+      console.error('Ошибка загрузки дополнительных пунктов меню:', e)
+      additionalMenuItems.value = []
+      return []
+    }
+  }
+
   async function forceRefetch() {
     allCategories.value = []
-    await fetchCategoryData()
+    additionalMenuItems.value = []
+    await Promise.all([
+      fetchCategoryData(),
+      fetchAdditionalMenuItems(),
+    ])
   }
 
   function getSubcategories(parentSlug: string | null): CategoryRow[] {
@@ -83,5 +123,15 @@ export const useCategoriesStore = defineStore('categories', () => {
     return allCategories.value.filter(c => c.parent_id === parentNode.id)
   }
 
-  return { allCategories, menuTree, isLoading, getBreadcrumbs, getSubcategories, fetchCategoryData, forceRefetch }
+  return {
+    allCategories,
+    menuTree,
+    additionalMenuItems,
+    isLoading,
+    getBreadcrumbs,
+    getSubcategories,
+    fetchCategoryData,
+    fetchAdditionalMenuItems,
+    forceRefetch,
+  }
 })
