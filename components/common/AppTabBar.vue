@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Search } from 'lucide-vue-next'
 import {
   NavigationMenu,
   NavigationMenuContent,
