@@ -22,6 +22,42 @@ const headerOverlay = inject(HeaderOverlayKey)
 const isMenuOpen = ref(false)
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
+const headerHeight = ref(0)
+const tabBarHeight = ref(0)
+
+// Получаем высоту header и tabbar для правильного позиционирования
+onMounted(() => {
+  if (process.client) {
+    const updateHeights = () => {
+      const header = document.querySelector('.header')
+      if (header) {
+        headerHeight.value = header.getBoundingClientRect().height
+      }
+
+      // Добавляем небольшую задержку для получения правильной высоты
+      setTimeout(() => {
+        const tabBar = document.querySelector('.mobile-tab-bar-container')
+        if (tabBar) {
+          tabBarHeight.value = tabBar.getBoundingClientRect().height
+        }
+      }, 50)
+    }
+
+    updateHeights()
+    window.addEventListener('resize', updateHeights)
+    window.addEventListener('scroll', updateHeights)
+
+    // Обновляем при изменении ориентации
+    window.addEventListener('orientationchange', () => {
+      setTimeout(updateHeights, 100)
+    })
+  }
+})
+
+const panelTopPosition = computed(() => {
+  // Если есть tabBarHeight, используем его, иначе берём полную высоту header
+  return tabBarHeight.value > 0 ? headerHeight.value : headerHeight.value
+})
 
 const categoriesStore = useCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
@@ -29,7 +65,58 @@ const { getImageUrl } = useSupabaseStorage()
 const menuTree = computed(() => categoriesStore.menuTree)
 const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems || [])
 
-// Собираем все категории с изображениями для масонри
+// Touch events для свайпа
+let touchStartX = 0
+let touchStartY = 0
+let isSwiping = false
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+  isSwiping = false
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (!touchStartX)
+    return
+
+  const touchCurrentX = e.touches[0].clientX
+  const touchCurrentY = e.touches[0].clientY
+
+  const diffX = touchCurrentX - touchStartX
+  const diffY = touchCurrentY - touchStartY
+
+  // Если свайп горизонтальный (вправо) и больше чем вертикальный
+  if (Math.abs(diffX) > Math.abs(diffY)) {
+    isSwiping = true
+    if (diffX > 0) {
+      // Свайп вправо - предотвращаем скролл
+      e.preventDefault()
+    }
+  }
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  if (!touchStartX || !isSwiping) {
+    touchStartX = 0
+    touchStartY = 0
+    isSwiping = false
+    return
+  }
+
+  const touchEndX = e.changedTouches[0].clientX
+  const diffX = touchEndX - touchStartX
+
+  // Если свайп вправо больше 80px - закрываем
+  if (diffX > 80) {
+    closeAll()
+  }
+
+  touchStartX = 0
+  touchStartY = 0
+  isSwiping = false
+}
+
 const categoriesForMasonry = computed(() => {
   const result: typeof menuTree.value = []
 
@@ -165,30 +252,37 @@ defineExpose({ closeAll })
     >
       <div
         v-if="isSearchOpen"
-        class="fixed inset-y-0 right-0 w-[85%] bg-white dark:bg-gray-900 z-[45] flex flex-col rounded-l-3xl shadow-2xl"
-        style="height: 100dvh; position: fixed;"
+        class="fixed right-0 w-[85%] bg-white dark:bg-gray-900 z-[45] flex flex-col rounded-tl-3xl shadow-2xl safe-area-inset"
+        :style="{
+          top: `${headerHeight}px`,
+          bottom: 0,
+          height: `calc(100vh - ${headerHeight}px)`,
+          maxHeight: `calc(100dvh - ${headerHeight}px)`,
+        }"
+        @touchstart="handleTouchStart"
+        @touchmove="handleTouchMove"
+        @touchend="handleTouchEnd"
       >
+        <!-- Индикатор свайпа -->
+        <div class="flex-shrink-0 flex items-center justify-center py-3 border-b border-gray-200 dark:border-gray-800">
+          <div class="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full" />
+        </div>
+
         <!-- Контент с прокруткой -->
         <div class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch">
           <div class="p-4 space-y-6">
-            <!-- Заголовок внутри контента -->
-            <div class="sticky top-0 bg-white dark:bg-gray-900 z-10 pb-4">
-              <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                Поиск товаров
-              </h2>
-              <!-- Поисковое поле -->
-              <div class="relative">
-                <Input
-                  id="mobile-search-input"
-                  v-model="searchQuery"
-                  type="text"
-                  placeholder="Что ищете?"
-                  class="pl-11 h-12 text-base rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 transition-all duration-300 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                />
-                <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
-                  <Search class="size-5 text-gray-400 dark:text-gray-500" />
-                </span>
-              </div>
+            <!-- Поисковое поле -->
+            <div class="relative">
+              <Input
+                id="mobile-search-input"
+                v-model="searchQuery"
+                type="text"
+                placeholder="Что ищете?"
+                class="pl-11 h-12 text-base rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 transition-all duration-300 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+              />
+              <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+                <Search class="size-5 text-gray-400 dark:text-gray-500" />
+              </span>
             </div>
 
             <!-- Подсказки поиска -->
@@ -228,7 +322,19 @@ defineExpose({ closeAll })
         v-if="isMenuOpen"
         class="fixed top-[64px] bottom-0 right-0 w-[85%] bg-white dark:bg-gray-900 z-[45] flex flex-col rounded-tl-3xl shadow-2xl"
         style="position: fixed;"
+        @touchstart="handleTouchStart"
+        @touchmove="handleTouchMove"
+        @touchend="handleTouchEnd"
       >
+        <!-- Индикатор свайпа -->
+        <div class="flex-shrink-0 flex items-center justify-center py-3 border-b border-gray-200 dark:border-gray-800">
+          <div class="flex items-center gap-2 text-gray-400 dark:text-gray-600">
+            <Icon name="lucide:chevron-right" class="w-4 h-4 animate-pulse" />
+            <div class="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full" />
+            <span class="text-xs font-medium">Свайп для закрытия</span>
+          </div>
+        </div>
+
         <!-- Контент с прокруткой -->
         <div class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch">
           <!-- Загрузка -->
