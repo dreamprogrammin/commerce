@@ -271,7 +271,7 @@ defineExpose({ closeAll })
         <!-- Контент с прокруткой -->
         <div 
           class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch"
-          :style="{ paddingBottom: `${tabBarHeight + 20}px` }"
+          :style="{ paddingBottom: `${tabBarHeight + 80}px` }"
         >
           <div class="p-4 space-y-6">
             <!-- Поисковое поле -->
@@ -337,7 +337,7 @@ defineExpose({ closeAll })
         <!-- Контент с прокруткой -->
         <div 
           class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch"
-          :style="{ paddingBottom: `${tabBarHeight + 20}px` }"
+          :style="{ paddingBottom: `${tabBarHeight + 80}px` }"
         >
           <!-- Загрузка -->
           <div
