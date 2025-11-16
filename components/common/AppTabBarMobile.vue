@@ -263,13 +263,16 @@ defineExpose({ closeAll })
         @touchmove="handleTouchMove"
         @touchend="handleTouchEnd"
       >
-        <!-- Индикатор свайпа -->
+        <!-- Индикатор свайпа (только полоска) -->
         <div class="flex-shrink-0 flex items-center justify-center py-3 border-b border-gray-200 dark:border-gray-800">
           <div class="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full" />
         </div>
 
         <!-- Контент с прокруткой -->
-        <div class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch">
+        <div 
+          class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch"
+          :style="{ paddingBottom: `${tabBarHeight + 20}px` }"
+        >
           <div class="p-4 space-y-6">
             <!-- Поисковое поле -->
             <div class="relative">
@@ -286,7 +289,7 @@ defineExpose({ closeAll })
             </div>
 
             <!-- Подсказки поиска -->
-            <div class="space-y-6 pb-20">
+            <div class="space-y-6">
               <div v-for="section in searchSuggestions" :key="section.title">
                 <h4 class="text-[11px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
                   <div class="w-1 h-4 bg-blue-500 rounded-full" />
@@ -326,17 +329,16 @@ defineExpose({ closeAll })
         @touchmove="handleTouchMove"
         @touchend="handleTouchEnd"
       >
-        <!-- Индикатор свайпа -->
+        <!-- Индикатор свайпа (только полоска) -->
         <div class="flex-shrink-0 flex items-center justify-center py-3 border-b border-gray-200 dark:border-gray-800">
-          <div class="flex items-center gap-2 text-gray-400 dark:text-gray-600">
-            <Icon name="lucide:chevron-right" class="w-4 h-4 animate-pulse" />
-            <div class="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full" />
-            <span class="text-xs font-medium">Свайп для закрытия</span>
-          </div>
+          <div class="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full" />
         </div>
 
         <!-- Контент с прокруткой -->
-        <div class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch">
+        <div 
+          class="flex-1 overflow-y-auto overscroll-contain webkit-overflow-scrolling-touch"
+          :style="{ paddingBottom: `${tabBarHeight + 20}px` }"
+        >
           <!-- Загрузка -->
           <div
             v-if="categoriesStore.isLoading"
@@ -374,7 +376,7 @@ defineExpose({ closeAll })
             </div>
 
             <!-- Масонри сетка категорий -->
-            <div v-if="categoriesForMasonry.length > 0" class="p-4 columns-2 gap-3 space-y-3 pb-20">
+            <div v-if="categoriesForMasonry.length > 0" class="p-4 columns-2 gap-3 space-y-3">
               <NuxtLink
                 v-for="(category, index) in categoriesForMasonry"
                 :key="category.id"
