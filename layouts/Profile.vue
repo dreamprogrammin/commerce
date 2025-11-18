@@ -20,6 +20,9 @@ const navItems = [
 </script>
 
 <template>
+  <div class="hidden md:block">
+    <CommonHeader />
+  </div>
   <div :class="`${alwaysContainedClass} mx-auto px-4 py-8`">
     <div class="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-8">
       <!-- Боковая панель -->

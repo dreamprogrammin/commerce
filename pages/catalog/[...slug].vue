@@ -10,6 +10,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
+definePageMeta({ layout: 'catalog' })
 // --- 1. Инициализация ---
 const route = useRoute()
 const productsStore = useProductsStore()

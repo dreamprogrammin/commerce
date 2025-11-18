@@ -6,6 +6,9 @@ const { handleOut } = useAuth()
 </script>
 
 <template>
+  <div class="hidden md:block">
+    <CommonHeader />
+  </div>
   <div class="flex min-h-screen w-full bg-muted/40">
     <aside class="hidden w-64 flex-col border-r bg-background sm:flex">
       <div class="flex h-16 items-center border-b px-6">

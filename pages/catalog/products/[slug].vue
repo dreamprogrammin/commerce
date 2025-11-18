@@ -10,6 +10,7 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
+definePageMeta({ layout: 'catalog' })
 const route = useRoute()
 const router = useRouter()
 const productsStore = useProductsStore()
