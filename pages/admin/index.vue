@@ -51,6 +51,60 @@ definePageMeta({
         </Card>
       </NuxtLink>
 
+      <NuxtLink to="/admin/products" class="block">
+        <Card class="hover:border-primary transition-colors">
+          <CardHeader class="flex flex-row items-center justify-between pb-2">
+            <CardTitle class="text-sm font-medium">
+              Управление товарами
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold">
+              Товары
+            </div>
+            <p class="text-xs text-muted-foreground">
+              Добавление и редактирование товаров.
+            </p>
+          </CardContent>
+        </Card>
+      </NuxtLink>
+
+      <NuxtLink to="/admin/catalog" class="block">
+        <Card class="hover:border-primary transition-colors">
+          <CardHeader class="flex flex-row items-center justify-between pb-2">
+            <CardTitle class="text-sm font-medium">
+              Управление каталогами
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold">
+              Каталог
+            </div>
+            <p class="text-xs text-muted-foreground">
+              Добавление и редактирование каталога.
+            </p>
+          </CardContent>
+        </Card>
+      </NuxtLink>
+
+      <NuxtLink to="/admin/banners" class="block">
+        <Card class="hover:border-primary transition-colors">
+          <CardHeader class="flex flex-row items-center justify-between pb-2">
+            <CardTitle class="text-sm font-medium">
+              Управление баннерами
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold">
+              баннер
+            </div>
+            <p class="text-xs text-muted-foreground">
+              Добавление и редактирование банеров.
+            </p>
+          </CardContent>
+        </Card>
+      </NuxtLink>
+
       <!-- Здесь можно будет добавлять другие карточки -->
     </div>
   </div>

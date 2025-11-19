@@ -4,6 +4,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+
 // SEO
 useHead({
   title: 'Каталог товаров',
@@ -34,6 +35,21 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
     })
     .sort((a, b) => a.display_order - b.display_order)
 })
+
+// Определяем размер карточки на основе featured_order
+function getCardSize(category: CategoryRow): 'small' | 'medium' | 'large' {
+  const order = category.featured_order ?? 0
+
+  // featured_order используется как индикатор размера:
+  // 0-33: small (обычная карточка)
+  // 34-66: medium (средняя, в 1.5 раза выше)
+  // 67-100: large (большая, занимает 2 колонки)
+  if (order >= 67)
+    return 'large'
+  if (order >= 34)
+    return 'medium'
+  return 'small'
+}
 </script>
 
 <template>
@@ -50,22 +66,24 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
     <!-- Основной контент -->
     <div class="px-4 py-6">
       <!-- Загрузка -->
-      <div v-if="categoriesStore.isLoading" class="masonry-container">
+      <div v-if="categoriesStore.isLoading" class="masonry-grid">
         <div v-for="i in 6" :key="i" class="masonry-item">
           <Skeleton class="w-full aspect-[3/4] rounded-xl" />
         </div>
       </div>
 
       <!-- Масонри-сетка категорий -->
-      <div v-else-if="secondLevelCategories.length > 0" class="masonry-container">
+      <div v-else-if="secondLevelCategories.length > 0" class="masonry-grid">
         <NuxtLink
           v-for="(category, index) in secondLevelCategories"
           :key="category.id"
           :to="category.href"
-          class="masonry-item"
+          class="masonry-item" :class="[
+            `size-${getCardSize(category)}`,
+          ]"
           :style="{ animationDelay: `${index * 50}ms` }"
         >
-          <Card class="category-card group overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
+          <Card class="category-card group overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow h-full">
             <!-- Изображение -->
             <div v-if="category.image_url" class="category-image">
               <img
@@ -82,16 +100,27 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
             <div v-else class="category-placeholder">
               <Icon
                 :name="category.icon_name || 'lucide:package'"
-                class="w-12 h-12 text-muted-foreground"
+                class="text-muted-foreground" :class="[
+                  getCardSize(category) === 'large' ? 'w-20 h-20' : 'w-12 h-12',
+                ]"
               />
             </div>
 
             <!-- Контент карточки -->
             <div class="category-content">
-              <h3 class="category-title">
+              <h3
+                class="category-title" :class="[
+                  getCardSize(category) === 'large' && 'text-2xl',
+                ]"
+              >
                 {{ category.name }}
               </h3>
-              <p v-if="category.description" class="category-description">
+              <p
+                v-if="category.description"
+                class="category-description" :class="[
+                  getCardSize(category) === 'large' && 'text-base line-clamp-3',
+                ]"
+              >
                 {{ category.description }}
               </p>
 
@@ -121,21 +150,32 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
   </div>
 </template>
 
-  <style scoped>
-  /* Масонри через CSS Columns - идеально для мобилки */
-.masonry-container {
-  column-count: 2;
-  column-gap: 0.75rem;
-  margin: 0 auto;
+<style scoped>
+/* Масонри через CSS Grid - более гибкий контроль */
+.masonry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  grid-auto-rows: 120px; /* Базовая высота строки */
 }
 
 .masonry-item {
-  display: inline-block;
-  width: 100%;
-  margin-bottom: 0.75rem;
-  break-inside: avoid;
   animation: fadeInUp 0.4s ease-out forwards;
   opacity: 0;
+}
+
+/* Размеры карточек */
+.masonry-item.size-small {
+  grid-row: span 2; /* 240px высота */
+}
+
+.masonry-item.size-medium {
+  grid-row: span 3; /* 360px высота */
+}
+
+.masonry-item.size-large {
+  grid-column: span 2; /* На всю ширину */
+  grid-row: span 3; /* 360px высота */
 }
 
 @keyframes fadeInUp {
@@ -154,6 +194,7 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
   position: relative;
   display: block;
   cursor: pointer;
+  height: 100%;
 }
 
 .category-card:active {
@@ -165,7 +206,7 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
 .category-image {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  height: 100%;
   overflow: hidden;
   border-radius: calc(var(--radius) - 2px);
 }
@@ -173,7 +214,7 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
 /* Плейсхолдер без изображения */
 .category-placeholder {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -226,19 +267,25 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
 
 /* Адаптация для очень маленьких экранов */
 @media (max-width: 360px) {
-  .masonry-container {
-    column-count: 1;
+  .masonry-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 160px;
+  }
+
+  .masonry-item.size-large {
+    grid-column: span 1;
   }
 }
 
 /* Для больших мобильных телефонов */
 @media (min-width: 480px) {
-  .masonry-container {
-    column-gap: 1rem;
+  .masonry-grid {
+    gap: 1rem;
+    grid-auto-rows: 140px;
   }
 
-  .masonry-item {
-    margin-bottom: 1rem;
+  .category-content {
+    padding: 1.25rem;
   }
 }
 </style>

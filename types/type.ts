@@ -138,16 +138,21 @@ export interface ICheckoutData {
   guestInfo?: { name: string, email: string, phone: string }
 }
 
-export type CategoryRow = Database['public']['Tables']['categories']['Row']
-export type CategoryInsert
-  = Database['public']['Tables']['categories']['Insert']
-export type CategoryUpdate
-  = Database['public']['Tables']['categories']['Update']
+export type CategoryRow = Database['public']['Tables']['categories']['Row'] & {
+  featured_order?: number | null // 🆕 Добавляем поле для управления размером карточки
+}
 
-export type CategoryMenuItem
-  = Database['public']['Tables']['categories']['Row'] & {
-    children?: CategoryMenuItem[]
-  }
+export type CategoryInsert = Database['public']['Tables']['categories']['Insert'] & {
+  featured_order?: number | null
+}
+
+export type CategoryUpdate = Database['public']['Tables']['categories']['Update'] & {
+  featured_order?: number | null
+}
+
+export type CategoryMenuItem = CategoryRow & {
+  children?: CategoryMenuItem[]
+}
 
 export type EditableCategory = CategoryRow & {
   children: EditableCategory[]
