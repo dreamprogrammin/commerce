@@ -69,7 +69,7 @@ definePageMeta({
         </Card>
       </NuxtLink>
 
-      <NuxtLink to="/admin/catalog" class="block">
+      <NuxtLink to="/admin/catalog-grid" class="block">
         <Card class="hover:border-primary transition-colors">
           <CardHeader class="flex flex-row items-center justify-between pb-2">
             <CardTitle class="text-sm font-medium">

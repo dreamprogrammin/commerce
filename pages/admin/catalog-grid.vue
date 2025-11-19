@@ -49,6 +49,19 @@ const categoriesBySize = computed(() => {
   return { small, medium, large }
 })
 
+const originalFeaturedOrders = ref<Map<string, number>>(new Map())
+
+// После загрузки категорий сохраняем оригинальные значения
+watch(() => adminCategoriesStore.allCategories, (categories) => {
+  if (categories.length > 0 && originalFeaturedOrders.value.size === 0) {
+    categories.forEach((cat) => {
+      originalFeaturedOrders.value.set(cat.id, cat.featured_order ?? 0)
+    })
+  }
+}, { immediate: true })
+
+// Проверяем есть ли изменения
+
 // Выбранные категории
 const selectedCategories = ref<string[]>([])
 
@@ -103,22 +116,42 @@ async function saveChanges() {
   isSaving.value = true
 
   try {
-    // Обновляем только featured_order для всех категорий
-    const updates = adminCategoriesStore.allCategories.map(cat => ({
-      id: cat.id,
-      featured_order: cat.featured_order ?? 0,
-    }))
-
     const supabase = useSupabaseClient()
-    const { error } = await supabase
-      .from('categories')
-      .upsert(updates)
 
-    if (error)
-      throw error
+    // Обновляем только измененные категории
+    const changedCategories = adminCategoriesStore.allCategories.filter((cat) => {
+      const original = originalFeaturedOrders.value.get(cat.id)
+      return original !== (cat.featured_order ?? 0)
+    })
 
-    toast.success('Размеры карточек успешно сохранены!')
+    if (changedCategories.length === 0) {
+      toast.info('Нет изменений для сохранения')
+      isSaving.value = false
+      return
+    }
+
+    const updatePromises = changedCategories.map(cat =>
+      supabase
+        .from('categories')
+        .update({ featured_order: cat.featured_order ?? 0 })
+        .eq('id', cat.id),
+    )
+
+    const results = await Promise.all(updatePromises)
+
+    const errors = results.filter(r => r.error)
+    if (errors.length > 0) {
+      throw new Error(`Ошибка обновления ${errors.length} категорий`)
+    }
+
+    toast.success(`Обновлено категорий: ${changedCategories.length}`)
+
+    // Обновляем оригинальные значения
     await adminCategoriesStore.fetchAllCategories(true)
+    originalFeaturedOrders.value.clear()
+    adminCategoriesStore.allCategories.forEach((cat) => {
+      originalFeaturedOrders.value.set(cat.id, cat.featured_order ?? 0)
+    })
   }
   catch (e: any) {
     toast.error('Ошибка сохранения', { description: e.message })
