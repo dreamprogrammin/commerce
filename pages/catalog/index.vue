@@ -55,7 +55,7 @@ const additionalItemGradients = {
 <template>
   <div class="min-h-screen bg-background pb-20">
     <!-- Шапка с навигацией -->
-    <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b sr-only">
       <div class="px-4 py-3">
         <h1 class="text-2xl font-bold">
           Каталог
@@ -66,13 +66,13 @@ const additionalItemGradients = {
     <!-- Основной контент -->
     <div class="px-4 py-6">
       <!-- Загрузка -->
-      <div v-if="categoriesStore.isLoading" class="grid grid-cols-2 gap-3 auto-rows-[180px]">
+      <div v-if="categoriesStore.isLoading" class="grid grid-cols-2 gap-1 auto-rows-[180px]">
         <Skeleton v-for="i in 6" :key="i" class="w-full h-full rounded-xl" />
       </div>
 
       <div v-else class="space-y-4">
         <!-- Блоки Акции и Новинки -->
-        <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-3">
+        <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-1">
           <NuxtLink
             v-for="item in additionalItems"
             :key="item.id"
@@ -112,7 +112,7 @@ const additionalItemGradients = {
         </div>
 
         <!-- Сетка категорий -->
-        <div v-if="secondLevelCategories.length > 0" class="grid grid-cols-2 gap-3 auto-rows-[180px]">
+        <div v-if="secondLevelCategories.length > 0" class="grid grid-cols-2 gap-1 auto-rows-[180px]">
           <NuxtLink
             v-for="(category, index) in secondLevelCategories"
             :key="category.id"
@@ -142,7 +142,7 @@ const additionalItemGradients = {
               </div>
 
               <!-- Контент карточки с градиентом -->
-              <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent text-white">
+              <div class="absolute bottom-0 left-0 right-0 p-3 to-transparent text-white">
                 <h3
                   class="font-semibold leading-tight drop-shadow-md" :class="[
                     isLargeCard(category) ? 'text-lg mb-1' : 'text-base',
