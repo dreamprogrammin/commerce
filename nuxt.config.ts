@@ -3,13 +3,6 @@ import tailwindcss from '@tailwindcss/vite'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
-
-  // 📱 Настройки для доступа с телефона (без ngrok!)
-  devServer: {
-    host: '0.0.0.0', // Разрешает доступ из локальной сети
-    port: 3000,
-  },
-
   modules: [
     '@pinia/nuxt',
     '@nuxtjs/supabase',
@@ -18,11 +11,10 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxt/icon',
   ],
-
-  // 🛡️ Настройки Nitro (объединенные)
+  // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
   nitro: {
     routeRules: {
-      // Проксируем запросы к Supabase через наш сервер
+    // Проксируем запросы к Supabase через наш сервер
       '/api/image-proxy/**': {
         proxy: {
           to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**',
@@ -45,7 +37,6 @@ export default defineNuxtConfig({
       },
     },
   },
-
   image: {
     domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
     alias: {
@@ -81,26 +72,21 @@ export default defineNuxtConfig({
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
         },
       ],
-      meta: [
-        { name: 'viewport', content: 'width=device-width, initial-scale=1.0, viewport-fit=cover' },
-        { name: 'theme-color', content: '#ffffff' },
-        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
-      ],
     },
   },
 
+  // image: {
+  //   domains: ['https://gvsdevsvzgcivpphcuai.supabase.co'],
+  // },
   supabase: {
     redirect: false,
     baseURL: `${import.meta.env.NUXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public`,
     types: 'types/supabase.ts',
   },
-
   css: ['~/assets/css/tailwind.css'],
-
   vite: {
     plugins: [tailwindcss()],
   },
-
   shadcn: {
     /**
      * Prefix for all the imported component
@@ -112,6 +98,5 @@ export default defineNuxtConfig({
      */
     componentDir: './components/ui',
   },
-
   devtools: { enabled: true },
 })
