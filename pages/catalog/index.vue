@@ -106,9 +106,6 @@ const additionalItemStyles = {
               <!-- Сетка паттерн -->
               <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle, white 1px, transparent 1px); background-size: 20px 20px;" />
 
-              <!-- Градиент для текста -->
-              <div class="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-
               <!-- Эмодзи - с анимацией и эффектами -->
               <div class="absolute -top-3 -right-3 z-10 transform group-hover:scale-110 group-hover:rotate-0 rotate-12 transition-all duration-500 ease-out animate-pulse-slow">
                 <div class="relative">
