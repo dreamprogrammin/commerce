@@ -5,6 +5,7 @@ import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
+definePageMeta({ layout: 'catalog' })
 // SEO
 useHead({
   title: 'Каталог товаров',
@@ -39,10 +40,14 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
     .sort((a, b) => a.display_order - b.display_order)
 })
 
-// Определяем размер карточки (упрощено: большой или маленький)
-function isLargeCard(category: CategoryRow): boolean {
+// Определяем размер карточки
+function getCategorySize(category: CategoryRow): 'small' | 'medium' | 'large' {
   const order = (category as any).featured_order ?? 0
-  return order >= 50 // >= 50 = большая, < 50 = маленькая
+  if (order >= 67)
+    return 'large'
+  if (order >= 34)
+    return 'medium'
+  return 'small'
 }
 
 // Градиенты для дополнительных блоков
@@ -55,7 +60,7 @@ const additionalItemGradients = {
 <template>
   <div class="min-h-screen bg-background pb-20">
     <!-- Шапка с навигацией -->
-    <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b sr-only">
+    <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
       <div class="px-4 py-3">
         <h1 class="text-2xl font-bold">
           Каталог
@@ -64,20 +69,20 @@ const additionalItemGradients = {
     </div>
 
     <!-- Основной контент -->
-    <div class="px-4 py-6">
+    <div class="px-2 py-4">
       <!-- Загрузка -->
-      <div v-if="categoriesStore.isLoading" class="grid grid-cols-2 gap-1 auto-rows-[180px]">
-        <Skeleton v-for="i in 6" :key="i" class="w-full h-full rounded-xl" />
+      <div v-if="categoriesStore.isLoading" class="grid grid-cols-2 gap-2 auto-rows-[200px]">
+        <Skeleton v-for="i in 6" :key="i" class="w-full h-full rounded-2xl" />
       </div>
 
-      <div v-else class="space-y-4">
+      <div v-else class="space-y-2">
         <!-- Блоки Акции и Новинки -->
-        <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-1">
+        <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-2">
           <NuxtLink
             v-for="item in additionalItems"
             :key="item.id"
             :to="item.href"
-            class="relative block overflow-hidden rounded-xl h-[140px] shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200"
+            class="relative block overflow-hidden rounded-2xl h-[200px] shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200"
           >
             <div
               class="relative h-full bg-gradient-to-br" :class="[
@@ -85,26 +90,20 @@ const additionalItemGradients = {
               ]"
             >
               <!-- Декоративные элементы -->
-              <div class="absolute inset-0 bg-black/10" />
-              <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
-              <div class="absolute -left-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-2xl" />
+              <div class="absolute inset-0 bg-black/5" />
 
-              <!-- Контент -->
-              <div class="relative h-full flex flex-col items-center justify-center text-white p-4">
-                <Icon
-                  :name="item.icon || 'lucide:star'"
-                  class="w-10 h-10 mb-2 drop-shadow-lg"
-                />
-                <h3 class="text-base font-bold drop-shadow-md text-center">
+              <!-- Контент - название внизу -->
+              <div class="absolute bottom-0 left-0 right-0 p-4">
+                <h3 class="text-lg font-bold text-white drop-shadow-md">
                   {{ item.name }}
                 </h3>
               </div>
 
-              <!-- Иконка стрелки -->
-              <div class="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+              <!-- Иконка в центре справа -->
+              <div class="absolute right-4 top-1/2 -translate-y-1/2">
                 <Icon
-                  name="lucide:chevron-right"
-                  class="w-3 h-3 text-white"
+                  :name="item.icon || 'lucide:star'"
+                  class="w-20 h-20 text-white/30 drop-shadow-lg"
                 />
               </div>
             </div>
@@ -112,60 +111,42 @@ const additionalItemGradients = {
         </div>
 
         <!-- Сетка категорий -->
-        <div v-if="secondLevelCategories.length > 0" class="grid grid-cols-2 gap-1 auto-rows-[180px]">
+        <div v-if="secondLevelCategories.length > 0" class="grid grid-cols-2 gap-2 auto-rows-[200px]">
           <NuxtLink
             v-for="(category, index) in secondLevelCategories"
             :key="category.id"
             :to="category.href"
-            class="relative block overflow-hidden rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 animate-fadeInUp opacity-0" :class="[
-              isLargeCard(category) ? 'row-span-2 h-auto' : 'h-[180px]',
+            class="relative block overflow-hidden rounded-2xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 animate-fadeInUp opacity-0 bg-card" :class="[
+              getCategorySize(category) === 'large' ? 'row-span-2 h-auto'
+              : getCategorySize(category) === 'medium' ? 'row-span-2 h-auto'
+                : 'h-[200px]',
             ]"
             :style="{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }"
           >
-            <Card class="relative h-full overflow-hidden border-0">
-              <!-- Изображение -->
-              <div v-if="category.image_url" class="relative w-full h-full">
-                <img
-                  :src="getImageUrl(BUCKET_NAME_CATEGORY, category.image_url, IMAGE_SIZES.CATEGORY_MENU) || undefined"
-                  :alt="category.name"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
-                >
-              </div>
+            <!-- Изображение -->
+            <div v-if="category.image_url" class="absolute inset-0">
+              <img
+                :src="getImageUrl(BUCKET_NAME_CATEGORY, category.image_url, IMAGE_SIZES.CATEGORY_MENU) || undefined"
+                :alt="category.name"
+                class="w-full h-full object-contain p-4"
+                loading="lazy"
+              >
+            </div>
 
-              <!-- Фоллбэк без изображения -->
-              <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/10">
-                <Icon
-                  :name="category.icon_name || 'lucide:package'"
-                  class="w-12 h-12 text-muted-foreground"
-                />
-              </div>
+            <!-- Фоллбэк без изображения -->
+            <div v-else class="absolute inset-0 bg-muted flex items-center justify-center p-4">
+              <Icon
+                :name="category.icon_name || 'lucide:package'"
+                class="w-20 h-20 text-muted-foreground opacity-40"
+              />
+            </div>
 
-              <!-- Контент карточки с градиентом -->
-              <div class="absolute bottom-0 left-0 right-0 p-3 to-transparent text-white">
-                <h3
-                  class="font-semibold leading-tight drop-shadow-md" :class="[
-                    isLargeCard(category) ? 'text-lg mb-1' : 'text-base',
-                  ]"
-                >
-                  {{ category.name }}
-                </h3>
-                <p
-                  v-if="category.description && isLargeCard(category)"
-                  class="text-xs leading-snug opacity-90 drop-shadow-sm line-clamp-2 mt-1"
-                >
-                  {{ category.description }}
-                </p>
-              </div>
-
-              <!-- Иконка стрелки -->
-              <div class="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Icon
-                  name="lucide:chevron-right"
-                  class="w-4 h-4 text-white"
-                />
-              </div>
-            </Card>
+            <!-- Контент карточки - только название внизу -->
+            <div class="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm">
+              <h3 class="font-semibold leading-tight text-foreground text-sm">
+                {{ category.name }}
+              </h3>
+            </div>
           </NuxtLink>
         </div>
 
