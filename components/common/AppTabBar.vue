@@ -36,6 +36,8 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 
 const activeMenuValue = ref<string | undefined>()
 const isSearchOpen = ref(false)
+// Отслеживание загруженных изображений для каждой категории
+const loadedImages = ref<Set<string>>(new Set())
 
 const categoriesStore = useCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
@@ -49,6 +51,7 @@ useAsyncData('additional-menu-items', () => categoriesStore.fetchAdditionalMenuI
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
 )
+
 watch(isAnyPopupOpenInTabBar, (isOpen) => {
   if (isOpen) {
     headerOverlay?.showOverlay()
@@ -62,16 +65,23 @@ watch(isAnyPopupOpenInTabBar, (isOpen) => {
   }
 })
 
+// Загружаем изображения при открытии конкретного меню
 watch(activeMenuValue, (newValue) => {
-  if (newValue !== undefined && isSearchOpen.value) {
-    isSearchOpen.value = false
+  if (newValue !== undefined) {
+    if (isSearchOpen.value) {
+      isSearchOpen.value = false
+    }
+    // Отмечаем, что изображения для этой категории нужно загрузить
+    loadedImages.value.add(newValue)
   }
 })
+
 watch(isSearchOpen, (isOpen) => {
   if (isOpen !== undefined && activeMenuValue.value) {
     activeMenuValue.value = undefined
   }
 })
+
 onUnmounted(() => {
   if (isAnyPopupOpenInTabBar.value) {
     headerOverlay?.hideOverlay()
@@ -86,6 +96,12 @@ function closeAllPopups() {
 function getCategoryImageUrl(imageUrl: string | null) {
   return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_MENU)
 }
+
+// Проверяем, нужно ли загружать изображение
+function shouldLoadImage(parentSlug: string): boolean {
+  return loadedImages.value.has(parentSlug)
+}
+
 defineExpose({ closeAllPopups })
 </script>
 
@@ -161,8 +177,11 @@ defineExpose({ closeAllPopups })
               </NuxtLink>
 
               <NavigationMenuContent>
-                <div class="p-10 md:p-12 min-w-screen bg-white dark:bg-gray-900">
-                  <ul class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                <div class="min-w-screen bg-white dark:bg-gray-900">
+                  <ul
+                    :class="containerClass"
+                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
+                  >
                     <li
                       v-for="childItem in rootItem.children"
                       :key="childItem.id"
@@ -175,14 +194,23 @@ defineExpose({ closeAllPopups })
                       >
                         <div
                           v-if="childItem.image_url"
-                          class="mb-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800"
+                          class="mb-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800"
                         >
+                          <!-- Используем loading="lazy" и загружаем только при открытии меню -->
                           <img
+                            v-if="shouldLoadImage(rootItem.slug)"
                             :src="getCategoryImageUrl(childItem.image_url) || undefined"
                             :alt="childItem.name"
                             loading="lazy"
                             class="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           >
+                          <!-- Placeholder пока меню не открыто -->
+                          <div
+                            v-else
+                            class="h-36 w-full flex items-center justify-center"
+                          >
+                            <Icon name="lucide:image" class="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                          </div>
                         </div>
                         <div class="text-sm font-bold leading-tight text-gray-900 dark:text-gray-100 mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {{ childItem.name }}
