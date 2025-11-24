@@ -102,6 +102,11 @@ function shouldLoadImage(parentSlug: string): boolean {
   return loadedImages.value.has(parentSlug)
 }
 
+// Функция для закрытия меню после клика по ссылке
+function handleLinkClick() {
+  activeMenuValue.value = undefined
+}
+
 defineExpose({ closeAllPopups })
 </script>
 
@@ -171,16 +176,17 @@ defineExpose({ closeAllPopups })
               <NuxtLink :to="rootItem.href" as-child>
                 <NavigationMenuTrigger
                   :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-5 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl`"
+                  @click="handleLinkClick"
                 >
                   {{ rootItem.name }}
                 </NavigationMenuTrigger>
               </NuxtLink>
 
               <NavigationMenuContent>
-                <div class="min-w-screen bg-white dark:bg-gray-900">
+                <div class="min-w-screen h-[35dvh] bg-white dark:bg-gray-900 overflow-y-auto">
                   <ul
                     :class="containerClass"
-                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
+                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 py-12"
                   >
                     <li
                       v-for="childItem in rootItem.children"
@@ -190,7 +196,7 @@ defineExpose({ closeAllPopups })
                       <NuxtLink
                         :to="childItem.href"
                         class="group block select-none rounded-xl p-4 leading-none no-underline outline-none transition-all duration-200 hover:shadow-lg border border-gray-200 dark:border-gray-800 hover:border-blue-400 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
-                        @click="activeMenuValue = undefined"
+                        @click="handleLinkClick"
                       >
                         <div
                           v-if="childItem.image_url"
@@ -233,7 +239,7 @@ defineExpose({ closeAllPopups })
                           <NuxtLink
                             :to="grandChildItem.href"
                             class="flex items-center gap-2 select-none rounded-lg py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium"
-                            @click="activeMenuValue = undefined"
+                            @click="handleLinkClick"
                           >
                             <Icon name="lucide:chevron-right" class="w-3 h-3" />
                             {{ grandChildItem.name }}
