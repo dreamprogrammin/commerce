@@ -10,7 +10,6 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
-definePageMeta({ layout: 'catalog' })
 const route = useRoute()
 const router = useRouter()
 const productsStore = useProductsStore()
@@ -22,6 +21,7 @@ const { getImageUrl } = useSupabaseStorage()
 const slug = computed(() => route.params.slug as string)
 
 const selectedAccessoryIds = ref<string[]>([])
+const isMobileDetailsOpen = ref(false) // 🔥 Для мобильного листа с деталями
 
 const { data, pending: isLoading } = useAsyncData(
   `product-page-${slug.value}`,
@@ -46,7 +46,6 @@ const { data, pending: isLoading } = useAsyncData(
       })(),
       (async () => {
         if (fetchedProduct.category_id) {
-          // ✅ Загружаем и кэшируем бренды и атрибуты для похожих товаров
           const categorySlug = fetchedProduct.categories?.slug
           if (categorySlug) {
             await Promise.all([
@@ -185,26 +184,30 @@ watch(() => product.value?.id, () => {
 </script>
 
 <template>
-  <div :class="`${containerClass} py-12`">
+  <div :class="`${containerClass} py-6 lg:py-12`">
     <ClientOnly>
       <ProductDetailSkeleton v-if="isLoading" />
 
       <div v-else-if="product">
-        <Breadcrumbs :items="breadcrumbs" class="mb-6" />
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+        <!-- Десктоп хлебные крошки -->
+        <Breadcrumbs :items="breadcrumbs" class="mb-6 hidden lg:block" />
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 lg:gap-12 items-start">
+          <!-- Галерея -->
           <div class="lg:col-span-8 top-24">
             <ProductGallery
               v-if="product.product_images && product.product_images.length > 0"
               :images="product.product_images"
             />
 
-            <div v-else class="bg-muted rounded-lg flex items-center justify-center h-full">
+            <div v-else class="bg-muted rounded-lg flex items-center justify-center h-64 lg:h-full">
               <p class="text-muted-foreground">
                 Изображения отсутствуют
               </p>
             </div>
 
-            <div class="mt-16 pt-8 border-t">
+            <!-- Описание и характеристики (только десктоп) -->
+            <div class="hidden lg:block mt-16 pt-8 border-t">
               <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="md:col-span-2">
                   <ProductDescription v-if="product.description" :description="product.description" />
@@ -216,135 +219,160 @@ watch(() => product.value?.id, () => {
             </div>
           </div>
 
-          <div class="lg:col-span-4 sticky top-24">
-            <div class="space-y-6">
-              <NuxtLink v-if="product.categories" :to="`/catalog/${product.categories.slug}`" class="text-sm text-muted-foreground hover:text-primary transition-colors">
+          <!-- Боковая панель (десктоп) / Мобильная карточка -->
+          <div class="lg:col-span-4 lg:sticky lg:top-24">
+            <div class="space-y-4 lg:space-y-6">
+              <!-- Категория -->
+              <NuxtLink
+                v-if="product.categories"
+                :to="`/catalog/${product.categories.slug}`"
+                class="text-xs lg:text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
                 {{ product.categories.name }}
               </NuxtLink>
-              <h1 class="text-3xl lg:text-4xl font-bold mt-1">
+
+              <!-- Название товара -->
+              <h1 class="text-2xl lg:text-3xl lg:text-4xl font-bold mt-1">
                 {{ product.name }}
               </h1>
-            </div>
-            <p class="text-4xl font-bold">
-              {{ product.price }} ₸
-            </p>
 
-            <div v-if="accessories.length > 0" class="pt-4 border-t">
-              <h3 class="font-semibold mb-3">
-                С этим товаром покупают:
-              </h3>
-              <div class="space-y-3">
-                <div
-                  v-for="acc in accessories"
-                  :key="acc.id"
-                  class="flex items-center justify-between p-2 rounded-md border cursor-pointer select-none transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted hover:bg-muted/50"
-                  @click="() => {
-                    const isChecked = selectedAccessoryIds.includes(acc.id)
-                    if (isChecked) {
-                      selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
-                    }
-                    else {
-                      selectedAccessoryIds.push(acc.id)
-                    }
-                  }"
-                >
-                  <div class="flex items-center gap-3">
-                    <div @click.stop>
-                      <Checkbox
-                        :id="`acc-${acc.id}`"
-                        :model-value="selectedAccessoryIds.includes(acc.id)"
-                        @update:model-value="(checkedState) => {
-                          if (checkedState === true) {
-                            if (!selectedAccessoryIds.includes(acc.id)) {
-                              selectedAccessoryIds.push(acc.id)
-                            }
-                          }
-                          else if (checkedState === false) {
-                            selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
-                          }
-                        }"
-                      />
-                    </div>
-                    <div class="w-12 h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                      <img
-                        v-if="acc.product_images && acc.product_images.length > 0"
-                        :src="getAccessoryImageUrl(acc.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
-                        :alt="acc.name"
-                        class="w-full h-full object-cover"
-                        loading="lazy"
-                      >
-                      <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                        Нет фото
-                      </div>
-                    </div>
-                    <span class="text-sm font-medium leading-none">
-                      {{ acc.name }}
-                    </span>
-                  </div>
-                  <span class="text-sm font-semibold whitespace-nowrap">+ {{ acc.price }} ₸</span>
-                </div>
-              </div>
-            </div>
+              <!-- Цена -->
+              <p class="text-3xl lg:text-4xl font-bold">
+                {{ product.price }} ₸
+              </p>
 
-            <div :key="`price-${product.id}`" class="pt-4 border-t">
-              <div class="flex justify-between items-baseline">
-                <span class="text-lg font-medium">Общая стоимость:</span>
-                <div class="text-4xl font-bold flex items-center gap-0.5">
+              <!-- Кнопка "Подробнее" (только мобилка) -->
+              <Button
+                variant="outline"
+                class="w-full lg:hidden"
+                @click="isMobileDetailsOpen = true"
+              >
+                <Icon name="lucide:info" class="w-4 h-4 mr-2" />
+                Описание и характеристики
+              </Button>
+
+              <!-- Аксессуары -->
+              <div v-if="accessories.length > 0" class="pt-4 border-t">
+                <h3 class="font-semibold text-base lg:text-lg mb-3">
+                  С этим товаром покупают:
+                </h3>
+                <div class="space-y-2 lg:space-y-3">
                   <div
-                    v-for="(digit, i) in String(Math.round(totalPrice)).split('')"
-                    :key="`digit-${i}`"
-                    :ref="el => { if (el) digitColumns[i] = el as HTMLElement }"
-                    class="digit-column"
+                    v-for="acc in accessories"
+                    :key="acc.id"
+                    class="flex items-center justify-between p-2 rounded-md border cursor-pointer select-none transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted hover:bg-muted/50"
+                    @click="() => {
+                      const isChecked = selectedAccessoryIds.includes(acc.id)
+                      if (isChecked) {
+                        selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
+                      }
+                      else {
+                        selectedAccessoryIds.push(acc.id)
+                      }
+                    }"
                   >
-                    <div class="digit-ribbon">
-                      <div v-for="d in 10" :key="d" class="digit-item">
-                        {{ d - 1 }}
+                    <div class="flex items-center gap-2 lg:gap-3 flex-1 min-w-0">
+                      <div @click.stop>
+                        <Checkbox
+                          :id="`acc-${acc.id}`"
+                          :model-value="selectedAccessoryIds.includes(acc.id)"
+                          @update:model-value="(checkedState) => {
+                            if (checkedState === true) {
+                              if (!selectedAccessoryIds.includes(acc.id)) {
+                                selectedAccessoryIds.push(acc.id)
+                              }
+                            }
+                            else if (checkedState === false) {
+                              selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
+                            }
+                          }"
+                        />
                       </div>
+                      <div class="w-10 h-10 lg:w-12 lg:h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                        <img
+                          v-if="acc.product_images && acc.product_images.length > 0"
+                          :src="getAccessoryImageUrl(acc.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
+                          :alt="acc.name"
+                          class="w-full h-full object-cover"
+                          loading="lazy"
+                        >
+                        <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                          Нет фото
+                        </div>
+                      </div>
+                      <span class="text-xs lg:text-sm font-medium leading-tight truncate">
+                        {{ acc.name }}
+                      </span>
                     </div>
+                    <span class="text-xs lg:text-sm font-semibold whitespace-nowrap ml-2">+ {{ acc.price }} ₸</span>
                   </div>
-                  <span class="ml-2">₸</span>
                 </div>
               </div>
-            </div>
 
-            <div class="p-4 bg-primary/10 text-primary rounded-lg border border-primary/20">
-              При покупке вы получите <span class="font-bold">{{ totalBonuses }} бонусов</span>
-            </div>
-            <ClientOnly>
-              <div class="flex items-center gap-4 pt-4">
-                <template v-if="product.stock_quantity > 0">
-                  <Button
-                    v-if="!mainItemInCart"
-                    size="lg"
-                    class="flex-grow"
-                    @click="addToCart"
-                  >
-                    Добавить в корзину
-                  </Button>
-
-                  <template v-else>
-                    <Button
-                      size="lg"
-                      class="flex-grow"
-                      variant="outline"
-                      @click="router.push('/cart')"
+              <!-- Общая стоимость -->
+              <div :key="`price-${product.id}`" class="pt-4 border-t">
+                <div class="flex justify-between items-baseline">
+                  <span class="text-base lg:text-lg font-medium">Общая стоимость:</span>
+                  <div class="text-2xl lg:text-4xl font-bold flex items-center gap-0.5">
+                    <div
+                      v-for="(digit, i) in String(Math.round(totalPrice)).split('')"
+                      :key="`digit-${i}`"
+                      :ref="el => { if (el) digitColumns[i] = el as HTMLElement }"
+                      class="digit-column"
                     >
-                      Перейти в корзину
+                      <div class="digit-ribbon">
+                        <div v-for="d in 10" :key="d" class="digit-item">
+                          {{ d - 1 }}
+                        </div>
+                      </div>
+                    </div>
+                    <span class="ml-1 lg:ml-2">₸</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Бонусы -->
+              <div class="p-3 lg:p-4 bg-primary/10 text-primary rounded-lg border border-primary/20 text-sm lg:text-base">
+                При покупке вы получите <span class="font-bold">{{ totalBonuses }} бонусов</span>
+              </div>
+
+              <!-- Кнопки действий -->
+              <ClientOnly>
+                <div class="flex items-center gap-3 lg:gap-4 pt-4">
+                  <template v-if="product.stock_quantity > 0">
+                    <Button
+                      v-if="!mainItemInCart"
+                      size="lg"
+                      class="flex-grow h-12 lg:h-11"
+                      @click="addToCart"
+                    >
+                      Добавить в корзину
                     </Button>
 
-                    <QuantitySelector
-                      :product="product"
-                      :quantity="quantityInCart"
-                      class="w-1/3"
-                    />
-                  </template>
-                </template>
+                    <template v-else>
+                      <Button
+                        size="lg"
+                        class="flex-grow h-12 lg:h-11"
+                        variant="outline"
+                        @click="router.push('/cart')"
+                      >
+                        Перейти в корзину
+                      </Button>
 
-                <Button v-else size="lg" class="flex-grow" disabled>
-                  Нет в наличии
-                </Button>
-              </div>
-            </ClientOnly>
+                      <QuantitySelector
+                        :product="product"
+                        :quantity="quantityInCart"
+                        class="w-auto"
+                      />
+                    </template>
+                  </template>
+
+                  <Button v-else size="lg" class="flex-grow h-12 lg:h-11" disabled>
+                    Нет в наличии
+                  </Button>
+                </div>
+              </ClientOnly>
+            </div>
           </div>
         </div>
       </div>
@@ -365,10 +393,47 @@ watch(() => product.value?.id, () => {
         <ProductDetailSkeleton />
       </template>
     </ClientOnly>
+
+    <!-- Мобильный Sheet с описанием и характеристиками -->
+    <Sheet v-if="product" v-model:open="isMobileDetailsOpen">
+      <SheetContent side="bottom" class="h-[85vh] flex flex-col p-0">
+        <SheetHeader class="px-4 py-4 border-b flex-shrink-0">
+          <SheetTitle class="text-lg font-semibold">
+            Описание и характеристики
+          </SheetTitle>
+        </SheetHeader>
+
+        <div class="flex-1 overflow-y-auto px-4 py-6 space-y-8">
+          <!-- Описание -->
+          <div v-if="product.description">
+            <h3 class="font-semibold text-base mb-3">
+              Описание
+            </h3>
+            <ProductDescription :description="product.description" />
+          </div>
+
+          <!-- Характеристики -->
+          <div class="pt-6 border-t">
+            <h3 class="font-semibold text-base mb-3">
+              Характеристики
+            </h3>
+            <ProductFeatures :product="product" />
+          </div>
+        </div>
+
+        <div class="px-4 py-4 border-t flex-shrink-0 bg-background">
+          <Button class="w-full h-12" @click="isMobileDetailsOpen = false">
+            Закрыть
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   </div>
-  <ProductCarousel v-if="similarProducts.length > 0" :products="similarProducts" class="mt-16 pt-8 border-t">
+
+  <!-- Похожие товары -->
+  <ProductCarousel v-if="similarProducts.length > 0" :products="similarProducts" class="mt-12 lg:mt-16 pt-6 lg:pt-8 border-t">
     <template #header>
-      <h2 class="text-2xl font-bold mb-6">
+      <h2 class="text-xl lg:text-2xl font-bold mb-4 lg:mb-6">
         Похожие товары
       </h2>
     </template>
@@ -377,14 +442,22 @@ watch(() => product.value?.id, () => {
 
 <style scoped>
 .digit-column {
-  height: 2.5rem;
-  line-height: 2.5rem;
+  height: 1.75rem;
+  line-height: 1.75rem;
   overflow: hidden;
   position: relative;
-  width: 1.5rem;
+  width: 1.125rem;
   text-align: center;
   border-radius: 0.25rem;
   transition: background-color 0.3s ease;
+}
+
+@media (min-width: 1024px) {
+  .digit-column {
+    height: 2.5rem;
+    line-height: 2.5rem;
+    width: 1.5rem;
+  }
 }
 
 .digit-ribbon {
@@ -393,7 +466,14 @@ watch(() => product.value?.id, () => {
 }
 
 .digit-item {
-  height: 2.5rem;
-  line-height: 2.5rem;
+  height: 1.75rem;
+  line-height: 1.75rem;
+}
+
+@media (min-width: 1024px) {
+  .digit-item {
+    height: 2.5rem;
+    line-height: 2.5rem;
+  }
 }
 </style>

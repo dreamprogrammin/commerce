@@ -5,12 +5,12 @@ import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
+import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
-definePageMeta({ layout: 'catalog' })
 // --- 1. Инициализация ---
 const route = useRoute()
 const productsStore = useProductsStore()
@@ -25,7 +25,8 @@ const availableBrands = ref<BrandForFilter[]>([])
 const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
-const accumulatedProducts = ref<ProductWithGallery[]>([]) // ✅ Типизировано
+const accumulatedProducts = ref<ProductWithGallery[]>([])
+const isMobileFiltersOpen = ref(false) // 🔥 Состояние для мобильных фильтров
 
 interface ActiveFilters {
   sortBy: SortByType
@@ -68,6 +69,27 @@ const title = computed(() => {
 })
 
 const priceRange = ref({ min: 0, max: 50000 })
+
+// 🔥 Подсчет активных фильтров
+const activeFiltersCount = computed(() => {
+  let count = 0
+
+  count += activeFilters.value.subCategoryIds.length
+  count += activeFilters.value.brandIds.length
+  count += activeFilters.value.materialIds.length
+  count += activeFilters.value.countryIds.length
+
+  Object.values(activeFilters.value.attributes).forEach((values) => {
+    count += values.length
+  })
+
+  if (activeFilters.value.price[0] !== priceRange.value.min
+    || activeFilters.value.price[1] !== priceRange.value.max) {
+    count += 1
+  }
+
+  return count
+})
 
 // 🔥 Формируем фильтры для запроса
 const catalogFilters = computed<IProductFilters>(() => {
@@ -153,7 +175,6 @@ async function loadFilterData(slug: string) {
       attributes: newAttributeFilters,
     }
 
-    // Сбрасываем накопленные товары
     currentPage.value = 1
     accumulatedProducts.value = []
   }
@@ -164,19 +185,15 @@ async function loadFilterData(slug: string) {
 
 // 🔥 Загрузка следующей страницы
 function loadMoreProducts() {
-  // Сохраняем текущие товары
   if (currentPage.value === 1) {
     accumulatedProducts.value = [...currentPageProducts.value]
   }
-
-  // Увеличиваем страницу
   currentPage.value++
 }
 
 // 🔥 Отслеживаем загрузку новой страницы и добавляем товары
 watch(currentPageProducts, (newProducts) => {
   if (currentPage.value > 1 && newProducts.length > 0) {
-    // Добавляем новые товары к накопленным
     const existingIds = new Set(accumulatedProducts.value.map(p => p.id))
     const uniqueNewProducts = newProducts.filter(p => !existingIds.has(p.id))
     accumulatedProducts.value = [...accumulatedProducts.value, ...uniqueNewProducts]
@@ -228,7 +245,8 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
     </ClientOnly>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-      <aside class="col-span-1 lg:sticky top-24 self-start">
+      <!-- Десктоп фильтры -->
+      <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
         <DynamicFilters
           v-model="activeFilters"
           :available-filters="availableFilters"
@@ -240,8 +258,27 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
         />
       </aside>
 
-      <main class="col-span-3 min-w-0">
-        <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
+      <div class="col-span-1 lg:col-span-3 min-w-0">
+        <!-- Мобильная кнопка фильтров + CatalogHeader в одной строке -->
+        <div class="mb-4 flex items-center gap-3">
+          <!-- Кнопка фильтров (только на мобилке) -->
+          <Button
+            variant="outline"
+            class="lg:hidden h-11 shrink-0"
+            @click="isMobileFiltersOpen = true"
+          >
+            <Icon name="lucide:sliders-horizontal" class="w-4 h-4 mr-2" />
+            Фильтры
+            <Badge v-if="activeFiltersCount > 0" variant="secondary" class="ml-2">
+              {{ activeFiltersCount }}
+            </Badge>
+          </Button>
+
+          <!-- CatalogHeader (занимает оставшееся место) -->
+          <div class="flex-1 min-w-0">
+            <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
+          </div>
+        </div>
 
         <!-- Скелетон при первой загрузке -->
         <ProductGridSkeleton v-if="isLoading" />
@@ -278,7 +315,20 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
             Попробуйте изменить фильтры или выбрать другую категорию.
           </p>
         </div>
-      </main>
+      </div>
     </div>
+
+    <!-- Мобильные фильтры (Sheet) -->
+    <DynamicFiltersMobile
+      v-model="activeFilters"
+      :open="isMobileFiltersOpen"
+      :available-filters="availableFilters"
+      :available-brands="availableBrands"
+      :price-range="priceRange"
+      :available-materials="availableMaterials"
+      :available-countries="availableCountries"
+      :is-loading="isLoadingFilters"
+      @update:open="isMobileFiltersOpen = $event"
+    />
   </div>
 </template>

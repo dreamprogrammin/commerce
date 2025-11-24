@@ -19,7 +19,7 @@ onMounted(() => {
   <div class="relative overflow-hidden rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
     <div class="p-3 sm:p-4 flex-1 flex flex-col">
       <!-- Header -->
-      <div class="flex items-center justify-between mb-3 sm:mb-4">
+      <div class="flex items-center justify-between mb-1 sm:mb-2">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 sm:w-9 sm:h-9 bg-blue-500 dark:bg-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center">
             <Icon name="lucide:gift" class="w-4 h-4 text-white" />
@@ -49,7 +49,7 @@ onMounted(() => {
             <div v-if="isLoading" class="h-20 sm:h-24 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
               <Icon name="lucide:loader-2" class="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-blue-500" />
             </div>
-            <div v-else-if="profile" class="p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
+            <div v-else-if="profile" class="p-2 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
               <div class="flex items-center justify-center gap-3 sm:block sm:space-y-2">
                 <div class="w-12 h-12 sm:w-14 sm:h-14 bg-blue-500 dark:bg-blue-600 rounded-xl flex items-center justify-center sm:mx-auto">
                   <Icon name="lucide:wallet" class="w-6 h-6 sm:w-7 sm:h-7 text-white" />
@@ -137,17 +137,17 @@ onMounted(() => {
       <!-- Actions -->
       <div class="mt-3 sm:mt-4">
         <ClientOnly>
-          <div v-if="isLoggedIn" class="space-y-1.5">
+          <div v-if="isLoggedIn" class="flex w-full gap-2">
             <Button
               as-child
-              class="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl h-9 text-sm"
+              class="flex-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl h-9 text-sm"
             >
               <NuxtLink to="/profile/bonuses">
                 <Icon name="lucide:history" class="w-3.5 h-3.5 mr-1.5" />
                 История бонусов
               </NuxtLink>
             </Button>
-            <Button as-child variant="outline" class="w-full rounded-xl h-9 text-xs">
+            <Button as-child variant="outline" class="flex-1 rounded-xl h-9 text-xs">
               <NuxtLink to="/bonus-program-rules">
                 <Icon name="lucide:info" class="w-3.5 h-3.5 mr-1.5" />
                 Правила программы
