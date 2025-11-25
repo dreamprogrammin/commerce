@@ -197,7 +197,7 @@ watch(() => props.priceRange, (newRange) => {
             <div v-for="cat in subcategories" :key="cat.id" class="flex items-center space-x-3">
               <Checkbox
                 :id="`mobile-cat-${cat.id}`"
-                :checked="props.modelValue.subCategoryIds.includes(cat.id)"
+                :model-value="props.modelValue.subCategoryIds.includes(cat.id)"
                 @update:model-value="(checked) => updateSubCategory(!!checked, cat.id)"
               />
               <Label :for="`mobile-cat-${cat.id}`" class="font-normal cursor-pointer text-sm">
@@ -216,7 +216,7 @@ watch(() => props.priceRange, (newRange) => {
             <div v-for="brand in availableBrands" :key="brand.id" class="flex items-center space-x-3">
               <Checkbox
                 :id="`mobile-brand-${brand.id}`"
-                :checked="modelValue.brandIds?.includes(brand.id)"
+                :model-value="modelValue.brandIds?.includes(brand.id)"
                 @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'brandIds', brand.id)"
               />
               <Label :for="`mobile-brand-${brand.id}`" class="font-normal cursor-pointer text-sm">
@@ -235,7 +235,7 @@ watch(() => props.priceRange, (newRange) => {
             <div v-for="material in availableMaterials" :key="material.id" class="flex items-center space-x-3">
               <Checkbox
                 :id="`mobile-material-${material.id}`"
-                :checked="modelValue.materialIds?.includes(String(material.id))"
+                :model-value="modelValue.materialIds?.includes(String(material.id))"
                 @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'materialIds', material.id)"
               />
               <Label :for="`mobile-material-${material.id}`" class="font-normal cursor-pointer text-sm">
@@ -254,7 +254,7 @@ watch(() => props.priceRange, (newRange) => {
             <div v-for="country in availableCountries" :key="country.id" class="flex items-center space-x-3">
               <Checkbox
                 :id="`mobile-country-${country.id}`"
-                :checked="modelValue.countryIds?.includes(String(country.id))"
+                :model-value="modelValue.countryIds?.includes(String(country.id))"
                 @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'countryIds', country.id)"
               />
               <Label :for="`mobile-country-${country.id}`" class="font-normal cursor-pointer text-sm">
@@ -283,7 +283,7 @@ watch(() => props.priceRange, (newRange) => {
             >
               <Checkbox
                 :id="`mobile-attr-${option.id}`"
-                :checked="modelValue.attributes[filter.slug]?.includes(option.id)"
+                :model-value="modelValue.attributes[filter.slug]?.includes(option.id)"
                 @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
               />
               <Label :for="`mobile-attr-${option.id}`" class="font-normal cursor-pointer text-sm">

@@ -3,7 +3,7 @@ import type { LocationQueryValue } from 'vue-router'
 import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
@@ -13,7 +13,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 // --- 1. Инициализация ---
 const route = useRoute()
-const productsStore = useProductsStore()
+const router = useRouter()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
@@ -26,7 +26,8 @@ const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
 const accumulatedProducts = ref<ProductWithGallery[]>([])
-const isMobileFiltersOpen = ref(false) // 🔥 Состояние для мобильных фильтров
+const isMobileFiltersOpen = ref(false)
+const isSubcategoriesDrawerOpen = ref(false)
 
 interface ActiveFilters {
   sortBy: SortByType
@@ -40,11 +41,11 @@ interface ActiveFilters {
 
 const activeFilters = ref<ActiveFilters>({
   sortBy: getSortByFromQuery(route.query.sort_by),
-  subCategoryIds: [],
+  subCategoryIds: getArrayFromQuery(route.query.subcategories),
   price: [0, 50000],
-  brandIds: [],
-  materialIds: [],
-  countryIds: [],
+  brandIds: getArrayFromQuery(route.query.brands),
+  materialIds: getArrayFromQuery(route.query.materials),
+  countryIds: getArrayFromQuery(route.query.countries),
   attributes: {},
 })
 
@@ -70,7 +71,9 @@ const title = computed(() => {
 
 const priceRange = ref({ min: 0, max: 50000 })
 
-// 🔥 Подсчет активных фильтров
+// Получаем подкатегории из store
+const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
+
 const activeFiltersCount = computed(() => {
   let count = 0
 
@@ -91,7 +94,6 @@ const activeFiltersCount = computed(() => {
   return count
 })
 
-// 🔥 Формируем фильтры для запроса
 const catalogFilters = computed<IProductFilters>(() => {
   const attributeFilters: AttributeFilter[] = Object.entries(activeFilters.value.attributes)
     .filter(([, optionIds]) => optionIds.length > 0)
@@ -110,7 +112,6 @@ const catalogFilters = computed<IProductFilters>(() => {
   }
 })
 
-// 🔥 НОВОЕ: Используем Vue Query для товаров
 const {
   products: currentPageProducts,
   hasMore,
@@ -118,7 +119,6 @@ const {
   isFetching,
 } = useCatalogQuery(catalogFilters, currentPage, PAGE_SIZE)
 
-// 🔥 Отображаемые товары (накопленные при "Показать еще")
 const displayedProducts = computed(() => {
   if (currentPage.value === 1) {
     return currentPageProducts.value
@@ -127,6 +127,14 @@ const displayedProducts = computed(() => {
 })
 
 // --- 4. Функции-обработчики ---
+
+function getArrayFromQuery(queryValue: LocationQueryValue | LocationQueryValue[] | undefined): string[] {
+  if (!queryValue)
+    return []
+  if (Array.isArray(queryValue))
+    return queryValue.filter(Boolean) as string[]
+  return queryValue ? [queryValue] : []
+}
 
 function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[] | undefined): SortByType {
   if (!queryValue)
@@ -138,11 +146,13 @@ function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[
   return 'popularity'
 }
 
-// 🔥 Загрузка метаданных фильтров (из Pinia Store с кэшем)
 async function loadFilterData(slug: string) {
   isLoadingFilters.value = true
 
   try {
+    // Инициализируем store здесь, где он используется
+    const productsStore = useProductsStore()
+
     const [brands, attributes, materials, countries, priceRangeData] = await Promise.all([
       productsStore.fetchBrandsForCategory(slug),
       productsStore.fetchAttributesForCategory(slug),
@@ -160,18 +170,25 @@ async function loadFilterData(slug: string) {
     const priceMax = priceRangeData.max_price
     priceRange.value = { min: priceMin, max: priceMax }
 
+    // Восстанавливаем атрибуты из URL
     const newAttributeFilters: Record<string, any[]> = {}
     for (const attr of attributes) {
-      newAttributeFilters[attr.slug] = []
+      const queryKey = `attr_${attr.slug}`
+      const queryValue = route.query[queryKey]
+      newAttributeFilters[attr.slug] = getArrayFromQuery(queryValue)
     }
+
+    // Восстанавливаем цену из URL или используем значения по умолчанию
+    const priceMinFromQuery = route.query.price_min ? Number(route.query.price_min) : priceMin
+    const priceMaxFromQuery = route.query.price_max ? Number(route.query.price_max) : priceMax
 
     activeFilters.value = {
       sortBy: getSortByFromQuery(route.query.sort_by),
-      subCategoryIds: [],
-      price: [priceMin, priceMax],
-      brandIds: [],
-      materialIds: [],
-      countryIds: [],
+      subCategoryIds: getArrayFromQuery(route.query.subcategories),
+      price: [priceMinFromQuery, priceMaxFromQuery],
+      brandIds: getArrayFromQuery(route.query.brands),
+      materialIds: getArrayFromQuery(route.query.materials),
+      countryIds: getArrayFromQuery(route.query.countries),
       attributes: newAttributeFilters,
     }
 
@@ -183,7 +200,6 @@ async function loadFilterData(slug: string) {
   }
 }
 
-// 🔥 Загрузка следующей страницы
 function loadMoreProducts() {
   if (currentPage.value === 1) {
     accumulatedProducts.value = [...currentPageProducts.value]
@@ -191,7 +207,6 @@ function loadMoreProducts() {
   currentPage.value++
 }
 
-// 🔥 Отслеживаем загрузку новой страницы и добавляем товары
 watch(currentPageProducts, (newProducts) => {
   if (currentPage.value > 1 && newProducts.length > 0) {
     const existingIds = new Set(accumulatedProducts.value.map(p => p.id))
@@ -200,35 +215,123 @@ watch(currentPageProducts, (newProducts) => {
   }
 })
 
+// Функции для работы с динамическими атрибутами
+function updateAttribute(checked: boolean, attributeSlug: string, optionId: string | number) {
+  const stringId = String(optionId)
+  const currentSelection: string[] = (activeFilters.value.attributes[attributeSlug] || []).map(String)
+  const newSelection = new Set<string>(currentSelection)
+
+  if (checked)
+    newSelection.add(stringId)
+  else
+    newSelection.delete(stringId)
+
+  activeFilters.value = {
+    ...activeFilters.value,
+    attributes: {
+      ...activeFilters.value.attributes,
+      [attributeSlug]: Array.from(newSelection),
+    },
+  }
+}
+
+function clearAttributeFilter(attributeSlug: string) {
+  activeFilters.value = {
+    ...activeFilters.value,
+    attributes: {
+      ...activeFilters.value.attributes,
+      [attributeSlug]: [],
+    },
+  }
+}
+
+// Функция для переключения подкатегории
+function toggleSubCategory(catId: string) {
+  const newIds = new Set(activeFilters.value.subCategoryIds)
+  if (newIds.has(catId)) {
+    newIds.delete(catId)
+  }
+  else {
+    newIds.add(catId)
+  }
+  activeFilters.value = {
+    ...activeFilters.value,
+    subCategoryIds: Array.from(newIds),
+  }
+}
+
+// Функция для обновления URL параметров
+function updateQueryParams() {
+  const query: Record<string, any> = {}
+
+  if (activeFilters.value.sortBy !== 'popularity') {
+    query.sort_by = activeFilters.value.sortBy
+  }
+
+  if (activeFilters.value.subCategoryIds.length > 0) {
+    query.subcategories = activeFilters.value.subCategoryIds
+  }
+
+  if (activeFilters.value.brandIds.length > 0) {
+    query.brands = activeFilters.value.brandIds
+  }
+
+  if (activeFilters.value.materialIds.length > 0) {
+    query.materials = activeFilters.value.materialIds
+  }
+
+  if (activeFilters.value.countryIds.length > 0) {
+    query.countries = activeFilters.value.countryIds
+  }
+
+  if (activeFilters.value.price[0] !== priceRange.value.min) {
+    query.price_min = activeFilters.value.price[0]
+  }
+
+  if (activeFilters.value.price[1] !== priceRange.value.max) {
+    query.price_max = activeFilters.value.price[1]
+  }
+
+  // Добавляем атрибуты
+  Object.entries(activeFilters.value.attributes).forEach(([slug, values]) => {
+    if (values.length > 0) {
+      query[`attr_${slug}`] = values
+    }
+  })
+
+  router.replace({ query })
+}
+
 // --- 5. Логика загрузки данных и реакции на изменения ---
 
+// Загружаем категории один раз при SSR/CSR
 await useAsyncData(
   `catalog-meta-${currentCategorySlug.value}`,
   () => categoriesStore.fetchCategoryData(),
   { watch: [currentCategorySlug] },
 )
 
-watch(
-  currentCategorySlug,
-  (newSlug) => {
-    if (newSlug) {
-      loadFilterData(newSlug)
-    }
+// Загружаем фильтры при первой загрузке и при смене категории
+await useAsyncData(
+  `catalog-filters-${currentCategorySlug.value}`,
+  () => loadFilterData(currentCategorySlug.value),
+  {
+    watch: [currentCategorySlug],
+    server: true, // Загружаем на сервере
   },
-  { immediate: true },
 )
 
-// 🔥 При изменении фильтров - сбрасываем на первую страницу
+// Отслеживаем изменения фильтров и обновляем URL
 watchDebounced(
   activeFilters,
   () => {
     currentPage.value = 1
     accumulatedProducts.value = []
+    updateQueryParams()
   },
   { debounce: 500, deep: true },
 )
 
-// 🔥 Общий индикатор загрузки
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
 </script>
 
@@ -259,25 +362,176 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
       </aside>
 
       <div class="col-span-1 lg:col-span-3 min-w-0">
-        <!-- Мобильная кнопка фильтров + CatalogHeader в одной строке -->
-        <div class="mb-4 flex items-center gap-3">
-          <!-- Кнопка фильтров (только на мобилке) -->
+        <!-- Кнопка для открытия Drawer с подкатегориями (только если они есть) -->
+        <div v-if="subcategories.length > 0" class="block md:hidden mb-4">
           <Button
             variant="outline"
-            class="lg:hidden h-11 shrink-0"
+            class="h-11 gap-2"
+            @click="isSubcategoriesDrawerOpen = true"
+          >
+            <Icon name="lucide:list" class="w-4 h-4" />
+            Подкатегории
+            <Badge
+              v-if="activeFilters.subCategoryIds.length > 0"
+              variant="secondary"
+              class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs"
+            >
+              {{ activeFilters.subCategoryIds.length }}
+            </Badge>
+          </Button>
+        </div>
+
+        <!-- Объединенная панель: фильтры + сортировка + динамические атрибуты -->
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+          <!-- Кнопка фильтров (только на мобилке) -->
+          <Button
+            :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
+            class="lg:hidden h-11 w-11 p-0 shrink-0 relative transition-colors" :class="[
+              activeFiltersCount > 0 ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500' : '',
+            ]"
             @click="isMobileFiltersOpen = true"
           >
-            <Icon name="lucide:sliders-horizontal" class="w-4 h-4 mr-2" />
-            Фильтры
-            <Badge v-if="activeFiltersCount > 0" variant="secondary" class="ml-2">
+            <Icon name="lucide:sliders-horizontal" class="w-5 h-5" />
+            <Badge
+              v-if="activeFiltersCount > 0"
+              variant="secondary"
+              class="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-white text-blue-500 border-2 border-blue-500"
+            >
               {{ activeFiltersCount }}
             </Badge>
           </Button>
 
-          <!-- CatalogHeader (занимает оставшееся место) -->
-          <div class="flex-1 min-w-0">
-            <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
-          </div>
+          <!-- Сортировка -->
+          <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
+
+          <!-- Разделитель -->
+          <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border" />
+
+          <!-- Динамические атрибуты -->
+          <template v-if="!isLoadingFilters && availableFilters.length > 0">
+            <template v-for="filter in availableFilters" :key="filter.id">
+              <!-- Select type -->
+              <Popover v-if="filter.display_type === 'select'">
+                <PopoverTrigger as-child>
+                  <Button
+                    :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
+                    class="h-11 gap-2 transition-colors" :class="[
+                      (activeFilters.attributes[filter.slug] || []).length > 0
+                        ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
+                        : '',
+                    ]"
+                  >
+                    {{ filter.name }}
+                    <Badge
+                      v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
+                      variant="secondary"
+                      class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
+                    >
+                      {{ (activeFilters.attributes[filter.slug] || []).length }}
+                    </Badge>
+                    <Icon name="lucide:chevron-down" class="w-3.5 h-3.5 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent class="w-64 p-3" align="start">
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between mb-2">
+                      <h4 class="font-semibold text-sm">
+                        {{ filter.name }}
+                      </h4>
+                      <Button
+                        v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
+                        variant="ghost"
+                        size="sm"
+                        class="h-6 px-2 text-xs"
+                        @click="clearAttributeFilter(filter.slug)"
+                      >
+                        <Icon name="lucide:x" class="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    <div class="max-h-64 overflow-y-auto space-y-2">
+                      <div
+                        v-for="option in filter.attribute_options"
+                        :key="option.id"
+                        class="flex items-center space-x-2"
+                      >
+                        <Checkbox
+                          :id="`attr-${filter.slug}-${option.id}`"
+                          :model-value="(activeFilters.attributes[filter.slug] || []).includes(option.id)"
+                          @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
+                        />
+                        <Label
+                          :for="`attr-${filter.slug}-${option.id}`"
+                          class="font-normal cursor-pointer text-sm"
+                        >
+                          {{ option.value }}
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              <!-- Color type -->
+              <Popover v-else-if="filter.display_type === 'color'">
+                <PopoverTrigger as-child>
+                  <Button
+                    :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
+                    class="h-11 gap-2 transition-colors" :class="[
+                      (activeFilters.attributes[filter.slug] || []).length > 0
+                        ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
+                        : '',
+                    ]"
+                  >
+                    {{ filter.name }}
+                    <Badge
+                      v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
+                      variant="secondary"
+                      class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
+                    >
+                      {{ (activeFilters.attributes[filter.slug] || []).length }}
+                    </Badge>
+                    <Icon name="lucide:chevron-down" class="w-3.5 h-3.5 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent class="w-64 p-3" align="start">
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <h4 class="font-semibold text-sm">
+                        {{ filter.name }}
+                      </h4>
+                      <Button
+                        v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
+                        variant="ghost"
+                        size="sm"
+                        class="h-6 px-2 text-xs"
+                        @click="clearAttributeFilter(filter.slug)"
+                      >
+                        <Icon name="lucide:x" class="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <button
+                        v-for="option in filter.attribute_options"
+                        :key="option.id"
+                        type="button"
+                        :title="option.value"
+                        :style="{ backgroundColor: ((option.meta as unknown) as { hex: string })?.hex }"
+                        class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95"
+                        :class="{
+                          'border-primary ring-2 ring-primary ring-offset-2': (activeFilters.attributes[filter.slug] || []).includes(option.id),
+                          'border-border': !(activeFilters.attributes[filter.slug] || []).includes(option.id),
+                        }"
+                        @click="() => {
+                          const isCurrentlyChecked = (activeFilters.attributes[filter.slug] || []).includes(option.id);
+                          updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
+                        }"
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </template>
+          </template>
         </div>
 
         <!-- Скелетон при первой загрузке -->
@@ -330,5 +584,53 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
       :is-loading="isLoadingFilters"
       @update:open="isMobileFiltersOpen = $event"
     />
+
+    <!-- Drawer с подкатегориями -->
+    <Drawer v-model:open="isSubcategoriesDrawerOpen">
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Выберите подкатегории</DrawerTitle>
+          <DrawerDescription>
+            Фильтрация применяется автоматически
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <div class="px-4 pb-6 space-y-2 max-h-[60vh] overflow-y-auto">
+          <div
+            v-for="cat in subcategories"
+            :key="cat.id"
+            class="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors"
+          >
+            <Checkbox
+              :id="`drawer-cat-${cat.id}`"
+              :model-value="activeFilters.subCategoryIds.includes(cat.id)"
+              @update:model-value="() => toggleSubCategory(cat.id)"
+            />
+            <Label
+              :for="`drawer-cat-${cat.id}`"
+              class="flex-1 font-medium cursor-pointer text-base"
+            >
+              {{ cat.name }}
+            </Label>
+          </div>
+        </div>
+
+        <DrawerFooter>
+          <Button
+            v-if="activeFilters.subCategoryIds.length > 0"
+            variant="outline"
+            class="w-full"
+            @click="activeFilters.subCategoryIds = []"
+          >
+            Сбросить все
+          </Button>
+          <DrawerClose as-child>
+            <Button class="w-full">
+              Закрыть
+            </Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   </div>
 </template>
