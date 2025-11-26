@@ -474,7 +474,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
                 <ClientOnly>
                   <button
                     type="button"
-                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
                     @click="isSubcategoriesDrawerOpen = true"
                   >
                     <Icon name="lucide:grid-2x2" class="w-4 h-4" />
