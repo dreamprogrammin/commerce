@@ -2,7 +2,7 @@
 import type { LocationQueryValue } from 'vue-router'
 import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue' // Добавлен onMounted
 import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
@@ -16,6 +16,12 @@ const route = useRoute()
 const router = useRouter()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
+
+// Флаг монтирования для корректной гидратации
+const isMounted = ref(false)
+onMounted(() => {
+  isMounted.value = true
+})
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
 const currentPage = ref(1)
@@ -74,9 +80,28 @@ const priceRange = ref({ min: 0, max: 50000 })
 // Получаем подкатегории из store
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
+// НОВОЕ: Вычисляем лейбл для мобильной кнопки категорий
+const activeSubcategoryLabel = computed(() => {
+  const count = activeFilters.value.subCategoryIds.length
+  if (count === 0)
+    return 'Все категории'
+
+  // Находим имя первой выбранной категории
+  const firstId = activeFilters.value.subCategoryIds[0]
+  const category = subcategories.value.find(c => c.id === firstId)
+
+  if (!category)
+    return 'Выбрано' // Fallback на случай ошибки данных
+
+  if (count > 1) {
+    return `${category.name} (+${count - 1})`
+  }
+
+  return category.name
+})
+
 const activeFiltersCount = computed(() => {
   let count = 0
-
   count += activeFilters.value.subCategoryIds.length
   count += activeFilters.value.brandIds.length
   count += activeFilters.value.materialIds.length
@@ -327,25 +352,24 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 
 <template>
   <div :class="`${containerClass} py-8`">
-    <!-- Breadcrumbs и заголовок рендерятся на сервере -->
+    <!-- Breadcrumbs и заголовок -->
     <ClientOnly>
       <Breadcrumbs
         v-if="breadcrumbs && breadcrumbs.length > 0"
         :items="breadcrumbs"
         class="mb-6"
       />
-
-      <!-- Опционально: заглушка (скелет) на время загрузки, чтобы контент не прыгал -->
       <template #fallback>
         <div class="h-6 w-1/3 bg-muted rounded mb-6 animate-pulse" />
       </template>
     </ClientOnly>
+
     <h1 class="text-3xl font-bold mb-6 capitalize">
       {{ title }}
     </h1>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-      <!-- Десктоп фильтры - рендерятся на сервере -->
+      <!-- Десктоп фильтры -->
       <ClientOnly>
         <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
           <DynamicFilters
@@ -362,42 +386,13 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
         <template #fallback>
           <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
             <div class="p-4 border rounded-lg bg-card space-y-6">
-              <!-- Заголовок "Фильтры" -->
-              <div>
-                <Skeleton class="h-6 w-24" />
-              </div>
-
-              <!-- Секция 1: Имитация списка категорий -->
-              <div class="space-y-4">
-                <Skeleton class="h-5 w-32" /> <!-- Заголовок секции -->
+              <Skeleton class="h-6 w-24" />
+              <div class="space-y-4 pt-4">
+                <Skeleton class="h-5 w-32" />
                 <div class="space-y-2">
-                  <!-- 4 строки чекбоксов -->
                   <div v-for="i in 4" :key="i" class="flex items-center space-x-2">
-                    <Skeleton class="h-4 w-4 rounded" /> <!-- Чекбокс -->
-                    <Skeleton class="h-4 w-3/4" />       <!-- Текст -->
-                  </div>
-                </div>
-              </div>
-
-              <!-- Секция 2: Имитация Брендов (с линией разделителем) -->
-              <div class="space-y-4 pt-4 border-t">
-                <Skeleton class="h-5 w-20" />
-                <div class="space-y-2">
-                  <div v-for="i in 3" :key="i" class="flex items-center space-x-2">
                     <Skeleton class="h-4 w-4 rounded" />
-                    <Skeleton class="h-4 w-1/2" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Секция 3: Имитация Цены (слайдер) -->
-              <div class="space-y-4 pt-4 border-t">
-                <Skeleton class="h-5 w-16" />
-                <div class="pt-2 space-y-4">
-                  <Skeleton class="h-5 w-full rounded-full" /> <!-- Сам слайдер -->
-                  <div class="flex justify-between">
-                    <Skeleton class="h-4 w-12" /> <!-- Мин цена -->
-                    <Skeleton class="h-4 w-12" /> <!-- Макс цена -->
+                    <Skeleton class="h-4 w-3/4" />
                   </div>
                 </div>
               </div>
@@ -407,87 +402,39 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
       </ClientOnly>
 
       <div class="col-span-1 lg:col-span-3 min-w-0">
-        <!-- Единая панель: подкатегории + фильтры + сортировка -->
         <div class="mb-6 space-y-4">
-          <!-- Подкатегории на мобильных -->
+          <!-- НОВОЕ: Подкатегории на мобильных (Кнопка + Сброс) -->
           <div v-if="subcategories.length > 0" class="lg:hidden">
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <Icon name="lucide:layers" class="w-4 h-4 text-muted-foreground" />
-                <h3 class="text-sm font-medium text-foreground">
-                  Подкатегории
-                </h3>
-                <Badge
-                  v-if="activeFilters.subCategoryIds.length > 0"
-                  variant="secondary"
-                  class="h-5 min-w-5 px-1.5 text-xs font-semibold"
-                >
-                  {{ activeFilters.subCategoryIds.length }}
-                </Badge>
-              </div>
+            <div class="flex items-center justify-between">
+              <!-- Левая часть: Кнопка-Бейдж -->
               <Button
-                v-if="activeFilters.subCategoryIds.length > 0"
+                variant="outline"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
+                @click="isSubcategoriesDrawerOpen = true"
+              >
+                <Icon
+                  :name="activeFilters.subCategoryIds.length > 0 ? 'lucide:layers' : 'lucide:grid-2x2'"
+                  class="w-4 h-4 shrink-0"
+                />
+                <span class="truncate">{{ activeSubcategoryLabel }}</span>
+              </Button>
+
+              <!-- Правая часть: Кнопка Сброса -->
+              <Button
                 variant="ghost"
-                size="sm"
-                class="h-7 px-2 text-xs -mr-2"
+                size="icon"
+                :disabled="activeFilters.subCategoryIds.length === 0"
+                class="inline-flex items-center gap-2 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
                 @click="activeFilters.subCategoryIds = []"
               >
-                <Icon name="lucide:x" class="w-3.5 h-3.5 mr-1" />
-                Сбросить
+                <Icon name="lucide:x" class="w-5 h-5" />
               </Button>
-            </div>
-
-            <div class="relative">
-              <div
-                class="absolute right-0 top-0 bottom-2 w-12 bg-gradient-to-l from-background to-transparent pointer-events-none z-10"
-              />
-
-              <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
-                <button
-                  v-for="cat in subcategories"
-                  :key="cat.id"
-                  type="button"
-                  class="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0 snap-start"
-                  :class="[
-                    activeFilters.subCategoryIds.includes(cat.id)
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]'
-                      : 'bg-secondary/60 text-secondary-foreground hover:bg-secondary hover:scale-[1.02] hover:shadow-md active:scale-95',
-                  ]"
-                  @click="toggleSubCategory(cat.id)"
-                >
-                  <div
-                    v-if="activeFilters.subCategoryIds.includes(cat.id)"
-                    class="flex items-center justify-center w-4 h-4 rounded-full bg-white/20"
-                  >
-                    <Icon name="lucide:check" class="w-3 h-3" />
-                  </div>
-
-                  <span>{{ cat.name }}</span>
-
-                  <div
-                    v-if="!activeFilters.subCategoryIds.includes(cat.id)"
-                    class="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-primary/20 transition-colors"
-                  />
-                </button>
-
-                <!-- Кнопка drawer только на клиенте -->
-                <ClientOnly>
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
-                    @click="isSubcategoriesDrawerOpen = true"
-                  >
-                    <Icon name="lucide:grid-2x2" class="w-4 h-4" />
-                    <span>Все категории</span>
-                  </button>
-                </ClientOnly>
-              </div>
             </div>
           </div>
 
-          <!-- Панель с фильтрами, сортировкой и подкатегориями в одну строку на десктопе -->
+          <!-- Панель управления (Фильтры, Сортировка) -->
           <div class="flex flex-wrap items-center gap-2">
-            <!-- Кнопка мобильных фильтров только на клиенте -->
+            <!-- Кнопка мобильных фильтров -->
             <ClientOnly>
               <Button
                 :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
@@ -507,13 +454,12 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </Button>
             </ClientOnly>
 
-            <!-- Сортировка - рендерится на сервере -->
+            <!-- Сортировка -->
             <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
 
-            <!-- Разделитель -->
-            <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border" />
+            <!-- Десктопные дропдауны атрибутов -->
+            <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border hidden lg:block" />
 
-            <!-- Динамические атрибуты -->
             <template v-if="!isLoadingFilters && availableFilters.length > 0">
               <template v-for="filter in availableFilters" :key="filter.id">
                 <!-- Select type -->
@@ -521,7 +467,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
                   <PopoverTrigger as-child>
                     <Button
                       :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
-                      class="h-11 gap-2 transition-colors" :class="[
+                      class="hidden lg:inline-flex h-11 gap-2 transition-colors" :class="[
                         (activeFilters.attributes[filter.slug] || []).length > 0
                           ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
                           : '',
@@ -582,7 +528,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
                   <PopoverTrigger as-child>
                     <Button
                       :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
-                      class="h-11 gap-2 transition-colors" :class="[
+                      class="hidden lg:inline-flex h-11 gap-2 transition-colors" :class="[
                         (activeFilters.attributes[filter.slug] || []).length > 0
                           ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
                           : '',
@@ -639,10 +585,9 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </template>
             </template>
 
-            <!-- Подкатегории на десктопе (в одну строку) -->
+            <!-- Подкатегории на десктопе (остаются как были, скрыты на мобиле) -->
             <template v-if="subcategories.length > 0">
               <div class="hidden lg:block h-6 w-px bg-border" />
-
               <button
                 v-for="cat in subcategories"
                 :key="cat.id"
@@ -661,9 +606,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
                 >
                   <Icon name="lucide:check" class="w-3 h-3" />
                 </div>
-
                 <span>{{ cat.name }}</span>
-
                 <div
                   v-if="!activeFilters.subCategoryIds.includes(cat.id)"
                   class="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-primary/20 transition-colors"
@@ -673,8 +616,10 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
           </div>
         </div>
 
-        <!-- Скелетон, товары, пустое состояние - рендерятся на сервере -->
-        <ProductGridSkeleton v-if="isLoading && displayedProducts.length === 0" />
+        <!-- Скелетон, товары, пустое состояние -->
+        <ProductGridSkeleton
+          v-if="(isLoading && isMounted) || (isLoading && displayedProducts.length === 0)"
+        />
 
         <div v-else-if="displayedProducts.length > 0" class="space-y-8">
           <ProductGrid :products="displayedProducts" />
@@ -707,7 +652,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
       </div>
     </div>
 
-    <!-- Мобильные компоненты только на клиенте -->
+    <!-- Мобильные компоненты -->
     <ClientOnly>
       <!-- Мобильные фильтры (Sheet) -->
       <DynamicFiltersMobile
@@ -774,15 +719,6 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 </template>
 
 <style scoped>
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
 @keyframes shimmer {
   0% {
     background-position: -200% center;
