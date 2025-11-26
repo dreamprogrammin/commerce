@@ -150,7 +150,6 @@ async function loadFilterData(slug: string) {
   isLoadingFilters.value = true
 
   try {
-    // Инициализируем store здесь, где он используется
     const productsStore = useProductsStore()
 
     const [brands, attributes, materials, countries, priceRangeData] = await Promise.all([
@@ -170,7 +169,6 @@ async function loadFilterData(slug: string) {
     const priceMax = priceRangeData.max_price
     priceRange.value = { min: priceMin, max: priceMax }
 
-    // Восстанавливаем атрибуты из URL
     const newAttributeFilters: Record<string, any[]> = {}
     for (const attr of attributes) {
       const queryKey = `attr_${attr.slug}`
@@ -178,7 +176,6 @@ async function loadFilterData(slug: string) {
       newAttributeFilters[attr.slug] = getArrayFromQuery(queryValue)
     }
 
-    // Восстанавливаем цену из URL или используем значения по умолчанию
     const priceMinFromQuery = route.query.price_min ? Number(route.query.price_min) : priceMin
     const priceMaxFromQuery = route.query.price_max ? Number(route.query.price_max) : priceMax
 
@@ -215,7 +212,6 @@ watch(currentPageProducts, (newProducts) => {
   }
 })
 
-// Функции для работы с динамическими атрибутами
 function updateAttribute(checked: boolean, attributeSlug: string, optionId: string | number) {
   const stringId = String(optionId)
   const currentSelection: string[] = (activeFilters.value.attributes[attributeSlug] || []).map(String)
@@ -245,7 +241,6 @@ function clearAttributeFilter(attributeSlug: string) {
   }
 }
 
-// Функция для переключения подкатегории
 function toggleSubCategory(catId: string) {
   const newIds = new Set(activeFilters.value.subCategoryIds)
   if (newIds.has(catId)) {
@@ -260,7 +255,6 @@ function toggleSubCategory(catId: string) {
   }
 }
 
-// Функция для обновления URL параметров
 function updateQueryParams() {
   const query: Record<string, any> = {}
 
@@ -292,7 +286,6 @@ function updateQueryParams() {
     query.price_max = activeFilters.value.price[1]
   }
 
-  // Добавляем атрибуты
   Object.entries(activeFilters.value.attributes).forEach(([slug, values]) => {
     if (values.length > 0) {
       query[`attr_${slug}`] = values
@@ -304,24 +297,21 @@ function updateQueryParams() {
 
 // --- 5. Логика загрузки данных и реакции на изменения ---
 
-// Загружаем категории один раз при SSR/CSR
 await useAsyncData(
   `catalog-meta-${currentCategorySlug.value}`,
   () => categoriesStore.fetchCategoryData(),
   { watch: [currentCategorySlug] },
 )
 
-// Загружаем фильтры при первой загрузке и при смене категории
 await useAsyncData(
   `catalog-filters-${currentCategorySlug.value}`,
   () => loadFilterData(currentCategorySlug.value),
   {
     watch: [currentCategorySlug],
-    server: true, // Загружаем на сервере
+    server: true,
   },
 )
 
-// Отслеживаем изменения фильтров и обновляем URL
 watchDebounced(
   activeFilters,
   () => {
@@ -337,211 +327,358 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 
 <template>
   <div :class="`${containerClass} py-8`">
+    <!-- Breadcrumbs и заголовок рендерятся на сервере -->
     <ClientOnly>
-      <Breadcrumbs :items="breadcrumbs" class="mb-6" />
-      <h1 class="text-3xl font-bold mb-6 capitalize">
-        {{ title }}
-      </h1>
+      <Breadcrumbs
+        v-if="breadcrumbs && breadcrumbs.length > 0"
+        :items="breadcrumbs"
+        class="mb-6"
+      />
+
+      <!-- Опционально: заглушка (скелет) на время загрузки, чтобы контент не прыгал -->
       <template #fallback>
-        <div class="mb-6 h-6 w-1/3 rounded-lg bg-gray-200 animate-pulse" />
+        <div class="h-6 w-1/3 bg-muted rounded mb-6 animate-pulse" />
       </template>
     </ClientOnly>
+    <h1 class="text-3xl font-bold mb-6 capitalize">
+      {{ title }}
+    </h1>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-      <!-- Десктоп фильтры -->
-      <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
-        <DynamicFilters
-          v-model="activeFilters"
-          :available-filters="availableFilters"
-          :available-brands="availableBrands"
-          :price-range="priceRange"
-          :available-materials="availableMaterials"
-          :available-countries="availableCountries"
-          :is-loading="isLoadingFilters"
-        />
-      </aside>
+      <!-- Десктоп фильтры - рендерятся на сервере -->
+      <ClientOnly>
+        <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
+          <DynamicFilters
+            v-model="activeFilters"
+            :available-filters="availableFilters"
+            :available-brands="availableBrands"
+            :price-range="priceRange"
+            :available-materials="availableMaterials"
+            :available-countries="availableCountries"
+            :is-loading="isLoadingFilters"
+          />
+        </aside>
+
+        <template #fallback>
+          <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
+            <div class="p-4 border rounded-lg bg-card space-y-6">
+              <!-- Заголовок "Фильтры" -->
+              <div>
+                <Skeleton class="h-6 w-24" />
+              </div>
+
+              <!-- Секция 1: Имитация списка категорий -->
+              <div class="space-y-4">
+                <Skeleton class="h-5 w-32" /> <!-- Заголовок секции -->
+                <div class="space-y-2">
+                  <!-- 4 строки чекбоксов -->
+                  <div v-for="i in 4" :key="i" class="flex items-center space-x-2">
+                    <Skeleton class="h-4 w-4 rounded" /> <!-- Чекбокс -->
+                    <Skeleton class="h-4 w-3/4" />       <!-- Текст -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Секция 2: Имитация Брендов (с линией разделителем) -->
+              <div class="space-y-4 pt-4 border-t">
+                <Skeleton class="h-5 w-20" />
+                <div class="space-y-2">
+                  <div v-for="i in 3" :key="i" class="flex items-center space-x-2">
+                    <Skeleton class="h-4 w-4 rounded" />
+                    <Skeleton class="h-4 w-1/2" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Секция 3: Имитация Цены (слайдер) -->
+              <div class="space-y-4 pt-4 border-t">
+                <Skeleton class="h-5 w-16" />
+                <div class="pt-2 space-y-4">
+                  <Skeleton class="h-5 w-full rounded-full" /> <!-- Сам слайдер -->
+                  <div class="flex justify-between">
+                    <Skeleton class="h-4 w-12" /> <!-- Мин цена -->
+                    <Skeleton class="h-4 w-12" /> <!-- Макс цена -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </template>
+      </ClientOnly>
 
       <div class="col-span-1 lg:col-span-3 min-w-0">
-        <!-- Кнопка для открытия Drawer с подкатегориями (только если они есть) -->
-        <div v-if="subcategories.length > 0" class="block md:hidden mb-4">
-          <Button
-            variant="outline"
-            class="h-11 gap-2"
-            @click="isSubcategoriesDrawerOpen = true"
-          >
-            <Icon name="lucide:list" class="w-4 h-4" />
-            Подкатегории
-            <Badge
-              v-if="activeFilters.subCategoryIds.length > 0"
-              variant="secondary"
-              class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs"
-            >
-              {{ activeFilters.subCategoryIds.length }}
-            </Badge>
-          </Button>
-        </div>
+        <!-- Единая панель: подкатегории + фильтры + сортировка -->
+        <div class="mb-6 space-y-4">
+          <!-- Подкатегории на мобильных -->
+          <div v-if="subcategories.length > 0" class="lg:hidden">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <Icon name="lucide:layers" class="w-4 h-4 text-muted-foreground" />
+                <h3 class="text-sm font-medium text-foreground">
+                  Подкатегории
+                </h3>
+                <Badge
+                  v-if="activeFilters.subCategoryIds.length > 0"
+                  variant="secondary"
+                  class="h-5 min-w-5 px-1.5 text-xs font-semibold"
+                >
+                  {{ activeFilters.subCategoryIds.length }}
+                </Badge>
+              </div>
+              <Button
+                v-if="activeFilters.subCategoryIds.length > 0"
+                variant="ghost"
+                size="sm"
+                class="h-7 px-2 text-xs -mr-2"
+                @click="activeFilters.subCategoryIds = []"
+              >
+                <Icon name="lucide:x" class="w-3.5 h-3.5 mr-1" />
+                Сбросить
+              </Button>
+            </div>
 
-        <!-- Объединенная панель: фильтры + сортировка + динамические атрибуты -->
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-          <!-- Кнопка фильтров (только на мобилке) -->
-          <Button
-            :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
-            class="lg:hidden h-11 w-11 p-0 shrink-0 relative transition-colors" :class="[
-              activeFiltersCount > 0 ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500' : '',
-            ]"
-            @click="isMobileFiltersOpen = true"
-          >
-            <Icon name="lucide:sliders-horizontal" class="w-5 h-5" />
-            <Badge
-              v-if="activeFiltersCount > 0"
-              variant="secondary"
-              class="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-white text-blue-500 border-2 border-blue-500"
-            >
-              {{ activeFiltersCount }}
-            </Badge>
-          </Button>
+            <div class="relative">
+              <div
+                class="absolute right-0 top-0 bottom-2 w-12 bg-gradient-to-l from-background to-transparent pointer-events-none z-10"
+              />
 
-          <!-- Сортировка -->
-          <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
-
-          <!-- Разделитель -->
-          <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border" />
-
-          <!-- Динамические атрибуты -->
-          <template v-if="!isLoadingFilters && availableFilters.length > 0">
-            <template v-for="filter in availableFilters" :key="filter.id">
-              <!-- Select type -->
-              <Popover v-if="filter.display_type === 'select'">
-                <PopoverTrigger as-child>
-                  <Button
-                    :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
-                    class="h-11 gap-2 transition-colors" :class="[
-                      (activeFilters.attributes[filter.slug] || []).length > 0
-                        ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
-                        : '',
-                    ]"
+              <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+                <button
+                  v-for="cat in subcategories"
+                  :key="cat.id"
+                  type="button"
+                  class="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0 snap-start"
+                  :class="[
+                    activeFilters.subCategoryIds.includes(cat.id)
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]'
+                      : 'bg-secondary/60 text-secondary-foreground hover:bg-secondary hover:scale-[1.02] hover:shadow-md active:scale-95',
+                  ]"
+                  @click="toggleSubCategory(cat.id)"
+                >
+                  <div
+                    v-if="activeFilters.subCategoryIds.includes(cat.id)"
+                    class="flex items-center justify-center w-4 h-4 rounded-full bg-white/20"
                   >
-                    {{ filter.name }}
-                    <Badge
-                      v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
-                      variant="secondary"
-                      class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
+                    <Icon name="lucide:check" class="w-3 h-3" />
+                  </div>
+
+                  <span>{{ cat.name }}</span>
+
+                  <div
+                    v-if="!activeFilters.subCategoryIds.includes(cat.id)"
+                    class="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-primary/20 transition-colors"
+                  />
+                </button>
+
+                <!-- Кнопка drawer только на клиенте -->
+                <ClientOnly>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
+                    @click="isSubcategoriesDrawerOpen = true"
+                  >
+                    <Icon name="lucide:grid-2x2" class="w-4 h-4" />
+                    <span>Все категории</span>
+                  </button>
+                </ClientOnly>
+              </div>
+            </div>
+          </div>
+
+          <!-- Панель с фильтрами, сортировкой и подкатегориями в одну строку на десктопе -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Кнопка мобильных фильтров только на клиенте -->
+            <ClientOnly>
+              <Button
+                :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
+                class="lg:hidden h-11 w-11 p-0 shrink-0 relative transition-colors" :class="[
+                  activeFiltersCount > 0 ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500' : '',
+                ]"
+                @click="isMobileFiltersOpen = true"
+              >
+                <Icon name="lucide:sliders-horizontal" class="w-5 h-5" />
+                <Badge
+                  v-if="activeFiltersCount > 0"
+                  variant="secondary"
+                  class="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-white text-blue-500 border-2 border-blue-500"
+                >
+                  {{ activeFiltersCount }}
+                </Badge>
+              </Button>
+            </ClientOnly>
+
+            <!-- Сортировка - рендерится на сервере -->
+            <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
+
+            <!-- Разделитель -->
+            <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border" />
+
+            <!-- Динамические атрибуты -->
+            <template v-if="!isLoadingFilters && availableFilters.length > 0">
+              <template v-for="filter in availableFilters" :key="filter.id">
+                <!-- Select type -->
+                <Popover v-if="filter.display_type === 'select'">
+                  <PopoverTrigger as-child>
+                    <Button
+                      :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
+                      class="h-11 gap-2 transition-colors" :class="[
+                        (activeFilters.attributes[filter.slug] || []).length > 0
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
+                          : '',
+                      ]"
                     >
-                      {{ (activeFilters.attributes[filter.slug] || []).length }}
-                    </Badge>
-                    <Icon name="lucide:chevron-down" class="w-3.5 h-3.5 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent class="w-64 p-3" align="start">
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between mb-2">
-                      <h4 class="font-semibold text-sm">
-                        {{ filter.name }}
-                      </h4>
-                      <Button
+                      {{ filter.name }}
+                      <Badge
                         v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
-                        variant="ghost"
-                        size="sm"
-                        class="h-6 px-2 text-xs"
-                        @click="clearAttributeFilter(filter.slug)"
+                        variant="secondary"
+                        class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
                       >
-                        <Icon name="lucide:x" class="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                    <div class="max-h-64 overflow-y-auto space-y-2">
-                      <div
-                        v-for="option in filter.attribute_options"
-                        :key="option.id"
-                        class="flex items-center space-x-2"
-                      >
-                        <Checkbox
-                          :id="`attr-${filter.slug}-${option.id}`"
-                          :model-value="(activeFilters.attributes[filter.slug] || []).includes(option.id)"
-                          @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
-                        />
-                        <Label
-                          :for="`attr-${filter.slug}-${option.id}`"
-                          class="font-normal cursor-pointer text-sm"
+                        {{ (activeFilters.attributes[filter.slug] || []).length }}
+                      </Badge>
+                      <Icon name="lucide:chevron-down" class="w-3.5 h-3.5 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent class="w-64 p-3" align="start">
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold text-sm">
+                          {{ filter.name }}
+                        </h4>
+                        <Button
+                          v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
+                          variant="ghost"
+                          size="sm"
+                          class="h-6 px-2 text-xs"
+                          @click="clearAttributeFilter(filter.slug)"
                         >
-                          {{ option.value }}
-                        </Label>
+                          <Icon name="lucide:x" class="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      <div class="max-h-64 overflow-y-auto space-y-2">
+                        <div
+                          v-for="option in filter.attribute_options"
+                          :key="option.id"
+                          class="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            :id="`attr-${filter.slug}-${option.id}`"
+                            :model-value="(activeFilters.attributes[filter.slug] || []).includes(option.id)"
+                            @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
+                          />
+                          <Label
+                            :for="`attr-${filter.slug}-${option.id}`"
+                            class="font-normal cursor-pointer text-sm"
+                          >
+                            {{ option.value }}
+                          </Label>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverContent>
+                </Popover>
 
-              <!-- Color type -->
-              <Popover v-else-if="filter.display_type === 'color'">
-                <PopoverTrigger as-child>
-                  <Button
-                    :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
-                    class="h-11 gap-2 transition-colors" :class="[
-                      (activeFilters.attributes[filter.slug] || []).length > 0
-                        ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
-                        : '',
-                    ]"
-                  >
-                    {{ filter.name }}
-                    <Badge
-                      v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
-                      variant="secondary"
-                      class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
+                <!-- Color type -->
+                <Popover v-else-if="filter.display_type === 'color'">
+                  <PopoverTrigger as-child>
+                    <Button
+                      :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
+                      class="h-11 gap-2 transition-colors" :class="[
+                        (activeFilters.attributes[filter.slug] || []).length > 0
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
+                          : '',
+                      ]"
                     >
-                      {{ (activeFilters.attributes[filter.slug] || []).length }}
-                    </Badge>
-                    <Icon name="lucide:chevron-down" class="w-3.5 h-3.5 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent class="w-64 p-3" align="start">
-                  <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                      <h4 class="font-semibold text-sm">
-                        {{ filter.name }}
-                      </h4>
-                      <Button
+                      {{ filter.name }}
+                      <Badge
                         v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
-                        variant="ghost"
-                        size="sm"
-                        class="h-6 px-2 text-xs"
-                        @click="clearAttributeFilter(filter.slug)"
+                        variant="secondary"
+                        class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
                       >
-                        <Icon name="lucide:x" class="w-3.5 h-3.5" />
-                      </Button>
+                        {{ (activeFilters.attributes[filter.slug] || []).length }}
+                      </Badge>
+                      <Icon name="lucide:chevron-down" class="w-3.5 h-3.5 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent class="w-64 p-3" align="start">
+                    <div class="space-y-3">
+                      <div class="flex items-center justify-between">
+                        <h4 class="font-semibold text-sm">
+                          {{ filter.name }}
+                        </h4>
+                        <Button
+                          v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
+                          variant="ghost"
+                          size="sm"
+                          class="h-6 px-2 text-xs"
+                          @click="clearAttributeFilter(filter.slug)"
+                        >
+                          <Icon name="lucide:x" class="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          v-for="option in filter.attribute_options"
+                          :key="option.id"
+                          type="button"
+                          :title="option.value"
+                          :style="{ backgroundColor: ((option.meta as unknown) as { hex: string })?.hex }"
+                          class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95"
+                          :class="{
+                            'border-primary ring-2 ring-primary ring-offset-2': (activeFilters.attributes[filter.slug] || []).includes(option.id),
+                            'border-border': !(activeFilters.attributes[filter.slug] || []).includes(option.id),
+                          }"
+                          @click="() => {
+                            const isCurrentlyChecked = (activeFilters.attributes[filter.slug] || []).includes(option.id);
+                            updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
+                          }"
+                        />
+                      </div>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                      <button
-                        v-for="option in filter.attribute_options"
-                        :key="option.id"
-                        type="button"
-                        :title="option.value"
-                        :style="{ backgroundColor: ((option.meta as unknown) as { hex: string })?.hex }"
-                        class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95"
-                        :class="{
-                          'border-primary ring-2 ring-primary ring-offset-2': (activeFilters.attributes[filter.slug] || []).includes(option.id),
-                          'border-border': !(activeFilters.attributes[filter.slug] || []).includes(option.id),
-                        }"
-                        @click="() => {
-                          const isCurrentlyChecked = (activeFilters.attributes[filter.slug] || []).includes(option.id);
-                          updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
-                        }"
-                      />
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverContent>
+                </Popover>
+              </template>
             </template>
-          </template>
+
+            <!-- Подкатегории на десктопе (в одну строку) -->
+            <template v-if="subcategories.length > 0">
+              <div class="hidden lg:block h-6 w-px bg-border" />
+
+              <button
+                v-for="cat in subcategories"
+                :key="cat.id"
+                type="button"
+                class="hidden lg:inline-flex group relative items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0"
+                :class="[
+                  activeFilters.subCategoryIds.includes(cat.id)
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]'
+                    : 'bg-secondary/60 text-secondary-foreground hover:bg-secondary hover:scale-[1.02] hover:shadow-md active:scale-95',
+                ]"
+                @click="toggleSubCategory(cat.id)"
+              >
+                <div
+                  v-if="activeFilters.subCategoryIds.includes(cat.id)"
+                  class="flex items-center justify-center w-4 h-4 rounded-full bg-white/20"
+                >
+                  <Icon name="lucide:check" class="w-3 h-3" />
+                </div>
+
+                <span>{{ cat.name }}</span>
+
+                <div
+                  v-if="!activeFilters.subCategoryIds.includes(cat.id)"
+                  class="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-primary/20 transition-colors"
+                />
+              </button>
+            </template>
+          </div>
         </div>
 
-        <!-- Скелетон при первой загрузке -->
-        <ProductGridSkeleton v-if="isLoading" />
+        <!-- Скелетон, товары, пустое состояние - рендерятся на сервере -->
+        <ProductGridSkeleton v-if="isLoading && displayedProducts.length === 0" />
 
-        <!-- Товары -->
         <div v-else-if="displayedProducts.length > 0" class="space-y-8">
           <ProductGrid :products="displayedProducts" />
 
-          <!-- Кнопка "Показать еще" -->
           <div v-if="hasMore" class="text-center">
             <Button
               variant="outline"
@@ -554,13 +691,11 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
             </Button>
           </div>
 
-          <!-- Индикатор фоновой загрузки -->
           <div v-if="isFetching && currentPage > 1" class="text-center text-sm text-muted-foreground">
             Загрузка товаров...
           </div>
         </div>
 
-        <!-- Пустое состояние -->
         <div v-else class="text-center py-20 text-muted-foreground border-2 border-dashed rounded-lg">
           <h3 class="text-2xl font-semibold">
             Товары не найдены
@@ -572,65 +707,88 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
       </div>
     </div>
 
-    <!-- Мобильные фильтры (Sheet) -->
-    <DynamicFiltersMobile
-      v-model="activeFilters"
-      :open="isMobileFiltersOpen"
-      :available-filters="availableFilters"
-      :available-brands="availableBrands"
-      :price-range="priceRange"
-      :available-materials="availableMaterials"
-      :available-countries="availableCountries"
-      :is-loading="isLoadingFilters"
-      @update:open="isMobileFiltersOpen = $event"
-    />
+    <!-- Мобильные компоненты только на клиенте -->
+    <ClientOnly>
+      <!-- Мобильные фильтры (Sheet) -->
+      <DynamicFiltersMobile
+        v-model="activeFilters"
+        :open="isMobileFiltersOpen"
+        :available-filters="availableFilters"
+        :available-brands="availableBrands"
+        :price-range="priceRange"
+        :available-materials="availableMaterials"
+        :available-countries="availableCountries"
+        :is-loading="isLoadingFilters"
+        @update:open="isMobileFiltersOpen = $event"
+      />
 
-    <!-- Drawer с подкатегориями -->
-    <Drawer v-model:open="isSubcategoriesDrawerOpen">
-      <DrawerContent>
-        <DrawerHeader>
-          <DrawerTitle>Выберите подкатегории</DrawerTitle>
-          <DrawerDescription>
-            Фильтрация применяется автоматически
-          </DrawerDescription>
-        </DrawerHeader>
+      <!-- Drawer с подкатегориями -->
+      <Drawer v-model:open="isSubcategoriesDrawerOpen">
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Выберите подкатегории</DrawerTitle>
+            <DrawerDescription>
+              Фильтрация применяется автоматически
+            </DrawerDescription>
+          </DrawerHeader>
 
-        <div class="px-4 pb-6 space-y-2 max-h-[60vh] overflow-y-auto">
-          <div
-            v-for="cat in subcategories"
-            :key="cat.id"
-            class="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors"
-          >
-            <Checkbox
-              :id="`drawer-cat-${cat.id}`"
-              :model-value="activeFilters.subCategoryIds.includes(cat.id)"
-              @update:model-value="() => toggleSubCategory(cat.id)"
-            />
-            <Label
-              :for="`drawer-cat-${cat.id}`"
-              class="flex-1 font-medium cursor-pointer text-base"
+          <div class="px-4 pb-6 space-y-2 max-h-[60vh] overflow-y-auto">
+            <div
+              v-for="cat in subcategories"
+              :key="cat.id"
+              class="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors"
             >
-              {{ cat.name }}
-            </Label>
+              <Checkbox
+                :id="`drawer-cat-${cat.id}`"
+                :model-value="activeFilters.subCategoryIds.includes(cat.id)"
+                @update:model-value="() => toggleSubCategory(cat.id)"
+              />
+              <Label
+                :for="`drawer-cat-${cat.id}`"
+                class="flex-1 font-medium cursor-pointer text-base"
+              >
+                {{ cat.name }}
+              </Label>
+            </div>
           </div>
-        </div>
 
-        <DrawerFooter>
-          <Button
-            v-if="activeFilters.subCategoryIds.length > 0"
-            variant="outline"
-            class="w-full"
-            @click="activeFilters.subCategoryIds = []"
-          >
-            Сбросить все
-          </Button>
-          <DrawerClose as-child>
-            <Button class="w-full">
-              Закрыть
+          <DrawerFooter>
+            <Button
+              v-if="activeFilters.subCategoryIds.length > 0"
+              variant="outline"
+              class="w-full"
+              @click="activeFilters.subCategoryIds = []"
+            >
+              Сбросить все
             </Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+            <DrawerClose as-child>
+              <Button class="w-full">
+                Закрыть
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </ClientOnly>
   </div>
 </template>
+
+<style scoped>
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+</style>

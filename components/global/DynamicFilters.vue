@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import type { PropType } from 'vue'
-import type { AttributeWithValue, BrandForFilter, ColorOptionMeta, Country, Material } from '@/types' // Убедитесь, что типы импортированы
+import type { AttributeWithValue, BrandForFilter, ColorOptionMeta, Country, Material } from '@/types'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 // --- 1. PROPS & EMITS ---
 const props = defineProps({
-  // modelValue теперь содержит все активные фильтры
   modelValue: {
     type: Object as PropType<{
       subCategoryIds: string[]
       price: [number, number]
-      brandIds: string[] // Прямой массив ID
-      materialIds: string[] // Прямой массив ID
-      countryIds: string[] // Прямой массив ID
+      brandIds: string[]
+      materialIds: string[]
+      countryIds: string[]
       attributes: Record<string, (string | number)[]>
     }>,
     required: true,
@@ -26,13 +25,12 @@ const props = defineProps({
     type: Array as PropType<BrandForFilter[]>,
     default: () => [],
   },
-  // === НОВЫЕ ПРОПСЫ ===
   availableMaterials: {
-    type: Array as PropType<Material[]>, // Используем ваш тип Material
+    type: Array as PropType<Material[]>,
     default: () => [],
   },
   availableCountries: {
-    type: Array as PropType<Country[]>, // Используем ваш тип Country
+    type: Array as PropType<Country[]>,
     default: () => [],
   },
   availableFilters: {
@@ -50,7 +48,6 @@ const route = useRoute()
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
-// Локальное состояние для слайдера цены, чтобы UI был отзывчивым
 const localPrice = ref<[number, number]>([...props.modelValue.price])
 
 // --- 3. ОБРАБОТЧИКИ ИЗМЕНЕНИЙ ---
@@ -66,13 +63,8 @@ function updateSubCategory(checked: boolean, catId: string) {
   emit('update:modelValue', { ...props.modelValue, subCategoryIds: Array.from(newIds) })
 }
 
-/**
- * УНИВЕРСАЛЬНАЯ функция для обновления ЛЮБОГО ДИНАМИЧЕСКОГО АТРИБУТА (Color, Size, etc.)
- */
 function updateAttribute(checked: boolean, attributeSlug: string, optionId: string | number) {
   const stringId = String(optionId)
-
-  // Явно указываем, что тут массив строк
   const currentSelection: string[] = (props.modelValue.attributes[attributeSlug] || []).map(String)
   const newSelection = new Set<string>(currentSelection)
 
@@ -89,15 +81,10 @@ function updateAttribute(checked: boolean, attributeSlug: string, optionId: stri
   })
 }
 
-/**
- * НОВАЯ УНИВЕРСАЛЬНАЯ функция для обновления ПРЯМЫХ ID (Brand, Material, Country)
- */
 function updateDirectFilter(checked: boolean, key: 'brandIds' | 'materialIds' | 'countryIds', id: string | number) {
-  // Конвертируем ID в строку перед использованием в Set
   const stringId = String(id)
-
-  const currentSelection: string[] = (props.modelValue[key] || []).map(String) // Убеждаемся, что все - строки
-  const newSelection = new Set<string>(currentSelection) // Явно типизируем Set<string>
+  const currentSelection: string[] = (props.modelValue[key] || []).map(String)
+  const newSelection = new Set<string>(currentSelection)
 
   if (checked)
     newSelection.add(stringId)
@@ -105,7 +92,7 @@ function updateDirectFilter(checked: boolean, key: 'brandIds' | 'materialIds' | 
 
   emit('update:modelValue', {
     ...props.modelValue,
-    [key]: Array.from(newSelection), // Возвращаем массив строк
+    [key]: Array.from(newSelection),
   })
 }
 
@@ -121,7 +108,6 @@ watch(() => props.modelValue.price, (newVal) => {
 }, { deep: true })
 
 watch(() => props.priceRange, (newRange) => {
-  // При смене категории, сбрасываем и локальную цену
   localPrice.value = [newRange.min, newRange.max]
 }, { deep: true })
 </script>
@@ -134,7 +120,7 @@ watch(() => props.priceRange, (newRange) => {
       </h3>
     </div>
 
-    <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ (логика сохранена) -->
+    <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ -->
     <div v-if="subcategories.length > 0" class="space-y-4">
       <h4 class="font-semibold">
         Подкатегории
@@ -149,6 +135,7 @@ watch(() => props.priceRange, (newRange) => {
       </div>
     </div>
 
+    <!-- 2. БРЕНДЫ -->
     <div v-if="availableBrands.length > 0" class="space-y-4 pt-4 border-t">
       <h4 class="font-semibold">
         Бренды
@@ -165,6 +152,7 @@ watch(() => props.priceRange, (newRange) => {
       </div>
     </div>
 
+    <!-- 3. МАТЕРИАЛЫ -->
     <div v-if="availableMaterials.length > 0" class="space-y-4 pt-4 border-t">
       <h4 class="font-semibold">
         Материал
@@ -181,6 +169,7 @@ watch(() => props.priceRange, (newRange) => {
       </div>
     </div>
 
+    <!-- 4. СТРАНЫ -->
     <div v-if="availableCountries.length > 0" class="space-y-4 pt-4 border-t">
       <h4 class="font-semibold">
         Страна происхождения
@@ -197,7 +186,7 @@ watch(() => props.priceRange, (newRange) => {
       </div>
     </div>
 
-    <!-- 2. ДИНАМИЧЕСКИЕ ФИЛЬТРЫ (Атрибуты) -->
+    <!-- 5. ДИНАМИЧЕСКИЕ АТРИБУТЫ -->
     <div
       v-for="filter in availableFilters"
       :key="filter.id"
@@ -207,7 +196,7 @@ watch(() => props.priceRange, (newRange) => {
         {{ filter.name }}
       </h4>
 
-      <!-- Рендерим чекбоксы для типа 'select' -->
+      <!-- Для типа 'select' -->
       <div v-if="filter.display_type === 'select'" class="space-y-2">
         <div
           v-for="option in filter.attribute_options"
@@ -223,7 +212,7 @@ watch(() => props.priceRange, (newRange) => {
         </div>
       </div>
 
-      <!-- Рендерим кружки с цветом для типа 'color' -->
+      <!-- Для типа 'color' -->
       <div v-if="filter.display_type === 'color'" class="flex flex-wrap gap-2">
         <button
           v-for="option in filter.attribute_options"
@@ -231,7 +220,6 @@ watch(() => props.priceRange, (newRange) => {
           type="button"
           :title="option.value"
           :style="{ backgroundColor: ((option.meta as unknown) as ColorOptionMeta)?.hex }"
-
           class="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
           :class="{
             'border-primary ring-2 ring-primary ring-offset-2': modelValue.attributes[filter.slug]?.includes(option.id),
@@ -242,35 +230,46 @@ watch(() => props.priceRange, (newRange) => {
             updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
           }"
         />
-        <!-- Примечание: для цветов лучше использовать не toggle, а просто выбор. Повторный клик не будет отменять. -->
-        <!-- Если нужна отмена, логику `updateAttribute` нужно будет усложнить -->
       </div>
-
-      <!-- TODO: Здесь можно добавить рендеринг для других типов, например, 'range' -->
     </div>
 
-    <!-- 3. ФИЛЬТР ПО ЦЕНЕ (логика сохранена) -->
-    <div class="space-y-4 pt-4 border-t">
-      <h4 class="font-semibold">
-        Цена
-      </h4>
-      <div v-if="isLoading" class="space-y-4 pt-2">
-        <Skeleton class="h-4 w-full" />
-        <Skeleton class="h-4 w-1/2" />
+    <!-- 6. ФИЛЬТР ПО ЦЕНЕ -->
+    <ClientOnly>
+      <div class="space-y-4 pt-4 border-t">
+        <h4 class="font-semibold">
+          Цена
+        </h4>
+        <div v-if="isLoading" class="space-y-4 pt-2">
+          <Skeleton class="h-4 w-full" />
+          <Skeleton class="h-4 w-1/2" />
+        </div>
+        <template v-else>
+          <Slider
+            v-model="localPrice"
+            :min="priceRange.min"
+            :max="priceRange.max"
+            :step="100"
+            @value-commit="commitPriceToFilters"
+          />
+          <div class="flex justify-between text-sm text-muted-foreground">
+            <span>{{ Math.round(localPrice[0]) }} ₸</span>
+            <span>{{ Math.round(localPrice[1]) }} ₸</span>
+          </div>
+        </template>
       </div>
-      <template v-else>
-        <Slider
-          v-model="localPrice"
-          :min="priceRange.min"
-          :max="priceRange.max"
-          :step="100"
-          @value-commit="commitPriceToFilters"
-        />
-        <div class="flex justify-between text-sm text-muted-foreground">
-          <span>{{ Math.round(localPrice[0]) }} ₸</span>
-          <span>{{ Math.round(localPrice[1]) }} ₸</span>
+
+      <!-- Fallback для SSR -->
+      <template #fallback>
+        <div class="space-y-4 pt-4 border-t">
+          <h4 class="font-semibold">
+            Цена
+          </h4>
+          <div class="space-y-4 pt-2">
+            <Skeleton class="h-4 w-full" />
+            <Skeleton class="h-4 w-1/2" />
+          </div>
         </div>
       </template>
-    </div>
+    </ClientOnly>
   </div>
 </template>
