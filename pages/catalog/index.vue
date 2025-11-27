@@ -183,10 +183,11 @@ const additionalItemStyles = {
               <ResponsiveImage
                 :src="getCategoryImageUrl(category)"
                 :alt="category.name"
+                :blur-data-url="category.blur_placeholder"
                 aspect-ratio="square"
                 object-fit="contain"
                 placeholder-type="lqip"
-                :eager="index < 4"
+                :eager="false"
               />
             </div>
 
