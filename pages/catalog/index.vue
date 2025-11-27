@@ -180,8 +180,8 @@ const additionalItemStyles = {
           >
             <!-- 🖼️ Изображение через ResponsiveImage -->
             <div v-if="category.image_url" class="absolute bottom-0 right-0 w-[85%] h-[85%]">
-              <ResponsiveImage
-                :src="getCategoryImageUrl(category)"
+              <NuxtImg
+                :src="getCategoryImageUrl(category) || undefined"
                 :alt="category.name"
                 :blur-data-url="category.blur_placeholder"
                 aspect-ratio="square"
