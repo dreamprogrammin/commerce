@@ -15,12 +15,16 @@ export default defineNuxtConfig({
   // 🎯 КРИТИЧНАЯ ОПТИМИЗАЦИЯ: Route Rules для разных страниц
   routeRules: {
     // Каталог - SSR с кешированием (для SEO)
-    '/catalog': {
-      ssr: true,
-      swr: 60 * 5, // Кеш на 5 минут (stale-while-revalidate)
-      // Предзагрузка данных на сервере
-      prerender: false,
-    },
+    // В DEV кеш отключен для Tailwind CSS 4
+    '/catalog': import.meta.env.NODE_ENV === 'production'
+      ? {
+          ssr: true,
+          swr: 60 * 5, // Кеш на 5 минут (только в production)
+          prerender: false,
+        }
+      : {
+          ssr: true, // В dev без кеша
+        },
 
     // API роуты - кешируем агрессивно
     '/api/**': {
@@ -37,10 +41,14 @@ export default defineNuxtConfig({
     '/contacts': { prerender: true },
 
     // Детальные страницы товаров - ISR
-    '/products/**': {
-      ssr: true,
-      swr: 60 * 10, // 10 минут
-    },
+    '/catalog/**': import.meta.env.NODE_ENV === 'production'
+      ? { ssr: true, swr: 60 * 5 }
+      : { ssr: true },
+
+    // Товары - ISR + длинный кеш
+    '/catalog/products/**': import.meta.env.NODE_ENV === 'production'
+      ? { ssr: true, swr: 60 * 10 }
+      : { ssr: true },
   },
 
   // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
