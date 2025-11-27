@@ -11,14 +11,45 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxt/icon',
   ],
+
+  // 🎯 КРИТИЧНАЯ ОПТИМИЗАЦИЯ: Route Rules для разных страниц
+  routeRules: {
+    // Каталог - SSR с кешированием (для SEO)
+    '/catalog': {
+      ssr: true,
+      swr: 60 * 5, // Кеш на 5 минут (stale-while-revalidate)
+      // Предзагрузка данных на сервере
+      prerender: false,
+    },
+
+    // API роуты - кешируем агрессивно
+    '/api/**': {
+      cors: true,
+      cache: {
+        maxAge: 60 * 60, // 1 час
+        swr: true,
+      },
+    },
+
+    // Статичные страницы - можно пререндерить
+    '/': { prerender: true },
+    '/about': { prerender: true },
+    '/contacts': { prerender: true },
+
+    // Детальные страницы товаров - ISR
+    '/products/**': {
+      ssr: true,
+      swr: 60 * 10, // 10 минут
+    },
+  },
+
   // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
   nitro: {
     routeRules: {
-    // Проксируем запросы к Supabase через наш сервер
+      // Проксируем запросы к Supabase через наш сервер
       '/api/image-proxy/**': {
         proxy: {
           to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**',
-          // Добавляем правильные заголовки
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
@@ -36,25 +67,17 @@ export default defineNuxtConfig({
         },
       },
     },
+    // Сжатие ответов
+    compressPublicAssets: true,
+    // Минификация
+    minify: true,
   },
+
+  // 🖼️ Базовая настройка изображений
+  // НЕ используем провайдеры - у нас своя система через useSupabaseStorage
   image: {
     domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
-    alias: {
-      supabase: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public',
-    },
-    format: ['webp', 'avif', 'jpeg'],
-    screens: {
-      xs: 320,
-      sm: 640,
-      md: 768,
-      lg: 1024,
-      xl: 1280,
-      xxl: 1536,
-    },
-    // Preload критичные изображения
-    preload: {
-      fetchpriority: 'high',
-    },
+    // Остальное не нужно - твой composable всё делает
   },
 
   // 🚀 App настройки
@@ -72,31 +95,63 @@ export default defineNuxtConfig({
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
         },
       ],
+      meta: [
+        { charset: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      ],
     },
   },
 
-  // image: {
-  //   domains: ['https://gvsdevsvzgcivpphcuai.supabase.co'],
-  // },
+  // 📦 Supabase
   supabase: {
     redirect: false,
     baseURL: `${import.meta.env.NUXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public`,
     types: 'types/supabase.ts',
   },
+
+  // 🎨 Стили
   css: ['~/assets/css/tailwind.css'],
+
+  // ⚡ Vite оптимизации
   vite: {
     plugins: [tailwindcss()],
+    build: {
+      // Минификация
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true, // Убираем console.log в продакшене
+        },
+      },
+      // Разделение чанков
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vue-vendor': ['vue', 'vue-router'],
+            'supabase-vendor': ['@supabase/supabase-js'],
+          },
+        },
+      },
+    },
   },
+
+  // 🎯 Shadcn UI
   shadcn: {
-    /**
-     * Prefix for all the imported component
-     */
     prefix: '',
-    /**
-     * Directory that the component lives in.
-     * @default "./components/ui"
-     */
     componentDir: './components/ui',
   },
+
+  // 🔧 Experimental features для производительности
+  experimental: {
+    payloadExtraction: true, // Извлекает данные в отдельные файлы
+    renderJsonPayloads: true, // JSON вместо JS для пейлоадов
+    viewTransition: true, // View Transitions API
+  },
+
+  // 🏗️ Build оптимизации
+  build: {
+    transpile: ['vue-sonner'], // Транспилируем для совместимости
+  },
+
   devtools: { enabled: true },
 })
