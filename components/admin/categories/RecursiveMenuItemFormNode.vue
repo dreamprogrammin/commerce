@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { EditableCategory } from '@/types'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,6 +9,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import {
+  formatFileSize,
+  generateBlurPlaceholder,
+  getOptimizationInfo,
+  optimizeImageBeforeUpload,
+  shouldOptimizeImage,
+} from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 
 const props = defineProps<{
@@ -28,8 +36,12 @@ const RecursiveCategoryFormNode = defineAsyncComponent(
 )
 
 const isChildrenVisible = ref(true)
+const isProcessingImage = ref(false)
+
 // 👇 Используем универсальную функцию getImageUrl
 const { getImageUrl } = useSupabaseStorage()
+
+const optimizationInfo = computed(() => getOptimizationInfo())
 
 const name = computed({
   get: () => props.item.name,
@@ -75,7 +87,6 @@ const isDeleted = computed({
 })
 
 // 👇 Computed для отображения оптимизированного изображения
-// Теперь использует универсальную функцию с предустановкой
 const displayImageUrl = computed(() => {
   // Если есть превью нового файла (локальный blob URL)
   if (props.item._imagePreview) {
@@ -85,31 +96,90 @@ const displayImageUrl = computed(() => {
   // Если есть существующее изображение в БД - используем оптимизацию
   if (props.item.image_url) {
     // Используем предустановку CATEGORY_IMAGE
-    return getImageUrl(BUCKET_NAME_CATEGORY, props.item.image_url, IMAGE_SIZES.CATEGORY_IMAGE)
+    return getImageUrl(BUCKET_NAME_CATEGORY, props.item.image_url, IMAGE_SIZES.CATEGORY_MENU)
   }
 
   return null
 })
 
-function handleImageChange(event: Event) {
+// 🆕 Обработка загрузки изображения с генерацией blur
+async function handleImageChange(event: Event) {
   const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (file) {
+  if (!target.files || target.files.length === 0) {
+    return
+  }
+
+  const file = target.files[0]
+  if (!file) {
+    return
+  }
+
+  isProcessingImage.value = true
+  const toastId = toast.loading(
+    `${optimizationInfo.value.icon} Обработка изображения...`,
+  )
+
+  try {
+    let blurDataUrl: string | undefined
+    let processedFile = file
+
+    // Проверяем нужна ли оптимизация
+    if (shouldOptimizeImage(file)) {
+      const result = await optimizeImageBeforeUpload(file)
+
+      console.log(
+        `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
+      )
+
+      processedFile = result.file
+      blurDataUrl = result.blurPlaceholder
+    }
+    else {
+      // Файл маленький - генерируем только blur
+      const blurResult = await generateBlurPlaceholder(file)
+      console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
+      blurDataUrl = blurResult.dataUrl
+    }
+
+    // Создаем preview URL для отображения
+    const previewUrl = URL.createObjectURL(processedFile)
+
+    // Обновляем item с новым файлом и blur
     emit('update:item', {
       ...props.item,
-      _imageFile: file,
-      _imagePreview: URL.createObjectURL(file),
-      image_url: null,
+      _imageFile: processedFile,
+      _imagePreview: previewUrl,
+      _blurPlaceholder: blurDataUrl, // 🆕 Сохраняем blur для последующей загрузки
+      image_url: null, // Очищаем старый URL
     })
+
+    toast.success(
+      `✅ Изображение загружено ${optimizationInfo.value.icon}`,
+      { id: toastId },
+    )
+  }
+  catch (error) {
+    toast.error('❌ Ошибка при обработке файла', { id: toastId })
+    console.error('handleImageChange error:', error)
+  }
+  finally {
+    isProcessingImage.value = false
   }
 }
 
 function removeImage() {
+  // Очищаем blob URL если он есть
+  if (props.item._imagePreview) {
+    URL.revokeObjectURL(props.item._imagePreview)
+  }
+
   emit('update:item', {
     ...props.item,
     _imageFile: undefined,
     _imagePreview: undefined,
+    _blurPlaceholder: undefined, // 🆕 Очищаем blur
     image_url: null,
+    blur_placeholder: null, // 🆕 Очищаем blur в БД
   })
 }
 </script>
@@ -215,14 +285,19 @@ function removeImage() {
         </div>
       </div>
 
-      <!-- 👇 Изображение с оптимизацией через getImageUrl -->
+      <!-- 🆕 Изображение с обработкой и blur -->
       <div>
-        <Label :for="`image-${props.item._tempId || props.item.id}`">Изображение для меню</Label>
+        <Label :for="`image-${props.item._tempId || props.item.id}`">
+          Изображение для меню
+          <span v-if="isProcessingImage" class="text-xs text-muted-foreground ml-2">
+            {{ optimizationInfo.icon }} Обработка...
+          </span>
+        </Label>
         <Input
           :id="`image-${props.item._tempId || props.item.id}`"
           type="file"
           accept="image/png, image/jpeg, image/webp"
-          :disabled="isDeleted"
+          :disabled="isDeleted || isProcessingImage"
           @change="handleImageChange"
         />
         <div

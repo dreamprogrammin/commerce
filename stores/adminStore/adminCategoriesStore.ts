@@ -16,6 +16,7 @@ interface CategoryUpsertPayload {
   display_in_menu: boolean
   display_order: number
   image_url: string | null
+  blur_placeholder: string | null // 🆕 Добавили blur
   icon_name: string | null
 }
 
@@ -30,6 +31,7 @@ function createInsertPayload(item: EditableCategory, parentId: string | null, di
     display_in_menu: item.display_in_menu,
     display_order: displayOrder,
     image_url: item.image_url,
+    blur_placeholder: item.blur_placeholder, // 🆕 Добавили blur
     icon_name: item.icon_name,
   }
 }
@@ -46,6 +48,7 @@ function createUpdatePayload(item: EditableCategory, parentId: string | null, di
     display_in_menu: item.display_in_menu,
     display_order: displayOrder,
     image_url: item.image_url,
+    blur_placeholder: item.blur_placeholder, // 🆕 Добавили blur
     icon_name: item.icon_name,
   }
 }
@@ -147,14 +150,27 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         for (const [index, item] of items.entries()) {
           const originalItem = item.id ? originalItems.get(item.id) : null
 
+          // 🆕 Обработка изображения с blur
           if (item._imageFile) {
-            if (originalItem?.image_url)
+            // Удаляем старое изображение если оно было
+            if (originalItem?.image_url) {
               await removeFile('category-images', originalItem.image_url)
-            const newPath = await uploadFile(item._imageFile, { bucketName: 'category-images', filePathPrefix: `categories/${item.slug || 'new'}` })
+            }
+
+            // Загружаем новое изображение
+            const newPath = await uploadFile(item._imageFile, {
+              bucketName: 'category-images',
+              filePathPrefix: `categories/${item.slug || 'new'}`,
+            })
+
+            // Сохраняем путь к изображению и blur
             item.image_url = newPath || null
+            item.blur_placeholder = item._blurPlaceholder || null // 🆕 Сохраняем blur!
           }
           else if (originalItem?.image_url && item.image_url === null) {
+            // Если изображение было удалено
             await removeFile('category-images', originalItem.image_url)
+            item.blur_placeholder = null // 🆕 Очищаем blur тоже
           }
 
           if (item._isDeleted && item.id) {

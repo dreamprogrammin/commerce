@@ -162,6 +162,7 @@ export type EditableCategory = CategoryRow & {
   _isDeleted?: boolean
   _imageFile?: File | null
   _imagePreview?: string
+  _blurPlaceholder?: string // 🆕 Добавляем для хранения blur data URL
 }
 
 export interface IBreadcrumbItem {
