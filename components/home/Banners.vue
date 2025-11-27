@@ -56,13 +56,13 @@ function getBannerImageUrl(imageUrl: string | null) {
       >
         <!-- Изображение -->
         <div class="relative h-48 md:h-64 overflow-hidden bg-gray-100">
-          <NuxtImg
+          <img
             v-if="banner.image_url"
             :src="getBannerImageUrl(banner.image_url) || undefined"
             :alt="banner.title"
             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
-          />
+          >
           <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
             <Icon name="lucide:image" class="w-16 h-16 text-gray-400" />
           </div>
