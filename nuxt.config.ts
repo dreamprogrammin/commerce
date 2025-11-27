@@ -8,7 +8,6 @@ export default defineNuxtConfig({
     '@nuxtjs/supabase',
     'shadcn-nuxt',
     'pinia-plugin-persistedstate/nuxt',
-    '@nuxt/image',
     '@nuxt/icon',
   ],
 
