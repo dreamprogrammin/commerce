@@ -14,19 +14,26 @@ export default defineNuxtConfig({
 
   // 🎯 КРИТИЧНАЯ ОПТИМИЗАЦИЯ: Route Rules для разных страниц
   routeRules: {
-    // Каталог - SSR с кешированием (для SEO)
-    // В DEV кеш отключен для Tailwind CSS 4
-    '/catalog': import.meta.env.NODE_ENV === 'production'
-      ? {
-          ssr: true,
-          swr: 60 * 5, // Кеш на 5 минут (только в production)
-          prerender: false,
-        }
-      : {
-          ssr: true, // В dev без кеша
-        },
+    // 1️⃣ Главная страница - статика
+    '/': { prerender: true },
 
-    // API роуты - кешируем агрессивно
+    // 2️⃣ Товары - СНАЧАЛА более специфичные правила
+    '/catalog/products/**': import.meta.env.NODE_ENV === 'production'
+      ? { ssr: true, swr: 60 * 10 } // 10 минут для карточек товаров
+      : { ssr: true },
+
+    // 3️⃣ Потом общее правило для каталога (НЕ перекроет /products/**)
+    '/catalog/**': import.meta.env.NODE_ENV === 'production'
+      ? { ssr: true, swr: 60 * 5 } // 5 минут для категорий/фильтров
+      : { ssr: true },
+
+    // 4️⃣ SPA страницы (интерактивные)
+    '/cart/**': { ssr: false },
+    '/checkout/**': { ssr: false },
+    '/profile/**': { ssr: false },
+    '/admin/**': { ssr: false },
+
+    // 5️⃣ API роуты
     '/api/**': {
       cors: true,
       cache: {
@@ -34,19 +41,6 @@ export default defineNuxtConfig({
         swr: true,
       },
     },
-
-    // Статичные страницы - можно пререндерить
-    '/': { prerender: true },
-
-    // Детальные страницы товаров - ISR
-    '/catalog/**': import.meta.env.NODE_ENV === 'production'
-      ? { ssr: true, swr: 60 * 5 }
-      : { ssr: true },
-
-    // Товары - ISR + длинный кеш
-    '/catalog/products/**': import.meta.env.NODE_ENV === 'production'
-      ? { ssr: true, swr: 60 * 10 }
-      : { ssr: true },
   },
 
   // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
@@ -80,17 +74,14 @@ export default defineNuxtConfig({
   },
 
   // 🖼️ Базовая настройка изображений
-  // НЕ используем провайдеры - у нас своя система через useSupabaseStorage
   image: {
     domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
-    // Остальное не нужно - твой composable всё делает
   },
 
   // 🚀 App настройки
   app: {
     head: {
       link: [
-        // Preconnect к Supabase для быстрых запросов
         {
           rel: 'preconnect',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
@@ -111,7 +102,6 @@ export default defineNuxtConfig({
   // 📦 Supabase
   supabase: {
     redirect: false,
-    baseURL: `${import.meta.env.NUXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public`,
     types: 'types/supabase.ts',
   },
 
@@ -122,14 +112,12 @@ export default defineNuxtConfig({
   vite: {
     plugins: [tailwindcss()],
     build: {
-      // Минификация
       minify: 'terser',
       terserOptions: {
         compress: {
-          drop_console: true, // Убираем console.log в продакшене
+          drop_console: true,
         },
       },
-      // Разделение чанков
       rollupOptions: {
         output: {
           manualChunks: {
@@ -149,14 +137,14 @@ export default defineNuxtConfig({
 
   // 🔧 Experimental features для производительности
   experimental: {
-    payloadExtraction: true, // Извлекает данные в отдельные файлы
-    renderJsonPayloads: true, // JSON вместо JS для пейлоадов
-    viewTransition: true, // View Transitions API
+    payloadExtraction: true,
+    renderJsonPayloads: true,
+    viewTransition: true,
   },
 
   // 🏗️ Build оптимизации
   build: {
-    transpile: ['vue-sonner'], // Транспилируем для совместимости
+    transpile: ['vue-sonner'],
   },
 
   devtools: { enabled: true },
