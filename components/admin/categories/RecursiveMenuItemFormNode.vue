@@ -104,15 +104,21 @@ const displayImageUrl = computed(() => {
 
 // 🆕 Обработка загрузки изображения с генерацией blur
 async function handleImageChange(event: Event) {
+  console.log('🎯 handleImageChange ВЫЗВАНА!') // 🔍 ЛОГ 1
+
   const target = event.target as HTMLInputElement
   if (!target.files || target.files.length === 0) {
+    console.log('⚠️ Нет файлов') // 🔍 ЛОГ 2
     return
   }
 
   const file = target.files[0]
   if (!file) {
+    console.log('⚠️ Файл пустой') // 🔍 ЛОГ 3
     return
   }
+
+  console.log('📁 Файл выбран:', file.name, formatFileSize(file.size)) // 🔍 ЛОГ 4
 
   isProcessingImage.value = true
   const toastId = toast.loading(
@@ -125,6 +131,7 @@ async function handleImageChange(event: Event) {
 
     // Проверяем нужна ли оптимизация
     if (shouldOptimizeImage(file)) {
+      console.log('🔧 Файл требует оптимизации (> 500KB)') // 🔍 ЛОГ 5
       const result = await optimizeImageBeforeUpload(file)
 
       console.log(
@@ -133,25 +140,40 @@ async function handleImageChange(event: Event) {
 
       processedFile = result.file
       blurDataUrl = result.blurPlaceholder
+      console.log('🎨 Blur от оптимизации:', blurDataUrl?.substring(0, 50)) // 🔍 ЛОГ 6
     }
     else {
+      console.log('📦 Файл маленький, только blur') // 🔍 ЛОГ 7
       // Файл маленький - генерируем только blur
       const blurResult = await generateBlurPlaceholder(file)
       console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
       blurDataUrl = blurResult.dataUrl
+      console.log('🎨 Blur от генератора:', blurDataUrl?.substring(0, 50)) // 🔍 ЛОГ 8
     }
+
+    console.log('🔍 Финальный blur перед emit:', blurDataUrl?.substring(0, 50)) // 🔍 ЛОГ 9
 
     // Создаем preview URL для отображения
     const previewUrl = URL.createObjectURL(processedFile)
 
     // Обновляем item с новым файлом и blur
-    emit('update:item', {
+    const updatedItem = {
       ...props.item,
       _imageFile: processedFile,
       _imagePreview: previewUrl,
       _blurPlaceholder: blurDataUrl, // 🆕 Сохраняем blur для последующей загрузки
       image_url: null, // Очищаем старый URL
-    })
+    }
+
+    console.log('💾 Отправляем update:item с данными:', {
+      name: updatedItem.name,
+      hasFile: !!updatedItem._imageFile,
+      hasPreview: !!updatedItem._imagePreview,
+      hasBlur: !!updatedItem._blurPlaceholder,
+      blurLength: updatedItem._blurPlaceholder?.length,
+    }) // 🔍 ЛОГ 10
+
+    emit('update:item', updatedItem)
 
     toast.success(
       `✅ Изображение загружено ${optimizationInfo.value.icon}`,
@@ -160,7 +182,7 @@ async function handleImageChange(event: Event) {
   }
   catch (error) {
     toast.error('❌ Ошибка при обработке файла', { id: toastId })
-    console.error('handleImageChange error:', error)
+    console.error('❌ handleImageChange error:', error) // 🔍 ЛОГ 11
   }
   finally {
     isProcessingImage.value = false

@@ -13,7 +13,7 @@ const adminCategoriesStore = useAdminCategoriesStore()
 
 const rootCategories = computed(() => adminCategoriesStore.buildCategoryTree(null))
 const selectedRootCategory = ref<EditableCategory | null>(null)
-const formTree = reactive<EditableCategory[]>([]) // ИСПРАВЛЕНИЕ №1: Это независимый ref
+const formTree = reactive<EditableCategory[]>([])
 const isSaving = ref(false)
 
 onMounted(() => {
@@ -21,13 +21,11 @@ onMounted(() => {
 })
 
 function handleAddChild(parentItem: EditableCategory) {
-  // Рекурсивная функция для поиска родителя и добавления ребенка
   function findAndAdd(tree: EditableCategory[]): boolean {
     const parentId = parentItem.id || parentItem._tempId
     const parentNode = tree.find(item => (item.id || item._tempId) === parentId)
 
     if (parentNode) {
-      // Если у родителя еще нет массива children, создаем его
       if (!parentNode.children) {
         parentNode.children = []
       }
@@ -39,7 +37,7 @@ function handleAddChild(parentItem: EditableCategory) {
         name: '',
         slug: '',
         href: '',
-        parent_id: parentNode.id, // ID реального родителя
+        parent_id: parentNode.id,
         display_order: parentNode.children.length,
         children: [],
         description: null,
@@ -52,10 +50,9 @@ function handleAddChild(parentItem: EditableCategory) {
         updated_at: new Date().toISOString(),
       }
       parentNode.children.push(newChild)
-      return true // Нашли и добавили
+      return true
     }
 
-    // Если не нашли на текущем уровне, ищем в дочерних элементах
     for (const item of tree) {
       if (Array.isArray(item.children) && findAndAdd(item.children)) {
         return true
@@ -69,7 +66,6 @@ function handleAddChild(parentItem: EditableCategory) {
 
 function selectRootCategory(category: EditableCategory) {
   selectedRootCategory.value = category
-  // ИСПРАВЛЕНИЕ №1: Создаем глубокую копию для безопасного редактирования
   formTree.length = 0
   const newChildren = JSON.parse(JSON.stringify(category.children || []))
   formTree.push(...newChildren)
@@ -104,6 +100,28 @@ function addNodeToRoot() {
 async function saveAllChanges() {
   if (!selectedRootCategory.value)
     return
+
+  console.log('💾 НАЧИНАЕМ СОХРАНЕНИЕ') // 🔍 ЛОГ
+
+  // 🔍 Логируем состояние перед сохранением
+  function logTreeState(tree: EditableCategory[], prefix = '') {
+    tree.forEach((item) => {
+      console.log(`${prefix}📁 ${item.name}:`, {
+        hasFile: !!item._imageFile,
+        hasPreview: !!item._imagePreview,
+        hasBlur: !!item._blurPlaceholder,
+        blurLength: item._blurPlaceholder?.length,
+        blurPreview: item._blurPlaceholder?.substring(0, 50),
+      })
+      if (item.children?.length) {
+        logTreeState(item.children, `${prefix}  `)
+      }
+    })
+  }
+
+  console.log('🌳 Состояние дерева перед сохранением:')
+  logTreeState(formTree)
+
   isSaving.value = true
 
   const finalTreeState = adminCategoriesStore.buildCategoryTree(null)
@@ -134,30 +152,26 @@ async function saveAllChanges() {
   }
   isSaving.value = false
 }
+
 function handleRemove(itemToRemove: EditableCategory) {
-  // Рекурсивная функция для поиска и удаления
   function findAndRemove(tree: EditableCategory[]): boolean {
     const targetId = itemToRemove.id || itemToRemove._tempId
     const index = tree.findIndex(item => (item.id || item._tempId) === targetId)
 
     if (index !== -1) {
-      // === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ ===
-      // 1. Получаем сам узел (node) по найденному индексу
       const nodeToRemove = tree[index]
 
-      // 2. Добавляем явную проверку, что узел существует
       if (nodeToRemove) {
-        if (nodeToRemove.id) { // Если узел из БД (имеет реальный id)
-          nodeToRemove._isDeleted = true // то помечаем его на удаление
+        if (nodeToRemove.id) {
+          nodeToRemove._isDeleted = true
         }
-        else { // Если узел новый (имеет только _tempId)
-          tree.splice(index, 1) // то просто удаляем его из массива
+        else {
+          tree.splice(index, 1)
         }
       }
-      return true // Сообщаем, что нашли и обработали
+      return true
     }
 
-    // Ищем в дочерних элементах
     for (const item of tree) {
       if (Array.isArray(item.children) && findAndRemove(item.children)) {
         return true
@@ -173,7 +187,6 @@ function handleRemove(itemToRemove: EditableCategory) {
 
 <template>
   <div class="container mx-auto p-4 md:p-8">
-    <!-- Шапка страницы -->
     <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
       <h1 class="text-3xl font-bold text-foreground">
         Управление Категориями
@@ -184,14 +197,12 @@ function handleRemove(itemToRemove: EditableCategory) {
       </Button>
     </div>
 
-    <!-- Индикаторы -->
     <div v-if="adminCategoriesStore.isLoading" class="text-center py-20">
       <p class="text-muted-foreground mt-4 text-lg">
         Загрузка данных...
       </p>
     </div>
 
-    <!-- Основная сетка -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <aside class="lg:col-span-1">
         <h2 class="text-lg font-semibold mb-3">
@@ -209,9 +220,6 @@ function handleRemove(itemToRemove: EditableCategory) {
             <span class="flex-1">{{ rootCat.name }}</span>
           </Button>
         </div>
-        <p class="text-xs text-muted-foreground mt-2 p-2 bg-muted/50 rounded-md">
-          Корневые категории создаются в БД с флагом `is_root_category=true`.
-        </p>
       </aside>
 
       <main class="lg:col-span-3">
@@ -230,7 +238,14 @@ function handleRemove(itemToRemove: EditableCategory) {
               :level="0"
               :parent-href="selectedRootCategory.href || ''"
               @remove-self="handleRemove(item)"
-              @update:item="(updateItem) => { formTree[index] = updateItem }"
+              @update:item="(updateItem) => {
+                console.log('🔄 update:item получен:', {
+                  name: updateItem.name,
+                  hasBlur: !!updateItem._blurPlaceholder,
+                  blurLength: updateItem._blurPlaceholder?.length,
+                })
+                formTree[index] = updateItem
+              }"
               @remove-child="handleRemove"
               @add-child="handleAddChild"
             />

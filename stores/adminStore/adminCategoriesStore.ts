@@ -150,8 +150,16 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         for (const [index, item] of items.entries()) {
           const originalItem = item.id ? originalItems.get(item.id) : null
 
+          console.log(`🔍 Обработка item: ${item.name}`, {
+            hasFile: !!item._imageFile,
+            hasBlur: !!item._blurPlaceholder,
+            blurLength: item._blurPlaceholder?.length,
+          }) // 🔍 ЛОГ
+
           // 🆕 Обработка изображения с blur
           if (item._imageFile) {
+            console.log(`📤 Загружаем файл для: ${item.name}`) // 🔍 ЛОГ
+
             // Удаляем старое изображение если оно было
             if (originalItem?.image_url) {
               await removeFile('category-images', originalItem.image_url)
@@ -166,6 +174,13 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
             // Сохраняем путь к изображению и blur
             item.image_url = newPath || null
             item.blur_placeholder = item._blurPlaceholder || null // 🆕 Сохраняем blur!
+
+            console.log(`✅ Файл загружен для: ${item.name}`, {
+              imagePath: item.image_url,
+              hasBlur: !!item.blur_placeholder,
+              blurLength: item.blur_placeholder?.length,
+              blurPreview: item.blur_placeholder?.substring(0, 50),
+            }) // 🔍 ЛОГ
           }
           else if (originalItem?.image_url && item.image_url === null) {
             // Если изображение было удалено
