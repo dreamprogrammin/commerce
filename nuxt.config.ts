@@ -8,6 +8,7 @@ export default defineNuxtConfig({
     '@nuxtjs/supabase',
     'shadcn-nuxt',
     'pinia-plugin-persistedstate/nuxt',
+    '@nuxt/image',
     '@nuxt/icon',
   ],
 
@@ -36,8 +37,6 @@ export default defineNuxtConfig({
 
     // Статичные страницы - можно пререндерить
     '/': { prerender: true },
-    '/about': { prerender: true },
-    '/contacts': { prerender: true },
 
     // Детальные страницы товаров - ISR
     '/catalog/**': import.meta.env.NODE_ENV === 'production'
