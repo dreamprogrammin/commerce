@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { IBreadcrumbItem } from '@/types'
 import { useMediaQuery } from '@vueuse/core'
-import { ChevronRight, MoreHorizontal } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Home } from 'lucide-vue-next'
 
 const props = defineProps<{
   items: IBreadcrumbItem[]
@@ -9,78 +9,81 @@ const props = defineProps<{
 
 const isDesktop = useMediaQuery('(min-width: 768px)')
 
-// Только промежуточные элементы для дропдауна (без главной и последних двух)
-const dropdownItems = computed<IBreadcrumbItem[]>(() => {
-  if (props.items.length <= 2) {
-    return []
-  }
-  // Берем все элементы кроме последних двух (категория и товар)
-  return props.items.slice(0, -2)
-})
-
-// Предпоследний элемент - это КАТЕГОРИЯ (откуда пришел товар)
-const categoryItem = computed(() => {
+// Родительская категория (предпоследний элемент)
+const parentItem = computed(() => {
   if (props.items.length < 2) {
     return null
   }
   return props.items[props.items.length - 2]
 })
+
+// Текущая страница (последний элемент)
+const currentItem = computed(() => {
+  if (props.items.length === 0) {
+    return null
+  }
+  return props.items[props.items.length - 1]
+})
 </script>
 
 <template>
-  <nav v-if="items && items.length > 0" aria-label="Breadcrumb">
+  <nav v-if="items && items.length > 0" aria-label="Breadcrumb" class="mb-6">
     <!-- ДЕСКТОПНАЯ ВЕРСИЯ -->
-    <ol v-if="isDesktop" class="flex items-center space-x-2 text-sm text-muted-foreground">
-      <li>
-        <NuxtLink to="/" class="hover:text-primary transition-colors">
-          Главная
-        </NuxtLink>
-      </li>
-      <li v-for="item in items" :key="item.id">
-        <div class="flex items-center">
-          <ChevronRight class="h-4 w-4" />
-          <NuxtLink :to="item.href" class="ml-2 hover:text-primary transition-colors">
-            {{ item.name }}
+    <div v-if="isDesktop">
+      <ol class="flex items-center space-x-2 text-sm text-muted-foreground">
+        <!-- Главная -->
+        <li>
+          <NuxtLink
+            to="/"
+            class="hover:text-primary transition-colors flex items-center gap-1.5"
+          >
+            <Home class="h-3.5 w-3.5" />
+            <span>Главная</span>
           </NuxtLink>
-        </div>
-      </li>
-    </ol>
+        </li>
 
-    <!-- МОБИЛЬНАЯ ВЕРСИЯ -->
-    <div v-else class="flex items-center space-x-2 text-sm">
-      <!-- Главная -->
-      <NuxtLink to="/" class="text-muted-foreground hover:text-primary transition-colors flex-shrink-0">
-        Главная
+        <!-- Все элементы пути -->
+        <li v-for="(item, index) in items" :key="item.id">
+          <div class="flex items-center">
+            <ChevronRight class="h-4 w-4 mx-1" />
+            <!-- Последний элемент не является ссылкой -->
+            <NuxtLink
+              v-if="index < items.length - 1"
+              :to="item.href"
+              class="hover:text-primary transition-colors"
+            >
+              {{ item.name }}
+            </NuxtLink>
+            <span
+              v-else
+              class="text-foreground font-medium"
+            >
+              {{ item.name }}
+            </span>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <!-- МОБИЛЬНАЯ ВЕРСИЯ - Вертикальная -->
+    <div v-else class="space-y-3">
+      <!-- Кнопка "Назад" к родительской категории -->
+      <NuxtLink
+        v-if="parentItem"
+        :to="parentItem.href"
+        class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
+      >
+        <ChevronLeft class="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+        <span>{{ parentItem.name }}</span>
       </NuxtLink>
 
-      <!-- Разделитель -->
-      <ChevronRight class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-
-      <!-- Кнопка "..." с выпадающим меню (если есть промежуточные элементы) -->
-      <template v-if="dropdownItems.length > 0">
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="outline" size="icon" class="h-8 w-8 rounded-full flex-shrink-0">
-              <MoreHorizontal class="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem v-for="item in dropdownItems" :key="item.id" as-child>
-              <NuxtLink :to="item.href">
-                {{ item.name }}
-              </NuxtLink>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <!-- Разделитель -->
-        <ChevronRight class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-      </template>
-
-      <!-- Категория товара (а не само название товара) - кликабельная -->
-      <NuxtLink v-if="categoryItem" :to="categoryItem.href" class="font-medium text-foreground truncate hover:text-primary transition-colors">
-        {{ categoryItem.name }}
-      </NuxtLink>
+      <!-- Текущая страница -->
+      <h1
+        v-if="currentItem"
+        class="text-2xl font-bold text-foreground"
+      >
+        {{ currentItem.name }}
+      </h1>
     </div>
   </nav>
 </template>

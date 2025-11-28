@@ -396,7 +396,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
       </template>
     </ClientOnly>
 
-    <h1 class="text-3xl font-bold mb-6 capitalize">
+    <h1 class="text-xl md:text-3xl font-bold mb-6 capitalize">
       {{ title }}
     </h1>
 
@@ -437,10 +437,10 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
         <div class="mb-6 space-y-4">
           <!-- Подкатегории на мобильных -->
           <div v-if="subcategories.length > 0" class="lg:hidden">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-2">
               <Button
                 variant="outline"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
+                class="inline-flex flex-1 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
                 @click="isSubcategoriesDrawerOpen = true"
               >
                 <Icon
@@ -708,44 +708,59 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
       <Drawer v-model:open="isSubcategoriesDrawerOpen">
         <DrawerContent>
           <DrawerHeader>
-            <DrawerTitle>Выберите подкатегории</DrawerTitle>
+            <DrawerTitle class="flex items-center gap-2">
+              <Icon name="lucide:layers" class="w-5 h-5 text-primary" />
+              Выберите подкатегории
+            </DrawerTitle>
             <DrawerDescription>
               Фильтрация применяется автоматически
             </DrawerDescription>
           </DrawerHeader>
 
           <div class="px-4 pb-6 space-y-2 max-h-[60vh] overflow-y-auto">
-            <div
+            <button
               v-for="cat in subcategories"
               :key="cat.id"
-              class="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors"
+              type="button"
+              class="w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-200"
+              :class="[
+                activeFilters.subCategoryIds.includes(cat.id)
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+                  : 'bg-secondary/60 hover:bg-secondary hover:shadow-md active:scale-[0.98]',
+              ]"
+              @click="toggleSubCategory(cat.id)"
             >
-              <Checkbox
-                :id="`drawer-cat-${cat.id}`"
-                :model-value="activeFilters.subCategoryIds.includes(cat.id)"
-                @update:model-value="() => toggleSubCategory(cat.id)"
-              />
-              <Label
-                :for="`drawer-cat-${cat.id}`"
-                class="flex-1 font-medium cursor-pointer text-base"
+              <div
+                class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0"
+                :class="activeFilters.subCategoryIds.includes(cat.id) ? 'bg-white/20' : 'bg-background/50'"
               >
-                {{ cat.name }}
-              </Label>
-            </div>
+                <Icon
+                  :name="activeFilters.subCategoryIds.includes(cat.id) ? 'lucide:check' : 'lucide:folder'"
+                  class="w-5 h-5"
+                />
+              </div>
+              <div class="flex-1 text-left">
+                <div class="font-semibold text-base">
+                  {{ cat.name }}
+                </div>
+              </div>
+            </button>
           </div>
 
-          <DrawerFooter>
+          <DrawerFooter class="gap-2">
             <Button
               v-if="activeFilters.subCategoryIds.length > 0"
               variant="outline"
               class="w-full"
               @click="activeFilters.subCategoryIds = []"
             >
-              Сбросить все
+              <Icon name="lucide:x" class="w-4 h-4 mr-2" />
+              Сбросить все ({{ activeFilters.subCategoryIds.length }})
             </Button>
             <DrawerClose as-child>
               <Button class="w-full">
-                Закрыть
+                <Icon name="lucide:check" class="w-4 h-4 mr-2" />
+                Применить
               </Button>
             </DrawerClose>
           </DrawerFooter>

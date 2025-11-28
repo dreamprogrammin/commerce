@@ -128,7 +128,7 @@ watch(() => props.priceRange, (newRange) => {
       <div v-for="cat in subcategories" :key="cat.id" class="flex items-center space-x-2">
         <Checkbox
           :id="`cat-${cat.id}`"
-          :checked="props.modelValue.subCategoryIds.includes(cat.id)"
+          :model-value="props.modelValue.subCategoryIds.includes(cat.id)"
           @update:model-value="(checked) => updateSubCategory(!!checked, cat.id)"
         />
         <Label :for="`cat-${cat.id}`" class="font-normal cursor-pointer">{{ cat.name }}</Label>
@@ -144,7 +144,7 @@ watch(() => props.priceRange, (newRange) => {
         <div v-for="brand in availableBrands" :key="brand.id" class="flex items-center space-x-2">
           <Checkbox
             :id="`brand-${brand.id}`"
-            :checked="modelValue.brandIds?.includes(brand.id)"
+            :model-value="modelValue.brandIds?.includes(brand.id)"
             @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'brandIds', brand.id)"
           />
           <Label :for="`brand-${brand.id}`" class="font-normal cursor-pointer">{{ brand.name }}</Label>
@@ -161,7 +161,7 @@ watch(() => props.priceRange, (newRange) => {
         <div v-for="material in availableMaterials" :key="material.id" class="flex items-center space-x-2">
           <Checkbox
             :id="`material-${material.id}`"
-            :checked="modelValue.materialIds?.includes(String(material.id))"
+            :model-value="modelValue.materialIds?.includes(String(material.id))"
             @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'materialIds', material.id)"
           />
           <Label :for="`material-${material.id}`" class="font-normal cursor-pointer">{{ material.name }}</Label>
@@ -178,7 +178,7 @@ watch(() => props.priceRange, (newRange) => {
         <div v-for="country in availableCountries" :key="country.id" class="flex items-center space-x-2">
           <Checkbox
             :id="`country-${country.id}`"
-            :checked="modelValue.countryIds?.includes(String(country.id))"
+            :model-value="modelValue.countryIds?.includes(String(country.id))"
             @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'countryIds', country.id)"
           />
           <Label :for="`country-${country.id}`" class="font-normal cursor-pointer">{{ country.name }}</Label>
@@ -205,7 +205,7 @@ watch(() => props.priceRange, (newRange) => {
         >
           <Checkbox
             :id="`attr-${option.id}`"
-            :checked="modelValue.attributes[filter.slug]?.includes(option.id)"
+            :model-value="modelValue.attributes[filter.slug]?.includes(option.id)"
             @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
           />
           <Label :for="`attr-${option.id}`" class="font-normal cursor-pointer">{{ option.value }}</Label>
