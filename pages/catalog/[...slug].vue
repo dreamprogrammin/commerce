@@ -2,7 +2,7 @@
 import type { LocationQueryValue } from 'vue-router'
 import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
@@ -16,6 +16,10 @@ const route = useRoute()
 const router = useRouter()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
+
+// ✅ НОВОЕ: Throttle для навигации
+let isNavigating = false
+let navigationTimeout: NodeJS.Timeout | null = null
 
 // Флаг монтирования для корректной гидратации
 const isMounted = ref(false)
@@ -332,27 +336,27 @@ function updateQueryParams() {
   router.replace({ query })
 }
 
-// --- 5. КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Логика загрузки данных ---
+// --- 5. УПРОЩЕННАЯ ЛОГИКА ЗАГРУЗКИ ДАННЫХ ---
 
-// ✅ Контроллер для отмены запросов
-let loadingController: AbortController | null = null
-
-// ✅ Предыдущий slug для сравнения
-const previousSlug = ref(currentCategorySlug.value)
-
-// ✅ Следим за изменением категории
-watch(currentCategorySlug, async (newSlug) => {
+// ✅ Следим за изменением категории с защитой от спама
+watch(currentCategorySlug, async (newSlug, oldSlug) => {
   // Проверяем, действительно ли изменился slug
-  if (newSlug === previousSlug.value)
+  if (!oldSlug || newSlug === oldSlug)
     return
 
-  previousSlug.value = newSlug
-
-  // Отменяем предыдущие запросы
-  if (loadingController) {
-    loadingController.abort()
+  // ✅ Защита от слишком частых переключений
+  if (isNavigating) {
+    console.log('⏸️ Navigation in progress, skipping...')
+    return
   }
-  loadingController = new AbortController()
+
+  isNavigating = true
+  console.log('🔄 Category changed:', oldSlug, '->', newSlug)
+
+  // Очищаем предыдущий таймаут
+  if (navigationTimeout) {
+    clearTimeout(navigationTimeout)
+  }
 
   // Сбрасываем состояние НЕМЕДЛЕННО
   currentPage.value = 1
@@ -360,36 +364,42 @@ watch(currentCategorySlug, async (newSlug) => {
   isLoadingFilters.value = true
 
   try {
-    // Загружаем данные для новой категории
-    await loadFilterData(newSlug)
+    // Параллельная загрузка метаданных категорий и фильтров
+    await Promise.all([
+      categoriesStore.fetchCategoryData(),
+      loadFilterData(newSlug),
+    ])
 
     // Очищаем query параметры при смене категории
     await router.replace({ query: {} })
   }
   catch (error) {
-    if ((error as Error).name !== 'AbortError') {
-      console.error('Error loading category:', error)
-    }
+    console.error('Error loading category:', error)
   }
   finally {
     isLoadingFilters.value = false
+
+    // Разблокируем навигацию через 500ms
+    navigationTimeout = setTimeout(() => {
+      isNavigating = false
+    }, 500)
   }
 }, { immediate: false })
 
-// Начальная загрузка данных
-await useAsyncData(
-  `catalog-meta-${currentCategorySlug.value}`,
-  () => categoriesStore.fetchCategoryData(),
-  { server: true },
-)
+// ✅ Начальная загрузка ТОЛЬКО на сервере
+if (import.meta.server) {
+  await categoriesStore.fetchCategoryData()
+  await loadFilterData(currentCategorySlug.value)
+}
+else {
+  // На клиенте загружаем только если данных нет
+  if (!availableFilters.value.length && !isLoadingFilters.value) {
+    await categoriesStore.fetchCategoryData()
+    await loadFilterData(currentCategorySlug.value)
+  }
+}
 
-await useAsyncData(
-  `catalog-filters-${currentCategorySlug.value}`,
-  () => loadFilterData(currentCategorySlug.value),
-  { server: true },
-)
-
-// ✅ Debounce для фильтров - сбрасываем страницу и обновляем query
+// ✅ Debounce для фильтров - уменьшен до 300ms для лучшего UX
 watchDebounced(
   activeFilters,
   () => {
@@ -397,8 +407,15 @@ watchDebounced(
     accumulatedProducts.value = []
     updateQueryParams()
   },
-  { debounce: 800, deep: true },
+  { debounce: 300, deep: true },
 )
+
+// ✅ Очистка таймаута при размонтировании
+onUnmounted(() => {
+  if (navigationTimeout) {
+    clearTimeout(navigationTimeout)
+  }
+})
 
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
 </script>

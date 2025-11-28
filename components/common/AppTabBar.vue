@@ -183,7 +183,7 @@ defineExpose({ closeAllPopups })
               </NuxtLink>
 
               <NavigationMenuContent>
-                <div class="min-w-screen h-[35dvh] bg-white dark:bg-gray-900 overflow-y-auto">
+                <div class="min-w-screen h-[35vh] bg-white dark:bg-gray-900 overflow-y-auto">
                   <ul
                     :class="containerClass"
                     class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 py-12"
