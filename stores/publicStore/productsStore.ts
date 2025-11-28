@@ -14,9 +14,6 @@ export const useProductsStore = defineStore('productsStore', () => {
   const allCountries = ref<Country[]>([])
   const priceRangeByCategory = ref<Record<string, { min_price: number, max_price: number }>>({})
 
-  // ✅ НОВОЕ: Трекер загрузки для предотвращения дублирования запросов
-  const loadingPromises = ref<Record<string, Promise<any>>>({})
-
   // ============================================
   // 📦 МЕТОДЫ С КЭШИРОВАНИЕМ
   // ============================================
@@ -26,33 +23,18 @@ export const useProductsStore = defineStore('productsStore', () => {
       console.warn('✅ All brands from cache')
       return
     }
-
-    // ✅ Предотвращаем дублирование запросов
-    const key = 'all-brands'
-    if (loadingPromises.value[key]) {
-      return loadingPromises.value[key]
+    try {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error)
+        throw error
+      brands.value = data || []
     }
-
-    const promise = (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('brands')
-          .select('*')
-          .order('name', { ascending: true })
-        if (error)
-          throw error
-        brands.value = data || []
-      }
-      catch (error: any) {
-        toast.error('Ошибка при загрузке брендов', { description: error.message })
-      }
-      finally {
-        delete loadingPromises.value[key]
-      }
-    })()
-
-    loadingPromises.value[key] = promise
-    return promise
+    catch (error: any) {
+      toast.error('Ошибка при загрузке брендов', { description: error.message })
+    }
   }
 
   async function fetchBrandsForCategory(categorySlug: string): Promise<BrandForFilter[]> {
@@ -65,36 +47,22 @@ export const useProductsStore = defineStore('productsStore', () => {
       return brandsByCategory.value[categorySlug]
     }
 
-    // ✅ Предотвращаем дублирование запросов
-    const key = `brands-${categorySlug}`
-    if (loadingPromises.value[key]) {
-      return loadingPromises.value[key]
-    }
-
     console.warn('🌐 Fetching brands from server:', categorySlug)
 
-    const promise = (async () => {
-      try {
-        const { data, error } = await supabase.rpc('get_brands_by_category_slug', {
-          p_category_slug: categorySlug,
-        })
-        if (error)
-          throw error
+    try {
+      const { data, error } = await supabase.rpc('get_brands_by_category_slug', {
+        p_category_slug: categorySlug,
+      })
+      if (error)
+        throw error
 
-        brandsByCategory.value[categorySlug] = data || []
-        return data || []
-      }
-      catch (error: any) {
-        console.error('Ошибка загрузки брендов для категории:', error)
-        return []
-      }
-      finally {
-        delete loadingPromises.value[key]
-      }
-    })()
-
-    loadingPromises.value[key] = promise
-    return promise
+      brandsByCategory.value[categorySlug] = data || []
+      return data || []
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки брендов для категории:', error)
+      return []
+    }
   }
 
   async function fetchAttributesForCategory(categorySlug: string): Promise<AttributeWithValue[]> {
@@ -107,47 +75,33 @@ export const useProductsStore = defineStore('productsStore', () => {
       return attributesByCategory.value[categorySlug]
     }
 
-    // ✅ Предотвращаем дублирование запросов
-    const key = `attributes-${categorySlug}`
-    if (loadingPromises.value[key]) {
-      return loadingPromises.value[key]
-    }
-
     console.warn('🌐 Fetching attributes from server:', categorySlug)
 
-    const promise = (async () => {
-      try {
-        const { data: categoryData, error: categoryError } = await supabase
-          .from('categories')
-          .select('id')
-          .eq('slug', categorySlug)
-          .single()
-        if (categoryError)
-          throw categoryError
+    try {
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', categorySlug)
+        .single()
+      if (categoryError)
+        throw categoryError
 
-        const { data, error } = await supabase
-          .from('attributes')
-          .select('*, attribute_options(*), category_attributes!inner(category_id)')
-          .eq('category_attributes.category_id', categoryData.id)
-          .order('name')
+      const { data, error } = await supabase
+        .from('attributes')
+        .select('*, attribute_options(*), category_attributes!inner(category_id)')
+        .eq('category_attributes.category_id', categoryData.id)
+        .order('name')
 
-        if (error)
-          throw error
+      if (error)
+        throw error
 
-        attributesByCategory.value[categorySlug] = data || []
-        return data || []
-      }
-      catch (error: any) {
-        console.error('Ошибка загрузки атрибутов для фильтров:', error)
-        return []
-      }
-      finally {
-        delete loadingPromises.value[key]
-      }
-    })()
-
-    loadingPromises.value[key] = promise
-    return promise
+      attributesByCategory.value[categorySlug] = data || []
+      return data || []
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки атрибутов для фильтров:', error)
+      return []
+    }
   }
 
   async function fetchAllMaterials(): Promise<Material[]> {
@@ -156,33 +110,19 @@ export const useProductsStore = defineStore('productsStore', () => {
       return allMaterials.value
     }
 
-    // ✅ Предотвращаем дублирование запросов
-    const key = 'all-materials'
-    if (loadingPromises.value[key]) {
-      return loadingPromises.value[key]
-    }
-
     console.warn('🌐 Fetching materials from server')
 
-    const promise = (async () => {
-      try {
-        const { data, error } = await supabase.from('materials').select('*').order('name')
-        if (error)
-          throw error
-        allMaterials.value = data || []
-        return data || []
-      }
-      catch (error: any) {
-        toast.error('Ошибка при загрузке материалов', { description: error.message })
-        return []
-      }
-      finally {
-        delete loadingPromises.value[key]
-      }
-    })()
-
-    loadingPromises.value[key] = promise
-    return promise
+    try {
+      const { data, error } = await supabase.from('materials').select('*').order('name')
+      if (error)
+        throw error
+      allMaterials.value = data || []
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке материалов', { description: error.message })
+      return []
+    }
   }
 
   async function fetchAllCountries(): Promise<Country[]> {
@@ -191,33 +131,19 @@ export const useProductsStore = defineStore('productsStore', () => {
       return allCountries.value
     }
 
-    // ✅ Предотвращаем дублирование запросов
-    const key = 'all-countries'
-    if (loadingPromises.value[key]) {
-      return loadingPromises.value[key]
-    }
-
     console.warn('🌐 Fetching countries from server')
 
-    const promise = (async () => {
-      try {
-        const { data, error } = await supabase.from('countries').select('*').order('name')
-        if (error)
-          throw error
-        allCountries.value = data || []
-        return data || []
-      }
-      catch (error: any) {
-        toast.error('Ошибка при загрузке стран', { description: error.message })
-        return []
-      }
-      finally {
-        delete loadingPromises.value[key]
-      }
-    })()
-
-    loadingPromises.value[key] = promise
-    return promise
+    try {
+      const { data, error } = await supabase.from('countries').select('*').order('name')
+      if (error)
+        throw error
+      allCountries.value = data || []
+      return data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка при загрузке стран', { description: error.message })
+      return []
+    }
   }
 
   async function fetchPriceRangeForCategory(categorySlug: string): Promise<{ min_price: number, max_price: number }> {
@@ -231,44 +157,30 @@ export const useProductsStore = defineStore('productsStore', () => {
       return priceRangeByCategory.value[categorySlug]
     }
 
-    // ✅ Предотвращаем дублирование запросов
-    const key = `price-range-${categorySlug}`
-    if (loadingPromises.value[key]) {
-      return loadingPromises.value[key]
-    }
-
     console.warn('🌐 Fetching price range from server:', categorySlug)
 
-    const promise = (async () => {
-      try {
-        const { data, error } = await supabase
-          .rpc('get_category_price_range', { p_category_slug: categorySlug })
-          .overrideTypes<{ min_price: number, max_price: number }[]>()
+    try {
+      const { data, error } = await supabase
+        .rpc('get_category_price_range', { p_category_slug: categorySlug })
+        .overrideTypes<{ min_price: number, max_price: number }[]>()
 
-        if (error)
-          throw error
+      if (error)
+        throw error
 
-        const range = data && data.length > 0 ? data[0] : null
-        const result = {
-          min_price: Number(range?.min_price || 0),
-          max_price: Number(range?.max_price || 50000),
-        }
-
-        priceRangeByCategory.value[categorySlug] = result
-        return result
+      const range = data && data.length > 0 ? data[0] : null
+      const result = {
+        min_price: Number(range?.min_price || 0),
+        max_price: Number(range?.max_price || 50000),
       }
-      catch (error: any) {
-        console.error('Ошибка при получении диапазона цен:', error)
-        toast.error('Ошибка при загрузке диапазона цен', { description: error.message })
-        return { min_price: 0, max_price: 50000 }
-      }
-      finally {
-        delete loadingPromises.value[key]
-      }
-    })()
 
-    loadingPromises.value[key] = promise
-    return promise
+      priceRangeByCategory.value[categorySlug] = result
+      return result
+    }
+    catch (error: any) {
+      console.error('Ошибка при получении диапазона цен:', error)
+      toast.error('Ошибка при загрузке диапазона цен', { description: error.message })
+      return { min_price: 0, max_price: 50000 }
+    }
   }
 
   // ============================================
@@ -282,7 +194,6 @@ export const useProductsStore = defineStore('productsStore', () => {
     allCountries.value = []
     priceRangeByCategory.value = {}
     brands.value = []
-    loadingPromises.value = {} // ✅ Очищаем промисы
     console.warn('🧹 All cache cleared')
   }
 
@@ -290,34 +201,22 @@ export const useProductsStore = defineStore('productsStore', () => {
     delete brandsByCategory.value[categorySlug]
     delete attributesByCategory.value[categorySlug]
     delete priceRangeByCategory.value[categorySlug]
-    // ✅ Очищаем промисы для этой категории
-    delete loadingPromises.value[`brands-${categorySlug}`]
-    delete loadingPromises.value[`attributes-${categorySlug}`]
-    delete loadingPromises.value[`price-range-${categorySlug}`]
     console.warn('🧹 Cache cleared for category:', categorySlug)
   }
 
   function invalidateBrandsCache() {
     brandsByCategory.value = {}
     brands.value = []
-    // ✅ Очищаем промисы брендов
-    Object.keys(loadingPromises.value).forEach((key) => {
-      if (key.startsWith('brands-')) {
-        delete loadingPromises.value[key]
-      }
-    })
     console.warn('🧹 Brands cache invalidated')
   }
 
   function invalidateMaterialsCache() {
     allMaterials.value = []
-    delete loadingPromises.value['all-materials']
     console.warn('🧹 Materials cache invalidated')
   }
 
   function invalidateCountriesCache() {
     allCountries.value = []
-    delete loadingPromises.value['all-countries']
     console.warn('🧹 Countries cache invalidated')
   }
 
@@ -325,19 +224,12 @@ export const useProductsStore = defineStore('productsStore', () => {
   // 📊 МЕТОДЫ БЕЗ КЭШИРОВАНИЯ (товары)
   // ============================================
 
-  // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Добавлен AbortSignal
   async function fetchProducts(
     filters: IProductFilters,
     currentPage = 1,
     pageSize = 12,
-    signal?: AbortSignal, // ✅ ДОБАВЛЕН параметр
   ): Promise<{ products: ProductWithGallery[], hasMore: boolean }> {
     try {
-      // ✅ Проверяем отмену ПЕРЕД запросом
-      if (signal?.aborted) {
-        throw new Error('Request aborted')
-      }
-
       const { data: rpcResponse, error } = await supabase.rpc('get_filtered_products', {
         p_category_slug: filters.categorySlug,
         p_subcategory_ids: filters.subCategoryIds,
@@ -351,11 +243,6 @@ export const useProductsStore = defineStore('productsStore', () => {
         p_material_ids: filters.materialIds,
         p_attributes: filters.attributes,
       })
-
-      // ✅ Проверяем отмену ПОСЛЕ запроса
-      if (signal?.aborted) {
-        throw new Error('Request aborted')
-      }
 
       if (error)
         throw error
@@ -378,12 +265,6 @@ export const useProductsStore = defineStore('productsStore', () => {
       return { products: newProducts, hasMore }
     }
     catch (error: any) {
-      // ✅ Не показываем toast для отмененных запросов
-      if (error.message === 'Request aborted') {
-        console.log('🚫 Request was aborted')
-        return { products: [], hasMore: false }
-      }
-
       toast.error('Ошибка при загрузке товаров', { description: error.message })
       return { products: [], hasMore: false }
     }
@@ -442,13 +323,14 @@ export const useProductsStore = defineStore('productsStore', () => {
         .from('products')
         .select('*, categories(name, slug), product_images(*)')
         .eq('is_active', true)
-        .eq('is_featured', true)
-        .order('featured_order', { ascending: true })
+        .eq('is_featured', true) // 🎯 Только избранные
+        .order('featured_order', { ascending: true }) // 🎯 По порядку
         .limit(limit)
 
       if (error)
         throw error
 
+      // 🔄 Fallback: если избранных нет - берём по бонусам
       if (!data || data.length === 0) {
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('products')
