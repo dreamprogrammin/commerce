@@ -24,10 +24,38 @@ useSeoMeta({
   ogTitle: 'Кракен Шоп - Магазин детских игрушек',
   ogDescription: 'Лучшие игрушки для ваших детей! Развивающие игры, конструкторы, куклы и многое другое.',
 })
+
+// 🆕 Управление LoadingBar при навигации
+const nuxtApp = useNuxtApp()
+const isPageLoading = ref(false)
+
+nuxtApp.hook('page:start', () => {
+  isPageLoading.value = true
+})
+
+nuxtApp.hook('page:finish', () => {
+  // Небольшая задержка для плавности
+  setTimeout(() => {
+    isPageLoading.value = false
+  }, 100)
+})
+
+// Скрываем при ошибках
+nuxtApp.hook('vue:error', () => {
+  isPageLoading.value = false
+})
 </script>
 
 <template>
   <div>
+    <!-- 🆕 Глобальная полоска загрузки -->
+    <LoadingBar
+      :loading="isPageLoading"
+      color="blue"
+      :show-glow="true"
+      :show-shimmer="true"
+    />
+
     <NuxtLayout>
       <NuxtPage />
       <Toaster />

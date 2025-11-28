@@ -12,16 +12,17 @@ export default defineNuxtConfig({
     '@nuxt/icon',
   ],
 
-  // 🎯 ИСПРАВЛЕННЫЕ Route Rules
+  // 🎯 ОПТИМИЗИРОВАННЫЕ Route Rules
   routeRules: {
     // 1️⃣ Главная страница - статика
     '/': { prerender: true },
 
-    // 2️⃣ Каталог - УБИРАЕМ SWR для dev, оставляем SSR
+    // 2️⃣ Каталог - SSR с агрессивным кешем в production
     '/catalog/**': import.meta.env.NODE_ENV === 'production'
       ? {
           ssr: true,
-          swr: 60 * 5, // 5 минут кеш только в production
+          swr: 60 * 10, // 🆕 Увеличен кеш до 10 минут
+          isr: true, // 🆕 Incremental Static Regeneration
         }
       : {
           ssr: true,
@@ -34,12 +35,12 @@ export default defineNuxtConfig({
     '/profile/**': { ssr: false },
     '/admin/**': { ssr: false },
 
-    // 4️⃣ API роуты
+    // 4️⃣ API роуты с оптимизацией
     '/api/**': {
       cors: true,
       headers: {
         'Cache-Control': import.meta.env.NODE_ENV === 'production'
-          ? 'public, max-age=3600, s-maxage=3600'
+          ? 'public, max-age=3600, s-maxage=7200, stale-while-revalidate=86400' // 🆕 Добавлен stale-while-revalidate
           : 'no-cache',
       },
     },
@@ -70,11 +71,27 @@ export default defineNuxtConfig({
     },
     compressPublicAssets: true,
     minify: true,
+    // 🆕 Оптимизация памяти
+    prerender: {
+      concurrency: 10, // Ограничение одновременных запросов при prerender
+      interval: 50, // Интервал между запросами
+    },
   },
 
   // 🖼️ Изображения
   image: {
     domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
+    // 🆕 Оптимизация изображений
+    screens: {
+      xs: 320,
+      sm: 640,
+      md: 768,
+      lg: 1024,
+      xl: 1280,
+      xxl: 1536,
+    },
+    quality: 80, // Баланс между качеством и размером
+    format: ['webp'], // Приоритет современным форматам
   },
 
   // 🚀 App настройки
@@ -96,9 +113,14 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ],
     },
-    // ⚡ ДОБАВЛЯЕМ: Настройки для корректных переходов
-    pageTransition: { name: 'page', mode: 'out-in' },
-    keepalive: false, // Отключаем keepalive для catalog страниц
+    // ⚡ Улучшенные переходы
+    pageTransition: {
+      name: 'page',
+      mode: 'out-in',
+      // 🆕 Быстрые переходы
+      duration: 150,
+    },
+    keepalive: false,
   },
 
   // 📦 Supabase
@@ -118,6 +140,8 @@ export default defineNuxtConfig({
       terserOptions: {
         compress: {
           drop_console: true,
+          drop_debugger: true,
+          pure_funcs: ['console.log', 'console.debug'], // 🆕 Удаляем логи
         },
       },
       rollupOptions: {
@@ -125,8 +149,15 @@ export default defineNuxtConfig({
           manualChunks: {
             'vue-vendor': ['vue', 'vue-router'],
             'supabase-vendor': ['@supabase/supabase-js'],
+            'ui-vendor': ['lucide-vue-next', 'reka-ui'], // 🆕 Разделение UI библиотек
           },
         },
+      },
+    },
+    // 🆕 Оптимизация dev сервера
+    server: {
+      hmr: {
+        overlay: false, // Отключаем оверлей ошибок для лучшей производительности
       },
     },
   },
@@ -142,11 +173,21 @@ export default defineNuxtConfig({
     payloadExtraction: true,
     renderJsonPayloads: true,
     viewTransition: true,
+    // 🆕 Экспериментальные оптимизации
+    componentIslands: true, // Изолированные компоненты
+    sharedPrerenderData: true, // Переиспользование данных при prerender
   },
 
   // 🏗️ Build оптимизации
   build: {
     transpile: ['vue-sonner'],
+  },
+
+  // 🆕 Настройка router для лучшей производительности
+  router: {
+    options: {
+      scrollBehaviorType: 'smooth', // Плавный скролл
+    },
   },
 
   devtools: { enabled: true },

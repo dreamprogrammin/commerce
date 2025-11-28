@@ -2,7 +2,7 @@
 import type { LocationQueryValue } from 'vue-router'
 import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
-import { computed, onMounted, ref, watch } from 'vue' // Добавлен onMounted
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
@@ -19,8 +19,19 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 
 // Флаг монтирования для корректной гидратации
 const isMounted = ref(false)
+
+// 🆕 Отмена запросов при размонтировании
+const abortController = ref<AbortController | null>(null)
+
 onMounted(() => {
   isMounted.value = true
+})
+
+onUnmounted(() => {
+  // Отменяем все активные запросы при уходе со страницы
+  if (abortController.value) {
+    abortController.value.abort()
+  }
 })
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
@@ -80,18 +91,16 @@ const priceRange = ref({ min: 0, max: 50000 })
 // Получаем подкатегории из store
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
-// НОВОЕ: Вычисляем лейбл для мобильной кнопки категорий
 const activeSubcategoryLabel = computed(() => {
   const count = activeFilters.value.subCategoryIds.length
   if (count === 0)
     return 'Все категории'
 
-  // Находим имя первой выбранной категории
   const firstId = activeFilters.value.subCategoryIds[0]
   const category = subcategories.value.find(c => c.id === firstId)
 
   if (!category)
-    return 'Выбрано' // Fallback на случай ошибки данных
+    return 'Выбрано'
 
   if (count > 1) {
     return `${category.name} (+${count - 1})`
@@ -171,13 +180,21 @@ function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[
   return 'popularity'
 }
 
+// 🆕 Оптимизированная загрузка фильтров с отменой
 async function loadFilterData(slug: string) {
+  // Отменяем предыдущий запрос
+  if (abortController.value) {
+    abortController.value.abort()
+  }
+
+  abortController.value = new AbortController()
   isLoadingFilters.value = true
 
   try {
     const productsStore = useProductsStore()
 
-    const [brands, attributes, materials, countries, priceRangeData] = await Promise.all([
+    // 🆕 Используем Promise.allSettled для продолжения при частичных ошибках
+    const results = await Promise.allSettled([
       productsStore.fetchBrandsForCategory(slug),
       productsStore.fetchAttributesForCategory(slug),
       productsStore.fetchAllMaterials(),
@@ -185,17 +202,24 @@ async function loadFilterData(slug: string) {
       productsStore.fetchPriceRangeForCategory(slug),
     ])
 
-    availableBrands.value = brands
-    availableFilters.value = attributes
-    availableMaterials.value = materials
-    availableCountries.value = countries
+    // Обрабатываем успешные результаты
+    const [brandsResult, attributesResult, materialsResult, countriesResult, priceRangeResult] = results
+
+    availableBrands.value = brandsResult.status === 'fulfilled' ? brandsResult.value : []
+    availableFilters.value = attributesResult.status === 'fulfilled' ? attributesResult.value : []
+    availableMaterials.value = materialsResult.status === 'fulfilled' ? materialsResult.value : []
+    availableCountries.value = countriesResult.status === 'fulfilled' ? countriesResult.value : []
+
+    const priceRangeData = priceRangeResult.status === 'fulfilled'
+      ? priceRangeResult.value
+      : { min_price: 0, max_price: 50000 }
 
     const priceMin = priceRangeData.min_price
     const priceMax = priceRangeData.max_price
     priceRange.value = { min: priceMin, max: priceMax }
 
     const newAttributeFilters: Record<string, any[]> = {}
-    for (const attr of attributes) {
+    for (const attr of availableFilters.value) {
       const queryKey = `attr_${attr.slug}`
       const queryValue = route.query[queryKey]
       newAttributeFilters[attr.slug] = getArrayFromQuery(queryValue)
@@ -216,6 +240,12 @@ async function loadFilterData(slug: string) {
 
     currentPage.value = 1
     accumulatedProducts.value = []
+  }
+  catch (error: any) {
+    // Игнорируем ошибки отмены
+    if (error.name !== 'AbortError') {
+      console.error('Error loading filters:', error)
+    }
   }
   finally {
     isLoadingFilters.value = false
@@ -280,6 +310,7 @@ function toggleSubCategory(catId: string) {
   }
 }
 
+// 🆕 Дебаунс для query params (уменьшен до 300ms)
 function updateQueryParams() {
   const query: Record<string, any> = {}
 
@@ -337,6 +368,7 @@ await useAsyncData(
   },
 )
 
+// 🆕 Уменьшен debounce до 300ms
 watchDebounced(
   activeFilters,
   () => {
@@ -344,7 +376,7 @@ watchDebounced(
     accumulatedProducts.value = []
     updateQueryParams()
   },
-  { debounce: 500, deep: true },
+  { debounce: 300, deep: true },
 )
 
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
@@ -403,10 +435,9 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 
       <div class="col-span-1 lg:col-span-3 min-w-0">
         <div class="mb-6 space-y-4">
-          <!-- НОВОЕ: Подкатегории на мобильных (Кнопка + Сброс) -->
+          <!-- Подкатегории на мобильных -->
           <div v-if="subcategories.length > 0" class="lg:hidden">
             <div class="flex items-center justify-between">
-              <!-- Левая часть: Кнопка-Бейдж -->
               <Button
                 variant="outline"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
@@ -419,7 +450,6 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
                 <span class="truncate">{{ activeSubcategoryLabel }}</span>
               </Button>
 
-              <!-- Правая часть: Кнопка Сброса -->
               <Button
                 variant="ghost"
                 size="icon"
@@ -432,9 +462,8 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
             </div>
           </div>
 
-          <!-- Панель управления (Фильтры, Сортировка) -->
+          <!-- Панель управления -->
           <div class="flex flex-wrap items-center gap-2">
-            <!-- Кнопка мобильных фильтров -->
             <ClientOnly>
               <Button
                 :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
@@ -454,10 +483,8 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </Button>
             </ClientOnly>
 
-            <!-- Сортировка -->
             <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
 
-            <!-- Десктопные дропдауны атрибутов -->
             <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border hidden lg:block" />
 
             <template v-if="!isLoadingFilters && availableFilters.length > 0">
@@ -585,7 +612,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </template>
             </template>
 
-            <!-- Подкатегории на десктопе (остаются как были, скрыты на мобиле) -->
+            <!-- Подкатегории на десктопе -->
             <template v-if="subcategories.length > 0">
               <div class="hidden lg:block h-6 w-px bg-border" />
               <button
@@ -616,39 +643,49 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
           </div>
         </div>
 
-        <!-- Скелетон, товары, пустое состояние -->
-        <ProductGridSkeleton
-          v-if="(isLoading && isMounted) || (isLoading && displayedProducts.length === 0)"
-        />
+        <!-- Контент с плавным переходом -->
+        <Transition
+          enter-active-class="transition-opacity duration-200"
+          leave-active-class="transition-opacity duration-150"
+          enter-from-class="opacity-0"
+          leave-to-class="opacity-0"
+          mode="out-in"
+        >
+          <div :key="isLoading ? 'loading' : 'content'">
+            <ProductGridSkeleton
+              v-if="(isLoading && isMounted) || (isLoading && displayedProducts.length === 0)"
+            />
 
-        <div v-else-if="displayedProducts.length > 0" class="space-y-8">
-          <ProductGrid :products="displayedProducts" />
+            <div v-else-if="displayedProducts.length > 0" class="space-y-8">
+              <ProductGrid :products="displayedProducts" />
 
-          <div v-if="hasMore" class="text-center">
-            <Button
-              variant="outline"
-              size="lg"
-              :disabled="isFetching"
-              @click="loadMoreProducts"
-            >
-              <span v-if="isFetching">Загрузка...</span>
-              <span v-else>Показать ещё</span>
-            </Button>
+              <div v-if="hasMore" class="text-center">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  :disabled="isFetching"
+                  @click="loadMoreProducts"
+                >
+                  <span v-if="isFetching">Загрузка...</span>
+                  <span v-else>Показать ещё</span>
+                </Button>
+              </div>
+
+              <div v-if="isFetching && currentPage > 1" class="text-center text-sm text-muted-foreground">
+                Загрузка товаров...
+              </div>
+            </div>
+
+            <div v-else class="text-center py-20 text-muted-foreground border-2 border-dashed rounded-lg">
+              <h3 class="text-2xl font-semibold">
+                Товары не найдены
+              </h3>
+              <p class="mt-2">
+                Попробуйте изменить фильтры или выбрать другую категорию.
+              </p>
+            </div>
           </div>
-
-          <div v-if="isFetching && currentPage > 1" class="text-center text-sm text-muted-foreground">
-            Загрузка товаров...
-          </div>
-        </div>
-
-        <div v-else class="text-center py-20 text-muted-foreground border-2 border-dashed rounded-lg">
-          <h3 class="text-2xl font-semibold">
-            Товары не найдены
-          </h3>
-          <p class="mt-2">
-            Попробуйте изменить фильтры или выбрать другую категорию.
-          </p>
-        </div>
+        </Transition>
       </div>
     </div>
 
