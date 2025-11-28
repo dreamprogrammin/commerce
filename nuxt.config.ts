@@ -12,41 +12,42 @@ export default defineNuxtConfig({
     '@nuxt/icon',
   ],
 
-  // 🎯 КРИТИЧНАЯ ОПТИМИЗАЦИЯ: Route Rules для разных страниц
+  // 🎯 ИСПРАВЛЕННЫЕ Route Rules
   routeRules: {
     // 1️⃣ Главная страница - статика
     '/': { prerender: true },
 
-    // 2️⃣ Товары - СНАЧАЛА более специфичные правила
-    '/catalog/products/**': import.meta.env.NODE_ENV === 'production'
-      ? { ssr: true, swr: 60 * 10 } // 10 минут для карточек товаров
-      : { ssr: true },
-
-    // 3️⃣ Потом общее правило для каталога (НЕ перекроет /products/**)
+    // 2️⃣ Каталог - УБИРАЕМ SWR для dev, оставляем SSR
     '/catalog/**': import.meta.env.NODE_ENV === 'production'
-      ? { ssr: true, swr: 60 * 5 } // 5 минут для категорий/фильтров
-      : { ssr: true },
+      ? {
+          ssr: true,
+          swr: 60 * 5, // 5 минут кеш только в production
+        }
+      : {
+          ssr: true,
+          // В dev режиме НЕ кешируем
+        },
 
-    // 4️⃣ SPA страницы (интерактивные)
+    // 3️⃣ SPA страницы (интерактивные)
     '/cart/**': { ssr: false },
     '/checkout/**': { ssr: false },
     '/profile/**': { ssr: false },
     '/admin/**': { ssr: false },
 
-    // 5️⃣ API роуты
+    // 4️⃣ API роуты
     '/api/**': {
       cors: true,
-      cache: {
-        maxAge: 60 * 60, // 1 час
-        swr: true,
+      headers: {
+        'Cache-Control': import.meta.env.NODE_ENV === 'production'
+          ? 'public, max-age=3600, s-maxage=3600'
+          : 'no-cache',
       },
     },
   },
 
-  // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
+  // 🛡️ Nitro настройки
   nitro: {
     routeRules: {
-      // Проксируем запросы к Supabase через наш сервер
       '/api/image-proxy/**': {
         proxy: {
           to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**',
@@ -67,13 +68,11 @@ export default defineNuxtConfig({
         },
       },
     },
-    // Сжатие ответов
     compressPublicAssets: true,
-    // Минификация
     minify: true,
   },
 
-  // 🖼️ Базовая настройка изображений
+  // 🖼️ Изображения
   image: {
     domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
   },
@@ -97,6 +96,9 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ],
     },
+    // ⚡ ДОБАВЛЯЕМ: Настройки для корректных переходов
+    pageTransition: { name: 'page', mode: 'out-in' },
+    keepalive: false, // Отключаем keepalive для catalog страниц
   },
 
   // 📦 Supabase
@@ -135,7 +137,7 @@ export default defineNuxtConfig({
     componentDir: './components/ui',
   },
 
-  // 🔧 Experimental features для производительности
+  // 🔧 Experimental features
   experimental: {
     payloadExtraction: true,
     renderJsonPayloads: true,

@@ -2,7 +2,7 @@
 import type { LocationQueryValue } from 'vue-router'
 import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
-import { computed, onMounted, ref, watch } from 'vue' // Добавлен onMounted
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
@@ -80,18 +80,17 @@ const priceRange = ref({ min: 0, max: 50000 })
 // Получаем подкатегории из store
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
-// НОВОЕ: Вычисляем лейбл для мобильной кнопки категорий
+// Вычисляем лейбл для мобильной кнопки категорий
 const activeSubcategoryLabel = computed(() => {
   const count = activeFilters.value.subCategoryIds.length
   if (count === 0)
     return 'Все категории'
 
-  // Находим имя первой выбранной категории
   const firstId = activeFilters.value.subCategoryIds[0]
   const category = subcategories.value.find(c => c.id === firstId)
 
   if (!category)
-    return 'Выбрано' // Fallback на случай ошибки данных
+    return 'Выбрано'
 
   if (count > 1) {
     return `${category.name} (+${count - 1})`
@@ -320,23 +319,37 @@ function updateQueryParams() {
   router.replace({ query })
 }
 
-// --- 5. Логика загрузки данных и реакции на изменения ---
+// --- 5. КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Логика загрузки данных ---
 
+// ✅ Следим за изменением категории и СБРАСЫВАЕМ все фильтры
+watch(currentCategorySlug, async (newSlug, oldSlug) => {
+  if (newSlug !== oldSlug) {
+    // Сбрасываем состояние перед загрузкой
+    currentPage.value = 1
+    accumulatedProducts.value = []
+
+    // Загружаем данные для новой категории
+    await loadFilterData(newSlug)
+
+    // Очищаем query параметры при смене категории
+    router.replace({ query: {} })
+  }
+}, { immediate: false })
+
+// Начальная загрузка данных
 await useAsyncData(
   `catalog-meta-${currentCategorySlug.value}`,
   () => categoriesStore.fetchCategoryData(),
-  { watch: [currentCategorySlug] },
+  { server: true },
 )
 
 await useAsyncData(
   `catalog-filters-${currentCategorySlug.value}`,
   () => loadFilterData(currentCategorySlug.value),
-  {
-    watch: [currentCategorySlug],
-    server: true,
-  },
+  { server: true },
 )
 
+// Следим за изменением фильтров (НЕ категории)
 watchDebounced(
   activeFilters,
   () => {
@@ -351,7 +364,8 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 </script>
 
 <template>
-  <div :class="`${containerClass} py-8`">
+  <!-- ✅ ДОБАВЛЯЕМ KEY для принудительной перерисовки при смене категории -->
+  <div :key="currentCategorySlug" :class="`${containerClass} py-8`">
     <!-- Breadcrumbs и заголовок -->
     <ClientOnly>
       <Breadcrumbs
@@ -403,10 +417,9 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 
       <div class="col-span-1 lg:col-span-3 min-w-0">
         <div class="mb-6 space-y-4">
-          <!-- НОВОЕ: Подкатегории на мобильных (Кнопка + Сброс) -->
+          <!-- Подкатегории на мобильных -->
           <div v-if="subcategories.length > 0" class="lg:hidden">
             <div class="flex items-center justify-between">
-              <!-- Левая часть: Кнопка-Бейдж -->
               <Button
                 variant="outline"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
@@ -419,7 +432,6 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
                 <span class="truncate">{{ activeSubcategoryLabel }}</span>
               </Button>
 
-              <!-- Правая часть: Кнопка Сброса -->
               <Button
                 variant="ghost"
                 size="icon"
@@ -432,9 +444,8 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
             </div>
           </div>
 
-          <!-- Панель управления (Фильтры, Сортировка) -->
+          <!-- Панель управления -->
           <div class="flex flex-wrap items-center gap-2">
-            <!-- Кнопка мобильных фильтров -->
             <ClientOnly>
               <Button
                 :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
@@ -454,10 +465,8 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </Button>
             </ClientOnly>
 
-            <!-- Сортировка -->
             <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
 
-            <!-- Десктопные дропдауны атрибутов -->
             <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border hidden lg:block" />
 
             <template v-if="!isLoadingFilters && availableFilters.length > 0">
@@ -585,7 +594,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </template>
             </template>
 
-            <!-- Подкатегории на десктопе (остаются как были, скрыты на мобиле) -->
+            <!-- Подкатегории на десктопе -->
             <template v-if="subcategories.length > 0">
               <div class="hidden lg:block h-6 w-px bg-border" />
               <button
@@ -616,7 +625,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
           </div>
         </div>
 
-        <!-- Скелетон, товары, пустое состояние -->
+        <!-- Контент -->
         <ProductGridSkeleton
           v-if="(isLoading && isMounted) || (isLoading && displayedProducts.length === 0)"
         />
@@ -654,7 +663,6 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 
     <!-- Мобильные компоненты -->
     <ClientOnly>
-      <!-- Мобильные фильтры (Sheet) -->
       <DynamicFiltersMobile
         v-model="activeFilters"
         :open="isMobileFiltersOpen"
@@ -667,7 +675,6 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
         @update:open="isMobileFiltersOpen = $event"
       />
 
-      <!-- Drawer с подкатегориями -->
       <Drawer v-model:open="isSubcategoriesDrawerOpen">
         <DrawerContent>
           <DrawerHeader>
