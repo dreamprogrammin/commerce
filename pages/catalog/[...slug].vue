@@ -171,18 +171,28 @@ function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[
 }
 
 async function loadFilterData(slug: string) {
+  // Показываем загрузку сразу
   isLoadingFilters.value = true
 
   try {
     const productsStore = useProductsStore()
 
-    const [brands, attributes, materials, countries, priceRangeData] = await Promise.all([
+    // ✅ Используем Promise.allSettled вместо Promise.all
+    // чтобы не ломаться при ошибке одного запроса
+    const results = await Promise.allSettled([
       productsStore.fetchBrandsForCategory(slug),
       productsStore.fetchAttributesForCategory(slug),
       productsStore.fetchAllMaterials(),
       productsStore.fetchAllCountries(),
       productsStore.fetchPriceRangeForCategory(slug),
     ])
+
+    // Безопасно извлекаем результаты
+    const brands = results[0].status === 'fulfilled' ? results[0].value : []
+    const attributes = results[1].status === 'fulfilled' ? results[1].value : []
+    const materials = results[2].status === 'fulfilled' ? results[2].value : []
+    const countries = results[3].status === 'fulfilled' ? results[3].value : []
+    const priceRangeData = results[4].status === 'fulfilled' ? results[4].value : { min_price: 0, max_price: 50000 }
 
     availableBrands.value = brands
     availableFilters.value = attributes
@@ -215,6 +225,9 @@ async function loadFilterData(slug: string) {
 
     currentPage.value = 1
     accumulatedProducts.value = []
+  }
+  catch (error) {
+    console.error('Error loading filters:', error)
   }
   finally {
     isLoadingFilters.value = false
@@ -321,18 +334,45 @@ function updateQueryParams() {
 
 // --- 5. КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Логика загрузки данных ---
 
-// ✅ Следим за изменением категории и СБРАСЫВАЕМ все фильтры
-watch(currentCategorySlug, async (newSlug, oldSlug) => {
-  if (newSlug !== oldSlug) {
-    // Сбрасываем состояние перед загрузкой
-    currentPage.value = 1
-    accumulatedProducts.value = []
+// ✅ Контроллер для отмены запросов
+let loadingController: AbortController | null = null
 
+// ✅ Предыдущий slug для сравнения
+const previousSlug = ref(currentCategorySlug.value)
+
+// ✅ Следим за изменением категории
+watch(currentCategorySlug, async (newSlug) => {
+  // Проверяем, действительно ли изменился slug
+  if (newSlug === previousSlug.value)
+    return
+
+  previousSlug.value = newSlug
+
+  // Отменяем предыдущие запросы
+  if (loadingController) {
+    loadingController.abort()
+  }
+  loadingController = new AbortController()
+
+  // Сбрасываем состояние НЕМЕДЛЕННО
+  currentPage.value = 1
+  accumulatedProducts.value = []
+  isLoadingFilters.value = true
+
+  try {
     // Загружаем данные для новой категории
     await loadFilterData(newSlug)
 
     // Очищаем query параметры при смене категории
-    router.replace({ query: {} })
+    await router.replace({ query: {} })
+  }
+  catch (error) {
+    if ((error as Error).name !== 'AbortError') {
+      console.error('Error loading category:', error)
+    }
+  }
+  finally {
+    isLoadingFilters.value = false
   }
 }, { immediate: false })
 
@@ -349,7 +389,7 @@ await useAsyncData(
   { server: true },
 )
 
-// Следим за изменением фильтров (НЕ категории)
+// ✅ Debounce для фильтров - сбрасываем страницу и обновляем query
 watchDebounced(
   activeFilters,
   () => {
@@ -357,7 +397,7 @@ watchDebounced(
     accumulatedProducts.value = []
     updateQueryParams()
   },
-  { debounce: 500, deep: true },
+  { debounce: 800, deep: true },
 )
 
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
