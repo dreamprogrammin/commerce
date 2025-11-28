@@ -2,7 +2,7 @@
 import type { LocationQueryValue } from 'vue-router'
 import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue' // Добавлен onMounted
 import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
@@ -16,10 +16,6 @@ const route = useRoute()
 const router = useRouter()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
-
-// ✅ НОВОЕ: Throttle для навигации
-let isNavigating = false
-let navigationTimeout: NodeJS.Timeout | null = null
 
 // Флаг монтирования для корректной гидратации
 const isMounted = ref(false)
@@ -84,17 +80,18 @@ const priceRange = ref({ min: 0, max: 50000 })
 // Получаем подкатегории из store
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
-// Вычисляем лейбл для мобильной кнопки категорий
+// НОВОЕ: Вычисляем лейбл для мобильной кнопки категорий
 const activeSubcategoryLabel = computed(() => {
   const count = activeFilters.value.subCategoryIds.length
   if (count === 0)
     return 'Все категории'
 
+  // Находим имя первой выбранной категории
   const firstId = activeFilters.value.subCategoryIds[0]
   const category = subcategories.value.find(c => c.id === firstId)
 
   if (!category)
-    return 'Выбрано'
+    return 'Выбрано' // Fallback на случай ошибки данных
 
   if (count > 1) {
     return `${category.name} (+${count - 1})`
@@ -175,28 +172,18 @@ function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[
 }
 
 async function loadFilterData(slug: string) {
-  // Показываем загрузку сразу
   isLoadingFilters.value = true
 
   try {
     const productsStore = useProductsStore()
 
-    // ✅ Используем Promise.allSettled вместо Promise.all
-    // чтобы не ломаться при ошибке одного запроса
-    const results = await Promise.allSettled([
+    const [brands, attributes, materials, countries, priceRangeData] = await Promise.all([
       productsStore.fetchBrandsForCategory(slug),
       productsStore.fetchAttributesForCategory(slug),
       productsStore.fetchAllMaterials(),
       productsStore.fetchAllCountries(),
       productsStore.fetchPriceRangeForCategory(slug),
     ])
-
-    // Безопасно извлекаем результаты
-    const brands = results[0].status === 'fulfilled' ? results[0].value : []
-    const attributes = results[1].status === 'fulfilled' ? results[1].value : []
-    const materials = results[2].status === 'fulfilled' ? results[2].value : []
-    const countries = results[3].status === 'fulfilled' ? results[3].value : []
-    const priceRangeData = results[4].status === 'fulfilled' ? results[4].value : { min_price: 0, max_price: 50000 }
 
     availableBrands.value = brands
     availableFilters.value = attributes
@@ -229,9 +216,6 @@ async function loadFilterData(slug: string) {
 
     currentPage.value = 1
     accumulatedProducts.value = []
-  }
-  catch (error) {
-    console.error('Error loading filters:', error)
   }
   finally {
     isLoadingFilters.value = false
@@ -336,70 +320,23 @@ function updateQueryParams() {
   router.replace({ query })
 }
 
-// --- 5. УПРОЩЕННАЯ ЛОГИКА ЗАГРУЗКИ ДАННЫХ ---
+// --- 5. Логика загрузки данных и реакции на изменения ---
 
-// ✅ Следим за изменением категории с защитой от спама
-watch(currentCategorySlug, async (newSlug, oldSlug) => {
-  // Проверяем, действительно ли изменился slug
-  if (!oldSlug || newSlug === oldSlug)
-    return
+await useAsyncData(
+  `catalog-meta-${currentCategorySlug.value}`,
+  () => categoriesStore.fetchCategoryData(),
+  { watch: [currentCategorySlug] },
+)
 
-  // ✅ Защита от слишком частых переключений
-  if (isNavigating) {
-    console.log('⏸️ Navigation in progress, skipping...')
-    return
-  }
+await useAsyncData(
+  `catalog-filters-${currentCategorySlug.value}`,
+  () => loadFilterData(currentCategorySlug.value),
+  {
+    watch: [currentCategorySlug],
+    server: true,
+  },
+)
 
-  isNavigating = true
-  console.log('🔄 Category changed:', oldSlug, '->', newSlug)
-
-  // Очищаем предыдущий таймаут
-  if (navigationTimeout) {
-    clearTimeout(navigationTimeout)
-  }
-
-  // Сбрасываем состояние НЕМЕДЛЕННО
-  currentPage.value = 1
-  accumulatedProducts.value = []
-  isLoadingFilters.value = true
-
-  try {
-    // Параллельная загрузка метаданных категорий и фильтров
-    await Promise.all([
-      categoriesStore.fetchCategoryData(),
-      loadFilterData(newSlug),
-    ])
-
-    // Очищаем query параметры при смене категории
-    await router.replace({ query: {} })
-  }
-  catch (error) {
-    console.error('Error loading category:', error)
-  }
-  finally {
-    isLoadingFilters.value = false
-
-    // Разблокируем навигацию через 500ms
-    navigationTimeout = setTimeout(() => {
-      isNavigating = false
-    }, 500)
-  }
-}, { immediate: false })
-
-// ✅ Начальная загрузка ТОЛЬКО на сервере
-if (import.meta.server) {
-  await categoriesStore.fetchCategoryData()
-  await loadFilterData(currentCategorySlug.value)
-}
-else {
-  // На клиенте загружаем только если данных нет
-  if (!availableFilters.value.length && !isLoadingFilters.value) {
-    await categoriesStore.fetchCategoryData()
-    await loadFilterData(currentCategorySlug.value)
-  }
-}
-
-// ✅ Debounce для фильтров - уменьшен до 300ms для лучшего UX
 watchDebounced(
   activeFilters,
   () => {
@@ -407,22 +344,14 @@ watchDebounced(
     accumulatedProducts.value = []
     updateQueryParams()
   },
-  { debounce: 300, deep: true },
+  { debounce: 500, deep: true },
 )
-
-// ✅ Очистка таймаута при размонтировании
-onUnmounted(() => {
-  if (navigationTimeout) {
-    clearTimeout(navigationTimeout)
-  }
-})
 
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
 </script>
 
 <template>
-  <!-- ✅ ДОБАВЛЯЕМ KEY для принудительной перерисовки при смене категории -->
-  <div :key="currentCategorySlug" :class="`${containerClass} py-8`">
+  <div :class="`${containerClass} py-8`">
     <!-- Breadcrumbs и заголовок -->
     <ClientOnly>
       <Breadcrumbs
@@ -474,9 +403,10 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 
       <div class="col-span-1 lg:col-span-3 min-w-0">
         <div class="mb-6 space-y-4">
-          <!-- Подкатегории на мобильных -->
+          <!-- НОВОЕ: Подкатегории на мобильных (Кнопка + Сброс) -->
           <div v-if="subcategories.length > 0" class="lg:hidden">
             <div class="flex items-center justify-between">
+              <!-- Левая часть: Кнопка-Бейдж -->
               <Button
                 variant="outline"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
@@ -489,6 +419,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
                 <span class="truncate">{{ activeSubcategoryLabel }}</span>
               </Button>
 
+              <!-- Правая часть: Кнопка Сброса -->
               <Button
                 variant="ghost"
                 size="icon"
@@ -501,8 +432,9 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
             </div>
           </div>
 
-          <!-- Панель управления -->
+          <!-- Панель управления (Фильтры, Сортировка) -->
           <div class="flex flex-wrap items-center gap-2">
+            <!-- Кнопка мобильных фильтров -->
             <ClientOnly>
               <Button
                 :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
@@ -522,8 +454,10 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </Button>
             </ClientOnly>
 
+            <!-- Сортировка -->
             <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
 
+            <!-- Десктопные дропдауны атрибутов -->
             <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border hidden lg:block" />
 
             <template v-if="!isLoadingFilters && availableFilters.length > 0">
@@ -651,7 +585,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
               </template>
             </template>
 
-            <!-- Подкатегории на десктопе -->
+            <!-- Подкатегории на десктопе (остаются как были, скрыты на мобиле) -->
             <template v-if="subcategories.length > 0">
               <div class="hidden lg:block h-6 w-px bg-border" />
               <button
@@ -682,7 +616,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
           </div>
         </div>
 
-        <!-- Контент -->
+        <!-- Скелетон, товары, пустое состояние -->
         <ProductGridSkeleton
           v-if="(isLoading && isMounted) || (isLoading && displayedProducts.length === 0)"
         />
@@ -720,6 +654,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
 
     <!-- Мобильные компоненты -->
     <ClientOnly>
+      <!-- Мобильные фильтры (Sheet) -->
       <DynamicFiltersMobile
         v-model="activeFilters"
         :open="isMobileFiltersOpen"
@@ -732,6 +667,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
         @update:open="isMobileFiltersOpen = $event"
       />
 
+      <!-- Drawer с подкатегориями -->
       <Drawer v-model:open="isSubcategoriesDrawerOpen">
         <DrawerContent>
           <DrawerHeader>
