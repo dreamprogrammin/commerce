@@ -376,7 +376,7 @@ watchDebounced(
     accumulatedProducts.value = []
     updateQueryParams()
   },
-  { debounce: 300, deep: true },
+  { debounce: 0, deep: true },
 )
 
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
