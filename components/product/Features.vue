@@ -46,7 +46,7 @@ const staticFeatures = computed<FeatureItem[]>(() => {
       label: 'Бренд',
       value: props.product.brands.name,
       isLink: true,
-      href: `/catalog/brands/${props.product.brands.slug}`,
+      href: `/brand/${props.product.brands.slug}`,
     })
   }
 

@@ -22,7 +22,7 @@ const { getImageUrl } = useSupabaseStorage()
 const slug = computed(() => route.params.slug as string)
 
 const selectedAccessoryIds = ref<string[]>([])
-const isMobileDetailsOpen = ref(false) // 🔥 Для мобильного листа с деталями
+const activeTab = ref<'description' | 'features'>('description')
 
 const { data, pending: isLoading } = useAsyncData(
   `product-page-${slug.value}`,
@@ -185,83 +185,139 @@ watch(() => product.value?.id, () => {
 </script>
 
 <template>
-  <div :class="`${containerClass} py-6 lg:py-12`">
-    <ClientOnly>
-      <ProductDetailSkeleton v-if="isLoading" />
+  <div class="bg-background">
+    <div :class="`${containerClass} py-4 lg:py-6`">
+      <ClientOnly>
+        <ProductDetailSkeleton v-if="isLoading" />
 
-      <div v-else-if="product">
-        <!-- 🔥 Компактный breadcrumbs для товара -->
-        <Breadcrumbs :items="breadcrumbs" compact class="mb-4 lg:mb-6" />
+        <div v-else-if="product">
+          <!-- Breadcrumbs с кнопкой избранного -->
+          <div class="flex items-center justify-between mb-4">
+            <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
+            
+            <!-- Кнопка избранного для мобильных -->
+            <button
+              class="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg border bg-white hover:bg-muted transition-colors"
+              aria-label="Добавить в избранное"
+            >
+              <Icon name="mdi:heart-outline" class="w-6 h-6 text-muted-foreground" />
+            </button>
+          </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-          <!-- Галерея -->
-          <div class="lg:col-span-8 top-24">
-            <ProductGallery
-              v-if="product.product_images && product.product_images.length > 0"
-              :images="product.product_images"
-            />
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+            <!-- Левая колонка: Галерея -->
+            <div class="lg:col-span-7">
+              <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border">
+                <ProductGallery
+                  v-if="product.product_images && product.product_images.length > 0"
+                  :images="product.product_images"
+                />
 
-            <div v-else class="bg-muted rounded-lg flex items-center justify-center h-64 lg:h-full">
-              <p class="text-muted-foreground">
-                Изображения отсутствуют
-              </p>
-            </div>
-
-            <!-- Описание и характеристики (только десктоп) -->
-            <div class="hidden lg:block mt-16 pt-8 border-t">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="md:col-span-2">
-                  <ProductDescription v-if="product.description" :description="product.description" />
-                </div>
-                <div>
-                  <ProductFeatures :product="product" />
+                <div v-else class="bg-muted rounded-lg flex items-center justify-center h-64 lg:h-96">
+                  <p class="text-muted-foreground">
+                    Изображения отсутствуют
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Боковая панель (десктоп) / Мобильная карточка -->
-          <div class="lg:col-span-4 lg:sticky lg:top-24">
-            <div class="space-y-4 lg:space-y-6">
-              <!-- Категория -->
-              <NuxtLink
-                v-if="product.categories"
-                :to="`/catalog/${product.categories.slug}`"
-                class="text-xs lg:text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
-                {{ product.categories.name }}
-              </NuxtLink>
+            <!-- Правая колонка: Информация о товаре -->
+            <div class="lg:col-span-5">
+              <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border sticky top-4">
+                <!-- Название товара -->
+                <h1 class="text-xl lg:text-2xl font-bold mb-3 lg:mb-4 leading-tight">
+                  {{ product.name }}
+                </h1>
 
-              <!-- Название товара -->
-              <h1 class="text-2xl lg:text-3xl lg:text-4xl font-bold mt-1">
-                {{ product.name }}
-              </h1>
 
-              <!-- Цена -->
-              <p class="text-3xl lg:text-4xl font-bold">
-                {{ product.price }} ₸
-              </p>
 
-              <!-- Кнопка "Подробнее" (только мобилка) -->
-              <Button
-                variant="outline"
-                class="w-full lg:hidden"
-                @click="isMobileDetailsOpen = true"
-              >
-                <Icon name="lucide:info" class="w-4 h-4 mr-2" />
-                Описание и характеристики
-              </Button>
+                <!-- Цена -->
+                <div class="mb-6 lg:mb-8">
+                  <div class="flex items-baseline gap-3 mb-2">
+                    <p class="text-3xl lg:text-4xl font-bold text-primary">
+                      {{ Math.round(totalPrice).toLocaleString() }} ₸
+                    </p>
+                  </div>
+                  
+                  <!-- Бонусы -->
+                  <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium">
+                    <Icon name="lucide:gift" class="w-4 h-4" />
+                    <span>+{{ totalBonuses }} бонусов</span>
+                  </div>
+                </div>
+
+                <!-- Наличие -->
+                <div class="mb-6 pb-6 border-b">
+                  <div class="flex items-center gap-2 text-sm">
+                    <Icon 
+                      :name="product.stock_quantity > 0 ? 'lucide:check-circle' : 'lucide:x-circle'" 
+                      :class="product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'"
+                      class="w-5 h-5"
+                    />
+                    <span :class="product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                      {{ product.stock_quantity > 0 ? 'В наличии' : 'Нет в наличии' }}
+                    </span>
+                    <span v-if="product.stock_quantity > 0" class="text-muted-foreground">
+                      ({{ product.stock_quantity }} шт.)
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Кнопки действий (десктоп) -->
+                <ClientOnly>
+                  <div class="hidden lg:block space-y-3 mb-6">
+                    <template v-if="product.stock_quantity > 0">
+                      <Button
+                        v-if="!mainItemInCart"
+                        size="lg"
+                        class="w-full h-12 text-base font-semibold"
+                        @click="addToCart"
+                      >
+                        <Icon name="lucide:shopping-cart" class="w-5 h-5 mr-2" />
+                        Добавить в корзину
+                      </Button>
+
+                      <div v-else class="flex items-center gap-3">
+                        <Button
+                          size="lg"
+                          class="flex-grow h-12 text-base font-semibold"
+                          @click="router.push('/cart')"
+                        >
+                          <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
+                          Перейти в корзину
+                        </Button>
+
+                        <QuantitySelector
+                          :product="product"
+                          :quantity="quantityInCart"
+                          class="w-auto"
+                        />
+                      </div>
+                    </template>
+
+                    <Button v-else size="lg" class="w-full h-12" disabled>
+                      Нет в наличии
+                    </Button>
+
+                    <Button size="lg" variant="outline" class="w-full h-12 text-base">
+                      <Icon name="mdi:heart-outline" class="w-5 h-5 mr-2" />
+                      В избранное
+                    </Button>
+                  </div>
+                </ClientOnly>
+              </div>
 
               <!-- Аксессуары -->
-              <div v-if="accessories.length > 0" class="pt-4 border-t">
-                <h3 class="font-semibold text-base lg:text-lg mb-3">
-                  С этим товаром покупают:
+              <div v-if="accessories.length > 0" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4">
+                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+                  <Icon name="lucide:plus-circle" class="w-5 h-5 text-primary" />
+                  С этим товаром покупают
                 </h3>
-                <div class="space-y-2 lg:space-y-3">
+                <div class="space-y-3">
                   <div
                     v-for="acc in accessories"
                     :key="acc.id"
-                    class="flex items-center justify-between p-2 rounded-md border cursor-pointer select-none transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted hover:bg-muted/50"
+                    class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer select-none transition-all hover:shadow-md has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
                     @click="() => {
                       const isChecked = selectedAccessoryIds.includes(acc.id)
                       if (isChecked) {
@@ -272,173 +328,178 @@ watch(() => product.value?.id, () => {
                       }
                     }"
                   >
-                    <div class="flex items-center gap-2 lg:gap-3 flex-1 min-w-0">
-                      <div @click.stop>
-                        <Checkbox
-                          :id="`acc-${acc.id}`"
-                          :model-value="selectedAccessoryIds.includes(acc.id)"
-                          @update:model-value="(checkedState) => {
-                            if (checkedState === true) {
-                              if (!selectedAccessoryIds.includes(acc.id)) {
-                                selectedAccessoryIds.push(acc.id)
-                              }
+                    <div @click.stop>
+                      <Checkbox
+                        :id="`acc-${acc.id}`"
+                        :model-value="selectedAccessoryIds.includes(acc.id)"
+                        @update:model-value="(checkedState) => {
+                          if (checkedState === true) {
+                            if (!selectedAccessoryIds.includes(acc.id)) {
+                              selectedAccessoryIds.push(acc.id)
                             }
-                            else if (checkedState === false) {
-                              selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
-                            }
-                          }"
-                        />
-                      </div>
-                      <div class="w-10 h-10 lg:w-12 lg:h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                        <img
-                          v-if="acc.product_images && acc.product_images.length > 0"
-                          :src="getAccessoryImageUrl(acc.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
-                          :alt="acc.name"
-                          class="w-full h-full object-cover"
-                          loading="lazy"
-                        >
-                        <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                          Нет фото
-                        </div>
-                      </div>
-                      <span class="text-xs lg:text-sm font-medium leading-tight truncate">
-                        {{ acc.name }}
-                      </span>
-                    </div>
-                    <span class="text-xs lg:text-sm font-semibold whitespace-nowrap ml-2">+ {{ acc.price }} ₸</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Общая стоимость -->
-              <div :key="`price-${product.id}`" class="pt-4 border-t">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-base lg:text-lg font-medium">Общая стоимость:</span>
-                  <div class="text-2xl lg:text-4xl font-bold flex items-center gap-0.5">
-                    <div
-                      v-for="(digit, i) in String(Math.round(totalPrice)).split('')"
-                      :key="`digit-${i}`"
-                      :ref="el => { if (el) digitColumns[i] = el as HTMLElement }"
-                      class="digit-column"
-                    >
-                      <div class="digit-ribbon">
-                        <div v-for="d in 10" :key="d" class="digit-item">
-                          {{ d - 1 }}
-                        </div>
-                      </div>
-                    </div>
-                    <span class="ml-1 lg:ml-2">₸</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Бонусы -->
-              <div class="p-3 lg:p-4 bg-primary/10 text-primary rounded-lg border border-primary/20 text-sm lg:text-base">
-                При покупке вы получите <span class="font-bold">{{ totalBonuses }} бонусов</span>
-              </div>
-
-              <!-- Кнопки действий -->
-              <ClientOnly>
-                <div class="flex items-center gap-3 lg:gap-4 pt-4">
-                  <template v-if="product.stock_quantity > 0">
-                    <Button
-                      v-if="!mainItemInCart"
-                      size="lg"
-                      class="flex-grow h-12 lg:h-11"
-                      @click="addToCart"
-                    >
-                      Добавить в корзину
-                    </Button>
-
-                    <template v-else>
-                      <Button
-                        size="lg"
-                        class="flex-grow h-12 lg:h-11"
-                        variant="outline"
-                        @click="router.push('/cart')"
-                      >
-                        Перейти в корзину
-                      </Button>
-
-                      <QuantitySelector
-                        :product="product"
-                        :quantity="quantityInCart"
-                        class="w-auto"
+                          }
+                          else if (checkedState === false) {
+                            selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
+                          }
+                        }"
                       />
-                    </template>
-                  </template>
-
-                  <Button v-else size="lg" class="flex-grow h-12 lg:h-11" disabled>
-                    Нет в наличии
-                  </Button>
+                    </div>
+                    <div class="w-14 h-14 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                      <img
+                        v-if="acc.product_images && acc.product_images.length > 0"
+                        :src="getAccessoryImageUrl(acc.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
+                        :alt="acc.name"
+                        class="w-full h-full object-cover"
+                        loading="lazy"
+                      >
+                      <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                        Нет фото
+                      </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium leading-tight mb-1">
+                        {{ acc.name }}
+                      </p>
+                      <p class="text-sm font-bold text-primary">+ {{ acc.price }} ₸</p>
+                    </div>
+                  </div>
                 </div>
-              </ClientOnly>
+              </div>
+            </div>
+          </div>
+
+          <!-- Описание и характеристики (табы) -->
+          <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8">
+            <!-- Табы -->
+            <div class="border-b mb-6">
+              <div class="flex gap-6">
+                <button
+                  :class="[
+                    'pb-3 px-1 font-semibold text-base transition-colors relative',
+                    activeTab === 'description' 
+                      ? 'text-primary' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  ]"
+                  @click="activeTab = 'description'"
+                >
+                  Описание
+                  <div 
+                    v-if="activeTab === 'description'" 
+                    class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+                  />
+                </button>
+                <button
+                  :class="[
+                    'pb-3 px-1 font-semibold text-base transition-colors relative',
+                    activeTab === 'features' 
+                      ? 'text-primary' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  ]"
+                  @click="activeTab = 'features'"
+                >
+                  Характеристики
+                  <div 
+                    v-if="activeTab === 'features'" 
+                    class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+                  />
+                </button>
+              </div>
+            </div>
+
+            <!-- Контент табов -->
+            <div class="prose max-w-none">
+              <div v-if="activeTab === 'description'">
+                <ProductDescription v-if="product.description" :description="product.description" />
+                <p v-else class="text-muted-foreground">Описание отсутствует</p>
+              </div>
+
+              <div v-if="activeTab === 'features'">
+                <ProductFeatures :product="product" />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div v-else class="text-center py-20">
-        <h1 class="text-2xl font-bold">
-          Товар не найден
-        </h1>
-        <p class="text-muted-foreground mt-2">
-          Возможно, товар был удален или ссылка неверна.
-        </p>
-        <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
-          ← Вернуться в каталог
-        </NuxtLink>
-      </div>
+        <div v-else class="text-center py-20">
+          <h1 class="text-2xl font-bold">
+            Товар не найден
+          </h1>
+          <p class="text-muted-foreground mt-2">
+            Возможно, товар был удален или ссылка неверна.
+          </p>
+          <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
+            ← Вернуться в каталог
+          </NuxtLink>
+        </div>
 
-      <template #fallback>
-        <ProductDetailSkeleton />
-      </template>
+        <template #fallback>
+          <ProductDetailSkeleton />
+        </template>
+      </ClientOnly>
+    </div>
+
+    <!-- Стики панель для мобильных (исчезает при достижении похожих товаров) -->
+    <ClientOnly>
+      <div v-if="product" class="lg:hidden sticky bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 safe-area-inset-bottom">
+        <div class="px-4 py-3">
+          <div class="flex items-center gap-3">
+            <div v-if="!mainItemInCart" class="flex-shrink-0">
+              <p class="text-xs text-muted-foreground mb-0.5">Цена</p>
+              <p class="text-xl font-bold text-primary">
+                {{ Math.round(totalPrice).toLocaleString() }} ₸
+              </p>
+            </div>
+
+            <template v-if="product.stock_quantity > 0">
+              <Button
+                v-if="!mainItemInCart"
+                size="lg"
+                class="flex-grow h-11 text-base font-semibold"
+                @click="addToCart"
+              >
+                <Icon name="lucide:shopping-cart" class="w-5 h-5 mr-2" />
+                В корзину
+              </Button>
+
+              <div v-else class="flex items-center gap-2 flex-grow">
+                <Button
+                  size="lg"
+                  class="flex-grow h-11 text-base font-semibold"
+                  @click="router.push('/cart')"
+                >
+                  <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
+                  В корзине
+                </Button>
+
+                <QuantitySelector
+                  :product="product"
+                  :quantity="quantityInCart"
+                  class="w-auto"
+                />
+              </div>
+            </template>
+
+            <Button v-else size="lg" class="flex-grow h-11" disabled>
+              Нет в наличии
+            </Button>
+          </div>
+        </div>
+      </div>
     </ClientOnly>
 
-    <!-- Мобильный Sheet с описанием и характеристиками -->
-    <Sheet v-if="product" v-model:open="isMobileDetailsOpen">
-      <SheetContent side="bottom" class="h-[85vh] flex flex-col p-0">
-        <SheetHeader class="px-4 py-4 border-b flex-shrink-0">
-          <SheetTitle class="text-lg font-semibold">
-            Описание и характеристики
-          </SheetTitle>
-        </SheetHeader>
-
-        <div class="flex-1 overflow-y-auto px-4 py-6 space-y-8">
-          <!-- Описание -->
-          <div v-if="product.description">
-            <h3 class="font-semibold text-base mb-3">
-              Описание
-            </h3>
-            <ProductDescription :description="product.description" />
-          </div>
-
-          <!-- Характеристики -->
-          <div class="pt-6 border-t">
-            <h3 class="font-semibold text-base mb-3">
-              Характеристики
-            </h3>
-            <ProductFeatures :product="product" />
-          </div>
-        </div>
-
-        <div class="px-4 py-4 border-t flex-shrink-0 bg-background">
-          <Button class="w-full h-12" @click="isMobileDetailsOpen = false">
-            Закрыть
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+    <!-- Похожие товары -->
+    <div v-if="similarProducts.length > 0" class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12">
+      <div :class="containerClass">
+        <ProductCarousel :products="similarProducts">
+          <template #header>
+            <h2 class="text-2xl lg:text-3xl font-bold mb-6">
+              Похожие товары
+            </h2>
+          </template>
+        </ProductCarousel>
+      </div>
+    </div>
   </div>
-
-  <!-- Похожие товары -->
-  <ProductCarousel v-if="similarProducts.length > 0" :products="similarProducts" class="mt-12 lg:mt-16 pt-6 lg:pt-8 border-t">
-    <template #header>
-      <h2 class="text-xl lg:text-2xl font-bold mb-4 lg:mb-6">
-        Похожие товары
-      </h2>
-    </template>
-  </ProductCarousel>
 </template>
 
 <style scoped>

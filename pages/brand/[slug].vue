@@ -3,12 +3,13 @@ import type { IBreadcrumbItem, ProductWithGallery } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { carouselContainerVariants } from '@/lib/variants'
 
 const route = useRoute()
 const productsStore = useProductsStore()
 const { getOptimizedUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
-
+const containerClass = carouselContainerVariants({ contained: 'always' })
 // -- Локальное состояние страницы --
 const products = ref<ProductWithGallery[]>([])
 const isLoading = ref(true)
@@ -84,7 +85,7 @@ useHead({
 </script>
 
 <template>
-  <div class="container mx-auto py-8">
+  <div :class="`${containerClass} py-8`">
     <!-- Хлебные крошки -->
     <Breadcrumbs :items="breadcrumbs" class="mb-6" />
 
