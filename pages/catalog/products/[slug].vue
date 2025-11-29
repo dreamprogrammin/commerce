@@ -17,6 +17,7 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
+const CarouselContainerClass = carouselContainerVariants({ contained: 'desktop' })
 const { getImageUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
@@ -207,7 +208,7 @@ watch(() => product.value?.id, () => {
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
             <!-- Левая колонка: Галерея -->
             <div class="lg:col-span-7">
-              <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border">
+              <div class="bg-white rounded-xl lg:p-4 lg:shadow-sm lg:border">
                 <ProductGallery
                   v-if="product.product_images && product.product_images.length > 0"
                   :images="product.product_images"
@@ -442,7 +443,7 @@ watch(() => product.value?.id, () => {
     <ClientOnly>
       <div v-if="product" class="lg:hidden sticky bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 safe-area-inset-bottom">
         <div class="px-4 py-3">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 justify-between">
             <div v-if="!mainItemInCart" class="flex-shrink-0">
               <p class="text-xs text-muted-foreground mb-0.5">Цена</p>
               <p class="text-xl font-bold text-primary">
@@ -454,7 +455,7 @@ watch(() => product.value?.id, () => {
               <Button
                 v-if="!mainItemInCart"
                 size="lg"
-                class="flex-grow h-11 text-base font-semibold"
+                class="h-11 text-base font-semibold"
                 @click="addToCart"
               >
                 <Icon name="lucide:shopping-cart" class="w-5 h-5 mr-2" />
@@ -489,7 +490,6 @@ watch(() => product.value?.id, () => {
 
     <!-- Похожие товары -->
     <div v-if="similarProducts.length > 0" class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12">
-      <div :class="containerClass">
         <ProductCarousel :products="similarProducts">
           <template #header>
             <h2 class="text-2xl lg:text-3xl font-bold mb-6">
@@ -497,7 +497,6 @@ watch(() => product.value?.id, () => {
             </h2>
           </template>
         </ProductCarousel>
-      </div>
     </div>
   </div>
 </template>
