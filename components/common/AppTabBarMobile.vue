@@ -77,7 +77,7 @@ onUnmounted(() => {
         <!-- Кнопка "Каталог" -->
         <NuxtLink
           to="/catalog"
-          class="group flex items-center justify-center gap-2 hover:bg-primary/90 h-11 px-6 rounded-lg transition-colors bg-blue-500"
+          class="group flex items-center justify-center gap-2 hover:bg-blue/200 h-11 px-6 rounded-lg transition-colors bg-blue-500"
         >
           <Icon name="lucide:layout-grid" class="w-5 h-5 text-white" />
           <span class="text-sm text-white font-semibold">

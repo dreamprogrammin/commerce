@@ -9,6 +9,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -189,10 +190,10 @@ watch(() => product.value?.id, () => {
       <ProductDetailSkeleton v-if="isLoading" />
 
       <div v-else-if="product">
-        <!-- Десктоп хлебные крошки -->
-        <Breadcrumbs :items="breadcrumbs" class="mb-6 hidden lg:block" />
+        <!-- 🔥 Компактный breadcrumbs для товара -->
+        <Breadcrumbs :items="breadcrumbs" compact class="mb-4 lg:mb-6" />
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 lg:gap-12 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           <!-- Галерея -->
           <div class="lg:col-span-8 top-24">
             <ProductGallery

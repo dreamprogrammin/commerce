@@ -390,6 +390,7 @@ const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.va
         v-if="breadcrumbs && breadcrumbs.length > 0"
         :items="breadcrumbs"
         class="mb-6"
+        compact
       />
       <template #fallback>
         <div class="h-6 w-1/3 bg-muted rounded mb-6 animate-pulse" />
