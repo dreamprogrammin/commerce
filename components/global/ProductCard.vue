@@ -185,12 +185,12 @@ const priceDetails = computed(() => {
               >
                 <NuxtLink
                   :to="`/catalog/products/${product.slug}`"
-                  class="block h-full aspect-square"
+                  class="block h-full aspect-3/4"
                 >
                   <ProgressiveImage
                     :src="getImageUrlByIndex(index)"
                     :alt="`${product.name} - фото ${index + 1}`"
-                    aspect-ratio="square"
+                    aspect-ratio="3/4"
                     object-fit="cover"
                     placeholder-type="lqip"
                     :blur-data-url="image.blur_placeholder"
@@ -256,8 +256,8 @@ const priceDetails = computed(() => {
               :key="`dot-desktop-${index}`"
               class="rounded-full transition-all"
               :class="index === activeImageIndex
-                ? 'w-5 h-1.5 bg-primary'
-                : 'w-1.5 h-1.5 bg-white/60'
+                ? 'w-5 h-1.5 bg-gray-600'
+                : 'w-1.5 h-1.5 bg-gray-300'
               "
             />
           </template>
@@ -269,8 +269,8 @@ const priceDetails = computed(() => {
               :key="`dot-mobile-${index}`"
               class="rounded-full transition-all"
               :class="index === mobileSelectedIndex
-                ? 'w-5 h-1.5 bg-primary'
-                : 'w-1.5 h-1.5 bg-white/60'
+                ? 'w-5 h-1.5 bg-gray-600'
+                : 'w-1.5 h-1.5 bg-gray-300'
               "
             />
           </template>
