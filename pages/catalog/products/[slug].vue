@@ -25,6 +25,10 @@ const slug = computed(() => route.params.slug as string)
 const selectedAccessoryIds = ref<string[]>([])
 const activeTab = ref<'description' | 'features'>('description')
 
+// 🆕 Отслеживание видимости похожих товаров
+const similarProductsRef = ref<HTMLElement | null>(null)
+const showStickyPanel = ref(true)
+
 const { data, pending: isLoading } = useAsyncData(
   `product-page-${slug.value}`,
   async () => {
@@ -165,6 +169,31 @@ function getAccessoryImageUrl(imageUrl: string | null) {
 
 useFlipCounter(totalPrice, digitColumns)
 
+// 🆕 Intersection Observer для отслеживания похожих товаров
+onMounted(() => {
+  if (!similarProductsRef.value) return
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        // Если похожие товары видны - скрываем стики панель
+        showStickyPanel.value = !entry.isIntersecting
+      })
+    },
+    {
+      // Срабатывает когда верхняя часть блока достигает нижней части экрана
+      rootMargin: '-64px 0px 0px 0px', // 64px = высота навигации
+      threshold: 0,
+    }
+  )
+
+  observer.observe(similarProductsRef.value)
+
+  onUnmounted(() => {
+    observer.disconnect()
+  })
+})
+
 watch(isLoading, (newIsLoading) => {
   if (newIsLoading === false && !product.value) {
     showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
@@ -229,8 +258,6 @@ watch(() => product.value?.id, () => {
                 <h1 class="text-xl lg:text-2xl font-bold mb-3 lg:mb-4 leading-tight">
                   {{ product.name }}
                 </h1>
-
-
 
                 <!-- Цена -->
                 <div class="mb-6 lg:mb-8">
@@ -439,64 +466,80 @@ watch(() => product.value?.id, () => {
       </ClientOnly>
     </div>
 
-    <!-- Стики панель для мобильных (исчезает при достижении похожих товаров) -->
+    <!-- 🆕 Стики панель для мобильных (исчезает при достижении похожих товаров) -->
     <ClientOnly>
-      <div v-if="product" class="lg:hidden sticky bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 safe-area-inset-bottom">
-        <div class="px-4 py-3">
-          <div class="flex items-center gap-3 justify-between">
-            <div v-if="!mainItemInCart" class="flex-shrink-0">
-              <p class="text-xs text-muted-foreground mb-0.5">Цена</p>
-              <p class="text-xl font-bold text-primary">
-                {{ Math.round(totalPrice).toLocaleString() }} ₸
-              </p>
-            </div>
+      <Transition
+        enter-active-class="transition-transform duration-300 ease-out"
+        enter-from-class="translate-y-full"
+        enter-to-class="translate-y-0"
+        leave-active-class="transition-transform duration-300 ease-in"
+        leave-from-class="translate-y-0"
+        leave-to-class="translate-y-full"
+      >
+        <div 
+          v-if="product && showStickyPanel" 
+          class="lg:hidden sticky bottom-16 left-0 right-0 bg-white border-t shadow-lg z-40"
+        >
+          <div class="px-4 py-3">
+            <div class="flex items-center gap-3 justify-between">
+              <div v-if="!mainItemInCart" class="flex-shrink-0">
+                <p class="text-xs text-muted-foreground mb-0.5">Цена</p>
+                <p class="text-xl font-bold text-primary">
+                  {{ Math.round(totalPrice).toLocaleString() }} ₸
+                </p>
+              </div>
 
-            <template v-if="product.stock_quantity > 0">
-              <Button
-                v-if="!mainItemInCart"
-                size="lg"
-                class="h-11 text-base font-semibold"
-                @click="addToCart"
-              >
-                <Icon name="lucide:shopping-cart" class="w-5 h-5 mr-2" />
-                В корзину
-              </Button>
-
-              <div v-else class="flex justify-between items-center gap-9 flex-grow-1">
+              <template v-if="product.stock_quantity > 0">
                 <Button
+                  v-if="!mainItemInCart"
                   size="lg"
                   class="h-11 text-base font-semibold"
-                  @click="router.push('/cart')"
+                  @click="addToCart"
                 >
-                  <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
-                  В корзине
+                  <Icon name="lucide:shopping-cart" class="w-5 h-5 mr-2" />
+                  В корзину
                 </Button>
 
-                <QuantitySelector
-                  :product="product"
-                  :quantity="quantityInCart"
-                  class="w-auto"
-                />
-              </div>
-            </template>
+                <div v-else class="flex justify-between items-center gap-3 flex-grow">
+                  <Button
+                    size="lg"
+                    class="h-11 text-base font-semibold"
+                    @click="router.push('/cart')"
+                  >
+                    <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
+                    В корзине
+                  </Button>
 
-            <Button v-else size="lg" class="flex-grow h-11" disabled>
-              Нет в наличии
-            </Button>
+                  <QuantitySelector
+                    :product="product"
+                    :quantity="quantityInCart"
+                    class="w-auto"
+                  />
+                </div>
+              </template>
+
+              <Button v-else size="lg" class="flex-grow h-11" disabled>
+                Нет в наличии
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </ClientOnly>
 
-    <!-- Похожие товары -->
-    <div v-if="similarProducts.length > 0" class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12">
-        <ProductCarousel :products="similarProducts">
-          <template #header>
-            <h2 class="text-2xl lg:text-3xl font-bold mb-6">
-              Похожие товары
-            </h2>
-          </template>
-        </ProductCarousel>
+    <!-- 🆕 Похожие товары с ref для отслеживания -->
+    <div 
+      v-if="similarProducts.length > 0" 
+      ref="similarProductsRef"
+      class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12"
+    >
+      <ProductCarousel :products="similarProducts">
+        <template #header>
+          <h2 class="text-2xl lg:text-3xl font-bold mb-6">
+            Похожие товары
+          </h2>
+        </template>
+      </ProductCarousel>
     </div>
   </div>
 </template>
