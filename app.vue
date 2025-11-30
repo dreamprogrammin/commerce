@@ -7,6 +7,7 @@ import 'vue-sonner/style.css'
 
 useAuthStore()
 useProductsStore()
+
 const modalStore = useModalStore()
 
 useHead({
@@ -60,6 +61,12 @@ nuxtApp.hook('vue:error', () => {
       <NuxtPage />
       <Toaster />
     </NuxtLayout>
+
+    <!-- 🆕 Мобильная навигация -->
+    <ClientOnly>
+      <MobileBottomNav />
+    </ClientOnly>
+
     <ClientOnly>
       <AuthLoginModal v-if="modalStore.showLoginModal" />
     </ClientOnly>
