@@ -8,9 +8,9 @@ interface Props {
   alt: string
   aspectRatio?: 'square' | 'video' | 'portrait' | '21/9' | '3/4'
   objectFit?: 'cover' | 'contain' | 'fill'
-  placeholderType?: 'shimmer' | 'blur' | 'color' | 'lqip' // 🆕 Добавили LQIP
+  placeholderType?: 'shimmer' | 'blur' | 'color' | 'lqip'
   placeholderColor?: string
-  blurDataUrl?: string | null // 🆕 Base64 blur preview
+  blurDataUrl?: string | null
   bucketName?: string
   filePath?: string
   useTransform?: boolean
@@ -20,7 +20,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   aspectRatio: 'square',
   objectFit: 'cover',
-  placeholderType: 'lqip', // 🎯 По умолчанию LQIP
+  placeholderType: 'lqip',
   placeholderColor: 'from-muted via-muted/70 to-muted',
   blurDataUrl: null,
   useTransform: true,
@@ -64,8 +64,8 @@ const aspectRatioClass = computed(() => {
   switch (props.aspectRatio) {
     case 'video': return 'aspect-video'
     case 'portrait': return 'aspect-[3/4]'
+    case '3/4': return 'aspect-[3/4]'
     case '21/9': return 'aspect-[21/9]'
-    case '3/4' : return 'aspect-[3/4]'
     case 'square':
     default: return 'aspect-square'
   }
