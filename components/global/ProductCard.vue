@@ -293,7 +293,7 @@ const priceDetails = computed(() => {
 
       <!-- 📝 Название товара -->
       <NuxtLink :to="`/catalog/products/${product.slug}`" class="block">
-        <h3 class="font-semibold text-sm leading-tight line-clamp-2 min-h-[40px] hover:text-primary transition-colors">
+        <h3 class="font-semibold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
           {{ product.name }}
         </h3>
       </NuxtLink>
