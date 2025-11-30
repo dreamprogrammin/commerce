@@ -21,11 +21,11 @@ export const carouselContainerVariants = cva(
 
         // Всегда ограниченный контейнер с padding на всех экранах
         // Используется для заголовков, текста, обычного контента
-        always: 'container max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12',
+        always: 'container max-w-screen-2xl mx-auto px-2 sm:px-6 md:px-8 lg:px-12',
 
         // Всегда full width с padding на всех экранах
         // Используется для секций, которые должны занимать всю ширину
-        false: 'px-4 sm:px-6 md:px-8 lg:px-12',
+        false: 'px-2 sm:px-6 md:px-8 lg:px-12',
       },
     },
     defaultVariants: {

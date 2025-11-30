@@ -65,9 +65,22 @@ export const IMAGE_SIZES = {
     width: 640,
     height: 640,
   },
+  
   CATEGORY_MENU: {
     width: 250,
     height: 150,
+  },
+
+  // Галерея товара - миниатюры
+  PRODUCT_GALLERY_THUMB: {
+    width: 120,
+    height: 120,
+  },
+
+  // Галерея товара - основное изображение
+  PRODUCT_GALLERY_MAIN: {
+    width: 800,
+    height: 800,
   },
 } as const
 
@@ -153,6 +166,22 @@ export const IMAGE_PRESETS = {
     resize: 'cover' as const,
   },
 
+  // Галерея товара - миниатюры (боковая панель)
+  PRODUCT_GALLERY_THUMB: {
+    ...IMAGE_SIZES.PRODUCT_GALLERY_THUMB,
+    quality: IMAGE_QUALITY.MEDIUM,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'cover' as const,
+  },
+
+  // Галерея товара - основное изображение
+  PRODUCT_GALLERY_MAIN: {
+    ...IMAGE_SIZES.PRODUCT_GALLERY_MAIN,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'contain' as const,
+  },
+
   // Hero баннер
   HERO_BANNER: {
     ...IMAGE_SIZES.HERO,
@@ -184,11 +213,12 @@ export const IMAGE_PRESETS = {
     format: IMAGE_FORMATS.MODERN,
     resize: 'cover' as const,
   },
+  
   CATEGORY_MENU: {
-    ...IMAGE_SIZES.CATEGORY_MENU, // Используем размеры, которые мы добавили
-    quality: IMAGE_QUALITY.MEDIUM, // Качество 75 - идеально для превью
-    format: IMAGE_FORMATS.MODERN, // WebP
-    resize: 'cover' as const, // Обрезать, чтобы заполнить контейнер
+    ...IMAGE_SIZES.CATEGORY_MENU,
+    quality: IMAGE_QUALITY.MEDIUM,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'cover' as const,
   },
 } as const
 

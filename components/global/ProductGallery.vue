@@ -86,7 +86,7 @@ function getMainUrl(imagePath: string) {
     </div>
 
     <!-- КОЛОНКА С ОСНОВНЫМ ИЗОБРАЖЕНИЕМ -->
-    <div class="w-full" :class="images && images.length > 1 ? 'lg:col-span-10' : 'col-span-12'">
+    <div class="w-full" :class="images && images.length > 1 ? 'lg:col-span-10 col-span-12' : 'col-span-12'">
       <Carousel
         class="w-full h-full relative"
         :opts="{ loop: true }"

@@ -6,7 +6,7 @@ import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
 interface Props {
   src: string | null | undefined
   alt: string
-  aspectRatio?: 'square' | 'video' | 'portrait' | '21/9'
+  aspectRatio?: 'square' | 'video' | 'portrait' | '21/9' | '3/4'
   objectFit?: 'cover' | 'contain' | 'fill'
   placeholderType?: 'shimmer' | 'blur' | 'color' | 'lqip' // 🆕 Добавили LQIP
   placeholderColor?: string
@@ -65,6 +65,7 @@ const aspectRatioClass = computed(() => {
     case 'video': return 'aspect-video'
     case 'portrait': return 'aspect-[3/4]'
     case '21/9': return 'aspect-[21/9]'
+    case '3/4' : return 'aspect-[3/4]'
     case 'square':
     default: return 'aspect-square'
   }

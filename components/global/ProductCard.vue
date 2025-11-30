@@ -3,6 +3,7 @@ import type { CarouselApi } from '../ui/carousel'
 import type { BaseProduct } from '@/types'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -128,25 +129,25 @@ const priceDetails = computed(() => {
 </script>
 
 <template>
-  <div class="border rounded-lg overflow-hidden group transition-shadow hover:shadow-lg bg-card flex flex-col h-full">
+  <div class="bg-white border rounded-xl overflow-hidden group transition-all hover:shadow-xl flex flex-col h-full">
     <!-- 🖼️ ГАЛЕРЕЯ ИЗОБРАЖЕНИЙ -->
     <div
-      class="relative bg-muted aspect-square overflow-hidden"
+      class="relative bg-gray-50 aspect-[3/4] overflow-hidden"
       @mousemove="handleMouseMove"
       @mouseleave="handleMouseLeave"
     >
       <!-- 🏷️ БЕЙДЖ СКИДКИ -->
       <div
         v-if="priceDetails.hasDiscount"
-        class="absolute top-2 right-2 z-10"
+        class="absolute top-3 right-3 z-10"
       >
-        <div class="bg-destructive text-white font-bold text-xs px-2 py-1 rounded-full">
+        <Badge variant="destructive" class="font-bold text-xs px-2.5 py-1 shadow-lg">
           -{{ priceDetails.percent }}%
-        </div>
+        </Badge>
       </div>
 
       <!-- ❤️ КНОПКА ДОБАВЛЕНИЯ В ИЗБРАННОЕ -->
-      <div class="absolute top-2 left-2 z-10">
+      <div class="absolute top-3 left-3 z-10">
         <ProductWishlistButton :product-id="product.id" :product-name="product.name" />
       </div>
 
@@ -154,11 +155,10 @@ const priceDetails = computed(() => {
         <!-- 🖥️ ДЕСКТОП: Наведение мышью меняет изображение -->
         <template v-if="!isTouchDevice">
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
-            <!-- 🎯 Используем eager=true для активного изображения (всегда видимо) -->
             <ProgressiveImage
               :src="activeImageUrl"
               :alt="`${product.name}`"
-              aspect-ratio="square"
+              aspect-ratio="3/4"
               object-fit="cover"
               placeholder-type="lqip"
               :blur-data-url="product.product_images?.[activeImageIndex]?.blur_placeholder"
@@ -187,7 +187,6 @@ const priceDetails = computed(() => {
                   :to="`/catalog/products/${product.slug}`"
                   class="block h-full aspect-square"
                 >
-                  <!-- 🎯 Используем eager=true для карусели (видимый слайд всегда показан) -->
                   <ProgressiveImage
                     :src="getImageUrlByIndex(index)"
                     :alt="`${product.name} - фото ${index + 1}`"
@@ -204,12 +203,11 @@ const priceDetails = computed(() => {
 
           <!-- 📷 Одно изображение на мобилке -->
           <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full">
-            <!-- 🎯 Используем eager=true для одного изображения -->
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
               :alt="`${product.name}`"
-              aspect-ratio="square"
+              aspect-ratio="3/4"
               object-fit="cover"
               placeholder-type="shimmer"
               eager
@@ -226,12 +224,11 @@ const priceDetails = computed(() => {
         <!-- ⚙️ Fallback для SSR -->
         <template #fallback>
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
-            <!-- 🎯 Используем eager=true для fallback -->
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
               :alt="`${product.name}`"
-              aspect-ratio="square"
+              aspect-ratio="3/4"
               object-fit="cover"
               placeholder-type="shimmer"
               eager
@@ -249,7 +246,7 @@ const priceDetails = computed(() => {
       <!-- 🔵 ИНДИКАТОРЫ-ТОЧКИ -->
       <div
         v-if="hasMultipleImages"
-        class="absolute bottom-2 left-0 right-0 h-4 flex justify-center items-center gap-2 pointer-events-none"
+        class="absolute bottom-3 left-0 right-0 flex justify-center items-center gap-1.5 pointer-events-none"
       >
         <ClientOnly>
           <!-- Десктоп индикаторы -->
@@ -257,10 +254,10 @@ const priceDetails = computed(() => {
             <div
               v-for="(_, index) in product.product_images"
               :key="`dot-desktop-${index}`"
-              class="w-2 h-2 rounded-full transition-all"
+              class="rounded-full transition-all"
               :class="index === activeImageIndex
-                ? 'bg-white scale-125 shadow-md'
-                : 'bg-white/50'
+                ? 'w-5 h-1.5 bg-primary'
+                : 'w-1.5 h-1.5 bg-white/60'
               "
             />
           </template>
@@ -270,10 +267,10 @@ const priceDetails = computed(() => {
             <div
               v-for="(_, index) in product.product_images"
               :key="`dot-mobile-${index}`"
-              class="w-2 h-2 rounded-full transition-all"
+              class="rounded-full transition-all"
               :class="index === mobileSelectedIndex
-                ? 'bg-white scale-125 shadow-md'
-                : 'bg-white/50'
+                ? 'w-5 h-1.5 bg-primary'
+                : 'w-1.5 h-1.5 bg-white/60'
               "
             />
           </template>
@@ -282,12 +279,12 @@ const priceDetails = computed(() => {
     </div>
 
     <!-- 📋 ИНФОРМАЦИЯ О ТОВАРЕ -->
-    <div class="p-4 space-y-2 flex-grow flex flex-col">
+    <div class="p-4 space-y-3 flex-grow flex flex-col">
       <!-- 🏢 Бренд -->
-      <div v-if="product.brands" class="h-4">
+      <div v-if="product.brands" class="min-h-[16px]">
         <NuxtLink
           :to="`/brand/${product.brands.slug}`"
-          class="text-xs text-muted-foreground hover:text-primary transition-colors"
+          class="text-xs text-muted-foreground hover:text-primary transition-colors font-medium"
           @click.stop
         >
           {{ product.brands.name }}
@@ -295,43 +292,52 @@ const priceDetails = computed(() => {
       </div>
 
       <!-- 📝 Название товара -->
-      <h3 class="font-semibold truncate h-6">
-        {{ product.name }}
-      </h3>
+      <NuxtLink :to="`/catalog/products/${product.slug}`" class="block">
+        <h3 class="font-semibold text-sm leading-tight line-clamp-2 min-h-[40px] hover:text-primary transition-colors">
+          {{ product.name }}
+        </h3>
+      </NuxtLink>
 
       <!-- 💰 Цена и бонусы -->
-      <div class="flex items-baseline justify-between">
+      <div class="space-y-1 mt-auto">
         <div class="flex items-baseline gap-2">
-          <p class="text-lg font-bold">
-            {{ priceDetails.finalPrice }} ₸
+          <p class="text-xl font-bold text-primary">
+            {{ priceDetails.finalPrice.toLocaleString() }} ₸
           </p>
           <p v-if="priceDetails.hasDiscount" class="text-sm text-muted-foreground line-through">
-            {{ priceDetails.originalPrice }} ₸
+            {{ priceDetails.originalPrice.toLocaleString() }} ₸
           </p>
         </div>
 
-        <p
+        <!-- Бонусы -->
+        <Badge
           v-if="product.bonus_points_award && product.bonus_points_award > 0"
-          class="text-xs text-primary font-medium"
+          variant="secondary"
+          class="inline-flex items-center gap-1 bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200"
         >
-          +{{ product.bonus_points_award }}
-        </p>
+          <Icon name="lucide:gift" class="w-3 h-3" />
+          <span>+{{ product.bonus_points_award }} бонусов</span>
+        </Badge>
       </div>
 
       <!-- 🛒 КНОПКА ДОБАВЛЕНИЯ В КОРЗИНУ -->
-      <div class="mt-auto pt-2">
+      <div class="pt-3">
         <ClientOnly>
           <Button
             v-if="!itemInCart"
-            class="w-full"
+            class="w-full h-10 font-semibold"
             :disabled="!product.stock_quantity || product.stock_quantity <= 0"
             @click="cartStore.addItem(product as BaseProduct, 1)"
           >
+            <Icon 
+              :name="product.stock_quantity && product.stock_quantity > 0 ? 'lucide:shopping-cart' : 'lucide:x-circle'" 
+              class="w-4 h-4 mr-2"
+            />
             <span v-if="product.stock_quantity && product.stock_quantity > 0">
-              🛒 В корзину
+              В корзину
             </span>
             <span v-else>
-              ❌ Нет в наличии
+              Нет в наличии
             </span>
           </Button>
 
@@ -342,8 +348,9 @@ const priceDetails = computed(() => {
           />
 
           <template #fallback>
-            <Button class="w-full" disabled>
-              ⏳ Загрузка...
+            <Button class="w-full h-10" disabled>
+              <Icon name="lucide:loader-2" class="w-4 h-4 mr-2 animate-spin" />
+              Загрузка...
             </Button>
           </template>
         </ClientOnly>

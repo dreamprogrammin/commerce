@@ -50,6 +50,23 @@ const subcategories = computed(() => categoriesStore.getSubcategories(currentCat
 
 const localPrice = ref<[number, number]>([...props.modelValue.price])
 
+// Подсчет активных фильтров
+const activeFiltersCount = computed(() => {
+  let count = 0
+  count += props.modelValue.subCategoryIds.length
+  count += props.modelValue.brandIds.length
+  count += props.modelValue.materialIds.length
+  count += props.modelValue.countryIds.length
+  Object.values(props.modelValue.attributes).forEach((values) => {
+    count += values.length
+  })
+  if (props.modelValue.price[0] !== props.priceRange.min
+    || props.modelValue.price[1] !== props.priceRange.max) {
+    count += 1
+  }
+  return count
+})
+
 // --- 3. ОБРАБОТЧИКИ ИЗМЕНЕНИЙ ---
 
 function updateSubCategory(checked: boolean, catId: string) {
@@ -102,6 +119,17 @@ function commitPriceToFilters(newPrice: number[]) {
   }
 }
 
+function resetFilters() {
+  emit('update:modelValue', {
+    subCategoryIds: [],
+    price: [props.priceRange.min, props.priceRange.max],
+    brandIds: [],
+    materialIds: [],
+    countryIds: [],
+    attributes: {},
+  })
+}
+
 // Синхронизируем локальную цену с пропсами
 watch(() => props.modelValue.price, (newVal) => {
   localPrice.value = [...newVal]
@@ -113,163 +141,323 @@ watch(() => props.priceRange, (newRange) => {
 </script>
 
 <template>
-  <div class="p-4 border rounded-lg bg-card space-y-6">
-    <div>
-      <h3 class="font-semibold text-lg">
-        Фильтры
-      </h3>
-    </div>
-
-    <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ -->
-    <div v-if="subcategories.length > 0" class="space-y-4">
-      <h4 class="font-semibold">
-        Подкатегории
-      </h4>
-      <div v-for="cat in subcategories" :key="cat.id" class="flex items-center space-x-2">
-        <Checkbox
-          :id="`cat-${cat.id}`"
-          :model-value="props.modelValue.subCategoryIds.includes(cat.id)"
-          @update:model-value="(checked) => updateSubCategory(!!checked, cat.id)"
-        />
-        <Label :for="`cat-${cat.id}`" class="font-normal cursor-pointer">{{ cat.name }}</Label>
+  <div class="bg-white border rounded-xl p-4 space-y-4 sticky top-4">
+    <!-- Заголовок -->
+    <div class="flex items-center justify-between pb-3 border-b">
+      <div class="flex items-center gap-2">
+        <Icon name="lucide:sliders-horizontal" class="w-5 h-5 text-muted-foreground" />
+        <h3 class="font-bold text-lg">
+          Фильтры
+        </h3>
       </div>
+      <Badge v-if="activeFiltersCount > 0" variant="secondary" class="bg-primary/10 text-primary">
+        {{ activeFiltersCount }}
+      </Badge>
     </div>
 
-    <!-- 2. БРЕНДЫ -->
-    <div v-if="availableBrands.length > 0" class="space-y-4 pt-4 border-t">
-      <h4 class="font-semibold">
-        Бренды
-      </h4>
-      <div class="space-y-2">
-        <div v-for="brand in availableBrands" :key="brand.id" class="flex items-center space-x-2">
-          <Checkbox
-            :id="`brand-${brand.id}`"
-            :model-value="modelValue.brandIds?.includes(brand.id)"
-            @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'brandIds', brand.id)"
-          />
-          <Label :for="`brand-${brand.id}`" class="font-normal cursor-pointer">{{ brand.name }}</Label>
+    <!-- Контент с прокруткой -->
+    <div class="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
+      <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ -->
+      <div v-if="subcategories.length > 0" class="space-y-2">
+        <div class="flex items-center gap-2 mb-2">
+          <Icon name="lucide:layers" class="w-4 h-4 text-muted-foreground" />
+          <h4 class="font-semibold text-sm">
+            Подкатегории
+          </h4>
         </div>
-      </div>
-    </div>
-
-    <!-- 3. МАТЕРИАЛЫ -->
-    <div v-if="availableMaterials.length > 0" class="space-y-4 pt-4 border-t">
-      <h4 class="font-semibold">
-        Материал
-      </h4>
-      <div class="space-y-2">
-        <div v-for="material in availableMaterials" :key="material.id" class="flex items-center space-x-2">
-          <Checkbox
-            :id="`material-${material.id}`"
-            :model-value="modelValue.materialIds?.includes(String(material.id))"
-            @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'materialIds', material.id)"
-          />
-          <Label :for="`material-${material.id}`" class="font-normal cursor-pointer">{{ material.name }}</Label>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. СТРАНЫ -->
-    <div v-if="availableCountries.length > 0" class="space-y-4 pt-4 border-t">
-      <h4 class="font-semibold">
-        Страна происхождения
-      </h4>
-      <div class="space-y-2">
-        <div v-for="country in availableCountries" :key="country.id" class="flex items-center space-x-2">
-          <Checkbox
-            :id="`country-${country.id}`"
-            :model-value="modelValue.countryIds?.includes(String(country.id))"
-            @update:model-value="(checkedState) => updateDirectFilter(!!checkedState, 'countryIds', country.id)"
-          />
-          <Label :for="`country-${country.id}`" class="font-normal cursor-pointer">{{ country.name }}</Label>
-        </div>
-      </div>
-    </div>
-
-    <!-- 5. ДИНАМИЧЕСКИЕ АТРИБУТЫ -->
-    <div
-      v-for="filter in availableFilters"
-      :key="filter.id"
-      class="space-y-4 pt-4 border-t"
-    >
-      <h4 class="font-semibold">
-        {{ filter.name }}
-      </h4>
-
-      <!-- Для типа 'select' -->
-      <div v-if="filter.display_type === 'select'" class="space-y-2">
-        <div
-          v-for="option in filter.attribute_options"
-          :key="option.id"
-          class="flex items-center space-x-2"
-        >
-          <Checkbox
-            :id="`attr-${option.id}`"
-            :model-value="modelValue.attributes[filter.slug]?.includes(option.id)"
-            @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
-          />
-          <Label :for="`attr-${option.id}`" class="font-normal cursor-pointer">{{ option.value }}</Label>
-        </div>
-      </div>
-
-      <!-- Для типа 'color' -->
-      <div v-if="filter.display_type === 'color'" class="flex flex-wrap gap-2">
         <button
-          v-for="option in filter.attribute_options"
-          :key="option.id"
+          v-for="cat in subcategories"
+          :key="cat.id"
           type="button"
-          :title="option.value"
-          :style="{ backgroundColor: ((option.meta as unknown) as ColorOptionMeta)?.hex }"
-          class="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
-          :class="{
-            'border-primary ring-2 ring-primary ring-offset-2': modelValue.attributes[filter.slug]?.includes(option.id),
-            'border-border': !modelValue.attributes[filter.slug]?.includes(option.id),
-          }"
-          @click="() => {
-            const isCurrentlyChecked = modelValue.attributes[filter.slug]?.includes(option.id);
-            updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
-          }"
-        />
+          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
+          :class="[
+            props.modelValue.subCategoryIds.includes(cat.id)
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
+          ]"
+          @click="updateSubCategory(!props.modelValue.subCategoryIds.includes(cat.id), cat.id)"
+        >
+          <div
+            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+            :class="props.modelValue.subCategoryIds.includes(cat.id) ? 'bg-white/20' : 'bg-background/50'"
+          >
+            <Icon
+              :name="props.modelValue.subCategoryIds.includes(cat.id) ? 'lucide:check' : 'lucide:folder'"
+              class="w-4 h-4"
+            />
+          </div>
+          <div class="flex-1 text-left font-medium">
+            {{ cat.name }}
+          </div>
+        </button>
       </div>
-    </div>
 
-    <!-- 6. ФИЛЬТР ПО ЦЕНЕ -->
-    <ClientOnly>
-      <div class="space-y-4 pt-4 border-t">
-        <h4 class="font-semibold">
-          Цена
-        </h4>
-        <div v-if="isLoading" class="space-y-4 pt-2">
-          <Skeleton class="h-4 w-full" />
-          <Skeleton class="h-4 w-1/2" />
+      <!-- 2. БРЕНДЫ -->
+      <div v-if="availableBrands.length > 0" class="space-y-2 pt-3 border-t">
+        <div class="flex items-center gap-2 mb-2">
+          <Icon name="lucide:tag" class="w-4 h-4 text-muted-foreground" />
+          <h4 class="font-semibold text-sm">
+            Бренды
+          </h4>
         </div>
-        <template v-else>
-          <Slider
-            v-model="localPrice"
-            :min="priceRange.min"
-            :max="priceRange.max"
-            :step="100"
-            @value-commit="commitPriceToFilters"
-          />
-          <div class="flex justify-between text-sm text-muted-foreground">
-            <span>{{ Math.round(localPrice[0]) }} ₸</span>
-            <span>{{ Math.round(localPrice[1]) }} ₸</span>
+        <button
+          v-for="brand in availableBrands"
+          :key="brand.id"
+          type="button"
+          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
+          :class="[
+            modelValue.brandIds?.includes(brand.id)
+              ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md shadow-purple-500/20'
+              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
+          ]"
+          @click="updateDirectFilter(!modelValue.brandIds?.includes(brand.id), 'brandIds', brand.id)"
+        >
+          <div
+            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+            :class="modelValue.brandIds?.includes(brand.id) ? 'bg-white/20' : 'bg-background/50'"
+          >
+            <Icon
+              :name="modelValue.brandIds?.includes(brand.id) ? 'lucide:check' : 'lucide:award'"
+              class="w-4 h-4"
+            />
+          </div>
+          <div class="flex-1 text-left font-medium">
+            {{ brand.name }}
+          </div>
+        </button>
+      </div>
+
+      <!-- 3. МАТЕРИАЛЫ -->
+      <div v-if="availableMaterials.length > 0" class="space-y-2 pt-3 border-t">
+        <div class="flex items-center gap-2 mb-2">
+          <Icon name="lucide:layers-2" class="w-4 h-4 text-muted-foreground" />
+          <h4 class="font-semibold text-sm">
+            Материал
+          </h4>
+        </div>
+        <button
+          v-for="material in availableMaterials"
+          :key="material.id"
+          type="button"
+          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
+          :class="[
+            modelValue.materialIds?.includes(String(material.id))
+              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md shadow-green-500/20'
+              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
+          ]"
+          @click="updateDirectFilter(!modelValue.materialIds?.includes(String(material.id)), 'materialIds', material.id)"
+        >
+          <div
+            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+            :class="modelValue.materialIds?.includes(String(material.id)) ? 'bg-white/20' : 'bg-background/50'"
+          >
+            <Icon
+              :name="modelValue.materialIds?.includes(String(material.id)) ? 'lucide:check' : 'lucide:box'"
+              class="w-4 h-4"
+            />
+          </div>
+          <div class="flex-1 text-left font-medium">
+            {{ material.name }}
+          </div>
+        </button>
+      </div>
+
+      <!-- 4. СТРАНЫ -->
+      <div v-if="availableCountries.length > 0" class="space-y-2 pt-3 border-t">
+        <div class="flex items-center gap-2 mb-2">
+          <Icon name="lucide:globe" class="w-4 h-4 text-muted-foreground" />
+          <h4 class="font-semibold text-sm">
+            Страна происхождения
+          </h4>
+        </div>
+        <button
+          v-for="country in availableCountries"
+          :key="country.id"
+          type="button"
+          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
+          :class="[
+            modelValue.countryIds?.includes(String(country.id))
+              ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20'
+              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
+          ]"
+          @click="updateDirectFilter(!modelValue.countryIds?.includes(String(country.id)), 'countryIds', country.id)"
+        >
+          <div
+            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+            :class="modelValue.countryIds?.includes(String(country.id)) ? 'bg-white/20' : 'bg-background/50'"
+          >
+            <Icon
+              :name="modelValue.countryIds?.includes(String(country.id)) ? 'lucide:check' : 'lucide:map-pin'"
+              class="w-4 h-4"
+            />
+          </div>
+          <div class="flex-1 text-left font-medium">
+            {{ country.name }}
+          </div>
+        </button>
+      </div>
+
+      <!-- 5. ДИНАМИЧЕСКИЕ АТРИБУТЫ -->
+      <div
+        v-for="filter in availableFilters"
+        :key="filter.id"
+        class="space-y-2 pt-3 border-t"
+      >
+        <div class="flex items-center gap-2 mb-2">
+          <Icon name="lucide:settings-2" class="w-4 h-4 text-muted-foreground" />
+          <h4 class="font-semibold text-sm">
+            {{ filter.name }}
+          </h4>
+        </div>
+
+        <!-- Для типа 'select' -->
+        <template v-if="filter.display_type === 'select'">
+          <div class="space-y-2">
+            <button
+              v-for="option in filter.attribute_options"
+              :key="option.id"
+              type="button"
+              class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
+              :class="[
+                modelValue.attributes[filter.slug]?.includes(option.id)
+                  ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-md shadow-pink-500/20'
+                  : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
+              ]"
+              @click="updateAttribute(!modelValue.attributes[filter.slug]?.includes(option.id), filter.slug, option.id)"
+            >
+              <div
+                class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+                :class="modelValue.attributes[filter.slug]?.includes(option.id) ? 'bg-white/20' : 'bg-background/50'"
+              >
+                <Icon
+                  :name="modelValue.attributes[filter.slug]?.includes(option.id) ? 'lucide:check' : 'lucide:circle'"
+                  class="w-4 h-4"
+                />
+              </div>
+              <div class="flex-1 text-left font-medium">
+                {{ option.value }}
+              </div>
+            </button>
+          </div>
+        </template>
+
+        <!-- Для типа 'color' -->
+        <template v-if="filter.display_type === 'color'">
+          <div class="grid grid-cols-3 gap-2 pt-2">
+            <button
+              v-for="option in filter.attribute_options"
+              :key="option.id"
+              type="button"
+              :title="option.value"
+              class="relative flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all duration-200"
+              :class="[
+                modelValue.attributes[filter.slug]?.includes(option.id)
+                  ? 'bg-primary/10 ring-2 ring-primary'
+                  : 'bg-secondary/60 hover:bg-secondary active:scale-95',
+              ]"
+              @click="() => {
+                const isCurrentlyChecked = modelValue.attributes[filter.slug]?.includes(option.id);
+                updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
+              }"
+            >
+              <div
+                :style="{ backgroundColor: ((option.meta as unknown) as ColorOptionMeta)?.hex }"
+                class="h-10 w-10 rounded-md border-2 transition-transform"
+                :class="{
+                  'border-primary scale-110': modelValue.attributes[filter.slug]?.includes(option.id),
+                  'border-border': !modelValue.attributes[filter.slug]?.includes(option.id),
+                }"
+              />
+              <span class="text-[10px] font-medium text-center line-clamp-1">
+                {{ option.value }}
+              </span>
+              <Icon
+                v-if="modelValue.attributes[filter.slug]?.includes(option.id)"
+                name="lucide:check-circle"
+                class="absolute top-0.5 right-0.5 w-4 h-4 text-primary"
+              />
+            </button>
           </div>
         </template>
       </div>
 
-      <!-- Fallback для SSR -->
-      <template #fallback>
-        <div class="space-y-4 pt-4 border-t">
-          <h4 class="font-semibold">
-            Цена
-          </h4>
-          <div class="space-y-4 pt-2">
-            <Skeleton class="h-4 w-full" />
-            <Skeleton class="h-4 w-1/2" />
+      <!-- 6. ФИЛЬТР ПО ЦЕНЕ -->
+      <ClientOnly>
+        <div class="space-y-3 pt-3 border-t">
+          <div class="flex items-center gap-2">
+            <Icon name="lucide:wallet" class="w-4 h-4 text-muted-foreground" />
+            <h4 class="font-semibold text-sm">
+              Цена
+            </h4>
           </div>
+
+          <template v-if="isLoading">
+            <div class="space-y-3 pt-2">
+              <Skeleton class="h-3 w-full" />
+              <Skeleton class="h-3 w-1/2" />
+            </div>
+          </template>
+          <template v-else>
+            <div class="px-1 pt-2">
+              <Slider
+                v-model="localPrice"
+                :min="priceRange.min"
+                :max="priceRange.max"
+                :step="100"
+                @value-commit="commitPriceToFilters"
+              />
+            </div>
+            <div class="flex justify-between items-center gap-2">
+              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
+                <div class="text-[10px] text-muted-foreground mb-0.5">
+                  От
+                </div>
+                <div class="font-semibold text-xs">
+                  {{ Math.round(localPrice[0]).toLocaleString() }} ₸
+                </div>
+              </div>
+              <Icon name="lucide:minus" class="w-3 h-3 text-muted-foreground" />
+              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
+                <div class="text-[10px] text-muted-foreground mb-0.5">
+                  До
+                </div>
+                <div class="font-semibold text-xs">
+                  {{ Math.round(localPrice[1]).toLocaleString() }} ₸
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
-      </template>
-    </ClientOnly>
+
+        <!-- Fallback для SSR -->
+        <template #fallback>
+          <div class="space-y-3 pt-3 border-t">
+            <div class="flex items-center gap-2">
+              <Icon name="lucide:wallet" class="w-4 h-4 text-muted-foreground" />
+              <h4 class="font-semibold text-sm">
+                Цена
+              </h4>
+            </div>
+            <div class="space-y-3 pt-2">
+              <Skeleton class="h-3 w-full" />
+              <Skeleton class="h-3 w-1/2" />
+            </div>
+          </div>
+        </template>
+      </ClientOnly>
+    </div>
+
+    <!-- Кнопка сброса -->
+    <div v-if="activeFiltersCount > 0" class="pt-3 border-t">
+      <Button
+        variant="outline"
+        size="sm"
+        class="w-full"
+        @click="resetFilters"
+      >
+        <Icon name="lucide:x" class="w-3 h-3 mr-2" />
+        Сбросить фильтры
+      </Button>
+    </div>
   </div>
 </template>

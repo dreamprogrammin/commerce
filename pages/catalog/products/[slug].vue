@@ -462,10 +462,10 @@ watch(() => product.value?.id, () => {
                 В корзину
               </Button>
 
-              <div v-else class="flex items-center gap-2 flex-grow">
+              <div v-else class="flex justify-between items-center gap-9 flex-grow-1">
                 <Button
                   size="lg"
-                  class="flex-grow h-11 text-base font-semibold"
+                  class="h-11 text-base font-semibold"
                   @click="router.push('/cart')"
                 >
                   <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
