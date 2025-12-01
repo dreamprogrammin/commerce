@@ -32,7 +32,7 @@ function handleOverlayClick() {
 
 <template>
   <header class="relative z-50 bg-white md:bg-blue-500 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-    <CommonHeaderTop :class="containerClass" />
+    <!-- <CommonHeaderTop :class="containerClass" /> -->
     <div :class="containerClass">
       <CommonHeaderBottom />
       <div class="hidden lg:block py-2">
