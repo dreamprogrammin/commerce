@@ -52,6 +52,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.2.0",
+    "@iconify-json/fluent-emoji-flat": "^1.2.5",
     "@iconify-json/lucide": "^1.2.73",
     "@types/lodash-es": "^4.17.12",
     "eslint": "^9.32.0",

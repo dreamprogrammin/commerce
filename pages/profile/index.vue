@@ -32,7 +32,7 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h1 class="text-3xl font-bold mb-6">
+    <h1 class="text-2xl md:text-3xl font-bold mb-3 md:mb-6">
       Настройки профиля
     </h1>
 
@@ -59,7 +59,7 @@ onMounted(async () => {
 
       <!-- Профиль загружен -->
       <div v-else-if="profile" class="space-y-6">
-        <h1 class="text-3xl font-bold">
+        <h1 class="text-2xl font-bold">
           Добро пожаловать, {{ fullName }}!
         </h1>
 
