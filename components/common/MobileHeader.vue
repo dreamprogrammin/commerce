@@ -74,7 +74,7 @@ onUnmounted(() => {
       class="fixed top-0 left-0 right-0 z-50 w-full bg-white dark:bg-gray-900 shadow-sm"
       :class="container"
     >
-      <div class="flex items-center justify-between h-[56px] px-4">
+      <div class="flex items-center justify-between h-[56px]">
         <!-- Логотип -->
         <NuxtLink to="/" class="flex items-center gap-2.5">
           <div class="bg-blue-500 p-1.5 rounded-full">
