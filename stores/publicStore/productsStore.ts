@@ -425,6 +425,132 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
+  /**
+   * Поиск товаров по имени и описанию
+   * @param query - поисковый запрос
+   * @param page - номер страницы
+   * @param pageSize - количество товаров на странице
+   * @returns объект с товарами и флагом hasMore
+   */
+  async function searchProductsByQuery(
+    query: string,
+    page: number = 1,
+    pageSize: number = 24,
+  ): Promise<{ products: ProductWithGallery[], hasMore: boolean, total: number }> {
+    if (!query.trim()) {
+      return { products: [], hasMore: false, total: 0 }
+    }
+
+    try {
+      const offset = (page - 1) * pageSize
+
+      // Сначала получаем общее количество
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+
+      if (countError)
+        throw countError
+
+      // Затем получаем товары для текущей страницы
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+        *,
+        product_images(id, image_url, blur_placeholder, display_order, alt_text),
+        brands(id, name, slug),
+        categories(name, slug)
+      `)
+        .eq('is_active', true)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+        .order('sales_count', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+
+      if (error)
+        throw error
+
+      const products = (data || []).map(product => ({
+        ...product,
+        product_images: Array.isArray(product.product_images)
+          ? product.product_images.sort((a, b) => a.display_order - b.display_order)
+          : [],
+        brands: product.brands as SimpleBrand | null,
+      })) as unknown as ProductWithGallery[]
+
+      const total = count || 0
+      const hasMore = offset + pageSize < total
+
+      return { products, hasMore, total }
+    }
+    catch (error: any) {
+      console.error('Ошибка поиска товаров:', error)
+      toast.error('Ошибка при поиске товаров', { description: error.message })
+      return { products: [], hasMore: false, total: 0 }
+    }
+  }
+
+  /**
+   * Получение популярных поисковых запросов
+   * (можно реализовать через таблицу search_analytics или возвращать статичные)
+   */
+  function getPopularSearchQueries(): string[] {
+    return [
+      'LEGO',
+      'мягкие игрушки',
+      'конструктор',
+      'кукла',
+      'машинка',
+      'пазлы',
+      'настольные игры',
+    ]
+  }
+
+  /**
+   * Автодополнение для поиска (suggestions)
+   * Возвращает товары и бренды, подходящие под запрос
+   */
+  async function getSearchSuggestions(query: string, limit: number = 5) {
+    if (!query.trim() || query.length < 2) {
+      return { products: [], brands: [] }
+    }
+
+    try {
+    // Поиск товаров
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, slug, price')
+        .eq('is_active', true)
+        .ilike('name', `%${query}%`)
+        .order('sales_count', { ascending: false })
+        .limit(limit)
+
+      if (productsError)
+        throw productsError
+
+      // Поиск брендов
+      const { data: brands, error: brandsError } = await supabase
+        .from('brands')
+        .select('id, name, slug')
+        .ilike('name', `%${query}%`)
+        .limit(3)
+
+      if (brandsError)
+        throw brandsError
+
+      return {
+        products: products || [],
+        brands: brands || [],
+      }
+    }
+    catch (error: any) {
+      console.error('Ошибка получения подсказок:', error)
+      return { products: [], brands: [] }
+    }
+  }
+
   // ============================================
   // 📤 RETURN
   // ============================================
@@ -453,6 +579,9 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchPriceRangeForCategory,
     fetchAllMaterials,
     fetchAllCountries,
+    searchProductsByQuery,
+    getPopularSearchQueries,
+    getSearchSuggestions,
 
     // Управление кэшем
     clearCache,

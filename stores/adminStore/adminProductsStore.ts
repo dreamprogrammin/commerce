@@ -548,7 +548,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       toast.error('Ошибка сохранения атрибутов товара', { description: error.message })
     }
   }
-
   return {
     products,
     currentProduct,
