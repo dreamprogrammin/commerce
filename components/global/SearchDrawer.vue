@@ -63,7 +63,7 @@ function handleSelectSuggestion(suggestion: string) {
 }
 
 function handleProductClick(slug: string) {
-  navigateTo(`catalog/product/${slug}`)
+  navigateTo(`catalog/products/${slug}`)
   close()
 }
 
@@ -150,7 +150,7 @@ function formatPrice(price: number, discount?: number): { original: string, fina
               <NuxtLink
                 v-for="brand in brandSuggestions"
                 :key="brand.id"
-                :to="`/catalog/all?brand=${brand.slug}`"
+                :to="`/brand/all?brand=${brand.slug}`"
                 class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl hover:shadow-md transition-all border border-blue-100"
                 @click="close"
               >
@@ -331,31 +331,6 @@ function formatPrice(price: number, discount?: number): { original: string, fina
                   class="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
                 />
               </button>
-            </div>
-          </div>
-
-          <!-- Популярные категории -->
-          <div class="px-2">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              Популярные категории
-            </h3>
-            <div class="grid grid-cols-2 gap-2">
-              <NuxtLink
-                to="/catalog/konstruktory"
-                class="flex items-center gap-2 p-3 bg-white rounded-lg hover:shadow-md transition-all border border-gray-100"
-                @click="close"
-              >
-                <Icon name="lucide:blocks" class="w-5 h-5 text-blue-500" />
-                <span class="text-sm font-medium text-gray-700">Конструкторы</span>
-              </NuxtLink>
-              <NuxtLink
-                to="/catalog/myagkie-igrushki"
-                class="flex items-center gap-2 p-3 bg-white rounded-lg hover:shadow-md transition-all border border-gray-100"
-                @click="close"
-              >
-                <Icon name="lucide:heart" class="w-5 h-5 text-pink-500" />
-                <span class="text-sm font-medium text-gray-700">Мягкие игрушки</span>
-              </NuxtLink>
             </div>
           </div>
         </div>
