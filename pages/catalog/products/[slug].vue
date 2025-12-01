@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { IBreadcrumbItem, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
+import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { IMAGE_SIZES } from '@/config/images'
@@ -9,7 +10,6 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,7 +17,6 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
-const CarouselContainerClass = carouselContainerVariants({ contained: 'desktop' })
 const { getImageUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
@@ -171,7 +170,8 @@ useFlipCounter(totalPrice, digitColumns)
 
 // 🆕 Intersection Observer для отслеживания похожих товаров
 onMounted(() => {
-  if (!similarProductsRef.value) return
+  if (!similarProductsRef.value)
+    return
 
   const observer = new IntersectionObserver(
     (entries) => {
@@ -184,7 +184,7 @@ onMounted(() => {
       // Срабатывает когда верхняя часть блока достигает нижней части экрана
       rootMargin: '-64px 0px 0px 0px', // 64px = высота навигации
       threshold: 0,
-    }
+    },
   )
 
   observer.observe(similarProductsRef.value)
@@ -224,14 +224,9 @@ watch(() => product.value?.id, () => {
           <!-- Breadcrumbs с кнопкой избранного -->
           <div class="flex items-center justify-between mb-4">
             <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
-            
+
             <!-- Кнопка избранного для мобильных -->
-            <button
-              class="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg border bg-white hover:bg-muted transition-colors"
-              aria-label="Добавить в избранное"
-            >
-              <Icon name="mdi:heart-outline" class="w-6 h-6 text-muted-foreground" />
-            </button>
+            <ProductWishlistButton :product-id="product.id" :product-name="product.name" class="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg border bg-white hover:bg-muted transition-colors" />
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
@@ -266,7 +261,7 @@ watch(() => product.value?.id, () => {
                       {{ Math.round(totalPrice).toLocaleString() }} ₸
                     </p>
                   </div>
-                  
+
                   <!-- Бонусы -->
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium">
                     <Icon name="lucide:gift" class="w-4 h-4" />
@@ -277,8 +272,8 @@ watch(() => product.value?.id, () => {
                 <!-- Наличие -->
                 <div class="mb-6 pb-6 border-b">
                   <div class="flex items-center gap-2 text-sm">
-                    <Icon 
-                      :name="product.stock_quantity > 0 ? 'lucide:check-circle' : 'lucide:x-circle'" 
+                    <Icon
+                      :name="product.stock_quantity > 0 ? 'lucide:check-circle' : 'lucide:x-circle'"
                       :class="product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'"
                       class="w-5 h-5"
                     />
@@ -388,7 +383,9 @@ watch(() => product.value?.id, () => {
                       <p class="text-sm font-medium leading-tight mb-1">
                         {{ acc.name }}
                       </p>
-                      <p class="text-sm font-bold text-primary">+ {{ acc.price }} ₸</p>
+                      <p class="text-sm font-bold text-primary">
+                        + {{ acc.price }} ₸
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -402,32 +399,30 @@ watch(() => product.value?.id, () => {
             <div class="border-b mb-6">
               <div class="flex gap-6">
                 <button
-                  :class="[
-                    'pb-3 px-1 font-semibold text-base transition-colors relative',
-                    activeTab === 'description' 
-                      ? 'text-primary' 
-                      : 'text-muted-foreground hover:text-foreground'
+                  class="pb-3 px-1 font-semibold text-base transition-colors relative" :class="[
+                    activeTab === 'description'
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
                   ]"
                   @click="activeTab = 'description'"
                 >
                   Описание
-                  <div 
-                    v-if="activeTab === 'description'" 
+                  <div
+                    v-if="activeTab === 'description'"
                     class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
                   />
                 </button>
                 <button
-                  :class="[
-                    'pb-3 px-1 font-semibold text-base transition-colors relative',
-                    activeTab === 'features' 
-                      ? 'text-primary' 
-                      : 'text-muted-foreground hover:text-foreground'
+                  class="pb-3 px-1 font-semibold text-base transition-colors relative" :class="[
+                    activeTab === 'features'
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
                   ]"
                   @click="activeTab = 'features'"
                 >
                   Характеристики
-                  <div 
-                    v-if="activeTab === 'features'" 
+                  <div
+                    v-if="activeTab === 'features'"
                     class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
                   />
                 </button>
@@ -438,7 +433,9 @@ watch(() => product.value?.id, () => {
             <div class="prose max-w-none">
               <div v-if="activeTab === 'description'">
                 <ProductDescription v-if="product.description" :description="product.description" />
-                <p v-else class="text-muted-foreground">Описание отсутствует</p>
+                <p v-else class="text-muted-foreground">
+                  Описание отсутствует
+                </p>
               </div>
 
               <div v-if="activeTab === 'features'">
@@ -476,14 +473,16 @@ watch(() => product.value?.id, () => {
         leave-from-class="translate-y-0"
         leave-to-class="translate-y-full"
       >
-        <div 
-          v-if="product && showStickyPanel" 
+        <div
+          v-if="product && showStickyPanel"
           class="lg:hidden sticky bottom-16 left-0 right-0 bg-white border-t shadow-lg z-40"
         >
           <div class="px-4 py-3">
             <div class="flex items-center gap-3 justify-between">
               <div v-if="!mainItemInCart" class="flex-shrink-0">
-                <p class="text-xs text-muted-foreground mb-0.5">Цена</p>
+                <p class="text-xs text-muted-foreground mb-0.5">
+                  Цена
+                </p>
                 <p class="text-xl font-bold text-primary">
                   {{ Math.round(totalPrice).toLocaleString() }} ₸
                 </p>
@@ -528,8 +527,8 @@ watch(() => product.value?.id, () => {
     </ClientOnly>
 
     <!-- 🆕 Похожие товары с ref для отслеживания -->
-    <div 
-      v-if="similarProducts.length > 0" 
+    <div
+      v-if="similarProducts.length > 0"
       ref="similarProductsRef"
       class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12"
     >

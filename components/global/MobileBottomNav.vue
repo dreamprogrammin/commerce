@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
   },
 ]
 
-const isActive = (path: string) => {
+function isActive(path: string) {
   if (path === '/') {
     return route.path === '/'
   }
@@ -67,7 +67,7 @@ const cartItemsCount = computed(() => {
             class="transition-all duration-300"
             :class="isActive(item.path) ? 'w-6 h-6 text-white' : 'w-5 h-5 text-muted-foreground'"
           />
-          
+
           <ClientOnly>
             <div
               v-if="item.path === '/cart' && cartItemsCount > 0"
@@ -77,7 +77,7 @@ const cartItemsCount = computed(() => {
             </div>
           </ClientOnly>
         </div>
-        
+
         <span
           class="text-[9px] font-medium transition-all pb-0.5"
           :class="isActive(item.path) ? 'text-blue-500 font-semibold' : 'text-muted-foreground'"

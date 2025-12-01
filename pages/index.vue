@@ -20,6 +20,10 @@ const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
 const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
 
+definePageMeta({
+  layout: 'home',
+})
+
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 
 const { data: mainPersonalData, pending: isLoadingRecommendations } = useAsyncData(

@@ -201,9 +201,9 @@ function calculateDiscount(price: number, discount: number) {
                       </NuxtLink>
                     </Button>
                     <div class="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <Button variant="outline" class="rounded-xl h-9 text-xs">
-                        <Icon name="lucide:heart" class="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                      </Button>
+                      <div class="border rounded-xl h-9 text-xs flex justify-center">
+                        <ProductWishlistButton :product-id="product.id" :product-name="product.name" />
+                      </div>
                       <Button as-child variant="outline" class="rounded-xl h-9 text-xs">
                         <NuxtLink :to="`/catalog/products/${product.slug}`">
                           <span class="hidden sm:inline">Подробнее</span>

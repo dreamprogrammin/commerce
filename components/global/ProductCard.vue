@@ -3,7 +3,6 @@ import type { CarouselApi } from '../ui/carousel'
 import type { BaseProduct } from '@/types'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -329,8 +328,8 @@ const priceDetails = computed(() => {
             :disabled="!product.stock_quantity || product.stock_quantity <= 0"
             @click="cartStore.addItem(product as BaseProduct, 1)"
           >
-            <Icon 
-              :name="product.stock_quantity && product.stock_quantity > 0 ? 'lucide:shopping-cart' : 'lucide:x-circle'" 
+            <Icon
+              :name="product.stock_quantity && product.stock_quantity > 0 ? 'lucide:shopping-cart' : 'lucide:x-circle'"
               class="w-4 h-4 mr-2"
             />
             <span v-if="product.stock_quantity && product.stock_quantity > 0">

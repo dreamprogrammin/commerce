@@ -33,8 +33,8 @@ const currentItem = computed(() => {
       <!-- Breadcrumbs -->
       <ol class="flex items-center flex-wrap gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <li>
-          <NuxtLink 
-            to="/" 
+          <NuxtLink
+            to="/"
             class="hover:text-primary transition-colors flex items-center gap-1.5 group"
           >
             <Home class="h-3.5 w-3.5 group-hover:scale-110 transition-transform" />
@@ -48,14 +48,13 @@ const currentItem = computed(() => {
           </NuxtLink>
         </li>
       </ol>
-    
     </div>
 
     <!-- МОБИЛЬНАЯ ВЕРСИЯ -->
     <div v-else>
       <!-- 🆕 Компактный режим (для страницы товара) -->
       <div v-if="compact" class="flex items-center">
-        <NuxtLink 
+        <NuxtLink
           :to="parentItem.href"
           class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-all group"
         >
@@ -67,7 +66,7 @@ const currentItem = computed(() => {
       <!-- Полный режим (для каталога) -->
       <div v-else class="space-y-4">
         <!-- Кнопка "Назад" -->
-        <NuxtLink 
+        <NuxtLink
           :to="parentItem.href"
           class="inline-flex items-center gap-2.5 text-sm font-medium text-primary hover:text-primary/80 transition-all group"
         >
@@ -80,8 +79,8 @@ const currentItem = computed(() => {
         <!-- Breadcrumb trail - компактный -->
         <div class="flex items-center gap-1.5 text-xs overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
           <!-- Главная -->
-          <NuxtLink 
-            to="/" 
+          <NuxtLink
+            to="/"
             class="text-muted-foreground/60 hover:text-primary transition-colors flex-shrink-0"
             aria-label="Главная"
           >
@@ -91,26 +90,25 @@ const currentItem = computed(() => {
           <!-- Все категории -->
           <template v-for="(item, index) in items" :key="item.id">
             <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/30 flex-shrink-0" />
-            
+
             <!-- Последняя категория (текущая) -->
-            <span 
+            <span
               v-if="index === items.length - 1"
               class="text-foreground/80 font-medium whitespace-nowrap"
             >
               {{ item.name }}
             </span>
-            
+
             <!-- Промежуточные категории -->
-            <NuxtLink 
+            <NuxtLink
               v-else
-              :to="item.href" 
+              :to="item.href"
               class="text-muted-foreground/60 hover:text-primary transition-colors whitespace-nowrap"
             >
               {{ item.name }}
             </NuxtLink>
           </template>
         </div>
-
       </div>
     </div>
   </nav>
