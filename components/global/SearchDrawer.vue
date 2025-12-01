@@ -40,7 +40,7 @@ watch(() => props.isOpen, (isOpen) => {
 
 // Живой поиск при вводе
 watch(searchQuery, (newQuery) => {
-  if (newQuery.trim().length >= 2) {
+  if (newQuery.trim().length >= 4) {
     debouncedSearch(newQuery)
   }
   else {
@@ -62,16 +62,6 @@ function handleSelectSuggestion(suggestion: string) {
   close()
 }
 
-function handleProductClick(slug: string) {
-  navigateTo(`catalog/products/${slug}`)
-  close()
-}
-
-function handleRemoveHistory(text: string, event: Event) {
-  event.stopPropagation()
-  removeHistoryItem(text)
-}
-
 function formatPrice(price: number, discount?: number): { original: string, final: string, hasDiscount: boolean } {
   const original = price.toLocaleString('ru-RU')
   const hasDiscount = !!discount && discount > 0
@@ -80,6 +70,11 @@ function formatPrice(price: number, discount?: number): { original: string, fina
     : original
 
   return { original, final, hasDiscount }
+}
+
+function handleRemoveHistory(text: string, event: Event) {
+  event.stopPropagation()
+  removeHistoryItem(text)
 }
 </script>
 
@@ -185,24 +180,25 @@ function formatPrice(price: number, discount?: number): { original: string, fina
               </button>
             </div>
 
-            <button
+            <NuxtLink
               v-for="product in searchResults"
               :key="product.id"
-              type="button"
+              :to="`/catalog/products/${product.slug}`"
               class="w-full flex items-center gap-4 p-3 bg-white rounded-xl hover:shadow-md transition-all duration-200 text-left border border-transparent hover:border-blue-100"
-              @click="handleProductClick(product.slug)"
+              @click="close"
             >
               <!-- Изображение товара -->
-              <div class="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-                <NuxtImg
+              <div class="w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                <ProgressiveImage
                   v-if="product.product_images[0]?.image_url"
                   :src="product.product_images[0].image_url"
                   :alt="product.name"
-                  :placeholder="product.product_images[0].blur_placeholder || undefined"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
+                  :blur-data-url="product.product_images[0].blur_placeholder"
+                  aspect-ratio="square"
+                  object-fit="cover"
+                  placeholder-type="lqip"
                 />
-                <div v-else class="w-full h-full flex items-center justify-center">
+                <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
                   <Icon name="lucide:package" class="w-6 h-6 text-gray-300" />
                 </div>
               </div>
@@ -257,7 +253,7 @@ function formatPrice(price: number, discount?: number): { original: string, fina
                   Нет в наличии
                 </div>
               </div>
-            </button>
+            </NuxtLink>
           </div>
         </div>
 
