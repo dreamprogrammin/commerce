@@ -12,6 +12,7 @@ export default defineNuxtConfig({
     '@nuxt/icon',
     '@nuxtjs/robots',
     '@nuxtjs/sitemap',
+    'nuxt-og-image',
   ],
 
   site: {
@@ -21,17 +22,51 @@ export default defineNuxtConfig({
     defaultLocale: 'ru',
   },
 
+  sitemap: {
+    sources: ['/api/sitemap-routes'], // Твой динамический генератор товаров (который мы обсуждали ранее)
+    exclude: [
+      '/admin/**',
+      '/confirm/**',
+      '/forgot-password/**',
+      '/order/**',
+      '/profile/**',
+      '/register/**',
+      '/reset-password/**',
+      '/cart',
+      '/checkout',
+      '/search', // Поиск обязательно исключаем из карты
+    ],
+  },
+
+  // 2. НАСТРОЙКА ROBOTS.TXT
+  // Говорим ботам: "Сюда даже не заходите, не тратьте время"
   robots: {
-    // Правила для всех ботов
     groups: [
       {
         userAgent: ['*'],
-        allow: ['/', '/catalog/**', '/brand/**'],
-        disallow: ['/admin', '/profile', '/checkout'],
-        comments: 'Allow Google AdsBot to index the login page but no-admin pages',
+        // Разрешаем только полезный контент
+        allow: [
+          '/',
+          '/catalog/**',
+          '/brand/**', // У тебя есть папка brand, её нужно разрешить
+        ],
+        // Блокируем технические разделы
+        disallow: [
+          '/admin',
+          '/confirm',
+          '/forgot-password',
+          '/order', // Историю заказов индексировать нельзя
+          '/profile',
+          '/register',
+          '/reset-password',
+          '/cart',
+          '/checkout',
+          '/search',
+          '/api/**', // API энпоинты тоже не нужны в поиске
+          '/*?*',
+        ],
       },
     ],
-    // Путь к sitemap
     sitemap: [
       'https://commerce-eta-wheat.vercel.app/sitemap.xml',
     ],

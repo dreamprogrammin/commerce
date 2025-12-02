@@ -6,7 +6,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
+import { BUCKET_NAME_CATEGORY } from '@/constants' // Проверь правильность пути
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -16,7 +18,7 @@ const route = useRoute()
 const router = useRouter()
 const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
-
+const { getImageUrl } = useSupabaseStorage()
 // Флаг монтирования для корректной гидратации
 const isMounted = ref(false)
 
@@ -64,6 +66,25 @@ const activeFilters = ref<ActiveFilters>({
   materialIds: getArrayFromQuery(route.query.materials),
   countryIds: getArrayFromQuery(route.query.countries),
   attributes: {},
+})
+
+const currentCategory = computed(() => {
+  if (!categoriesStore.allCategories.length)
+    return null
+  return categoriesStore.allCategories.find(c => c.slug === currentCategorySlug.value)
+})
+
+const categoryOgImageUrl = computed(() => {
+  const imageFilename = currentCategory.value?.image_url
+
+  if (!imageFilename)
+    return undefined
+
+  // Используем твой композабл.
+  // Важно: OG Image требует полный URL. Supabase composable обычно возвращает полный.
+  // Третий аргумент (размер) можно не передавать, чтобы получить оригинал,
+  // или передать 'lg'/'xl', если у тебя есть такие пресеты для лучшего качества.
+  return getImageUrl(BUCKET_NAME_CATEGORY, imageFilename)
 })
 
 // --- 3. Вычисляемые свойства ---
@@ -126,6 +147,11 @@ const activeFiltersCount = computed(() => {
   }
 
   return count
+})
+const canonicalUrl = computed(() => {
+  const baseUrl = 'https://commerce-eta-wheat.vercel.app'
+  const path = route.path
+  return `${baseUrl}${path}`
 })
 
 const catalogFilters = computed<IProductFilters>(() => {
@@ -351,6 +377,38 @@ function updateQueryParams() {
   router.replace({ query })
 }
 
+const hasActiveFilters = computed(() => {
+  return activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity'
+})
+
+const metaDescription = computed(() => {
+  if (hasActiveFilters.value) {
+    return `Результаты фильтрации для категории "${title.value}". Широкий выбор товаров.`
+  }
+  return `Каталог товаров в категории "${title.value}". Широкий ассортимент качественных товаров по выгодным ценам.`
+})
+
+const metaTitle = computed(() => {
+  if (hasActiveFilters.value) {
+    return `${title.value} - Фильтр | Ваш магазин`
+  }
+  return `${title.value} - Купить в интернет-магазине | Ваш магазин`
+})
+
+const robotsRule = computed(() => {
+  // Если есть фильтры ИЛИ сортировка не по умолчанию
+  if (activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity') {
+    return {
+      noindex: true,
+      follow: true, // Ссылки внутри сканируем, но страницу не сохраняем
+    }
+  }
+  return {
+    index: true,
+    follow: true,
+  }
+})
+
 // --- 5. Логика загрузки данных и реакции на изменения ---
 
 await useAsyncData(
@@ -378,6 +436,43 @@ watchDebounced(
   },
   { debounce: 300, deep: true },
 )
+
+useRobotsRule(robotsRule)
+
+// SEO метаданные
+useHead(() => ({
+  link: [
+    {
+      rel: 'canonical',
+      href: canonicalUrl.value,
+    },
+  ],
+}))
+
+defineOgImageComponent('NuxtSeo', {
+  title: metaTitle.value,
+  description: metaDescription.value,
+  theme: '#3b82f6', // Синий цвет (как у твоих фильтров)
+  colorMode: 'light', // Обычно светлая тема смотрится лучше с цветными картинками
+  // ✅ Передаем вычисленную картинку
+  image: categoryOgImageUrl.value,
+})
+
+// Обнови useHead с OG Image
+useHead(() => ({
+  title: metaTitle.value,
+  meta: [
+    { name: 'description', content: metaDescription.value },
+    { property: 'og:title', content: metaTitle.value },
+    { property: 'og:description', content: metaDescription.value },
+    { property: 'og:url', content: canonicalUrl.value },
+    { property: 'og:type', content: 'website' },
+    // 🆕 OG Image будет генерироваться автоматически
+  ],
+  link: [
+    { rel: 'canonical', href: canonicalUrl.value },
+  ],
+}))
 
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
 </script>
