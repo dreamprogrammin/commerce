@@ -10,65 +10,31 @@ export default defineNuxtConfig({
     'pinia-plugin-persistedstate/nuxt',
     '@nuxt/image',
     '@nuxt/icon',
-    '@nuxtjs/seo',
+    '@nuxtjs/robots',
+    '@nuxtjs/sitemap',
   ],
 
-  // 🔍 SEO Configuration
   site: {
     url: 'https://commerce-eta-wheat.vercel.app',
     name: 'Ваш магазин',
-    description: 'Описание вашего интернет-магазина с широким ассортиментом товаров',
+    description: 'Интернет-магазин с широким ассортиментом товаров.',
     defaultLocale: 'ru',
   },
 
-  // 🤖 Robots.txt конфигурация
   robots: {
     // Правила для всех ботов
     groups: [
       {
         userAgent: ['*'],
-        disallow: ['/admin', '/api', '/profile', '/checkout'],
-        allow: ['/'],
+        allow: ['/', '/catalog/**', '/brand/**'],
+        disallow: ['/admin', '/profile', '/checkout'],
+        comments: 'Allow Google AdsBot to index the login page but no-admin pages',
       },
     ],
-    // Ссылка на sitemap
-    sitemap: 'https://commerce-eta-wheat.vercel.app/sitemap.xml',
-  },
-
-  // 🗺️ Sitemap конфигурация
-  sitemap: {
-    // Автоматическое определение страниц
-    autoLastmod: true,
-    // Приоритеты страниц
-    defaults: {
-      changefreq: 'daily',
-      priority: 0.8,
-    },
-    // Исключения
-    exclude: [
-      '/admin/**',
-      '/profile/**',
-      '/checkout/**',
+    // Путь к sitemap
+    sitemap: [
+      'https://commerce-eta-wheat.vercel.app/sitemap.xml',
     ],
-    // Добавь статические URL если нужно
-    urls: [
-      {
-        loc: '/',
-        lastmod: new Date(),
-        changefreq: 'daily',
-        priority: 1.0,
-      },
-      {
-        loc: '/about',
-        changefreq: 'monthly',
-        priority: 0.8,
-      },
-    ],
-  },
-
-  // 🔗 Open Graph
-  ogImage: {
-    enabled: true,
   },
 
   // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
@@ -94,8 +60,6 @@ export default defineNuxtConfig({
           'Cache-Control': 'public, max-age=31536000, immutable',
         },
       },
-      // SEO оптимизация для статических страниц
-      '/': { prerender: true },
     },
     // Сжатие ответов
     compressPublicAssets: true,
@@ -124,7 +88,6 @@ export default defineNuxtConfig({
           rel: 'dns-prefetch',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
         },
-        // Favicon
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
       ],
       meta: [

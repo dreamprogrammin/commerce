@@ -16,7 +16,8 @@
   "dependencies": {
     "@nuxt/icon": "2.1.0",
     "@nuxt/image": "^1.11.0",
-    "@nuxtjs/seo": "^3.2.2",
+    "@nuxtjs/robots": "^5.6.0",
+    "@nuxtjs/sitemap": "^7.4.7",
     "@nuxtjs/supabase": "^1.6.1",
     "@pinia/nuxt": "^0.11.2",
     "@supabase/supabase-js": "^2.56.0",
@@ -56,12 +57,13 @@
     "@iconify-json/fluent-emoji-flat": "^1.2.5",
     "@iconify-json/lucide": "^1.2.73",
     "@types/lodash-es": "^4.17.12",
+    "@unhead/vue": "2.0.19",
     "eslint": "^9.32.0",
     "eslint-plugin-format": "^1.0.1",
     "lint-staged": "^16.1.4",
     "prettier": "^3.6.2",
     "simple-git-hooks": "^2.13.1",
-    "supabase": "^2.33.9",
+    "supabase": "^2.64.2",
     "typescript": "^5.9.2"
   }
 }
