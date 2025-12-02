@@ -14,7 +14,10 @@ interface ProductSearchResult {
   slug: string
   price: number
   discount_percentage: number
-  product_images: { image_url: string, blur_placeholder?: string | null }[]
+  product_images: {
+    image_url: string
+    blur_placeholder?: string | null
+  }[]
   brands: { id: string, name: string, slug: string } | null
   category_id: string | null
   stock_quantity: number
@@ -132,7 +135,7 @@ export function useProductSearch() {
             discount_percentage,
             stock_quantity,
             category_id,
-            product_images(image_url, blur_placeholder),
+            product_images(image_url, blur_placeholder, display_order),
             brands(id, name, slug)
           `)
           .eq('is_active', true)
@@ -150,19 +153,36 @@ export function useProductSearch() {
       if (productsData.error)
         throw productsData.error
 
-      const results = (productsData.data || []).map(product => ({
-        id: product.id,
-        name: product.name,
-        slug: product.slug,
-        price: product.price,
-        discount_percentage: product.discount_percentage,
-        stock_quantity: product.stock_quantity,
-        category_id: product.category_id,
-        product_images: Array.isArray(product.product_images)
+      // Обработка результатов с правильной типизацией изображений
+      const results = (productsData.data || []).map((product) => {
+        // Получаем изображения и сортируем их
+        const images = Array.isArray(product.product_images)
           ? product.product_images
-          : [],
-        brands: product.brands as any,
-      })) as ProductSearchResult[]
+              .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+              .map(img => ({
+                image_url: img.image_url || '',
+                blur_placeholder: img.blur_placeholder || null,
+              }))
+          : []
+
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.price,
+          discount_percentage: product.discount_percentage,
+          stock_quantity: product.stock_quantity,
+          category_id: product.category_id,
+          product_images: images,
+          brands: product.brands
+            ? {
+                id: (product.brands as any).id,
+                name: (product.brands as any).name,
+                slug: (product.brands as any).slug,
+              }
+            : null,
+        }
+      }) as ProductSearchResult[]
 
       searchResults.value = results
       brandSuggestions.value = brandsData.data || []

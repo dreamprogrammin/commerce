@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { nextTick, watch } from 'vue'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const props = defineProps<{
   isOpen: boolean
@@ -24,12 +27,17 @@ const {
   clearSearchHistory,
 } = useProductSearch()
 
-const searchInput = ref<HTMLInputElement | null>(null)
+const { getImageUrl: getSupabaseImageUrl } = useSupabaseStorage()
+
+interface ComponentWithEl {
+  $el: HTMLInputElement
+}
+const searchInput = ref<ComponentWithEl | null>(null)
 
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
     nextTick(() => {
-      searchInput.value?.focus()
+      searchInput.value?.$el?.focus()
     })
   }
   else {
@@ -37,7 +45,6 @@ watch(() => props.isOpen, (isOpen) => {
     searchResults.value = []
   }
 })
-
 // Живой поиск при вводе
 watch(searchQuery, (newQuery) => {
   if (newQuery.trim().length >= 4) {
@@ -75,6 +82,22 @@ function formatPrice(price: number, discount?: number): { original: string, fina
 function handleRemoveHistory(text: string, event: Event) {
   event.stopPropagation()
   removeHistoryItem(text)
+}
+
+/**
+ * Получить оптимизированный URL изображения
+ */
+function getImageUrl(imageUrl: string | null): string | null {
+  if (!imageUrl)
+    return null
+
+  return getSupabaseImageUrl(BUCKET_NAME_PRODUCT, imageUrl, {
+    width: IMAGE_SIZES.THUMBNAIL.width,
+    height: IMAGE_SIZES.THUMBNAIL.height,
+    quality: 80,
+    format: 'webp',
+    resize: 'cover',
+  })
 }
 </script>
 
@@ -191,12 +214,15 @@ function handleRemoveHistory(text: string, event: Event) {
               <div class="w-16 h-16 rounded-lg overflow-hidden shrink-0">
                 <ProgressiveImage
                   v-if="product.product_images[0]?.image_url"
-                  :src="product.product_images[0].image_url"
+                  :src="getImageUrl(product.product_images[0].image_url)"
                   :alt="product.name"
-                  :blur-data-url="product.product_images[0].blur_placeholder"
                   aspect-ratio="square"
                   object-fit="cover"
                   placeholder-type="lqip"
+                  :blur-data-url="product.product_images[0].blur_placeholder"
+                  :bucket-name="BUCKET_NAME_PRODUCT"
+                  :file-path="product.product_images[0].image_url"
+                  eager
                 />
                 <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
                   <Icon name="lucide:package" class="w-6 h-6 text-gray-300" />

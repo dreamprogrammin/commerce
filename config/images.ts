@@ -65,7 +65,7 @@ export const IMAGE_SIZES = {
     width: 640,
     height: 640,
   },
-  
+
   CATEGORY_MENU: {
     width: 250,
     height: 150,
@@ -213,7 +213,7 @@ export const IMAGE_PRESETS = {
     format: IMAGE_FORMATS.MODERN,
     resize: 'cover' as const,
   },
-  
+
   CATEGORY_MENU: {
     ...IMAGE_SIZES.CATEGORY_MENU,
     quality: IMAGE_QUALITY.MEDIUM,
