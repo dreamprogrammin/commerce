@@ -8,7 +8,8 @@ import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
-import { BUCKET_NAME_CATEGORY } from '@/constants' // Проверь правильность пути
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants' // Проверь правильность пути
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -68,6 +69,15 @@ const activeFilters = ref<ActiveFilters>({
   attributes: {},
 })
 
+// --- 3. Вычисляемые свойства ---
+const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? 'all')
+
+const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
+  if (currentCategorySlug.value === 'all') {
+    return [{ id: 'all', name: 'Все товары', href: '/catalog/all' }]
+  }
+  return categoriesStore.getBreadcrumbs(currentCategorySlug.value)
+})
 const currentCategory = computed(() => {
   if (!categoriesStore.allCategories.length)
     return null
@@ -85,16 +95,6 @@ const categoryOgImageUrl = computed(() => {
   // Третий аргумент (размер) можно не передавать, чтобы получить оригинал,
   // или передать 'lg'/'xl', если у тебя есть такие пресеты для лучшего качества.
   return getImageUrl(BUCKET_NAME_CATEGORY, imageFilename)
-})
-
-// --- 3. Вычисляемые свойства ---
-const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? 'all')
-
-const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
-  if (currentCategorySlug.value === 'all') {
-    return [{ id: 'all', name: 'Все товары', href: '/catalog/all' }]
-  }
-  return categoriesStore.getBreadcrumbs(currentCategorySlug.value)
 })
 
 const title = computed(() => {
@@ -449,32 +449,113 @@ useHead(() => ({
   ],
 }))
 
-defineOgImageComponent('NuxtSeo', {
-  title: metaTitle.value,
-  description: metaDescription.value,
-  theme: '#3b82f6', // Синий цвет (как у твоих фильтров)
-  colorMode: 'light', // Обычно светлая тема смотрится лучше с цветными картинками
-  // ✅ Передаем вычисленную картинку
-  image: categoryOgImageUrl.value,
+const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
+
+// 🔥 Подготовка данных для OG Image
+const ogImageDescription = computed(() => {
+  if (hasActiveFilters.value) {
+    return `Найдено товаров: ${displayedProducts.value.length}`
+  }
+  return 'Широкий ассортимент качественных товаров по выгодным ценам'
 })
 
-// Обнови useHead с OG Image
-useHead(() => ({
-  title: metaTitle.value,
-  meta: [
-    { name: 'description', content: metaDescription.value },
-    { property: 'og:title', content: metaTitle.value },
-    { property: 'og:description', content: metaDescription.value },
-    { property: 'og:url', content: canonicalUrl.value },
-    { property: 'og:type', content: 'website' },
-    // 🆕 OG Image будет генерироваться автоматически
-  ],
-  link: [
-    { rel: 'canonical', href: canonicalUrl.value },
-  ],
-}))
+// 🔥 Используй кастомный OG Image компонент
+defineOgImageComponent('OgImageCatalog', {
+  title: title.value,
+  description: ogImageDescription.value,
+  categoryImage: categoryOgImageUrl.value,
+  productsCount: displayedProducts.value.length || undefined,
+})
 
-const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
+// SEO метаданные
+useHead(() => {
+  const schemas = []
+
+  // 1. Breadcrumb Schema (Хлебные крошки)
+  if (breadcrumbs.value.length > 0) {
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': breadcrumbs.value.map((crumb, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'name': crumb.name,
+          'item': crumb.href
+            ? `https://commerce-eta-wheat.vercel.app${crumb.href}`
+            : undefined,
+        })),
+      }),
+    })
+  }
+
+  // 2. CollectionPage Schema (Страница коллекции/категории)
+  schemas.push({
+    type: 'application/ld+json',
+    children: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      'name': title.value,
+      'description': metaDescription.value,
+      'url': canonicalUrl.value,
+      'isPartOf': {
+        '@type': 'WebSite',
+        'name': 'Ваш магазин',
+        'url': 'https://commerce-eta-wheat.vercel.app',
+      },
+      // Если есть картинка категории
+      ...(categoryOgImageUrl.value && {
+        image: categoryOgImageUrl.value,
+      }),
+    }),
+  })
+
+  // 3. ItemList Schema (Список товаров в категории)
+  if (displayedProducts.value.length > 0) {
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        'numberOfItems': displayedProducts.value.length,
+        'itemListElement': displayedProducts.value.slice(0, 10).map((product, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'url': `https://commerce-eta-wheat.vercel.app/catalog/products/${product.slug}`,
+          'name': product.name,
+          'image': product.product_images?.[0]?.image_url
+            ? getImageUrl(BUCKET_NAME_PRODUCT, product.product_images?.[0]?.image_url, IMAGE_SIZES.CARD)
+            : undefined,
+        })),
+      }),
+    })
+  }
+
+  return {
+    title: metaTitle.value,
+    meta: [
+      { name: 'description', content: metaDescription.value },
+      { property: 'og:title', content: metaTitle.value },
+      { property: 'og:description', content: metaDescription.value },
+      { property: 'og:url', content: canonicalUrl.value },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:site_name', content: 'Ваш магазин' },
+      { property: 'og:locale', content: 'ru_RU' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: metaTitle.value },
+      { name: 'twitter:description', content: metaDescription.value },
+      { name: 'robots', content: robotsRule.value.noindex ? 'noindex, follow' : 'index, follow' },
+    ],
+    link: [
+      { rel: 'canonical', href: canonicalUrl.value },
+    ],
+    // 🔥 Добавляем все schemas
+    script: schemas,
+  }
+})
+
+useRobotsRule(robotsRule)
 </script>
 
 <template>

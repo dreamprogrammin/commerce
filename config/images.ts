@@ -42,6 +42,12 @@ export const IMAGE_SIZES = {
     height: 800,
   },
 
+  // 🆕 Large изображения (для OG Image, зума, высокого качества)
+  LARGE: {
+    width: 1200,
+    height: 1200,
+  },
+
   // Hero изображения
   HERO: {
     width: 1200,
@@ -81,6 +87,12 @@ export const IMAGE_SIZES = {
   PRODUCT_GALLERY_MAIN: {
     width: 800,
     height: 800,
+  },
+
+  // 🆕 OG Image (Open Graph для соцсетей)
+  OG_IMAGE: {
+    width: 1200,
+    height: 630, // Стандарт для OG изображений
   },
 } as const
 
@@ -163,6 +175,22 @@ export const IMAGE_PRESETS = {
     ...IMAGE_SIZES.THUMBNAIL,
     quality: IMAGE_QUALITY.LOW,
     format: IMAGE_FORMATS.MODERN,
+    resize: 'cover' as const,
+  },
+
+  // 🆕 Large изображения (для зума, OG Image)
+  LARGE: {
+    ...IMAGE_SIZES.LARGE,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'contain' as const,
+  },
+
+  // 🆕 OG Image для соцсетей
+  OG_IMAGE: {
+    ...IMAGE_SIZES.OG_IMAGE,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.FALLBACK, // JPEG для лучшей совместимости
     resize: 'cover' as const,
   },
 

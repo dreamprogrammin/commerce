@@ -13,6 +13,7 @@ export default defineNuxtConfig({
     '@nuxtjs/robots',
     '@nuxtjs/sitemap',
     'nuxt-og-image',
+    'nuxt-schema-org', // ✅ Уже добавлен
   ],
 
   site: {
@@ -22,8 +23,37 @@ export default defineNuxtConfig({
     defaultLocale: 'ru',
   },
 
+  // 🆕 НАСТРОЙКА SCHEMA.ORG
+  schemaOrg: {
+    identity: {
+      type: 'Organization', // или 'LocalBusiness' если физический магазин
+      name: 'Ваш магазин',
+      url: 'https://commerce-eta-wheat.vercel.app',
+      logo: 'https://commerce-eta-wheat.vercel.app/logo.png', // Добавь свой логотип
+      description: 'Интернет-магазин с широким ассортиментом качественных товаров.',
+      address: {
+        addressCountry: 'KZ',
+        addressLocality: 'Алматы',
+        // addressRegion: 'Алматинская область', // Опционально
+        // postalCode: '050000', // Опционально
+        // streetAddress: 'ул. Примерная, 123', // Опционально
+      },
+      contactPoint: {
+        telephone: '+7-XXX-XXX-XXXX', // Замени на свой
+        contactType: 'customer service',
+        availableLanguage: ['ru', 'kk'],
+      },
+      sameAs: [
+        // Твои соцсети (если есть)
+        // 'https://www.facebook.com/yourshop',
+        // 'https://www.instagram.com/yourshop',
+        // 'https://vk.com/yourshop',
+      ],
+    },
+  },
+
   sitemap: {
-    sources: ['/api/sitemap-routes'], // Твой динамический генератор товаров (который мы обсуждали ранее)
+    sources: ['/api/sitemap-routes'],
     exclude: [
       '/admin/**',
       '/confirm/**',
@@ -34,35 +64,31 @@ export default defineNuxtConfig({
       '/reset-password/**',
       '/cart',
       '/checkout',
-      '/search', // Поиск обязательно исключаем из карты
+      '/search',
     ],
   },
 
-  // 2. НАСТРОЙКА ROBOTS.TXT
-  // Говорим ботам: "Сюда даже не заходите, не тратьте время"
   robots: {
     groups: [
       {
         userAgent: ['*'],
-        // Разрешаем только полезный контент
         allow: [
           '/',
           '/catalog/**',
-          '/brand/**', // У тебя есть папка brand, её нужно разрешить
+          '/brand/**',
         ],
-        // Блокируем технические разделы
         disallow: [
           '/admin',
           '/confirm',
           '/forgot-password',
-          '/order', // Историю заказов индексировать нельзя
+          '/order',
           '/profile',
           '/register',
           '/reset-password',
           '/cart',
           '/checkout',
           '/search',
-          '/api/**', // API энпоинты тоже не нужны в поиске
+          '/api/**',
           '/*?*',
         ],
       },
@@ -72,10 +98,10 @@ export default defineNuxtConfig({
     ],
   },
 
-  // 🛡️ Настройки для обхода Cloudflare и оптимизации изображений
+  // ... остальная конфигурация без изменений
+
   nitro: {
     routeRules: {
-      // Проксируем запросы к Supabase через наш сервер
       '/api/image-proxy/**': {
         proxy: {
           to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**',
@@ -96,18 +122,14 @@ export default defineNuxtConfig({
         },
       },
     },
-    // Сжатие ответов
     compressPublicAssets: true,
-    // Минификация
     minify: true,
   },
 
-  // 🖼️ Базовая настройка изображений
   image: {
     domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
   },
 
-  // 🚀 App настройки
   app: {
     head: {
       htmlAttrs: {
@@ -133,16 +155,13 @@ export default defineNuxtConfig({
     },
   },
 
-  // 📦 Supabase
   supabase: {
     redirect: false,
     types: 'types/supabase.ts',
   },
 
-  // 🎨 Стили
   css: ['~/assets/css/tailwind.css'],
 
-  // ⚡ Vite оптимизации
   vite: {
     plugins: [tailwindcss()],
     build: {
@@ -163,13 +182,11 @@ export default defineNuxtConfig({
     },
   },
 
-  // 🎯 Shadcn UI
   shadcn: {
     prefix: '',
     componentDir: './components/ui',
   },
 
-  // 🏗️ Build оптимизации
   build: {
     transpile: ['vue-sonner'],
   },

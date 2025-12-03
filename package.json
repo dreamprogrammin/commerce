@@ -37,6 +37,7 @@
     "lucide-vue-next": "^0.536.0",
     "nuxt": "^4.0.2",
     "nuxt-og-image": "^5.1.12",
+    "nuxt-schema-org": "^5.0.9",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.5.0",
     "reka-ui": "^2.4.1",

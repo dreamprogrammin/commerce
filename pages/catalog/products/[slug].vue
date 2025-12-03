@@ -212,6 +212,134 @@ const quantity = ref(1)
 watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
+
+// 🔥 SEO БЛОК - добавь после product computed
+
+// Canonical URL
+const canonicalUrl = computed(() => {
+  if (!product.value)
+    return ''
+  return `https://commerce-eta-wheat.vercel.app/catalog/products/${product.value.slug}`
+})
+
+// Meta title
+const metaTitle = computed(() => {
+  if (!product.value)
+    return 'Загрузка товара...'
+  return `${product.value.name} - Купить в интернет-магазине | Ваш магазин`
+})
+
+// Meta description
+const metaDescription = computed(() => {
+  if (!product.value)
+    return ''
+
+  const priceInfo = `Цена: ${Math.round(product.value.price).toLocaleString()} ₸`
+  const stockInfo = product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ'
+  const desc = product.value.description
+    ? `${product.value.description.substring(0, 120)}...`
+    : 'Качественный товар по выгодной цене'
+
+  return `${desc} ${priceInfo}. ${stockInfo}. Быстрая доставка по Казахстану.`
+})
+
+// OG Image данные
+const productOgImage = computed(() => {
+  if (!product.value?.product_images?.[0]?.image_url)
+    return undefined
+  return getImageUrl(BUCKET_NAME_PRODUCT, product.value.product_images[0].image_url, IMAGE_SIZES.LARGE)
+})
+
+const categoryName = computed(() => product.value?.categories?.name)
+const brandName = computed(() => product.value?.brands?.name)
+
+// Robots rule - индексируем только товары в наличии или с описанием
+const robotsRule = computed(() => {
+  if (!product.value) {
+    return { noindex: true, nofollow: true }
+  }
+
+  // Не индексируем товары без описания и нет в наличии
+  if (!product.value.description && product.value.stock_quantity === 0) {
+    return { noindex: true, follow: true }
+  }
+
+  return { index: true, follow: true }
+})
+
+// Применяем robots правила
+useRobotsRule(robotsRule)
+
+// OG Image компонент
+defineOgImageComponent('OgImageProduct', {
+  title: product.value?.name || 'Товар',
+  price: product.value?.price || 0,
+  image: productOgImage.value,
+  brand: brandName.value,
+  category: categoryName.value,
+  inStock: (product.value?.stock_quantity || 0) > 0,
+})
+
+// Обнови существующий useHead
+useHead(() => ({
+  title: metaTitle.value,
+  meta: [
+    // Basic meta
+    { name: 'description', content: metaDescription.value },
+
+    // Open Graph (Facebook, WhatsApp, Telegram, VK)
+    { property: 'og:title', content: metaTitle.value },
+    { property: 'og:description', content: metaDescription.value },
+    { property: 'og:url', content: canonicalUrl.value },
+    { property: 'og:type', content: 'product' }, // 🔥 Важно для товаров!
+    { property: 'og:site_name', content: 'Ваш магазин' },
+    { property: 'og:locale', content: 'ru_RU' },
+
+    // Product specific OG tags
+    { property: 'product:price:amount', content: String(product.value?.price || 0) },
+    { property: 'product:price:currency', content: 'KZT' },
+    { property: 'product:availability', content: (product.value?.stock_quantity || 0) > 0 ? 'in stock' : 'out of stock' },
+    { property: 'product:brand', content: brandName.value || '' },
+    { property: 'product:category', content: categoryName.value || '' },
+
+    // Twitter Card
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: metaTitle.value },
+    { name: 'twitter:description', content: metaDescription.value },
+
+    // Дополнительно
+    { name: 'robots', content: robotsRule.value.noindex ? 'noindex, follow' : 'index, follow' },
+  ],
+  link: [
+    { rel: 'canonical', href: canonicalUrl.value },
+  ],
+  // 🔥 Structured Data (Schema.org) для Google
+  script: [
+    {
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        'name': product.value?.name,
+        'description': product.value?.description,
+        'image': productOgImage.value,
+        'brand': {
+          '@type': 'Brand',
+          'name': brandName.value || 'Ваш магазин',
+        },
+        'offers': {
+          '@type': 'Offer',
+          'price': product.value?.price,
+          'priceCurrency': 'KZT',
+          'availability': (product.value?.stock_quantity || 0) > 0
+            ? 'https://schema.org/InStock'
+            : 'https://schema.org/OutOfStock',
+          'url': canonicalUrl.value,
+        },
+      }),
+    },
+  ],
+}))
 </script>
 
 <template>
