@@ -55,7 +55,7 @@ const product = computed(() => productData.value)
 // 2. ВТОРОСТЕПЕННЫЕ ДАННЫЕ (Грузим в браузере)
 // Аксессуары, фильтры и похожие товары НЕ нужны поисковику срочно.
 // Мы грузим их с server: false, чтобы не перегружать Vercel.
-// eslint-disable-next-line unused-imports/no-unused-vars
+
 const { data: extraData, pending: isExtraLoading } = useAsyncData(
   `product-extra-${slug.value}`,
   async () => {
@@ -376,7 +376,7 @@ useHead(() => ({
   <div class="bg-background">
     <div :class="`${containerClass} py-4 lg:py-6`">
       <ClientOnly>
-        <ProductDetailSkeleton v-if="isLoading" />
+        <ProductDetailSkeleton v-if="isExtraLoading" />
 
         <div v-else-if="product">
           <!-- Breadcrumbs с кнопкой избранного -->
