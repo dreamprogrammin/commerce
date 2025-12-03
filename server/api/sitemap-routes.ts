@@ -9,76 +9,101 @@ interface SitemapRoute {
 }
 
 export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
-  // 1. Инициализируем клиент Supabase на сервере с типизацией
   const client = await serverSupabaseClient<Database>(event)
-
-  // Сюда будем складывать все найденные ссылки
   const sitemapRoutes: SitemapRoute[] = []
 
-  // --- ШАГ 1: ПОЛУЧАЕМ ТОВАРЫ ---
-  const { data: products, error: productsError } = await client
-    .from('products')
-    .select('slug, updated_at')
-    .eq('is_active', true) // Только активные товары
-    .not('slug', 'is', null)
+  try {
+    // --- СТАТИЧЕСКИЕ СТРАНИЦЫ ---
+    const staticPages = [
+      { loc: '/', priority: 1.0, changefreq: 'daily' as const },
+      { loc: '/catalog', priority: 0.9, changefreq: 'daily' as const },
+      { loc: '/brand/all', priority: 0.7, changefreq: 'weekly' as const },
+    ]
 
-  if (productsError) {
-    console.error('Ошибка загрузки товаров для sitemap:', productsError)
-  }
-
-  if (products) {
-    products.forEach((product) => {
+    staticPages.forEach((page) => {
       sitemapRoutes.push({
-        loc: `/catalog/products/${product.slug}`,
-        lastmod: product.updated_at ?? new Date().toISOString(),
-        changefreq: 'daily',
-        priority: 0.8,
+        ...page,
+        lastmod: new Date().toISOString(),
       })
     })
-  }
 
-  // --- ШАГ 2: ПОЛУЧАЕМ КАТЕГОРИИ ---
-  const { data: categories, error: categoriesError } = await client
-    .from('categories')
-    .select('slug, updated_at')
-    .eq('is_active', true) // Только активные категории
-    .not('slug', 'is', null)
+    // --- ТОВАРЫ ---
+    const { data: products, error: productsError } = await client
+      .from('products')
+      .select('slug, updated_at')
+      .eq('is_active', true)
+      .not('slug', 'is', null)
+      .order('created_at', { ascending: false })
 
-  if (categoriesError) {
-    console.error('Ошибка загрузки категорий для sitemap:', categoriesError)
-  }
+    if (productsError) {
+      console.error('Ошибка загрузки товаров для sitemap:', productsError)
+    }
 
-  if (categories) {
-    categories.forEach((category) => {
-      sitemapRoutes.push({
-        loc: `/catalog/${category.slug}`,
-        lastmod: category.updated_at ?? new Date().toISOString(),
-        changefreq: 'weekly',
-        priority: 0.7,
+    if (products && products.length > 0) {
+      console.log(`✅ Найдено товаров для sitemap: ${products.length}`)
+      products.forEach((product) => {
+        sitemapRoutes.push({
+          loc: `/catalog/products/${product.slug}`,
+          lastmod: product.updated_at ?? new Date().toISOString(),
+          changefreq: 'daily',
+          priority: 0.8,
+        })
       })
-    })
-  }
+    }
 
-  // --- ШАГ 3: ПОЛУЧАЕМ БРЕНДЫ ---
-  const { data: brands, error: brandsError } = await client
-    .from('brands')
-    .select('slug, updated_at')
-    .not('slug', 'is', null)
+    // --- КАТЕГОРИИ ---
+    const { data: categories, error: categoriesError } = await client
+      .from('categories')
+      .select('slug')
+      .not('slug', 'is', null)
 
-  if (brandsError) {
-    console.error('Ошибка загрузки брендов для sitemap:', brandsError)
-  }
+    if (categoriesError) {
+      console.error('Ошибка загрузки категорий для sitemap:', categoriesError)
+    }
 
-  if (brands) {
-    brands.forEach((brand) => {
-      sitemapRoutes.push({
-        loc: `/brand/all?brand=${brand.slug}`,
-        lastmod: brand.updated_at ?? new Date().toISOString(),
-        changefreq: 'monthly',
-        priority: 0.6,
+    if (categories && categories.length > 0) {
+      console.log(`✅ Найдено категорий для sitemap: ${categories.length}`)
+      categories.forEach((category) => {
+        sitemapRoutes.push({
+          loc: `/catalog/${category.slug}`,
+          lastmod: new Date().toISOString(),
+          changefreq: 'weekly',
+          priority: 0.75,
+        })
       })
-    })
-  }
+    }
+    else {
+      console.warn('⚠️ Категории не найдены в базе данных')
+    }
 
-  return sitemapRoutes
+    // --- БРЕНДЫ (БЕЗ query параметров) ---
+    const { data: brands, error: brandsError } = await client
+      .from('brands')
+      .select('slug, updated_at')
+      .not('slug', 'is', null)
+
+    if (brandsError) {
+      console.error('Ошибка загрузки брендов для sitemap:', brandsError)
+    }
+
+    if (brands && brands.length > 0) {
+      console.log(`✅ Найдено брендов для sitemap: ${brands.length}`)
+      brands.forEach((brand) => {
+        sitemapRoutes.push({
+          // ИСПРАВЛЕНО: Используем чистый URL без query
+          loc: `/brand/${brand.slug}`,
+          lastmod: brand.updated_at ?? new Date().toISOString(),
+          changefreq: 'monthly',
+          priority: 0.6,
+        })
+      })
+    }
+
+    console.log(`📊 Всего URL в sitemap: ${sitemapRoutes.length}`)
+    return sitemapRoutes
+  }
+  catch (error) {
+    console.error('Критическая ошибка при генерации sitemap:', error)
+    return sitemapRoutes
+  }
 })
