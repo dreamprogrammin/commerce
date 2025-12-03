@@ -40,7 +40,6 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     }
 
     if (products && products.length > 0) {
-      console.log(`✅ Найдено товаров для sitemap: ${products.length}`)
       products.forEach((product) => {
         sitemapRoutes.push({
           loc: `/catalog/products/${product.slug}`,
@@ -62,7 +61,6 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     }
 
     if (categories && categories.length > 0) {
-      console.log(`✅ Найдено категорий для sitemap: ${categories.length}`)
       categories.forEach((category) => {
         sitemapRoutes.push({
           loc: `/catalog/${category.slug}`,
@@ -87,7 +85,6 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     }
 
     if (brands && brands.length > 0) {
-      console.log(`✅ Найдено брендов для sitemap: ${brands.length}`)
       brands.forEach((brand) => {
         sitemapRoutes.push({
           // ИСПРАВЛЕНО: Используем чистый URL без query
@@ -99,7 +96,6 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       })
     }
 
-    console.log(`📊 Всего URL в sitemap: ${sitemapRoutes.length}`)
     return sitemapRoutes
   }
   catch (error) {

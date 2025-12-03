@@ -62,6 +62,101 @@ const { data: newestProducts, pending: isLoadingNewest } = useAsyncData(
 )
 
 const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
+
+// SEO для главной страницы
+const siteUrl = 'https://commerce-eta-wheat.vercel.app'
+const siteName = 'Ваш магазин'
+
+const metaTitle = 'Интернет-магазин детских товаров | Ваш магазин - Широкий ассортимент'
+const metaDescription = 'Купить детские товары в Казахстане ✓ Игрушки, одежда, обувь ✓ Бонусная программа ✓ Быстрая доставка по Алматы и всему Казахстану ✓ Гарантия качества'
+
+// Open Graph изображение
+const ogImageUrl = `${siteUrl}/og-home.png`
+
+useHead({
+  title: metaTitle,
+  meta: [
+    // Basic meta
+    { name: 'description', content: metaDescription },
+    { name: 'keywords', content: 'детские товары, игрушки, детская одежда, обувь для детей, интернет магазин Казахстан, Алматы' },
+
+    // Open Graph (для соцсетей)
+    { property: 'og:title', content: metaTitle },
+    { property: 'og:description', content: metaDescription },
+    { property: 'og:url', content: siteUrl },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:site_name', content: siteName },
+    { property: 'og:locale', content: 'ru_RU' },
+    { property: 'og:image', content: ogImageUrl },
+    { property: 'og:image:width', content: '1200' },
+    { property: 'og:image:height', content: '630' },
+    { property: 'og:image:alt', content: siteName },
+
+    // Twitter Card
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: metaTitle },
+    { name: 'twitter:description', content: metaDescription },
+    { name: 'twitter:image', content: ogImageUrl },
+
+    // Дополнительно
+    { name: 'robots', content: 'index, follow' },
+    { name: 'author', content: siteName },
+  ],
+  link: [
+    { rel: 'canonical', href: siteUrl },
+  ],
+  script: [
+    // 🔥 Schema.org для сайта
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        'name': siteName,
+        'url': siteUrl,
+        'potentialAction': {
+          '@type': 'SearchAction',
+          'target': `${siteUrl}/search?q={search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
+      }),
+    },
+    // 🔥 Schema.org для магазина
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Store',
+        'name': siteName,
+        'url': siteUrl,
+        'logo': `${siteUrl}/logo.png`,
+        'description': metaDescription,
+        'address': {
+          '@type': 'PostalAddress',
+          'addressCountry': 'KZ',
+          'addressLocality': 'Алматы',
+        },
+        'priceRange': '₸₸',
+        'telephone': '+7-XXX-XXX-XXXX', // Замени на свой
+      }),
+    },
+  ],
+})
+
+// Robots правило
+useRobotsRule({
+  index: true,
+  follow: true,
+})
+
+// 🔥 OG Image компонент (опционально, если создали компонент)
+defineOgImage({
+  component: 'Home',
+  props: {
+    title: 'Ваш магазин',
+    subtitle: 'Интернет-магазин детских товаров',
+  },
+})
 </script>
 
 <template>
