@@ -247,9 +247,11 @@ const metaDescription = computed(() => {
 const productOgImage = computed(() => {
   if (!product.value?.product_images?.[0]?.image_url)
     return undefined
-  return getImageUrl(BUCKET_NAME_PRODUCT, product.value.product_images[0].image_url, IMAGE_SIZES.LARGE)
-})
 
+  const imageUrl = product.value.product_images[0].image_url
+  // Прямой публичный URL из Supabase
+  return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
+})
 const categoryName = computed(() => product.value?.categories?.name)
 const brandName = computed(() => product.value?.brands?.name)
 
@@ -271,13 +273,21 @@ const robotsRule = computed(() => {
 useRobotsRule(robotsRule)
 
 // OG Image компонент
-defineOgImageComponent('OgImageProduct', {
-  title: product.value?.name || 'Товар',
-  price: product.value?.price || 0,
-  image: productOgImage.value,
-  brand: brandName.value,
-  category: categoryName.value,
-  inStock: (product.value?.stock_quantity || 0) > 0,
+// Вместо простого defineOgImage используй:
+watchEffect(() => {
+  if (product.value) {
+    defineOgImage({
+      component: 'Product',
+      props: {
+        title: product.value.name,
+        price: product.value.price,
+        image: productOgImage.value,
+        brand: brandName.value,
+        category: categoryName.value,
+        inStock: product.value.stock_quantity > 0,
+      },
+    })
+  }
 })
 
 // Обнови существующий useHead
@@ -291,9 +301,15 @@ useHead(() => ({
     { property: 'og:title', content: metaTitle.value },
     { property: 'og:description', content: metaDescription.value },
     { property: 'og:url', content: canonicalUrl.value },
-    { property: 'og:type', content: 'product' }, // 🔥 Важно для товаров!
+    { property: 'og:type', content: 'product' },
     { property: 'og:site_name', content: 'Ваш магазин' },
     { property: 'og:locale', content: 'ru_RU' },
+
+    // 🔥 Добавьте OG Image
+    { property: 'og:image', content: productOgImage.value || '' },
+    { property: 'og:image:width', content: '1200' },
+    { property: 'og:image:height', content: '630' },
+    { property: 'og:image:alt', content: product.value?.name || 'Товар' },
 
     // Product specific OG tags
     { property: 'product:price:amount', content: String(product.value?.price || 0) },
@@ -306,14 +322,14 @@ useHead(() => ({
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: metaTitle.value },
     { name: 'twitter:description', content: metaDescription.value },
+    { name: 'twitter:image', content: productOgImage.value || '' }, // 🔥 И для Twitter
 
-    // Дополнительно
+    // Robots
     { name: 'robots', content: robotsRule.value.noindex ? 'noindex, follow' : 'index, follow' },
   ],
   link: [
     { rel: 'canonical', href: canonicalUrl.value },
   ],
-  // 🔥 Structured Data (Schema.org) для Google
   script: [
     {
       type: 'application/ld+json',
@@ -322,7 +338,7 @@ useHead(() => ({
         '@type': 'Product',
         'name': product.value?.name,
         'description': product.value?.description,
-        'image': productOgImage.value,
+        'image': productOgImage.value, // Теперь это прямой URL
         'brand': {
           '@type': 'Brand',
           'name': brandName.value || 'Ваш магазин',
