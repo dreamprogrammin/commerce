@@ -28,65 +28,79 @@ const activeTab = ref<'description' | 'features'>('description')
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 
-const { data, pending: isLoading } = useAsyncData(
-  `product-page-${slug.value}`,
+const { data: productData, error: productError } = await useAsyncData(
+  `product-main-${slug.value}`,
   async () => {
+    // Категории нужны для breadcrumbs
     await categoriesStore.fetchCategoryData()
-    selectedAccessoryIds.value = []
 
+    // Сам товар
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
-
-    if (!fetchedProduct) {
-      return { product: null, accessories: [], similarProducts: [] }
-    }
-
-    let fetchedAccessories: ProductWithImages[] = []
-    let fetchedSimilarProducts: ProductWithImages[] = []
-
-    await Promise.all([
-      (async () => {
-        if (fetchedProduct.accessory_ids && fetchedProduct.accessory_ids.length > 0) {
-          fetchedAccessories = await productsStore.fetchProductsByIds(fetchedProduct.accessory_ids)
-        }
-      })(),
-      (async () => {
-        if (fetchedProduct.category_id) {
-          const categorySlug = fetchedProduct.categories?.slug
-          if (categorySlug) {
-            await Promise.all([
-              productsStore.fetchBrandsForCategory(categorySlug),
-              productsStore.fetchAttributesForCategory(categorySlug),
-              productsStore.fetchAllMaterials(),
-              productsStore.fetchAllCountries(),
-            ])
-          }
-
-          const excludeIds = [fetchedProduct.id, ...fetchedProduct.accessory_ids || []]
-          fetchedSimilarProducts = await productsStore.fetchSimilarProducts(
-            fetchedProduct.category_id,
-            excludeIds,
-          )
-        }
-      })(),
-    ])
-
-    return {
-      product: fetchedProduct,
-      accessories: fetchedAccessories,
-      similarProducts: fetchedSimilarProducts,
-    }
+    return fetchedProduct
   },
   {
     watch: [slug],
-    lazy: true,
+    // server: true (по умолчанию) - Обязательно для SEO
   },
 )
 
-const product = computed(() => data.value?.product)
-const accessories = computed(() => data.value?.accessories || [])
-const similarProducts = computed(() => data.value?.similarProducts || [])
-const digitColumns = ref<HTMLElement[]>([])
+// Обработка 404
+if (!productData.value && !productError.value) {
+  throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
+}
 
+// Привязываем к computed, чтобы остальной код не менять
+const product = computed(() => productData.value)
+
+// 2. ВТОРОСТЕПЕННЫЕ ДАННЫЕ (Грузим в браузере)
+// Аксессуары, фильтры и похожие товары НЕ нужны поисковику срочно.
+// Мы грузим их с server: false, чтобы не перегружать Vercel.
+// eslint-disable-next-line unused-imports/no-unused-vars
+const { data: extraData, pending: isExtraLoading } = useAsyncData(
+  `product-extra-${slug.value}`,
+  async () => {
+    // Если товара нет, ничего не грузим
+    if (!product.value)
+      return { accessories: [], similarProducts: [] }
+
+    // Запускаем тяжелые запросы параллельно
+    const [accData, similarData] = await Promise.all([
+      // Аксессуары
+      (async () => {
+        if (product.value?.accessory_ids?.length) {
+          return await productsStore.fetchProductsByIds(product.value.accessory_ids)
+        }
+        return []
+      })(),
+
+      // Похожие товары
+      (async () => {
+        if (product.value?.category_id) {
+          // Опционально: можно подгрузить фильтры тут же, если они нужны для похожих
+          // await productsStore.fetchBrandsForCategory(...)
+
+          return await productsStore.fetchSimilarProducts(
+            product.value.category_id,
+            [product.value.id, ...(product.value.accessory_ids || [])],
+          )
+        }
+        return []
+      })(),
+    ])
+
+    return { accessories: accData, similarProducts: similarData }
+  },
+  {
+    server: false, // 🔥 ГЛАВНОЕ ИЗМЕНЕНИЕ: Не грузить на сервере!
+    lazy: true, // Не блокировать навигацию
+    watch: [product], // Запустить, как только загрузится основной товар
+  },
+)
+
+const accessories = computed(() => extraData.value?.accessories || [])
+const similarProducts = computed(() => extraData.value?.similarProducts || [])
+const digitColumns = ref<HTMLElement[]>([])
+const isLoading = computed(() => !product.value)
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (!product.value) {
     return []
