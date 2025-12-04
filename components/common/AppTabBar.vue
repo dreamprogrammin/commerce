@@ -48,7 +48,6 @@ const categoriesStore = useCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
 const menuTree = computed(() => categoriesStore.menuTree)
-const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems || [])
 
 useAsyncData('category-data', () => categoriesStore.fetchCategoryData())
 useAsyncData('additional-menu-items', () => categoriesStore.fetchAdditionalMenuItems())

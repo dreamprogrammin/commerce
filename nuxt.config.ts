@@ -14,6 +14,7 @@ export default defineNuxtConfig({
     '@nuxtjs/sitemap',
     'nuxt-og-image',
     'nuxt-schema-org', // ✅ Уже добавлен
+    '@nuxt/fonts',
   ],
 
   site: {
@@ -39,7 +40,7 @@ export default defineNuxtConfig({
         // streetAddress: 'ул. Примерная, 123', // Опционально
       },
       contactPoint: {
-        telephone: '+7-XXX-XXX-XXXX', // Замени на свой
+        telephone: '+7-702-537-94-73', // Замени на свой
         contactType: 'customer service',
         availableLanguage: ['ru', 'kk'],
       },
