@@ -65,10 +65,10 @@ const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLo
 
 // SEO для главной страницы
 const siteUrl = 'https://commerce-eta-wheat.vercel.app'
-const siteName = 'Ваш магазин'
+const siteName = 'Ухтышка'
 
-const metaTitle = 'Интернет-магазин детских товаров | Ваш магазин - Широкий ассортимент'
-const metaDescription = 'Купить детские товары в Казахстане ✓ Игрушки, одежда, обувь ✓ Бонусная программа ✓ Быстрая доставка по Алматы и всему Казахстану ✓ Гарантия качества'
+const metaTitle = `Интернет-магазин детских товаров | ${siteName} - Широкий ассортимент`
+const metaDescription = 'Купить детские товары в Казахстане ✓ Бонусная программа ✓ Быстрая доставка по Алматы и всему Казахстану ✓ Гарантия качества'
 
 // Open Graph изображение
 const ogImageUrl = `${siteUrl}/og-home.jpeg`
@@ -78,7 +78,7 @@ useHead({
   meta: [
     // Basic meta
     { name: 'description', content: metaDescription },
-    { name: 'keywords', content: 'детские товары, игрушки, детская одежда, обувь для детей, интернет магазин Казахстан, Алматы' },
+    { name: 'keywords', content: 'детские товары, интернет магазин Казахстан, Алматы' },
 
     // Open Graph (для соцсетей)
     { property: 'og:title', content: metaTitle },
@@ -137,7 +137,7 @@ useHead({
           'addressLocality': 'Алматы',
         },
         'priceRange': '₸₸',
-        'telephone': '+7-XXX-XXX-XXXX', // Замени на свой
+        'telephone': '+7-702-537-94-73', // Замени на свой
       }),
     },
   ],
