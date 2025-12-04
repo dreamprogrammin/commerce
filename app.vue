@@ -72,3 +72,9 @@ nuxtApp.hook('vue:error', () => {
     </ClientOnly>
   </div>
 </template>
+
+<style>
+html {
+  font-family: 'Nunito', sans-serif;
+}
+</style>

@@ -13,8 +13,8 @@ export default defineNuxtConfig({
     '@nuxtjs/robots',
     '@nuxtjs/sitemap',
     'nuxt-og-image',
-    'nuxt-schema-org', // ✅ Уже добавлен
-    '@nuxt/fonts',
+    'nuxt-schema-org',
+    '@nuxt/fonts', // ✅ Должен быть последним или одним из последних
   ],
 
   site: {
@@ -24,32 +24,23 @@ export default defineNuxtConfig({
     defaultLocale: 'ru',
   },
 
-  // 🆕 НАСТРОЙКА SCHEMA.ORG
   schemaOrg: {
     identity: {
-      type: 'Organization', // или 'LocalBusiness' если физический магазин
+      type: 'Organization',
       name: 'Ваш магазин',
       url: 'https://commerce-eta-wheat.vercel.app',
-      logo: 'https://commerce-eta-wheat.vercel.app/logo.png', // Добавь свой логотип
+      logo: 'https://commerce-eta-wheat.vercel.app/logo.png',
       description: 'Интернет-магазин с широким ассортиментом качественных товаров.',
       address: {
         addressCountry: 'KZ',
         addressLocality: 'Алматы',
-        // addressRegion: 'Алматинская область', // Опционально
-        // postalCode: '050000', // Опционально
-        // streetAddress: 'ул. Примерная, 123', // Опционально
       },
       contactPoint: {
-        telephone: '+7-702-537-94-73', // Замени на свой
+        telephone: '+7-702-537-94-73',
         contactType: 'customer service',
         availableLanguage: ['ru', 'kk'],
       },
-      sameAs: [
-        // Твои соцсети (если есть)
-        // 'https://www.facebook.com/yourshop',
-        // 'https://www.instagram.com/yourshop',
-        // 'https://vk.com/yourshop',
-      ],
+      sameAs: [],
     },
   },
 
@@ -98,21 +89,6 @@ export default defineNuxtConfig({
       'https://commerce-eta-wheat.vercel.app/sitemap.xml',
     ],
   },
-
-  fonts: {
-    families: [
-      // Google Fonts
-      { name: 'Onest', provider: 'google' },
-      // Или если хотите использовать системные шрифты
-      // { name: 'Inter', provider: 'google' },
-    ],
-    defaults: {
-      weights: [400, 500, 600, 700],
-      styles: ['normal'],
-    },
-  },
-
-  // ... остальная конфигурация без изменений
 
   nitro: {
     routeRules: {
