@@ -71,7 +71,7 @@ const metaTitle = `Интернет-магазин детских товаров
 const metaDescription = 'Купить детские товары в Казахстане ✓ Бонусная программа ✓ Быстрая доставка по Алматы и всему Казахстану ✓ Гарантия качества'
 
 // Open Graph изображение
-const ogImageUrl = `${siteUrl}/og-home.jpeg`
+const ogImageUrl = `${siteUrl}/og-home-toys.jpeg`
 
 useHead({
   title: metaTitle,
