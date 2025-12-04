@@ -99,6 +99,19 @@ export default defineNuxtConfig({
     ],
   },
 
+  fonts: {
+    families: [
+      // Google Fonts
+      { name: 'Onest', provider: 'google' },
+      // Или если хотите использовать системные шрифты
+      // { name: 'Inter', provider: 'google' },
+    ],
+    defaults: {
+      weights: [400, 500, 600, 700],
+      styles: ['normal'],
+    },
+  },
+
   // ... остальная конфигурация без изменений
 
   nitro: {
