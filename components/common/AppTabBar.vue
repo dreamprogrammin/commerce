@@ -332,20 +332,5 @@ defineExpose({ closeAllPopups })
         </template>
       </NavigationMenuList>
     </NavigationMenu>
-
-    <!-- Дополнительные кнопки из бэкенда -->
-    <div v-if="additionalMenuItems.length > 0" class="flex items-center gap-2 flex-shrink-0">
-      <NuxtLink
-        v-for="item in additionalMenuItems"
-        :key="item.id"
-        :to="item.href"
-        class="group flex items-center gap-2 h-11 px-4 rounded-xl bg-white/15 hover:bg-white/25 transition-all duration-200 backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg hover:shadow-xl"
-      >
-        <Icon v-if="item.icon" :name="item.icon" class="size-[18px] text-white/90 group-hover:text-white transition-colors" />
-        <span class="text-sm font-semibold text-white/90 group-hover:text-white transition-colors">
-          {{ item.name }}
-        </span>
-      </NuxtLink>
-    </div>
   </div>
 </template>
