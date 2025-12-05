@@ -16,7 +16,7 @@ interface CategoryUpsertPayload {
   display_in_menu: boolean
   display_order: number
   image_url: string | null
-  blur_placeholder: string | null // 🆕 Добавили blur
+  blur_placeholder: string | null
   icon_name: string | null
 }
 
@@ -31,7 +31,7 @@ function createInsertPayload(item: EditableCategory, parentId: string | null, di
     display_in_menu: item.display_in_menu,
     display_order: displayOrder,
     image_url: item.image_url,
-    blur_placeholder: item.blur_placeholder, // 🆕 Добавили blur
+    blur_placeholder: item.blur_placeholder,
     icon_name: item.icon_name,
   }
 }
@@ -48,7 +48,7 @@ function createUpdatePayload(item: EditableCategory, parentId: string | null, di
     display_in_menu: item.display_in_menu,
     display_order: displayOrder,
     image_url: item.image_url,
-    blur_placeholder: item.blur_placeholder, // 🆕 Добавили blur
+    blur_placeholder: item.blur_placeholder,
     icon_name: item.icon_name,
   }
 }
@@ -150,15 +150,12 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         for (const [index, item] of items.entries()) {
           const originalItem = item.id ? originalItems.get(item.id) : null
 
-          console.log(`🔍 Обработка item: ${item.name}`, {
-            hasFile: !!item._imageFile,
-            hasBlur: !!item._blurPlaceholder,
-            blurLength: item._blurPlaceholder?.length,
-          }) // 🔍 ЛОГ
-
-          // 🆕 Обработка изображения с blur
+          // 🆕 ИСПРАВЛЕНИЕ: Обработка изображения с blur
           if (item._imageFile) {
-            console.log(`📤 Загружаем файл для: ${item.name}`) // 🔍 ЛОГ
+            console.log(`📤 Загружаем файл для: ${item.name}`, {
+              hasBlur: !!item._blurPlaceholder,
+              blurLength: item._blurPlaceholder?.length,
+            })
 
             // Удаляем старое изображение если оно было
             if (originalItem?.image_url) {
@@ -171,21 +168,24 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
               filePathPrefix: `categories/${item.slug || 'new'}`,
             })
 
-            // Сохраняем путь к изображению и blur
+            // 🔥 КРИТИЧНО: Переносим _blurPlaceholder в blur_placeholder
             item.image_url = newPath || null
-            item.blur_placeholder = item._blurPlaceholder || null // 🆕 Сохраняем blur!
+            item.blur_placeholder = item._blurPlaceholder || null
 
             console.log(`✅ Файл загружен для: ${item.name}`, {
               imagePath: item.image_url,
               hasBlur: !!item.blur_placeholder,
               blurLength: item.blur_placeholder?.length,
-              blurPreview: item.blur_placeholder?.substring(0, 50),
-            }) // 🔍 ЛОГ
+            })
           }
           else if (originalItem?.image_url && item.image_url === null) {
             // Если изображение было удалено
             await removeFile('category-images', originalItem.image_url)
-            item.blur_placeholder = null // 🆕 Очищаем blur тоже
+            item.blur_placeholder = null
+          }
+          else if (!item._imageFile && item._blurPlaceholder) {
+            // 🆕 ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Если blur есть, но файл не загружался (редактирование существующей категории)
+            item.blur_placeholder = item._blurPlaceholder
           }
 
           if (item._isDeleted && item.id) {

@@ -90,6 +90,14 @@ function getCategoryImageUrl(category: CategoryRow): string | null {
   })
 }
 
+// 🔧 Безопасное получение blur placeholder
+function getCategoryBlurUrl(category: CategoryRow): string | null {
+  const blur = category.blur_placeholder
+
+  // Возвращаем null если пустая строка или null
+  return blur && blur.trim() !== '' ? blur : null
+}
+
 // Современные яркие градиенты
 const additionalItemStyles = {
   new: {
@@ -178,16 +186,16 @@ const additionalItemStyles = {
             ]"
             :style="{ '--animation-delay': `${Math.min(index * 30, 300)}ms` }"
           >
-            <!-- 🖼️ Изображение через ResponsiveImage -->
+            <!-- 🖼️ Изображение через ResponsiveImage с исправленной передачей blur -->
             <div v-if="category.image_url" class="absolute bottom-0 right-0 w-[85%] h-[85%]">
               <ResponsiveImage
                 :src="getCategoryImageUrl(category)"
                 :alt="category.name"
-                :blur-data-url="category.blur_placeholder || null"
+                :blur-data-url="getCategoryBlurUrl(category)"
                 aspect-ratio="square"
                 object-fit="contain"
-                placeholder-type="lqip"
-                :eager="false"
+                :placeholder-type="getCategoryBlurUrl(category) ? 'lqip' : 'shimmer'"
+                :eager="index < 4"
               />
             </div>
 

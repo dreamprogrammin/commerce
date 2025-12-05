@@ -104,21 +104,15 @@ const displayImageUrl = computed(() => {
 
 // 🆕 Обработка загрузки изображения с генерацией blur
 async function handleImageChange(event: Event) {
-  console.log('🎯 handleImageChange ВЫЗВАНА!') // 🔍 ЛОГ 1
-
   const target = event.target as HTMLInputElement
   if (!target.files || target.files.length === 0) {
-    console.log('⚠️ Нет файлов') // 🔍 ЛОГ 2
     return
   }
 
   const file = target.files[0]
   if (!file) {
-    console.log('⚠️ Файл пустой') // 🔍 ЛОГ 3
     return
   }
-
-  console.log('📁 Файл выбран:', file.name, formatFileSize(file.size)) // 🔍 ЛОГ 4
 
   isProcessingImage.value = true
   const toastId = toast.loading(
@@ -131,7 +125,6 @@ async function handleImageChange(event: Event) {
 
     // Проверяем нужна ли оптимизация
     if (shouldOptimizeImage(file)) {
-      console.log('🔧 Файл требует оптимизации (> 500KB)') // 🔍 ЛОГ 5
       const result = await optimizeImageBeforeUpload(file)
 
       console.log(
@@ -140,18 +133,13 @@ async function handleImageChange(event: Event) {
 
       processedFile = result.file
       blurDataUrl = result.blurPlaceholder
-      console.log('🎨 Blur от оптимизации:', blurDataUrl?.substring(0, 50)) // 🔍 ЛОГ 6
     }
     else {
-      console.log('📦 Файл маленький, только blur') // 🔍 ЛОГ 7
       // Файл маленький - генерируем только blur
-      const blurResult = await generateBlurPlaceholder(file)
+      const blurResult = await generateBlurPlaceholder(file, 20, 0.5)
       console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
       blurDataUrl = blurResult.dataUrl
-      console.log('🎨 Blur от генератора:', blurDataUrl?.substring(0, 50)) // 🔍 ЛОГ 8
     }
-
-    console.log('🔍 Финальный blur перед emit:', blurDataUrl?.substring(0, 50)) // 🔍 ЛОГ 9
 
     // Создаем preview URL для отображения
     const previewUrl = URL.createObjectURL(processedFile)
@@ -165,24 +153,22 @@ async function handleImageChange(event: Event) {
       image_url: null, // Очищаем старый URL
     }
 
-    console.log('💾 Отправляем update:item с данными:', {
-      name: updatedItem.name,
-      hasFile: !!updatedItem._imageFile,
-      hasPreview: !!updatedItem._imagePreview,
-      hasBlur: !!updatedItem._blurPlaceholder,
-      blurLength: updatedItem._blurPlaceholder?.length,
-    }) // 🔍 ЛОГ 10
-
     emit('update:item', updatedItem)
 
     toast.success(
-      `✅ Изображение загружено ${optimizationInfo.value.icon}`,
-      { id: toastId },
+      `✅ Изображение готово ${optimizationInfo.value.icon}`,
+      {
+        id: toastId,
+        description: blurDataUrl ? 'Blur placeholder сгенерирован' : undefined,
+      },
     )
   }
   catch (error) {
-    toast.error('❌ Ошибка при обработке файла', { id: toastId })
-    console.error('❌ handleImageChange error:', error) // 🔍 ЛОГ 11
+    toast.error('❌ Ошибка при обработке файла', {
+      id: toastId,
+      description: (error as Error).message,
+    })
+    console.error('❌ handleImageChange error:', error)
   }
   finally {
     isProcessingImage.value = false
@@ -322,6 +308,13 @@ function removeImage() {
           :disabled="isDeleted || isProcessingImage"
           @change="handleImageChange"
         />
+
+        <!-- 🎨 Индикатор наличия blur -->
+        <p v-if="props.item._blurPlaceholder" class="text-xs text-green-600 mt-1 flex items-center gap-1">
+          <Icon name="lucide:check-circle" class="w-3 h-3" />
+          Blur placeholder готов
+        </p>
+
         <div
           v-if="displayImageUrl"
           class="mt-2 border p-2 rounded-md inline-block relative bg-background"
@@ -345,6 +338,15 @@ function removeImage() {
               <path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z" />
             </svg>
           </Button>
+
+          <!-- 👀 Индикатор blur на превью -->
+          <div
+            v-if="props.item._blurPlaceholder"
+            class="absolute bottom-1 left-1 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1"
+          >
+            <Icon name="lucide:sparkles" class="w-2.5 h-2.5" />
+            <span>LQIP</span>
+          </div>
         </div>
       </div>
 
