@@ -20,6 +20,7 @@ const bannerRef = computed(() => props.banner ?? null)
 const {
   formData,
   isSaving,
+  isGeneratingBlur, // 👈 Получаем статус генерации blur
   isEditMode,
   imagePreviewUrl,
   handleSubmit,
@@ -91,14 +92,32 @@ const currentImageUrl = computed(() => {
             id="image"
             type="file"
             accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+            :disabled="isGeneratingBlur"
             @change="handleImageChange"
           />
           <p class="text-xs text-muted-foreground mt-1">
             Форматы: JPEG, PNG, WebP, GIF. Максимум 5MB. Рекомендуемый размер: 1200x400px
           </p>
 
+          <!-- 🎨 Индикатор генерации blur -->
           <div
-            v-if="currentImageUrl"
+            v-if="isGeneratingBlur"
+            class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3"
+          >
+            <Icon name="lucide:loader-2" class="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+            <div class="text-sm">
+              <p class="font-medium text-blue-900">
+                Генерация превью...
+              </p>
+              <p class="text-blue-700 text-xs">
+                Создание размытого placeholder для быстрой загрузки
+              </p>
+            </div>
+          </div>
+
+          <!-- Превью изображения -->
+          <div
+            v-if="currentImageUrl && !isGeneratingBlur"
             class="mt-3 border p-2 rounded-md inline-block relative"
           >
             <img
@@ -116,6 +135,15 @@ const currentImageUrl = computed(() => {
             >
               <Icon name="lucide:x" class="w-4 h-4" />
             </Button>
+
+            <!-- 👀 Индикатор наличия blur preview -->
+            <div
+              v-if="formData.blur_data_url"
+              class="absolute bottom-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+            >
+              <Icon name="lucide:check-circle" class="w-3 h-3" />
+              <span>Blur готов</span>
+            </div>
           </div>
         </div>
 
@@ -193,15 +221,20 @@ const currentImageUrl = computed(() => {
           <Button
             type="button"
             variant="outline"
-            :disabled="isSaving"
+            :disabled="isSaving || isGeneratingBlur"
             @click="open = false"
           >
             Отмена
           </Button>
           <Button
             type="submit"
-            :disabled="isSaving"
+            :disabled="isSaving || isGeneratingBlur"
           >
+            <Icon
+              v-if="isSaving"
+              name="lucide:loader-2"
+              class="w-4 h-4 mr-2 animate-spin"
+            />
             {{ isSaving ? 'Сохранение...' : 'Сохранить' }}
           </Button>
         </DialogFooter>
