@@ -1,21 +1,11 @@
 <script setup lang="ts">
 import type { CarouselApi } from '../ui/carousel'
 import type { SlideRow } from '@/types'
-import { useQuery } from '@tanstack/vue-query'
 import Autoplay from 'embla-carousel-autoplay'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
-
-/**
- * 🎨 Props для карусели слайдов
- */
-const props = defineProps<{
-  slides: SlideRow[]
-  isLoading: boolean
-  error: any
-}>()
 
 const { getImageUrl } = useSupabaseStorage()
 
@@ -32,39 +22,50 @@ const autoplayPlugin = Autoplay({
 const emblaApi = ref<CarouselApi>()
 
 /**
- * 🔥 КЕШИРОВАНИЕ ИЗОБРАЖЕНИЙ С VUE QUERY
- * Предзагружаем все URL изображений и кешируем их
+ * 🔥 КЕШИРОВАНИЕ СЛАЙДОВ С useAsyncData
+ * Автоматически кеширует данные в Nuxt Data
  */
-const slideIds = computed(() => props.slides.map(s => s.id).sort().join(','))
+const { data: slides, pending: isLoading, error } = useAsyncData(
+  'home-slides',
+  async () => {
+    const supabase = useSupabaseClient()
+    const { data, error } = await supabase
+      .from('slides')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
 
-const slideImagesQuery = useQuery({
-  queryKey: computed(() => ['slide-images', slideIds.value] as const),
-  queryFn: async () => {
-    const imagePromises = props.slides.map(async (slide) => {
-      const desktopUrl = getSlideUrl(slide.image_url)
-      const mobileUrl = slide.image_url_mobile
-        ? getSlideUrlMobile(slide.image_url_mobile)
-        : null
+    if (error) {
+      console.error('Ошибка загрузки слайдов:', error)
+      throw error
+    }
 
-      return {
-        id: slide.id,
-        desktopUrl,
-        mobileUrl,
-        blurPlaceholder: slide.blur_placeholder,
-        title: slide.title,
-        ctaLink: slide.cta_link,
-      }
-    })
-
-    return await Promise.all(imagePromises)
+    return data as SlideRow[]
   },
-  enabled: computed(() => props.slides.length > 0 && !props.isLoading && !props.error),
-  staleTime: 30 * 60 * 1000, // 30 минут - изображения редко меняются
-  gcTime: 60 * 60 * 1000, // 60 минут в кеше
-  refetchOnMount: false, // Не перезагружать при монтировании
-  refetchOnWindowFocus: false,
-  refetchOnReconnect: false,
-  placeholderData: previousData => previousData, // Показываем старые данные пока грузятся новые
+  {
+    lazy: true,
+    default: () => [],
+    // 🔥 Кешируем данные - возвращаем из кеша если существуют
+    getCachedData(key) {
+      const data = useNuxtData(key)
+      return data.data.value
+    },
+  },
+)
+
+/**
+ * 🔥 КЕШИРОВАНИЕ URL ИЗОБРАЖЕНИЙ
+ * Подготавливаем URL для каждого слайда
+ */
+const processedSlides = computed(() => {
+  if (!slides.value)
+    return []
+
+  return slides.value.map(slide => ({
+    ...slide,
+    desktopUrl: getSlideUrl(slide.image_url),
+    mobileUrl: slide.image_url_mobile ? getSlideUrlMobile(slide.image_url_mobile) : null,
+  }))
 })
 
 /**
@@ -99,34 +100,12 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
     return imageUrl
   return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.MOBILE)
 }
-
-/**
- * 🔥 Получить закешированные данные изображения по ID
- */
-function getCachedSlideData(slideId: number | string) {
-  if (!slideImagesQuery.data.value)
-    return null
-  return slideImagesQuery.data.value.find(img => String(img.id) === String(slideId))
-}
-
-/**
- * 🔥 Статус загрузки с учетом кеша
- * Показываем скелетон только если данных еще нет в кеше
- */
-const isActuallyLoading = computed(() => {
-  // Если есть данные в кеше - не показываем загрузку
-  if (slideImagesQuery.data.value && slideImagesQuery.data.value.length > 0) {
-    return false
-  }
-  // Иначе проверяем статус загрузки
-  return props.isLoading || slideImagesQuery.isLoading.value
-})
 </script>
 
 <template>
   <div class="w-full">
     <!-- 🎨 СКЕЛЕТОН КАРУСЕЛИ (при загрузке) -->
-    <div v-if="isActuallyLoading" :class="carouselContainerClass">
+    <div v-if="isLoading" :class="carouselContainerClass">
       <div class="py-4">
         <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
           <!-- Главный видимый слайд-скелетон -->
@@ -152,19 +131,19 @@ const isActuallyLoading = computed(() => {
 
     <!-- ❌ ОШИБКА ЗАГРУЗКИ -->
     <div
-      v-else-if="error || slideImagesQuery.isError.value"
+      v-else-if="error"
       :class="`${containerClass} w-full aspect-21/9 bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center`"
     >
       <h3 class="mt-4 text-lg font-semibold">
         ⚠️ Не удалось загрузить слайдер
       </h3>
       <p class="text-sm">
-        {{ error?.message || slideImagesQuery.error.value?.message }}
+        {{ error.message }}
       </p>
     </div>
 
     <!-- 🎬 ОСНОВНАЯ КАРУСЕЛЬ -->
-    <ClientOnly v-else-if="slides.length > 0 && slideImagesQuery.data.value">
+    <ClientOnly v-else-if="processedSlides.length > 0">
       <Carousel
         :class="carouselContainerClass"
         :plugins="[autoplayPlugin]"
@@ -178,7 +157,7 @@ const isActuallyLoading = computed(() => {
       >
         <CarouselContent class="ml-0 md:-ml-5">
           <CarouselItem
-            v-for="slide in slides"
+            v-for="slide in processedSlides"
             :key="slide.id"
             class="pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4"
           >
@@ -194,13 +173,13 @@ const isActuallyLoading = computed(() => {
                   <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-3/2 md:aspect-19/6 lg:aspect-21/9">
                     <!-- ✅ Используем ResponsiveImage с закешированными URL -->
                     <ResponsiveImage
-                      v-if="getCachedSlideData(slide.id)?.desktopUrl"
-                      :src="getCachedSlideData(slide.id)!.desktopUrl!"
-                      :src-mobile="getCachedSlideData(slide.id)?.mobileUrl || undefined"
-                      :blur-data-url="getCachedSlideData(slide.id)?.blurPlaceholder || undefined"
+                      v-if="slide.desktopUrl"
+                      :src="slide.desktopUrl"
+                      :src-mobile="slide.mobileUrl || undefined"
+                      :blur-data-url="slide.blur_placeholder || undefined"
                       :alt="slide.title || 'Слайд'"
                       object-fit="cover"
-                      :placeholder-type="getCachedSlideData(slide.id)?.blurPlaceholder ? 'lqip' : 'shimmer'"
+                      :placeholder-type="slide.blur_placeholder ? 'lqip' : 'shimmer'"
                       class="w-full h-full"
                       :eager="true"
                     />
