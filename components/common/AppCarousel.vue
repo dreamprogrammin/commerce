@@ -35,8 +35,10 @@ const emblaApi = ref<CarouselApi>()
  * 🔥 КЕШИРОВАНИЕ ИЗОБРАЖЕНИЙ С VUE QUERY
  * Предзагружаем все URL изображений и кешируем их
  */
+const slideIds = computed(() => props.slides.map(s => s.id).sort().join(','))
+
 const slideImagesQuery = useQuery({
-  queryKey: computed(() => ['slide-images', props.slides.map(s => s.id)]),
+  queryKey: computed(() => ['slide-images', slideIds.value] as const),
   queryFn: async () => {
     const imagePromises = props.slides.map(async (slide) => {
       const desktopUrl = getSlideUrl(slide.image_url)
@@ -57,10 +59,12 @@ const slideImagesQuery = useQuery({
     return await Promise.all(imagePromises)
   },
   enabled: computed(() => props.slides.length > 0 && !props.isLoading && !props.error),
-  staleTime: 10 * 60 * 1000, // 10 минут - изображения редко меняются
-  gcTime: 30 * 60 * 1000, // 30 минут в кеше
+  staleTime: 30 * 60 * 1000, // 30 минут - изображения редко меняются
+  gcTime: 60 * 60 * 1000, // 60 минут в кеше
   refetchOnMount: false, // Не перезагружать при монтировании
   refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+  placeholderData: previousData => previousData, // Показываем старые данные пока грузятся новые
 })
 
 /**
@@ -107,9 +111,15 @@ function getCachedSlideData(slideId: number | string) {
 
 /**
  * 🔥 Статус загрузки с учетом кеша
+ * Показываем скелетон только если данных еще нет в кеше
  */
 const isActuallyLoading = computed(() => {
-  return props.isLoading || slideImagesQuery.isFetching.value
+  // Если есть данные в кеше - не показываем загрузку
+  if (slideImagesQuery.data.value && slideImagesQuery.data.value.length > 0) {
+    return false
+  }
+  // Иначе проверяем статус загрузки
+  return props.isLoading || slideImagesQuery.isLoading.value
 })
 </script>
 
