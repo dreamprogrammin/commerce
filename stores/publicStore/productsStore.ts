@@ -82,9 +82,19 @@ export const useProductsStore = defineStore('productsStore', () => {
         .from('categories')
         .select('id')
         .eq('slug', categorySlug)
-        .single()
-      if (categoryError)
-        throw categoryError
+        .maybeSingle()
+
+      if (categoryError) {
+        console.error('Error fetching category:', categoryError)
+        return []
+      }
+
+      if (!categoryData) {
+        console.warn(`Category not found: ${categorySlug}`)
+        // Кэшируем пустой результат, чтобы не делать повторные запросы
+        attributesByCategory.value[categorySlug] = []
+        return []
+      }
 
       const { data, error } = await supabase
         .from('attributes')
