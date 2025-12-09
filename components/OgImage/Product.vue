@@ -1,104 +1,129 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   title: string
   price: number
-  image?: string
-  brand?: string
+  imageUrl?: string
   category?: string
   inStock: boolean
 }>()
+
+// Форматируем цену красиво
+const formattedPrice = computed(() => {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(props.price || 0))
+})
 </script>
 
 <template>
-  <div class="w-full h-full flex items-center p-16" style="background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);">
-    <!-- Левая часть: Изображение товара -->
-    <div class="flex-shrink-0 w-[500px] h-[500px] mr-12">
-      <div class="w-full h-full bg-white rounded-3xl p-8" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+  <!--
+    ИСПОЛЬЗУЕМ STYLE ВМЕСТО КЛАССОВ TAILWIND
+    Это гарантирует, что Satori не упадет.
+  -->
+  <div
+    style="
+      width: 100%;
+      height: 100%;
+      display: flex;
+      background-image: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      color: white;
+      font-family: 'Inter', sans-serif;
+    "
+  >
+    <!-- Левая часть: Картинка товара -->
+    <div
+      style="
+        width: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 64px;
+      "
+    >
+      <div
+        style="
+          background-color: white;
+          border-radius: 24px;
+          padding: 32px;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        "
+      >
         <img
-          v-if="image"
-          :src="image"
-          alt=""
-          class="w-full h-full"
-          style="object-fit: contain;"
+          v-if="imageUrl"
+          :src="imageUrl"
+          width="400"
+          height="400"
+          style="
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          "
         >
-        <div v-else class="w-full h-full flex items-center justify-center text-8xl">
+        <!-- Смайлик, если картинки нет -->
+        <div v-else style="font-size: 80px;">
           📦
         </div>
       </div>
     </div>
 
     <!-- Правая часть: Информация -->
-    <div class="flex-1 flex flex-col" style="gap: 32px;">
-      <!-- Логотип и магазин -->
-      <div class="flex items-center" style="gap: 16px; margin-bottom: 32px;">
-        <div class="w-16 h-16 rounded-2xl bg-white flex items-center justify-center" style="opacity: 0.3;">
-          <div class="text-4xl">
-            🛍️
-          </div>
+    <div
+      style="
+        width: 50%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 64px;
+      "
+    >
+      <!-- Верх: Логотип/название магазина -->
+      <div style="display: flex; flex-direction: column;">
+        <div style="font-size: 30px; font-weight: 700; margin-bottom: 8px;">
+          Ваш Магазин
         </div>
-        <div class="text-white text-2xl font-bold">
-          Ваш магазин
-        </div>
-      </div>
-
-      <!-- Категория и бренд -->
-      <div v-if="category || brand" class="flex" style="gap: 12px; flex-wrap: wrap;">
-        <div v-if="category" class="px-5 py-2 bg-white rounded-xl" style="opacity: 0.2; border: 2px solid rgba(255, 255, 255, 0.3);">
-          <span class="text-white text-xl font-medium">{{ category }}</span>
-        </div>
-        <div v-if="brand" class="px-5 py-2 bg-white rounded-xl" style="opacity: 0.2; border: 2px solid rgba(255, 255, 255, 0.3);">
-          <span class="text-white text-xl font-medium">🏷️ {{ brand }}</span>
+        <div v-if="category" style="font-size: 20px; opacity: 0.9;">
+          {{ category }}
         </div>
       </div>
 
-      <!-- Название товара -->
-      <h1 class="text-6xl font-black text-white leading-tight">
-        {{ title }}
-      </h1>
-
-      <!-- Цена и статус -->
-      <div class="flex items-center" style="gap: 24px;">
-        <!-- Цена -->
-        <div class="bg-white rounded-3xl px-10 py-6" style="box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
-          <div class="text-lg text-gray-500 mb-1">
-            Цена
-          </div>
-          <div class="text-5xl font-black text-gray-900">
-            {{ price.toLocaleString() }} ₸
-          </div>
-        </div>
-
-        <!-- Статус наличия -->
-        <div
-          class="flex items-center px-8 py-6 rounded-3xl"
-          :style="{
-            backgroundColor: inStock ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-            border: inStock ? '2px solid rgba(34, 197, 94, 0.5)' : '2px solid rgba(239, 68, 68, 0.5)',
-            gap: '12px',
-          }"
+      <!-- Середина: Название товара -->
+      <div style="display: flex; align-items: center; flex-grow: 1;">
+        <h1
+          style="
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1.1;
+            /* Satori не поддерживает line-clamp, поэтому просто обрезаем overflow если что */
+            overflow: hidden;
+            max-height: 200px;
+          "
         >
-          <div class="text-4xl">
-            {{ inStock ? '✓' : '✗' }}
-          </div>
-          <div class="text-white text-2xl font-bold">
-            {{ inStock ? 'В наличии' : 'Нет в наличии' }}
-          </div>
-        </div>
+          {{ title }}
+        </h1>
       </div>
 
-      <!-- Преимущества -->
-      <div class="flex" style="gap: 16px; padding-top: 16px;">
-        <div class="flex items-center bg-white rounded-2xl px-6 py-3" style="gap: 8px; opacity: 0.2; border: 2px solid rgba(255, 255, 255, 0.3);">
-          <div class="text-2xl">
-            ⚡
-          </div>
-          <span class="text-white text-lg font-semibold">Быстрая доставка</span>
+      <!-- Низ: Цена и статус -->
+      <div style="display: flex; flex-direction: column;">
+        <div style="font-size: 60px; font-weight: 900; margin-bottom: 16px;">
+          {{ formattedPrice }} ₸
         </div>
-        <div class="flex items-center bg-white rounded-2xl px-6 py-3" style="gap: 8px; opacity: 0.2; border: 2px solid rgba(255, 255, 255, 0.3);">
-          <div class="text-2xl">
-            ✨
+
+        <div style="display: flex; align-items: center;">
+          <div
+            :style="{
+              backgroundColor: inStock ? '#22c55e' : '#ef4444',
+              padding: '12px 24px',
+              borderRadius: '9999px',
+              fontSize: '20px',
+              fontWeight: 600,
+              color: 'white',
+            }"
+          >
+            {{ inStock ? '✓ В наличии' : '✗ Нет в наличии' }}
           </div>
-          <span class="text-white text-lg font-semibold">Гарантия качества</span>
         </div>
       </div>
     </div>

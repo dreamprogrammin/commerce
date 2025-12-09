@@ -209,7 +209,7 @@ const canonicalUrl = computed(() => {
 const metaTitle = computed(() => {
   if (!product.value)
     return 'Загрузка товара...'
-  return `${product.value.name} - Купить в интернет-магазине | Ваш магазин`
+  return `${product.value.name} - Купить в интернет-магазине | Ухтышка`
 })
 
 const metaDescription = computed(() => {
@@ -223,16 +223,6 @@ const metaDescription = computed(() => {
     : 'Качественный товар по выгодной цене'
 
   return `${desc} ${priceInfo}. ${stockInfo}. Быстрая доставка по Казахстану.`
-})
-
-// 🔥 ИСПРАВЛЕНИЕ: Передаём изображение для КОМПОНЕНТА OG Image (не для мета-тега)
-const productImageForOg = computed(() => {
-  if (!product.value?.product_images?.[0]?.image_url) {
-    return 'https://commerce-eta-wheat.vercel.app/default-product.jpg'
-  }
-
-  const imageUrl = product.value.product_images[0].image_url
-  return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
@@ -252,35 +242,33 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 УПРОЩЁННЫЙ КОМПОНЕНТ: БЕЗ Tailwind, только inline-стили
-defineOgImageComponent('ProductSimple', {
-  title: computed(() => {
-    if (!product.value?.name)
-      return 'Товар'
-    // Ограничиваем длину названия
-    return product.value.name.length > 60
-      ? `${product.value.name.substring(0, 60)}...`
-      : product.value.name
-  }),
-  price: computed(() => Math.round(product.value?.price || 0)),
-  image: computed(() => {
-    if (!product.value?.product_images?.[0]?.image_url)
-      return ''
+// 🔥 Получаем URL первой картинки товара для OG Image
+const productImageUrl = computed(() => {
+  if (!product.value?.product_images?.[0]?.image_url) {
+    return undefined
+  }
 
-    const imageUrl = product.value.product_images[0].image_url
-    return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
-  }),
+  const imageUrl = product.value.product_images[0].image_url
+  return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
+})
+
+// 🔥 Настраиваем генерацию красивой OG Image через компонент
+defineOgImageComponent('Product', {
+  title: computed(() => product.value?.name || 'Товар'),
+  price: computed(() => product.value?.price || 0),
+  imageUrl: productImageUrl, // Передаем computed ref, Nuxt сам его развернет
+  category: computed(() => product.value?.categories?.name || ''),
   inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
 })
 
-// 🔥 Добавляем обратно useSeoMeta для остальных мета-тегов
+// Добавляем мета-теги
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: canonicalUrl,
-  ogSiteName: 'Ваш магазин',
+  ogSiteName: 'Ухтышка',
   ogLocale: 'ru_RU',
 
   // Twitter
@@ -294,8 +282,8 @@ useSeoMeta({
 
 useHead(() => ({
   meta: [
-    // Product specific OG tags (добавляем вручную, т.к. useSeoMeta их не поддерживает)
-    { property: 'og:type', content: 'product' }, // 👈 Добавляем здесь
+    // Product specific OG tags
+    { property: 'og:type', content: 'product' },
     { property: 'product:price:amount', content: String(product.value?.price || 0) },
     { property: 'product:price:currency', content: 'KZT' },
     { property: 'product:availability', content: (product.value?.stock_quantity || 0) > 0 ? 'in stock' : 'out of stock' },
@@ -313,10 +301,10 @@ useHead(() => ({
         '@type': 'Product',
         'name': product.value?.name,
         'description': product.value?.description,
-        'image': productImageForOg.value,
+        'image': productImageUrl.value || 'https://commerce-eta-wheat.vercel.app/og-default.jpg',
         'brand': {
           '@type': 'Brand',
-          'name': brandName.value || 'Ваш магазин',
+          'name': brandName.value || 'Ухтышка',
         },
         'offers': {
           '@type': 'Offer',
@@ -334,6 +322,7 @@ useHead(() => ({
 </script>
 
 <template>
+  <!-- Остальной template без изменений -->
   <div class="bg-background">
     <div :class="`${containerClass} py-4 lg:py-6`">
       <ClientOnly>
@@ -582,7 +571,7 @@ useHead(() => ({
       </ClientOnly>
     </div>
 
-    <!-- 🆕 Стики панель для мобильных (исчезает при достижении похожих товаров) -->
+    <!-- Стики панель для мобильных -->
     <ClientOnly>
       <Transition
         enter-active-class="transition-transform duration-300 ease-out"
@@ -645,7 +634,7 @@ useHead(() => ({
       </Transition>
     </ClientOnly>
 
-    <!-- 🆕 Похожие товары с ref для отслеживания -->
+    <!-- Похожие товары -->
     <div
       v-if="similarProducts.length > 0"
       ref="similarProductsRef"
