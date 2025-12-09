@@ -7,7 +7,8 @@ const props = defineProps<{
   inStock: boolean
 }>()
 
-// Форматируем цену красиво
+// Форматируем цену.
+// Если price не придет, будет 0.
 const formattedPrice = computed(() => {
   return new Intl.NumberFormat('ru-RU').format(Math.round(props.price || 0))
 })
@@ -15,8 +16,9 @@ const formattedPrice = computed(() => {
 
 <template>
   <!--
-    ИСПОЛЬЗУЕМ STYLE ВМЕСТО КЛАССОВ TAILWIND
-    Это гарантирует, что Satori не упадет.
+    Стили Satori:
+    1. font-family должен совпадать с тем, что в конфиге (Inter).
+    2. Всегда используем display: flex для контейнеров.
   -->
   <div
     style="
@@ -24,33 +26,39 @@ const formattedPrice = computed(() => {
       height: 100%;
       display: flex;
       background-image: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-      color: white;
       font-family: 'Inter', sans-serif;
+      color: white;
     "
   >
-    <!-- Левая часть: Картинка товара -->
+    <!-- Левая колонка: Изображение -->
     <div
       style="
         width: 50%;
+        height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 64px;
+        padding: 60px;
       "
     >
       <div
         style="
-          background-color: white;
-          border-radius: 24px;
-          padding: 32px;
+          display: flex;
           width: 100%;
           height: 100%;
-          display: flex;
+          background-color: white;
+          border-radius: 30px;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+          overflow: hidden;
         "
       >
+        <!--
+           Важно для картинки:
+           Если URL нет или он битый, покажем эмодзи.
+           Для img обязательно указывать object-fit в style.
+        -->
         <img
           v-if="imageUrl"
           :src="imageUrl"
@@ -62,68 +70,63 @@ const formattedPrice = computed(() => {
             object-fit: contain;
           "
         >
-        <!-- Смайлик, если картинки нет -->
-        <div v-else style="font-size: 80px;">
+        <div v-else style="font-size: 100px;">
           📦
         </div>
       </div>
     </div>
 
-    <!-- Правая часть: Информация -->
+    <!-- Правая колонка: Текст -->
     <div
       style="
         width: 50%;
+        height: 100%;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
-        padding: 64px;
+        justify-content: center;
+        padding-right: 60px;
       "
     >
-      <!-- Верх: Логотип/название магазина -->
-      <div style="display: flex; flex-direction: column;">
-        <div style="font-size: 30px; font-weight: 700; margin-bottom: 8px;">
-          Ваш Магазин
-        </div>
-        <div v-if="category" style="font-size: 20px; opacity: 0.9;">
-          {{ category }}
-        </div>
+      <!-- Категория / Магазин -->
+      <div style="display: flex; font-size: 24px; opacity: 0.8; margin-bottom: 20px;">
+        {{ category || 'Магазин' }}
       </div>
 
-      <!-- Середина: Название товара -->
-      <div style="display: flex; align-items: center; flex-grow: 1;">
-        <h1
-          style="
-            font-size: 48px;
-            font-weight: 800;
-            line-height: 1.1;
-            /* Satori не поддерживает line-clamp, поэтому просто обрезаем overflow если что */
-            overflow: hidden;
-            max-height: 200px;
-          "
-        >
-          {{ title }}
-        </h1>
+      <!-- Название товара -->
+      <div
+        style="
+          display: flex;
+          font-size: 48px;
+          font-weight: 900;
+          line-height: 1.1;
+          margin-bottom: 40px;
+          text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        "
+      >
+        {{ title || 'Название товара' }}
       </div>
 
-      <!-- Низ: Цена и статус -->
-      <div style="display: flex; flex-direction: column;">
-        <div style="font-size: 60px; font-weight: 900; margin-bottom: 16px;">
+      <!-- Цена -->
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <div style="font-size: 64px; font-weight: 700;">
           {{ formattedPrice }} ₸
         </div>
+      </div>
 
-        <div style="display: flex; align-items: center;">
-          <div
-            :style="{
-              backgroundColor: inStock ? '#22c55e' : '#ef4444',
-              padding: '12px 24px',
-              borderRadius: '9999px',
-              fontSize: '20px',
-              fontWeight: 600,
-              color: 'white',
-            }"
-          >
-            {{ inStock ? '✓ В наличии' : '✗ Нет в наличии' }}
-          </div>
+      <!-- Плашка наличия -->
+      <div style="display: flex; margin-top: 30px;">
+        <div
+          :style="{
+            backgroundColor: inStock ? '#22c55e' : '#ef4444',
+            padding: '10px 25px',
+            borderRadius: '20px',
+            fontSize: '24px',
+            fontWeight: 700,
+            color: 'white',
+            display: 'flex',
+          }"
+        >
+          {{ inStock ? '✓ В наличии' : '✗ Нет в наличии' }}
         </div>
       </div>
     </div>

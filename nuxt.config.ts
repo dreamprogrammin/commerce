@@ -26,12 +26,18 @@ export default defineNuxtConfig({
 
   // 🔥 Конфигурация OG Image с простым кастомным компонентом
   ogImage: {
+    // Включаем кеширование
+    runtimeCacheStorage: true,
     defaults: {
       width: 1200,
       height: 630,
-      cacheMaxAgeSeconds: 60 * 60 * 24 * 7,
     },
-    runtimeCacheStorage: true,
+    // 🔥 ВАЖНО: Явно указываем шрифты для Satori
+    fonts: [
+      'Inter:400',
+      'Inter:700',
+      'Inter:900',
+    ],
   },
 
   schemaOrg: {

@@ -254,11 +254,12 @@ const productImageUrl = computed(() => {
 
 // 🔥 Настраиваем генерацию красивой OG Image через компонент
 defineOgImageComponent('Product', {
-  title: computed(() => product.value?.name || 'Товар'),
-  price: computed(() => product.value?.price || 0),
-  imageUrl: productImageUrl, // Передаем computed ref, Nuxt сам его развернет
-  category: computed(() => product.value?.categories?.name || ''),
-  inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
+  title: computed(() => product.value?.name ?? 'Загрузка...'), // Используй ??
+  price: computed(() => product.value?.price ?? 0),
+  // Временно поставь здесь true, чтобы проверить отображение
+  imageUrl: computed(() => productImageUrl.value),
+  category: computed(() => categoryName.value ?? 'Каталог'),
+  inStock: computed(() => true),
 })
 
 // Добавляем мета-теги
