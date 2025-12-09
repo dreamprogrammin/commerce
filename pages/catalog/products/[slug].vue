@@ -225,10 +225,9 @@ const metaDescription = computed(() => {
   return `${desc} ${priceInfo}. ${stockInfo}. Быстрая доставка по Казахстану.`
 })
 
-// 🔥 ИСПРАВЛЕНИЕ: Правильный OG Image с fallback
-const productOgImage = computed(() => {
+// 🔥 ИСПРАВЛЕНИЕ: Передаём изображение для КОМПОНЕНТА OG Image (не для мета-тега)
+const productImageForOg = computed(() => {
   if (!product.value?.product_images?.[0]?.image_url) {
-    // Fallback изображение (создайте этот файл в /public/)
     return 'https://commerce-eta-wheat.vercel.app/default-product.jpg'
   }
 
@@ -257,7 +256,7 @@ useRobotsRule(robotsRule)
 defineOgImageComponent('Product', {
   title: computed(() => product.value?.name || 'Товар'),
   price: computed(() => product.value?.price || 0),
-  image: productOgImage, // Уже computed с fallback
+  image: productImageForOg, // 👈 Это для РЕНДЕРИНГА внутри компонента
   brand: brandName,
   category: categoryName,
   inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
@@ -276,12 +275,8 @@ useHead(() => ({
     { property: 'og:site_name', content: 'Ваш магазин' },
     { property: 'og:locale', content: 'ru_RU' },
 
-    // 🔥 OG Image (всегда есть значение благодаря fallback)
-    { property: 'og:image', content: productOgImage.value },
-    { property: 'og:image:width', content: '1200' },
-    { property: 'og:image:height', content: '630' },
-    { property: 'og:image:alt', content: product.value?.name || 'Товар' },
-    { property: 'og:image:type', content: 'image/jpeg' }, // 👈 Добавлено
+    // 🔥 УДАЛЕНО: Не добавляем og:image вручную - пусть nuxt-og-image сделает это сам!
+    // OG Image будет добавлен автоматически из defineOgImageComponent
 
     // Product specific
     { property: 'product:price:amount', content: String(product.value?.price || 0) },
@@ -294,7 +289,7 @@ useHead(() => ({
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: metaTitle.value },
     { name: 'twitter:description', content: metaDescription.value },
-    { name: 'twitter:image', content: productOgImage.value },
+    // Twitter image тоже будет добавлен автоматически
 
     // Robots
     { name: 'robots', content: robotsRule.value.noindex ? 'noindex, follow' : 'index, follow' },
@@ -310,7 +305,7 @@ useHead(() => ({
         '@type': 'Product',
         'name': product.value?.name,
         'description': product.value?.description,
-        'image': productOgImage.value,
+        'image': productImageForOg.value, // 👈 Здесь можно оставить прямую ссылку для Schema.org
         'brand': {
           '@type': 'Brand',
           'name': brandName.value || 'Ваш магазин',

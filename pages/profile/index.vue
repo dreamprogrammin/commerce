@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Hourglass, Star } from 'lucide-vue-next'
+import { CircleHelp, Hourglass, Star } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
