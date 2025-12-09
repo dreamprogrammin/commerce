@@ -252,18 +252,12 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 ИСПОЛЬЗУЕМ ВСТРОЕННЫЙ ШАБЛОН nuxt-og-image (без кастомного компонента)
-defineOgImageComponent('NuxtSeo', {
+// 🔥 ПРОСТОЙ КОМПОНЕНТ: Изображение товара + текст поверх
+defineOgImageComponent('ProductSimple', {
   title: computed(() => product.value?.name || 'Товар'),
-  description: computed(() => {
-    if (!product.value)
-      return ''
-    const price = `${Math.round(product.value.price).toLocaleString()} ₸`
-    const stock = product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ'
-    return `${price} • ${stock}`
-  }),
-  siteName: 'Ваш магазин',
-  theme: '#3b82f6',
+  price: computed(() => product.value?.price || 0),
+  image: productImageForOg,
+  inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
 })
 
 // 🔥 Добавляем обратно useSeoMeta для остальных мета-тегов

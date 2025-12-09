@@ -24,12 +24,13 @@ export default defineNuxtConfig({
     defaultLocale: 'ru',
   },
 
-  // 🔥 УПРОЩЁННАЯ конфигурация OG Image (без кастомных компонентов)
+  // 🔥 Конфигурация OG Image с простым кастомным компонентом
   ogImage: {
+    componentDirs: ['OgImage'], // 👈 Теперь можем использовать ProductSimple
     defaults: {
       width: 1200,
       height: 630,
-      cacheMaxAgeSeconds: 60 * 60 * 24 * 7, // 7 дней
+      cacheMaxAgeSeconds: 60 * 60 * 24 * 7,
     },
     runtimeCacheStorage: true,
   },
