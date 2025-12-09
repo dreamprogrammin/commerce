@@ -242,23 +242,24 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 Получаем URL первой картинки товара для OG Image
-const productImageUrl = computed(() => {
+// 🔥 ПРАВИЛЬНОЕ РЕШЕНИЕ: Используем прямую ссылку на картинку из Supabase
+const ogImageUrl = computed(() => {
   if (!product.value?.product_images?.[0]?.image_url) {
-    return undefined
+    // Fallback - дефолтное изображение с вашего сайта
+    return 'https://commerce-eta-wheat.vercel.app/og-default.jpg'
   }
 
   const imageUrl = product.value.product_images[0].image_url
+  // Используем прямую ссылку на картинку из Supabase Storage
   return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
 })
 
-// 🔥 Настраиваем генерацию красивой OG Image через компонент
-defineOgImageComponent('Product', {
-  title: computed(() => product.value?.name || 'Товар'),
-  price: computed(() => product.value?.price || 0),
-  imageUrl: productImageUrl, // Передаем computed ref, Nuxt сам его развернет
-  category: computed(() => product.value?.categories?.name || ''),
-  inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
+// 🔥 Настраиваем OG Image через defineOgImage
+defineOgImage({
+  url: ogImageUrl.value,
+  width: 1200,
+  height: 630,
+  alt: computed(() => product.value?.name || 'Товар'),
 })
 
 // Добавляем мета-теги
@@ -301,7 +302,7 @@ useHead(() => ({
         '@type': 'Product',
         'name': product.value?.name,
         'description': product.value?.description,
-        'image': productImageUrl.value || 'https://commerce-eta-wheat.vercel.app/og-default.jpg',
+        'image': ogImageUrl.value,
         'brand': {
           '@type': 'Brand',
           'name': brandName.value || 'Ухтышка',
