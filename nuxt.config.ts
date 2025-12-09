@@ -24,27 +24,14 @@ export default defineNuxtConfig({
     defaultLocale: 'ru',
   },
 
-  // 🔥 ИСПРАВЛЕНИЕ: Правильная конфигурация OG Image
+  // 🔥 УПРОЩЁННАЯ конфигурация OG Image (без кастомных компонентов)
   ogImage: {
-    componentDirs: ['OgImage'], // 👈 БЕЗ 'components/' - Nuxt добавит автоматически
     defaults: {
-      component: 'Product',
       width: 1200,
       height: 630,
       cacheMaxAgeSeconds: 60 * 60 * 24 * 7, // 7 дней
     },
-    // 🔥 ДОБАВЛЕНО: Включаем режим совместимости
-    compatibility: {
-      runtime: {
-        // Разрешаем рендеринг на сервере с async данными
-        prerender: {
-          enabled: true,
-        },
-      },
-    },
-    // Опционально: настройки рендеринга
     runtimeCacheStorage: true,
-    debug: import.meta.env.NODE_ENV === 'development', // Включить debug в dev-режиме
   },
 
   schemaOrg: {
@@ -142,6 +129,9 @@ export default defineNuxtConfig({
           'Cache-Control': 'public, max-age=604800, immutable',
         },
       },
+      // 🔥 ДОБАВЛЕНО: Отключаем prerender для несуществующих страниц
+      '/about': { prerender: false },
+      '/contacts': { prerender: false },
     },
     compressPublicAssets: true,
     minify: true,

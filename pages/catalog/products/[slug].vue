@@ -252,14 +252,27 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 САМОЕ НАДЁЖНОЕ РЕШЕНИЕ: useSeoMeta + defineOgImage
+// 🔥 ИСПОЛЬЗУЕМ ВСТРОЕННЫЙ ШАБЛОН nuxt-og-image (без кастомного компонента)
+defineOgImageComponent('NuxtSeo', {
+  title: computed(() => product.value?.name || 'Товар'),
+  description: computed(() => {
+    if (!product.value)
+      return ''
+    const price = `${Math.round(product.value.price).toLocaleString()} ₸`
+    const stock = product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ'
+    return `${price} • ${stock}`
+  }),
+  siteName: 'Ваш магазин',
+  theme: '#3b82f6',
+})
+
+// 🔥 Добавляем обратно useSeoMeta для остальных мета-тегов
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: canonicalUrl,
-  // ogType: 'product', // ❌ УДАЛЕНО - useSeoMeta не поддерживает 'product'
   ogSiteName: 'Ваш магазин',
   ogLocale: 'ru_RU',
 
@@ -271,25 +284,6 @@ useSeoMeta({
   // Robots
   robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
 })
-
-// OG Image определяем отдельно
-watch(product, (newProduct) => {
-  if (newProduct) {
-    defineOgImage({
-      component: 'Product',
-      props: {
-        title: newProduct.name || 'Товар',
-        price: newProduct.price || 0,
-        image: newProduct.product_images?.[0]?.image_url
-          ? `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${newProduct.product_images[0].image_url}`
-          : 'https://commerce-eta-wheat.vercel.app/default-product.jpg',
-        brand: newProduct.brands?.name || '',
-        category: newProduct.categories?.name || '',
-        inStock: (newProduct.stock_quantity || 0) > 0,
-      },
-    })
-  }
-}, { immediate: true })
 
 useHead(() => ({
   meta: [
