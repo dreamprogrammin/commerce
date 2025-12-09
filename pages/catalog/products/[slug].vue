@@ -252,51 +252,54 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 ИСПРАВЛЕНИЕ: Используем defineOgImage с компонентом
-// Этот способ работает с async данными!
-defineOgImage({
-  component: 'Product',
-  props: {
-    title: computed(() => product.value?.name || 'Товар'),
-    price: computed(() => product.value?.price || 0),
-    image: productImageForOg,
-    brand: brandName,
-    category: categoryName,
-    inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
-  },
+// 🔥 САМОЕ НАДЁЖНОЕ РЕШЕНИЕ: useSeoMeta + defineOgImage
+useSeoMeta({
+  title: metaTitle,
+  description: metaDescription,
+  ogTitle: metaTitle,
+  ogDescription: metaDescription,
+  ogUrl: canonicalUrl,
+  // ogType: 'product', // ❌ УДАЛЕНО - useSeoMeta не поддерживает 'product'
+  ogSiteName: 'Ваш магазин',
+  ogLocale: 'ru_RU',
+
+  // Twitter
+  twitterCard: 'summary_large_image',
+  twitterTitle: metaTitle,
+  twitterDescription: metaDescription,
+
+  // Robots
+  robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
 })
 
+// OG Image определяем отдельно
+watch(product, (newProduct) => {
+  if (newProduct) {
+    defineOgImage({
+      component: 'Product',
+      props: {
+        title: newProduct.name || 'Товар',
+        price: newProduct.price || 0,
+        image: newProduct.product_images?.[0]?.image_url
+          ? `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${newProduct.product_images[0].image_url}`
+          : 'https://commerce-eta-wheat.vercel.app/default-product.jpg',
+        brand: newProduct.brands?.name || '',
+        category: newProduct.categories?.name || '',
+        inStock: (newProduct.stock_quantity || 0) > 0,
+      },
+    })
+  }
+}, { immediate: true })
+
 useHead(() => ({
-  title: metaTitle.value,
   meta: [
-    { name: 'description', content: metaDescription.value },
-
-    // Open Graph
-    { property: 'og:title', content: metaTitle.value },
-    { property: 'og:description', content: metaDescription.value },
-    { property: 'og:url', content: canonicalUrl.value },
-    { property: 'og:type', content: 'product' },
-    { property: 'og:site_name', content: 'Ваш магазин' },
-    { property: 'og:locale', content: 'ru_RU' },
-
-    // 🔥 УДАЛЕНО: Не добавляем og:image вручную - пусть nuxt-og-image сделает это сам!
-    // OG Image будет добавлен автоматически из defineOgImageComponent
-
-    // Product specific
+    // Product specific OG tags (добавляем вручную, т.к. useSeoMeta их не поддерживает)
+    { property: 'og:type', content: 'product' }, // 👈 Добавляем здесь
     { property: 'product:price:amount', content: String(product.value?.price || 0) },
     { property: 'product:price:currency', content: 'KZT' },
     { property: 'product:availability', content: (product.value?.stock_quantity || 0) > 0 ? 'in stock' : 'out of stock' },
     { property: 'product:brand', content: brandName.value || '' },
     { property: 'product:category', content: categoryName.value || '' },
-
-    // Twitter
-    { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:title', content: metaTitle.value },
-    { name: 'twitter:description', content: metaDescription.value },
-    // Twitter image тоже будет добавлен автоматически
-
-    // Robots
-    { name: 'robots', content: robotsRule.value.noindex ? 'noindex, follow' : 'index, follow' },
   ],
   link: [
     { rel: 'canonical', href: canonicalUrl.value },
@@ -309,7 +312,7 @@ useHead(() => ({
         '@type': 'Product',
         'name': product.value?.name,
         'description': product.value?.description,
-        'image': productImageForOg.value, // 👈 Здесь можно оставить прямую ссылку для Schema.org
+        'image': productImageForOg.value,
         'brand': {
           '@type': 'Brand',
           'name': brandName.value || 'Ваш магазин',
