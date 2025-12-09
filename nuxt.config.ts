@@ -23,8 +23,6 @@ export default defineNuxtConfig({
     description: 'Интернет-магазин с широким ассортиментом товаров.',
     defaultLocale: 'ru',
   },
-
-  // 🔥 Конфигурация OG Image с простым кастомным компонентом
   ogImage: {
     // Включаем кеширование
     runtimeCacheStorage: true,
@@ -73,8 +71,6 @@ export default defineNuxtConfig({
       '/cart',
       '/checkout',
       '/search',
-      '/about', // 👈 ДОБАВЛЕНО
-      '/contacts', // 👈 ДОБАВЛЕНО
     ],
   },
 
@@ -129,13 +125,13 @@ export default defineNuxtConfig({
           'Cache-Control': 'public, max-age=31536000, immutable',
         },
       },
-      // 🔥 ДОБАВЛЕНО: Правило для OG Image эндпоинта
+      // 🔥 Правило для OG Image эндпоинта
       '/__og-image__/**': {
         headers: {
           'Cache-Control': 'public, max-age=604800, immutable',
         },
       },
-      // 🔥 ДОБАВЛЕНО: Отключаем prerender для несуществующих страниц
+      // 🔥 Отключаем prerender для несуществующих страниц
       '/about': { prerender: false },
       '/contacts': { prerender: false },
     },
