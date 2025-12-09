@@ -80,6 +80,8 @@ export default defineNuxtConfig({
       '/cart',
       '/checkout',
       '/search',
+      '/about', // 👈 ДОБАВЛЕНО
+      '/contacts', // 👈 ДОБАВЛЕНО
     ],
   },
 
