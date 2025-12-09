@@ -1,59 +1,131 @@
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   title: string
   price: number
   image: string
   inStock: boolean
 }>()
-
-// Форматируем цену (Intl.NumberFormat надежнее в node среде)
-const formattedPrice = new Intl.NumberFormat('ru-RU').format(props.price)
 </script>
 
 <template>
-  <!--
-    Важно:
-    1. Используем style для background-image (Satori это любит больше, чем img absolute).
-    2. width и height должны быть 100%.
-    3. display: flex обязателен для родителя.
-  -->
   <div
-    class="w-full h-full flex flex-col justify-end bg-white"
     :style="{
-      backgroundImage: `url('${image}')`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      width: '1200px',
+      height: '630px',
+      display: 'flex',
+      position: 'relative',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      overflow: 'hidden',
     }"
   >
-    <!-- Затемнение (градиент лучше делать через absolute div внутри flex контейнера) -->
+    <!-- Изображение товара (с проверкой доступности) -->
     <div
-      class="absolute inset-0"
-      style="background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);"
-    />
+      :style="{
+        position: 'absolute',
+        top: '80px',
+        left: '80px',
+        width: '470px',
+        height: '470px',
+        background: 'white',
+        borderRadius: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+      }"
+    >
+      <img
+        v-if="image"
+        :src="image"
+        alt=""
+        :style="{
+          maxWidth: '90%',
+          maxHeight: '90%',
+          objectFit: 'contain',
+        }"
+      >
+      <div
+        v-else :style="{
+          fontSize: '120px',
+        }"
+      >
+        📦
+      </div>
+    </div>
 
-    <!-- Контент -->
-    <div class="relative w-full p-16 flex flex-col items-start text-white z-10">
-      <h1 class="text-6xl font-bold mb-4 leading-tight">
+    <!-- Правая панель с информацией -->
+    <div
+      :style="{
+        position: 'absolute',
+        right: '0',
+        top: '0',
+        bottom: '0',
+        width: '580px',
+        padding: '80px 60px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        background: 'rgba(255,255,255,0.95)',
+      }"
+    >
+      <!-- Название магазина -->
+      <div
+        :style="{
+          fontSize: '24px',
+          fontWeight: '600',
+          color: '#667eea',
+          marginBottom: '24px',
+        }"
+      >
+        Ваш магазин
+      </div>
+
+      <!-- Название товара -->
+      <h1
+        :style="{
+          fontSize: '48px',
+          fontWeight: '800',
+          color: '#1a202c',
+          lineHeight: '1.2',
+          marginBottom: '32px',
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: '3',
+          WebkitBoxOrient: 'vertical',
+        }"
+      >
         {{ title }}
       </h1>
 
-      <div class="flex items-center gap-6">
-        <span class="text-4xl font-bold text-white">
-          {{ formattedPrice }} ₸
-        </span>
-
-        <div
-          class="flex items-center px-4 py-2 rounded-lg border-2"
-          :class="inStock ? 'border-green-400 text-green-400' : 'border-red-400 text-red-400'"
-        >
-          <span class="text-3xl font-bold">
-            {{ inStock ? '✓ В наличии' : '✗ Нет в наличии' }}
-          </span>
-        </div>
+      <!-- Цена -->
+      <div
+        :style="{
+          fontSize: '56px',
+          fontWeight: '900',
+          color: '#667eea',
+          marginBottom: '24px',
+        }"
+      >
+        {{ price.toLocaleString() }} ₸
       </div>
 
-      <div class="mt-8 text-2xl opacity-80 font-medium">
-        Ваш магазин
+      <!-- Статус наличия -->
+      <div
+        :style="{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          fontSize: '24px',
+          fontWeight: '600',
+          background: inStock ? '#d4edda' : '#f8d7da',
+          color: inStock ? '#155724' : '#721c24',
+          width: 'fit-content',
+        }"
+      >
+        <span>{{ inStock ? '✓' : '✗' }}</span>
+        <span>{{ inStock ? 'В наличии' : 'Нет в наличии' }}</span>
       </div>
     </div>
   </div>

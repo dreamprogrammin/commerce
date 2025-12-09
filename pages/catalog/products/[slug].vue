@@ -252,11 +252,24 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 ПРОСТОЙ КОМПОНЕНТ: Изображение товара + текст поверх
+// 🔥 УПРОЩЁННЫЙ КОМПОНЕНТ: БЕЗ Tailwind, только inline-стили
 defineOgImageComponent('ProductSimple', {
-  title: computed(() => product.value?.name || 'Товар'),
-  price: computed(() => product.value?.price || 0),
-  image: productImageForOg,
+  title: computed(() => {
+    if (!product.value?.name)
+      return 'Товар'
+    // Ограничиваем длину названия
+    return product.value.name.length > 60
+      ? `${product.value.name.substring(0, 60)}...`
+      : product.value.name
+  }),
+  price: computed(() => Math.round(product.value?.price || 0)),
+  image: computed(() => {
+    if (!product.value?.product_images?.[0]?.image_url)
+      return ''
+
+    const imageUrl = product.value.product_images[0].image_url
+    return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
+  }),
   inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
 })
 
