@@ -19,14 +19,13 @@ export default defineNuxtConfig({
 
   site: {
     url: 'https://commerce-eta-wheat.vercel.app',
-    name: 'Ваш магазин',
+    name: 'Ухтышка',
     description: 'Интернет-магазин с широким ассортиментом товаров.',
     defaultLocale: 'ru',
   },
 
   // 🔥 Конфигурация OG Image с простым кастомным компонентом
   ogImage: {
-    componentDirs: ['OgImage'], // 👈 Теперь можем использовать ProductSimple
     defaults: {
       width: 1200,
       height: 630,
@@ -38,7 +37,7 @@ export default defineNuxtConfig({
   schemaOrg: {
     identity: {
       type: 'Organization',
-      name: 'Ваш магазин',
+      name: 'Ухтышка',
       url: 'https://commerce-eta-wheat.vercel.app',
       logo: 'https://commerce-eta-wheat.vercel.app/logo.png',
       description: 'Интернет-магазин с широким ассортиментом качественных товаров.',
