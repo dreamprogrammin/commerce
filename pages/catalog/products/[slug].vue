@@ -24,48 +24,34 @@ const slug = computed(() => route.params.slug as string)
 const selectedAccessoryIds = ref<string[]>([])
 const activeTab = ref<'description' | 'features'>('description')
 
-// 🆕 Отслеживание видимости похожих товаров
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 
 const { data: productData, error: productError } = await useAsyncData(
   `product-main-${slug.value}`,
   async () => {
-    // Категории нужны для breadcrumbs
     await categoriesStore.fetchCategoryData()
-
-    // Сам товар
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
     return fetchedProduct
   },
   {
     watch: [slug],
-    // server: true (по умолчанию) - Обязательно для SEO
   },
 )
 
-// Обработка 404
 if (!productData.value && !productError.value) {
   throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
 }
 
-// Привязываем к computed, чтобы остальной код не менять
 const product = computed(() => productData.value)
-
-// 2. ВТОРОСТЕПЕННЫЕ ДАННЫЕ (Грузим в браузере)
-// Аксессуары, фильтры и похожие товары НЕ нужны поисковику срочно.
-// Мы грузим их с server: false, чтобы не перегружать Vercel.
 
 const { data: extraData, pending: isExtraLoading } = useAsyncData(
   `product-extra-${slug.value}`,
   async () => {
-    // Если товара нет, ничего не грузим
     if (!product.value)
       return { accessories: [], similarProducts: [] }
 
-    // Запускаем тяжелые запросы параллельно
     const [accData, similarData] = await Promise.all([
-      // Аксессуары
       (async () => {
         if (product.value?.accessory_ids?.length) {
           return await productsStore.fetchProductsByIds(product.value.accessory_ids)
@@ -73,12 +59,8 @@ const { data: extraData, pending: isExtraLoading } = useAsyncData(
         return []
       })(),
 
-      // Похожие товары
       (async () => {
         if (product.value?.category_id) {
-          // Опционально: можно подгрузить фильтры тут же, если они нужны для похожих
-          // await productsStore.fetchBrandsForCategory(...)
-
           return await productsStore.fetchSimilarProducts(
             product.value.category_id,
             [product.value.id, ...(product.value.accessory_ids || [])],
@@ -91,9 +73,9 @@ const { data: extraData, pending: isExtraLoading } = useAsyncData(
     return { accessories: accData, similarProducts: similarData }
   },
   {
-    server: false, // 🔥 ГЛАВНОЕ ИЗМЕНЕНИЕ: Не грузить на сервере!
-    lazy: true, // Не блокировать навигацию
-    watch: [product], // Запустить, как только загрузится основной товар
+    server: false,
+    lazy: true,
+    watch: [product],
   },
 )
 
@@ -182,7 +164,6 @@ function getAccessoryImageUrl(imageUrl: string | null) {
 
 useFlipCounter(totalPrice, digitColumns)
 
-// 🆕 Intersection Observer для отслеживания похожих товаров
 onMounted(() => {
   if (!similarProductsRef.value)
     return
@@ -190,13 +171,11 @@ onMounted(() => {
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        // Если похожие товары видны - скрываем стики панель
         showStickyPanel.value = !entry.isIntersecting
       })
     },
     {
-      // Срабатывает когда верхняя часть блока достигает нижней части экрана
-      rootMargin: '-64px 0px 0px 0px', // 64px = высота навигации
+      rootMargin: '-64px 0px 0px 0px',
       threshold: 0,
     },
   )
@@ -214,36 +193,25 @@ watch(isLoading, (newIsLoading) => {
   }
 })
 
-useHead(() => ({
-  title: product.value?.name || 'Загрузка товара...',
-  meta: [
-    { name: 'description', content: product.value?.description || `Купить ${product.value?.name || 'товар'} в нашем интернет-магазине.` },
-  ],
-}))
-
 const quantity = ref(1)
 
 watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
 
-// 🔥 SEO БЛОК - добавь после product computed
-
-// Canonical URL
+// 🔥 SEO & OG IMAGE
 const canonicalUrl = computed(() => {
   if (!product.value)
     return ''
   return `https://commerce-eta-wheat.vercel.app/catalog/products/${product.value.slug}`
 })
 
-// Meta title
 const metaTitle = computed(() => {
   if (!product.value)
     return 'Загрузка товара...'
   return `${product.value.name} - Купить в интернет-магазине | Ваш магазин`
 })
 
-// Meta description
 const metaDescription = computed(() => {
   if (!product.value)
     return ''
@@ -257,25 +225,25 @@ const metaDescription = computed(() => {
   return `${desc} ${priceInfo}. ${stockInfo}. Быстрая доставка по Казахстану.`
 })
 
-// OG Image данные
+// 🔥 ИСПРАВЛЕНИЕ: Правильный OG Image с fallback
 const productOgImage = computed(() => {
-  if (!product.value?.product_images?.[0]?.image_url)
-    return undefined
+  if (!product.value?.product_images?.[0]?.image_url) {
+    // Fallback изображение (создайте этот файл в /public/)
+    return 'https://commerce-eta-wheat.vercel.app/default-product.jpg'
+  }
 
   const imageUrl = product.value.product_images[0].image_url
-  // Прямой публичный URL из Supabase
   return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
 })
+
 const categoryName = computed(() => product.value?.categories?.name)
 const brandName = computed(() => product.value?.brands?.name)
 
-// Robots rule - индексируем только товары в наличии или с описанием
 const robotsRule = computed(() => {
   if (!product.value) {
     return { noindex: true, nofollow: true }
   }
 
-  // Не индексируем товары без описания и нет в наличии
   if (!product.value.description && product.value.stock_quantity === 0) {
     return { noindex: true, follow: true }
   }
@@ -283,35 +251,24 @@ const robotsRule = computed(() => {
   return { index: true, follow: true }
 })
 
-// Применяем robots правила
 useRobotsRule(robotsRule)
 
-// OG Image компонент
-// Вместо простого defineOgImage используй:
-watchEffect(() => {
-  if (product.value) {
-    defineOgImage({
-      component: 'Product',
-      props: {
-        title: product.value.name,
-        price: product.value.price,
-        image: productOgImage.value,
-        brand: brandName.value,
-        category: categoryName.value,
-        inStock: product.value.stock_quantity > 0,
-      },
-    })
-  }
+// 🔥 ИСПРАВЛЕНИЕ: Используем defineOgImageComponent вместо watchEffect
+defineOgImageComponent('Product', {
+  title: computed(() => product.value?.name || 'Товар'),
+  price: computed(() => product.value?.price || 0),
+  image: productOgImage, // Уже computed с fallback
+  brand: brandName,
+  category: categoryName,
+  inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
 })
 
-// Обнови существующий useHead
 useHead(() => ({
   title: metaTitle.value,
   meta: [
-    // Basic meta
     { name: 'description', content: metaDescription.value },
 
-    // Open Graph (Facebook, WhatsApp, Telegram, VK)
+    // Open Graph
     { property: 'og:title', content: metaTitle.value },
     { property: 'og:description', content: metaDescription.value },
     { property: 'og:url', content: canonicalUrl.value },
@@ -319,24 +276,25 @@ useHead(() => ({
     { property: 'og:site_name', content: 'Ваш магазин' },
     { property: 'og:locale', content: 'ru_RU' },
 
-    // 🔥 Добавьте OG Image
-    { property: 'og:image', content: productOgImage.value || '' },
+    // 🔥 OG Image (всегда есть значение благодаря fallback)
+    { property: 'og:image', content: productOgImage.value },
     { property: 'og:image:width', content: '1200' },
     { property: 'og:image:height', content: '630' },
     { property: 'og:image:alt', content: product.value?.name || 'Товар' },
+    { property: 'og:image:type', content: 'image/jpeg' }, // 👈 Добавлено
 
-    // Product specific OG tags
+    // Product specific
     { property: 'product:price:amount', content: String(product.value?.price || 0) },
     { property: 'product:price:currency', content: 'KZT' },
     { property: 'product:availability', content: (product.value?.stock_quantity || 0) > 0 ? 'in stock' : 'out of stock' },
     { property: 'product:brand', content: brandName.value || '' },
     { property: 'product:category', content: categoryName.value || '' },
 
-    // Twitter Card
+    // Twitter
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: metaTitle.value },
     { name: 'twitter:description', content: metaDescription.value },
-    { name: 'twitter:image', content: productOgImage.value || '' }, // 🔥 И для Twitter
+    { name: 'twitter:image', content: productOgImage.value },
 
     // Robots
     { name: 'robots', content: robotsRule.value.noindex ? 'noindex, follow' : 'index, follow' },
@@ -352,7 +310,7 @@ useHead(() => ({
         '@type': 'Product',
         'name': product.value?.name,
         'description': product.value?.description,
-        'image': productOgImage.value, // Теперь это прямой URL
+        'image': productOgImage.value,
         'brand': {
           '@type': 'Brand',
           'name': brandName.value || 'Ваш магазин',

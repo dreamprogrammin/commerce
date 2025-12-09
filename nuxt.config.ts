@@ -14,7 +14,7 @@ export default defineNuxtConfig({
     '@nuxtjs/sitemap',
     'nuxt-og-image',
     'nuxt-schema-org',
-    '@nuxt/fonts', // ✅ Должен быть последним или одним из последних
+    '@nuxt/fonts',
   ],
 
   site: {
@@ -22,6 +22,20 @@ export default defineNuxtConfig({
     name: 'Ваш магазин',
     description: 'Интернет-магазин с широким ассортиментом товаров.',
     defaultLocale: 'ru',
+  },
+
+  // 🔥 ИСПРАВЛЕНИЕ: Правильная конфигурация OG Image
+  ogImage: {
+    componentDirs: ['OgImage'], // 👈 БЕЗ 'components/' - Nuxt добавит автоматически
+    defaults: {
+      component: 'Product',
+      width: 1200,
+      height: 630,
+      cacheMaxAgeSeconds: 60 * 60 * 24 * 7, // 7 дней
+    },
+    // Опционально: настройки рендеринга
+    runtimeCacheStorage: true,
+    debug: import.meta.env.NODE_ENV === 'development', // Включить debug в dev-режиме
   },
 
   schemaOrg: {
@@ -109,6 +123,12 @@ export default defineNuxtConfig({
           'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
           'Access-Control-Allow-Headers': '*',
           'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      },
+      // 🔥 ДОБАВЛЕНО: Правило для OG Image эндпоинта
+      '/__og-image__/**': {
+        headers: {
+          'Cache-Control': 'public, max-age=604800, immutable',
         },
       },
     },
