@@ -252,14 +252,18 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 ИСПРАВЛЕНИЕ: Используем defineOgImageComponent вместо watchEffect
-defineOgImageComponent('Product', {
-  title: computed(() => product.value?.name || 'Товар'),
-  price: computed(() => product.value?.price || 0),
-  image: productImageForOg, // 👈 Это для РЕНДЕРИНГА внутри компонента
-  brand: brandName,
-  category: categoryName,
-  inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
+// 🔥 ИСПРАВЛЕНИЕ: Используем defineOgImage с компонентом
+// Этот способ работает с async данными!
+defineOgImage({
+  component: 'Product',
+  props: {
+    title: computed(() => product.value?.name || 'Товар'),
+    price: computed(() => product.value?.price || 0),
+    image: productImageForOg,
+    brand: brandName,
+    category: categoryName,
+    inStock: computed(() => (product.value?.stock_quantity || 0) > 0),
+  },
 })
 
 useHead(() => ({

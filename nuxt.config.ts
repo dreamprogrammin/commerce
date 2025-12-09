@@ -33,6 +33,15 @@ export default defineNuxtConfig({
       height: 630,
       cacheMaxAgeSeconds: 60 * 60 * 24 * 7, // 7 дней
     },
+    // 🔥 ДОБАВЛЕНО: Включаем режим совместимости
+    compatibility: {
+      runtime: {
+        // Разрешаем рендеринг на сервере с async данными
+        prerender: {
+          enabled: true,
+        },
+      },
+    },
     // Опционально: настройки рендеринга
     runtimeCacheStorage: true,
     debug: import.meta.env.NODE_ENV === 'development', // Включить debug в dev-режиме
