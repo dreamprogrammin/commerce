@@ -169,7 +169,7 @@ onMounted(() => {
 
       <!-- DESKTOP: Горизонтальные карточки как на скриншоте -->
       <div class="hidden md:block">
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 max-w-7xl">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <NuxtLink
             v-for="category in popularCategories"
             :key="category.id"
@@ -190,7 +190,7 @@ onMounted(() => {
               <div class="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-primary/10 transition-all duration-300" />
 
               <!-- Content -->
-              <div class="absolute inset-0 flex flex-col p-6">
+              <div class="absolute inset-0 flex flex-col p-4">
                 <!-- Category name - занимает верхнюю часть -->
                 <div class="flex-shrink-0 pr-20">
                   <h3 class="text-lg font-bold text-gray-900 leading-tight break-words">

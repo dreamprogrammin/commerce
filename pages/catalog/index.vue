@@ -195,7 +195,7 @@ const additionalItemStyles = {
                 aspect-ratio="square"
                 object-fit="contain"
                 :placeholder-type="getCategoryBlurUrl(category) ? 'lqip' : 'shimmer'"
-                :eager="index < 4"
+                eager
               />
             </div>
 
