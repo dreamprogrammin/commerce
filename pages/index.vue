@@ -25,6 +25,7 @@ definePageMeta({
 })
 
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
+const desktopContainedClass = carouselContainerVariants({ contained: 'desktop' })
 
 const { data: mainPersonalData, pending: isLoadingRecommendations } = useAsyncData(
   'home-recommendations',
@@ -189,7 +190,7 @@ useRobotsRule({
     </div>
 
     <!-- Популярные категории -->
-    <div :class="alwaysContainedClass">
+    <div :class="desktopContainedClass">
       <HomePopularCategories />
     </div>
 
