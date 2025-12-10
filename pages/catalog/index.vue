@@ -101,11 +101,11 @@ function getCategoryBlurUrl(category: CategoryRow): string | null {
 // Современные яркие градиенты
 const additionalItemStyles = {
   new: {
-    gradient: 'from-emerald-400 via-green-400 to-teal-400',
+    gradient: 'bg-gray-50',
     shadow: 'shadow-emerald-500/30',
   },
   sale: {
-    gradient: 'from-yellow-400 via-amber-400 to-orange-400',
+    gradient: 'bg-gray-50',
     shadow: 'shadow-yellow-500/30',
   },
 }
@@ -178,7 +178,7 @@ const additionalItemStyles = {
             v-for="(category, index) in secondLevelCategories"
             :key="category.id"
             :to="category.href"
-            class="category-card relative block overflow-hidden rounded-2xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 bg-card"
+            class="category-card relative block overflow-hidden rounded-2xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 bg-gray-50"
             :class="[
               getCategorySize(category) === 'large' ? 'row-span-2'
               : getCategorySize(category) === 'medium' ? 'row-span-2'
