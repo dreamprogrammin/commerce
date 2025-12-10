@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { IBreadcrumbItem, ProductWithImages } from '@/types'
+import type { IBreadcrumbItem } from '@/types'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { toast } from 'vue-sonner'
 import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -16,6 +17,7 @@ const router = useRouter()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
+const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl } = useSupabaseStorage()
 
@@ -27,44 +29,64 @@ const activeTab = ref<'description' | 'features'>('description')
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 
-// ✅ Основной продукт - загружается первым (SSR)
-const { data: productData, error: productError } = await useAsyncData(
-  `product-main-${slug.value}`,
-  async () => {
+// ✅ 1. Загрузка категорий (один раз) - категории загружаются в store
+useQuery({
+  queryKey: ['categories'],
+  queryFn: async () => {
     await categoriesStore.fetchCategoryData()
+    return true
+  },
+  staleTime: 10 * 60 * 1000, // 10 минут
+  gcTime: 30 * 60 * 1000,
+})
+
+// ✅ 2. Основной продукт - с кешированием по slug
+const {
+  data: product,
+  isLoading: isProductLoading,
+  isError: isProductError,
+} = useQuery({
+  queryKey: ['product', slug],
+  queryFn: async () => {
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
+    if (!fetchedProduct) {
+      throw new Error('Товар не найден')
+    }
     return fetchedProduct
   },
-  {
-    watch: [slug],
-  },
-)
+  staleTime: 5 * 60 * 1000, // 5 минут - данные свежие
+  gcTime: 30 * 60 * 1000, // 30 минут в кеше
+  retry: 1,
+})
 
-if (!productData.value && !productError.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
-}
+// ✅ Обработка ошибки 404
+watch([isProductError, product], ([error, prod]) => {
+  if (error || (!isProductLoading.value && !prod)) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Товар не найден',
+      fatal: true,
+    })
+  }
+})
 
-const product = computed(() => productData.value)
-
-// ✅ Аксессуары - независимая загрузка (важны для конверсии, грузим отдельно)
-const { data: accessories, pending: accessoriesLoading } = useAsyncData(
-  `product-accessories-${slug.value}`,
-  async () => {
+// ✅ 3. Аксессуары - загружаются после основного продукта
+const { data: accessories, isLoading: accessoriesLoading } = useQuery({
+  queryKey: ['product-accessories', computed(() => product.value?.id)],
+  queryFn: async () => {
     if (!product.value?.accessory_ids?.length)
       return []
     return await productsStore.fetchProductsByIds(product.value.accessory_ids)
   },
-  {
-    server: false,
-    lazy: true,
-    watch: [product],
-  },
-)
+  enabled: computed(() => !!product.value?.accessory_ids?.length),
+  staleTime: 10 * 60 * 1000, // 10 минут - аксессуары редко меняются
+  gcTime: 30 * 60 * 1000,
+})
 
-// ✅ Похожие товары - независимая lazy загрузка (они внизу страницы, не блокируют основной контент)
-const { data: similarProducts, pending: similarProductsLoading } = useAsyncData(
-  `product-similar-${slug.value}`,
-  async () => {
+// ✅ 4. Похожие товары - кешируются по category_id (умная штука!)
+const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
+  queryKey: ['similar-products', computed(() => product.value?.category_id)],
+  queryFn: async () => {
     if (!product.value?.category_id)
       return []
     return await productsStore.fetchSimilarProducts(
@@ -72,15 +94,13 @@ const { data: similarProducts, pending: similarProductsLoading } = useAsyncData(
       [product.value.id, ...(product.value.accessory_ids || [])],
     )
   },
-  {
-    server: false,
-    lazy: true,
-    watch: [product],
-  },
-)
+  enabled: computed(() => !!product.value?.category_id),
+  staleTime: 15 * 60 * 1000, // 15 минут - похожие товары долго актуальны
+  gcTime: 30 * 60 * 1000,
+})
 
 const digitColumns = ref<HTMLElement[]>([])
-const isLoading = computed(() => !product.value)
+const isLoading = computed(() => isProductLoading.value)
 
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (!product.value) {
@@ -186,17 +206,20 @@ onMounted(() => {
   })
 })
 
-watch(isLoading, (newIsLoading) => {
-  if (newIsLoading === false && !product.value) {
-    showError({ statusCode: 404, statusMessage: 'Товар не найден', fatal: true })
-  }
-})
-
 const quantity = ref(1)
 
 watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
+
+// 🔥 Prefetch похожих товаров при наведении
+function prefetchProduct(productSlug: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['product', productSlug],
+    queryFn: () => productsStore.fetchProductBySlug(productSlug),
+    staleTime: 5 * 60 * 1000,
+  })
+}
 
 // 🔥 SEO & OG IMAGE
 const canonicalUrl = computed(() => {
@@ -647,8 +670,12 @@ useHead(() => ({
         </div>
       </div>
 
-      <!-- Карусель похожих товаров -->
-      <ProductCarousel v-else :products="similarProducts || []">
+      <!-- Карусель похожих товаров с prefetch -->
+      <ProductCarousel
+        v-else
+        :products="similarProducts || []"
+        @mouseenter-product="prefetchProduct"
+      >
         <template #header>
           <h2 class="text-2xl lg:text-3xl font-bold mb-6">
             Похожие товары
