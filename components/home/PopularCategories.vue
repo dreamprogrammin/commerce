@@ -81,9 +81,9 @@ onMounted(() => {
       </div>
 
       <!-- Desktop Loading -->
-      <div class="hidden md:flex flex-wrap gap-3 justify-center">
+      <div class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto px-4">
         <div v-for="i in 8" :key="i">
-          <Skeleton class="h-32 w-28 rounded-2xl" />
+          <Skeleton class="h-48 rounded-3xl" />
         </div>
       </div>
     </div>
@@ -167,9 +167,9 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- DESKTOP: Компактные вертикальные чипсы -->
-      <div>
-        <div class="hidden md:flex flex-wrap gap-3 justify-center">
+      <!-- DESKTOP: Горизонтальные карточки как на скриншоте -->
+      <div class="hidden md:block">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 max-w-7xl">
           <NuxtLink
             v-for="category in popularCategories"
             :key="category.id"
@@ -178,27 +178,49 @@ onMounted(() => {
           >
             <div
               class="
-              flex flex-col items-center gap-2 w-28 h-32 p-3
-              bg-gradient-to-b from-gray-50 to-white
-              border border-gray-200 rounded-2xl
+              relative h-48 rounded-3xl overflow-hidden
+              bg-gradient-to-br from-gray-50 to-gray-100
+              border border-gray-200
               transition-all duration-300
-              hover:shadow-lg hover:border-gray-300 hover:-translate-y-1
+              hover:shadow-xl hover:border-gray-300 hover:-translate-y-1
               cursor-pointer
-              relative overflow-hidden
             "
             >
+              <!-- Gradient overlay on hover -->
               <div class="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-primary/10 transition-all duration-300" />
-              <div class="relative w-16 h-16 flex items-center justify-center flex-shrink-0">
-                <img
-                  :src="getCategoryImageUrl(category.image_url || null)"
-                  :alt="category.name"
-                  class="w-full h-full object-contain"
-                  loading="lazy"
-                >
+
+              <!-- Content -->
+              <div class="absolute inset-0 flex flex-col p-6">
+                <!-- Category name - занимает верхнюю часть -->
+                <div class="flex-shrink-0 pr-20">
+                  <h3 class="text-lg font-bold text-gray-900 leading-tight break-words">
+                    {{ category.name }}
+                  </h3>
+                </div>
+
+                <!-- Spacer -->
+                <div class="flex-1 min-h-0" />
+
+                <!-- Bottom section: Arrow + Image - фиксированная позиция внизу -->
+                <div class="flex-shrink-0 flex items-end justify-between">
+                  <!-- Arrow button -->
+                  <div class="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </div>
+
+                  <!-- Product image - абсолютное позиционирование -->
+                  <div class="absolute bottom-0 right-0 w-36 h-36 flex items-center justify-center p-3">
+                    <img
+                      :src="getCategoryImageUrl(category.image_url || null)"
+                      :alt="category.name"
+                      class="w-full h-full object-contain drop-shadow-lg"
+                      loading="lazy"
+                    >
+                  </div>
+                </div>
               </div>
-              <span class="font-medium text-xs text-gray-700 text-center relative z-10 group-hover:text-gray-900 transition-colors leading-tight">
-                {{ category.name }}
-              </span>
             </div>
           </NuxtLink>
         </div>

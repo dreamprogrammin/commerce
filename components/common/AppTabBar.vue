@@ -237,7 +237,7 @@ defineExpose({ closeAllPopups })
                       >
                         <div
                           v-if="childItem.image_url"
-                          class="mb-3 overflow-hidden dark:border-gray-800 dark:bg-gray-800"
+                          class="mb-3 overflow-hidden dark:border-gray-800 dark:bg-gray-800 rounded-lg aspect-square w-16"
                         >
                           <!-- 🆕 Transition для плавной загрузки -->
                           <Transition
@@ -252,11 +252,11 @@ defineExpose({ closeAllPopups })
                               :alt="childItem.name"
                               loading="lazy"
                               decoding="async"
-                              class="h-16 w-1/2 object-cover transition-transform duration-300 group-hover:scale-105"
+                              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             >
                             <div
                               v-else
-                              class="h-16 w-1/2 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700"
+                              class="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700"
                             >
                               <Icon name="lucide:image" class="w-8 h-8 text-gray-300 dark:text-gray-600 animate-pulse" />
                             </div>
