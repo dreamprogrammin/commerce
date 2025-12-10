@@ -27,6 +27,7 @@ const activeTab = ref<'description' | 'features'>('description')
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 
+// ✅ Основной продукт - загружается первым (SSR)
 const { data: productData, error: productError } = await useAsyncData(
   `product-main-${slug.value}`,
   async () => {
@@ -45,32 +46,13 @@ if (!productData.value && !productError.value) {
 
 const product = computed(() => productData.value)
 
-const { data: extraData, pending: isExtraLoading } = useAsyncData(
-  `product-extra-${slug.value}`,
+// ✅ Аксессуары - независимая загрузка (важны для конверсии, грузим отдельно)
+const { data: accessories, pending: accessoriesLoading } = useAsyncData(
+  `product-accessories-${slug.value}`,
   async () => {
-    if (!product.value)
-      return { accessories: [], similarProducts: [] }
-
-    const [accData, similarData] = await Promise.all([
-      (async () => {
-        if (product.value?.accessory_ids?.length) {
-          return await productsStore.fetchProductsByIds(product.value.accessory_ids)
-        }
-        return []
-      })(),
-
-      (async () => {
-        if (product.value?.category_id) {
-          return await productsStore.fetchSimilarProducts(
-            product.value.category_id,
-            [product.value.id, ...(product.value.accessory_ids || [])],
-          )
-        }
-        return []
-      })(),
-    ])
-
-    return { accessories: accData, similarProducts: similarData }
+    if (!product.value?.accessory_ids?.length)
+      return []
+    return await productsStore.fetchProductsByIds(product.value.accessory_ids)
   },
   {
     server: false,
@@ -79,10 +61,27 @@ const { data: extraData, pending: isExtraLoading } = useAsyncData(
   },
 )
 
-const accessories = computed(() => extraData.value?.accessories || [])
-const similarProducts = computed(() => extraData.value?.similarProducts || [])
+// ✅ Похожие товары - независимая lazy загрузка (они внизу страницы, не блокируют основной контент)
+const { data: similarProducts, pending: similarProductsLoading } = useAsyncData(
+  `product-similar-${slug.value}`,
+  async () => {
+    if (!product.value?.category_id)
+      return []
+    return await productsStore.fetchSimilarProducts(
+      product.value.category_id,
+      [product.value.id, ...(product.value.accessory_ids || [])],
+    )
+  },
+  {
+    server: false,
+    lazy: true,
+    watch: [product],
+  },
+)
+
 const digitColumns = ref<HTMLElement[]>([])
 const isLoading = computed(() => !product.value)
+
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (!product.value) {
     return []
@@ -106,7 +105,7 @@ const totalPrice = computed(() => {
   if (!product.value)
     return 0
   let total = Number(product.value.price)
-  const selected = accessories.value.filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
   for (const acc of selected) {
     total += Number(acc.price)
   }
@@ -117,7 +116,7 @@ const totalBonuses = computed(() => {
   if (!product.value)
     return 0
   let total = Number(product.value.bonus_points_award)
-  const selected = accessories.value.filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
   for (const acc of selected) {
     total += Number(acc.bonus_points_award)
   }
@@ -142,7 +141,7 @@ function addToCart() {
     cartStore.addItem(product.value, 1)
   }
 
-  const selectedAccessories = accessories.value.filter(acc =>
+  const selectedAccessories = (accessories.value || []).filter(acc =>
     selectedAccessoryIds.value.includes(acc.id),
   )
   for (const acc of selectedAccessories) {
@@ -242,19 +241,15 @@ const robotsRule = computed(() => {
 
 useRobotsRule(robotsRule)
 
-// 🔥 ПРАВИЛЬНОЕ РЕШЕНИЕ: Используем прямую ссылку на картинку из Supabase
 const ogImageUrl = computed(() => {
   if (!product.value?.product_images?.[0]?.image_url) {
-    // Fallback - дефолтное изображение с вашего сайта
     return 'https://commerce-eta-wheat.vercel.app/og-default.jpg'
   }
 
   const imageUrl = product.value.product_images[0].image_url
-  // Используем прямую ссылку на картинку из Supabase Storage
   return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
 })
 
-// 🔥 Настраиваем OG Image через defineOgImage
 defineOgImage({
   url: ogImageUrl.value,
   width: 1200,
@@ -262,7 +257,6 @@ defineOgImage({
   alt: computed(() => product.value?.name || 'Товар'),
 })
 
-// Добавляем мета-теги
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
@@ -271,19 +265,14 @@ useSeoMeta({
   ogUrl: canonicalUrl,
   ogSiteName: 'Ухтышка',
   ogLocale: 'ru_RU',
-
-  // Twitter
   twitterCard: 'summary_large_image',
   twitterTitle: metaTitle,
   twitterDescription: metaDescription,
-
-  // Robots
   robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
 })
 
 useHead(() => ({
   meta: [
-    // Product specific OG tags
     { property: 'og:type', content: 'product' },
     { property: 'product:price:amount', content: String(product.value?.price || 0) },
     { property: 'product:price:currency', content: 'KZT' },
@@ -323,18 +312,15 @@ useHead(() => ({
 </script>
 
 <template>
-  <!-- Остальной template без изменений -->
   <div class="bg-background">
     <div :class="`${containerClass} py-4 lg:py-6`">
       <ClientOnly>
-        <ProductDetailSkeleton v-if="isExtraLoading" />
+        <ProductDetailSkeleton v-if="isLoading" />
 
         <div v-else-if="product">
           <!-- Breadcrumbs с кнопкой избранного -->
           <div class="flex items-center justify-between mb-4">
             <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
-
-            <!-- Кнопка избранного для мобильных -->
             <ProductWishlistButton :product-id="product.id" :product-name="product.name" class="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg border bg-white hover:bg-muted transition-colors" />
           </div>
 
@@ -346,7 +332,6 @@ useHead(() => ({
                   v-if="product.product_images && product.product_images.length > 0"
                   :images="product.product_images"
                 />
-
                 <div v-else class="bg-muted rounded-lg flex items-center justify-center h-64 lg:h-96">
                   <p class="text-muted-foreground">
                     Изображения отсутствуют
@@ -358,12 +343,10 @@ useHead(() => ({
             <!-- Правая колонка: Информация о товаре -->
             <div class="lg:col-span-5">
               <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border sticky top-4">
-                <!-- Название товара -->
                 <h1 class="text-xl lg:text-2xl font-bold mb-3 lg:mb-4 leading-tight">
                   {{ product.name }}
                 </h1>
 
-                <!-- Цена -->
                 <div class="mb-6 lg:mb-8">
                   <div class="flex items-baseline gap-3 mb-2">
                     <p class="text-3xl lg:text-4xl font-bold text-primary">
@@ -371,14 +354,12 @@ useHead(() => ({
                     </p>
                   </div>
 
-                  <!-- Бонусы -->
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium">
                     <Icon name="lucide:gift" class="w-4 h-4" />
                     <span>+{{ totalBonuses }} бонусов</span>
                   </div>
                 </div>
 
-                <!-- Наличие -->
                 <div class="mb-6 pb-6 border-b">
                   <div class="flex items-center gap-2 text-sm">
                     <Icon
@@ -395,7 +376,6 @@ useHead(() => ({
                   </div>
                 </div>
 
-                <!-- Кнопки действий (десктоп) -->
                 <ClientOnly>
                   <div class="hidden lg:block space-y-3 mb-6">
                     <template v-if="product.stock_quantity > 0">
@@ -439,13 +419,27 @@ useHead(() => ({
                 </ClientOnly>
               </div>
 
-              <!-- Аксессуары -->
-              <div v-if="accessories.length > 0" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4">
+              <!-- ✅ Аксессуары с независимой загрузкой -->
+              <div v-if="accessoriesLoading || (accessories && accessories.length > 0)" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4">
                 <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
                   <Icon name="lucide:plus-circle" class="w-5 h-5 text-primary" />
                   С этим товаром покупают
                 </h3>
-                <div class="space-y-3">
+
+                <!-- Скелетон для аксессуаров -->
+                <div v-if="accessoriesLoading" class="space-y-3">
+                  <div v-for="i in 3" :key="i" class="flex items-center gap-3 p-3 rounded-lg border animate-pulse">
+                    <div class="w-4 h-4 bg-muted rounded" />
+                    <div class="w-14 h-14 bg-muted rounded-lg" />
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 bg-muted rounded w-3/4" />
+                      <div class="h-4 bg-muted rounded w-1/4" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Список аксессуаров -->
+                <div v-else class="space-y-3">
                   <div
                     v-for="acc in accessories"
                     :key="acc.id"
@@ -502,9 +496,8 @@ useHead(() => ({
             </div>
           </div>
 
-          <!-- Описание и характеристики (табы) -->
+          <!-- Описание и характеристики -->
           <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8">
-            <!-- Табы -->
             <div class="border-b mb-6">
               <div class="flex gap-6">
                 <button
@@ -538,7 +531,6 @@ useHead(() => ({
               </div>
             </div>
 
-            <!-- Контент табов -->
             <div class="prose max-w-none">
               <div v-if="activeTab === 'description'">
                 <ProductDescription v-if="product.description" :description="product.description" />
@@ -635,13 +627,28 @@ useHead(() => ({
       </Transition>
     </ClientOnly>
 
-    <!-- Похожие товары -->
+    <!-- ✅ Похожие товары с независимой загрузкой -->
     <div
-      v-if="similarProducts.length > 0"
+      v-if="similarProductsLoading || (similarProducts && similarProducts.length > 0)"
       ref="similarProductsRef"
       class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12"
     >
-      <ProductCarousel :products="similarProducts">
+      <!-- Скелетон для похожих товаров -->
+      <div v-if="similarProductsLoading" :class="`${containerClass}`">
+        <h2 class="text-2xl lg:text-3xl font-bold mb-6">
+          Похожие товары
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div v-for="i in 4" :key="i" class="bg-white rounded-xl p-4 animate-pulse">
+            <div class="aspect-square bg-muted rounded-lg mb-3" />
+            <div class="h-4 bg-muted rounded w-3/4 mb-2" />
+            <div class="h-4 bg-muted rounded w-1/2" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Карусель похожих товаров -->
+      <ProductCarousel v-else :products="similarProducts || []">
         <template #header>
           <h2 class="text-2xl lg:text-3xl font-bold mb-6">
             Похожие товары
