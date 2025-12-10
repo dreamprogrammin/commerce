@@ -162,10 +162,9 @@ const additionalItemStyles = {
               <!-- Контент -->
               <div class="absolute left-0 top-1/2 -translate-y-1/2 p-5 z-10 max-w-[55%]">
                 <div class="space-y-1">
-                  <h3 class="text-2xl font-black text-white drop-shadow-lg leading-tight tracking-tight">
+                  <h3 class="text-xl font-bold leading-tight tracking-tight">
                     {{ item.name }}
                   </h3>
-                  <div class="h-1 w-12 bg-white/80 rounded-full group-hover:w-16 transition-all duration-300" />
                 </div>
               </div>
             </div>
@@ -209,7 +208,7 @@ const additionalItemStyles = {
 
             <!-- Контент карточки - показывается сразу -->
             <div class="absolute top-0 left-0 p-4 max-w-[70%] z-20">
-              <h3 class="font-medium leading-tight text-foreground text-sm">
+              <h3 class="font-bold leading-tight text-foreground text-sm">
                 {{ category.name }}
               </h3>
             </div>
