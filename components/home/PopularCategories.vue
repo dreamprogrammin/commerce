@@ -65,7 +65,7 @@ onMounted(() => {
 
 <template>
   <div class="py-8 md:py-12">
-    <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-center mb-8">
+    <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-start mb-8">
       Популярные категории
     </h2>
 

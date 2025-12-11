@@ -196,6 +196,9 @@ useRobotsRule({
 
     <!-- Карточки бонусов и избранного -->
     <div :class="alwaysContainedClass" class="py-8 md:py-12">
+      <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-start mb-8">
+        Акции и бонусы
+      </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
         <HomeBonusProgramCard />
         <HomeFeaturedProduct />

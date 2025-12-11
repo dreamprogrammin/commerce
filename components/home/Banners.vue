@@ -46,8 +46,8 @@ function getBannerImageUrl(imageUrl: string | null) {
   <div class="py-8 md:py-12">
     <!-- Скелетон при загрузке -->
     <div v-if="pending" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Skeleton class="h-48 md:h-64 rounded-lg" />
-      <Skeleton class="h-48 md:h-64 rounded-lg" />
+      <Skeleton class="h-64 md:h-80 lg:h-96 rounded-lg" />
+      <Skeleton class="h-64 md:h-80 lg:h-96 rounded-lg" />
     </div>
 
     <!-- Баннеры -->
@@ -62,7 +62,7 @@ function getBannerImageUrl(imageUrl: string | null) {
         }"
       >
         <!-- Изображение с ResponsiveImage -->
-        <div class="relative h-48 md:h-64">
+        <div class="relative h-48 md:h-80 lg:h-96">
           <ResponsiveImage
             v-if="banner.image_url"
             :src="getBannerImageUrl(banner.image_url)"
