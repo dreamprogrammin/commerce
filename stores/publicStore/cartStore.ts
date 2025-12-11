@@ -1,9 +1,15 @@
-import type { BaseProduct, Database, ICartItem, ICheckoutData } from '@/types'
+import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { useProfileStore } from '../core/profileStore'
 import { useProductsStore } from './productsStore'
 
 const CART_STORAGE_KEY = 'krakenshop-cart-v1'
+
+// 🔥 Тип для элемента корзины - используем существующий ProductWithImages
+export interface ICartItem {
+  product: ProductWithImages // Это уже ProductRow + product_images[]
+  quantity: number
+}
 
 export const useCartStore = defineStore('cartStore', () => {
   const supabase = useSupabaseClient<Database>()
@@ -15,8 +21,6 @@ export const useCartStore = defineStore('cartStore', () => {
   const isProcessing = ref(false)
   const bonusesToSpend = ref(0)
   const productsStore = useProductsStore()
-
-  // УБИРАЕМ всю логику hydrateFromStorage() и watch() - плагин все сделает сам
 
   const totalItems = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
 
@@ -33,30 +37,74 @@ export const useCartStore = defineStore('cartStore', () => {
     return finalTotal > 0 ? Number(finalTotal.toFixed(2)) : 0
   })
 
-  async function addItem(product: BaseProduct, quantity: number) {
+  /**
+   * Добавить товар в корзину
+   * @param productIdOrObject - ID товара (string) или объект товара с полем id
+   * @param quantity - Количество
+   */
+  async function addItem(productIdOrObject: string | { id: string }, quantity: number = 1) {
+    // 🔥 Извлекаем ID из строки или объекта
+    const productId = typeof productIdOrObject === 'string'
+      ? productIdOrObject
+      : productIdOrObject.id
+
+    if (!productId || typeof productId !== 'string') {
+      toast.error('Неверный ID товара')
+      console.error('Invalid product ID:', productIdOrObject)
+      return
+    }
+
     // 1. Проверяем, есть ли товар уже в корзине
-    const existingItem = items.value.find(item => item.product.id === product.id)
+    const existingItem = items.value.find(item => item.product.id === productId)
 
     if (existingItem) {
       existingItem.quantity += quantity
-      toast.success(`"${product.name}" (+${quantity})`)
+      toast.success(`"${existingItem.product.name}" (+${quantity})`)
+      return
     }
-    else {
-      // 2. Если товара нет, загружаем его ПОЛНУЮ версию
-      //    Это гарантирует, что в корзине всегда будет полный объект ProductRow
-      const fullProduct = await productsStore.getProductById(product.id)
+
+    // 2. Загружаем полный товар с изображениями
+    try {
+      const { data: fullProduct, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_images (
+            id,
+            image_url,
+            blur_placeholder,
+            alt_text,
+            display_order
+          )
+        `)
+        .eq('id', productId)
+        .order('display_order', {
+          referencedTable: 'product_images',
+          ascending: true,
+        })
+        .single()
+
+      if (error)
+        throw error
 
       if (fullProduct) {
-        // 3. Добавляем в корзину ПОЛНЫЙ объект
-        items.value.push({ product: fullProduct, quantity })
+        // 3. Добавляем в корзину полный объект с изображениями
+        items.value.push({
+          product: fullProduct as ProductWithImages,
+          quantity,
+        })
         toast.success(`"${fullProduct.name}" добавлен в корзину!`)
       }
       else {
-        // 4. Обрабатываем ошибку, если не удалось загрузить товар
-        toast.error('Не удалось добавить товар в корзину')
+        toast.error('Товар не найден')
       }
     }
+    catch (e: any) {
+      console.error('Ошибка при добавлении товара в корзину:', e)
+      toast.error('Не удалось добавить товар в корзину')
+    }
   }
+
   function removeItem(productId: string) {
     items.value = items.value.filter(i => i.product.id !== productId)
     toast.info('Товар удален из корзины')
@@ -93,7 +141,6 @@ export const useCartStore = defineStore('cartStore', () => {
   /**
    * Гарантирует наличие сессии (реальной или анонимной) перед действием с корзиной.
    */
-
   async function ensureUserSession() {
     if (user.value)
       return user.value
@@ -121,11 +168,14 @@ export const useCartStore = defineStore('cartStore', () => {
     try {
       const currentUser = await ensureUserSession()
       if (!currentUser) {
-        // Если сессию создать не удалось, прерываем оформление
         throw new Error('Не удалось создать сессию для оформления заказа.')
       }
+
       const { data: newOrderId, error } = await supabase.rpc('create_order', {
-        p_cart_items: items.value.map(i => ({ product_id: i.product.id, quantity: i.quantity })),
+        p_cart_items: items.value.map(i => ({
+          product_id: i.product.id,
+          quantity: i.quantity,
+        })),
         p_delivery_method: orderData.deliveryMethod,
         p_payment_method: orderData.paymentMethod,
         p_delivery_address: orderData.deliveryAddress,
@@ -135,17 +185,14 @@ export const useCartStore = defineStore('cartStore', () => {
 
       if (error)
         throw error
+
       const bonusesAwarded = items.value
         .reduce((sum, item) =>
           sum + (item.product.bonus_points_award || 0) * item.quantity, 0)
 
       toast.success('Заказ успешно создан!', {
-        description: 'Наш менеджер скоро с вами свяжется.',
-      })
-
-      toast.success('Заказ успешно создан!', {
-        description: `Спасибо за покупку! ${bonusesAwarded} бонусов будут начислены на ваш счет и станут активны через 14 дней. Отслеживать статус можно в личном кабинете.`,
-        duration: 10000, // Показываем еще дольше
+        description: `Спасибо за покупку! ${bonusesAwarded} бонусов будут начислены на ваш счет и станут активны через 14 дней.`,
+        duration: 10000,
       })
 
       clearCart()

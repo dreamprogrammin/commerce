@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref, toRaw, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -93,11 +90,24 @@ async function handleFormSubmit() {
  */
 async function placeOrder() {
   showBonusModal.value = false // Закрываем модалку, если была открыта
+
+  // 🔥 ВАЖНО: Собираем guestInfo из формы
+  const guestInfo = {
+    name: orderForm.value.name.trim(),
+    email: orderForm.value.email.trim(),
+    phone: orderForm.value.phone.trim(),
+  }
+
   await cartStore.checkout({
     deliveryMethod: orderForm.value.deliveryMethod,
     paymentMethod: orderForm.value.paymentMethod,
-    deliveryAddress: orderForm.value.deliveryMethod === 'courier' ? toRaw(orderForm.value.address) : undefined,
-    // `guestInfo` больше не нужен, так как у нас теперь всегда есть user.id (реальный или анонимный)
+    deliveryAddress: orderForm.value.deliveryMethod === 'courier'
+      ? {
+          line1: orderForm.value.address.line1,
+          city: orderForm.value.address.city,
+        }
+      : undefined,
+    guestInfo, // 🔥 Передаём данные формы!
   })
 }
 
@@ -146,17 +156,36 @@ function handleRegisterAndGetBonus() {
           <CardContent class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label for="name">Имя и Фамилия</Label>
-                <Input id="name" v-model="orderForm.name" required autocomplete="name" />
+                <Label for="name">Имя и Фамилия *</Label>
+                <Input
+                  id="name"
+                  v-model="orderForm.name"
+                  required
+                  autocomplete="name"
+                  placeholder="Иван Иванов"
+                />
               </div>
               <div>
-                <Label for="phone">Телефон</Label>
-                <Input id="phone" v-model="orderForm.phone" required autocomplete="tel" placeholder="+7 (777) 123-45-67" />
+                <Label for="phone">Телефон *</Label>
+                <Input
+                  id="phone"
+                  v-model="orderForm.phone"
+                  required
+                  autocomplete="tel"
+                  placeholder="+7 (777) 123-45-67"
+                />
               </div>
             </div>
             <div>
-              <Label for="email">Email</Label>
-              <Input id="email" v-model="orderForm.email" type="email" required autocomplete="email" />
+              <Label for="email">Email *</Label>
+              <Input
+                id="email"
+                v-model="orderForm.email"
+                type="email"
+                required
+                autocomplete="email"
+                placeholder="example@mail.com"
+              />
             </div>
           </CardContent>
         </Card>
@@ -182,12 +211,17 @@ function handleRegisterAndGetBonus() {
             </RadioGroup>
             <div v-if="orderForm.deliveryMethod === 'courier'" class="space-y-4 animate-in fade-in">
               <div>
-                <Label for="city">Город</Label>
+                <Label for="city">Город *</Label>
                 <Input id="city" v-model="orderForm.address.city" required />
               </div>
               <div>
-                <Label for="address">Улица, дом, квартира</Label>
-                <Input id="address" v-model="orderForm.address.line1" required />
+                <Label for="address">Улица, дом, квартира *</Label>
+                <Input
+                  id="address"
+                  v-model="orderForm.address.line1"
+                  required
+                  placeholder="ул. Пушкина, д. 1, кв. 1"
+                />
               </div>
             </div>
           </CardContent>
@@ -201,7 +235,14 @@ function handleRegisterAndGetBonus() {
               У вас на счету <span class="font-bold text-primary">{{ bonusBalance }} бонусов</span>. 1 бонус = 1 ₸.
             </p>
             <div class="flex items-center gap-4 mt-4">
-              <Input id="bonuses" v-model.number="bonusesInput" type="number" placeholder="Сколько списать?" :max="bonusBalance" />
+              <Input
+                id="bonuses"
+                v-model.number="bonusesInput"
+                type="number"
+                placeholder="Сколько списать?"
+                :max="bonusBalance"
+                min="0"
+              />
               <Button type="button" variant="outline" @click="applyBonuses">
                 Применить
               </Button>
@@ -247,10 +288,9 @@ function handleRegisterAndGetBonus() {
         <AlertDialogHeader>
           <AlertDialogTitle>Получите двойные бонусы!</AlertDialogTitle>
           <AlertDialogDescription class="py-4">
-            За этот заказ вам будет начислено 1000 бонусов
+            За этот заказ вам будет начислено <span class="font-bold text-primary">{{ bonusesToAward }}</span> бонусов
             <br><br>
-            Зарегистрируйтесь сейчас и получите <span class="font-bold text-primary text-lg">1000</span> в подарок!
-            приветственных бонусов на свой счет! Они станут доступны для использования через 14 дней. Ваша корзина и введенные данные сохранятся."
+            Зарегистрируйтесь сейчас и получите <span class="font-bold text-primary text-lg">1000</span> приветственных бонусов в подарок! Они станут доступны для использования через 14 дней. Ваша корзина и введенные данные сохранятся.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

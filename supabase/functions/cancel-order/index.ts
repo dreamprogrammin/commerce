@@ -1,56 +1,52 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
+import { createAdminClient } from '../_shared/supabase-client.ts'
+import { textResponse } from '../_shared/response-helpers.ts'
+
+console.log('✅ Функция cancel-order запущена')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
   try {
     const url = new URL(req.url)
     const orderId = url.searchParams.get('order_id')
-    if (!orderId) throw new Error('ID заказа не предоставлен.')
 
-    const supabaseAdminClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    if (!orderId) {
+      return textResponse('❌ ID заказа не предоставлен', 400)
+    }
+
+    console.log(`🗑️ Отмена заказа: ${orderId}`)
+
+    const supabase = createAdminClient()
+    const { data: resultMessage, error } = await supabase.rpc('cancel_order', {
+      p_order_id: orderId,
+    })
+
+    if (error) {
+      console.error('❌ RPC ошибка:', error)
+      throw error
+    }
+
+    console.log(`✅ Заказ ${orderId} отменен`)
+
+    return textResponse(
+      '🗑️ ЗАКАЗ ОТМЕНЕН\n' +
+      '=================\n' +
+      `ID: ...${orderId.slice(-6)}\n` +
+      `${resultMessage || 'Заказ успешно отменен'}\n\n` +
+      'Это окно можно закрыть.'
     )
-
-    const { data: resultMessage, error } = await supabaseAdminClient.rpc('cancel_order', {
-      p_order_id: orderId
-    })
-    if (error) throw error
-
-    // Формируем простой и понятный текстовый ответ
-    const responseText = `
-🗑️ ЗАКАЗ ОТМЕНЕН
-=================
-ID Заказа: ...${orderId.slice(-6)}
-Результат: ${resultMessage}
-
-Это окно можно закрыть.
-    `
-    return new Response(responseText, {
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'text/plain; charset=utf-8' 
-      },
-    })
-
   } catch (error) {
-    let errorMessage = "Произошла неизвестная ошибка."
-    if (error instanceof Error) errorMessage = error.message
+    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка'
+    console.error('❌ Ошибка отмены:', errorMessage)
 
-    const errorText = `
-❌ ОШИБКА ОТМЕНЫ ЗАКАЗА!
-========================
-Детали: ${errorMessage}
-    `
-    return new Response(errorText, {
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'text/plain; charset=utf-8' 
-      },
-      status: 400
-    })
+    return textResponse(
+      '❌ ОШИБКА ОТМЕНЫ ЗАКАЗА\n' +
+      '========================\n' +
+      `Детали: ${errorMessage}`,
+      400
+    )
   }
 })

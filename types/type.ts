@@ -126,11 +126,6 @@ export interface IProductFilters {
   attributes?: AttributeFilter[]
 }
 
-export interface ICartItem {
-  product: ProductRow
-  quantity: number
-}
-
 export interface ICheckoutData {
   deliveryMethod: 'pickup' | 'courier'
   paymentMethod: string
