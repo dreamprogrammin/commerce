@@ -78,10 +78,10 @@ onUnmounted(() => {
         <!-- Логотип -->
         <NuxtLink to="/" class="flex items-center gap-2.5">
           <div class="bg-blue-500 p-1.5 rounded-full">
-            <Icon name="lucide:store" class="size-5 text-white" />
+            <Icon name="lucide:toy-brick" class="size-5 text-white" />
           </div>
           <span class="text-xl font-bold text-blue-500">
-            Shop
+            Ухтышка
           </span>
         </NuxtLink>
 
