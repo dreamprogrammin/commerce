@@ -327,7 +327,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.notify-order-to-telegram]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/notify-order-to-telegram/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -338,7 +338,7 @@ entrypoint = "./functions/notify-order-to-telegram/index.ts"
 
 [functions.confirm-order]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/confirm-order/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -349,7 +349,7 @@ entrypoint = "./functions/confirm-order/index.ts"
 
 [functions.cancel-order]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/cancel-order/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
