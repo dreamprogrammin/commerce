@@ -13,6 +13,7 @@ export const useProfileStore = defineStore('profileStore', () => {
   const bonusBalance = computed(() => profile.value?.active_bonus_balance ?? 0)
   const pendingBonuses = computed(() => profile.value?.pending_bonus_balance ?? 0)
   const isLoggedIn = computed(() => !!user.value && !!profile.value)
+
   const fullName = computed(() => {
     if (!profile.value)
       return 'Гость'
@@ -21,9 +22,9 @@ export const useProfileStore = defineStore('profileStore', () => {
     const lastName = profile.value.last_name || ''
     const fullName = `${firstName} ${lastName}`.trim()
 
-    // Если имя и фамилия не заданы, возвращаем email
     return fullName || user.value?.email || 'Пользователь'
   })
+
   const isAdmin = computed(() => profile.value?.role === 'admin')
 
   /**
@@ -110,6 +111,16 @@ export const useProfileStore = defineStore('profileStore', () => {
   function clearProfile() {
     profile.value = null
   }
+
+  // ✅ Следим за изменением пользователя
+  watch(user, (newUser) => {
+    if (newUser) {
+      loadProfile()
+    }
+    else {
+      clearProfile()
+    }
+  })
 
   return {
     // State

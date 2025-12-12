@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Gift, Star } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
@@ -11,7 +12,7 @@ const cartStore = useCartStore()
 const profileStore = useProfileStore()
 
 // --- Реактивные данные из сторов ---
-const { user, isLoggedIn, isGuest } = storeToRefs(authStore)
+const { user, isLoggedIn } = storeToRefs(authStore)
 const { bonusBalance } = storeToRefs(profileStore)
 const { subtotal, discountAmount, total, items, isProcessing, bonusesToSpend } = storeToRefs(cartStore)
 
@@ -32,7 +33,8 @@ const showBonusModal = ref(false)
 
 // --- Вычисляемые свойства ---
 const bonusesToAward = computed(() => {
-  return items.value.reduce((sum, item) => sum + (item.product.bonus_points_award || 0) * item.quantity, 0)
+  return items.value.reduce((sum, item) =>
+    sum + (item.product.bonus_points_award || 0) * item.quantity, 0)
 })
 
 // --- Логика ---
@@ -52,46 +54,63 @@ watch(
   { immediate: true },
 )
 
-// "Ловим" возвращение пользователя после OAuth для слияния аккаунтов
+// ✅ Проверяем, новый ли пользователь при загрузке страницы
 onMounted(() => {
-  authStore.checkForUserMerge()
+  authStore.checkForNewUser()
 })
 
 function applyBonuses() {
+  if (bonusesInput.value > bonusBalance.value) {
+    toast.error('Недостаточно бонусов', {
+      description: `У вас доступно только ${bonusBalance.value} бонусов`,
+    })
+    bonusesInput.value = bonusBalance.value
+    return
+  }
+
   cartStore.setBonusesToSpend(bonusesInput.value)
   bonusesInput.value = bonusesToSpend.value
+
   if (bonusesToSpend.value > 0) {
-    toast.success(`${bonusesToSpend.value} бонусов применено!`)
+    toast.success(`${bonusesToSpend.value} бонусов применено!`, {
+      description: `Скидка: ${bonusesToSpend.value} ₸`,
+    })
   }
 }
 
 /**
- * Главный обработчик отправки формы.
- * Решает, нужно ли показывать модалку или сразу оформлять заказ.
+ * ✅ Главный обработчик отправки формы
  */
 async function handleFormSubmit() {
-  // Если пользователь уже залогинен, просто оформляем заказ
+  // Валидация формы
+  if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !orderForm.value.phone.trim()) {
+    toast.error('Заполните все обязательные поля')
+    return
+  }
+
+  // Если пользователь залогинен, просто оформляем
   if (isLoggedIn.value) {
     await placeOrder()
     return
   }
-  // Если это гость (аноним) и ему можно начислить бонусы, показываем модалку
-  if (isGuest.value && bonusesToAward.value > 0) {
+
+  // ✅ Если это гость и ему могут начислить бонусы - показываем предложение
+  if (bonusesToAward.value > 0) {
     showBonusModal.value = true
   }
   else {
-    // Если гость, но бонусов нет - просто оформляем
+    // Гость без бонусов - просто оформляем
     await placeOrder()
   }
 }
 
 /**
- * Финальная функция, которая вызывает checkout в сторе.
+ * ✅ Финальная функция оформления заказа
  */
 async function placeOrder() {
-  showBonusModal.value = false // Закрываем модалку, если была открыта
+  showBonusModal.value = false
 
-  // 🔥 ВАЖНО: Собираем guestInfo из формы
+  // Собираем данные гостя
   const guestInfo = {
     name: orderForm.value.name.trim(),
     email: orderForm.value.email.trim(),
@@ -107,37 +126,67 @@ async function placeOrder() {
           city: orderForm.value.address.city,
         }
       : undefined,
-    guestInfo, // 🔥 Передаём данные формы!
+    guestInfo,
   })
 }
 
 /**
- * Вызывается из модального окна для регистрации.
+ * ✅ Вызывается для регистрации из модалки
  */
 function handleRegisterAndGetBonus() {
   showBonusModal.value = false
-  authStore.signInWithOAuth('google', '/checkout') // Возвращаем пользователя обратно на эту же страницу
+  // Возвращаем пользователя обратно на checkout после регистрации
+  authStore.signInWithOAuth('google', '/checkout')
 }
 </script>
 
 <template>
   <div class="container py-12">
-    <!-- Сценарий 1: Корзина пуста -->
-    <div v-if="items.length === 0" class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4">
+    <!-- ✅ Корзина пуста -->
+    <div
+      v-if="items.length === 0"
+      class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4"
+    >
       <h1 class="text-3xl font-bold mb-4">
         Ваша корзина пуста
       </h1>
-      <NuxtLink to="/catalog/boys">
-        <Button class="mt-4">
+      <NuxtLink to="/catalog">
+        <Button class="mt-4" size="lg">
           Начать покупки
         </Button>
       </NuxtLink>
     </div>
 
-    <!-- Сценарий 2: В корзине есть товары -->
+    <!-- ✅ Есть товары в корзине -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
       <!-- Левая колонка: Форма -->
       <form class="lg:col-span-2 space-y-8" @submit.prevent="handleFormSubmit">
+        <!-- ✅ Баннер с бонусами для гостей -->
+        <Alert v-if="!isLoggedIn" variant="default" class="border-primary/50 bg-primary/5">
+          <Gift class="h-5 w-5 text-primary" />
+          <AlertTitle class="text-primary">
+            Получите 1000 бонусов при регистрации!
+          </AlertTitle>
+          <AlertDescription class="space-y-2">
+            <p>Зарегистрируйтесь прямо сейчас и получите приветственный бонус.</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              @click="authStore.signInWithOAuth('google', '/checkout')"
+            >
+              Войти через Google
+            </Button>
+          </AlertDescription>
+        </Alert>
+
+        <!-- ✅ НОВОЕ: Подсказка о разных email -->
+        <EmailHintAlert
+          v-if="isLoggedIn && user?.email"
+          :current-email="user.email"
+          :entered-email="orderForm.email"
+        />
+
         <!-- Блок 1: Контактная информация -->
         <Card>
           <CardHeader>
@@ -147,7 +196,7 @@ function handleRegisterAndGetBonus() {
               <button
                 type="button"
                 class="font-semibold text-primary hover:underline"
-                @click="handleRegisterAndGetBonus"
+                @click="authStore.signInWithOAuth('google', '/checkout')"
               >
                 Войдите
               </button>, чтобы использовать бонусы!
@@ -190,25 +239,39 @@ function handleRegisterAndGetBonus() {
           </CardContent>
         </Card>
 
-        <!-- Блок 2: Доставка и оплата -->
+        <!-- Блок 2: Доставка -->
         <Card>
-          <CardHeader><CardTitle>2. Доставка и оплата</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>2. Доставка и оплата</CardTitle>
+          </CardHeader>
           <CardContent class="space-y-6">
-            <Label>Способ доставки</Label>
-            <RadioGroup v-model="orderForm.deliveryMethod" class="grid grid-cols-2 gap-4">
-              <div>
-                <RadioGroupItem id="pickup" value="pickup" class="peer sr-only" />
-                <Label for="pickup" class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
-                  Самовывоз
-                </Label>
-              </div>
-              <div>
-                <RadioGroupItem id="courier" value="courier" class="peer sr-only" />
-                <Label for="courier" class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
-                  Яндекс.Курьер
-                </Label>
-              </div>
-            </RadioGroup>
+            <div>
+              <Label>Способ доставки</Label>
+              <RadioGroup v-model="orderForm.deliveryMethod" class="grid grid-cols-2 gap-4 mt-2">
+                <div>
+                  <RadioGroupItem id="pickup" value="pickup" class="peer sr-only" />
+                  <Label
+                    for="pickup"
+                    class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                  >
+                    <span class="text-sm font-medium">Самовывоз</span>
+                    <span class="text-xs text-muted-foreground mt-1">Бесплатно</span>
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem id="courier" value="courier" class="peer sr-only" />
+                  <Label
+                    for="courier"
+                    class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                  >
+                    <span class="text-sm font-medium">Яндекс.Курьер</span>
+                    <span class="text-xs text-muted-foreground mt-1">От 500 ₸</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <!-- Адрес для курьера -->
             <div v-if="orderForm.deliveryMethod === 'courier'" class="space-y-4 animate-in fade-in">
               <div>
                 <Label for="city">Город *</Label>
@@ -227,14 +290,19 @@ function handleRegisterAndGetBonus() {
           </CardContent>
         </Card>
 
-        <!-- Блок 3: Бонусы (только для ПОЛНОСТЬЮ авторизованных) -->
+        <!-- ✅ Блок 3: Бонусы (только для авторизованных) -->
         <Card v-if="isLoggedIn && bonusBalance > 0">
-          <CardHeader><CardTitle>3. Бонусы</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <Star class="w-5 h-5 text-primary fill-primary" />
+              Применить бонусы
+            </CardTitle>
+            <CardDescription>
+              У вас <span class="font-bold text-primary">{{ bonusBalance }}</span> доступных бонусов (1 бонус = 1 ₸)
+            </CardDescription>
+          </CardHeader>
           <CardContent>
-            <p class="text-sm">
-              У вас на счету <span class="font-bold text-primary">{{ bonusBalance }} бонусов</span>. 1 бонус = 1 ₸.
-            </p>
-            <div class="flex items-center gap-4 mt-4">
+            <div class="flex items-center gap-4">
               <Input
                 id="bonuses"
                 v-model.number="bonusesInput"
@@ -242,63 +310,116 @@ function handleRegisterAndGetBonus() {
                 placeholder="Сколько списать?"
                 :max="bonusBalance"
                 min="0"
+                class="flex-1"
               />
               <Button type="button" variant="outline" @click="applyBonuses">
                 Применить
               </Button>
             </div>
+            <p class="text-xs text-muted-foreground mt-2">
+              Максимум можно списать: {{ bonusBalance }} бонусов
+            </p>
           </CardContent>
         </Card>
 
-        <Button type="submit" size="lg" class="w-full text-lg" :disabled="isProcessing">
-          <span v-if="isProcessing">Оформляем...</span>
-          <span v-else>Подтвердить заказ на {{ total }} ₸</span>
+        <!-- Кнопка оформления -->
+        <Button
+          type="submit"
+          size="lg"
+          class="w-full text-lg"
+          :disabled="isProcessing"
+        >
+          <span v-if="isProcessing">Оформляем заказ...</span>
+          <span v-else>Подтвердить заказ на {{ total.toFixed(0) }} ₸</span>
         </Button>
       </form>
 
-      <!-- Правая колонка: Состав и итоги заказа -->
+      <!-- Правая колонка: Состав заказа -->
       <aside class="col-span-1 lg:sticky top-24">
         <Card>
-          <CardHeader><CardTitle>Ваш заказ</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Ваш заказ</CardTitle>
+          </CardHeader>
           <CardContent class="space-y-4 text-sm">
+            <!-- Товары -->
             <div v-for="item in items" :key="item.product.id" class="flex justify-between items-start">
-              <span class="pr-2">{{ item.product.name }} (x{{ item.quantity }})</span>
-              <span class="font-semibold whitespace-nowrap">{{ (Number(item.product.price) * item.quantity).toFixed(2) }} ₸</span>
+              <span class="pr-2">{{ item.product.name }} × {{ item.quantity }}</span>
+              <span class="font-semibold whitespace-nowrap">
+                {{ (Number(item.product.price) * item.quantity).toFixed(0) }} ₸
+              </span>
             </div>
-            <div class="pt-4 border-t flex justify-between">
-              <span>Сумма:</span>
-              <span>{{ subtotal.toFixed(2) }} ₸</span>
-            </div>
-            <div v-if="discountAmount > 0" class="flex justify-between text-primary font-medium">
-              <span>Скидка бонусами:</span>
-              <span>-{{ discountAmount.toFixed(2) }} ₸</span>
+
+            <!-- Разделитель -->
+            <div class="pt-4 border-t space-y-2">
+              <div class="flex justify-between">
+                <span>Сумма:</span>
+                <span>{{ subtotal.toFixed(0) }} ₸</span>
+              </div>
+
+              <!-- Скидка -->
+              <div v-if="discountAmount > 0" class="flex justify-between text-primary font-medium">
+                <span>Скидка бонусами:</span>
+                <span>-{{ discountAmount.toFixed(0) }} ₸</span>
+              </div>
+
+              <!-- Будущие бонусы -->
+              <div v-if="bonusesToAward > 0" class="flex justify-between text-xs text-muted-foreground">
+                <span class="flex items-center gap-1">
+                  <Star class="w-3 h-3" />
+                  Вы получите:
+                </span>
+                <span>+{{ bonusesToAward }} бонусов</span>
+              </div>
             </div>
           </CardContent>
+
+          <!-- Итого -->
           <CardFooter class="pt-4 border-t flex justify-between font-bold text-lg">
             <span>Итого к оплате:</span>
-            <span>{{ total.toFixed(2) }} ₸</span>
+            <span>{{ total.toFixed(0) }} ₸</span>
           </CardFooter>
         </Card>
       </aside>
     </div>
 
-    <!-- Модальное окно с предложением бонусов для гостей -->
-    <AlertDialog :open="showBonusModal" @update:open="showBonusModal = false">
+    <!-- ✅ Модальное окно для гостей -->
+    <AlertDialog :open="showBonusModal" @update:open="(val) => showBonusModal = val">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Получите двойные бонусы!</AlertDialogTitle>
-          <AlertDialogDescription class="py-4">
-            За этот заказ вам будет начислено <span class="font-bold text-primary">{{ bonusesToAward }}</span> бонусов
-            <br><br>
-            Зарегистрируйтесь сейчас и получите <span class="font-bold text-primary text-lg">1000</span> приветственных бонусов в подарок! Они станут доступны для использования через 14 дней. Ваша корзина и введенные данные сохранятся.
+          <AlertDialogTitle class="flex items-center gap-2 text-xl">
+            <Gift class="w-6 h-6 text-primary" />
+            Получите 1000 бонусов!
+          </AlertDialogTitle>
+          <AlertDialogDescription class="py-4 space-y-3">
+            <p class="text-base">
+              За этот заказ вам будет начислено
+              <Badge variant="secondary" class="mx-1 text-base">
+                {{ bonusesToAward }} бонусов
+              </Badge>
+            </p>
+            <div class="p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <p class="text-base font-semibold text-foreground mb-2">
+                🎉 Специальное предложение:
+              </p>
+              <p class="text-base text-foreground">
+                Зарегистрируйтесь <strong>прямо сейчас</strong> и получите
+                <span class="text-primary font-bold text-lg">1000 приветственных бонусов</span> в подарок!
+              </p>
+            </div>
+            <p class="text-sm text-muted-foreground">
+              • Бонусы станут доступны через 14 дней<br>
+              • Ваша корзина и данные сохранятся<br>
+              • 1 бонус = 1 ₸ скидки
+            </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <Button variant="ghost" @click="placeOrder">
-            Нет, спасибо, продолжить как гость
+        <AlertDialogFooter class="flex-col sm:flex-row gap-2">
+          <Button variant="outline" class="w-full sm:w-auto" @click="placeOrder">
+            Продолжить как гость
           </Button>
-          <Button @click="handleRegisterAndGetBonus">
-            Войти через Google и получить бонусы
+          <Button class="w-full sm:w-auto" @click="handleRegisterAndGetBonus">
+            <Gift class="w-4 h-4 mr-2" />
+            Получить бонусы
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
