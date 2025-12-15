@@ -9,9 +9,18 @@ export const useModalStore = defineStore('modalStore', () => {
     showLoginModal.value = false
   }
 
+  // ✅ Добавляем toggle для удобства
+  function toggleLoginModal() {
+    showLoginModal.value = !showLoginModal.value
+  }
+
   return {
-    openLoginModal,
+    // State
     showLoginModal,
+
+    // Actions
+    openLoginModal,
     closeLoginModal,
+    toggleLoginModal,
   }
 })
