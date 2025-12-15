@@ -4,15 +4,17 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
 const container = carouselContainerVariants({ contained: 'always' })
 const wishlistStore = useWishlistStore()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
+const modalStore = useModalStore()
 
 const { user } = storeToRefs(authStore)
-const { fullName } = storeToRefs(profileStore)
+const { fullName, isLoggedIn } = storeToRefs(profileStore)
 
 const isVisible = ref(true)
 const isSearchOpen = ref(false)
@@ -41,6 +43,11 @@ function handleScroll() {
 
 function openSearch() {
   isSearchOpen.value = true
+}
+
+// ✅ Функция открытия модального окна логина
+function openLoginModal() {
+  modalStore.openLoginModal()
 }
 
 const wishlistCount = computed(() => wishlistStore.wishlistProductIds.length)
@@ -111,26 +118,41 @@ onUnmounted(() => {
             </ClientOnly>
           </NuxtLink>
 
-          <!-- Профиль -->
-          <NuxtLink
-            to="/profile"
-            class="relative transition-colors active:scale-95"
-            :class="user && fullName
-              ? 'flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full'
-              : 'p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full'"
-          >
-            <ClientOnly>
-              <div v-if="user && fullName" class="flex items-center gap-1.5">
-                <div class="size-6 rounded-full bg-white/20 flex items-center justify-center">
-                  <Icon name="lucide:user" class="size-3.5 text-white" />
-                </div>
-                <span class="text-sm font-semibold text-white">
-                  {{ fullName }}
-                </span>
+          <!-- ✅ Профиль / Логин -->
+          <ClientOnly>
+            <!-- Авторизованный пользователь -->
+            <NuxtLink
+              v-if="isLoggedIn"
+              to="/profile"
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
+            >
+              <div class="size-6 rounded-full bg-white/20 flex items-center justify-center">
+                <Icon name="lucide:user" class="size-3.5 text-white" />
               </div>
-              <Icon v-else name="lucide:user" class="size-5 text-gray-700 dark:text-gray-300" />
-            </ClientOnly>
-          </NuxtLink>
+              <span class="text-sm font-semibold text-white max-w-[80px] truncate">
+                {{ fullName }}
+              </span>
+            </NuxtLink>
+
+            <!-- ✅ Неавторизованный пользователь - ОТКРЫВАЕТ МОДАЛКУ -->
+            <button
+              v-else
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
+              @click="openLoginModal"
+            >
+              <Icon name="lucide:user" class="size-5 text-white" />
+              <span class="text-sm font-semibold text-white">
+                Войти
+              </span>
+            </button>
+
+            <template #fallback>
+              <div class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full animate-pulse">
+                <div class="size-6 rounded-full bg-gray-200 dark:bg-gray-700" />
+                <div class="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            </template>
+          </ClientOnly>
         </div>
       </div>
     </div>

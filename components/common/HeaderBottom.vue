@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
@@ -9,6 +10,7 @@ const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const wishlistStore = useWishlistStore()
 const cartStore = useCartStore()
+const modalStore = useModalStore()
 
 const { user } = storeToRefs(authStore)
 const { fullName, bonusBalance, isLoggedIn } = storeToRefs(profileStore)
@@ -23,6 +25,11 @@ const formattedBonus = computed(() => {
     return '0'
   return bonusBalance.value.toLocaleString('ru-KZ')
 })
+
+// ✅ Функция открытия модального окна логина
+function openLoginModal() {
+  modalStore.openLoginModal()
+}
 
 // Загружаем профиль при монтировании
 onMounted(() => {
@@ -104,7 +111,7 @@ onMounted(() => {
           </ClientOnly>
         </NuxtLink>
 
-        <!-- Cashback Button -->
+        <!-- ✅ Cashback Button - ТОЛЬКО для авторизованных -->
         <NuxtLink
           v-if="isLoggedIn"
           to="/profile/bonus"
@@ -120,15 +127,15 @@ onMounted(() => {
           </div>
         </NuxtLink>
 
-        <!-- Profile Button -->
-        <NuxtLink
-          to="/profile"
-          class="group"
-        >
-          <ClientOnly>
-            <!-- Авторизованный пользователь -->
+        <!-- ✅ Profile Button / Login Button -->
+        <ClientOnly>
+          <!-- Авторизованный пользователь -->
+          <NuxtLink
+            v-if="isLoggedIn"
+            to="/profile"
+            class="group"
+          >
             <div
-              v-if="user && fullName"
               class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl shadow-lg md:shadow-lg transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20"
             >
               <div class="size-6 md:size-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center font-bold text-white text-sm border border-white/30">
@@ -138,29 +145,34 @@ onMounted(() => {
                 {{ fullName }}
               </span>
             </div>
+          </NuxtLink>
 
-            <!-- Неавторизованный пользователь -->
+          <!-- ✅ Неавторизованный пользователь - ОТКРЫВАЕТ МОДАЛКУ -->
+          <button
+            v-else
+            class="group"
+            @click="openLoginModal"
+          >
             <div
-              v-else
-              class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl md:rounded-2xl transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
+              class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
             >
               <Icon
                 name="lucide:user"
-                class="size-5 text-gray-700 dark:text-gray-300 md:text-white"
+                class="size-5 text-white"
               />
-              <span class="hidden md:block text-sm font-semibold text-gray-700 dark:text-gray-300 md:text-white">
+              <span class="hidden md:block text-sm font-semibold text-white">
                 Войти
               </span>
             </div>
+          </button>
 
-            <template #fallback>
-              <div class="flex items-center gap-2 px-4 py-2.5 bg-gray-100/50 dark:bg-gray-800/50 md:bg-white/10 rounded-2xl animate-pulse md:backdrop-blur-sm">
-                <div class="size-7 rounded-full bg-gray-200 dark:bg-gray-700 md:bg-white/20" />
-                <div class="hidden md:block w-20 h-4 bg-gray-200 dark:bg-gray-700 md:bg-white/20 rounded" />
-              </div>
-            </template>
-          </ClientOnly>
-        </NuxtLink>
+          <template #fallback>
+            <div class="flex items-center gap-2 px-4 py-2.5 bg-gray-100/50 dark:bg-gray-800/50 md:bg-white/10 rounded-2xl animate-pulse md:backdrop-blur-sm">
+              <div class="size-7 rounded-full bg-gray-200 dark:bg-gray-700 md:bg-white/20" />
+              <div class="hidden md:block w-20 h-4 bg-gray-200 dark:bg-gray-700 md:bg-white/20 rounded" />
+            </div>
+          </template>
+        </ClientOnly>
       </div>
     </div>
   </div>

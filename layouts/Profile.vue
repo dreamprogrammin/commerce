@@ -6,7 +6,9 @@ import { useAuthStore } from '@/stores/core/useAuthStore'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
+const { isLoggedIn } = storeToRefs(authStore)
 const { fullName } = storeToRefs(profileStore)
+
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 
 const navItems = [
@@ -19,10 +21,14 @@ const navItems = [
 ]
 
 const userInitial = computed(() => fullName.value?.charAt(0) || 'П')
+
+// ✅ Защита: если пользователь не авторизован - ничего не показываем
+// Middleware уже откроет модальное окно и прервет навигацию
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col md:block">
+  <!-- ✅ Показываем layout только авторизованным пользователям -->
+  <div v-if="isLoggedIn" class="min-h-screen flex flex-col md:block">
     <!-- Desktop Header -->
     <div class="hidden md:block">
       <CommonHeader />
@@ -159,6 +165,16 @@ const userInitial = computed(() => fullName.value?.charAt(0) || 'П')
           <Icon name="lucide:log-out" class="w-5 h-5" />
         </Button>
       </div>
+    </div>
+  </div>
+
+  <!-- ✅ Если не авторизован - показываем loader (на случай race condition) -->
+  <div v-else class="min-h-screen flex items-center justify-center">
+    <div class="text-center space-y-4">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+      <p class="text-muted-foreground">
+        Проверка авторизации...
+      </p>
     </div>
   </div>
 </template>
