@@ -1,6 +1,7 @@
 import type { Database } from '@/types/supabase'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
+import { useModalStore } from '../modal/useModalStore'
 import { useProfileStore } from './profileStore'
 
 export const useAuthStore = defineStore('authStore', () => {
@@ -9,31 +10,39 @@ export const useAuthStore = defineStore('authStore', () => {
   const user = useSupabaseUser()
   const profileStore = useProfileStore()
 
-  // ✅ Теперь все просто: либо залогинен, либо нет (анонимов больше нет)
-  const isLoggedIn = computed(() => !!user.value)
-  const isGuest = computed(() => !user.value)
+  const isLoggedIn = computed(() => !!user.value && !user.value.is_anonymous)
+  const isGuest = computed(() => !!user.value && user.value.is_anonymous)
 
   /**
-   * Инициирует вход через OAuth (например, Google).
+   * Инициирует вход через Google OAuth
    */
-  async function signInWithOAuth(provider: 'google' | 'apple', redirectTo: string = '/profile') {
+  async function signInWithOAuth(provider: 'google', redirectTo: string = '/') {
+    if (user.value && user.value.is_anonymous) {
+      localStorage.setItem('anon_user_id_to_merge', user.value.id)
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}${redirectTo}`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       })
       if (error)
         throw error
     }
     catch (e: any) {
-      toast.error(`Ошибка входа через ${provider}`, { description: e.message })
+      localStorage.removeItem('anon_user_id_to_merge')
+      toast.error('Ошибка входа через Google', { description: e.message })
+      throw e
     }
   }
 
   /**
-   * Выполняет выход пользователя из системы.
+   * Выполняет выход пользователя из системы
    */
   async function signOut() {
     try {
@@ -51,51 +60,50 @@ export const useAuthStore = defineStore('authStore', () => {
   }
 
   /**
-   * ✅ НОВАЯ ЛОГИКА: Проверяем, новый ли это пользователь
-   * Если да - показываем приветствие с информацией о бонусах
+   * Проверяет и объединяет данные анонимного пользователя с реальным
    */
-  async function checkForNewUser() {
-    if (!user.value)
-      return
+  async function checkForUserMerge() {
+    const oldAnonId = localStorage.getItem('anon_user_id_to_merge')
+    const newUserId = user.value?.id
 
-    try {
-      // Загружаем профиль
-      const profileExists = await profileStore.loadProfile(true)
-
-      if (profileExists && profileStore.profile) {
-        const profile = profileStore.profile
-
-        // Проверяем, есть ли приветственные бонусы
-        if (profile.has_received_welcome_bonus && profile.pending_bonus_balance >= 1000) {
-          // Это новый пользователь, показываем приветствие
-          toast.success('Добро пожаловать! 🎉', {
-            description: 'Вам начислено 1000 приветственных бонусов! Они станут доступны через 14 дней.',
-            duration: 8000,
+    if (oldAnonId && newUserId && oldAnonId !== newUserId && !user.value?.is_anonymous) {
+      try {
+        const { error } = await supabase
+          .rpc('merge_anon_user_into_real_user', {
+            old_anon_user_id: oldAnonId,
+            new_real_user_id: newUserId,
           })
-        }
-        else if (profile.has_received_welcome_bonus) {
-          // Старый пользователь возвращается
-          toast.info(`С возвращением, ${profileStore.fullName}!`, {
-            description: 'Рады видеть вас снова в нашем магазине.',
-            duration: 5000,
-          })
-        }
+        if (error)
+          throw error
+        toast.success('Ваши гостевые данные и корзина успешно перенесены!')
+        await profileStore.loadProfile(true)
       }
-    }
-    catch (e: any) {
-      console.error('Error checking user status:', e)
+      catch (e: any) {
+        toast.error('Не удалось перенести данные гостя.', { description: e.message })
+      }
+      finally {
+        localStorage.removeItem('anon_user_id_to_merge')
+      }
     }
   }
 
-  // Следим за изменениями авторизации
-  supabase.auth.onAuthStateChange((event) => {
+  // Обработчик изменения состояния авторизации
+  supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN') {
-      // При входе проверяем, новый ли пользователь
-      checkForNewUser()
+      await profileStore.loadProfile()
+      await checkForUserMerge()
+
+      const modalStore = useModalStore()
+      modalStore.closeLoginModal()
+
+      toast.success('Добро пожаловать!', {
+        description: 'Вы успешно вошли в систему',
+      })
     }
-    else if (event === 'INITIAL_SESSION' && user.value) {
-      // При восстановлении сессии просто загружаем профиль
-      profileStore.loadProfile()
+    else if (event === 'INITIAL_SESSION') {
+      if (session) {
+        await profileStore.loadProfile()
+      }
     }
     else if (event === 'SIGNED_OUT') {
       profileStore.clearProfile()
@@ -106,8 +114,8 @@ export const useAuthStore = defineStore('authStore', () => {
     user,
     isGuest,
     isLoggedIn,
+    checkForUserMerge,
     signInWithOAuth,
     signOut,
-    checkForNewUser, // ✅ Новый метод вместо checkForUserMerge
   }
 })
