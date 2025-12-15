@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   ],
 
   site: {
-    url: 'https://commerce-eta-wheat.vercel.app',
+    url: 'https://uhti.kz',
     name: 'Ухтышка',
     description: 'Интернет-магазин с широким ассортиментом товаров.',
     defaultLocale: 'ru',
@@ -42,8 +42,8 @@ export default defineNuxtConfig({
     identity: {
       type: 'Organization',
       name: 'Ухтышка',
-      url: 'https://commerce-eta-wheat.vercel.app',
-      logo: 'https://commerce-eta-wheat.vercel.app/logo.png',
+      url: 'https://uhti.kz',
+      logo: 'https://uhti.kz/logo.png',
       description: 'Интернет-магазин с широким ассортиментом качественных товаров.',
       address: {
         addressCountry: 'KZ',
@@ -100,7 +100,7 @@ export default defineNuxtConfig({
       },
     ],
     sitemap: [
-      'https://commerce-eta-wheat.vercel.app/sitemap.xml',
+      'https://uhti.kz/sitemap.xml',
     ],
   },
 

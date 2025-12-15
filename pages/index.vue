@@ -65,7 +65,7 @@ const { data: newestProducts, pending: isLoadingNewest } = useAsyncData(
 const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
 
 // SEO для главной страницы
-const siteUrl = 'https://commerce-eta-wheat.vercel.app'
+const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
 
 const metaTitle = `Интернет-магазин детских товаров | ${siteName} - Широкий ассортимент`

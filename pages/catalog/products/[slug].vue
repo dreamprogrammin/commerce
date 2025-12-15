@@ -225,7 +225,7 @@ function prefetchProduct(productSlug: string) {
 const canonicalUrl = computed(() => {
   if (!product.value)
     return ''
-  return `https://commerce-eta-wheat.vercel.app/catalog/products/${product.value.slug}`
+  return `https://uhti.kz/catalog/products/${product.value.slug}`
 })
 
 const metaTitle = computed(() => {
@@ -266,7 +266,7 @@ useRobotsRule(robotsRule)
 
 const ogImageUrl = computed(() => {
   if (!product.value?.product_images?.[0]?.image_url) {
-    return 'https://commerce-eta-wheat.vercel.app/og-default.jpg'
+    return 'https://uhti.kz/og-default.jpg'
   }
 
   const imageUrl = product.value.product_images[0].image_url

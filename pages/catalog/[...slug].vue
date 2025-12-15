@@ -149,7 +149,7 @@ const activeFiltersCount = computed(() => {
   return count
 })
 const canonicalUrl = computed(() => {
-  const baseUrl = 'https://commerce-eta-wheat.vercel.app'
+  const baseUrl = 'https://uhti.kz'
   const path = route.path
   return `${baseUrl}${path}`
 })
@@ -483,7 +483,7 @@ useHead(() => {
           'position': index + 1,
           'name': crumb.name,
           'item': crumb.href
-            ? `https://commerce-eta-wheat.vercel.app${crumb.href}`
+            ? `https://uhti.kz${crumb.href}`
             : undefined,
         })),
       }),
@@ -502,7 +502,7 @@ useHead(() => {
       'isPartOf': {
         '@type': 'WebSite',
         'name': 'Ваш магазин',
-        'url': 'https://commerce-eta-wheat.vercel.app',
+        'url': 'https://uhti.kz',
       },
       // Если есть картинка категории
       ...(categoryOgImageUrl.value && {
@@ -522,7 +522,7 @@ useHead(() => {
         'itemListElement': displayedProducts.value.slice(0, 10).map((product, index) => ({
           '@type': 'ListItem',
           'position': index + 1,
-          'url': `https://commerce-eta-wheat.vercel.app/catalog/products/${product.slug}`,
+          'url': `https://uhti.kz/catalog/products/${product.slug}`,
           'name': product.name,
           'image': product.product_images?.[0]?.image_url
             ? getImageUrl(BUCKET_NAME_PRODUCT, product.product_images?.[0]?.image_url, IMAGE_SIZES.CARD)

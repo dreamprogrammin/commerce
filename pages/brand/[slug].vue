@@ -2,8 +2,8 @@
 import type { IBreadcrumbItem, ProductWithGallery } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
-import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { carouselContainerVariants } from '@/lib/variants'
+import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
 const productsStore = useProductsStore()
