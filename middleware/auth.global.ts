@@ -1,9 +1,7 @@
 // middleware/auth.ts
 import { useModalStore } from '@/stores/modal/useModalStore'
 
-export default defineNuxtRouteMiddleware((to, _from) => {
-  const user = useSupabaseUser()
-
+export default defineNuxtRouteMiddleware(async (to, _from) => {
   // Все пути профиля, требующие авторизации
   const protectedProfilePaths = [
     '/profile',
@@ -15,6 +13,28 @@ export default defineNuxtRouteMiddleware((to, _from) => {
     '/profile/settings',
   ]
 
+  // ✅ НА СЕРВЕРЕ: Пропускаем защищенные страницы (проверим на клиенте)
+  if (import.meta.server && protectedProfilePaths.includes(to.path)) {
+    return
+  }
+
+  // ✅ НА КЛИЕНТЕ: Даем время на инициализацию сессии
+  if (import.meta.client && protectedProfilePaths.includes(to.path)) {
+    const supabase = useSupabaseClient()
+
+    // Ждем получения сессии (максимум 100мс)
+    const { data: { session } } = await supabase.auth.getSession()
+
+    // Если нет сессии - блокируем
+    if (!session) {
+      const modalStore = useModalStore()
+      modalStore.openLoginModal()
+      return navigateTo('/')
+    }
+  }
+
+  const user = useSupabaseUser()
+
   // Dashboard (если используется)
   if (!user.value && to.path === '/dashboard') {
     return navigateTo('/login')
@@ -22,18 +42,6 @@ export default defineNuxtRouteMiddleware((to, _from) => {
 
   // Если пользователь уже залогинен, не показываем страницы входа
   if (user.value && ['/login', '/register'].includes(to.path)) {
-    return navigateTo('/')
-  }
-
-  // ✅ ГЛАВНАЯ ПРОВЕРКА: Если гость пытается зайти в профиль
-  if (protectedProfilePaths.includes(to.path) && !user.value) {
-    // ✅ Открываем модалку ТОЛЬКО на клиенте
-    if (import.meta.client) {
-      const modalStore = useModalStore()
-      modalStore.openLoginModal()
-    }
-
-    // Прерываем навигацию и редиректим на главную
     return navigateTo('/')
   }
 })
