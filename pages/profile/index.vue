@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CircleHelp, Hourglass, Link2, Star } from 'lucide-vue-next'
+import { Hourglass, Star } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
@@ -50,20 +50,6 @@ onMounted(async () => {
         </Badge>
       </div>
 
-      <!-- ✅ Привязка старых заказов -->
-      <Alert class="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-        <Link2 class="h-5 w-5 text-blue-600" />
-        <AlertTitle class="text-blue-900 dark:text-blue-100">
-          Есть заказы на другой email?
-        </AlertTitle>
-        <AlertDescription class="space-y-3">
-          <p class="text-blue-800 dark:text-blue-200">
-            Если вы делали заказы на другой email адрес, вы можете привязать их к вашему аккаунту и получить бонусы за эти заказы!
-          </p>
-          <LinkOrdersDialog />
-        </AlertDescription>
-      </Alert>
-
       <!-- Личные данные -->
       <Card>
         <CardHeader>
@@ -71,9 +57,6 @@ onMounted(async () => {
           <CardDescription>Ваша основная информация</CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
-          <div class="flex justify-between items-center">
-            <span class="text-muted-foreground">Email</span>
-          </div>
           <div class="flex justify-between items-center">
             <span class="text-muted-foreground">Телефон</span>
             <span>{{ profile.phone || 'Не указан' }}</span>
@@ -128,8 +111,8 @@ onMounted(async () => {
                     </TooltipTrigger>
                     <TooltipContent class="max-w-xs">
                       <p>
-                        Бонусы активируются через 14 дней после регистрации
-                        или получения заказа. Это защита от мошенничества.
+                        Бонусы активируются через 14 дней после регистрации.
+                        Это защита от мошенничества.
                       </p>
                     </TooltipContent>
                   </Tooltip>

@@ -2,8 +2,8 @@
 import { useModalStore } from '@/stores/modal/useModalStore'
 
 export default defineNuxtRouteMiddleware(async (to, _from) => {
-  // Все пути профиля, требующие авторизации
-  const protectedProfilePaths = [
+  // Пути, требующие авторизации
+  const protectedPaths = [
     '/profile',
     '/profile/bonus',
     '/profile/children',
@@ -13,34 +13,30 @@ export default defineNuxtRouteMiddleware(async (to, _from) => {
     '/profile/settings',
   ]
 
-  // ✅ НА СЕРВЕРЕ: Пропускаем защищенные страницы (проверим на клиенте)
-  if (import.meta.server && protectedProfilePaths.includes(to.path)) {
-    return
-  }
+  const isProtectedPath = protectedPaths.some(path => to.path.startsWith(path))
 
-  // ✅ НА КЛИЕНТЕ: Даем время на инициализацию сессии
-  if (import.meta.client && protectedProfilePaths.includes(to.path)) {
-    const supabase = useSupabaseClient()
+  // Если это защищенный путь
+  if (isProtectedPath) {
+    // На сервере пропускаем (проверим на клиенте)
+    if (import.meta.server) {
+      return
+    }
 
-    // Ждем получения сессии (максимум 100мс)
-    const { data: { session } } = await supabase.auth.getSession()
+    // На клиенте проверяем сессию
+    if (import.meta.client) {
+      const supabase = useSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
 
-    // Если нет сессии - блокируем
-    if (!session) {
-      const modalStore = useModalStore()
-      modalStore.openLoginModal()
-      return navigateTo('/')
+      if (!session) {
+        const modalStore = useModalStore()
+        modalStore.openLoginModal()
+        return navigateTo('/')
+      }
     }
   }
 
+  // Если залогинен, не показываем страницы входа
   const user = useSupabaseUser()
-
-  // Dashboard (если используется)
-  if (!user.value && to.path === '/dashboard') {
-    return navigateTo('/login')
-  }
-
-  // Если пользователь уже залогинен, не показываем страницы входа
   if (user.value && ['/login', '/register'].includes(to.path)) {
     return navigateTo('/')
   }

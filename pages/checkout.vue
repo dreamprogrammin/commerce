@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Gift, Star } from 'lucide-vue-next'
+import { Star } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
@@ -29,7 +29,6 @@ const orderForm = ref({
   },
 })
 const bonusesInput = ref(0)
-const showBonusModal = ref(false)
 
 // --- Вычисляемые свойства ---
 const bonusesToAward = computed(() => {
@@ -39,7 +38,7 @@ const bonusesToAward = computed(() => {
 
 // --- Логика ---
 
-// Предзаполнение формы при загрузке или изменении профиля
+// Предзаполнение формы при загрузке
 watch(
   () => profileStore.profile,
   (newProfile) => {
@@ -53,11 +52,6 @@ watch(
   },
   { immediate: true },
 )
-
-// ✅ Проверяем, новый ли пользователь при загрузке страницы
-onMounted(() => {
-  authStore.checkForNewUser()
-})
 
 function applyBonuses() {
   if (bonusesInput.value > bonusBalance.value) {
@@ -79,43 +73,23 @@ function applyBonuses() {
 }
 
 /**
- * ✅ Главный обработчик отправки формы
+ * Оформление заказа (упрощенная версия)
  */
-async function handleFormSubmit() {
+async function placeOrder() {
   // Валидация формы
   if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !orderForm.value.phone.trim()) {
     toast.error('Заполните все обязательные поля')
     return
   }
 
-  // Если пользователь залогинен, просто оформляем
-  if (isLoggedIn.value) {
-    await placeOrder()
-    return
-  }
-
-  // ✅ Если это гость и ему могут начислить бонусы - показываем предложение
-  if (bonusesToAward.value > 0) {
-    showBonusModal.value = true
-  }
-  else {
-    // Гость без бонусов - просто оформляем
-    await placeOrder()
-  }
-}
-
-/**
- * ✅ Финальная функция оформления заказа
- */
-async function placeOrder() {
-  showBonusModal.value = false
-
-  // Собираем данные гостя
-  const guestInfo = {
-    name: orderForm.value.name.trim(),
-    email: orderForm.value.email.trim(),
-    phone: orderForm.value.phone.trim(),
-  }
+  // Собираем данные гостя (если не залогинен)
+  const guestInfo = !isLoggedIn.value
+    ? {
+        name: orderForm.value.name.trim(),
+        email: orderForm.value.email.trim(),
+        phone: orderForm.value.phone.trim(),
+      }
+    : undefined
 
   await cartStore.checkout({
     deliveryMethod: orderForm.value.deliveryMethod,
@@ -129,20 +103,11 @@ async function placeOrder() {
     guestInfo,
   })
 }
-
-/**
- * ✅ Вызывается для регистрации из модалки
- */
-function handleRegisterAndGetBonus() {
-  showBonusModal.value = false
-  // Возвращаем пользователя обратно на checkout после регистрации
-  authStore.signInWithOAuth('google', '/checkout')
-}
 </script>
 
 <template>
   <div class="container py-12">
-    <!-- ✅ Корзина пуста -->
+    <!-- Корзина пуста -->
     <div
       v-if="items.length === 0"
       class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4"
@@ -157,49 +122,24 @@ function handleRegisterAndGetBonus() {
       </NuxtLink>
     </div>
 
-    <!-- ✅ Есть товары в корзине -->
+    <!-- Есть товары в корзине -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
       <!-- Левая колонка: Форма -->
-      <form class="lg:col-span-2 space-y-8" @submit.prevent="handleFormSubmit">
-        <!-- ✅ Баннер с бонусами для гостей -->
-        <Alert v-if="!isLoggedIn" variant="default" class="border-primary/50 bg-primary/5">
-          <Gift class="h-5 w-5 text-primary" />
-          <AlertTitle class="text-primary">
-            Получите 1000 бонусов при регистрации!
-          </AlertTitle>
-          <AlertDescription class="space-y-2">
-            <p>Зарегистрируйтесь прямо сейчас и получите приветственный бонус.</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              @click="authStore.signInWithOAuth('google', '/checkout')"
-            >
-              Войти через Google
-            </Button>
-          </AlertDescription>
-        </Alert>
-
-        <!-- ✅ НОВОЕ: Подсказка о разных email -->
-        <EmailHintAlert
-          v-if="isLoggedIn && user?.email"
-          :current-email="user.email"
-          :entered-email="orderForm.email"
-        />
-
+      <form class="lg:col-span-2 space-y-8" @submit.prevent="placeOrder">
         <!-- Блок 1: Контактная информация -->
         <Card>
           <CardHeader>
             <CardTitle>1. Контактная информация</CardTitle>
             <CardDescription v-if="!isLoggedIn">
-              Уже есть аккаунт?
+              Хотите получать бонусы за покупки?
               <button
                 type="button"
                 class="font-semibold text-primary hover:underline"
                 @click="authStore.signInWithOAuth('google', '/checkout')"
               >
                 Войдите
-              </button>, чтобы использовать бонусы!
+              </button>
+              и получите 1000 бонусов в подарок!
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
@@ -290,7 +230,7 @@ function handleRegisterAndGetBonus() {
           </CardContent>
         </Card>
 
-        <!-- ✅ Блок 3: Бонусы (только для авторизованных) -->
+        <!-- Блок 3: Бонусы (только для авторизованных) -->
         <Card v-if="isLoggedIn && bonusBalance > 0">
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
@@ -362,8 +302,8 @@ function handleRegisterAndGetBonus() {
                 <span>-{{ discountAmount.toFixed(0) }} ₸</span>
               </div>
 
-              <!-- Будущие бонусы -->
-              <div v-if="bonusesToAward > 0" class="flex justify-between text-xs text-muted-foreground">
+              <!-- Будущие бонусы (только для авторизованных) -->
+              <div v-if="isLoggedIn && bonusesToAward > 0" class="flex justify-between text-xs text-muted-foreground">
                 <span class="flex items-center gap-1">
                   <Star class="w-3 h-3" />
                   Вы получите:
@@ -381,48 +321,5 @@ function handleRegisterAndGetBonus() {
         </Card>
       </aside>
     </div>
-
-    <!-- ✅ Модальное окно для гостей -->
-    <AlertDialog :open="showBonusModal" @update:open="(val) => showBonusModal = val">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle class="flex items-center gap-2 text-xl">
-            <Gift class="w-6 h-6 text-primary" />
-            Получите 1000 бонусов!
-          </AlertDialogTitle>
-          <AlertDialogDescription class="py-4 space-y-3">
-            <p class="text-base">
-              За этот заказ вам будет начислено
-              <Badge variant="secondary" class="mx-1 text-base">
-                {{ bonusesToAward }} бонусов
-              </Badge>
-            </p>
-            <div class="p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <p class="text-base font-semibold text-foreground mb-2">
-                🎉 Специальное предложение:
-              </p>
-              <p class="text-base text-foreground">
-                Зарегистрируйтесь <strong>прямо сейчас</strong> и получите
-                <span class="text-primary font-bold text-lg">1000 приветственных бонусов</span> в подарок!
-              </p>
-            </div>
-            <p class="text-sm text-muted-foreground">
-              • Бонусы станут доступны через 14 дней<br>
-              • Ваша корзина и данные сохранятся<br>
-              • 1 бонус = 1 ₸ скидки
-            </p>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter class="flex-col sm:flex-row gap-2">
-          <Button variant="outline" class="w-full sm:w-auto" @click="placeOrder">
-            Продолжить как гость
-          </Button>
-          <Button class="w-full sm:w-auto" @click="handleRegisterAndGetBonus">
-            <Gift class="w-4 h-4 mr-2" />
-            Получить бонусы
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   </div>
 </template>
