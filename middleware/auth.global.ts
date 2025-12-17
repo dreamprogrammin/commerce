@@ -3,7 +3,6 @@ import { useModalStore } from '@/stores/modal/useModalStore'
 
 export default defineNuxtRouteMiddleware((to, _from) => {
   const user = useSupabaseUser()
-  const modalStore = useModalStore()
 
   // Все пути профиля, требующие авторизации
   const protectedProfilePaths = [
@@ -28,10 +27,13 @@ export default defineNuxtRouteMiddleware((to, _from) => {
 
   // ✅ ГЛАВНАЯ ПРОВЕРКА: Если гость пытается зайти в профиль
   if (protectedProfilePaths.includes(to.path) && !user.value) {
-    // Открываем модальное окно логина
-    modalStore.openLoginModal()
+    // ✅ Открываем модалку ТОЛЬКО на клиенте
+    if (import.meta.client) {
+      const modalStore = useModalStore()
+      modalStore.openLoginModal()
+    }
 
-    // Прерываем навигацию и остаемся на текущей странице
-    return abortNavigation()
+    // Прерываем навигацию и редиректим на главную
+    return navigateTo('/')
   }
 })

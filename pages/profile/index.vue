@@ -9,7 +9,6 @@ const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
 // --- Реактивные данные ---
-const { user } = storeToRefs(authStore)
 const { profile, fullName, bonusBalance, isLoading, pendingBonuses } = storeToRefs(profileStore)
 
 // --- Метаданные страницы ---
@@ -24,9 +23,7 @@ useHead({
 
 // --- Загружаем профиль при монтировании ---
 onMounted(async () => {
-  if (user.value) {
-    await profileStore.loadProfile()
-  }
+  await profileStore.loadProfile()
 })
 </script>
 
@@ -76,7 +73,6 @@ onMounted(async () => {
         <CardContent class="space-y-4">
           <div class="flex justify-between items-center">
             <span class="text-muted-foreground">Email</span>
-            <span>{{ user?.email }}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-muted-foreground">Телефон</span>

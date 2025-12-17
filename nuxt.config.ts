@@ -134,6 +134,20 @@ export default defineNuxtConfig({
       // 🔥 Отключаем prerender для несуществующих страниц
       '/about': { prerender: false },
       '/contacts': { prerender: false },
+      '/profile/**': {
+        ssr: false, // Отключаем серверный рендеринг
+      },
+
+      // Отключаем для других защищенных страниц
+      '/checkout': {
+        ssr: false,
+      },
+      '/cart': {
+        ssr: false,
+      },
+      '/order/**': {
+        ssr: false,
+      },
     },
     compressPublicAssets: true,
     minify: true,
