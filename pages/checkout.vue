@@ -30,6 +30,9 @@ const orderForm = ref({
 })
 const bonusesInput = ref(0)
 
+// --- Модалка для гостей ---
+const showGuestModal = ref(false)
+
 // --- Вычисляемые свойства ---
 const bonusesToAward = computed(() => {
   return items.value.reduce((sum, item) =>
@@ -53,6 +56,20 @@ watch(
   { immediate: true },
 )
 
+// Показываем модалку гостям один раз за сессию
+const hasSeenModalKey = 'guest_bonus_modal_seen'
+
+onMounted(() => {
+  const hasSeenModal = sessionStorage.getItem(hasSeenModalKey)
+
+  if (!isLoggedIn.value && items.value.length > 0 && !hasSeenModal) {
+    setTimeout(() => {
+      showGuestModal.value = true
+      sessionStorage.setItem(hasSeenModalKey, 'true')
+    }, 800)
+  }
+})
+
 function applyBonuses() {
   if (bonusesInput.value > bonusBalance.value) {
     toast.error('Недостаточно бонусов', {
@@ -72,17 +89,14 @@ function applyBonuses() {
   }
 }
 
-/**
- * Оформление заказа (упрощенная версия)
- */
 async function placeOrder() {
-  // Валидация формы
+  // Валидация
   if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !orderForm.value.phone.trim()) {
     toast.error('Заполните все обязательные поля')
     return
   }
 
-  // Собираем данные гостя (если не залогинен)
+  // Данные гостя (если не авторизован)
   const guestInfo = !isLoggedIn.value
     ? {
         name: orderForm.value.name.trim(),
@@ -107,6 +121,9 @@ async function placeOrder() {
 
 <template>
   <div class="container py-12">
+    <!-- Модалка для гостей -->
+    <GuestBonusModal v-model:open="showGuestModal" />
+
     <!-- Корзина пуста -->
     <div
       v-if="items.length === 0"
@@ -131,15 +148,14 @@ async function placeOrder() {
           <CardHeader>
             <CardTitle>1. Контактная информация</CardTitle>
             <CardDescription v-if="!isLoggedIn">
-              Хотите получать бонусы за покупки?
               <button
                 type="button"
                 class="font-semibold text-primary hover:underline"
-                @click="authStore.signInWithOAuth('google', '/checkout')"
+                @click="showGuestModal = true"
               >
-                Войдите
+                Зарегистрируйтесь
               </button>
-              и получите 1000 бонусов в подарок!
+              и получите 1000 бонусов прямо сейчас! 🎁
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
