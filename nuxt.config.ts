@@ -168,7 +168,7 @@ export default defineNuxtConfig({
       // Image proxy
       '/api/image-proxy/**': {
         proxy: {
-          to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/**', // 🔥 Добавил /v1/object/public
+          to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**', // 🔥 Добавил /v1/object/public
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
