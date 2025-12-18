@@ -20,17 +20,17 @@ export default defineNuxtConfig({
   site: {
     url: 'https://uhti.kz',
     name: 'Ухтышка',
-    description: 'Интернет-магазин с широким ассортиментом товаров.',
+    // 🔥 Улучшенное описание для детских игрушек
+    description: 'Интернет-магазин детских игрушек с быстрой доставкой по Казахстану. Развивающие игры, конструкторы, куклы, машинки, настольные игры.',
     defaultLocale: 'ru',
   },
+
   ogImage: {
-    // Включаем кеширование
     runtimeCacheStorage: true,
     defaults: {
       width: 1200,
       height: 630,
     },
-    // 🔥 ВАЖНО: Явно указываем шрифты для Satori
     fonts: [
       'Inter:400',
       'Inter:700',
@@ -44,7 +44,8 @@ export default defineNuxtConfig({
       name: 'Ухтышка',
       url: 'https://uhti.kz',
       logo: 'https://uhti.kz/logo.png',
-      description: 'Интернет-магазин с широким ассортиментом качественных товаров.',
+      // 🔥 Улучшенное описание
+      description: 'Интернет-магазин детских игрушек с широким ассортиментом качественных товаров и быстрой доставкой по Казахстану.',
       address: {
         addressCountry: 'KZ',
         addressLocality: 'Алматы',
@@ -54,7 +55,12 @@ export default defineNuxtConfig({
         contactType: 'customer service',
         availableLanguage: ['ru', 'kk'],
       },
-      sameAs: [],
+      sameAs: [
+        // 🔥 Добавьте ссылки на соцсети когда создадите
+        // 'https://www.instagram.com/uhtikz',
+        // 'https://www.facebook.com/uhtikz',
+        // 'https://t.me/uhtikz',
+      ],
     },
   },
 
@@ -72,6 +78,11 @@ export default defineNuxtConfig({
       '/checkout',
       '/search',
     ],
+    // 🔥 Настройки по умолчанию для sitemap
+    defaults: {
+      changefreq: 'daily',
+      priority: 0.7,
+    },
   },
 
   robots: {
@@ -95,8 +106,24 @@ export default defineNuxtConfig({
           '/checkout',
           '/search',
           '/api/**',
-          '/*?*',
+          '/_nuxt/**', // 🔥 Добавил _nuxt
+          // 🔥 ИСПРАВЛЕНО: убрал '/*?*' - это блокирует фильтры в каталоге!
         ],
+      },
+      // 🔥 Специальные правила для Яндекса
+      {
+        userAgent: ['Yandex'],
+        allow: [
+          '/',
+          '/catalog/**',
+          '/brand/**',
+        ],
+        disallow: [
+          '/admin',
+          '/api/**',
+          '/profile',
+        ],
+        crawlDelay: 1,
       },
     ],
     sitemap: [
@@ -106,9 +133,42 @@ export default defineNuxtConfig({
 
   nitro: {
     routeRules: {
+      // 🔥 Главная страница - короткий кеш (часто меняется)
+      '/': {
+        swr: 600, // 10 минут
+        headers: {
+          'Cache-Control': 'public, max-age=600, s-maxage=600, stale-while-revalidate=1200',
+        },
+      },
+
+      // 🔥 Каталог - средний кеш
+      '/catalog': {
+        swr: 1800, // 30 минут
+        headers: {
+          'Cache-Control': 'public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600',
+        },
+      },
+
+      // 🔥 Страницы товаров - длинный кеш (редко меняются)
+      '/catalog/products/**': {
+        swr: 3600, // 1 час
+        headers: {
+          'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200',
+        },
+      },
+
+      // 🔥 Категории - средний кеш
+      '/catalog/**': {
+        swr: 1800, // 30 минут
+        headers: {
+          'Cache-Control': 'public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600',
+        },
+      },
+
+      // Image proxy
       '/api/image-proxy/**': {
         proxy: {
-          to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**',
+          to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/**', // 🔥 Добавил /v1/object/public
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
@@ -125,39 +185,58 @@ export default defineNuxtConfig({
           'Cache-Control': 'public, max-age=31536000, immutable',
         },
       },
-      // 🔥 Правило для OG Image эндпоинта
+
+      // OG Image эндпоинт
       '/__og-image__/**': {
         headers: {
           'Cache-Control': 'public, max-age=604800, immutable',
         },
       },
-      '/catalog/products/**': {
-        swr: 3600, // Кеш на 1 час для статических страниц
+
+      // 🔥 Статические страницы (создайте их позже)
+      '/about': {
+        prerender: false,
+        swr: 86400, // 24 часа - редко меняется
       },
-      // 🔥 Отключаем prerender для несуществующих страниц
-      '/about': { prerender: false },
-      '/contacts': { prerender: false },
-      '/profile/**': {
-        ssr: false, // Отключаем серверный рендеринг
+      '/contacts': {
+        prerender: false,
+        swr: 86400, // 24 часа
       },
 
-      // Отключаем для других защищенных страниц
-      '/checkout': {
-        ssr: false,
-      },
-      '/cart': {
-        ssr: false,
-      },
-      '/order/**': {
-        ssr: false,
-      },
+      // Защищенные страницы без SSR
+      '/profile/**': { ssr: false },
+      '/checkout': { ssr: false },
+      '/cart': { ssr: false },
+      '/order/**': { ssr: false },
+      '/admin/**': { ssr: false }, // 🔥 Добавил админку
     },
+
     compressPublicAssets: true,
     minify: true,
+
+    // 🔥 Prerender важных страниц при билде
+    prerender: {
+      crawlLinks: true,
+      routes: [
+        '/',
+        '/catalog',
+      ],
+    },
   },
 
   image: {
     domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
+    // 🔥 Оптимизация изображений
+    format: ['webp', 'jpg', 'png'],
+    quality: 80,
+    screens: {
+      xs: 320,
+      sm: 640,
+      md: 768,
+      lg: 1024,
+      xl: 1280,
+      xxl: 1536,
+    },
   },
 
   app: {
@@ -166,7 +245,7 @@ export default defineNuxtConfig({
         lang: 'ru',
       },
       link: [
-      // Preconnect
+        // Preconnect
         {
           rel: 'preconnect',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
@@ -194,12 +273,18 @@ export default defineNuxtConfig({
       ],
       meta: [
         { charset: 'utf-8' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { name: 'format-detection', content: 'telephone=no' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=5' }, // 🔥 Добавил maximum-scale
+        { name: 'format-detection', content: 'telephone=yes' }, // 🔥 Изменил на yes для e-commerce
 
-        // Тема для мобильных браузеров (можете изменить цвет)
+        // Тема для мобильных браузеров
         { name: 'theme-color', content: '#ffffff' },
         { name: 'msapplication-TileColor', content: '#ffffff' },
+
+        // 🔥 Мобильная оптимизация
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+        { name: 'apple-mobile-web-app-title', content: 'Ухтышка' },
       ],
     },
   },
@@ -218,6 +303,7 @@ export default defineNuxtConfig({
       terserOptions: {
         compress: {
           drop_console: true,
+          drop_debugger: true, // 🔥 Добавил удаление debugger
         },
       },
       rollupOptions: {
@@ -238,6 +324,13 @@ export default defineNuxtConfig({
 
   build: {
     transpile: ['vue-sonner'],
+  },
+
+  // 🔥 Экспериментальные функции для производительности
+  experimental: {
+    payloadExtraction: true,
+    renderJsonPayloads: true,
+    viewTransition: true,
   },
 
   devtools: { enabled: true },
