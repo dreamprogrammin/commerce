@@ -56,11 +56,22 @@ export const useAuthStore = defineStore('authStore', () => {
   // Обработчик изменения состояния авторизации
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN') {
-      await profileStore.loadProfile()
+      // Пытаемся загрузить профиль
+      const hasProfile = await profileStore.loadProfile()
 
-      toast.success('Добро пожаловать!', {
-        description: 'Вы получили 1000 приветственных бонусов 🎁',
-      })
+      if (hasProfile) {
+        // Профиль уже существует - обычный вход
+        toast.success('С возвращением!', {
+          description: `Добро пожаловать, ${profileStore.fullName}!`,
+        })
+      }
+      else {
+        // Профиля нет - первый вход
+        toast.success('Добро пожаловать!', {
+          description: 'Сделайте первую покупку и получите 1000 приветственных бонусов! 🎁',
+          duration: 7000,
+        })
+      }
     }
     else if (event === 'INITIAL_SESSION') {
       if (session) {

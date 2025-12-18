@@ -1,13 +1,11 @@
 import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { useProfileStore } from '../core/profileStore'
-import { useProductsStore } from './productsStore'
 
 const CART_STORAGE_KEY = 'krakenshop-cart-v1'
 
-// 🔥 Тип для элемента корзины - используем существующий ProductWithImages
 export interface ICartItem {
-  product: ProductWithImages // Это уже ProductRow + product_images[]
+  product: ProductWithImages
   quantity: number
 }
 
@@ -20,7 +18,6 @@ export const useCartStore = defineStore('cartStore', () => {
   const items = ref<ICartItem[]>([])
   const isProcessing = ref(false)
   const bonusesToSpend = ref(0)
-  const productsStore = useProductsStore()
 
   const totalItems = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
 
@@ -29,6 +26,9 @@ export const useCartStore = defineStore('cartStore', () => {
   )
 
   const discountAmount = computed(() => {
+    // Только для авторизованных пользователей
+    if (!user.value)
+      return 0
     return Math.min(bonusesToSpend.value, profileStore.bonusBalance)
   })
 
@@ -37,13 +37,15 @@ export const useCartStore = defineStore('cartStore', () => {
     return finalTotal > 0 ? Number(finalTotal.toFixed(2)) : 0
   })
 
-  /**
-   * Добавить товар в корзину
-   * @param productIdOrObject - ID товара (string) или объект товара с полем id
-   * @param quantity - Количество
-   */
+  // Вычисляем бонусы, которые пользователь получит (только для авторизованных)
+  const bonusesToAward = computed(() => {
+    if (!user.value)
+      return 0
+    return items.value.reduce((sum, item) =>
+      sum + (item.product.bonus_points_award || 0) * item.quantity, 0)
+  })
+
   async function addItem(productIdOrObject: string | { id: string }, quantity: number = 1) {
-    // 🔥 Извлекаем ID из строки или объекта
     const productId = typeof productIdOrObject === 'string'
       ? productIdOrObject
       : productIdOrObject.id
@@ -54,7 +56,6 @@ export const useCartStore = defineStore('cartStore', () => {
       return
     }
 
-    // 1. Проверяем, есть ли товар уже в корзине
     const existingItem = items.value.find(item => item.product.id === productId)
 
     if (existingItem) {
@@ -63,7 +64,6 @@ export const useCartStore = defineStore('cartStore', () => {
       return
     }
 
-    // 2. Загружаем полный товар с изображениями
     try {
       const { data: fullProduct, error } = await supabase
         .from('products')
@@ -88,7 +88,6 @@ export const useCartStore = defineStore('cartStore', () => {
         throw error
 
       if (fullProduct) {
-        // 3. Добавляем в корзину полный объект с изображениями
         items.value.push({
           product: fullProduct as ProductWithImages,
           quantity,
@@ -128,6 +127,12 @@ export const useCartStore = defineStore('cartStore', () => {
   }
 
   function setBonusesToSpend(amount: number) {
+    // Бонусы только для авторизованных
+    if (!user.value) {
+      bonusesToSpend.value = 0
+      return
+    }
+
     const userBalance = profileStore.bonusBalance
     if (amount < 0 || Number.isNaN(amount)) {
       bonusesToSpend.value = 0
@@ -139,67 +144,89 @@ export const useCartStore = defineStore('cartStore', () => {
   }
 
   /**
-   * Гарантирует наличие сессии (реальной или анонимной) перед действием с корзиной.
+   * Оформление заказа
+   * Автоматически определяет: гость или авторизованный пользователь
    */
-  async function ensureUserSession() {
-    if (user.value)
-      return user.value
-    try {
-      const { data, error } = await supabase
-        .auth
-        .signInAnonymously()
-      if (error)
-        throw error
-      console.warn('Создана анонимная сессия для гостя:', data.user?.id)
-      return data.user
-    }
-    catch (e: any) {
-      toast.error('Ошибка создания гостевой сессии', { description: e.message })
-      return null
-    }
-  }
-
   async function checkout(orderData: ICheckoutData) {
     if (items.value.length === 0) {
       toast.error('Ваша корзина пуста.')
       return
     }
+
     isProcessing.value = true
+
     try {
-      const currentUser = await ensureUserSession()
-      if (!currentUser) {
-        throw new Error('Не удалось создать сессию для оформления заказа.')
+      const cartItems = items.value.map(i => ({
+        product_id: i.product.id,
+        quantity: i.quantity,
+      }))
+
+      let orderId: string | null = null
+
+      // Определяем: гость или авторизованный пользователь
+      if (!user.value) {
+        // === ГОСТЕВОЙ ЗАКАЗ ===
+        if (!orderData.guestInfo?.name || !orderData.guestInfo?.email || !orderData.guestInfo?.phone) {
+          throw new Error('Заполните все обязательные поля: имя, email и телефон')
+        }
+
+        const { data, error } = await supabase.rpc('create_guest_checkout', {
+          p_cart_items: cartItems,
+          p_guest_info: orderData.guestInfo,
+          p_delivery_method: orderData.deliveryMethod,
+          p_delivery_address: orderData.deliveryAddress,
+          p_payment_method: orderData.paymentMethod,
+        })
+
+        if (error)
+          throw error
+        orderId = data
+
+        toast.success('Заказ успешно оформлен!', {
+          description: 'Спасибо за покупку! Мы свяжемся с вами в ближайшее время.',
+          duration: 5000,
+        })
+      }
+      else {
+        // === ЗАКАЗ АВТОРИЗОВАННОГО ПОЛЬЗОВАТЕЛЯ ===
+        const { data, error } = await supabase.rpc('create_user_order', {
+          p_cart_items: cartItems,
+          p_delivery_method: orderData.deliveryMethod,
+          p_delivery_address: orderData.deliveryAddress,
+          p_payment_method: orderData.paymentMethod,
+          p_bonuses_to_spend: bonusesToSpend.value,
+        })
+
+        if (error)
+          throw error
+        orderId = data
+
+        const bonusesAwarded = bonusesToAward.value
+
+        toast.success('Заказ успешно создан!', {
+          description: bonusesAwarded > 0
+            ? `Спасибо за покупку! ${bonusesAwarded} бонусов будут начислены на ваш счет и станут активны через 7 дней.`
+            : 'Спасибо за покупку!',
+          duration: 10000,
+        })
+
+        // Перезагружаем профиль для обновления бонусов
+        await profileStore.loadProfile(true)
       }
 
-      const { data: newOrderId, error } = await supabase.rpc('create_order', {
-        p_cart_items: items.value.map(i => ({
-          product_id: i.product.id,
-          quantity: i.quantity,
-        })),
-        p_delivery_method: orderData.deliveryMethod,
-        p_payment_method: orderData.paymentMethod,
-        p_delivery_address: orderData.deliveryAddress,
-        p_guest_info: orderData.guestInfo,
-        p_bonuses_to_spend: bonusesToSpend.value,
-      })
-
-      if (error)
-        throw error
-
-      const bonusesAwarded = items.value
-        .reduce((sum, item) =>
-          sum + (item.product.bonus_points_award || 0) * item.quantity, 0)
-
-      toast.success('Заказ успешно создан!', {
-        description: `Спасибо за покупку! ${bonusesAwarded} бонусов будут начислены на ваш счет и станут активны через 14 дней.`,
-        duration: 10000,
-      })
+      if (!orderId) {
+        throw new Error('Не удалось получить ID заказа')
+      }
 
       clearCart()
-      await router.push(`/order/success/${newOrderId}`)
+      await router.push(`/order/success/${orderId}`)
     }
     catch (error: any) {
-      toast.error('Ошибка оформления заказа', { description: error.message })
+      console.error('Checkout error:', error)
+      toast.error('Ошибка оформления заказа', {
+        description: error.message || 'Попробуйте еще раз',
+        duration: 5000,
+      })
     }
     finally {
       isProcessing.value = false
@@ -214,6 +241,7 @@ export const useCartStore = defineStore('cartStore', () => {
     subtotal,
     discountAmount,
     total,
+    bonusesToAward,
     addItem,
     removeItem,
     updateQuantity,

@@ -6,17 +6,22 @@ import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
-// --- Инициализация ---
 const authStore = useAuthStore()
 const cartStore = useCartStore()
 const profileStore = useProfileStore()
 
-// --- Реактивные данные из сторов ---
 const { user, isLoggedIn } = storeToRefs(authStore)
 const { bonusBalance } = storeToRefs(profileStore)
-const { subtotal, discountAmount, total, items, isProcessing, bonusesToSpend } = storeToRefs(cartStore)
+const {
+  subtotal,
+  discountAmount,
+  total,
+  items,
+  isProcessing,
+  bonusesToSpend,
+  bonusesToAward,
+} = storeToRefs(cartStore)
 
-// --- Локальное состояние формы ---
 const orderForm = ref({
   name: '',
   phone: '',
@@ -29,19 +34,9 @@ const orderForm = ref({
   },
 })
 const bonusesInput = ref(0)
-
-// --- Модалка для гостей ---
 const showGuestModal = ref(false)
 
-// --- Вычисляемые свойства ---
-const bonusesToAward = computed(() => {
-  return items.value.reduce((sum, item) =>
-    sum + (item.product.bonus_points_award || 0) * item.quantity, 0)
-})
-
-// --- Логика ---
-
-// Предзаполнение формы при загрузке
+// Предзаполнение формы
 watch(
   () => profileStore.profile,
   (newProfile) => {
@@ -56,7 +51,7 @@ watch(
   { immediate: true },
 )
 
-// Показываем модалку гостям один раз за сессию
+// Модалка для гостей (один раз за сессию)
 const hasSeenModalKey = 'guest_bonus_modal_seen'
 
 onMounted(() => {
@@ -96,7 +91,7 @@ async function placeOrder() {
     return
   }
 
-  // Данные гостя (если не авторизован)
+  // Для гостей обязательны данные
   const guestInfo = !isLoggedIn.value
     ? {
         name: orderForm.value.name.trim(),
@@ -142,7 +137,7 @@ async function placeOrder() {
     <!-- Есть товары в корзине -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
       <!-- Левая колонка: Форма -->
-      <form class="lg:col-span-2 space-y-8" @submit.prevent="placeOrder">
+      <div class="lg:col-span-2 space-y-8">
         <!-- Блок 1: Контактная информация -->
         <Card>
           <CardHeader>
@@ -155,7 +150,7 @@ async function placeOrder() {
               >
                 Зарегистрируйтесь
               </button>
-              и получите 1000 бонусов прямо сейчас! 🎁
+              и получите 1000 бонусов при первой покупке! 🎁
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
@@ -280,15 +275,16 @@ async function placeOrder() {
 
         <!-- Кнопка оформления -->
         <Button
-          type="submit"
+          type="button"
           size="lg"
           class="w-full text-lg"
           :disabled="isProcessing"
+          @click="placeOrder"
         >
           <span v-if="isProcessing">Оформляем заказ...</span>
           <span v-else>Подтвердить заказ на {{ total.toFixed(0) }} ₸</span>
         </Button>
-      </form>
+      </div>
 
       <!-- Правая колонка: Состав заказа -->
       <aside class="col-span-1 lg:sticky top-24">
