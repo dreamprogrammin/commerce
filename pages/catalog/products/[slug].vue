@@ -29,18 +29,28 @@ const activeTab = ref<'description' | 'features'>('description')
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 
-// ✅ 1. Загрузка категорий (один раз) - категории загружаются в store
-useQuery({
-  queryKey: ['categories'],
-  queryFn: async () => {
+// 🔥 КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Загружаем категории и продукт на сервере
+if (import.meta.server) {
+  // Загружаем категории сначала
+  if (!categoriesStore.allCategories.length) {
     await categoriesStore.fetchCategoryData()
-    return true
-  },
-  staleTime: 10 * 60 * 1000, // 10 минут
-  gcTime: 30 * 60 * 1000,
-})
+  }
 
-// ✅ 2. Основной продукт - с кешированием по slug
+  // Загружаем продукт и добавляем в QueryClient для гидратации
+  const initialProduct = await productsStore.fetchProductBySlug(slug.value)
+  if (!initialProduct) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Товар не найден',
+      fatal: true,
+    })
+  }
+
+  // 🔥 Предзаполняем кеш для useQuery
+  queryClient.setQueryData(['product', slug.value], initialProduct)
+}
+
+// ✅ useQuery будет использовать данные из кеша на сервере
 const {
   data: product,
   isLoading: isProductLoading,
@@ -54,9 +64,13 @@ const {
     }
     return fetchedProduct
   },
-  staleTime: 5 * 60 * 1000, // 5 минут - данные свежие
-  gcTime: 30 * 60 * 1000, // 30 минут в кеше
+  staleTime: 5 * 60 * 1000,
+  gcTime: 30 * 60 * 1000,
   retry: 1,
+  // 🔥 На сервере данные уже в кеше, не делаем повторный запрос
+  initialData: import.meta.server
+    ? queryClient.getQueryData(['product', slug.value])
+    : undefined,
 })
 
 // ✅ Обработка ошибки 404
@@ -79,11 +93,11 @@ const { data: accessories, isLoading: accessoriesLoading } = useQuery({
     return await productsStore.fetchProductsByIds(product.value.accessory_ids)
   },
   enabled: computed(() => !!product.value?.accessory_ids?.length),
-  staleTime: 10 * 60 * 1000, // 10 минут - аксессуары редко меняются
+  staleTime: 10 * 60 * 1000,
   gcTime: 30 * 60 * 1000,
 })
 
-// ✅ 4. Похожие товары - кешируются по category_id (умная штука!)
+// ✅ 4. Похожие товары
 const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
   queryKey: ['similar-products', computed(() => product.value?.category_id)],
   queryFn: async () => {
@@ -95,7 +109,7 @@ const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
     )
   },
   enabled: computed(() => !!product.value?.category_id),
-  staleTime: 15 * 60 * 1000, // 15 минут - похожие товары долго актуальны
+  staleTime: 15 * 60 * 1000,
   gcTime: 30 * 60 * 1000,
 })
 
@@ -212,7 +226,6 @@ watch(() => product.value?.id, () => {
   quantity.value = 1
 }, { immediate: true })
 
-// 🔥 Prefetch похожих товаров при наведении
 function prefetchProduct(productSlug: string) {
   queryClient.prefetchQuery({
     queryKey: ['product', productSlug],
@@ -221,7 +234,7 @@ function prefetchProduct(productSlug: string) {
   })
 }
 
-// 🔥 SEO & OG IMAGE
+// 🔥 SEO & OG IMAGE - теперь данные доступны на сервере
 const canonicalUrl = computed(() => {
   if (!product.value)
     return ''
@@ -230,7 +243,7 @@ const canonicalUrl = computed(() => {
 
 const metaTitle = computed(() => {
   if (!product.value)
-    return 'Загрузка товара...'
+    return 'Товар | Ухтышка'
   return `${product.value.name} - Купить в интернет-магазине | Ухтышка`
 })
 

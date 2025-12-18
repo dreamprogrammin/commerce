@@ -131,6 +131,9 @@ export default defineNuxtConfig({
           'Cache-Control': 'public, max-age=604800, immutable',
         },
       },
+      '/catalog/products/**': {
+        swr: 3600, // Кеш на 1 час для статических страниц
+      },
       // 🔥 Отключаем prerender для несуществующих страниц
       '/about': { prerender: false },
       '/contacts': { prerender: false },
