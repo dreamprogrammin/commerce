@@ -166,6 +166,7 @@ export default defineNuxtConfig({
         lang: 'ru',
       },
       link: [
+      // Preconnect
         {
           rel: 'preconnect',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
@@ -175,12 +176,30 @@ export default defineNuxtConfig({
           rel: 'dns-prefetch',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
         },
+
+        // Favicon для разных устройств и браузеров
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+        { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png' },
+        { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
+
+        // Apple Touch Icon
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+
+        // Android Chrome
+        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/android-chrome-192x192.png' },
+        { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/android-chrome-512x512.png' },
+
+        // Web App Manifest
+        { rel: 'manifest', href: '/site.webmanifest' },
       ],
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'format-detection', content: 'telephone=no' },
+
+        // Тема для мобильных браузеров (можете изменить цвет)
+        { name: 'theme-color', content: '#ffffff' },
+        { name: 'msapplication-TileColor', content: '#ffffff' },
       ],
     },
   },
