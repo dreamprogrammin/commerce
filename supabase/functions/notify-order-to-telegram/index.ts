@@ -55,9 +55,6 @@ interface OrderData {
   delivery_method: string
   payment_method: string | null
   delivery_address: { city: string, line1: string } | null
-  guest_name: string | null
-  guest_phone: string | null
-  guest_email: string | null
   user_id: string | null
   status: string
   bonuses_awarded: number
@@ -135,10 +132,14 @@ Deno.serve(async (req) => {
 
     let orderData: OrderData | null = null
     let orderError: { message: string } | null = null
+    let guestName: string | null = null
+    let guestPhone: string | null = null
+    let guestEmail: string | null = null
 
     // Получаем данные в зависимости от типа заказа
     if (tableName === 'guest_checkouts') {
-      // Гостевой заказ
+      // Гостевой заказ - БЕЗ бонусов
+      console.log('👥 Обработка гостевого заказа')
       const result = await supabaseAdmin
         .from('guest_checkouts')
         .select(`
@@ -159,8 +160,13 @@ Deno.serve(async (req) => {
       const guestData = result.data as unknown as GuestCheckoutData | null
       orderError = result.error
       
-      // Преобразуем структуру гостевого заказа к общему формату
+      // Сохраняем гостевую информацию
       if (guestData) {
+        guestName = guestData.guest_name
+        guestPhone = guestData.guest_phone
+        guestEmail = guestData.guest_email
+        
+        // Преобразуем структуру гостевого заказа к общему формату
         orderData = {
           id: guestData.id,
           final_amount: guestData.final_amount,
@@ -168,13 +174,10 @@ Deno.serve(async (req) => {
           delivery_method: guestData.delivery_method,
           payment_method: guestData.payment_method,
           delivery_address: guestData.delivery_address,
-          guest_name: guestData.guest_name,
-          guest_phone: guestData.guest_phone,
-          guest_email: guestData.guest_email,
           status: guestData.status,
           user_id: null,
-          bonuses_awarded: 0,
-          bonuses_spent: 0,
+          bonuses_awarded: 0, // У гостей нет бонусов
+          bonuses_spent: 0,   // У гостей нет бонусов
           profile: null,
           order_items: guestData.guest_checkout_items.map(item => ({
             quantity: item.quantity,
@@ -184,7 +187,8 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      // Заказ авторизованного пользователя
+      // Заказ авторизованного пользователя - С бонусами
+      console.log('👤 Обработка заказа зарегистрированного пользователя')
       const result = await supabaseAdmin
         .from('orders')
         .select(`
@@ -202,18 +206,8 @@ Deno.serve(async (req) => {
         .eq('id', orderId)
         .single()
       
-      const userData = result.data as unknown as Omit<OrderData, 'guest_name' | 'guest_phone' | 'guest_email'> | null
+      orderData = result.data as unknown as OrderData | null
       orderError = result.error
-      
-      // Добавляем пустые гостевые поля для единообразия
-      if (userData) {
-        orderData = {
-          ...userData,
-          guest_name: null,
-          guest_phone: null,
-          guest_email: null
-        }
-      }
     }
 
     if (orderError) {
@@ -230,6 +224,11 @@ Deno.serve(async (req) => {
     console.log(`   User ID: ${typedOrderData.user_id || 'гость'}`)
     console.log(`   Статус: ${typedOrderData.status}`)
     console.log(`   Товаров в заказе: ${typedOrderData.order_items.length}`)
+    
+    if (tableName === 'orders') {
+      console.log(`   💳 Бонусы списаны: ${typedOrderData.bonuses_spent}`)
+      console.log(`   🎁 Бонусы начислятся: ${typedOrderData.bonuses_awarded}`)
+    }
 
     // Отдельно получаем изображения для каждого товара
     const productIds = typedOrderData.order_items
@@ -292,9 +291,6 @@ Deno.serve(async (req) => {
       }
       
       // Если это относительный путь
-      // В таблице product_images хранится: products/uuid/file.webp (БЕЗ имени bucket)
-      // Реальный bucket: product-images
-      // Правильный URL: https://.../public/product-images/products/uuid/file.webp
       const cleanPath = url.startsWith('/') ? url.slice(1) : url
       const publicUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${cleanPath}`
       console.log(`   🔄 Создан публичный URL: ${publicUrl}`)
@@ -322,11 +318,14 @@ Deno.serve(async (req) => {
     // ========================================
     // 📱 ФОРМИРОВАНИЕ И ОТПРАВКА СООБЩЕНИЯ
     // ========================================
+    
+    // Определяем имя клиента в зависимости от типа заказа
     const customerName = typedOrderData.profile?.first_name
       ? `${typedOrderData.profile.first_name} ${typedOrderData.profile.last_name || ''}`.trim()
-      : typedOrderData.guest_name || 'Не указано'
+      : guestName || 'Не указано'
     
-    const customerPhone = typedOrderData.profile?.phone || typedOrderData.guest_phone || 'Не указан'
+    const customerPhone = typedOrderData.profile?.phone || guestPhone || 'Не указан'
+    const customerEmail = guestEmail || 'Не указан'
     const customerType = typedOrderData.user_id ? '👤 Зарегистрированный' : '👥 Гость'
     
     const orderDate = new Date(typedOrderData.created_at).toLocaleString('ru-RU', { 
@@ -380,8 +379,14 @@ Deno.serve(async (req) => {
     messageText += `*Дата:* ${orderDate}\n`
     messageText += `*Тип:* ${customerType}\n`
     messageText += `*Клиент:* ${customerName}\n`
-    messageText += `*Телефон:* \`${customerPhone}\`\n\n`
-    messageText += `*Состав заказа:*\n`
+    messageText += `*Телефон:* \`${customerPhone}\`\n`
+    
+    // Для гостей показываем email
+    if (tableName === 'guest_checkouts' && guestEmail) {
+      messageText += `*Email:* ${customerEmail}\n`
+    }
+    
+    messageText += `\n*Состав заказа:*\n`
     
     // Добавляем информацию о товарах
     productsWithImages.forEach(item => {
@@ -390,11 +395,14 @@ Deno.serve(async (req) => {
 
     messageText += `*Итого:* ${typedOrderData.final_amount} ₸\n`
     
-    if (typedOrderData.user_id) {
+    // Бонусы показываем ТОЛЬКО для зарегистрированных пользователей
+    if (typedOrderData.user_id && tableName === 'orders') {
       if (typedOrderData.bonuses_spent > 0) {
         messageText += `💳 *Списано бонусов:* ${typedOrderData.bonuses_spent}\n`
       }
-      messageText += `🎁 *Будет начислено бонусов:* ${typedOrderData.bonuses_awarded}\n`
+      if (typedOrderData.bonuses_awarded > 0) {
+        messageText += `🎁 *Будет начислено через 14 дней:* ${typedOrderData.bonuses_awarded}\n`
+      }
     }
     
     messageText += `*Оплата:* ${typedOrderData.payment_method || 'Не указано'}\n`
@@ -514,6 +522,7 @@ Deno.serve(async (req) => {
         success: true, 
         message: 'Уведомление отправлено в Telegram',
         orderId,
+        table: tableName,
         customerType: typedOrderData.user_id ? 'registered' : 'guest',
         bonusesAwarded: typedOrderData.bonuses_awarded,
         bonusesSpent: typedOrderData.bonuses_spent,
