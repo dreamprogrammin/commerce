@@ -7,6 +7,8 @@ const corsHeaders = {
 
 interface OrderPayload {
   record: { id: string }
+  table: 'orders' | 'guest_checkouts'
+  operation?: string
 }
 
 interface ProductImage {
@@ -18,6 +20,19 @@ interface ProductImage {
 interface OrderItem {
   quantity: number
   product_id: string
+  product: {
+    id: string
+    name: string | null
+    price: number | null
+    sku: string | null
+    barcode: string | null
+  } | null
+}
+
+interface GuestCheckoutItem {
+  quantity: number
+  product_id: string
+  price_per_item: number
   product: {
     id: string
     name: string | null
@@ -49,6 +64,20 @@ interface OrderData {
   bonuses_spent: number
   profile: OrderProfile | null
   order_items: OrderItem[]
+}
+
+interface GuestCheckoutData {
+  id: string
+  final_amount: number
+  created_at: string
+  delivery_method: string
+  payment_method: string | null
+  delivery_address: { city: string, line1: string } | null
+  guest_name: string | null
+  guest_phone: string | null
+  guest_email: string | null
+  status: string
+  guest_checkout_items: GuestCheckoutItem[]
 }
 
 console.log('✅ Функция notify-order-to-telegram инициализирована')
@@ -92,7 +121,10 @@ Deno.serve(async (req) => {
 
     const payload: OrderPayload = await req.json()
     const orderId = payload.record.id
+    const tableName = payload.table || 'orders' // По умолчанию orders для обратной совместимости
+    
     console.log(`📦 Обработка заказа: ${orderId}`)
+    console.log(`📋 Таблица: ${tableName}`)
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
@@ -101,24 +133,88 @@ Deno.serve(async (req) => {
       }
     })
 
-    // Получаем данные заказа
-    const { data: orderData, error: orderError } = await supabaseAdmin
-      .from('orders')
-      .select(`
-        id, final_amount, created_at, delivery_method, payment_method,
-        delivery_address, guest_name, guest_phone, guest_email, user_id,
-        status, bonuses_awarded, bonuses_spent,
-        profile:profiles(first_name, last_name, phone),
-        order_items(
-          quantity, 
-          product_id,
-          product:products(
-            id, name, price, sku, barcode
+    let orderData: OrderData | null = null
+    let orderError: { message: string } | null = null
+
+    // Получаем данные в зависимости от типа заказа
+    if (tableName === 'guest_checkouts') {
+      // Гостевой заказ
+      const result = await supabaseAdmin
+        .from('guest_checkouts')
+        .select(`
+          id, final_amount, created_at, delivery_method, payment_method,
+          delivery_address, guest_name, guest_phone, guest_email, status,
+          guest_checkout_items(
+            quantity, 
+            product_id,
+            price_per_item,
+            product:products(
+              id, name, price, sku, barcode
+            )
           )
-        )
-      `)
-      .eq('id', orderId)
-      .single()
+        `)
+        .eq('id', orderId)
+        .single()
+      
+      const guestData = result.data as unknown as GuestCheckoutData | null
+      orderError = result.error
+      
+      // Преобразуем структуру гостевого заказа к общему формату
+      if (guestData) {
+        orderData = {
+          id: guestData.id,
+          final_amount: guestData.final_amount,
+          created_at: guestData.created_at,
+          delivery_method: guestData.delivery_method,
+          payment_method: guestData.payment_method,
+          delivery_address: guestData.delivery_address,
+          guest_name: guestData.guest_name,
+          guest_phone: guestData.guest_phone,
+          guest_email: guestData.guest_email,
+          status: guestData.status,
+          user_id: null,
+          bonuses_awarded: 0,
+          bonuses_spent: 0,
+          profile: null,
+          order_items: guestData.guest_checkout_items.map(item => ({
+            quantity: item.quantity,
+            product_id: item.product_id,
+            product: item.product
+          }))
+        }
+      }
+    } else {
+      // Заказ авторизованного пользователя
+      const result = await supabaseAdmin
+        .from('orders')
+        .select(`
+          id, final_amount, created_at, delivery_method, payment_method,
+          delivery_address, user_id, status, bonuses_awarded, bonuses_spent,
+          profile:profiles(first_name, last_name, phone),
+          order_items(
+            quantity, 
+            product_id,
+            product:products(
+              id, name, price, sku, barcode
+            )
+          )
+        `)
+        .eq('id', orderId)
+        .single()
+      
+      const userData = result.data as unknown as Omit<OrderData, 'guest_name' | 'guest_phone' | 'guest_email'> | null
+      orderError = result.error
+      
+      // Добавляем пустые гостевые поля для единообразия
+      if (userData) {
+        orderData = {
+          ...userData,
+          guest_name: null,
+          guest_phone: null,
+          guest_email: null
+        }
+      }
+    }
 
     if (orderError) {
       console.error('❌ Ошибка получения заказа:', orderError)
@@ -126,11 +222,12 @@ Deno.serve(async (req) => {
     }
 
     if (!orderData) {
-      throw new Error(`Заказ ${orderId} не найден`)
+      throw new Error(`Заказ ${orderId} не найден в таблице ${tableName}`)
     }
 
-    const typedOrderData = orderData as unknown as OrderData
-    console.log(`✅ Заказ получен. User ID: ${typedOrderData.user_id || 'гость'}`)
+    const typedOrderData = orderData
+    console.log(`✅ Заказ получен из таблицы: ${tableName}`)
+    console.log(`   User ID: ${typedOrderData.user_id || 'гость'}`)
     console.log(`   Статус: ${typedOrderData.status}`)
     console.log(`   Товаров в заказе: ${typedOrderData.order_items.length}`)
 
@@ -312,9 +409,10 @@ Deno.serve(async (req) => {
     // Кнопки управления заказом
     const adminSecret = Deno.env.get('ADMIN_SECRET')
     const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
+    const tableParam = `&table=${tableName}`
     
-    const confirmUrl = `${supabaseUrl}/functions/v1/confirm-order?order_id=${orderId}${secretParam}`
-    const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${secretParam}`
+    const confirmUrl = `${supabaseUrl}/functions/v1/confirm-order?order_id=${orderId}${tableParam}${secretParam}`
+    const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableParam}${secretParam}`
 
     const inlineKeyboard = {
       inline_keyboard: [

@@ -22,6 +22,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const orderId = url.searchParams.get('order_id')
     const providedSecret = url.searchParams.get('secret')
+    const tableParam = url.searchParams.get('table') // Новый параметр
 
     if (!orderId) {
       return new Response(
@@ -61,9 +62,50 @@ Deno.serve(async (req) => {
       }
     })
 
-    // Вызываем функцию подтверждения заказа
+    // Определяем таблицу, если не указана явно
+    let tableName = tableParam
+    if (!tableName) {
+      console.log('🔍 Определяем таблицу заказа...')
+      const { data: detectedTable, error: detectError } = await supabase.rpc('get_order_table_name', {
+        p_order_id: orderId
+      })
+
+      if (detectError) {
+        console.error('❌ Ошибка определения таблицы:', detectError)
+        return new Response(
+          `❌ ОШИБКА\n\nНе удалось определить тип заказа:\n${detectError.message}`,
+          { 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'text/plain; charset=UTF-8' 
+            },
+            status: 500
+          }
+        )
+      }
+
+      tableName = detectedTable
+    }
+
+    if (!tableName) {
+      return new Response(
+        '❌ ОШИБКА\n\nЗаказ не найден',
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'text/plain; charset=UTF-8' 
+          },
+          status: 404
+        }
+      )
+    }
+
+    console.log(`📋 Таблица заказа: ${tableName}`)
+
+    // Вызываем функцию подтверждения заказа с указанием таблицы
     const { data, error } = await supabase.rpc('confirm_and_process_order', {
-      p_order_id: orderId
+      p_order_id: orderId,
+      p_table_name: tableName
     })
 
     if (error) {
@@ -82,13 +124,15 @@ Deno.serve(async (req) => {
 
     console.log('✅ Заказ успешно подтвержден:', data)
 
+    const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
     const responseText = `✅ ЗАКАЗ ПОДТВЕРЖДЕН
 
 📦 Заказ №${orderId.slice(-6)}
+Тип: ${orderType}
 Статус: Подтвержден и обработан
 
 Заказ принят в работу.
-Клиент получит уведомление о подтверждении.`
+${tableName === 'orders' ? 'Клиент получит уведомление о подтверждении.' : 'Гостевой заказ обработан.'}`
 
     return new Response(
       responseText,

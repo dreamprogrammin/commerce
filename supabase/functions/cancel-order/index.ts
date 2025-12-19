@@ -22,6 +22,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const orderId = url.searchParams.get('order_id')
     const providedSecret = url.searchParams.get('secret')
+    const tableParam = url.searchParams.get('table') // Новый параметр
 
     if (!orderId) {
       return new Response(
@@ -61,16 +62,69 @@ Deno.serve(async (req) => {
       }
     })
 
-    // Обновляем статус заказа на 'cancelled'
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ 
-        status: 'cancelled',
-        updated_at: new Date().toISOString()
+    // Определяем таблицу, если не указана явно
+    let tableName = tableParam
+    if (!tableName) {
+      console.log('🔍 Определяем таблицу заказа...')
+      const { data: detectedTable, error: detectError } = await supabase.rpc('get_order_table_name', {
+        p_order_id: orderId
       })
-      .eq('id', orderId)
-      .select()
-      .single()
+
+      if (detectError) {
+        console.error('❌ Ошибка определения таблицы:', detectError)
+        return new Response(
+          `❌ ОШИБКА\n\nНе удалось определить тип заказа:\n${detectError.message}`,
+          { 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'text/plain; charset=UTF-8' 
+            },
+            status: 500
+          }
+        )
+      }
+
+      tableName = detectedTable
+    }
+
+    if (!tableName) {
+      return new Response(
+        '❌ ОШИБКА\n\nЗаказ не найден',
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'text/plain; charset=UTF-8' 
+          },
+          status: 404
+        }
+      )
+    }
+
+    console.log(`📋 Таблица заказа: ${tableName}`)
+
+    // Получаем данные заказа перед отменой (для информации о бонусах)
+    let orderData: { user_id?: string; bonuses_spent?: number; bonuses_awarded?: number; status: string } | null = null
+    if (tableName === 'orders') {
+      const { data } = await supabase
+        .from('orders')
+        .select('user_id, bonuses_spent, bonuses_awarded, status')
+        .eq('id', orderId)
+        .single()
+      orderData = data
+    } else {
+      const { data } = await supabase
+        .from('guest_checkouts')
+        .select('status')
+        .eq('id', orderId)
+        .single()
+      orderData = data as { status: string } | null
+    }
+
+    // Вызываем функцию отмены заказа с указанием таблицы
+    const { data, error } = await supabase.rpc('cancel_order', {
+      p_order_id: orderId,
+      p_table_name: tableName
+    })
 
     if (error) {
       console.error('❌ Ошибка при отмене:', error)
@@ -86,43 +140,19 @@ Deno.serve(async (req) => {
       )
     }
 
-    if (!data) {
-      return new Response(
-        '❌ ОШИБКА\n\nЗаказ не найден',
-        { 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'text/plain; charset=UTF-8' 
-          },
-          status: 404
-        }
-      )
-    }
+    console.log('✅ Заказ успешно отменен:', data)
 
-    console.log('✅ Заказ успешно отменен')
-
-    // Если заказ был от авторизованного пользователя, возвращаем потраченные бонусы
+    // Формируем сообщение о бонусах
     let bonusMessage = ''
-    if (data.user_id && data.bonuses_spent > 0) {
-      console.log(`💰 Возврат ${data.bonuses_spent} бонусов пользователю ${data.user_id}`)
-      
-      const { error: bonusError } = await supabase.rpc('increment_bonus_balance', {
-        user_id: data.user_id,
-        amount: data.bonuses_spent
-      })
-
-      if (bonusError) {
-        console.error('⚠️ Не удалось вернуть бонусы:', bonusError)
-        bonusMessage = `\n\n⚠️ Внимание: бонусы не были возвращены автоматически`
-      } else {
-        console.log('✅ Бонусы возвращены')
-        bonusMessage = `\n\n💰 Бонусы возвращены: ${data.bonuses_spent} ₸`
-      }
+    if (tableName === 'orders' && orderData?.user_id && orderData?.bonuses_spent && orderData.bonuses_spent > 0) {
+      bonusMessage = `\n\n💰 Бонусы возвращены: ${orderData.bonuses_spent}`
     }
 
+    const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
     const responseText = `✅ ЗАКАЗ ОТМЕНЕН
 
 📦 Заказ №${orderId.slice(-6)}
+Тип: ${orderType}
 Статус: Отменен${bonusMessage}
 
 Операция выполнена успешно.`
