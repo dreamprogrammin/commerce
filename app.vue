@@ -1,31 +1,4 @@
 <script setup lang="ts">
-import { Toaster } from 'vue-sonner'
-import { useModalStore } from '@/stores/modal/useModalStore'
-import { useAuthStore } from './stores/auth'
-import { useProductsStore } from './stores/publicStore/productsStore'
-import 'vue-sonner/style.css'
-
-useAuthStore()
-useProductsStore()
-
-const modalStore = useModalStore()
-
-useHead({
-  htmlAttrs: {
-    lang: 'ru',
-  },
-  link: [
-    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-  ],
-})
-
-useSeoMeta({
-  title: 'Ухтшыка - Магазин детских игрушек',
-  description: 'Лучшие игрушки для ваших детей! Развивающие игры, конструкторы, куклы и многое другое.',
-  ogTitle: 'Ухтышка - Магазин детских игрушек',
-  ogDescription: 'Лучшие игрушки для ваших детей! Развивающие игры, конструкторы, куклы и многое другое.',
-})
-
 // 🆕 Управление LoadingBar при навигации
 const nuxtApp = useNuxtApp()
 const isPageLoading = ref(false)
@@ -45,6 +18,55 @@ nuxtApp.hook('page:finish', () => {
 nuxtApp.hook('vue:error', () => {
   isPageLoading.value = false
 })
+
+const siteUrl = 'https://uhti.kz'
+const siteName = 'Ухтышка'
+
+// ✅ Динамичный шаблон для title всех страниц
+useHead({
+  titleTemplate: (titleChunk) => {
+    return titleChunk ? `${titleChunk}` : `${siteName} - Интернет-магазин детских игрушек`
+  },
+})
+
+// ✅ Глобальная Schema.org Organization (используется на всех страницах)
+useSchemaOrg([
+  {
+    '@type': 'Organization',
+    '@id': `${siteUrl}/#organization`,
+    'name': siteName,
+    'legalName': 'ИП Ухтышка',
+    'url': siteUrl,
+    'logo': {
+      '@type': 'ImageObject',
+      '@id': `${siteUrl}/#logo`,
+      'url': `${siteUrl}/logo.png`,
+      'contentUrl': `${siteUrl}/logo.png`,
+      'width': 250,
+      'height': 60,
+      'caption': siteName,
+    },
+    'image': { '@id': `${siteUrl}/#logo` },
+    'description': 'Интернет-магазин детских игрушек с широким ассортиментом и быстрой доставкой по Казахстану',
+    'foundingDate': '2024',
+    'address': {
+      '@type': 'PostalAddress',
+      'addressCountry': 'KZ',
+      'addressLocality': 'Алматы',
+      'addressRegion': 'Алматинская область',
+    },
+    'contactPoint': {
+      '@type': 'ContactPoint',
+      'telephone': '+7-702-537-94-73',
+      'contactType': 'customer service',
+      'availableLanguage': ['Russian', 'Kazakh'],
+      'areaServed': 'KZ',
+    },
+    'sameAs': [
+      'https://www.instagram.com/uhtykz',
+    ],
+  },
+])
 </script>
 
 <template>
@@ -75,14 +97,9 @@ nuxtApp.hook('vue:error', () => {
       <MobileBottomNav />
     </ClientOnly>
 
+    <!-- ✅ ИСПРАВЛЕНО: Модалка всегда в DOM, управляется через v-model внутри -->
     <ClientOnly>
-      <AuthLoginModal v-if="modalStore.showLoginModal" />
+      <AuthLoginModal />
     </ClientOnly>
   </div>
 </template>
-
-<style>
-html {
-  font-family: 'Comfortaa', sans-serif;
-}
-</style>

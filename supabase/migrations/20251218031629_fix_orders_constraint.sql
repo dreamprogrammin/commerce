@@ -1,34 +1,78 @@
 -- =====================================================================================
--- ФИНАЛЬНАЯ ЛОГИКА: ГОСТЕВЫЕ ЗАКАЗЫ + БОНУСЫ ТОЛЬКО ДЛЯ ЗАРЕГИСТРИРОВАННЫХ
+-- ФИНАЛЬНАЯ ЛОГИКА: ГОСТЕВЫЕ ЗАКАЗЫ + БОНУСЫ ТОЛЬКО ДЛЯ ЗАРЕГИСТРИРОВАННЫХ (БЕЗОПАСНАЯ)
 -- =====================================================================================
+
+-- === ЧАСТЬ 0: СОЗДАЕМ НЕДОСТАЮЩИЕ ТАБЛИЦЫ (ДЛЯ ЛОКАЛКИ) ===
+
+-- Создаем bonus_activation_skipped, если её нет
+CREATE TABLE IF NOT EXISTS public.bonus_activation_skipped (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID,
+    user_id UUID,
+    reason TEXT NOT NULL,
+    bonuses_amount INT,
+    pending_balance INT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE public.bonus_activation_skipped IS 
+'Лог пропущенных активаций бонусов для диагностики проблем';
+
+CREATE INDEX IF NOT EXISTS idx_bonus_activation_skipped_created 
+ON public.bonus_activation_skipped(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_bonus_activation_skipped_user 
+ON public.bonus_activation_skipped(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_bonus_activation_skipped_order 
+ON public.bonus_activation_skipped(order_id);
+
 
 -- === ЧАСТЬ 1: ИСПРАВЛЯЕМ CONSTRAINT НА ORDERS ===
 
--- Удаляем строгий constraint orders -> profiles
-ALTER TABLE public.orders 
-  DROP CONSTRAINT IF EXISTS "orders_user_id_fkey";
+-- Удаляем старый constraint
+DO $$
+BEGIN
+  ALTER TABLE public.orders 
+    DROP CONSTRAINT IF EXISTS "orders_user_id_fkey";
+  
+  ALTER TABLE public.orders 
+    DROP CONSTRAINT IF EXISTS "orders_user_id_fkey_to_profiles";
+END $$;
 
--- Создаем constraint только для проверки auth.users (первоисточник)
--- Профиль создастся триггером ПОСЛЕ вставки заказа
-ALTER TABLE public.orders 
-  ADD CONSTRAINT "orders_user_id_fkey" 
-  FOREIGN KEY (user_id) 
-  REFERENCES auth.users(id) 
-  ON DELETE SET NULL
-  NOT VALID;
-
--- Валидируем constraint (проверяем существующие данные)
-ALTER TABLE public.orders 
-  VALIDATE CONSTRAINT "orders_user_id_fkey";
+-- Создаем constraint только для проверки auth.users
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'orders_user_id_fkey' 
+    AND conrelid = 'public.orders'::regclass
+  ) THEN
+    ALTER TABLE public.orders 
+      ADD CONSTRAINT "orders_user_id_fkey" 
+      FOREIGN KEY (user_id) 
+      REFERENCES auth.users(id) 
+      ON DELETE SET NULL
+      NOT VALID;
+    
+    -- Валидируем constraint
+    ALTER TABLE public.orders 
+      VALIDATE CONSTRAINT "orders_user_id_fkey";
+  END IF;
+END $$;
 
 COMMENT ON CONSTRAINT "orders_user_id_fkey" ON public.orders IS 
   'Проверяет только auth.users. Профиль создается триггером автоматически.';
 
 -- Удаляем старые триггеры и функции
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.handle_new_user();
 DROP TRIGGER IF EXISTS on_profile_created_grant_bonus ON public.profiles;
+DROP TRIGGER IF EXISTS on_first_order_grant_welcome_bonus ON public.orders;
+
+DROP FUNCTION IF EXISTS public.handle_new_user();
+DROP FUNCTION IF EXISTS public.handle_new_user_profile_creation();
 DROP FUNCTION IF EXISTS public.grant_welcome_bonus();
+DROP FUNCTION IF EXISTS public.grant_welcome_bonus_on_first_order();
 
 COMMENT ON TABLE public.profiles IS 
   'Профили создаются ТОЛЬКО вручную (админом или при первой покупке зарегистрированного пользователя)';
@@ -37,47 +81,88 @@ COMMENT ON TABLE public.profiles IS
 -- === ЧАСТЬ 2: ИСПРАВЛЯЕМ ДРУГИЕ CONSTRAINTS ===
 
 -- Все остальные таблицы тоже должны ссылаться на auth.users
--- Потому что профили создаются не сразу
 
 -- 2.1 user_addresses
-ALTER TABLE public.user_addresses 
-  DROP CONSTRAINT IF EXISTS "user_addresses_user_id_fkey";
-
-ALTER TABLE public.user_addresses 
-  ADD CONSTRAINT "user_addresses_user_id_fkey" 
-  FOREIGN KEY (user_id) 
-  REFERENCES auth.users(id) 
-  ON DELETE CASCADE;
+DO $$
+BEGIN
+  ALTER TABLE public.user_addresses 
+    DROP CONSTRAINT IF EXISTS "user_addresses_user_id_fkey";
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'user_addresses_user_id_fkey' 
+    AND conrelid = 'public.user_addresses'::regclass
+  ) THEN
+    ALTER TABLE public.user_addresses 
+      ADD CONSTRAINT "user_addresses_user_id_fkey" 
+      FOREIGN KEY (user_id) 
+      REFERENCES auth.users(id) 
+      ON DELETE CASCADE;
+  END IF;
+END $$;
 
 -- 2.2 children
-ALTER TABLE public.children 
-  DROP CONSTRAINT IF EXISTS "children_user_id_fkey";
-
-ALTER TABLE public.children 
-  ADD CONSTRAINT "children_user_id_fkey" 
-  FOREIGN KEY (user_id) 
-  REFERENCES auth.users(id) 
-  ON DELETE CASCADE;
+DO $$
+BEGIN
+  ALTER TABLE public.children 
+    DROP CONSTRAINT IF EXISTS "children_user_id_fkey";
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'children_user_id_fkey' 
+    AND conrelid = 'public.children'::regclass
+  ) THEN
+    ALTER TABLE public.children 
+      ADD CONSTRAINT "children_user_id_fkey" 
+      FOREIGN KEY (user_id) 
+      REFERENCES auth.users(id) 
+      ON DELETE CASCADE;
+  END IF;
+END $$;
 
 -- 2.3 wishlist
-ALTER TABLE public.wishlist 
-  DROP CONSTRAINT IF EXISTS "wishlist_user_id_fkey";
+DO $$
+BEGIN
+  ALTER TABLE public.wishlist 
+    DROP CONSTRAINT IF EXISTS "wishlist_user_id_fkey";
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'wishlist_user_id_fkey' 
+    AND conrelid = 'public.wishlist'::regclass
+  ) THEN
+    ALTER TABLE public.wishlist 
+      ADD CONSTRAINT "wishlist_user_id_fkey" 
+      FOREIGN KEY (user_id) 
+      REFERENCES auth.users(id) 
+      ON DELETE CASCADE;
+  END IF;
+END $$;
 
-ALTER TABLE public.wishlist 
-  ADD CONSTRAINT "wishlist_user_id_fkey" 
-  FOREIGN KEY (user_id) 
-  REFERENCES auth.users(id) 
-  ON DELETE CASCADE;
-
--- 2.4 bonus_activation_skipped
-ALTER TABLE public.bonus_activation_skipped 
-  DROP CONSTRAINT IF EXISTS "bonus_activation_skipped_user_id_fkey";
-
-ALTER TABLE public.bonus_activation_skipped 
-  ADD CONSTRAINT "bonus_activation_skipped_user_id_fkey" 
-  FOREIGN KEY (user_id) 
-  REFERENCES auth.users(id) 
-  ON DELETE CASCADE;
+-- 2.4 bonus_activation_skipped (только если таблица существует)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_tables 
+    WHERE schemaname = 'public' 
+    AND tablename = 'bonus_activation_skipped'
+  ) THEN
+    ALTER TABLE public.bonus_activation_skipped 
+      DROP CONSTRAINT IF EXISTS "bonus_activation_skipped_user_id_fkey";
+    
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint 
+      WHERE conname = 'bonus_activation_skipped_user_id_fkey' 
+      AND conrelid = 'public.bonus_activation_skipped'::regclass
+    ) THEN
+      ALTER TABLE public.bonus_activation_skipped 
+        ADD CONSTRAINT "bonus_activation_skipped_user_id_fkey" 
+        FOREIGN KEY (user_id) 
+        REFERENCES auth.users(id) 
+        ON DELETE CASCADE;
+    END IF;
+  END IF;
+END $$;
 
 
 -- === ЧАСТЬ 3: ЛОГИКА ПРИВЕТСТВЕННОГО БОНУСА ПРИ ПЕРВОЙ ПОКУПКЕ ===
@@ -155,8 +240,6 @@ COMMENT ON FUNCTION public.grant_welcome_bonus_on_first_order IS
   'Выдает 1000 бонусов при первом заказе. Если профиля нет - создает его автоматически.';
 
 -- Триггер на таблице orders
-DROP TRIGGER IF EXISTS on_first_order_grant_welcome_bonus ON public.orders;
-
 CREATE TRIGGER on_first_order_grant_welcome_bonus
   AFTER INSERT ON public.orders
   FOR EACH ROW
@@ -164,7 +247,7 @@ CREATE TRIGGER on_first_order_grant_welcome_bonus
   EXECUTE FUNCTION public.grant_welcome_bonus_on_first_order();
 
 
--- === ЧАСТЬ 3: ОБНОВЛЯЕМ ФУНКЦИЮ CREATE_ORDER ===
+-- === ЧАСТЬ 4: ОБНОВЛЯЕМ ФУНКЦИЮ CREATE_ORDER ===
 
 CREATE OR REPLACE FUNCTION public.create_order(
   p_cart_items JSONB,
@@ -313,7 +396,7 @@ COMMENT ON FUNCTION public.create_order IS
   'Создает заказ. Гости оформляют без профиля. Зарегистрированные получают бонусы.';
 
 
--- === ЧАСТЬ 4: ПРОВЕРКА И СТАТИСТИКА ===
+-- === ЧАСТЬ 5: ПРОВЕРКА И СТАТИСТИКА ===
 
 DO $$
 DECLARE
@@ -351,7 +434,7 @@ END;
 $$;
 
 
--- === ЧАСТЬ 5: КОММЕНТАРИИ ДЛЯ ЯСНОСТИ ===
+-- === ЧАСТЬ 6: КОММЕНТАРИИ ДЛЯ ЯСНОСТИ ===
 
 COMMENT ON COLUMN public.orders.user_id IS 
   'NULL для гостевых заказов, UUID для авторизованных пользователей';
@@ -365,6 +448,9 @@ COMMENT ON COLUMN public.orders.bonuses_awarded IS
 
 -- =====================================================================================
 -- ИТОГО:
+-- ✅ Миграция безопасна для повторного запуска (идемпотентна)
+-- ✅ Работает как в продакшене, так и локально
+-- ✅ Создает bonus_activation_skipped если её нет
 -- ✅ Гости могут оформлять заказы БЕЗ создания профиля
 -- ✅ При регистрации профиль НЕ создается автоматически
 -- ✅ Профиль создается только при первой покупке авторизованного пользователя

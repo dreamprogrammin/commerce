@@ -1,6 +1,6 @@
 -- =====================================================================================
--- Миграция: Исправление системы активации бонусов
--- Файл: fix_bonus_activation_system.sql
+-- Миграция: Исправление системы активации бонусов (ПОЛНАЯ ВЕРСИЯ)
+-- Файл: 20251212_fix_bonus_activation_complete.sql
 -- Дата: 2025-12-12
 -- Описание: Исправляет логику функции activate_pending_bonuses и пересчитывает балансы
 -- =====================================================================================
@@ -11,8 +11,8 @@
 
 CREATE TABLE IF NOT EXISTS public.bonus_activation_skipped (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id UUID REFERENCES public.orders(id),
-    user_id UUID REFERENCES public.profiles(id),
+    order_id UUID,
+    user_id UUID,
     reason TEXT NOT NULL,
     bonuses_amount INT,
     pending_balance INT,
@@ -30,6 +30,28 @@ ON public.bonus_activation_skipped(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_bonus_activation_skipped_order 
 ON public.bonus_activation_skipped(order_id);
+
+-- Добавляем foreign keys, если их еще нет
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'bonus_activation_skipped_order_id_fkey'
+    ) THEN
+        ALTER TABLE public.bonus_activation_skipped 
+        ADD CONSTRAINT bonus_activation_skipped_order_id_fkey
+        FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'bonus_activation_skipped_user_id_fkey'
+    ) THEN
+        ALTER TABLE public.bonus_activation_skipped 
+        ADD CONSTRAINT bonus_activation_skipped_user_id_fkey
+        FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- =====================================================================================
 -- Шаг 1: Обновление функции activate_pending_bonuses
@@ -260,13 +282,100 @@ ON public.profiles (created_at, has_received_welcome_bonus, pending_bonus_balanc
 WHERE has_received_welcome_bonus = TRUE AND pending_bonus_balance > 0;
 
 -- =====================================================================================
--- Шаг 6: View для мониторинга бонусной системы
+-- Шаг 6: View для мониторинга бонусной системы (базовая версия)
 -- =====================================================================================
 
 -- Удаляем старый VIEW, если существует
 DROP VIEW IF EXISTS public.bonus_system_status;
 
--- Создаём новый VIEW с правильной структурой
+-- Создаём базовый VIEW без зависимости от pg_cron
+CREATE VIEW public.bonus_system_status AS
+SELECT 
+    (SELECT COUNT(*) FROM public.profiles WHERE pending_bonus_balance > 0) as users_with_pending_bonuses,
+    (SELECT COUNT(*) FROM public.profiles WHERE active_bonus_balance > 0) as users_with_active_bonuses,
+    (SELECT COUNT(*) FROM public.profiles WHERE pending_bonus_balance < 0 OR active_bonus_balance < 0) as users_with_negative_balance,
+    (SELECT COUNT(*) FROM public.orders WHERE status = 'confirmed' AND bonuses_activation_date <= NOW()) as orders_ready_for_activation,
+    (SELECT COALESCE(SUM(bonuses_awarded), 0) FROM public.orders WHERE status = 'confirmed' AND bonuses_activation_date <= NOW()) as bonuses_ready_for_activation,
+    (SELECT COUNT(*) FROM public.bonus_activation_skipped WHERE created_at > NOW() - INTERVAL '7 days') as skipped_last_7_days;
+
+COMMENT ON VIEW public.bonus_system_status IS 
+'Мониторинг состояния бонусной системы';
+
+-- =====================================================================================
+-- Шаг 7: Настройка pg_cron (только для продакшена)
+-- =====================================================================================
+
+DO $$
+BEGIN
+    -- Проверяем, доступен ли pg_cron (только в Supabase продакшене)
+    IF EXISTS (
+        SELECT 1 FROM pg_available_extensions 
+        WHERE name = 'pg_cron'
+    ) THEN
+        -- Включаем расширение, если ещё не включено
+        CREATE EXTENSION IF NOT EXISTS pg_cron;
+        
+        -- Удаляем старое задание, если существует
+        IF EXISTS (
+            SELECT 1 FROM cron.job 
+            WHERE jobname = 'Daily Bonus Activation'
+        ) THEN
+            PERFORM cron.unschedule('Daily Bonus Activation');
+        END IF;
+        
+        -- Создаём новое задание: каждый день в 2:00 AM UTC
+        PERFORM cron.schedule(
+            'Daily Bonus Activation',
+            '0 2 * * *',
+            'SELECT public.activate_pending_bonuses();'
+        );
+        
+        RAISE NOTICE 'pg_cron настроен: задание "Daily Bonus Activation" запланировано на 2:00 AM UTC';
+    ELSE
+        RAISE NOTICE 'pg_cron недоступен (локальная разработка) - пропускаем настройку cron';
+    END IF;
+END $$;
+
+-- =====================================================================================
+-- Шаг 8: Создание функции для получения статуса cron
+-- =====================================================================================
+
+-- Создаём функцию для получения статуса cron (работает в любом окружении)
+CREATE OR REPLACE FUNCTION public.get_cron_status()
+RETURNS TABLE (
+    last_run TIMESTAMPTZ,
+    last_status TEXT,
+    is_configured BOOLEAN
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    -- Проверяем, доступен ли pg_cron
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+        RETURN QUERY
+        SELECT 
+            (SELECT MAX(start_time) 
+             FROM cron.job_run_details jrd 
+             JOIN cron.job j ON j.jobid = jrd.jobid 
+             WHERE j.jobname = 'Daily Bonus Activation') as last_run,
+            (SELECT status 
+             FROM cron.job_run_details jrd 
+             JOIN cron.job j ON j.jobid = jrd.jobid 
+             WHERE j.jobname = 'Daily Bonus Activation' 
+             ORDER BY start_time DESC 
+             LIMIT 1) as last_status,
+            TRUE as is_configured;
+    ELSE
+        -- Возвращаем NULL для локальной разработки
+        RETURN QUERY SELECT NULL::TIMESTAMPTZ, NULL::TEXT, FALSE;
+    END IF;
+END;
+$$;
+
+COMMENT ON FUNCTION public.get_cron_status IS 
+'Возвращает статус cron задания (работает как в prod, так и локально)';
+
+-- Пересоздаём VIEW с использованием функции
+DROP VIEW IF EXISTS public.bonus_system_status;
+
 CREATE VIEW public.bonus_system_status AS
 SELECT 
     (SELECT COUNT(*) FROM public.profiles WHERE pending_bonus_balance > 0) as users_with_pending_bonuses,
@@ -275,14 +384,16 @@ SELECT
     (SELECT COUNT(*) FROM public.orders WHERE status = 'confirmed' AND bonuses_activation_date <= NOW()) as orders_ready_for_activation,
     (SELECT COALESCE(SUM(bonuses_awarded), 0) FROM public.orders WHERE status = 'confirmed' AND bonuses_activation_date <= NOW()) as bonuses_ready_for_activation,
     (SELECT COUNT(*) FROM public.bonus_activation_skipped WHERE created_at > NOW() - INTERVAL '7 days') as skipped_last_7_days,
-    (SELECT MAX(start_time) FROM cron.job_run_details jrd JOIN cron.job j ON j.jobid = jrd.jobid WHERE j.jobname = 'Daily Bonus Activation') as last_cron_run,
-    (SELECT status FROM cron.job_run_details jrd JOIN cron.job j ON j.jobid = jrd.jobid WHERE j.jobname = 'Daily Bonus Activation' ORDER BY start_time DESC LIMIT 1) as last_cron_status;
+    cs.last_run as last_cron_run,
+    cs.last_status as last_cron_status,
+    cs.is_configured as cron_is_configured
+FROM public.get_cron_status() cs;
 
 COMMENT ON VIEW public.bonus_system_status IS 
-'Мониторинг состояния бонусной системы';
+'Мониторинг состояния бонусной системы (работает в любом окружении)';
 
 -- =====================================================================================
--- Шаг 7: Тестовый запуск функции
+-- Шаг 9: Тестовый запуск функции
 -- =====================================================================================
 
 -- Запускаем функцию активации для проверки
