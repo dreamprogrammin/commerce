@@ -3,13 +3,17 @@ import { storeToRefs } from 'pinia'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 
+import { useAuthStore } from '@/stores/core/useAuthStore'
+
 const profileStore = useProfileStore()
+const authStore = useAuthStore()
 const modalStore = useModalStore()
 
-const { profile, isLoading, bonusBalance, isLoggedIn } = storeToRefs(profileStore)
+const { profile, isLoading, bonusBalance } = storeToRefs(profileStore)
+const { isLoggedIn: isAuth } = storeToRefs(authStore)
 
 onMounted(() => {
-  if (isLoggedIn.value && !profile.value) {
+  if (isAuth.value && !profile.value) {
     profileStore.loadProfile()
   }
 })
@@ -38,7 +42,7 @@ onMounted(() => {
 
       <!-- Balance Section -->
       <ClientOnly>
-        <div v-if="isLoggedIn" class="mb-3">
+        <div v-if="isAuth" class="mb-3">
           <div v-if="isLoading" class="h-20 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg">
             <Icon name="lucide:loader-2" class="w-5 h-5 animate-spin text-primary" />
           </div>
@@ -120,7 +124,7 @@ onMounted(() => {
       <!-- Actions -->
       <div class="mt-auto">
         <ClientOnly>
-          <div v-if="isLoggedIn" class="space-y-1.5">
+          <div v-if="isAuth" class="space-y-1.5">
             <Button
               as-child
               class="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg h-9 text-xs font-semibold"

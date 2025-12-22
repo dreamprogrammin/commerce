@@ -13,8 +13,8 @@ const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const modalStore = useModalStore()
 
-const { user } = storeToRefs(authStore)
-const { fullName, isLoggedIn } = storeToRefs(profileStore)
+const { user, isLoggedIn: isAuth } = storeToRefs(authStore)
+const { fullName } = storeToRefs(profileStore)
 
 const isVisible = ref(true)
 const isSearchOpen = ref(false)
@@ -122,7 +122,7 @@ onUnmounted(() => {
           <ClientOnly>
             <!-- Авторизованный пользователь -->
             <NuxtLink
-              v-if="isLoggedIn"
+              v-if="isAuth"
               to="/profile"
               class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
             >

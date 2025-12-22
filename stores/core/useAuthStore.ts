@@ -6,8 +6,17 @@ import { useProfileStore } from './profileStore'
 export const useAuthStore = defineStore('authStore', () => {
   const supabase = useSupabaseClient<Database>()
   const router = useRouter()
-  const user = useSupabaseUser()
+  const supabaseUser = useSupabaseUser()
+  // Используем локальный ref для пользователя, чтобы иметь полный контроль над обновлением
+  const user = ref(supabaseUser.value)
   const profileStore = useProfileStore()
+
+  // Синхронизируем локальный стейт с useSupabaseUser при гидратации
+  watch(supabaseUser, (newUser) => {
+    if (newUser) {
+      user.value = newUser
+    }
+  })
 
   const isLoggedIn = computed(() => !!user.value)
 
@@ -55,9 +64,18 @@ export const useAuthStore = defineStore('authStore', () => {
 
   // Обработчик изменения состояния авторизации
   supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log(`AUTH DEBUG: Auth Event: ${event}`, session)
+    
+    // 🔥 ВАЖНО: Обновляем пользователя вручную, так как useSupabaseUser может тупить
+    user.value = session?.user || null
+
     if (event === 'SIGNED_IN') {
+      console.log('AUTH DEBUG: SIGNED_IN triggered. Session:', session)
+      console.log('AUTH DEBUG: Current User:', user.value)
+      
       // Пытаемся загрузить профиль
       const hasProfile = await profileStore.loadProfile()
+      console.log('AUTH DEBUG: Profile loaded?', hasProfile)
 
       if (hasProfile) {
         // Профиль уже существует - обычный вход
@@ -67,6 +85,7 @@ export const useAuthStore = defineStore('authStore', () => {
       }
       else {
         // Профиля нет - первый вход
+        console.log('AUTH DEBUG: No profile found, showing welcome toast')
         toast.success('Добро пожаловать!', {
           description: 'Сделайте первую покупку и получите 1000 приветственных бонусов! 🎁',
           duration: 7000,
@@ -74,12 +93,22 @@ export const useAuthStore = defineStore('authStore', () => {
       }
     }
     else if (event === 'INITIAL_SESSION') {
+      console.log('AUTH DEBUG: INITIAL_SESSION triggered. Session:', session)
       if (session) {
         await profileStore.loadProfile()
+      } else {
+        console.log('AUTH DEBUG: No session in INITIAL_SESSION')
       }
     }
     else if (event === 'SIGNED_OUT') {
+      console.log('AUTH DEBUG: SIGNED_OUT triggered')
       profileStore.clearProfile()
+    }
+    else if (event === 'TOKEN_REFRESHED') {
+      console.log('AUTH DEBUG: TOKEN_REFRESHED')
+    }
+    else {
+      console.log(`AUTH DEBUG: Unhandled event: ${event}`)
     }
   })
 

@@ -29,8 +29,10 @@ export const useProfileStore = defineStore('profileStore', () => {
 
   /**
    * Загружает профиль текущего авторизованного пользователя
+   * @param force Принудительная перезагрузка
+   * @param retries Количество оставшихся попыток (для рекурсивного вызова)
    */
-  async function loadProfile(force: boolean = false): Promise<boolean> {
+  async function loadProfile(force: boolean = false, retries: number = 3): Promise<boolean> {
     if (!force && profile.value) {
       return true
     }
@@ -52,6 +54,14 @@ export const useProfileStore = defineStore('profileStore', () => {
         throw error
       }
 
+      if (!data && retries > 0) {
+        // Если профиль не найден, пробуем еще раз через паузу (ждем триггер)
+        // Задержка: 500мс, 1000мс, 1500мс
+        const delay = (4 - retries) * 500
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return loadProfile(true, retries - 1)
+      }
+
       profile.value = data
       return !!data
     }
@@ -63,7 +73,10 @@ export const useProfileStore = defineStore('profileStore', () => {
       return false
     }
     finally {
-      isLoading.value = false
+      // Снимаем загрузку только если это последняя попытка или успех
+      if (profile.value || retries === 0) {
+        isLoading.value = false
+      }
     }
   }
 

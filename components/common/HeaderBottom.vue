@@ -12,8 +12,8 @@ const wishlistStore = useWishlistStore()
 const cartStore = useCartStore()
 const modalStore = useModalStore()
 
-const { user } = storeToRefs(authStore)
-const { fullName, bonusBalance, isLoggedIn } = storeToRefs(profileStore)
+const { user, isLoggedIn: isAuth } = storeToRefs(authStore)
+const { fullName, bonusBalance, isLoggedIn: isProfileLoaded } = storeToRefs(profileStore)
 
 const wishlistCount = computed(() => wishlistStore.wishlistProductIds.length)
 const cartCount = computed(() => cartStore.items.length)
@@ -21,7 +21,7 @@ const userInitial = computed(() => fullName.value?.charAt(0) || 'П')
 
 // Форматирование бонусов для отображения
 const formattedBonus = computed(() => {
-  if (!isLoggedIn.value || bonusBalance.value === 0)
+  if (!isProfileLoaded.value || bonusBalance.value === 0)
     return '0'
   return bonusBalance.value.toLocaleString('ru-KZ')
 })
@@ -33,9 +33,21 @@ function openLoginModal() {
 
 // Загружаем профиль при монтировании
 onMounted(() => {
+  console.log('HeaderBottom mounted. User:', user.value)
+  console.log('HeaderBottom mounted. isAuth:', isAuth.value)
+  
   if (user.value) {
     profileStore.loadProfile()
   }
+})
+
+watch(user, (newUser) => {
+  console.log('HeaderBottom: User changed:', newUser)
+  console.log('HeaderBottom: isAuth:', isAuth.value)
+})
+
+watch(isAuth, (newVal) => {
+  console.log('HeaderBottom: isAuth changed:', newVal)
 })
 </script>
 
@@ -113,7 +125,7 @@ onMounted(() => {
 
         <!-- ✅ Cashback Button - ТОЛЬКО для авторизованных -->
         <NuxtLink
-          v-if="isLoggedIn"
+          v-if="isAuth"
           to="/profile/bonus"
           class="hidden md:flex items-center gap-2.5 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg group"
         >
@@ -131,7 +143,7 @@ onMounted(() => {
         <ClientOnly>
           <!-- Авторизованный пользователь -->
           <NuxtLink
-            v-if="isLoggedIn"
+            v-if="isAuth"
             to="/profile"
             class="group"
           >
