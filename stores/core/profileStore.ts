@@ -165,16 +165,6 @@ export const useProfileStore = defineStore('profileStore', () => {
     profile.value = null
   }
 
-  // ✅ Следим за изменением пользователя
-  watch(user, (newUser) => {
-    if (newUser) {
-      loadProfile()
-    }
-    else {
-      clearProfile()
-    }
-  })
-
   return {
     // State
     profile,

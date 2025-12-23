@@ -30,25 +30,6 @@ const formattedBonus = computed(() => {
 function openLoginModal() {
   modalStore.openLoginModal()
 }
-
-// Загружаем профиль при монтировании
-onMounted(() => {
-  console.log('HeaderBottom mounted. User:', user.value)
-  console.log('HeaderBottom mounted. isAuth:', isAuth.value)
-  
-  if (user.value) {
-    profileStore.loadProfile()
-  }
-})
-
-watch(user, (newUser) => {
-  console.log('HeaderBottom: User changed:', newUser)
-  console.log('HeaderBottom: isAuth:', isAuth.value)
-})
-
-watch(isAuth, (newVal) => {
-  console.log('HeaderBottom: isAuth changed:', newVal)
-})
 </script>
 
 <template>
