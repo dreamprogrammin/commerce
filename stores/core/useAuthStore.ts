@@ -71,18 +71,15 @@ export const useAuthStore = defineStore('authStore', () => {
     if (event === 'SIGNED_IN') {
       console.log('AUTH DEBUG: SIGNED_IN triggered')
 
-      // ✅ Пытаемся загрузить профиль, ждем создания только для новых пользователей
+      // ✅ Пытаемся загрузить профиль
       const hasProfile = await profileStore.loadProfile(true, false)
 
       if (hasProfile) {
-        // Профиль существует - обычный вход
         toast.success('С возвращением!', {
           description: `Добро пожаловать, ${profileStore.fullName}!`,
         })
       }
       else {
-        // Профиля нет - первый вход (профиль создастся при первом заказе)
-        console.log('AUTH DEBUG: New user, no profile yet (normal)')
         toast.success('Добро пожаловать!', {
           description: 'Сделайте первую покупку и получите 1000 приветственных бонусов! 🎁',
           duration: 7000,
@@ -92,8 +89,25 @@ export const useAuthStore = defineStore('authStore', () => {
     else if (event === 'INITIAL_SESSION') {
       console.log('AUTH DEBUG: INITIAL_SESSION triggered')
       if (session) {
-        // ✅ При инициализации НЕ ждем создания профиля
-        await profileStore.loadProfile(false, false)
+        // ✅ КРИТИЧЕСКИ ВАЖНО: Загружаем профиль и ЖДЕМ его загрузки
+        console.log('AUTH DEBUG: Loading profile for initial session...')
+
+        // Даем немного времени на инициализацию
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Загружаем профиль с force=true чтобы не использовать кеш
+        await profileStore.loadProfile(true, false)
+
+        console.log('AUTH DEBUG: Profile loaded:', !!profileStore.profile)
+
+        // Если профиль не загрузился с первого раза, пробуем еще раз
+        if (!profileStore.profile && session.user) {
+          console.log('AUTH DEBUG: Retrying profile load...')
+          await new Promise(resolve => setTimeout(resolve, 300))
+          await profileStore.loadProfile(true, false)
+        }
+
+        console.log('AUTH DEBUG: Final profile state:', !!profileStore.profile)
       }
       else {
         console.log('AUTH DEBUG: No session in INITIAL_SESSION')
@@ -105,6 +119,11 @@ export const useAuthStore = defineStore('authStore', () => {
     }
     else if (event === 'TOKEN_REFRESHED') {
       console.log('AUTH DEBUG: TOKEN_REFRESHED')
+      // При обновлении токена перезагружаем профиль, если его нет
+      if (!profileStore.profile && session?.user) {
+        console.log('AUTH DEBUG: Reloading profile after token refresh')
+        await profileStore.loadProfile(true, false)
+      }
     }
   })
 
