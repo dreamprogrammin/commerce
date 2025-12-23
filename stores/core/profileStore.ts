@@ -30,9 +30,9 @@ export const useProfileStore = defineStore('profileStore', () => {
   /**
    * Загружает профиль текущего авторизованного пользователя
    * @param force Принудительная перезагрузка
-   * @param retries Количество оставшихся попыток (для рекурсивного вызова)
+   * @param waitForCreation Ждать создания профиля (используется только при первом входе после OAuth)
    */
-  async function loadProfile(force: boolean = false, retries: number = 3): Promise<boolean> {
+  async function loadProfile(force: boolean = false, waitForCreation: boolean = false): Promise<boolean> {
     if (!force && profile.value) {
       return true
     }
@@ -44,39 +44,78 @@ export const useProfileStore = defineStore('profileStore', () => {
     isLoading.value = true
 
     try {
-      const { data, error, status } = await supabase
+      // ✅ Используем maybeSingle() вместо single() - не падает, если нет данных
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.value.id)
-        .single()
+        .maybeSingle()
 
-      if (error && status !== 406) {
+      // Обрабатываем ошибки
+      if (error) {
+        console.error('Profile loading error:', error)
         throw error
       }
 
-      if (!data && retries > 0) {
-        // Если профиль не найден, пробуем еще раз через паузу (ждем триггер)
-        // Задержка: 500мс, 1000мс, 1500мс
-        const delay = (4 - retries) * 500
-        await new Promise(resolve => setTimeout(resolve, delay))
-        return loadProfile(true, retries - 1)
+      // Если профиля нет и мы НЕ ждем создания - это нормально
+      // Профиль создастся при первом заказе
+      if (!data && !waitForCreation) {
+        console.log('No profile yet for user:', user.value.id, '(will be created on first order)')
+        profile.value = null
+        return false
       }
 
+      // Если мы ждем создания профиля (после OAuth) - делаем несколько попыток
+      if (!data && waitForCreation) {
+        console.log('Waiting for profile creation...')
+        // Пробуем 3 раза с небольшими задержками
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 300 * attempt))
+
+          const { data: retryData, error: retryError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.value.id)
+            .maybeSingle()
+
+          if (retryError) {
+            console.error('Profile retry error:', retryError)
+            continue
+          }
+
+          if (retryData) {
+            console.log('Profile found on attempt', attempt)
+            profile.value = retryData
+            return true
+          }
+        }
+
+        // После всех попыток профиля все еще нет - это OK
+        console.log('No profile created yet (normal for new users)')
+        profile.value = null
+        return false
+      }
+
+      // Профиль найден
       profile.value = data
+      if (data) {
+        console.log('Profile loaded successfully:', data.id)
+      }
+
       return !!data
     }
     catch (error: any) {
       console.error('Profile loading error:', error)
+
       toast.error('Ошибка при загрузке профиля', {
         description: error.message,
       })
+
       return false
     }
     finally {
-      // Снимаем загрузку только если это последняя попытка или успех
-      if (profile.value || retries === 0) {
-        isLoading.value = false
-      }
+      // ✅ ВСЕГДА снимаем загрузку в конце
+      isLoading.value = false
     }
   }
 
@@ -92,6 +131,7 @@ export const useProfileStore = defineStore('profileStore', () => {
     isSaving.value = true
 
     try {
+      // ✅ Здесь single() корректен - мы обновляем существующий профиль
       const { data, error } = await supabase
         .from('profiles')
         .update(toRaw(updates))
