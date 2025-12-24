@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git stash:*)",
+      "Bash(ls:*)",
+      "Bash(supabase gen types:*)",
+      "Bash(cat:*)",
+      "Bash(pnpm dlx supabase:*)"
     ]
   }
 }

@@ -46,7 +46,7 @@ function handleClose() {
               1000 бонусов
             </p>
             <p class="text-sm text-muted-foreground">
-              = 1000 ₸ на следующие покупки
+              при первой покупке = 1000 ₸ на следующие заказы
             </p>
           </div>
         </div>
@@ -54,7 +54,7 @@ function handleClose() {
         <!-- Как это работает -->
         <div class="space-y-3 text-sm">
           <p class="text-muted-foreground text-center">
-            Просто войдите через Google и бонусы сразу на вашем счету!
+            Войдите через Google и получите 1000 бонусов после подтверждения первого заказа!
           </p>
 
           <div class="flex items-center gap-2 text-muted-foreground">
@@ -72,7 +72,7 @@ function handleClose() {
       <DialogFooter class="flex-col sm:flex-col gap-2">
         <Button size="lg" class="w-full" @click="handleRegister">
           <Gift class="w-4 h-4 mr-2" />
-          Получить 1000 бонусов
+          Зарегистрироваться и получить бонусы
         </Button>
         <Button variant="ghost" size="sm" class="w-full" @click="handleClose">
           Нет, спасибо

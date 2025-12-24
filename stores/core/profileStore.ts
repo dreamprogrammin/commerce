@@ -58,9 +58,9 @@ export const useProfileStore = defineStore('profileStore', () => {
       }
 
       // Если профиля нет и мы НЕ ждем создания - это нормально
-      // Профиль создастся при первом заказе
+      // Профиль должен был создаться автоматически при регистрации через триггер
       if (!data && !waitForCreation) {
-        console.log('No profile yet for user:', user.value.id, '(will be created on first order)')
+        console.log('No profile yet for user:', user.value.id, '(should be created by trigger)')
         profile.value = null
         return false
       }
