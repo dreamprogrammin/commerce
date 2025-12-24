@@ -134,8 +134,7 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
-COMMENT ON TRIGGER on_auth_user_created ON auth.users IS
-'Триггер автоматически создает профиль при регистрации нового пользователя';
+-- Комментарий к триггеру на auth.users пропущен из-за отсутствия прав владельца
 
 -- =====================================================================================
 -- ШАГ 5: СОЗДАНИЕ ФУНКЦИИ ДЛЯ ЗАЩИТЫ РОЛИ ПОЛЬЗОВАТЕЛЯ

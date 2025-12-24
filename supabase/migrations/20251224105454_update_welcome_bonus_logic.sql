@@ -136,7 +136,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.confirm_and_process_order IS
+COMMENT ON FUNCTION public.confirm_and_process_order(UUID) IS
 'Подтверждает заказ: списывает товары со склада, обрабатывает бонусы.
 При первом заказе начисляет 1000 приветственных бонусов СРАЗУ в active_bonus_balance.
 Бонусы за покупку начисляются в pending_bonus_balance с активацией через 7 дней.';
@@ -208,7 +208,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.activate_pending_bonuses IS
+COMMENT ON FUNCTION public.activate_pending_bonuses() IS
 'Активирует ожидающие бонусы за заказы через 7 дней после подтверждения.
 Запускается через pg_cron ежедневно.';
 
@@ -316,7 +316,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.cancel_order IS
+COMMENT ON FUNCTION public.cancel_order(UUID) IS
 'Отменяет заказ и откатывает все связанные операции (товары, бонусы).
 Если отменяется первый заказ - откатывает приветственный бонус 1000.';
 
