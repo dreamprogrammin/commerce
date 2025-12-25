@@ -19,8 +19,8 @@ export default defineNuxtPlugin(async () => {
     if (event === 'SIGNED_IN') {
       console.log('[Auth Plugin] User signed in, loading profile...')
 
-      // Загружаем профиль с force=true для новой сессии
-      const hasProfile = await profileStore.loadProfile(true, false)
+      // ✅ ИСПРАВЛЕНО: Ждем создания профиля для новых пользователей (Google OAuth)
+      const hasProfile = await profileStore.loadProfile(true, true)
 
       if (hasProfile) {
         toast.success('С возвращением!', {
@@ -41,8 +41,8 @@ export default defineNuxtPlugin(async () => {
         // Даем время на инициализацию
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Загружаем профиль с force=true
-        await profileStore.loadProfile(true, false)
+        // ✅ ИСПРАВЛЕНО: Ждем создания профиля для новых пользователей
+        await profileStore.loadProfile(true, true)
 
         console.log('[Auth Plugin] Profile loaded:', !!profileStore.profile)
 
@@ -50,7 +50,7 @@ export default defineNuxtPlugin(async () => {
         if (!profileStore.profile) {
           console.log('[Auth Plugin] Retrying profile load...')
           await new Promise(resolve => setTimeout(resolve, 300))
-          await profileStore.loadProfile(true, false)
+          await profileStore.loadProfile(true, true)
         }
       }
     }
@@ -63,7 +63,7 @@ export default defineNuxtPlugin(async () => {
       // Перезагружаем профиль если его нет
       if (!profileStore.profile && session?.user) {
         console.log('[Auth Plugin] Reloading profile after token refresh')
-        await profileStore.loadProfile(true, false)
+        await profileStore.loadProfile(true, true)
       }
     }
   })

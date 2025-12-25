@@ -7,7 +7,9 @@
       "Bash(supabase gen types:*)",
       "Bash(cat:*)",
       "Bash(pnpm dlx supabase:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(pnpm dev)",
+      "Bash(pnpm install)"
     ]
   }
 }

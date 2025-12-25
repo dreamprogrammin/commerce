@@ -68,6 +68,7 @@
     "prettier": "^3.6.2",
     "simple-git-hooks": "^2.13.1",
     "supabase": "^2.64.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.16"
   }
 }

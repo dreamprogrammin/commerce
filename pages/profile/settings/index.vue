@@ -61,8 +61,9 @@ watch(profile, resetForm, {
 onMounted(() => {
   // `onAuthStateChange` в `authStore` уже вызывает `loadProfile`,
   // но этот вызов является дополнительной подстраховкой.
+  // ✅ ИСПРАВЛЕНО: Ждем создания профиля для новых пользователей
   if (!profile.value) {
-    profileStore.loadProfile()
+    profileStore.loadProfile(false, true)
   }
 })
 
@@ -170,7 +171,7 @@ async function handleUpdate() {
             <p class="text-muted-foreground">
               Не удалось загрузить данные профиля.
             </p>
-            <Button variant="outline" class="mt-4" @click="profileStore.loadProfile()">
+            <Button variant="outline" class="mt-4" @click="profileStore.loadProfile(true, true)">
               Попробовать снова
             </Button>
           </div>

@@ -23,7 +23,8 @@ useHead({
 
 // --- Загружаем профиль при монтировании ---
 onMounted(async () => {
-  await profileStore.loadProfile()
+  // ✅ ИСПРАВЛЕНО: Ждем создания профиля для новых пользователей (после Google OAuth)
+  await profileStore.loadProfile(false, true)
 })
 </script>
 
@@ -135,7 +136,7 @@ onMounted(async () => {
 
       <!-- Действия -->
       <div class="flex flex-wrap gap-4 mt-6">
-        <Button variant="outline" @click="profileStore.loadProfile(true)">
+        <Button variant="outline" @click="profileStore.loadProfile(true, true)">
           Обновить данные
         </Button>
         <Button variant="destructive" @click="authStore.signOut()">
@@ -149,7 +150,7 @@ onMounted(async () => {
       <p class="text-destructive">
         Не удалось загрузить данные профиля
       </p>
-      <Button @click="profileStore.loadProfile(true)">
+      <Button @click="profileStore.loadProfile(true, true)">
         Попробовать снова
       </Button>
     </div>
