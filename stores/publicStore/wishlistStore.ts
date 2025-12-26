@@ -81,7 +81,9 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
       await fetchWishlistProducts()
     }
     catch (error: any) {
-      toast.error(`${error}'Ошибка при обновлении избранного`)
+      toast.error('Ошибка при обновлении избранного', {
+        description: error?.message || 'Неизвестная ошибка',
+      })
     }
   }
 

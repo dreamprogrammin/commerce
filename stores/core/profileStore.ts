@@ -43,15 +43,25 @@ export const useProfileStore = defineStore('profileStore', () => {
         // Добавляем таймаут 10 секунд
         return await Promise.race([
           loadingPromise,
-          new Promise<boolean>((_, reject) => 
+          new Promise<boolean>((_, reject) =>
             setTimeout(() => reject(new Error('Profile load timeout')), 10000)
           )
         ])
-      } catch (error) {
-        console.error('[ProfileStore] Loading promise timed out or failed, forcing reload')
+      } catch (error: any) {
+        console.error('[ProfileStore] Loading promise timed out or failed:', error.message)
+
+        // ✅ Очищаем зависший промис и состояние
         loadingPromise = null
         isLoading.value = false
-        // Продолжаем выполнение для повторной попытки
+
+        // ✅ Если это таймаут - пытаемся загрузить заново с force=true
+        if (error.message === 'Profile load timeout') {
+          console.log('[ProfileStore] Retrying after timeout with force=true')
+          return await loadProfile(true, waitForCreation)
+        }
+
+        // Для других ошибок пробрасываем дальше
+        throw error
       }
     }
 

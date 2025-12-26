@@ -18,6 +18,7 @@ export const useCartStore = defineStore('cartStore', () => {
   const items = ref<ICartItem[]>([])
   const isProcessing = ref(false)
   const bonusesToSpend = ref(0)
+  const isAddingItem = ref(false) // Флаг для предотвращения race condition
 
   const totalItems = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
 
@@ -46,6 +47,12 @@ export const useCartStore = defineStore('cartStore', () => {
   })
 
   async function addItem(productIdOrObject: string | { id: string }, quantity: number = 1) {
+    // ✅ Предотвращение параллельных запросов (race condition fix)
+    if (isAddingItem.value) {
+      console.log('[CartStore] Already adding item, ignoring duplicate request')
+      return
+    }
+
     const productId = typeof productIdOrObject === 'string'
       ? productIdOrObject
       : productIdOrObject.id
@@ -64,6 +71,7 @@ export const useCartStore = defineStore('cartStore', () => {
       return
     }
 
+    isAddingItem.value = true
     try {
       const { data: fullProduct, error } = await supabase
         .from('products')
@@ -101,6 +109,9 @@ export const useCartStore = defineStore('cartStore', () => {
     catch (e: any) {
       console.error('Ошибка при добавлении товара в корзину:', e)
       toast.error('Не удалось добавить товар в корзину')
+    }
+    finally {
+      isAddingItem.value = false
     }
   }
 
