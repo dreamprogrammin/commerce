@@ -21,10 +21,26 @@ useHead({
   title: 'Мой профиль',
 })
 
-// --- Загружаем профиль при монтировании ---
+// ✅ ИСПРАВЛЕНО: Загружаем профиль только если его еще нет
 onMounted(async () => {
-  // ✅ ИСПРАВЛЕНО: Ждем создания профиля для новых пользователей (после Google OAuth)
-  await profileStore.loadProfile(false, true)
+  console.log('[Profile Page] Mounted, checking profile...')
+  
+  // Если профиля нет - загружаем (plugin уже мог его загрузить)
+  if (!profile.value) {
+    console.log('[Profile Page] No profile, loading...')
+    await profileStore.loadProfile(false, true)
+  } else {
+    console.log('[Profile Page] Profile already loaded')
+  }
+})
+
+// ✅ Добавляем watch для отладки
+watch(isLoading, (val) => {
+  console.log('[Profile Page] isLoading changed:', val)
+})
+
+watch(profile, (val) => {
+  console.log('[Profile Page] profile changed:', !!val)
 })
 </script>
 
@@ -38,6 +54,9 @@ onMounted(async () => {
     <div v-if="isLoading" class="space-y-4">
       <Skeleton class="h-40 w-full" />
       <Skeleton class="h-32 w-full" />
+      <p class="text-sm text-muted-foreground text-center mt-4">
+        Загрузка профиля...
+      </p>
     </div>
 
     <!-- Профиль загружен -->
@@ -150,9 +169,17 @@ onMounted(async () => {
       <p class="text-destructive">
         Не удалось загрузить данные профиля
       </p>
-      <Button @click="profileStore.loadProfile(true, true)">
-        Попробовать снова
-      </Button>
+      <p class="text-sm text-muted-foreground">
+        Возможно, профиль еще создается. Попробуйте обновить страницу.
+      </p>
+      <div class="flex gap-2 justify-center">
+        <Button @click="profileStore.loadProfile(true, true)">
+          Попробовать снова
+        </Button>
+        <Button variant="outline" @click="$router.go(0)">
+          Обновить страницу
+        </Button>
+      </div>
     </div>
   </div>
 </template>
