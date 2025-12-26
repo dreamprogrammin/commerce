@@ -15,7 +15,10 @@
       "Bash(pnpm test:run:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(pnpx supabase db diff:*)"
     ]
   }
 }
