@@ -2,7 +2,7 @@
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useProfileStore } from '@/stores/core/profileStore'
 
-export default defineNuxtRouteMiddleware(async (to, _from) => {
+export default defineNuxtRouteMiddleware(async (to, from) => {
   // ✅ Пропускаем на сервере - проверка только на клиенте
   if (import.meta.server) {
     return
@@ -10,7 +10,7 @@ export default defineNuxtRouteMiddleware(async (to, _from) => {
 
   // Пути, требующие авторизации
   const protectedPaths = [
-    '/profile',
+    '/profile/**',
   ]
 
   const isProtectedPath = protectedPaths.some(path => to.path.startsWith(path))
@@ -26,59 +26,48 @@ export default defineNuxtRouteMiddleware(async (to, _from) => {
   }
 
   // ✅ Для защищенных путей проверяем авторизацию
-  console.log('[Auth Middleware] Checking auth for:', to.path)
+  console.log('[Auth Middleware] Checking auth for protected route:', to.path)
 
   const user = useSupabaseUser()
 
-  // Если пользователя нет - редирект
+  // ✅ ВАЖНО: Даем время на инициализацию после OAuth редиректа
   if (!user.value) {
-    console.log('[Auth Middleware] No user, opening login modal')
+    console.log('[Auth Middleware] No user detected, waiting for auth initialization...')
     
-    // Открываем модалку входа
-    const modalStore = useModalStore()
-    modalStore.openLoginModal()
+    // Ждем немного - возможно, auth plugin еще не отработал
+    await new Promise(resolve => setTimeout(resolve, 100))
     
-    return navigateTo('/')
+    // Проверяем еще раз
+    if (!user.value) {
+      console.log('[Auth Middleware] Still no user after wait, redirecting to home')
+      
+      const modalStore = useModalStore()
+      modalStore.openLoginModal()
+      
+      return navigateTo('/')
+    }
   }
 
-  // ✅ Пользователь есть - проверяем профиль
+  console.log('[Auth Middleware] User authenticated:', user.value.id)
+
+  // ✅ ИСПРАВЛЕНО: НЕ ждем загрузку профиля - просто запускаем если нужно
   const profileStore = useProfileStore()
 
-  console.log('[Auth Middleware] User exists:', user.value.id)
   console.log('[Auth Middleware] Profile state:', {
     exists: !!profileStore.profile,
     loading: profileStore.isLoading
   })
 
-  // Если профиль загружается - ждем немного
-  if (profileStore.isLoading) {
-    console.log('[Auth Middleware] Profile is loading, waiting...')
-    
-    const startTime = Date.now()
-    const maxWaitTime = 3000 // 3 секунды максимум
-
-    while (profileStore.isLoading && (Date.now() - startTime) < maxWaitTime) {
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
-
-    console.log('[Auth Middleware] Wait finished. Profile:', !!profileStore.profile)
-  }
-
-  // Если профиля все еще нет - пытаемся загрузить
+  // Если профиля нет И он НЕ загружается - запускаем загрузку (не ждем)
   if (!profileStore.profile && !profileStore.isLoading) {
-    console.log('[Auth Middleware] No profile found, attempting to load...')
+    console.log('[Auth Middleware] Starting profile load (not awaiting)...')
     
-    try {
-      await profileStore.loadProfile(false, true)
-      console.log('[Auth Middleware] Profile loaded:', !!profileStore.profile)
-    } catch (error) {
-      console.error('[Auth Middleware] Failed to load profile:', error)
-    }
+    // ✅ Не ждем результат - пусть загружается в фоне
+    profileStore.loadProfile(false, true).catch(error => {
+      console.error('[Auth Middleware] Profile load error:', error)
+    })
   }
 
-  // ✅ Если после всех попыток профиля нет - это OK для новых пользователей
-  // Страница сама обработает отсутствие профиля
-  if (!profileStore.profile) {
-    console.log('[Auth Middleware] No profile after load attempts (might be new user)')
-  }
+  // ✅ Разрешаем переход сразу
+  console.log('[Auth Middleware] Allowing navigation immediately')
 })

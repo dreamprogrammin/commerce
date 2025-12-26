@@ -17,8 +17,10 @@ export const useAuthStore = defineStore('authStore', () => {
   /**
    * Инициирует вход через Google OAuth
    */
-  async function signInWithOAuth(provider: 'google', redirectTo: string = '/') {
+  async function signInWithOAuth(provider: 'google', redirectTo: string = '/profile') {
     try {
+      console.log('[Auth Store] Starting OAuth flow, redirect to:', redirectTo)
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -29,10 +31,16 @@ export const useAuthStore = defineStore('authStore', () => {
           },
         },
       })
-      if (error)
+      
+      if (error) {
+        console.error('[Auth Store] OAuth error:', error)
         throw error
+      }
+      
+      console.log('[Auth Store] OAuth redirect initiated')
     }
     catch (e: any) {
+      console.error('[Auth Store] OAuth failed:', e)
       toast.error('Ошибка входа через Google', { description: e.message })
       throw e
     }
@@ -43,18 +51,36 @@ export const useAuthStore = defineStore('authStore', () => {
    */
   async function signOut() {
     try {
+      console.log('[Auth Store] Signing out...')
+      
       const { error } = await supabase.auth.signOut()
-      if (error)
+      
+      if (error) {
+        console.error('[Auth Store] Sign out error:', error)
         throw error
+      }
 
       profileStore.clearProfile()
+      
+      console.log('[Auth Store] Sign out successful, redirecting to home')
       await router.push('/')
+      
       toast.success('Вы успешно вышли из системы')
     }
     catch (e: any) {
+      console.error('[Auth Store] Sign out failed:', e)
       toast.error('Ошибка при выходе', { description: e.message })
     }
   }
+
+  // ✅ Отладка состояния авторизации
+  watch(user, (newUser, oldUser) => {
+    console.log('[Auth Store] User state changed:', {
+      from: oldUser?.id,
+      to: newUser?.id,
+      hasProfile: !!profileStore.profile
+    })
+  })
 
   return {
     user,

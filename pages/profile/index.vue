@@ -23,24 +23,38 @@ useHead({
 
 // ✅ ИСПРАВЛЕНО: Загружаем профиль только если его еще нет
 onMounted(async () => {
-  console.log('[Profile Page] Mounted, checking profile...')
+  console.log('[Profile Page] Mounted, checking profile...', {
+    profile: !!profile.value,
+    isLoading: isLoading.value
+  })
+  
+  // ✅ Если isLoading=true больше 2 секунд - сбрасываем принудительно
+  if (isLoading.value) {
+    console.log('[Profile Page] Loading detected, setting timeout...')
+    setTimeout(() => {
+      if (isLoading.value) {
+        console.warn('[Profile Page] Force resetting isLoading after timeout')
+        profileStore.$patch({ isLoading: false })
+      }
+    }, 2000)
+  }
   
   // Если профиля нет - загружаем (plugin уже мог его загрузить)
-  if (!profile.value) {
+  if (!profile.value && !isLoading.value) {
     console.log('[Profile Page] No profile, loading...')
     await profileStore.loadProfile(false, true)
   } else {
-    console.log('[Profile Page] Profile already loaded')
+    console.log('[Profile Page] Profile already loaded or loading')
   }
 })
 
 // ✅ Добавляем watch для отладки
-watch(isLoading, (val) => {
-  console.log('[Profile Page] isLoading changed:', val)
+watch(isLoading, (val, oldVal) => {
+  console.log('[Profile Page] isLoading changed:', oldVal, '->', val)
 })
 
-watch(profile, (val) => {
-  console.log('[Profile Page] profile changed:', !!val)
+watch(profile, (val, oldVal) => {
+  console.log('[Profile Page] profile changed:', !!oldVal, '->', !!val)
 })
 </script>
 
@@ -57,6 +71,19 @@ watch(profile, (val) => {
       <p class="text-sm text-muted-foreground text-center mt-4">
         Загрузка профиля...
       </p>
+      <!-- ✅ Кнопка экстренной отмены -->
+      <div class="flex justify-center mt-4">
+        <Button 
+          variant="outline" 
+          size="sm"
+          @click="() => {
+            profileStore.$patch({ isLoading: false })
+            profileStore.loadProfile(true, true)
+          }"
+        >
+          Загрузка зависла? Нажмите здесь
+        </Button>
+      </div>
     </div>
 
     <!-- Профиль загружен -->

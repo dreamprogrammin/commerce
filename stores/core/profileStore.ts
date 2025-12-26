@@ -36,10 +36,23 @@ export const useProfileStore = defineStore('profileStore', () => {
    * @param waitForCreation Ждать создания профиля (используется только при первом входе после OAuth)
    */
   async function loadProfile(force: boolean = false, waitForCreation: boolean = false): Promise<boolean> {
-    // ✅ Если уже идет загрузка - возвращаем существующий промис
+    // ✅ Если уже идет загрузка - возвращаем существующий промис (с таймаутом)
     if (loadingPromise && !force) {
       console.log('[ProfileStore] Already loading, returning existing promise')
-      return loadingPromise
+      try {
+        // Добавляем таймаут 10 секунд
+        return await Promise.race([
+          loadingPromise,
+          new Promise<boolean>((_, reject) => 
+            setTimeout(() => reject(new Error('Profile load timeout')), 10000)
+          )
+        ])
+      } catch (error) {
+        console.error('[ProfileStore] Loading promise timed out or failed, forcing reload')
+        loadingPromise = null
+        isLoading.value = false
+        // Продолжаем выполнение для повторной попытки
+      }
     }
 
     // Если профиль уже есть и не требуется принудительная перезагрузка
@@ -127,10 +140,10 @@ export const useProfileStore = defineStore('profileStore', () => {
         return false
       }
       finally {
-        // ✅ ВСЕГДА снимаем загрузку и очищаем промис
+        // ✅ КРИТИЧНО: ВСЕГДА снимаем загрузку и очищаем промис
+        console.log('[ProfileStore] Profile load completed, resetting loading state')
         isLoading.value = false
         loadingPromise = null
-        console.log('[ProfileStore] Profile load completed')
       }
     })()
 
