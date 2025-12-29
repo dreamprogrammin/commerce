@@ -1,12 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage, updateMessageButtons } from '../_shared/telegramUtils.ts'
+import { updateTelegramMessage, removeMessageButtons } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('✅ Функция assign-order-to-admin инициализирована')
+console.log('✅ Функция deliver-order инициализирована')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('👤 === НАЗНАЧЕНИЕ ЗАКАЗА АДМИНУ ===')
+    console.log('📦 === ДОСТАВКА ЗАКАЗА ===')
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -33,8 +33,6 @@ Deno.serve(async (req) => {
     const orderId = url.searchParams.get('order_id')
     const providedSecret = url.searchParams.get('secret')
     const tableParam = url.searchParams.get('table')
-    const adminName = url.searchParams.get('admin_name') || 'Админ'
-    const adminUsername = url.searchParams.get('admin_username')
 
     if (!orderId) {
       return new Response(
@@ -65,7 +63,6 @@ Deno.serve(async (req) => {
     }
 
     console.log(`📦 Заказ: ${orderId}`)
-    console.log(`👤 Админ: ${adminName}${adminUsername ? ` (@${adminUsername})` : ''}`)
 
     // Создаем admin-клиент
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -105,7 +102,6 @@ Deno.serve(async (req) => {
     // Получаем текущие данные заказа
     let orderData: {
       status: string
-      assigned_admin_name?: string | null
       telegram_message_id?: string | null
       final_amount?: number
       guest_name?: string
@@ -114,14 +110,14 @@ Deno.serve(async (req) => {
     if (tableName === 'orders') {
       const { data } = await supabase
         .from('orders')
-        .select('status, assigned_admin_name, telegram_message_id, final_amount, profile:profiles(first_name, last_name)')
+        .select('status, telegram_message_id, final_amount, profile:profiles(first_name, last_name)')
         .eq('id', orderId)
         .single()
       orderData = data as any
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, assigned_admin_name, telegram_message_id, final_amount, guest_name')
+        .select('status, telegram_message_id, final_amount, guest_name')
         .eq('id', orderId)
         .single()
       orderData = data
@@ -140,11 +136,10 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Проверяем, не взят ли уже заказ другим админом
-    if (orderData.assigned_admin_name && orderData.assigned_admin_name !== adminName) {
-      console.log(`⚠️ Заказ уже взят: ${orderData.assigned_admin_name}`)
+    // Проверяем статус
+    if (orderData.status === 'delivered') {
       return new Response(
-        `⚠️ ВНИМАНИЕ\n\nЗаказ уже в работе у:\n${orderData.assigned_admin_name}`,
+        '⚠️ ВНИМАНИЕ\n\nЗаказ уже доставлен',
         {
           headers: {
             ...corsHeaders,
@@ -155,21 +150,31 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Обновляем заказ - назначаем админа и сразу подтверждаем (confirmed)
+    if (orderData.status === 'cancelled') {
+      return new Response(
+        '❌ ОШИБКА\n\nНевозможно доставить отмененный заказ',
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'text/plain; charset=UTF-8'
+          },
+          status: 400
+        }
+      )
+    }
+
+    // Обновляем заказ - устанавливаем статус delivered
     const { error: updateError } = await supabase
       .from(tableName)
       .update({
-        assigned_admin_name: adminName,
-        assigned_admin_username: adminUsername,
-        assigned_at: new Date().toISOString(),
-        status: 'confirmed'
+        status: 'delivered'
       })
       .eq('id', orderId)
 
     if (updateError) {
-      console.error('❌ Ошибка при назначении админа:', updateError)
+      console.error('❌ Ошибка при обновлении статуса:', updateError)
       return new Response(
-        `❌ ОШИБКА\n\nНе удалось взять заказ в работу:\n${updateError.message}`,
+        `❌ ОШИБКА\n\nНе удалось обновить статус заказа:\n${updateError.message}`,
         {
           headers: {
             ...corsHeaders,
@@ -180,7 +185,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log('✅ Заказ успешно назначен админу')
+    console.log('✅ Заказ успешно доставлен')
 
     // Обновляем Telegram сообщение
     if (orderData.telegram_message_id) {
@@ -190,7 +195,7 @@ Deno.serve(async (req) => {
         ? `${(orderData as any).profile?.first_name || ''} ${(orderData as any).profile?.last_name || ''}`.trim() || 'Не указано'
         : orderData.guest_name || 'Гость'
 
-      const updatedText = `⚙️ *В ОБРАБОТКЕ*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n👨‍💼 *Ответственный:* ${adminName}${adminUsername ? ` (@${adminUsername})` : ''}\n\n_Статус: confirmed_\n\n📝 Заказ взят в работу\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+      const updatedText = `✅ *ДОСТАВЛЕН*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n_Статус: delivered_\n\n📦 Заказ успешно доставлен\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
       const updateResult = await updateTelegramMessage(
         botToken,
@@ -202,48 +207,23 @@ Deno.serve(async (req) => {
       if (updateResult.success) {
         console.log('✅ Telegram сообщение обновлено')
 
-        // Добавляем новые кнопки: "Доставлен" и "Отменить"
-        const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${orderId}${tableParam ? `&table=${tableName}` : ''}${secretParam}`
-        const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableParam ? `&table=${tableName}` : ''}${secretParam}`
-
-        const newButtons = [
-          [
-            { text: '✅ Доставлен', url: deliveredUrl }
-          ],
-          [
-            { text: '❌ Отменить', url: cancelUrl }
-          ]
-        ]
-
-        const buttonsResult = await updateMessageButtons(
-          botToken,
-          chatId,
-          orderData.telegram_message_id,
-          newButtons
-        )
-
-        if (buttonsResult.success) {
-          console.log('✅ Кнопки обновлены для всех админов')
-        } else {
-          console.error('⚠️ Не удалось обновить кнопки:', buttonsResult.error)
-        }
+        // Удаляем кнопки (заказ доставлен, действия не нужны)
+        await removeMessageButtons(botToken, chatId, orderData.telegram_message_id)
       } else {
         console.error('⚠️ Не удалось обновить Telegram:', updateResult.error)
       }
     }
 
-    console.log('🎉 Назначение админа завершено')
+    console.log('🎉 Доставка заказа завершена')
 
     const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
-    const responseText = `✅ ЗАКАЗ ВЗЯТ В РАБОТУ
+    const responseText = `✅ ЗАКАЗ ДОСТАВЛЕН
 
 📦 Заказ №${orderId.slice(-6)}
 Тип: ${orderType}
-👨‍💼 Ответственный: ${adminName}${adminUsername ? ` (@${adminUsername})` : ''}
+Статус: Доставлен
 
-Статус изменен на: В обработке
-
-Другие админы увидят это обновление в Telegram.`
+Операция выполнена успешно.`
 
     return new Response(
       responseText,

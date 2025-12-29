@@ -58,6 +58,58 @@ export async function updateTelegramMessage(
 }
 
 /**
+ * Обновляет inline-кнопки в сообщении
+ * @param botToken - Токен Telegram бота
+ * @param chatId - ID чата
+ * @param messageId - ID сообщения
+ * @param buttons - Массив кнопок (inline_keyboard)
+ * @returns Promise с результатом
+ */
+export async function updateMessageButtons(
+  botToken: string,
+  chatId: string,
+  messageId: string,
+  buttons: any[][]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log(`🔘 Обновление кнопок в сообщении ${messageId}...`)
+
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: parseInt(messageId),
+          reply_markup: { inline_keyboard: buttons }
+        }),
+      }
+    )
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      console.error('❌ Ошибка обновления кнопок:', result)
+      return {
+        success: false,
+        error: result.description || 'Unknown error'
+      }
+    }
+
+    console.log('✅ Кнопки обновлены')
+    return { success: true }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('❌ Критическая ошибка при обновлении кнопок:', errorMessage)
+    return {
+      success: false,
+      error: errorMessage
+    }
+  }
+}
+
+/**
  * Удаляет inline-кнопки из сообщения (делает их неактивными)
  * @param botToken - Токен Telegram бота
  * @param chatId - ID чата
@@ -69,42 +121,7 @@ export async function removeMessageButtons(
   chatId: string,
   messageId: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    console.log(`🔘 Удаление кнопок из сообщения ${messageId}...`)
-
-    const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          message_id: parseInt(messageId),
-          reply_markup: { inline_keyboard: [] }
-        }),
-      }
-    )
-
-    const result = await response.json()
-
-    if (!response.ok) {
-      console.error('❌ Ошибка удаления кнопок:', result)
-      return {
-        success: false,
-        error: result.description || 'Unknown error'
-      }
-    }
-
-    console.log('✅ Кнопки удалены')
-    return { success: true }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error('❌ Критическая ошибка при удалении кнопок:', errorMessage)
-    return {
-      success: false,
-      error: errorMessage
-    }
-  }
+  return updateMessageButtons(botToken, chatId, messageId, [])
 }
 
 /**

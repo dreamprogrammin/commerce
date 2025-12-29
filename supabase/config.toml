@@ -370,6 +370,12 @@ verify_jwt = false
 import_map = "./functions/sync-order-status-to-telegram/deno.json"
 entrypoint = "./functions/sync-order-status-to-telegram/index.ts"
 
+[functions.deliver-order]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deliver-order/deno.json"
+entrypoint = "./functions/deliver-order/index.ts"
+
 [functions.image-transformer]
 enabled = true
 verify_jwt = true
