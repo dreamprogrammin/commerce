@@ -15,6 +15,7 @@ export default defineNuxtConfig({
     'nuxt-og-image',
     'nuxt-schema-org',
     '@nuxt/fonts',
+    '@nuxtjs/storybook',
   ],
 
   site: {

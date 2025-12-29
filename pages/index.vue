@@ -249,17 +249,28 @@ useRobotsRule({
       </p>
     </div>
 
-    <!-- Блок приветствия/авторизации -->
+    <!-- Блок приветствия/авторизации и статус заказа -->
     <div :class="alwaysContainedClass" class="py-4">
       <ClientOnly>
-        <div v-if="isLoggedIn" class="p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <NuxtLink v-if="isAdmin" to="/admin" class="font-semibold text-primary hover:underline">
-            Перейти в панель администратора
-          </NuxtLink>
-          <NuxtLink v-else to="/profile" class="font-semibold text-primary hover:underline">
-            Перейти в личный кабинет
-          </NuxtLink>
+        <!-- Для авторизованных пользователей -->
+        <div v-if="isLoggedIn">
+          <!-- Админ -->
+          <div v-if="isAdmin" class="p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <NuxtLink to="/admin" class="font-semibold text-primary hover:underline">
+              Перейти в панель администратора
+            </NuxtLink>
+          </div>
+          <!-- Обычный пользователь - показываем статус заказа или приветствие -->
+          <template v-else>
+            <HomeActiveOrderStatus />
+            <div class="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <NuxtLink to="/profile" class="font-semibold text-primary hover:underline">
+                Перейти в личный кабинет
+              </NuxtLink>
+            </div>
+          </template>
         </div>
+        <!-- Для неавторизованных -->
         <div v-else class="p-4 bg-gray-100 border rounded-md">
           <NuxtLink to="/profile" class="font-semibold text-primary hover:underline">
             Пожалуйста, авторизуйтесь, чтобы получать бонусы!

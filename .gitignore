@@ -23,3 +23,5 @@ logs
 .env.*
 !.env.example
 !.env.dev
+*storybook.log
+storybook-static
