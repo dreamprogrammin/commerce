@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+console.log('✅ Функция cancel-order инициализирована v2')
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {

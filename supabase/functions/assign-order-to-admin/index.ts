@@ -155,14 +155,14 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Обновляем заказ - назначаем админа и сразу подтверждаем (confirmed)
+    // Обновляем заказ - назначаем админа и переводим в обработку (processing)
     const { error: updateError } = await supabase
       .from(tableName)
       .update({
         assigned_admin_name: adminName,
         assigned_admin_username: adminUsername,
         assigned_at: new Date().toISOString(),
-        status: 'confirmed'
+        status: 'processing'
       })
       .eq('id', orderId)
 
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
         ? `${(orderData as any).profile?.first_name || ''} ${(orderData as any).profile?.last_name || ''}`.trim() || 'Не указано'
         : orderData.guest_name || 'Гость'
 
-      const updatedText = `⚙️ *В ОБРАБОТКЕ*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n👨‍💼 *Ответственный:* ${adminName}${adminUsername ? ` (@${adminUsername})` : ''}\n\n_Статус: confirmed_\n\n📝 Заказ взят в работу\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+      const updatedText = `⚙️ *В ОБРАБОТКЕ*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n👨‍💼 *Ответственный:* ${adminName}${adminUsername ? ` (@${adminUsername})` : ''}\n\n_Статус: processing_\n\n📝 Заказ взят в работу. Уточните детали с клиентом.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
       const updateResult = await updateTelegramMessage(
         botToken,
@@ -202,13 +202,17 @@ Deno.serve(async (req) => {
       if (updateResult.success) {
         console.log('✅ Telegram сообщение обновлено')
 
-        // Добавляем новые кнопки: "Доставлен" и "Отменить"
-        const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${orderId}${tableParam ? `&table=${tableName}` : ''}${secretParam}`
-        const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableParam ? `&table=${tableName}` : ''}${secretParam}`
+        // Формируем параметры для URL кнопок
+        const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
+        const tableUrlParam = `&table=${tableName}`
+
+        // Добавляем новые кнопки: "Подтвердить" и "Отменить"
+        const confirmUrl = `${supabaseUrl}/functions/v1/confirm-order?order_id=${orderId}${tableUrlParam}${secretParam}`
+        const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableUrlParam}${secretParam}`
 
         const newButtons = [
           [
-            { text: '✅ Доставлен', url: deliveredUrl }
+            { text: '✅ Подтвердить', url: confirmUrl }
           ],
           [
             { text: '❌ Отменить', url: cancelUrl }

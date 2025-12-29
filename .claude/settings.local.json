@@ -18,7 +18,12 @@
       "Bash(git push:*)",
       "Bash(curl:*)",
       "Bash(grep:*)",
-      "Bash(pnpx supabase db diff:*)"
+      "Bash(pnpx supabase db diff:*)",
+      "Bash(supabase stop:*)",
+      "Bash(supabase start:*)",
+      "Bash(supabase functions deploy:*)",
+      "Bash(psql:*)",
+      "Bash(supabase migration:*)"
     ]
   }
 }

@@ -77,7 +77,7 @@ interface GuestCheckoutData {
   guest_checkout_items: GuestCheckoutItem[]
 }
 
-console.log('✅ Функция notify-order-to-telegram инициализирована')
+console.log('✅ Функция notify-order-to-telegram инициализирована v2')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
