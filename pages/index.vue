@@ -270,11 +270,14 @@ useRobotsRule({
             </div>
           </template>
         </div>
-        <!-- Для неавторизованных -->
-        <div v-else class="p-4 bg-gray-100 border rounded-md">
-          <NuxtLink to="/profile" class="font-semibold text-primary hover:underline">
-            Пожалуйста, авторизуйтесь, чтобы получать бонусы!
-          </NuxtLink>
+        <!-- Для неавторизованных - показываем отслеживание заказа для гостей -->
+        <div v-else>
+          <HomeGuestOrderTracking class="mb-4" />
+          <div class="p-4 bg-gray-100 border rounded-md">
+            <NuxtLink to="/profile" class="font-semibold text-primary hover:underline">
+              Пожалуйста, авторизуйтесь, чтобы получать бонусы!
+            </NuxtLink>
+          </div>
         </div>
         <template #fallback>
           <div class="p-4 bg-gray-100 border rounded-md animate-pulse">
