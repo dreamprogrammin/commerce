@@ -194,12 +194,58 @@ Deno.serve(async (req) => {
     console.log('📝 Текст обновления:')
     console.log(updatedText)
 
-    // Обновляем Telegram сообщение
+    // Формируем кнопки в зависимости от статуса
+    let buttons = null
+    const adminSecret = Deno.env.get('ADMIN_SECRET')
+    const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
+    const tableParam = `&table=${table}`
+
+    if (record.status === 'processing') {
+      // В работе → показываем [Подтвердить] [Отменить]
+      const confirmUrl = `${supabaseUrl}/functions/v1/confirm-order?order_id=${record.id}${tableParam}${secretParam}`
+      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
+
+      buttons = {
+        inline_keyboard: [
+          [{ text: '✅ Подтвердить', url: confirmUrl }],
+          [{ text: '❌ Отменить', url: cancelUrl }]
+        ]
+      }
+    } else if (record.status === 'confirmed') {
+      // Подтверждён → показываем [Доставлен] [Отменить]
+      const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${record.id}${tableParam}${secretParam}`
+      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
+
+      buttons = {
+        inline_keyboard: [
+          [{ text: '✅ Доставлен', url: deliveredUrl }],
+          [{ text: '❌ Отменить', url: cancelUrl }]
+        ]
+      }
+    } else if (record.status === 'new' || record.status === 'pending') {
+      // Новый → показываем [Взять в работу] [Отменить]
+      const assignUrl = `${supabaseUrl}/functions/v1/assign-order-to-admin?order_id=${record.id}${tableParam}${secretParam}`
+      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
+
+      buttons = {
+        inline_keyboard: [
+          [{ text: '✅ Взять в работу', url: assignUrl }],
+          [{ text: '❌ Отменить', url: cancelUrl }]
+        ]
+      }
+    }
+    // Для delivered и cancelled кнопок нет (buttons = null)
+
+    console.log('🔘 Кнопки:', buttons ? JSON.stringify(buttons) : 'отсутствуют')
+
+    // Обновляем Telegram сообщение с кнопками
     const updateResult = await updateTelegramMessage(
       botToken,
       chatId,
       record.telegram_message_id,
-      updatedText
+      updatedText,
+      'Markdown',
+      buttons || undefined
     )
 
     if (updateResult.success) {

@@ -1,12 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage, updateMessageButtons } from '../_shared/telegramUtils.ts'
+import { updateTelegramMessage } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('✅ Функция assign-order-to-admin инициализирована')
+console.log('✅ Функция assign-order-to-admin v3 инициализирована')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -210,6 +210,8 @@ Deno.serve(async (req) => {
           ]
         ]
       }
+
+      console.log('🔘 Формируем кнопки:', JSON.stringify(newButtons))
 
       // Обновляем текст И кнопки одновременно
       const updateResult = await updateTelegramMessage(

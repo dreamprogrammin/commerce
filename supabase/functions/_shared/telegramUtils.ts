@@ -1,5 +1,6 @@
 /**
  * Утилиты для работы с Telegram Bot API
+ * @version 3.0 - Fixed button disappearing issue
  */
 
 /**
@@ -33,7 +34,12 @@ export async function updateTelegramMessage(
     // Добавляем кнопки если они переданы
     if (replyMarkup) {
       body.reply_markup = replyMarkup
+      console.log('🔘 Передаём кнопки в Telegram API:', JSON.stringify(replyMarkup))
+    } else {
+      console.log('⚠️ Кнопки НЕ переданы!')
     }
+
+    console.log('📤 Отправляем в Telegram API:', JSON.stringify(body))
 
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/editMessageText`,
