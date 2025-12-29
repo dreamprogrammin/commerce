@@ -7,6 +7,19 @@ import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
+// 🔥 Принимаем данные через props (загружаются в useSlides)
+interface Props {
+  slides?: SlideRow[] | null
+  isLoading?: boolean
+  error?: Error | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  slides: () => [],
+  isLoading: false,
+  error: null,
+})
+
 const { getImageUrl } = useSupabaseStorage()
 
 // --- CAROUSEL CONFIG ---
@@ -22,46 +35,14 @@ const autoplayPlugin = Autoplay({
 const emblaApi = ref<CarouselApi>()
 
 /**
- * 🔥 КЕШИРОВАНИЕ СЛАЙДОВ С useAsyncData
- * Автоматически кеширует данные в Nuxt Data
- */
-const { data: slides, pending: isLoading, error } = useAsyncData(
-  'home-slides',
-  async () => {
-    const supabase = useSupabaseClient()
-    const { data, error } = await supabase
-      .from('slides')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    if (error) {
-      console.error('Ошибка загрузки слайдов:', error)
-      throw error
-    }
-
-    return data as SlideRow[]
-  },
-  {
-    lazy: true,
-    default: () => [],
-    // 🔥 Кешируем данные - возвращаем из кеша если существуют
-    getCachedData(key) {
-      const data = useNuxtData(key)
-      return data.data.value
-    },
-  },
-)
-
-/**
  * 🔥 КЕШИРОВАНИЕ URL ИЗОБРАЖЕНИЙ
- * Подготавливаем URL для каждого слайда
+ * Подготавливаем URL для каждого слайда из props
  */
 const processedSlides = computed(() => {
-  if (!slides.value)
+  if (!props.slides || !Array.isArray(props.slides))
     return []
 
-  return slides.value.map(slide => ({
+  return props.slides.map(slide => ({
     ...slide,
     desktopUrl: getSlideUrl(slide.image_url),
     mobileUrl: slide.image_url_mobile ? getSlideUrlMobile(slide.image_url_mobile) : null,
@@ -105,7 +86,7 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
 <template>
   <div class="w-full">
     <!-- 🎨 СКЕЛЕТОН КАРУСЕЛИ (при загрузке) -->
-    <div v-if="isLoading" :class="carouselContainerClass">
+    <div v-if="props.isLoading" :class="carouselContainerClass">
       <div class="py-4">
         <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
           <!-- Главный видимый слайд-скелетон -->
@@ -131,14 +112,14 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
 
     <!-- ❌ ОШИБКА ЗАГРУЗКИ -->
     <div
-      v-else-if="error"
+      v-else-if="props.error"
       :class="`${containerClass} w-full aspect-21/9 bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center p-4 text-center`"
     >
       <h3 class="mt-4 text-lg font-semibold">
         ⚠️ Не удалось загрузить слайдер
       </h3>
       <p class="text-sm">
-        {{ error.message }}
+        {{ props.error.message }}
       </p>
     </div>
 

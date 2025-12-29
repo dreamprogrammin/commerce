@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
@@ -8,13 +9,15 @@ import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategorie
 const popularCategoriesStore = usePopularCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
-const { data: popularCategories, pending: isLoading } = useAsyncData(
-  'home-popular-categories',
-  async () => {
+// 🔥 TanStack Query - популярные категории с автоматическим кешированием
+const { data: popularCategories, isLoading } = useQuery({
+  queryKey: ['home-popular-categories'],
+  queryFn: async () => {
     await popularCategoriesStore.fetchPopularCategories()
     return popularCategoriesStore.popularCategories
   },
-)
+  initialData: () => [],
+})
 
 function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)

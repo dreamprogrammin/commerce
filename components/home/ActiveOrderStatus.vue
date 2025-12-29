@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { Package, Clock, Truck, CheckCircle } from 'lucide-vue-next'
+import { ArrowRight } from 'lucide-vue-next'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const {
   activeOrder,
@@ -10,6 +13,8 @@ const {
   fetchOrders,
   subscribeToOrderUpdates,
 } = useUserOrders()
+
+const { getImageUrl } = useSupabaseStorage()
 
 // Подписка на обновления заказов
 let channel: any = null
@@ -25,77 +30,75 @@ onUnmounted(() => {
   }
 })
 
-// Иконка в зависимости от статуса
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'new':
-    case 'pending':
-      return Clock
-    case 'processing':
-      return Package
-    case 'confirmed':
-    case 'shipped':
-      return Truck
-    case 'delivered':
-      return CheckCircle
-    default:
-      return Package
-  }
-}
+// Получить первое изображение первого товара
+const firstProductImage = computed(() => {
+  if (!activeOrder.value?.order_items?.length) return null
+  const firstProduct = activeOrder.value.order_items[0]?.product
+  if (!firstProduct?.product_images?.length) return null
+  return firstProduct.product_images[0]
+})
+
+// URL изображения
+const productImageUrl = computed(() => {
+  if (!firstProductImage.value?.image_url) return null
+  return getImageUrl(BUCKET_NAME_PRODUCT, firstProductImage.value.image_url, IMAGE_SIZES.PRODUCT_CARD)
+})
 </script>
 
 <template>
-  <div v-if="!isLoading && activeOrder" class="mb-4">
-    <Card class="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-      <CardHeader>
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex items-center gap-3 flex-1 min-w-0">
-            <div class="p-2 bg-primary/10 rounded-full flex-shrink-0">
-              <component :is="getStatusIcon(activeOrder.status)" class="w-5 h-5 md:w-6 md:h-6 text-primary" />
-            </div>
-            <div class="min-w-0 flex-1">
-              <CardTitle class="text-base md:text-lg truncate">
-                Заказ №{{ activeOrder.id.slice(-6) }}
-              </CardTitle>
-              <CardDescription class="text-xs md:text-sm">
-                от {{ new Date(activeOrder.created_at).toLocaleDateString('ru-RU') }}
-              </CardDescription>
-            </div>
-          </div>
-          <Badge :class="getStatusColor(activeOrder.status)" class="flex-shrink-0 text-xs">
-            {{ getStatusLabel(activeOrder.status) }}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div class="space-y-3">
-          <!-- Сумма заказа -->
-          <div class="flex justify-between items-center text-sm">
-            <span class="text-muted-foreground">Сумма заказа:</span>
-            <span class="font-semibold">{{ activeOrder.final_amount.toLocaleString('ru-RU') }} ₸</span>
-          </div>
-
-          <!-- Товары в заказе -->
-          <div class="flex items-center gap-2 text-sm text-muted-foreground">
-            <Icon name="lucide:shopping-bag" class="w-4 h-4" />
-            <span>{{ activeOrder.order_items.length }} {{ activeOrder.order_items.length === 1 ? 'товар' : 'товара' }}</span>
-          </div>
-
-          <!-- Кнопка просмотра -->
-          <div class="pt-2">
-            <Button
-              as-child
-              variant="default"
-              size="sm"
-              class="w-full"
+  <!-- 🔥 Компактная горизонтальная плашка активного заказа -->
+  <NuxtLink
+    v-if="!isLoading && activeOrder"
+    :to="`/profile/order/${activeOrder.id}`"
+    class="block mb-3 group"
+  >
+    <Card class="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 hover:shadow-md transition-all duration-200">
+      <CardContent class="p-3">
+        <div class="flex items-center gap-3">
+          <!-- Изображение первого товара -->
+          <div class="relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-white">
+            <ResponsiveImage
+              v-if="productImageUrl"
+              :src="productImageUrl"
+              :blur-data-url="firstProductImage?.blur_placeholder || undefined"
+              :alt="activeOrder.order_items[0]?.product?.name || 'Товар'"
+              object-fit="cover"
+              placeholder-type="lqip"
+              class="w-full h-full"
+            />
+            <div
+              v-else
+              class="w-full h-full flex items-center justify-center bg-gray-100"
             >
-              <NuxtLink :to="`/profile/order/${activeOrder.id}`">
-                Подробнее о заказе
-              </NuxtLink>
-            </Button>
+              <Icon name="lucide:package" class="w-6 h-6 text-gray-400" />
+            </div>
           </div>
+
+          <!-- Информация о заказе -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-semibold text-sm md:text-base truncate">
+                Заказ №{{ activeOrder.id.slice(-6) }}
+              </span>
+              <Badge :class="getStatusColor(activeOrder.status)" class="text-xs px-2 py-0 h-5">
+                {{ getStatusLabel(activeOrder.status) }}
+              </Badge>
+            </div>
+            <div class="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+              <span class="font-medium text-foreground">
+                {{ activeOrder.final_amount.toLocaleString('ru-RU') }} ₸
+              </span>
+              <span class="hidden sm:inline">•</span>
+              <span class="hidden sm:inline">
+                {{ activeOrder.order_items.length }} {{ activeOrder.order_items.length === 1 ? 'товар' : activeOrder.order_items.length < 5 ? 'товара' : 'товаров' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Стрелка -->
+          <ArrowRight class="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
         </div>
       </CardContent>
     </Card>
-  </div>
+  </NuxtLink>
 </template>

@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/vue-query'
 import type { Database, SlideRow } from '@/types'
 
 /**
@@ -6,16 +7,15 @@ import type { Database, SlideRow } from '@/types'
  * Особенности:
  * - Загружает только активные слайды с blur_placeholder
  * - Сортирует по display_order
- * - Поддерживает SSR с lazy loading
+ * - Использует TanStack Query для кеширования (5-10 мин)
  * - Автоматически обрабатывает ошибки
  */
 export function useSlides() {
   const supabase = useSupabaseClient<Database>()
-  const key = 'global-slides'
 
-  const asyncData = useAsyncData<SlideRow[]>(
-    key,
-    async () => {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['global-slides'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('slides')
         .select(`
@@ -25,7 +25,7 @@ export function useSlides() {
           image_url,
           blur_placeholder,
           image_url_mobile,
-          blur_placeholder_mobile, 
+          blur_placeholder_mobile,
           cta_link,
           cta_text,
           is_active,
@@ -60,26 +60,21 @@ ${data.map((slide, i) => `  ${i + 1}. ${slide.title}
 
       return data || []
     },
-    {
-      lazy: true,
-      default: () => [],
-    },
-  )
-
-  const isLoading = computed(() => asyncData.pending.value)
+    initialData: () => [],
+  })
 
   /**
    * 🔄 Обновить слайды (например, после изменения в админке)
    */
   async function refresh() {
-    await asyncData.refresh()
+    await refetch()
   }
 
   /**
    * 📊 Статистика по слайдам
    */
   const stats = computed(() => {
-    const slides = asyncData.data.value || []
+    const slides = data.value || []
     return {
       total: slides.length,
       withImages: slides.filter(s => s.image_url).length,
@@ -90,8 +85,8 @@ ${data.map((slide, i) => `  ${i + 1}. ${slide.title}
 
   return {
     // 📊 Данные
-    slides: asyncData.data,
-    error: asyncData.error,
+    slides: data,
+    error,
     isLoading,
     stats,
 
@@ -99,7 +94,7 @@ ${data.map((slide, i) => `  ${i + 1}. ${slide.title}
     refresh,
 
     // 🎯 Утилиты
-    isEmpty: computed(() => (asyncData.data.value?.length || 0) === 0),
-    hasError: computed(() => !!asyncData.error.value),
+    isEmpty: computed(() => (data.value?.length || 0) === 0),
+    hasError: computed(() => !!error.value),
   }
 }

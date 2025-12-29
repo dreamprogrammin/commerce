@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query'
 import { useSlides } from '@/composables/slides/useSlides'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
@@ -27,9 +28,10 @@ definePageMeta({
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 const desktopContainedClass = carouselContainerVariants({ contained: 'desktop' })
 
-const { data: mainPersonalData, pending: isLoadingRecommendations } = useAsyncData(
-  'home-recommendations',
-  async () => {
+// 🔥 TanStack Query - рекомендации и избранное с автоматическим кешированием
+const { data: mainPersonalData, isLoading: isLoadingRecommendations } = useQuery({
+  queryKey: ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value],
+  queryFn: async () => {
     const [recommended, wishlist] = await Promise.all([
       recommendationsStore.fetchRecommendations(),
       isLoggedIn.value ? wishlistStore.fetchWishlistProducts() : [],
@@ -40,27 +42,25 @@ const { data: mainPersonalData, pending: isLoadingRecommendations } = useAsyncDa
       wishlist: Array.isArray(wishlist) ? wishlist : [],
     }
   },
-  {
-    watch: [user, personalizationTrigger, isLoggedIn],
-    lazy: true,
-    default: () => ({ recommended: [], wishlist: [] }),
-  },
-)
+  initialData: () => ({ recommended: [], wishlist: [] }),
+})
 
-const recommendedProducts = computed(() => mainPersonalData.value.recommended)
-const wishlistProducts = computed(() => mainPersonalData.value.wishlist)
+const recommendedProducts = computed(() => mainPersonalData.value?.recommended || [])
+const wishlistProducts = computed(() => mainPersonalData.value?.wishlist || [])
 
-const { data: popularProducts, pending: isLoadingPopular } = useAsyncData(
-  'home-popular',
-  () => productsStore.fetchPopularProducts(10),
-  { lazy: true, default: () => [] },
-)
+// 🔥 TanStack Query - популярные товары с автоматическим кешированием
+const { data: popularProducts, isLoading: isLoadingPopular } = useQuery({
+  queryKey: ['home-popular'],
+  queryFn: () => productsStore.fetchPopularProducts(10),
+  initialData: () => [],
+})
 
-const { data: newestProducts, pending: isLoadingNewest } = useAsyncData(
-  'home-newest',
-  () => productsStore.fetchNewestProducts(10),
-  { lazy: true, default: () => [] },
-)
+// 🔥 TanStack Query - новые поступления с автоматическим кешированием
+const { data: newestProducts, isLoading: isLoadingNewest } = useQuery({
+  queryKey: ['home-newest'],
+  queryFn: () => productsStore.fetchNewestProducts(10),
+  initialData: () => [],
+})
 
 const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
 
