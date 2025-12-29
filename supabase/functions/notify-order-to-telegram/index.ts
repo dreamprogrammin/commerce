@@ -508,11 +508,14 @@ Deno.serve(async (req) => {
         } else {
           console.log('✅ Медиа-группа отправлена')
           const mediaResult = await mediaResponse.json()
-          // Для медиа-группы берем message_id первого сообщения
-          telegramMessageId = mediaResult.result?.[0]?.message_id || null
+          console.log(`📊 Медиа-группа: message_id = ${mediaResult.result?.[0]?.message_id}`)
 
           // Отправляем кнопки отдельным сообщением
-          await sendTextMessage(botToken, chatId, 'Управление заказом:', inlineKeyboard)
+          const buttonsResponse = await sendTextMessage(botToken, chatId, 'Управление заказом:', inlineKeyboard)
+          const buttonsResult = await buttonsResponse.json()
+          // ВАЖНО: Сохраняем message_id от сообщения с кнопками, а не от медиа-группы!
+          telegramMessageId = buttonsResult.result?.message_id || null
+          console.log(`🔘 Сообщение с кнопками: message_id = ${telegramMessageId}`)
         }
       } else {
         console.log('📝 Нет доступных изображений, отправка текстового сообщения')
