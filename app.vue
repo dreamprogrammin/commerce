@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // 🆕 Управление LoadingBar при навигации
+import 'vue-sonner/style.css'
 const nuxtApp = useNuxtApp()
 const isPageLoading = ref(false)
 
