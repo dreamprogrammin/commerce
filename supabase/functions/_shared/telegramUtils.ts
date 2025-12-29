@@ -9,6 +9,7 @@
  * @param messageId - ID сообщения для обновления
  * @param newText - Новый текст сообщения
  * @param parseMode - Режим парсинга (Markdown, HTML)
+ * @param replyMarkup - Опциональная клавиатура (кнопки)
  * @returns Promise с результатом обновления
  */
 export async function updateTelegramMessage(
@@ -16,22 +17,30 @@ export async function updateTelegramMessage(
   chatId: string,
   messageId: string,
   newText: string,
-  parseMode: 'Markdown' | 'HTML' = 'Markdown'
+  parseMode: 'Markdown' | 'HTML' = 'Markdown',
+  replyMarkup?: { inline_keyboard: any[][] }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     console.log(`📝 Обновление Telegram сообщения ${messageId}...`)
+
+    const body: any = {
+      chat_id: chatId,
+      message_id: parseInt(messageId),
+      text: newText,
+      parse_mode: parseMode,
+    }
+
+    // Добавляем кнопки если они переданы
+    if (replyMarkup) {
+      body.reply_markup = replyMarkup
+    }
 
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/editMessageText`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          message_id: parseInt(messageId),
-          text: newText,
-          parse_mode: parseMode,
-        }),
+        body: JSON.stringify(body),
       }
     )
 

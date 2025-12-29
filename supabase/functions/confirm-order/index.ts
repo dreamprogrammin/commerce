@@ -193,24 +193,15 @@ Deno.serve(async (req) => {
 
         const updatedText = `✅ *ЗАКАЗ ПОДТВЕРЖДЕН*\n\n🔔 Заказ №${orderId.slice(-6)}\n\n_Статус: confirmed_\n\n✔️ Клиент согласен. Заказ готов к доставке.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
-        const updateResult = await updateTelegramMessage(
-          botToken,
-          chatId,
-          orderData.telegram_message_id,
-          updatedText
-        )
+        // Формируем новые кнопки: "Доставлен" и "Отменить"
+        const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
+        const tableUrlParam = `&table=${tableName}`
 
-        if (updateResult.success) {
-          console.log('✅ Telegram сообщение обновлено')
+        const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${orderId}${tableUrlParam}${secretParam}`
+        const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableUrlParam}${secretParam}`
 
-          // Добавляем новые кнопки: "Доставлен" и "Отменить"
-          const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
-          const tableUrlParam = `&table=${tableName}`
-
-          const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${orderId}${tableUrlParam}${secretParam}`
-          const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableUrlParam}${secretParam}`
-
-          const newButtons = [
+        const newButtons = {
+          inline_keyboard: [
             [
               { text: '✅ Доставлен', url: deliveredUrl }
             ],
@@ -218,19 +209,20 @@ Deno.serve(async (req) => {
               { text: '❌ Отменить', url: cancelUrl }
             ]
           ]
+        }
 
-          const buttonsResult = await updateMessageButtons(
-            botToken,
-            chatId,
-            orderData.telegram_message_id,
-            newButtons
-          )
+        // Обновляем текст И кнопки одновременно
+        const updateResult = await updateTelegramMessage(
+          botToken,
+          chatId,
+          orderData.telegram_message_id,
+          updatedText,
+          'Markdown',
+          newButtons
+        )
 
-          if (buttonsResult.success) {
-            console.log('✅ Кнопки обновлены для всех админов')
-          } else {
-            console.error('⚠️ Не удалось обновить кнопки:', buttonsResult.error)
-          }
+        if (updateResult.success) {
+          console.log('✅ Telegram сообщение и кнопки обновлены для всех админов')
         } else {
           console.error('⚠️ Не удалось обновить Telegram:', updateResult.error)
         }
