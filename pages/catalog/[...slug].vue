@@ -390,9 +390,9 @@ const metaDescription = computed(() => {
 
 const metaTitle = computed(() => {
   if (hasActiveFilters.value) {
-    return `${title.value} - Фильтр | Ваш магазин`
+    return `${title.value} - Фильтр | Ухтышка`
   }
-  return `${title.value} - Купить в интернет-магазине | Ваш магазин`
+  return `${title.value} - Купить в интернет-магазине | Ухтышка`
 })
 
 const robotsRule = computed(() => {
@@ -501,7 +501,7 @@ useHead(() => {
       'url': canonicalUrl.value,
       'isPartOf': {
         '@type': 'WebSite',
-        'name': 'Ваш магазин',
+        'name': 'Ухтышка',
         'url': 'https://uhti.kz',
       },
       // Если есть картинка категории
@@ -540,7 +540,7 @@ useHead(() => {
       { property: 'og:description', content: metaDescription.value },
       { property: 'og:url', content: canonicalUrl.value },
       { property: 'og:type', content: 'website' },
-      { property: 'og:site_name', content: 'Ваш магазин' },
+      { property: 'og:site_name', content: 'Ухтышка' },
       { property: 'og:locale', content: 'ru_RU' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: metaTitle.value },

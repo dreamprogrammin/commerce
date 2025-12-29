@@ -22,11 +22,23 @@ nuxtApp.hook('vue:error', () => {
 
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
+const route = useRoute()
 
-// ✅ Динамичный шаблон для title всех страниц
+// ✅ Динамичный шаблон для title всех страниц + hreflang
 useHead({
   titleTemplate: (titleChunk) => {
     return titleChunk ? `${titleChunk}` : `${siteName} - Интернет-магазин детских игрушек`
+  },
+  // ✅ Глобальные hreflang теги для русского/казахского языков
+  link: () => {
+    const currentPath = route.fullPath
+    const currentUrl = `${siteUrl}${currentPath}`
+
+    return [
+      { rel: 'alternate', hreflang: 'ru', href: currentUrl },
+      { rel: 'alternate', hreflang: 'kk', href: currentUrl },
+      { rel: 'alternate', hreflang: 'x-default', href: currentUrl },
+    ]
   },
 })
 

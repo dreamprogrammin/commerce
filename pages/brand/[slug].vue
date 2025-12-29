@@ -75,12 +75,109 @@ const brandLogoUrl = computed(() => {
   })
 })
 
-// Устанавливаем заголовок страницы для SEO
+// ========================================
+// SEO META TAGS + STRUCTURED DATA
+// ========================================
+const siteUrl = 'https://uhti.kz'
+const siteName = 'Ухтышка'
+
+const brandUrl = computed(() => `${siteUrl}/brand/${brandSlug}`)
+const metaTitle = computed(() => brand.value ? `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}` : 'Бренд не найден')
+const metaDescription = computed(() => brand.value ? `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName} ⭐ Оригинальная продукция ✓ Гарантия качества ✓ Доставка по Казахстану ✓ Бонусная программа` : `Товары бренда в ${siteName}`)
+
 useHead({
-  title: () => brand.value?.name || 'Бренд не найден',
-  meta: [
-    { name: 'description', content: () => `Товары бренда ${brand.value?.name || ''}` },
+  title: metaTitle,
+  link: [
+    { rel: 'canonical', href: brandUrl.value },
   ],
+  meta: [
+    { name: 'description', content: metaDescription },
+    { name: 'keywords', content: () => `${brand.value?.name || 'бренд'}, товары бренда, оригинальная продукция, Алматы, Казахстан` },
+
+    // Open Graph
+    { property: 'og:title', content: metaTitle },
+    { property: 'og:description', content: metaDescription },
+    { property: 'og:url', content: brandUrl.value },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:site_name', content: siteName },
+    { property: 'og:locale', content: 'ru_RU' },
+    { property: 'og:image', content: () => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg` },
+
+    // Twitter Card
+    { name: 'twitter:card', content: 'summary' },
+    { name: 'twitter:title', content: metaTitle },
+    { name: 'twitter:description', content: metaDescription },
+    { name: 'twitter:image', content: () => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg` },
+
+    // Robots
+    { name: 'robots', content: 'index, follow' },
+  ],
+  script: [
+    // BreadcrumbList Schema
+    {
+      type: 'application/ld+json',
+      children: () => JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+          {
+            '@type': 'ListItem',
+            'position': 1,
+            'name': 'Главная',
+            'item': siteUrl,
+          },
+          {
+            '@type': 'ListItem',
+            'position': 2,
+            'name': 'Бренды',
+            'item': `${siteUrl}/brands`,
+          },
+          ...(brand.value ? [{
+            '@type': 'ListItem',
+            'position': 3,
+            'name': brand.value.name,
+            'item': brandUrl.value,
+          }] : []),
+        ],
+      }),
+    },
+    // Brand Schema
+    {
+      type: 'application/ld+json',
+      children: () => brand.value ? JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Brand',
+        'name': brand.value.name,
+        'url': brandUrl.value,
+        ...(brandLogoUrl.value && {
+          logo: brandLogoUrl.value,
+          image: brandLogoUrl.value,
+        }),
+      }) : '{}',
+    },
+    // CollectionPage Schema
+    {
+      type: 'application/ld+json',
+      children: () => brand.value ? JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        'name': `Товары бренда ${brand.value.name}`,
+        'description': metaDescription.value,
+        'url': brandUrl.value,
+        'isPartOf': {
+          '@type': 'WebSite',
+          'name': siteName,
+          'url': siteUrl,
+        },
+      }) : '{}',
+    },
+  ],
+})
+
+// Robots правило
+useRobotsRule({
+  index: true,
+  follow: true,
 })
 </script>
 

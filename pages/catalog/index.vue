@@ -6,12 +6,90 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 definePageMeta({ layout: 'catalog' })
 
-// SEO
+// ========================================
+// SEO META TAGS
+// ========================================
+const siteUrl = 'https://uhti.kz'
+const siteName = 'Ухтышка'
+const catalogUrl = `${siteUrl}/catalog`
+
+const metaTitle = 'Каталог детских игрушек - Купить игрушки для детей в Алматы | Ухтышка'
+const metaDescription = 'Полный каталог детских игрушек в интернет-магазине Ухтышка ⭐ Развивающие игры, конструкторы, куклы, машинки для детей всех возрастов ✓ Доставка по Казахстану ✓ Бонусная программа'
+
+// SEO - расширенные мета-теги + structured data
 useHead({
-  title: 'Каталог товаров',
-  meta: [
-    { name: 'description', content: 'Просмотрите наш каталог детских товаров' },
+  title: metaTitle,
+  link: [
+    { rel: 'canonical', href: catalogUrl },
   ],
+  meta: [
+    { name: 'description', content: metaDescription },
+    { name: 'keywords', content: 'каталог игрушек, детские товары, игрушки Алматы, купить игрушки, категории игрушек' },
+
+    // Open Graph
+    { property: 'og:title', content: metaTitle },
+    { property: 'og:description', content: metaDescription },
+    { property: 'og:url', content: catalogUrl },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:site_name', content: siteName },
+    { property: 'og:locale', content: 'ru_RU' },
+    { property: 'og:image', content: `${siteUrl}/og-catalog.jpeg` },
+
+    // Twitter Card
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: metaTitle },
+    { name: 'twitter:description', content: metaDescription },
+    { name: 'twitter:image', content: `${siteUrl}/og-catalog.jpeg` },
+
+    // Robots
+    { name: 'robots', content: 'index, follow' },
+  ],
+  script: [
+    // BreadcrumbList Schema
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+          {
+            '@type': 'ListItem',
+            'position': 1,
+            'name': 'Главная',
+            'item': siteUrl,
+          },
+          {
+            '@type': 'ListItem',
+            'position': 2,
+            'name': 'Каталог',
+            'item': catalogUrl,
+          },
+        ],
+      }),
+    },
+    // CollectionPage Schema
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        'name': 'Каталог детских игрушек',
+        'description': metaDescription,
+        'url': catalogUrl,
+        'isPartOf': {
+          '@type': 'WebSite',
+          'name': siteName,
+          'url': siteUrl,
+        },
+      }),
+    },
+  ],
+})
+
+// Robots правило
+useRobotsRule({
+  index: true,
+  follow: true,
 })
 
 const categoriesStore = useCategoriesStore()

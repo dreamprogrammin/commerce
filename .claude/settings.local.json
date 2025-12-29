@@ -23,7 +23,8 @@
       "Bash(supabase start:*)",
       "Bash(supabase functions deploy:*)",
       "Bash(psql:*)",
-      "Bash(supabase migration:*)"
+      "Bash(supabase migration:*)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" pnpm build:*)"
     ]
   }
 }

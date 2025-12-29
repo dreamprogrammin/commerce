@@ -34,10 +34,14 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       .eq('is_active', true)
       .not('slug', 'is', null)
       .order('created_at', { ascending: false })
+      .limit(10000) // ✅ Явно указываем большой лимит
 
     if (productsError) {
-      console.error('Ошибка загрузки товаров для sitemap:', productsError)
+      console.error('❌ Ошибка загрузки товаров для sitemap:', productsError)
     }
+
+    // ✅ Логирование количества товаров
+    console.log(`✅ Sitemap: Загружено ${products?.length || 0} товаров`)
 
     if (products && products.length > 0) {
       products.forEach((product) => {
@@ -49,22 +53,29 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
         })
       })
     }
+    else {
+      console.warn('⚠️ Товары не найдены в базе данных')
+    }
 
     // --- КАТЕГОРИИ ---
     const { data: categories, error: categoriesError } = await client
       .from('categories')
-      .select('slug')
+      .select('slug, updated_at')
       .not('slug', 'is', null)
+      .limit(1000) // ✅ Явно указываем лимит
 
     if (categoriesError) {
-      console.error('Ошибка загрузки категорий для sitemap:', categoriesError)
+      console.error('❌ Ошибка загрузки категорий для sitemap:', categoriesError)
     }
+
+    // ✅ Логирование количества категорий
+    console.log(`✅ Sitemap: Загружено ${categories?.length || 0} категорий`)
 
     if (categories && categories.length > 0) {
       categories.forEach((category) => {
         sitemapRoutes.push({
           loc: `/catalog/${category.slug}`,
-          lastmod: new Date().toISOString(),
+          lastmod: category.updated_at ?? new Date().toISOString(), // ✅ Используем реальную дату обновления
           changefreq: 'weekly',
           priority: 0.75,
         })
@@ -79,15 +90,18 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       .from('brands')
       .select('slug, updated_at')
       .not('slug', 'is', null)
+      .limit(1000) // ✅ Явно указываем лимит
 
     if (brandsError) {
-      console.error('Ошибка загрузки брендов для sitemap:', brandsError)
+      console.error('❌ Ошибка загрузки брендов для sitemap:', brandsError)
     }
+
+    // ✅ Логирование количества брендов
+    console.log(`✅ Sitemap: Загружено ${brands?.length || 0} брендов`)
 
     if (brands && brands.length > 0) {
       brands.forEach((brand) => {
         sitemapRoutes.push({
-          // ИСПРАВЛЕНО: Используем чистый URL без query
           loc: `/brand/${brand.slug}`,
           lastmod: brand.updated_at ?? new Date().toISOString(),
           changefreq: 'monthly',
@@ -95,6 +109,12 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
         })
       })
     }
+    else {
+      console.warn('⚠️ Бренды не найдены в базе данных')
+    }
+
+    // ✅ Итоговое логирование
+    console.log(`✅ Sitemap: Всего сгенерировано ${sitemapRoutes.length} URLs`)
 
     return sitemapRoutes
   }
