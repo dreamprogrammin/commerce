@@ -155,14 +155,14 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Обновляем заказ - назначаем админа и меняем статус на processing
+    // Обновляем заказ - назначаем админа и сразу подтверждаем (confirmed)
     const { error: updateError } = await supabase
       .from(tableName)
       .update({
         assigned_admin_name: adminName,
         assigned_admin_username: adminUsername,
         assigned_at: new Date().toISOString(),
-        status: 'processing'
+        status: 'confirmed'
       })
       .eq('id', orderId)
 
