@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { updateTelegramMessage } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,22 +103,22 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Таблица заказа: ${tableName}`)
 
-    // Получаем данные заказа перед отменой (для информации о бонусах)
-    let orderData: { user_id?: string; bonuses_spent?: number; bonuses_awarded?: number; status: string } | null = null
+    // Получаем данные заказа перед отменой (для информации о бонусах и telegram_message_id)
+    let orderData: { user_id?: string; bonuses_spent?: number; bonuses_awarded?: number; status: string; telegram_message_id?: string | null } | null = null
     if (tableName === 'orders') {
       const { data } = await supabase
         .from('orders')
-        .select('user_id, bonuses_spent, bonuses_awarded, status')
+        .select('user_id, bonuses_spent, bonuses_awarded, status, telegram_message_id')
         .eq('id', orderId)
         .single()
       orderData = data
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status')
+        .select('status, telegram_message_id')
         .eq('id', orderId)
         .single()
-      orderData = data as { status: string } | null
+      orderData = data as { status: string; telegram_message_id?: string | null } | null
     }
 
     // Вызываем функцию отмены заказа с указанием таблицы
@@ -141,6 +142,32 @@ Deno.serve(async (req) => {
     }
 
     console.log('✅ Заказ успешно отменен:', data)
+
+    // Обновляем Telegram сообщение, если есть telegram_message_id
+    if (orderData?.telegram_message_id) {
+      const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
+      const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
+
+      if (botToken && chatId) {
+        console.log(`📱 Обновление Telegram сообщения ${orderData.telegram_message_id}...`)
+
+        // Получаем текущий текст из БД для формирования обновленного сообщения
+        const updatedText = `❌ *ЗАКАЗ ОТМЕНЕН*\n\n🔔 Заказ №${orderId.slice(-6)} был отменен администратором\n\n_Статус: cancelled_\n\n⚠️ Все действия с этим заказом недоступны`
+
+        const updateResult = await updateTelegramMessage(
+          botToken,
+          chatId,
+          orderData.telegram_message_id,
+          updatedText
+        )
+
+        if (updateResult.success) {
+          console.log('✅ Telegram сообщение обновлено для всех админов')
+        } else {
+          console.error('⚠️ Не удалось обновить Telegram:', updateResult.error)
+        }
+      }
+    }
 
     // Формируем сообщение о бонусах
     let bonusMessage = ''

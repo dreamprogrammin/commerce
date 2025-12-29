@@ -435,24 +435,26 @@ Deno.serve(async (req) => {
 
     // Если есть изображения - отправляем медиа-группу, иначе обычное сообщение
     const imagesWithUrl = productsWithImages.filter(p => p.imageUrl)
-    
+
     console.log(`📊 Статистика изображений:`)
     console.log(`   Всего товаров: ${productsWithImages.length}`)
     console.log(`   Товаров с изображениями: ${imagesWithUrl.length}`)
-    
+
+    let telegramMessageId: number | null = null
+
     if (imagesWithUrl.length > 0 && imagesWithUrl.length <= 10) {
       console.log('📸 Попытка отправки медиа-группы...')
-      
+
       // Пробуем загрузить изображения и проверить их доступность
       const validImages: Array<{ imageUrl: string, index: number }> = []
-      
+
       for (let i = 0; i < imagesWithUrl.length; i++) {
         const item = imagesWithUrl[i]
         if (!item.imageUrl) continue
-        
+
         try {
           console.log(`   Проверка изображения ${i + 1}: ${item.imageUrl}`)
-          
+
           // Пробуем загрузить изображение
           const imageResponse = await fetch(item.imageUrl, {
             method: 'HEAD',
@@ -460,7 +462,7 @@ Deno.serve(async (req) => {
               'User-Agent': 'Mozilla/5.0 (compatible; TelegramBot/1.0)',
             }
           })
-          
+
           if (imageResponse.ok) {
             console.log(`   ✅ Изображение ${i + 1} доступно`)
             validImages.push({ imageUrl: item.imageUrl, index: i })
@@ -471,9 +473,9 @@ Deno.serve(async (req) => {
           console.error(`   ❌ Ошибка проверки изображения ${i + 1}:`, err)
         }
       }
-      
+
       console.log(`   Доступных изображений: ${validImages.length}`)
-      
+
       if (validImages.length > 0) {
         const mediaGroup = validImages.map((item, idx) => ({
           type: 'photo',
@@ -498,28 +500,57 @@ Deno.serve(async (req) => {
           const errorBody = await mediaResponse.json()
           console.error('❌ Ошибка отправки медиа-группы:', errorBody)
           // Fallback на обычное сообщение
-          await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
+          const textResponse = await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
+          const textResult = await textResponse.json()
+          telegramMessageId = textResult.result?.message_id || null
         } else {
           console.log('✅ Медиа-группа отправлена')
+          const mediaResult = await mediaResponse.json()
+          // Для медиа-группы берем message_id первого сообщения
+          telegramMessageId = mediaResult.result?.[0]?.message_id || null
+
           // Отправляем кнопки отдельным сообщением
           await sendTextMessage(botToken, chatId, 'Управление заказом:', inlineKeyboard)
         }
       } else {
         console.log('📝 Нет доступных изображений, отправка текстового сообщения')
-        await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
+        const textResponse = await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
+        const textResult = await textResponse.json()
+        telegramMessageId = textResult.result?.message_id || null
       }
     } else {
       console.log('📝 Отправка текстового сообщения (нет изображений)')
       // Отправляем обычное текстовое сообщение с кнопками
-      await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
+      const textResponse = await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
+      const textResult = await textResponse.json()
+      telegramMessageId = textResult.result?.message_id || null
     }
 
     console.log('✅ Уведомление отправлено в Telegram')
+
+    // Сохраняем message_id в базе данных для последующего обновления статуса
+    if (telegramMessageId) {
+      console.log(`💾 Сохранение telegram_message_id: ${telegramMessageId}`)
+
+      const { error: updateError } = await supabaseAdmin
+        .from(tableName)
+        .update({ telegram_message_id: telegramMessageId.toString() })
+        .eq('id', orderId)
+
+      if (updateError) {
+        console.error('⚠️ Ошибка сохранения telegram_message_id:', updateError)
+      } else {
+        console.log('✅ telegram_message_id сохранен в БД')
+      }
+    } else {
+      console.log('⚠️ telegram_message_id не получен от Telegram API')
+    }
+
     console.log('🎉 Обработка заказа завершена успешно')
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: 'Уведомление отправлено в Telegram',
         orderId,
         table: tableName,
@@ -527,8 +558,9 @@ Deno.serve(async (req) => {
         bonusesAwarded: typedOrderData.bonuses_awarded,
         bonusesSpent: typedOrderData.bonuses_spent,
         productsCount: typedOrderData.order_items.length,
-        imagesCount: imagesWithUrl.length
-      }), 
+        imagesCount: imagesWithUrl.length,
+        telegramMessageId: telegramMessageId
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
