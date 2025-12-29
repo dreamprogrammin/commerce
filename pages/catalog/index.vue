@@ -17,8 +17,8 @@ useHead({
 const categoriesStore = useCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
-// 🚀 КРИТИЧНО: useAsyncData для SSR с кешированием
-const { data: catalogData, pending } = await useAsyncData(
+// 🚀 Оптимизированный useAsyncData: неблокирующий + SSR + кеширование
+const { data: catalogData, pending } = useAsyncData(
   'catalog-page',
   async () => {
     await Promise.all([
@@ -32,11 +32,14 @@ const { data: catalogData, pending } = await useAsyncData(
     }
   },
   {
-    lazy: false,
-    server: true,
-    // Кеш на клиенте
-    getCachedData: (key) => {
-      return useNuxtApp().payload.data[key] || useNuxtApp().static.data[key]
+    lazy: true, // ✅ Неблокирующая загрузка - страница рендерится сразу
+    server: true, // ✅ SSR сохраняется для SEO
+    dedupe: 'defer', // ✅ Предотвращает дублирующие запросы
+    default: () => ({ categories: [], additional: [] }), // ✅ Начальные данные
+    // ✅ Упрощенное кеширование
+    getCachedData(key) {
+      const data = useNuxtData(key)
+      return data.data.value
     },
   },
 )
@@ -124,9 +127,23 @@ const additionalItemStyles = {
 
     <!-- Основной контент -->
     <div class="px-2 py-4">
-      <!-- Скелетон - показываем только при pending -->
-      <div v-if="pending" class="grid grid-cols-2 gap-2 auto-rows-[200px]">
-        <Skeleton v-for="i in 6" :key="i" class="w-full h-full rounded-2xl" />
+      <!-- 🎨 Улучшенный скелетон - точная имитация реального контента -->
+      <div v-if="pending" class="space-y-2">
+        <!-- Блоки Акции и Новинки -->
+        <div class="grid grid-cols-2 gap-2">
+          <Skeleton class="w-full h-[200px] rounded-3xl" />
+          <Skeleton class="w-full h-[200px] rounded-3xl" />
+        </div>
+
+        <!-- Сетка категорий -->
+        <div class="grid grid-cols-2 gap-2 auto-rows-[120px]">
+          <Skeleton class="w-full h-full rounded-2xl row-span-2" />
+          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
+          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
+          <Skeleton class="w-full h-full rounded-2xl row-span-2" />
+          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
+          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
+        </div>
       </div>
 
       <!-- Контент - рендерится сразу после загрузки -->
