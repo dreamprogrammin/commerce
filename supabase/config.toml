@@ -358,6 +358,18 @@ entrypoint = "./functions/cancel-order/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/cancel-order/*.html" ]
 
+[functions.assign-order-to-admin]
+enabled = true
+verify_jwt = false
+import_map = "./functions/assign-order-to-admin/deno.json"
+entrypoint = "./functions/assign-order-to-admin/index.ts"
+
+[functions.sync-order-status-to-telegram]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-order-status-to-telegram/deno.json"
+entrypoint = "./functions/sync-order-status-to-telegram/index.ts"
+
 [functions.image-transformer]
 enabled = true
 verify_jwt = true
