@@ -249,6 +249,10 @@ useRobotsRule({
       </p>
     </div>
 
+    <div :class="desktopContainedClass">
+      <HomeActiveOrderStatus />
+    </div>
+
     <!-- Блок приветствия/авторизации и статус заказа -->
     <div :class="alwaysContainedClass" class="py-4">
       <ClientOnly>
