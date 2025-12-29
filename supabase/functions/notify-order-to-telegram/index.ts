@@ -418,14 +418,18 @@ Deno.serve(async (req) => {
     const adminSecret = Deno.env.get('ADMIN_SECRET')
     const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
     const tableParam = `&table=${tableName}`
-    
+
+    const assignUrl = `${supabaseUrl}/functions/v1/assign-order-to-admin?order_id=${orderId}${tableParam}${secretParam}&admin_name=Админ`
     const confirmUrl = `${supabaseUrl}/functions/v1/confirm-order?order_id=${orderId}${tableParam}${secretParam}`
     const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableParam}${secretParam}`
 
     const inlineKeyboard = {
       inline_keyboard: [
         [
-          { text: '✅ Подтвердить', url: confirmUrl }, 
+          { text: '👨‍💼 Взять в работу', url: assignUrl }
+        ],
+        [
+          { text: '✅ Подтвердить', url: confirmUrl },
           { text: '❌ Отменить', url: cancelUrl }
         ],
       ],

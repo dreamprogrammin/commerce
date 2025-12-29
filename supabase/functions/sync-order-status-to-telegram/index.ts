@@ -132,6 +132,8 @@ Deno.serve(async (req) => {
 
     // Получаем информацию о заказе
     let orderInfo = ''
+    let assignedAdmin = ''
+
     if (table === 'orders') {
       const { data: orderData } = await supabase
         .from('orders')
@@ -139,6 +141,8 @@ Deno.serve(async (req) => {
           final_amount,
           bonuses_spent,
           bonuses_awarded,
+          assigned_admin_name,
+          assigned_admin_username,
           profile:profiles(first_name, last_name)
         `)
         .eq('id', record.id)
@@ -154,22 +158,38 @@ Deno.serve(async (req) => {
           orderInfo += `\n💳 *Списано бонусов:* ${orderData.bonuses_spent}`
         }
         orderInfo += `\n👤 *Клиент:* ${customerName}`
+
+        // Информация об ответственном админе
+        if (orderData.assigned_admin_name) {
+          assignedAdmin = `\n👨‍💼 *Ответственный:* ${orderData.assigned_admin_name}`
+          if (orderData.assigned_admin_username) {
+            assignedAdmin += ` (@${orderData.assigned_admin_username})`
+          }
+        }
       }
     } else {
       const { data: guestData } = await supabase
         .from('guest_checkouts')
-        .select('final_amount, guest_name')
+        .select('final_amount, guest_name, assigned_admin_name, assigned_admin_username')
         .eq('id', record.id)
         .single()
 
       if (guestData) {
         orderInfo = `\n💰 *Сумма:* ${guestData.final_amount} ₸`
         orderInfo += `\n👥 *Клиент:* ${guestData.guest_name || 'Гость'}`
+
+        // Информация об ответственном админе
+        if (guestData.assigned_admin_name) {
+          assignedAdmin = `\n👨‍💼 *Ответственный:* ${guestData.assigned_admin_name}`
+          if (guestData.assigned_admin_username) {
+            assignedAdmin += ` (@${guestData.assigned_admin_username})`
+          }
+        }
       }
     }
 
     // Формируем обновленное сообщение
-    const updatedText = `${statusEmoji} *${statusText}*\n\n🔔 Заказ №${record.id.slice(-6)}${orderInfo}\n\n_Статус: ${record.status}_\n\n${statusDescription}\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+    const updatedText = `${statusEmoji} *${statusText}*\n\n🔔 Заказ №${record.id.slice(-6)}${orderInfo}${assignedAdmin}\n\n_Статус: ${record.status}_\n\n${statusDescription}\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
     console.log('📝 Текст обновления:')
     console.log(updatedText)
