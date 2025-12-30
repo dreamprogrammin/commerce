@@ -76,93 +76,229 @@ const totalAmount = computed(() => {
     return 0
   return activeOrder.value.final_amount.toLocaleString('ru-RU')
 })
+
+// 🎨 Цветовая схема в зависимости от статуса заказа
+const orderColorScheme = computed(() => {
+  if (!activeOrder.value)
+    return null
+
+  const status = activeOrder.value.status
+
+  // Новый заказ (ожидание) - СИНИЙ
+  if (status === 'pending') {
+    return {
+      border: 'border-blue-200',
+      overlay: 'bg-blue-500/8',
+      badge: 'bg-blue-50',
+      icon: 'text-blue-500',
+      indicator: 'bg-blue-500',
+    }
+  }
+
+  // В обработке / подтвержден - ОРАНЖЕВЫЙ
+  if (status === 'confirmed' || status === 'processing') {
+    return {
+      border: 'border-orange-200',
+      overlay: 'bg-orange-500/8',
+      badge: 'bg-orange-50',
+      icon: 'text-orange-500',
+      indicator: 'bg-orange-500',
+    }
+  }
+
+  // Готов / доставлен - ЗЕЛЕНЫЙ
+  if (status === 'delivered' || status === 'completed') {
+    return {
+      border: 'border-green-200',
+      overlay: 'bg-green-500/8',
+      badge: 'bg-green-50',
+      icon: 'text-green-500',
+      indicator: 'bg-green-500',
+    }
+  }
+
+  // По умолчанию - серый
+  return {
+    border: 'border-gray-200',
+    overlay: 'bg-gray-500/8',
+    badge: 'bg-gray-50',
+    icon: 'text-gray-500',
+    indicator: 'bg-gray-500',
+  }
+})
+
+// ⏱️ Автоматическое скрытие карточки после подтверждения
+const shouldShowCard = ref(true)
+
+// Когда заказ подтвержден, запускаем таймер на скрытие (10 секунд)
+watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
+  if (newStatus === 'confirmed' && oldStatus === 'pending') {
+    // Заказ только что подтвердили - запускаем таймер на 10 секунд
+    setTimeout(() => {
+      shouldShowCard.value = false
+    }, 10000) // 10 секунд
+  }
+  else if (newStatus === 'delivered' || newStatus === 'completed') {
+    // Заказ доставлен - скрываем сразу
+    shouldShowCard.value = false
+  }
+}, { immediate: true })
 </script>
 
 <template>
-  <!-- 🔥 Компактная карточка активного заказа -->
-  <NuxtLink
-    v-if="!isLoading && activeOrder"
-    :to="`/profile/order/${activeOrder.id}`"
-    class="block mb-3 group"
+  <!-- 🔥 Красивая карточка активного заказа в стиле детских карточек -->
+  <Transition
+    enter-active-class="transition duration-300 ease-out"
+    enter-from-class="opacity-0 scale-95"
+    enter-to-class="opacity-100 scale-100"
+    leave-active-class="transition duration-300 ease-in"
+    leave-from-class="opacity-100 scale-100"
+    leave-to-class="opacity-0 scale-95"
   >
-    <Card class="border border-orange-200 bg-white hover:shadow-md transition-all duration-200 rounded-xl overflow-hidden">
-      <CardContent class="p-3">
-        <!-- Шапка: Статус + Заголовок (в одну строку) -->
-        <div class="flex items-center justify-between gap-2 mb-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <Badge
-              :class="getStatusColor(activeOrder.status)"
-              class="text-[10px] px-2 py-0.5 rounded font-medium flex-shrink-0"
-            >
-              {{ getStatusLabel(activeOrder.status) }}
-            </Badge>
-            <span class="text-xs font-semibold text-gray-900 truncate">
-              Заказ {{ orderDate }} №{{ activeOrder.id.slice(-6) }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Миниатюры товаров (компактнее) -->
-        <div class="flex items-center gap-1.5 mb-2 overflow-x-auto">
+    <NuxtLink
+      v-if="!isLoading && activeOrder && shouldShowCard && orderColorScheme"
+      :to="`/profile/order/${activeOrder.id}`"
+      class="block mb-4"
+    >
+      <Card
+        class="order-card cursor-pointer overflow-hidden p-0 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg border-2"
+        :class="orderColorScheme.border"
+      >
+        <div class="p-4 sm:p-5 relative">
+          <!-- Цветной оверлей при hover (цвет зависит от статуса) -->
           <div
-            v-for="(thumbnail, index) in productThumbnails"
-            :key="thumbnail.id"
-            class="relative flex-shrink-0 w-12 h-12 rounded-md overflow-hidden bg-gray-50 border border-gray-200"
-          >
-            <ProgressiveImage
-              v-if="thumbnail.imageUrl"
-              :src="thumbnail.imageUrl"
-              :blur-data-url="thumbnail.blurPlaceholder"
-              :alt="thumbnail.name"
-              object-fit="contain"
-              placeholder-type="lqip"
-              aspect-ratio="square"
-              :eager="index < 3"
-              class="w-full h-full"
-            />
-            <div
-              v-else
-              class="w-full h-full flex items-center justify-center bg-gray-100"
-            >
-              <Icon name="lucide:package" class="w-4 h-4 text-gray-400" />
-            </div>
-          </div>
-
-          <!-- Показать "+N" если товаров больше 5 -->
-          <div
-            v-if="activeOrder.order_items.length > 5"
-            class="flex-shrink-0 w-12 h-12 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center"
-          >
-            <span class="text-[10px] font-semibold text-gray-600">
-              +{{ activeOrder.order_items.length - 5 }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Футер: Стоимость, количество, стрелка -->
-        <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-          <div class="flex items-center gap-2">
-            <!-- Общая стоимость -->
-            <div class="flex items-center gap-1">
-              <Icon name="lucide:wallet" class="w-3.5 h-3.5 text-gray-500" />
-              <span class="text-xs font-semibold text-gray-900">
-                {{ totalAmount }} ₸
-              </span>
-            </div>
-
-            <!-- Количество товаров -->
-            <Badge variant="secondary" class="text-[10px] px-1.5 py-0">
-              {{ totalItems }} {{ totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров' }}
-            </Badge>
-          </div>
-
-          <!-- Стрелка перехода -->
-          <Icon
-            name="lucide:arrow-right"
-            class="w-4 h-4 text-gray-400 group-hover:text-orange-500 group-hover:translate-x-1 transition-all"
+            class="color-overlay absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-300"
+            :class="orderColorScheme.overlay"
           />
+
+        <div class="flex items-center gap-4 relative z-10">
+          <!-- Миниатюры товаров вместо аватара -->
+          <div class="relative flex-shrink-0">
+            <div class="product-thumbnails-container">
+              <!-- Стек из 3 изображений с эффектом глубины -->
+              <div class="relative w-16 h-16">
+                <div
+                  v-for="(thumbnail, index) in productThumbnails.slice(0, 3)"
+                  :key="thumbnail.id"
+                  class="absolute rounded-xl overflow-hidden bg-white shadow-md transition-transform duration-300"
+                  :class="{
+                    'w-16 h-16 z-30': index === 0,
+                    'w-14 h-14 z-20 top-1 left-2 opacity-80': index === 1,
+                    'w-12 h-12 z-10 top-2 left-4 opacity-60': index === 2,
+                  }"
+                  :style="{
+                    transform: `translateY(${index * 2}px) scale(${1 - index * 0.1})`,
+                  }"
+                >
+                  <ProgressiveImage
+                    v-if="thumbnail.imageUrl"
+                    :src="thumbnail.imageUrl"
+                    :blur-data-url="thumbnail.blurPlaceholder"
+                    :alt="thumbnail.name"
+                    object-fit="contain"
+                    placeholder-type="lqip"
+                    aspect-ratio="square"
+                    eager
+                    class="w-full h-full"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
+                    <Icon name="lucide:package" class="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+
+                <!-- Индикатор дополнительных товаров (цвет зависит от статуса) -->
+                <div
+                  v-if="activeOrder.order_items.length > 3"
+                  class="absolute -bottom-1 -right-1 z-40 w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shadow-lg ring-2 ring-white"
+                  :class="orderColorScheme.indicator"
+                >
+                  +{{ activeOrder.order_items.length - 3 }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Информация о заказе -->
+          <div class="flex-grow min-w-0">
+            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+              <!-- Статус -->
+              <Badge
+                :class="getStatusColor(activeOrder.status)"
+                class="text-[11px] px-2.5 py-0.5 rounded-full font-medium"
+              >
+                {{ getStatusLabel(activeOrder.status) }}
+              </Badge>
+
+              <!-- Номер заказа -->
+              <h3 class="font-bold text-sm text-card-foreground">
+                №{{ activeOrder.id.slice(-6) }}
+              </h3>
+            </div>
+
+            <!-- Дата и метрики -->
+            <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <!-- Дата заказа -->
+              <div class="flex items-center gap-1.5">
+                <Icon name="lucide:calendar" class="w-3.5 h-3.5" />
+                <span class="font-medium">{{ orderDate }}</span>
+              </div>
+
+              <!-- Стоимость -->
+              <div class="flex items-center gap-1.5">
+                <Icon name="lucide:wallet" class="w-3.5 h-3.5" />
+                <span class="font-semibold text-gray-900">{{ totalAmount }} ₸</span>
+              </div>
+
+              <!-- Количество товаров -->
+              <Badge variant="secondary" class="text-[10px] px-2 py-0.5">
+                {{ totalItems }} {{ totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров' }}
+              </Badge>
+            </div>
+          </div>
+
+          <!-- Стрелка (цвет зависит от статуса) -->
+          <div class="flex-shrink-0">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center" :class="orderColorScheme.badge">
+              <Icon
+                name="lucide:chevron-right"
+                class="chevron-icon w-5 h-5 transition-transform duration-300"
+                :class="orderColorScheme.icon"
+              />
+            </div>
+          </div>
         </div>
-      </CardContent>
+      </div>
     </Card>
   </NuxtLink>
+  </Transition>
 </template>
+
+<style scoped>
+/* Hover эффект для стрелки */
+.order-card:hover .chevron-icon {
+  transform: translateX(5px);
+}
+
+/* Hover эффект для оверлея */
+.order-card:hover .color-overlay {
+  opacity: 1;
+}
+
+/* Hover эффект для стека изображений */
+.order-card:hover .product-thumbnails-container > div > div:nth-child(1) {
+  transform: translateY(0) scale(1.05) rotate(-2deg);
+}
+
+.order-card:hover .product-thumbnails-container > div > div:nth-child(2) {
+  transform: translateY(2px) scale(0.95) rotate(2deg);
+}
+
+.order-card:hover .product-thumbnails-container > div > div:nth-child(3) {
+  transform: translateY(4px) scale(0.85) rotate(-2deg);
+}
+
+/* Active эффект (при клике) */
+.order-card:active {
+  transform: scale(0.98) !important;
+}
+</style>
