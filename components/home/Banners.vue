@@ -44,33 +44,49 @@ function getBannerImageUrl(imageUrl: string | null) {
 
 <template>
   <div class="py-8 md:py-12">
-    <!-- Скелетон при загрузке -->
+    <!-- Улучшенный скелетон при загрузке -->
     <div v-if="pending" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Skeleton class="h-64 md:h-80 lg:h-96 rounded-lg" />
-      <Skeleton class="h-64 md:h-80 lg:h-96 rounded-lg" />
+      <!-- Skeleton 1 -->
+      <div class="relative h-48 md:h-80 lg:h-96 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 via-gray-200 to-gray-100 animate-pulse">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <div class="absolute bottom-0 left-0 right-0 p-6 space-y-3">
+          <Skeleton class="h-7 w-3/4 bg-white/20" />
+          <Skeleton class="h-4 w-1/2 bg-white/20" />
+        </div>
+      </div>
+
+      <!-- Skeleton 2 -->
+      <div class="relative h-48 md:h-80 lg:h-96 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 via-gray-200 to-gray-100 animate-pulse">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <div class="absolute bottom-0 left-0 right-0 p-6 space-y-3">
+          <Skeleton class="h-7 w-3/4 bg-white/20" />
+          <Skeleton class="h-4 w-1/2 bg-white/20" />
+        </div>
+      </div>
     </div>
 
-    <!-- Баннеры -->
+    <!-- Баннеры с плавным появлением -->
     <div v-else-if="banners && banners.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <NuxtLink
-        v-for="banner in banners"
+        v-for="(banner, index) in banners"
         :key="banner.id"
         :to="banner.cta_link || '#'"
-        class="group relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-300"
+        class="group relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+        :style="{ animationDelay: `${index * 150}ms` }"
         :class="{
           'pointer-events-none': !banner.cta_link,
         }"
       >
         <!-- Изображение с ProgressiveImage -->
-        <div class="relative h-48 md:h-80 lg:h-96">
+        <div class="relative h-48 md:h-80 lg:h-96 bg-gradient-to-br from-gray-100 to-gray-200">
           <ProgressiveImage
             v-if="banner.image_url"
             :src="getBannerImageUrl(banner.image_url)"
             :alt="banner.title"
             aspect-ratio="video"
             object-fit="cover"
-            placeholder-type="lqip"
-            :blur-data-url="banner.blur_data_url || null"
+            :placeholder-type="banner.blur_data_url ? 'lqip' : 'shimmer'"
+            :blur-data-url="banner.blur_data_url || undefined"
             eager
             class="group-hover:scale-105 transition-transform duration-300"
           />
@@ -78,19 +94,22 @@ function getBannerImageUrl(imageUrl: string | null) {
           <!-- Fallback если нет изображения -->
           <div
             v-else
-            class="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300"
+            class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-purple-100"
           >
-            <Icon name="lucide:image" class="w-16 h-16 text-gray-400" />
+            <Icon name="lucide:image" class="w-16 h-16 text-muted-foreground/50" />
           </div>
+
+          <!-- Градиент overlay для текста -->
+          <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none" />
 
           <!-- Контент -->
           <div class="absolute bottom-0 left-0 right-0 p-6 text-white z-10">
-            <h3 class="text-xl md:text-2xl font-bold mb-2">
+            <h3 class="text-xl md:text-2xl font-bold mb-2 drop-shadow-lg">
               {{ banner.title }}
             </h3>
             <p
               v-if="banner.description"
-              class="text-sm md:text-base text-white/90 line-clamp-2"
+              class="text-sm md:text-base text-white/95 line-clamp-2 drop-shadow-md"
             >
               {{ banner.description }}
             </p>
@@ -107,12 +126,14 @@ function getBannerImageUrl(imageUrl: string | null) {
       </NuxtLink>
     </div>
 
-    <!-- Пустое состояние (если нет баннеров) -->
+    <!-- Пустое состояние (только если НЕ загрузка и баннеры пусты) -->
     <div
-      v-else
+      v-else-if="!pending && (!banners || banners.length === 0)"
       class="text-center py-12 text-muted-foreground"
     >
-      <Icon name="lucide:image-off" class="w-12 h-12 mx-auto mb-4 opacity-50" />
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+        <Icon name="lucide:image-off" class="w-8 h-8 opacity-50" />
+      </div>
       <p class="text-sm">
         Нет активных баннеров для отображения
       </p>
