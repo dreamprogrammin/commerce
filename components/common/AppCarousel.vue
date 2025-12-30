@@ -7,18 +7,14 @@ import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
-// 🔥 Принимаем данные через props (загружаются в useSlides)
+// 🔥 Принимаем данные через props (загружаются в useSlides composable с TanStack Query)
 interface Props {
   slides?: SlideRow[] | null
   isLoading?: boolean
   error?: Error | null
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  slides: () => [],
-  isLoading: false,
-  error: null,
-})
+const props = defineProps<Props>()
 
 const { getImageUrl } = useSupabaseStorage()
 

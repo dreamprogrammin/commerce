@@ -42,7 +42,9 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations } = useQuery
       wishlist: Array.isArray(wishlist) ? wishlist : [],
     }
   },
-  initialData: () => ({ recommended: [], wishlist: [] }),
+  placeholderData: { recommended: [], wishlist: [] },
+  staleTime: 5 * 60 * 1000, // 5 минут
+  gcTime: 10 * 60 * 1000, // 10 минут
 })
 
 const recommendedProducts = computed(() => mainPersonalData.value?.recommended || [])
@@ -52,14 +54,18 @@ const wishlistProducts = computed(() => mainPersonalData.value?.wishlist || [])
 const { data: popularProducts, isLoading: isLoadingPopular } = useQuery({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
-  initialData: () => [],
+  placeholderData: [],
+  staleTime: 5 * 60 * 1000, // 5 минут
+  gcTime: 10 * 60 * 1000, // 10 минут
 })
 
 // 🔥 TanStack Query - новые поступления с автоматическим кешированием
 const { data: newestProducts, isLoading: isLoadingNewest } = useQuery({
   queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
-  initialData: () => [],
+  placeholderData: [],
+  staleTime: 5 * 60 * 1000, // 5 минут
+  gcTime: 10 * 60 * 1000, // 10 минут
 })
 
 const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)

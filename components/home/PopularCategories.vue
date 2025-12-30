@@ -16,7 +16,9 @@ const { data: popularCategories, isLoading } = useQuery({
     await popularCategoriesStore.fetchPopularCategories()
     return popularCategoriesStore.popularCategories
   },
-  initialData: () => [],
+  placeholderData: [],
+  staleTime: 5 * 60 * 1000, // 5 минут
+  gcTime: 10 * 60 * 1000, // 10 минут
 })
 
 function getCategoryImageUrl(imageUrl: string | null) {
