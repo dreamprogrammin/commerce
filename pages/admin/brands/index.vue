@@ -2,76 +2,251 @@
 import type { Brand } from '@/types'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
+import { Search, Plus, MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-vue-next'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_BRANDS } from '@/constants'
+import { IMAGE_SIZES } from '@/config/images'
 
 definePageMeta({ layout: 'admin' })
 
 const brandsStore = useAdminBrandsStore()
 const { brands, isLoading } = storeToRefs(brandsStore)
+const { getImageUrl } = useSupabaseStorage()
+
+// Поиск
+const searchQuery = ref('')
+const filteredBrands = computed(() => {
+  if (!searchQuery.value) return brands.value
+
+  const query = searchQuery.value.toLowerCase()
+  return brands.value.filter(brand =>
+    brand.name.toLowerCase().includes(query) ||
+    brand.slug?.toLowerCase().includes(query)
+  )
+})
 
 onMounted(() => {
   brandsStore.fetchBrands()
 })
 
-// Логика удаления
-async function confirmDelete(brand: Brand) {
-  if (toast.info(`Вы уверены, что хотите удалить бренд "${brand.name}"? Это действие необратимо и может повлиять на товары.`)) {
-    await brandsStore.deleteBrand(brand)
+// Логика удаления с AlertDialog
+const brandToDelete = ref<Brand | null>(null)
+const showDeleteDialog = ref(false)
+
+function openDeleteDialog(brand: Brand) {
+  brandToDelete.value = brand
+  showDeleteDialog.value = true
+}
+
+async function handleDelete() {
+  if (!brandToDelete.value) return
+
+  const success = await brandsStore.deleteBrand(brandToDelete.value)
+
+  if (success) {
+    toast.success(`Бренд "${brandToDelete.value.name}" успешно удален`)
   }
+
+  showDeleteDialog.value = false
+  brandToDelete.value = null
+}
+
+// Получить URL логотипа бренда
+function getBrandLogoUrl(logoUrl: string | null): string {
+  if (!logoUrl) return '/images/placeholder-brand.svg'
+  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.CATEGORY_MENU) || '/images/placeholder-brand.svg'
 }
 </script>
 
 <template>
-  <div class="container mx-auto p-8">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">
-        Управление брендами
-      </h1>
+  <div class="container mx-auto p-4 md:p-8 space-y-6">
+    <!-- Заголовок и кнопка добавления -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">
+          Управление брендами
+        </h1>
+        <p class="text-sm text-muted-foreground mt-1">
+          Просмотр и редактирование брендов товаров
+        </p>
+      </div>
       <NuxtLink to="/admin/brands/new">
-        <Button>Добавить новый бренд</Button>
+        <Button class="w-full sm:w-auto">
+          <Plus class="w-4 h-4 mr-2" />
+          Добавить бренд
+        </Button>
       </NuxtLink>
     </div>
 
-    <div v-if="isLoading">
-      Загрузка...
+    <!-- Поиск -->
+    <Card>
+      <CardContent class="pt-6">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            v-model="searchQuery"
+            placeholder="Поиск по названию или слагу..."
+            class="pl-10"
+          />
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Таблица брендов -->
+    <Card>
+      <CardContent class="p-0">
+        <!-- Skeleton загрузки -->
+        <div v-if="isLoading" class="p-6">
+          <div class="space-y-4">
+            <div v-for="i in 5" :key="i" class="flex items-center gap-4">
+              <Skeleton class="w-12 h-12 rounded-md" />
+              <div class="flex-1 space-y-2">
+                <Skeleton class="h-4 w-1/3" />
+                <Skeleton class="h-3 w-1/4" />
+              </div>
+              <Skeleton class="h-8 w-24" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Таблица -->
+        <Table v-else>
+          <TableHeader>
+            <TableRow>
+              <TableHead class="w-16">Лого</TableHead>
+              <TableHead>Название</TableHead>
+              <TableHead class="hidden md:table-cell">Слаг (URL)</TableHead>
+              <TableHead class="hidden lg:table-cell">Товаров</TableHead>
+              <TableHead class="text-right">Действия</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <!-- Пустое состояние -->
+            <TableRow v-if="filteredBrands.length === 0">
+              <TableCell colspan="5" class="h-32 text-center">
+                <div class="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <Search class="w-8 h-8 opacity-50" />
+                  <p v-if="searchQuery">
+                    Бренды не найдены по запросу "{{ searchQuery }}"
+                  </p>
+                  <p v-else>
+                    Бренды отсутствуют. Добавьте первый бренд.
+                  </p>
+                </div>
+              </TableCell>
+            </TableRow>
+
+            <!-- Строки брендов -->
+            <TableRow v-for="brand in filteredBrands" :key="brand.id" class="group">
+              <!-- Логотип -->
+              <TableCell>
+                <div class="w-12 h-12 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden border">
+                  <img
+                    :src="getBrandLogoUrl(brand.logo_url)"
+                    :alt="brand.name"
+                    class="w-full h-full object-contain p-1"
+                  >
+                </div>
+              </TableCell>
+
+              <!-- Название -->
+              <TableCell>
+                <div class="font-medium">
+                  {{ brand.name }}
+                </div>
+                <div class="text-xs text-muted-foreground md:hidden">
+                  {{ brand.slug }}
+                </div>
+              </TableCell>
+
+              <!-- Слаг (скрыт на мобильных) -->
+              <TableCell class="hidden md:table-cell text-muted-foreground">
+                <code class="text-xs bg-muted px-2 py-1 rounded">{{ brand.slug }}</code>
+              </TableCell>
+
+              <!-- Количество товаров (скрыто на планшетах) -->
+              <TableCell class="hidden lg:table-cell">
+                <Badge variant="secondary">
+                  {{ brand.product_count || 0 }} товаров
+                </Badge>
+              </TableCell>
+
+              <!-- Действия -->
+              <TableCell class="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <Button variant="ghost" size="sm">
+                      <MoreHorizontal class="w-4 h-4" />
+                      <span class="sr-only">Открыть меню</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Действия</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+
+                    <!-- Просмотр на сайте -->
+                    <DropdownMenuItem as-child>
+                      <NuxtLink :to="`/brand/${brand.slug}`" target="_blank">
+                        <Eye class="w-4 h-4 mr-2" />
+                        Просмотр на сайте
+                      </NuxtLink>
+                    </DropdownMenuItem>
+
+                    <!-- Редактировать -->
+                    <DropdownMenuItem as-child>
+                      <NuxtLink :to="`/admin/brands/${brand.id}`">
+                        <Pencil class="w-4 h-4 mr-2" />
+                        Редактировать
+                      </NuxtLink>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator />
+
+                    <!-- Удалить -->
+                    <DropdownMenuItem
+                      class="text-destructive focus:text-destructive"
+                      @click="openDeleteDialog(brand)"
+                    >
+                      <Trash2 class="w-4 h-4 mr-2" />
+                      Удалить
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+
+    <!-- Информация о количестве -->
+    <div v-if="!isLoading" class="text-sm text-muted-foreground text-center">
+      Всего брендов: {{ filteredBrands.length }}
+      <span v-if="searchQuery"> (отфильтровано из {{ brands.length }})</span>
     </div>
-    <div v-else class="border rounded-lg bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Название</TableHead>
-            <TableHead>Слаг (URL)</TableHead>
-            <TableHead class="text-right">
-              Действия
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow v-if="brands.length === 0">
-            <TableCell colspan="3" class="h-24 text-center">
-              Бренды не найдены.
-            </TableCell>
-          </TableRow>
-          <TableRow v-for="brand in brands" :key="brand.id">
-            <TableCell class="font-medium">
-              {{ brand.name }}
-            </TableCell>
-            <TableCell class="text-muted-foreground">
-              {{ brand.slug }}
-            </TableCell>
-            <TableCell class="text-right space-x-2">
-              <NuxtLink :to="`/admin/brands/${brand.id}`">
-                <Button variant="outline" size="sm">
-                  Редактировать
-                </Button>
-              </NuxtLink>
-              <Button variant="destructive" size="sm" @click="confirmDelete(brand)">
-                Удалить
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </div>
+
+    <!-- AlertDialog для подтверждения удаления -->
+    <AlertDialog v-model:open="showDeleteDialog">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Вы собираетесь удалить бренд <strong>"{{ brandToDelete?.name }}"</strong>.
+            <br><br>
+            Это действие необратимо и может повлиять на товары, связанные с этим брендом.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            @click="handleDelete"
+          >
+            Удалить
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
