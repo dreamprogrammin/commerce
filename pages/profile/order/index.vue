@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { Package, ShoppingBag } from 'lucide-vue-next'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const router = useRouter()
+const { getPublicUrl } = useSupabaseStorage()
 
 const {
   orders,
@@ -123,14 +126,15 @@ useHead({
                 :key="item.id"
                 class="flex-shrink-0 w-16 h-16 bg-muted rounded-lg overflow-hidden"
               >
-                <NuxtImg
+                <ProgressiveImage
                   v-if="item.product.product_images?.[0]"
-                  :src="item.product.product_images[0].image_url"
+                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, item.product.product_images[0].image_url)"
                   :alt="item.product.name"
-                  :placeholder="item.product.product_images[0].blur_placeholder || undefined"
-                  class="w-full h-full object-cover"
-                  width="64"
-                  height="64"
+                  :blur-data-url="item.product.product_images[0].blur_placeholder"
+                  aspect-ratio="square"
+                  object-fit="cover"
+                  placeholder-type="lqip"
+                  eager
                 />
                 <div v-else class="w-full h-full flex items-center justify-center">
                   <Package class="w-6 h-6 text-muted-foreground" />

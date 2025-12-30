@@ -2,10 +2,13 @@
 import { Package, Calendar, CreditCard, MapPin, Gift } from 'lucide-vue-next'
 import type { UserOrder } from '@/composables/orders/useUserOrders'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabaseClient()
+const { getPublicUrl } = useSupabaseStorage()
 
 const orderId = route.params.id as string
 
@@ -259,14 +262,15 @@ useHead({
             >
               <!-- Изображение -->
               <div class="flex-shrink-0 w-20 h-20 bg-muted rounded-lg overflow-hidden">
-                <NuxtImg
+                <ProgressiveImage
                   v-if="item.product.product_images?.[0]"
-                  :src="item.product.product_images[0].image_url"
+                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, item.product.product_images[0].image_url)"
                   :alt="item.product.name"
-                  :placeholder="item.product.product_images[0].blur_placeholder || undefined"
-                  class="w-full h-full object-cover"
-                  width="80"
-                  height="80"
+                  :blur-data-url="item.product.product_images[0].blur_placeholder"
+                  aspect-ratio="square"
+                  object-fit="cover"
+                  placeholder-type="lqip"
+                  eager
                 />
                 <div v-else class="w-full h-full flex items-center justify-center">
                   <Package class="w-8 h-8 text-muted-foreground" />

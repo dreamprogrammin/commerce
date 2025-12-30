@@ -27,7 +27,9 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" pnpm build:*)",
       "Bash(find:*)",
       "Bash(wc:*)",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "Bash(supabase db query:*)",
+      "Bash(supabase status:*)"
     ]
   }
 }

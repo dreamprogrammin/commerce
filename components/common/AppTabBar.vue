@@ -205,7 +205,7 @@ defineExpose({ closeAllPopups })
       class="static flex-1"
       :delay-duration="150"
     >
-      <NavigationMenuList class="flex w-full items-center justify-start gap-2">
+      <NavigationMenuList class="flex w-full items-center justify-end gap-2">
         <template v-for="rootItem in menuTree" :key="rootItem.id">
           <NavigationMenuItem :value="rootItem.slug">
             <template v-if="rootItem.children && rootItem.children.length > 0">
