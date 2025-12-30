@@ -48,7 +48,6 @@ function getBannerImageUrl(imageUrl: string | null) {
     <div v-if="pending" class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Skeleton 1 -->
       <div class="relative h-48 md:h-80 lg:h-96 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 via-gray-200 to-gray-100 animate-pulse">
-        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <div class="absolute bottom-0 left-0 right-0 p-6 space-y-3">
           <Skeleton class="h-7 w-3/4 bg-white/20" />
           <Skeleton class="h-4 w-1/2 bg-white/20" />
@@ -57,7 +56,6 @@ function getBannerImageUrl(imageUrl: string | null) {
 
       <!-- Skeleton 2 -->
       <div class="relative h-48 md:h-80 lg:h-96 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 via-gray-200 to-gray-100 animate-pulse">
-        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <div class="absolute bottom-0 left-0 right-0 p-6 space-y-3">
           <Skeleton class="h-7 w-3/4 bg-white/20" />
           <Skeleton class="h-4 w-1/2 bg-white/20" />
@@ -98,9 +96,6 @@ function getBannerImageUrl(imageUrl: string | null) {
           >
             <Icon name="lucide:image" class="w-16 h-16 text-muted-foreground/50" />
           </div>
-
-          <!-- Градиент overlay для текста -->
-          <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none" />
 
           <!-- Контент -->
           <div class="absolute bottom-0 left-0 right-0 p-6 text-white z-10">
