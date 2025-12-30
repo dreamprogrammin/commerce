@@ -83,7 +83,7 @@ function getBannerImageUrl(imageUrl: string | null) {
             :alt="banner.title"
             aspect-ratio="video"
             object-fit="cover"
-            :placeholder-type="banner.blur_data_url ? 'lqip' : 'shimmer'"
+            placeholder-type="lqip"
             :blur-data-url="banner.blur_data_url || undefined"
             eager
             class="group-hover:scale-105 transition-transform duration-300"
