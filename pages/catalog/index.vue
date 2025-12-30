@@ -280,9 +280,9 @@ const additionalItemStyles = {
             ]"
             :style="{ '--animation-delay': `${Math.min(index * 30, 300)}ms` }"
           >
-            <!-- 🖼️ Изображение через ResponsiveImage с исправленной передачей blur -->
+            <!-- 🖼️ Изображение через ProgressiveImage с исправленной передачей blur -->
             <div v-if="category.image_url" class="absolute bottom-0 right-0 w-[85%] h-[85%]">
-              <ResponsiveImage
+              <ProgressiveImage
                 :src="getCategoryImageUrl(category)"
                 :alt="category.name"
                 :blur-data-url="getCategoryBlurUrl(category)"

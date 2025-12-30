@@ -61,9 +61,9 @@ function getBannerImageUrl(imageUrl: string | null) {
           'pointer-events-none': !banner.cta_link,
         }"
       >
-        <!-- Изображение с ResponsiveImage -->
+        <!-- Изображение с ProgressiveImage -->
         <div class="relative h-48 md:h-80 lg:h-96">
-          <ResponsiveImage
+          <ProgressiveImage
             v-if="banner.image_url"
             :src="getBannerImageUrl(banner.image_url)"
             :alt="banner.title"

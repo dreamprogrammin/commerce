@@ -40,8 +40,22 @@ const firstProductImage = computed(() => {
 
 // URL изображения
 const productImageUrl = computed(() => {
-  if (!firstProductImage.value?.image_url) return null
-  return getImageUrl(BUCKET_NAME_PRODUCT, firstProductImage.value.image_url, IMAGE_SIZES.PRODUCT_CARD)
+  if (!firstProductImage.value?.image_url) {
+    console.log('❌ ActiveOrderStatus: Нет image_url', {
+      activeOrder: activeOrder.value,
+      orderItems: activeOrder.value?.order_items,
+      firstProduct: activeOrder.value?.order_items?.[0]?.product,
+    })
+    return null
+  }
+
+  const url = getImageUrl(BUCKET_NAME_PRODUCT, firstProductImage.value.image_url, IMAGE_SIZES.PRODUCT_CARD)
+  console.log('✅ ActiveOrderStatus: URL изображения сгенерирован', {
+    imageUrl: firstProductImage.value.image_url,
+    generatedUrl: url,
+    blurPlaceholder: firstProductImage.value.blur_placeholder,
+  })
+  return url
 })
 </script>
 
@@ -57,13 +71,15 @@ const productImageUrl = computed(() => {
         <div class="flex items-center gap-3">
           <!-- Изображение первого товара -->
           <div class="relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-white">
-            <ResponsiveImage
+            <ProgressiveImage
               v-if="productImageUrl"
               :src="productImageUrl"
               :blur-data-url="firstProductImage?.blur_placeholder || undefined"
               :alt="activeOrder.order_items[0]?.product?.name || 'Товар'"
               object-fit="cover"
               placeholder-type="lqip"
+              aspect-ratio="square"
+              :eager="true"
               class="w-full h-full"
             />
             <div

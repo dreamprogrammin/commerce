@@ -150,17 +150,17 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                   :external="!!slide.cta_link?.startsWith('http')"
                   class="block"
                 >
-                  <!-- 🎯 Контейнер изображения с ResponsiveImage -->
+                  <!-- 🎯 Контейнер изображения с ProgressiveImage -->
                   <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-3/2 md:aspect-19/6 lg:aspect-21/9">
-                    <!-- ✅ Используем ResponsiveImage с закешированными URL -->
-                    <ResponsiveImage
+                    <!-- ✅ Используем ProgressiveImage с закешированными URL -->
+                    <ProgressiveImage
                       v-if="slide.desktopUrl"
-                      :src="slide.desktopUrl"
-                      :src-mobile="slide.mobileUrl || undefined"
+                      :src="slide.mobileUrl || slide.desktopUrl"
                       :blur-data-url="slide.blur_placeholder || undefined"
                       :alt="slide.title || 'Слайд'"
                       object-fit="cover"
                       :placeholder-type="slide.blur_placeholder ? 'lqip' : 'shimmer'"
+                      aspect-ratio="21/9"
                       class="w-full h-full"
                       :eager="true"
                     />
