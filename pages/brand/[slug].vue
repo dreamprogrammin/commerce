@@ -15,7 +15,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 // -- Локальное состояние страницы --
 const products = ref<ProductWithGallery[]>([])
 const isLoading = ref(true)
-const sortBy = ref<'newest' | 'price-asc' | 'price-desc' | 'popularity'>('newest')
+const sortBy = ref<'newest' | 'price_asc' | 'price_desc' | 'popularity'>('newest')
 
 // 1. Умная загрузка информации о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(
@@ -90,8 +90,8 @@ const brandLogoUrl = computed(() => {
 const sortOptions = [
   { value: 'newest', label: 'Новинки' },
   { value: 'popularity', label: 'Популярные' },
-  { value: 'price-asc', label: 'Цена: по возрастанию' },
-  { value: 'price-desc', label: 'Цена: по убыванию' },
+  { value: 'price_asc', label: 'Цена: по возрастанию' },
+  { value: 'price_desc', label: 'Цена: по убыванию' },
 ]
 
 // ========================================
