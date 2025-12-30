@@ -249,7 +249,7 @@ useRobotsRule({
       </p>
     </div>
 
-    <div :class="desktopContainedClass">
+    <div :class="alwaysContainedClass">
       <HomeActiveOrderStatus />
     </div>
 
