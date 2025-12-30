@@ -206,9 +206,9 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
       </template>
     </ClientOnly>
 
-    <!-- 📭 ПУСТОЕ СОСТОЯНИЕ -->
+    <!-- 📭 ПУСТОЕ СОСТОЯНИЕ (только если НЕ загрузка и слайды пусты) -->
     <div
-      v-else
+      v-else-if="!props.isLoading && processedSlides.length === 0"
       :class="`${containerClass} w-full aspect-21/9 bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"
     >
       <p class="text-muted-foreground">
