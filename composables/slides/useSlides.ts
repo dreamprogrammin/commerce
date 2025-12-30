@@ -13,7 +13,7 @@ import type { Database, SlideRow } from '@/types'
 export function useSlides() {
   const supabase = useSupabaseClient<Database>()
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['global-slides'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -67,6 +67,11 @@ ${data.map((slide, i) => `  ${i + 1}. ${slide.title}
     gcTime: 10 * 60 * 1000, // 10 минут - время жизни в кэше
   })
 
+  // 🔄 Объединяем isLoading и isFetching для корректного показа скелетона
+  // isLoading = true только при первой загрузке
+  // isFetching = true при каждом запросе (включая перезагрузку)
+  const isLoadingOrFetching = computed(() => isLoading.value || isFetching.value)
+
   /**
    * 🔄 Обновить слайды (например, после изменения в админке)
    */
@@ -91,7 +96,7 @@ ${data.map((slide, i) => `  ${i + 1}. ${slide.title}
     // 📊 Данные
     slides: data,
     error,
-    isLoading,
+    isLoading: isLoadingOrFetching, // Используем комбинированный флаг для корректного показа скелетона
     stats,
 
     // 🔄 Методы
