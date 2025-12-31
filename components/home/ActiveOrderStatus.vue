@@ -31,10 +31,10 @@ onUnmounted(() => {
 
 // Получить до 5 товаров с изображениями
 const productThumbnails = computed(() => {
-  if (!activeOrder.value?.order_items?.length)
+  if (!displayOrder.value?.order_items?.length)
     return []
 
-  return activeOrder.value.order_items
+  return displayOrder.value.order_items
     .slice(0, 5) // Берем до 5 товаров
     .filter(item => item.product) // Фильтруем только товары с product
     .map((item) => {
@@ -52,10 +52,10 @@ const productThumbnails = computed(() => {
 
 // Форматирование даты "от 30 декабря"
 const orderDate = computed(() => {
-  if (!activeOrder.value?.created_at)
+  if (!displayOrder.value?.created_at)
     return ''
 
-  const formattedDate = new Date(activeOrder.value.created_at).toLocaleDateString('ru-RU', {
+  const formattedDate = new Date(displayOrder.value.created_at).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
   })
@@ -65,24 +65,24 @@ const orderDate = computed(() => {
 
 // Общее количество товаров
 const totalItems = computed(() => {
-  if (!activeOrder.value?.order_items?.length)
+  if (!displayOrder.value?.order_items?.length)
     return 0
-  return activeOrder.value.order_items.reduce((sum, item) => sum + item.quantity, 0)
+  return displayOrder.value.order_items.reduce((sum, item) => sum + item.quantity, 0)
 })
 
 // Общая стоимость
 const totalAmount = computed(() => {
-  if (!activeOrder.value?.final_amount)
+  if (!displayOrder.value?.final_amount)
     return 0
-  return activeOrder.value.final_amount.toLocaleString('ru-RU')
+  return displayOrder.value.final_amount.toLocaleString('ru-RU')
 })
 
 // 🎨 Цветовая схема в зависимости от статуса заказа
 const orderColorScheme = computed(() => {
-  if (!activeOrder.value)
+  if (!displayOrder.value)
     return null
 
-  const status = activeOrder.value.status
+  const status = displayOrder.value.status
 
   // Новый заказ (ожидание) - СИНИЙ
   if (status === 'pending') {
@@ -117,6 +117,17 @@ const orderColorScheme = computed(() => {
     }
   }
 
+  // Отменен - КРАСНЫЙ
+  if (status === 'cancelled') {
+    return {
+      border: 'border-red-200',
+      overlay: 'bg-red-500/8',
+      badge: 'bg-red-50',
+      icon: 'text-red-500',
+      indicator: 'bg-red-500',
+    }
+  }
+
   // По умолчанию - серый
   return {
     border: 'border-gray-200',
@@ -129,6 +140,21 @@ const orderColorScheme = computed(() => {
 
 // ⏱️ Автоматическое скрытие карточки после подтверждения
 const shouldShowCard = ref(true)
+
+// 🎯 Локальная копия заказа для отображения (чтобы показывать отмененный заказ 5 секунд)
+const displayOrder = ref<typeof activeOrder.value>(null)
+
+// Обновляем displayOrder когда меняется activeOrder
+watch(activeOrder, (newOrder, oldOrder) => {
+  if (newOrder) {
+    displayOrder.value = newOrder
+
+    // Если это новый заказ (другой ID), показываем карточку снова
+    if (!oldOrder || oldOrder.id !== newOrder.id) {
+      shouldShowCard.value = true
+    }
+  }
+}, { immediate: true })
 
 // Когда заказ подтвержден, запускаем таймер на скрытие (10 секунд)
 watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
@@ -143,6 +169,17 @@ watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
     shouldShowCard.value = false
   }
 }, { immediate: true })
+
+// Отдельный watcher для отмены заказа (используем displayOrder)
+watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
+  if (newStatus === 'cancelled' && oldStatus && oldStatus !== 'cancelled') {
+    // Заказ только что отменили - показываем 5 секунд
+    setTimeout(() => {
+      shouldShowCard.value = false
+      displayOrder.value = null // Очищаем после скрытия
+    }, 5000) // 5 секунд
+  }
+})
 </script>
 
 <template>
@@ -156,8 +193,8 @@ watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
     leave-to-class="opacity-0 scale-95"
   >
     <NuxtLink
-      v-if="!isLoading && activeOrder && shouldShowCard && orderColorScheme"
-      :to="`/profile/order/${activeOrder.id}`"
+      v-if="!isLoading && displayOrder && shouldShowCard && orderColorScheme"
+      :to="`/profile/order/${displayOrder.id}`"
       class="block mb-4"
     >
       <Card
@@ -208,11 +245,11 @@ watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
 
                 <!-- Индикатор дополнительных товаров (цвет зависит от статуса) -->
                 <div
-                  v-if="activeOrder.order_items.length > 3"
+                  v-if="displayOrder.order_items.length > 3"
                   class="absolute -bottom-1 -right-1 z-40 w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shadow-lg ring-2 ring-white"
                   :class="orderColorScheme.indicator"
                 >
-                  +{{ activeOrder.order_items.length - 3 }}
+                  +{{ displayOrder.order_items.length - 3 }}
                 </div>
               </div>
             </div>
@@ -223,15 +260,15 @@ watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
             <div class="flex items-center gap-2 mb-1.5 flex-wrap">
               <!-- Статус -->
               <Badge
-                :class="getStatusColor(activeOrder.status)"
+                :class="getStatusColor(displayOrder.status)"
                 class="text-[11px] px-2.5 py-0.5 rounded-full font-medium"
               >
-                {{ getStatusLabel(activeOrder.status) }}
+                {{ getStatusLabel(displayOrder.status) }}
               </Badge>
 
               <!-- Номер заказа -->
               <h3 class="font-bold text-sm text-card-foreground">
-                №{{ activeOrder.id.slice(-6) }}
+                №{{ displayOrder.id.slice(-6) }}
               </h3>
             </div>
 
