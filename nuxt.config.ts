@@ -228,7 +228,7 @@ export default defineNuxtConfig({
       minify: 'terser',
       terserOptions: {
         compress: {
-          drop_console: false, // ⚠️ ВРЕМЕННО отключено для отладки realtime
+          drop_console: true,
         },
       },
       rollupOptions: {
