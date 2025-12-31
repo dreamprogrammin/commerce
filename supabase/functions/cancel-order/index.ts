@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage, removeMessageButtons } from '../_shared/telegramUtils.ts'
+import { updateTelegramMessage } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -153,21 +153,20 @@ Deno.serve(async (req) => {
       if (botToken && chatId) {
         console.log(`📱 Обновление Telegram сообщения ${orderData.telegram_message_id}...`)
 
-        // Получаем текущий текст из БД для формирования обновленного сообщения
+        // Обновляем текст и удаляем кнопки одним запросом
         const updatedText = `❌ *ЗАКАЗ ОТМЕНЕН*\n\n🔔 Заказ №${orderId.slice(-6)} был отменен администратором\n\n_Статус: cancelled_\n\n⚠️ Все действия с этим заказом недоступны`
 
         const updateResult = await updateTelegramMessage(
           botToken,
           chatId,
           orderData.telegram_message_id,
-          updatedText
+          updatedText,
+          'Markdown',
+          { inline_keyboard: [] } // Удаляем кнопки в том же запросе
         )
 
         if (updateResult.success) {
-          console.log('✅ Telegram сообщение обновлено')
-
-          // Удаляем кнопки (заказ отменен, действия не нужны)
-          await removeMessageButtons(botToken, chatId, orderData.telegram_message_id)
+          console.log('✅ Telegram сообщение обновлено и кнопки удалены')
         } else {
           console.error('⚠️ Не удалось обновить Telegram:', updateResult.error)
         }
