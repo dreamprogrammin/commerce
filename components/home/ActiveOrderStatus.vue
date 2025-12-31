@@ -154,12 +154,22 @@ const shouldShowCard = ref(true)
 // 🎯 Локальная копия заказа для отображения (чтобы показывать отмененный заказ 5 секунд)
 const displayOrder = ref<typeof activeOrder.value>(null)
 
+// Флаг блокировки обновления displayOrder (когда показываем финальный статус)
+const isShowingFinalStatus = ref(false)
+
 // Обновляем displayOrder когда меняется activeOrder
 watch(activeOrder, (newOrder, oldOrder) => {
   console.log('🔄 activeOrder изменился:', {
     oldOrder: oldOrder ? { id: oldOrder.id.slice(-6), status: oldOrder.status } : null,
     newOrder: newOrder ? { id: newOrder.id.slice(-6), status: newOrder.status } : null,
+    isShowingFinalStatus: isShowingFinalStatus.value,
   })
+
+  // Если показываем финальный статус - не обновляем displayOrder
+  if (isShowingFinalStatus.value) {
+    console.log('⏳ Показываем финальный статус, блокируем обновление displayOrder')
+    return
+  }
 
   if (newOrder) {
     displayOrder.value = newOrder
@@ -197,12 +207,24 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
   console.log('📊 Статус displayOrder изменился:', { oldStatus, newStatus })
 
   if (newStatus === 'cancelled' && oldStatus && oldStatus !== 'cancelled') {
-    // Заказ только что отменили - показываем 5 секунд
-    console.log('❌ Заказ отменен, запускаем таймер на 5 сек')
+    // Заказ только что отменили - блокируем обновления и показываем 5 секунд
+    console.log('❌ Заказ отменен, блокируем обновления и запускаем таймер на 5 сек')
+    isShowingFinalStatus.value = true
+
     setTimeout(() => {
-      console.log('⏱️ Таймер истек, скрываем карточку отмененного заказа')
+      console.log('⏱️ Таймер истек, скрываем карточку и разблокируем обновления')
       shouldShowCard.value = false
-      displayOrder.value = null // Очищаем после скрытия
+      isShowingFinalStatus.value = false
+
+      // Переключаемся на следующий активный заказ если есть
+      if (activeOrder.value) {
+        displayOrder.value = activeOrder.value
+        shouldShowCard.value = true
+        console.log('🔄 Переключились на следующий активный заказ:', { id: activeOrder.value.id.slice(-6), status: activeOrder.value.status })
+      } else {
+        displayOrder.value = null
+        console.log('✅ Больше нет активных заказов')
+      }
     }, 5000) // 5 секунд
   }
 })
