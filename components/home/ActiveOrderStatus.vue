@@ -19,12 +19,22 @@ const { getImageUrl } = useSupabaseStorage()
 let channel: any = null
 
 onMounted(async () => {
+  console.log('🏠 ActiveOrderStatus монтируется')
   await fetchOrders()
+  console.log('🏠 Заказы загружены, создаем подписку...')
   channel = subscribeToOrderUpdates()
+
+  if (channel) {
+    console.log('🏠 Канал создан:', channel)
+  } else {
+    console.warn('🏠 Канал не создан (возможно пользователь не авторизован)')
+  }
 })
 
 onUnmounted(() => {
+  console.log('🏠 ActiveOrderStatus размонтируется')
   if (channel) {
+    console.log('🏠 Отписываемся от канала')
     channel.unsubscribe()
   }
 })
@@ -146,35 +156,51 @@ const displayOrder = ref<typeof activeOrder.value>(null)
 
 // Обновляем displayOrder когда меняется activeOrder
 watch(activeOrder, (newOrder, oldOrder) => {
+  console.log('🔄 activeOrder изменился:', {
+    oldOrder: oldOrder ? { id: oldOrder.id.slice(-6), status: oldOrder.status } : null,
+    newOrder: newOrder ? { id: newOrder.id.slice(-6), status: newOrder.status } : null,
+  })
+
   if (newOrder) {
     displayOrder.value = newOrder
+    console.log('📋 displayOrder обновлен:', { id: newOrder.id.slice(-6), status: newOrder.status })
 
     // Если это новый заказ (другой ID), показываем карточку снова
     if (!oldOrder || oldOrder.id !== newOrder.id) {
       shouldShowCard.value = true
+      console.log('🎯 Показываем карточку снова (новый заказ)')
     }
   }
 }, { immediate: true })
 
 // Когда заказ подтвержден, запускаем таймер на скрытие (10 секунд)
 watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
+  console.log('📊 Статус activeOrder изменился:', { oldStatus, newStatus })
+
   if (newStatus === 'confirmed' && oldStatus === 'pending') {
     // Заказ только что подтвердили - запускаем таймер на 10 секунд
+    console.log('✅ Заказ подтвержден, запускаем таймер на 10 сек')
     setTimeout(() => {
+      console.log('⏱️ Таймер истек, скрываем карточку')
       shouldShowCard.value = false
     }, 10000) // 10 секунд
   }
   else if (newStatus === 'delivered' || newStatus === 'completed') {
     // Заказ доставлен - скрываем сразу
+    console.log('📦 Заказ доставлен, скрываем карточку')
     shouldShowCard.value = false
   }
 }, { immediate: true })
 
 // Отдельный watcher для отмены заказа (используем displayOrder)
 watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
+  console.log('📊 Статус displayOrder изменился:', { oldStatus, newStatus })
+
   if (newStatus === 'cancelled' && oldStatus && oldStatus !== 'cancelled') {
     // Заказ только что отменили - показываем 5 секунд
+    console.log('❌ Заказ отменен, запускаем таймер на 5 сек')
     setTimeout(() => {
+      console.log('⏱️ Таймер истек, скрываем карточку отмененного заказа')
       shouldShowCard.value = false
       displayOrder.value = null // Очищаем после скрытия
     }, 5000) // 5 секунд

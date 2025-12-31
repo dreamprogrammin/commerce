@@ -109,7 +109,12 @@ export const useUserOrders = () => {
 
   // Подписка на real-time обновления заказов
   const subscribeToOrderUpdates = () => {
-    if (!user.value) return null
+    if (!user.value) {
+      console.warn('⚠️ Нет пользователя для подписки на заказы')
+      return null
+    }
+
+    console.log('🔔 Подписываемся на обновления заказов для пользователя:', user.value.id)
 
     const channel = supabase
       .channel(`user-orders:${user.value.id}`)
@@ -122,13 +127,17 @@ export const useUserOrders = () => {
           filter: `user_id=eq.${user.value.id}`,
         },
         (payload) => {
-          console.log('📦 Обновление заказа:', payload)
+          console.log('📦 Получено realtime событие обновления заказа:', payload)
+          console.log('📦 Старый статус:', payload.old.status)
+          console.log('📦 Новый статус:', payload.new.status)
 
           const updatedOrder = payload.new as UserOrder
           const oldOrder = payload.old as UserOrder
 
           // Обновляем заказ в списке
           const index = orders.value.findIndex((o) => o.id === updatedOrder.id)
+          console.log('📦 Индекс заказа в списке:', index)
+
           if (index !== -1) {
             // Сохраняем детали заказа (order_items) из старых данных
             const orderDetails = orders.value[index]
@@ -137,17 +146,31 @@ export const useUserOrders = () => {
               order_items: orderDetails.order_items,
             }
 
+            console.log('✅ Заказ обновлен в списке:', orders.value[index])
+
             // Показываем toast только если изменился статус
             if (oldOrder.status !== updatedOrder.status) {
+              console.log('📢 Показываем toast уведомление')
               showStatusChangeToast(updatedOrder)
             }
           } else {
             // Новый заказ - перезагружаем список
+            console.log('🔄 Заказ не найден в списке, перезагружаем')
             fetchOrders()
           }
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Успешно подписались на обновления заказов')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Ошибка канала realtime:', err)
+        } else if (status === 'TIMED_OUT') {
+          console.error('⏱️ Timeout при подписке на realtime')
+        } else {
+          console.log('📡 Статус канала realtime:', status)
+        }
+      })
 
     return channel
   }
