@@ -259,11 +259,7 @@ useRobotsRule({
       </p>
     </div>
 
-    <div :class="alwaysContainedClass">
-      <HomeActiveOrderStatus />
-    </div>
-
-    <!-- Блок приветствия/авторизации и статус заказа -->
+    <!-- Статус активного заказа и приветствие -->
     <div :class="alwaysContainedClass" class="py-4">
       <ClientOnly>
         <!-- Для авторизованных пользователей -->
@@ -274,24 +270,10 @@ useRobotsRule({
               Перейти в панель администратора
             </NuxtLink>
           </div>
-          <!-- Обычный пользователь - показываем статус заказа или приветствие -->
+          <!-- Обычный пользователь - показываем статус заказа -->
           <template v-else>
             <HomeActiveOrderStatus />
-            <div class="p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <NuxtLink to="/profile" class="font-semibold text-primary hover:underline">
-                Перейти в личный кабинет
-              </NuxtLink>
-            </div>
           </template>
-        </div>
-        <!-- Для неавторизованных - показываем отслеживание заказа для гостей -->
-        <div v-else>
-          <HomeGuestOrderTracking class="mb-4" />
-          <div class="p-4 bg-gray-100 border rounded-md">
-            <NuxtLink to="/profile" class="font-semibold text-primary hover:underline">
-              Пожалуйста, авторизуйтесь, чтобы получать бонусы!
-            </NuxtLink>
-          </div>
         </div>
         <template #fallback>
           <div class="p-4 bg-gray-100 border rounded-md animate-pulse">
