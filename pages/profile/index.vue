@@ -129,10 +129,10 @@ watch(profile, (val, oldVal) => {
               </div>
               <div>
                 <p class="font-semibold">
-                  Доступно к списанию
+                  Активные бонусы
                 </p>
                 <p class="text-xs text-muted-foreground">
-                  Можно использовать прямо сейчас
+                  Доступны к списанию в следующем заказе
                 </p>
               </div>
             </div>
@@ -149,7 +149,7 @@ watch(profile, (val, oldVal) => {
               </div>
               <div>
                 <p class="font-medium text-muted-foreground">
-                  Ожидает активации
+                  В ожидании (7 дней)
                 </p>
                 <TooltipProvider>
                   <Tooltip>
@@ -157,9 +157,9 @@ watch(profile, (val, oldVal) => {
                       Когда станут доступны?
                     </TooltipTrigger>
                     <TooltipContent class="max-w-xs">
-                      <p>
-                        Бонусы активируются через 7 дней после подтверждения заказа.
-                        Это защита от мошенничества.
+                      <p class="space-y-1">
+                        <span class="block">Бонусы активируются через 7 дней после подтверждения заказа администратором.</span>
+                        <span class="block text-muted-foreground text-xs">При отмене заказа в течение этого периода бонусы автоматически аннулируются.</span>
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -172,10 +172,15 @@ watch(profile, (val, oldVal) => {
           </div>
 
           <!-- Информация о бонусах -->
-          <div class="text-sm text-muted-foreground space-y-1 pt-2">
-            <p>• 1 бонус = 1 ₸ скидки при оплате</p>
-            <p>• Бонусы начисляются за каждую покупку</p>
-            <p>• Приветственный бонус: 1000 бонусов после подтверждения первого заказа</p>
+          <div class="text-sm text-muted-foreground space-y-2 pt-2">
+            <p class="font-medium text-foreground">Как работают бонусы:</p>
+            <div class="space-y-1 pl-2">
+              <p>• 1 бонус = 1 ₸ скидки при оплате</p>
+              <p>• Бонусы начисляются при <strong class="text-foreground">подтверждении заказа</strong> администратором</p>
+              <p>• Активация через 7 дней после подтверждения</p>
+              <p>• При отмене заказа бонусы автоматически аннулируются</p>
+              <p>• Приветственный бонус: <strong class="text-foreground">1000 бонусов</strong> после первого подтверждённого заказа</p>
+            </div>
           </div>
         </CardContent>
       </Card>

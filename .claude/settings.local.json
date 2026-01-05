@@ -32,7 +32,8 @@
       "Bash(supabase status:*)",
       "Bash(processedSlides.length === 0\"\n\nТеперь пустое состояние показывается только когда:\n- Загрузка завершена \\(isLoading === false\\)\n- И слайды действительно отсутствуют \\(processedSlides.length === 0\\)\n\nЛогика отображения состояний:\n1. isLoading === true → Skeleton loader\n2. error → Сообщение об ошибке\n3. processedSlides.length > 0 → Carousel с слайдами\n4. !isLoading && processedSlides.length === 0 → Пустое состояние\n\nРезультат:\n- ✅ Плавный переход от skeleton к слайдам\n- ✅ Нет промежуточного показа пустого состояния\n- ✅ Улучшенный UX при загрузке\n- ✅ Корректная обработка всех состояний\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git diff:*)",
-      "Bash(supabase db push:*)"
+      "Bash(supabase db push:*)",
+      "Bash(supabase db diff:*)"
     ]
   }
 }

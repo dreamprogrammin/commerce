@@ -150,7 +150,7 @@ async function placeOrder() {
               >
                 Зарегистрируйтесь
               </button>
-              и получите 1000 бонусов после подтверждения первого заказа! 🎁
+               получите 1000 бонусов после подтверждения первого заказа! 🎁
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
@@ -249,7 +249,7 @@ async function placeOrder() {
               Применить бонусы
             </CardTitle>
             <CardDescription>
-              У вас <span class="font-bold text-primary">{{ bonusBalance }}</span> доступных бонусов (1 бонус = 1 ₸)
+              У вас <span class="font-bold text-primary">{{ bonusBalance }}</span> активных бонусов (1 бонус = 1 ₸ скидки)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -267,9 +267,12 @@ async function placeOrder() {
                 Применить
               </Button>
             </div>
-            <p class="text-xs text-muted-foreground mt-2">
-              Максимум можно списать: {{ bonusBalance }} бонусов
-            </p>
+            <div class="text-xs text-muted-foreground mt-2 space-y-1">
+              <p>Максимум можно списать: {{ bonusBalance }} бонусов</p>
+              <p class="text-[11px]">
+                💡 Бонусы начисляются при подтверждении заказа и активируются через 7 дней
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -316,10 +319,19 @@ async function placeOrder() {
 
               <!-- Будущие бонусы (только для авторизованных) -->
               <div v-if="isLoggedIn && bonusesToAward > 0" class="flex justify-between text-xs text-muted-foreground">
-                <span class="flex items-center gap-1">
-                  <Star class="w-3 h-3" />
-                  Вы получите:
-                </span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger class="flex items-center gap-1 cursor-help">
+                      <Star class="w-3 h-3" />
+                      Вы получите (через 7 дней):
+                    </TooltipTrigger>
+                    <TooltipContent class="max-w-xs">
+                      <p class="text-xs">
+                        Бонусы будут начислены после подтверждения заказа администратором и активируются через 7 дней
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <span>+{{ bonusesToAward }} бонусов</span>
               </div>
             </div>
