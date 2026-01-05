@@ -66,11 +66,23 @@ onMounted(() => {
 })
 
 function applyBonuses() {
+  // Проверка 1: Достаточно ли бонусов на балансе
   if (bonusesInput.value > bonusBalance.value) {
     toast.error('Недостаточно бонусов', {
       description: `У вас доступно только ${bonusBalance.value} бонусов`,
     })
     bonusesInput.value = bonusBalance.value
+    return
+  }
+
+  // Проверка 2: Не превышают ли бонусы стоимость заказа
+  const maxBonuses = Math.floor(subtotal.value)
+  if (bonusesInput.value > maxBonuses) {
+    toast.warning('Слишком много бонусов', {
+      description: `Максимум для этого заказа: ${maxBonuses} бонусов (стоимость корзины)`,
+    })
+    bonusesInput.value = maxBonuses
+    cartStore.setBonusesToSpend(maxBonuses)
     return
   }
 
@@ -253,22 +265,40 @@ async function placeOrder() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div class="flex items-center gap-4">
-              <Input
-                id="bonuses"
-                v-model.number="bonusesInput"
-                type="number"
-                placeholder="Сколько списать?"
-                :max="bonusBalance"
-                min="0"
-                class="flex-1"
-              />
-              <Button type="button" variant="outline" @click="applyBonuses">
-                Применить
-              </Button>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <Input
+                  id="bonuses"
+                  v-model.number="bonusesInput"
+                  type="number"
+                  placeholder="Сколько списать?"
+                  :max="Math.min(bonusBalance, Math.floor(subtotal))"
+                  min="0"
+                  class="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  @click="bonusesInput = Math.min(bonusBalance, Math.floor(subtotal))"
+                >
+                  Максимум
+                </Button>
+                <Button type="button" variant="default" @click="applyBonuses">
+                  Применить
+                </Button>
+              </div>
             </div>
             <div class="text-xs text-muted-foreground mt-2 space-y-1">
-              <p>Максимум можно списать: {{ bonusBalance }} бонусов</p>
+              <p>
+                Максимум для этого заказа:
+                <span class="font-semibold text-foreground">
+                  {{ Math.min(bonusBalance, Math.floor(subtotal)) }} бонусов
+                </span>
+                <span v-if="bonusBalance > Math.floor(subtotal)" class="text-amber-600">
+                  (ограничено стоимостью корзины)
+                </span>
+              </p>
               <p class="text-[11px]">
                 💡 Бонусы начисляются при подтверждении заказа и активируются через 7 дней
               </p>

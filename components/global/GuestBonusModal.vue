@@ -46,25 +46,37 @@ function handleClose() {
               1000 бонусов
             </p>
             <p class="text-sm text-muted-foreground">
-              при первой покупке = 1000 ₸ на следующие заказы
+              после подтверждения первого заказа = 1000 ₸ скидки
             </p>
           </div>
         </div>
 
         <!-- Как это работает -->
         <div class="space-y-3 text-sm">
-          <p class="text-muted-foreground text-center">
-            Войдите через Google и получите 1000 бонусов после подтверждения первого заказа!
+          <p class="text-muted-foreground text-center font-medium">
+            Войдите через Google и получите приветственный бонус!
           </p>
 
-          <div class="flex items-center gap-2 text-muted-foreground">
-            <Star class="w-4 h-4 text-primary flex-shrink-0" />
-            <span>Накапливайте бонусы за каждую покупку</span>
+          <div class="space-y-2 bg-muted/30 rounded-lg p-3">
+            <div class="flex items-start gap-2 text-xs text-muted-foreground">
+              <span class="font-bold text-primary">1.</span>
+              <span>Бонусы начисляются при подтверждении заказа администратором</span>
+            </div>
+
+            <div class="flex items-start gap-2 text-xs text-muted-foreground">
+              <span class="font-bold text-primary">2.</span>
+              <span>Активация через 7 дней после подтверждения</span>
+            </div>
+
+            <div class="flex items-start gap-2 text-xs text-muted-foreground">
+              <span class="font-bold text-primary">3.</span>
+              <span>1 бонус = 1 ₸ скидки на следующие покупки</span>
+            </div>
           </div>
 
-          <div class="flex items-center gap-2 text-muted-foreground">
+          <div class="flex items-center gap-2 text-muted-foreground text-xs">
             <Star class="w-4 h-4 text-primary flex-shrink-0" />
-            <span>Оплачивайте ими до 100% заказа</span>
+            <span>Накапливайте бонусы за каждый заказ и экономьте!</span>
           </div>
         </div>
       </div>
