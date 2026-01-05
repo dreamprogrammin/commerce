@@ -14,20 +14,26 @@ export default defineNuxtPlugin(async () => {
 
   // ✅ Проверяем текущую сессию при инициализации
   const { data: { session } } = await supabase.auth.getSession()
-  
+
   if (session?.user) {
     console.log('[Auth Plugin] Found existing session on init:', session.user.id)
-    
-    // Загружаем профиль если его еще нет
-    if (!profileStore.profile) {
-      console.log('[Auth Plugin] Loading profile for existing session...')
-      await profileStore.loadProfile(false, true)
-      
-      if (profileStore.profile) {
-        console.log('[Auth Plugin] Profile loaded successfully on init')
-      } else {
-        console.log('[Auth Plugin] No profile yet (might be new user)')
-      }
+
+    // ✅ ИСПРАВЛЕНИЕ: НЕ ждем загрузку профиля - запускаем в фоне
+    if (!profileStore.profile && !profileStore.isLoading) {
+      console.log('[Auth Plugin] Starting profile load in background...')
+
+      // Запускаем загрузку, но НЕ ждем (чтобы не блокировать приложение)
+      profileStore.loadProfile(false, true)
+        .then(hasProfile => {
+          if (hasProfile) {
+            console.log('[Auth Plugin] Profile loaded successfully on init')
+          } else {
+            console.log('[Auth Plugin] No profile yet (might be new user)')
+          }
+        })
+        .catch(error => {
+          console.error('[Auth Plugin] Profile load failed on init:', error)
+        })
     }
   } else {
     console.log('[Auth Plugin] No session found on init')
@@ -72,11 +78,13 @@ export default defineNuxtPlugin(async () => {
     else if (event === 'INITIAL_SESSION' && session?.user) {
       // ✅ ИСПРАВЛЕНО: Обрабатываем INITIAL_SESSION (важно для OAuth редиректов)
       console.log('[Auth Plugin] Initial session detected, checking profile...')
-      
-      // Загружаем профиль только если его нет
+
+      // Загружаем профиль только если его нет (в фоне)
       if (!profileStore.profile && !profileStore.isLoading) {
         console.log('[Auth Plugin] Loading profile for initial session...')
-        await profileStore.loadProfile(false, true)
+        profileStore.loadProfile(false, true).catch(error => {
+          console.error('[Auth Plugin] Profile load failed for initial session:', error)
+        })
       }
     }
     else if (event === 'SIGNED_OUT') {
@@ -87,10 +95,12 @@ export default defineNuxtPlugin(async () => {
     }
     else if (event === 'TOKEN_REFRESHED') {
       console.log('[Auth Plugin] Token refreshed')
-      // Перезагружаем профиль только если его нет
+      // Перезагружаем профиль только если его нет (в фоне)
       if (!profileStore.profile && session?.user) {
         console.log('[Auth Plugin] Reloading profile after token refresh')
-        await profileStore.loadProfile(true, false)
+        profileStore.loadProfile(true, false).catch(error => {
+          console.error('[Auth Plugin] Profile load failed after token refresh:', error)
+        })
       }
     }
 

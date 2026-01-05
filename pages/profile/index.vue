@@ -27,25 +27,46 @@ onMounted(async () => {
     profile: !!profile.value,
     isLoading: isLoading.value
   })
-  
-  // ✅ Если isLoading=true больше 2 секунд - сбрасываем принудительно
-  if (isLoading.value) {
-    console.log('[Profile Page] Loading detected, setting timeout...')
-    setTimeout(() => {
-      if (isLoading.value) {
-        console.warn('[Profile Page] Force resetting isLoading after timeout')
-        profileStore.$patch({ isLoading: false })
+
+  // ✅ КРИТИЧЕСКИЙ ТАЙМАУТ: Если isLoading=true больше 3 секунд - принудительно сбрасываем
+  const forceResetTimeout = setTimeout(() => {
+    if (isLoading.value) {
+      console.error('[Profile Page] FORCE RESET: Loading stuck for 3 seconds')
+      profileStore.$patch({ isLoading: false })
+
+      // Пытаемся загрузить заново
+      if (!profile.value) {
+        console.log('[Profile Page] Retrying profile load after force reset...')
+        profileStore.loadProfile(true, true).catch(error => {
+          console.error('[Profile Page] Retry failed:', error)
+        })
       }
-    }, 2000)
-  }
-  
+    }
+  }, 3000)
+
   // Если профиля нет - загружаем (plugin уже мог его загрузить)
   if (!profile.value && !isLoading.value) {
     console.log('[Profile Page] No profile, loading...')
-    await profileStore.loadProfile(false, true)
+
+    try {
+      // ✅ Загружаем с таймаутом 5 секунд
+      await Promise.race([
+        profileStore.loadProfile(false, true),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Profile load timeout')), 5000)
+        )
+      ])
+    } catch (error: any) {
+      console.error('[Profile Page] Load failed:', error.message)
+      // Сбрасываем isLoading на всякий случай
+      profileStore.$patch({ isLoading: false })
+    }
   } else {
     console.log('[Profile Page] Profile already loaded or loading')
   }
+
+  // Очищаем таймаут
+  clearTimeout(forceResetTimeout)
 })
 
 // ✅ Добавляем watch для отладки
