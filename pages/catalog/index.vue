@@ -16,35 +16,52 @@ const catalogUrl = `${siteUrl}/catalog`
 const metaTitle = 'Каталог детских игрушек - Купить игрушки для детей в Алматы | Ухтышка'
 const metaDescription = 'Полный каталог детских игрушек в интернет-магазине Ухтышка ⭐ Развивающие игры, конструкторы, куклы, машинки для детей всех возрастов ✓ Доставка по Казахстану ✓ Бонусная программа'
 
-// SEO - расширенные мета-теги + structured data
-useHead({
-  title: metaTitle,
-  link: [
-    { rel: 'canonical', href: catalogUrl },
-  ],
-  meta: [
-    { name: 'description', content: metaDescription },
-    { name: 'keywords', content: 'каталог игрушек, детские товары, игрушки Алматы, купить игрушки, категории игрушек' },
+const categoriesStore = useCategoriesStore()
+const { getImageUrl } = useSupabaseStorage()
 
-    // Open Graph
-    { property: 'og:title', content: metaTitle },
-    { property: 'og:description', content: metaDescription },
-    { property: 'og:url', content: catalogUrl },
-    { property: 'og:type', content: 'website' },
-    { property: 'og:site_name', content: siteName },
-    { property: 'og:locale', content: 'ru_RU' },
-    { property: 'og:image', content: `${siteUrl}/og-catalog.jpeg` },
+// 🚀 Оптимизированный useAsyncData: неблокирующий + SSR + кеширование
+const { data: catalogData, pending } = useAsyncData(
+  'catalog-page',
+  async () => {
+    await Promise.all([
+      categoriesStore.fetchCategoryData(),
+      categoriesStore.fetchAdditionalMenuItems(),
+    ])
 
-    // Twitter Card
-    { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:title', content: metaTitle },
-    { name: 'twitter:description', content: metaDescription },
-    { name: 'twitter:image', content: `${siteUrl}/og-catalog.jpeg` },
+    return {
+      categories: categoriesStore.allCategories,
+      additional: categoriesStore.additionalMenuItems,
+    }
+  },
+  {
+    lazy: true, // ✅ Неблокирующая загрузка - страница рендерится сразу
+    server: true, // ✅ SSR сохраняется для SEO
+    dedupe: 'defer', // ✅ Предотвращает дублирующие запросы
+    // ✅ Упрощенное кеширование
+    getCachedData(key) {
+      const data = useNuxtData(key)
+      return data.data.value
+    },
+  },
+)
 
-    // Robots
-    { name: 'robots', content: 'index, follow' },
-  ],
-  script: [
+// Получаем подкатегории второго уровня
+const secondLevelCategories = computed<CategoryRow[]>(() => {
+  const allCats = catalogData.value?.categories || []
+
+  return allCats
+    .filter((cat) => {
+      if (!cat.parent_id)
+        return false
+      const parent = allCats.find(c => c.id === cat.parent_id)
+      return parent?.is_root_category === true
+    })
+    .sort((a, b) => a.display_order - b.display_order)
+})
+
+// 🔥 SEO - Динамические мета-теги + structured data с категориями
+useHead(() => {
+  const schemas = [
     // BreadcrumbList Schema
     {
       type: 'application/ld+json',
@@ -83,7 +100,65 @@ useHead({
         },
       }),
     },
-  ],
+  ]
+
+  // 🔥 Добавляем ItemList schema для категорий (важно для Google!)
+  if (secondLevelCategories.value.length > 0) {
+    schemas.push({
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        'name': 'Категории товаров',
+        'description': 'Категории детских игрушек в интернет-магазине Ухтышка',
+        'numberOfItems': secondLevelCategories.value.length,
+        'itemListElement': secondLevelCategories.value.map((category, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'url': `${siteUrl}${category.href}`,
+          'name': category.name,
+          'image': category.image_url
+            ? getImageUrl(BUCKET_NAME_CATEGORY, category.image_url, {
+              width: 400,
+              height: 400,
+              quality: 80,
+              format: 'webp',
+            })
+            : undefined,
+        })),
+      }),
+    })
+  }
+
+  return {
+    title: metaTitle,
+    link: [
+      { rel: 'canonical', href: catalogUrl },
+    ],
+    meta: [
+      { name: 'description', content: metaDescription },
+      { name: 'keywords', content: 'каталог игрушек, детские товары, игрушки Алматы, купить игрушки, категории игрушек' },
+
+      // Open Graph
+      { property: 'og:title', content: metaTitle },
+      { property: 'og:description', content: metaDescription },
+      { property: 'og:url', content: catalogUrl },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:site_name', content: siteName },
+      { property: 'og:locale', content: 'ru_RU' },
+      { property: 'og:image', content: `${siteUrl}/og-catalog.jpeg` },
+
+      // Twitter Card
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: metaTitle },
+      { name: 'twitter:description', content: metaDescription },
+      { name: 'twitter:image', content: `${siteUrl}/og-catalog.jpeg` },
+
+      // Robots
+      { name: 'robots', content: 'index, follow' },
+    ],
+    script: schemas,
+  }
 })
 
 // Robots правило
@@ -92,54 +167,11 @@ useRobotsRule({
   follow: true,
 })
 
-const categoriesStore = useCategoriesStore()
-const { getImageUrl } = useSupabaseStorage()
-
-// 🚀 Оптимизированный useAsyncData: неблокирующий + SSR + кеширование
-const { data: catalogData, pending } = useAsyncData(
-  'catalog-page',
-  async () => {
-    await Promise.all([
-      categoriesStore.fetchCategoryData(),
-      categoriesStore.fetchAdditionalMenuItems(),
-    ])
-
-    return {
-      categories: categoriesStore.allCategories,
-      additional: categoriesStore.additionalMenuItems,
-    }
-  },
-  {
-    lazy: true, // ✅ Неблокирующая загрузка - страница рендерится сразу
-    server: true, // ✅ SSR сохраняется для SEO
-    dedupe: 'defer', // ✅ Предотвращает дублирующие запросы
-    // ✅ Упрощенное кеширование
-    getCachedData(key) {
-      const data = useNuxtData(key)
-      return data.data.value
-    },
-  },
-)
-
 // ✅ Показываем skeleton только если идёт загрузка И данных нет
 const showSkeleton = computed(() => pending.value && !catalogData.value)
 
 // Дополнительные пункты (Акции, Новинки)
 const additionalItems = computed(() => catalogData.value?.additional || [])
-
-// Получаем подкатегории второго уровня
-const secondLevelCategories = computed<CategoryRow[]>(() => {
-  const allCats = catalogData.value?.categories || []
-
-  return allCats
-    .filter((cat) => {
-      if (!cat.parent_id)
-        return false
-      const parent = allCats.find(c => c.id === cat.parent_id)
-      return parent?.is_root_category === true
-    })
-    .sort((a, b) => a.display_order - b.display_order)
-})
 
 // Определяем размер карточки
 function getCategorySize(category: CategoryRow): 'small' | 'medium' | 'large' {

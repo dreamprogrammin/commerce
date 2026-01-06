@@ -17,6 +17,9 @@
 - [**TANSTACK_QUERY_PERSISTENCE.md**](./TANSTACK_QUERY_PERSISTENCE.md) — TanStack Query persistence в localStorage (кеш между перезагрузками).
 - [**MIGRATION_CODE.md**](./MIGRATION_CODE.md) — Заметки по миграции кода.
 
+## 🔍 SEO и Индексация
+- [**SEO_SETUP.md**](./SEO_SETUP.md) — Полное руководство по SEO настройке и индексации в Google (sitemap, structured data, meta tags, robots.txt).
+
 ## 🤖 Интеграции
 - [**telegram_troubleshooting.md**](./telegram_troubleshooting.md) — Устранение неполадок с Telegram ботом.
 - [**telegram_v3_update.md**](./telegram_v3_update.md) — Обновление интеграции с Telegram (v3).
