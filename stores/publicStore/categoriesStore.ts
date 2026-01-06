@@ -34,12 +34,7 @@ export const useCategoriesStore = defineStore('categories', () => {
       return allCategories.value
     isLoading.value = true
     try {
-      // ✅ Добавляем таймаут 5 секунд для загрузки категорий
-      const categoryQuery = supabase.from('categories').select('*').order('display_order')
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Categories fetch timeout (5s)')), 5000)
-      )
-      const { data, error } = await Promise.race([categoryQuery, timeoutPromise])
+      const { data, error } = await supabase.from('categories').select('*').order('display_order')
       if (error)
         throw error
 
@@ -80,16 +75,11 @@ export const useCategoriesStore = defineStore('categories', () => {
       return additionalMenuItems.value
 
     try {
-      // ✅ Добавляем таймаут 3 секунды для меню
-      const menuQuery = supabase
+      const { data, error } = await supabase
         .from('settings')
         .select('value')
         .eq('key', 'additional_menu_items')
         .single()
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Menu fetch timeout (3s)')), 3000)
-      )
-      const { data, error } = await Promise.race([menuQuery, timeoutPromise])
 
       if (error) {
         console.warn('Дополнительные пункты меню не найдены:', error)
