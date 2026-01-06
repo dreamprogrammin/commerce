@@ -17,7 +17,12 @@ export default defineNuxtPlugin(async () => {
 
   if (session?.user) {
     console.log('[Auth Plugin] Found existing session:', session.user.id)
-    console.log('[Auth Plugin] Profile from cache:', !!profileStore.profile)
+
+    // ✅ КРИТИЧНО: Даём Pinia persistence время восстановить данные из localStorage
+    // Pinia persistence работает синхронно, но может быть задержка в инициализации
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    console.log('[Auth Plugin] Profile from cache after wait:', !!profileStore.profile)
 
     // ✅ ИСПРАВЛЕНО: Профиль восстановится из localStorage автоматически
     // Загружаем только если СОВСЕМ нет профиля (новый пользователь)
