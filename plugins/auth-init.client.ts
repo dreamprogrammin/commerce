@@ -16,24 +16,20 @@ export default defineNuxtPlugin(async () => {
   const { data: { session } } = await supabase.auth.getSession()
 
   if (session?.user) {
-    console.log('[Auth Plugin] Found existing session on init:', session.user.id)
+    console.log('[Auth Plugin] Found existing session:', session.user.id)
+    console.log('[Auth Plugin] Profile from cache:', !!profileStore.profile)
 
-    // ✅ ИСПРАВЛЕНИЕ: НЕ ждем загрузку профиля - запускаем в фоне
+    // ✅ ИСПРАВЛЕНО: Профиль восстановится из localStorage автоматически
+    // Загружаем только если СОВСЕМ нет профиля (новый пользователь)
     if (!profileStore.profile && !profileStore.isLoading) {
-      console.log('[Auth Plugin] Starting profile load in background...')
+      console.log('[Auth Plugin] No cached profile, loading from DB...')
 
-      // Запускаем загрузку, но НЕ ждем (чтобы не блокировать приложение)
-      profileStore.loadProfile(false, true)
-        .then(hasProfile => {
-          if (hasProfile) {
-            console.log('[Auth Plugin] Profile loaded successfully on init')
-          } else {
-            console.log('[Auth Plugin] No profile yet (might be new user)')
-          }
-        })
-        .catch(error => {
-          console.error('[Auth Plugin] Profile load failed on init:', error)
-        })
+      // Загружаем только для новых пользователей
+      profileStore.loadProfile(false, true).catch(error => {
+        console.error('[Auth Plugin] Profile load failed:', error)
+      })
+    } else {
+      console.log('[Auth Plugin] Using cached profile, no DB fetch needed')
     }
   } else {
     console.log('[Auth Plugin] No session found on init')
@@ -94,14 +90,9 @@ export default defineNuxtPlugin(async () => {
       processedEvents.clear()
     }
     else if (event === 'TOKEN_REFRESHED') {
-      console.log('[Auth Plugin] Token refreshed')
-      // Перезагружаем профиль только если его нет (в фоне)
-      if (!profileStore.profile && session?.user) {
-        console.log('[Auth Plugin] Reloading profile after token refresh')
-        profileStore.loadProfile(true, false).catch(error => {
-          console.error('[Auth Plugin] Profile load failed after token refresh:', error)
-        })
-      }
+      console.log('[Auth Plugin] Token refreshed - profile should be in cache, no reload needed')
+      // ✅ ИСПРАВЛЕНО: НЕ перезагружаем профиль - он уже в localStorage!
+      // Токен обновился, но данные профиля те же самые
     }
 
     // ✅ Очищаем старые события (оставляем только последние 10)

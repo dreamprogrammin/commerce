@@ -244,4 +244,10 @@ export const useProfileStore = defineStore('profileStore', () => {
     updateProfile,
     clearProfile,
   }
+}, {
+  // ✅ КРИТИЧНО: Сохраняем профиль в localStorage
+  persist: {
+    key: 'profile-store',
+    pick: ['profile'], // Сохраняем только profile, не isLoading/isSaving
+  },
 })
