@@ -72,7 +72,18 @@ const { data: newestProductsData, isLoading: isLoadingNewest } = useQuery({
 
 const newestProducts = computed(() => newestProductsData.value || [])
 
-const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
+const isLoadingMainBlock = computed(() => {
+  const loading = isLoadingRecommendations.value || isLoadingPopular.value
+  if (import.meta.dev && loading) {
+    console.log('🔄 isLoadingMainBlock:', {
+      isLoadingRecommendations: isLoadingRecommendations.value,
+      isLoadingPopular: isLoadingPopular.value,
+      hasRecommended: recommendedProducts.value?.length || 0,
+      hasPopular: popularProducts.value?.length || 0,
+    })
+  }
+  return loading
+})
 
 // ========================================
 // SEO META TAGS
