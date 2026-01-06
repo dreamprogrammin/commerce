@@ -42,6 +42,14 @@ function getBannerImageUrl(imageUrl: string | null) {
     return null
   return getPublicUrl('banners', imageUrl)
 }
+
+// 🔧 Безопасное получение blur placeholder
+function getBannerBlurUrl(banner: Banner): string | null {
+  const blur = banner.blur_data_url
+
+  // Возвращаем null если пустая строка или null
+  return blur && blur.trim() !== '' ? blur : null
+}
 </script>
 
 <template>
@@ -85,8 +93,8 @@ function getBannerImageUrl(imageUrl: string | null) {
             :alt="banner.title"
             aspect-ratio="video"
             object-fit="cover"
-            placeholder-type="lqip"
-            :blur-data-url="banner.blur_data_url || undefined"
+            :placeholder-type="getBannerBlurUrl(banner) ? 'lqip' : 'shimmer'"
+            :blur-data-url="getBannerBlurUrl(banner)"
             eager
             class="group-hover:scale-105 transition-transform duration-300"
           />
