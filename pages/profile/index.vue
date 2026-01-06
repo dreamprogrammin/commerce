@@ -23,14 +23,8 @@ useHead({
 
 // ✅ Упрощённая логика - доверяемся кешу
 onMounted(() => {
-  console.log('[Profile Page] Mounted', {
-    hasProfile: !!profile.value,
-    isLoading: isLoading.value
-  })
-
   // Загружаем только если профиля вообще нет (новый пользователь)
   if (!profile.value && !isLoading.value) {
-    console.log('[Profile Page] No cached profile, loading from DB...')
     profileStore.loadProfile(false, true).catch(error => {
       console.error('[Profile Page] Load failed:', error)
     })

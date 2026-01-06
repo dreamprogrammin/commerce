@@ -10,50 +10,33 @@ export default defineNuxtPlugin(async () => {
   const profileStore = useProfileStore()
   const user = useSupabaseUser()
 
-  console.log('[Auth Plugin] Initializing auth state listener')
-
   // ✅ Проверяем текущую сессию при инициализации
   const { data: { session } } = await supabase.auth.getSession()
 
   if (session?.user) {
-    console.log('[Auth Plugin] Found existing session:', session.user.id)
-
     // ✅ КРИТИЧНО: Проверяем localStorage напрямую
     const storedData = localStorage.getItem('profile-store')
     const hasStoredProfile = storedData ? JSON.parse(storedData)?.profile : null
 
-    console.log('[Auth Plugin] LocalStorage has profile:', !!hasStoredProfile)
-
     // Если в localStorage есть данные, даём Pinia время их восстановить
     if (hasStoredProfile) {
-      console.log('[Auth Plugin] Waiting for Pinia to restore from localStorage...')
-
       // Ждём до 200мс с проверкой каждые 10мс
       for (let i = 0; i < 20; i++) {
         if (profileStore.profile) {
-          console.log('[Auth Plugin] Profile restored from cache after', i * 10, 'ms')
           break
         }
         await new Promise(resolve => setTimeout(resolve, 10))
       }
     }
 
-    console.log('[Auth Plugin] Profile from cache after wait:', !!profileStore.profile)
-
     // ✅ ИСПРАВЛЕНО: Профиль восстановится из localStorage автоматически
     // Загружаем только если СОВСЕМ нет профиля (новый пользователь)
     if (!profileStore.profile && !profileStore.isLoading) {
-      console.log('[Auth Plugin] No cached profile, loading from DB...')
-
       // Загружаем только для новых пользователей
       profileStore.loadProfile(false, true).catch(error => {
         console.error('[Auth Plugin] Profile load failed:', error)
       })
-    } else {
-      console.log('[Auth Plugin] Using cached profile, no DB fetch needed')
     }
-  } else {
-    console.log('[Auth Plugin] No session found on init')
   }
 
   // ✅ Используем Set для отслеживания обработанных событий
@@ -62,22 +45,14 @@ export default defineNuxtPlugin(async () => {
   // Регистрируем обработчик изменений auth state
   supabase.auth.onAuthStateChange(async (event, session) => {
     const eventKey = `${event}-${session?.user?.id}-${Date.now()}`
-    
-    console.log(`[Auth Plugin] Auth state changed: ${event}`, {
-      userId: session?.user?.id,
-      hasProfile: !!profileStore.profile
-    })
 
     // ✅ Предотвращаем дублирование обработки одного события
     if (processedEvents.has(eventKey)) {
-      console.log(`[Auth Plugin] Event ${eventKey} already processed, skipping`)
       return
     }
     processedEvents.add(eventKey)
 
     if (event === 'SIGNED_IN') {
-      console.log('[Auth Plugin] User signed in')
-
       // ✅ ИСПРАВЛЕНО: Используем кеш если профиль уже есть
       // force=false - возьмёт из localStorage если есть
       const hasProfile = await profileStore.loadProfile(false, true)
@@ -95,24 +70,19 @@ export default defineNuxtPlugin(async () => {
     }
     else if (event === 'INITIAL_SESSION' && session?.user) {
       // ✅ ИСПРАВЛЕНО: Обрабатываем INITIAL_SESSION (важно для OAuth редиректов)
-      console.log('[Auth Plugin] Initial session detected, checking profile...')
-
       // Загружаем профиль только если его нет (в фоне)
       if (!profileStore.profile && !profileStore.isLoading) {
-        console.log('[Auth Plugin] Loading profile for initial session...')
         profileStore.loadProfile(false, true).catch(error => {
           console.error('[Auth Plugin] Profile load failed for initial session:', error)
         })
       }
     }
     else if (event === 'SIGNED_OUT') {
-      console.log('[Auth Plugin] User signed out, clearing profile')
       profileStore.clearProfile()
       // Очищаем историю обработанных событий
       processedEvents.clear()
     }
     else if (event === 'TOKEN_REFRESHED') {
-      console.log('[Auth Plugin] Token refreshed - profile should be in cache, no reload needed')
       // ✅ ИСПРАВЛЕНО: НЕ перезагружаем профиль - он уже в localStorage!
       // Токен обновился, но данные профиля те же самые
     }
@@ -124,6 +94,4 @@ export default defineNuxtPlugin(async () => {
       eventsArray.slice(-10).forEach(e => processedEvents.add(e))
     }
   })
-
-  console.log('[Auth Plugin] Auth state listener initialized')
 })

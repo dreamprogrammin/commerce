@@ -40,18 +40,15 @@ export const useProfileStore = defineStore('profileStore', () => {
 
     // Если уже идет загрузка - возвращаем существующий промис
     if (loadingPromise && !force) {
-      console.log('[ProfileStore] Already loading, waiting...')
       return await loadingPromise
     }
 
     // Если профиль уже есть (из кеша или предыдущей загрузки)
     if (!force && profile.value) {
-      console.log('[ProfileStore] Using cached profile')
       return true
     }
 
     if (!user.value) {
-      console.log('[ProfileStore] No user, clearing profile')
       profile.value = null
       isLoading.value = false
       return false
@@ -60,7 +57,6 @@ export const useProfileStore = defineStore('profileStore', () => {
     // ✅ Создаем промис для текущей загрузки
     loadingPromise = (async () => {
       isLoading.value = true
-      console.log('[ProfileStore] Starting profile load for user:', user.value?.id)
 
       try {
         // Пробуем загрузить профиль
@@ -77,20 +73,17 @@ export const useProfileStore = defineStore('profileStore', () => {
 
         // Если профиль найден - сохраняем и выходим
         if (data) {
-          console.log('[ProfileStore] Profile loaded successfully:', data.id)
           profile.value = data
           return true
         }
 
         // Если профиля нет и мы НЕ ждем создания
         if (!waitForCreation) {
-          console.log('[ProfileStore] No profile found, not waiting')
           profile.value = null
           return false
         }
 
         // ✅ Если ждем создания - делаем несколько попыток с экспоненциальной задержкой
-        console.log('[ProfileStore] Waiting for profile creation...')
         const maxAttempts = 5
         const delays = [100, 300, 500, 1000, 2000] // миллисекунды
 
@@ -109,14 +102,12 @@ export const useProfileStore = defineStore('profileStore', () => {
           }
 
           if (retryData) {
-            console.log('[ProfileStore] Profile found on attempt', attempt + 1)
             profile.value = retryData
             return true
           }
         }
 
         // После всех попыток профиля нет
-        console.log('[ProfileStore] Profile not created after all attempts')
         profile.value = null
         return false
       }
@@ -130,7 +121,6 @@ export const useProfileStore = defineStore('profileStore', () => {
       }
       finally {
         // ✅ КРИТИЧНО: ВСЕГДА снимаем загрузку и очищаем промис
-        console.log('[ProfileStore] Profile load completed, resetting loading state')
         isLoading.value = false
         loadingPromise = null
       }
@@ -181,7 +171,6 @@ export const useProfileStore = defineStore('profileStore', () => {
    * Очищает состояние профиля
    */
   function clearProfile() {
-    console.log('[ProfileStore] Clearing profile')
     profile.value = null
     isLoading.value = false
     loadingPromise = null
