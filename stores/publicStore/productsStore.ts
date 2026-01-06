@@ -1,6 +1,14 @@
 import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, Country, Database, FullProduct, IProductFilters, Material, ProductRow, ProductWithGallery, ProductWithImages, SimpleBrand } from '@/types'
 import { toast } from 'vue-sonner'
 
+// ✅ Helper для добавления таймаута к Supabase запросам
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`${operation} timeout (${timeoutMs}ms)`)), timeoutMs)
+  )
+  return Promise.race([promise, timeoutPromise])
+}
+
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
@@ -240,19 +248,24 @@ export const useProductsStore = defineStore('productsStore', () => {
     pageSize = 12,
   ): Promise<{ products: ProductWithGallery[], hasMore: boolean }> {
     try {
-      const { data: rpcResponse, error } = await supabase.rpc('get_filtered_products', {
-        p_category_slug: filters.categorySlug,
-        p_subcategory_ids: filters.subCategoryIds,
-        p_brand_ids: filters.brandIds,
-        p_price_min: filters.priceMin,
-        p_price_max: filters.priceMax,
-        p_sort_by: filters.sortBy,
-        p_page_size: pageSize,
-        p_page_number: currentPage,
+      // ✅ Критичный запрос с таймаутом 8 секунд
+      const { data: rpcResponse, error } = await withTimeout(
+        supabase.rpc('get_filtered_products', {
+          p_category_slug: filters.categorySlug,
+          p_subcategory_ids: filters.subCategoryIds,
+          p_brand_ids: filters.brandIds,
+          p_price_min: filters.priceMin,
+          p_price_max: filters.priceMax,
+          p_sort_by: filters.sortBy,
+          p_page_size: pageSize,
+          p_page_number: currentPage,
         p_country_ids: filters.countryIds,
         p_material_ids: filters.materialIds,
         p_attributes: filters.attributes,
-      })
+      }),
+      8000,
+      'Products fetch'
+    )
 
       if (error)
         throw error

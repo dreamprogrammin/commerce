@@ -84,12 +84,18 @@ export const useProfileStore = defineStore('profileStore', () => {
       console.log('[ProfileStore] Starting profile load for user:', user.value?.id)
 
       try {
-        // Пробуем загрузить профиль
-        const { data, error } = await supabase
+        // ✅ КРИТИЧНО: Добавляем таймаут для запроса профиля (3 секунды)
+        const profileQuery = supabase
           .from('profiles')
           .select('*')
           .eq('id', user.value!.id)
           .maybeSingle()
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Profile fetch timeout (3s)')), 3000)
+        )
+
+        const { data, error } = await Promise.race([profileQuery, timeoutPromise])
 
         if (error) {
           console.error('[ProfileStore] Profile loading error:', error)
@@ -118,21 +124,33 @@ export const useProfileStore = defineStore('profileStore', () => {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           await new Promise(resolve => setTimeout(resolve, delays[attempt]))
 
-          const { data: retryData, error: retryError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.value!.id)
-            .maybeSingle()
+          // ✅ Добавляем таймаут для каждой retry попытки (2 секунды)
+          try {
+            const retryQuery = supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.value!.id)
+              .maybeSingle()
 
-          if (retryError) {
-            console.error('[ProfileStore] Profile retry error:', retryError)
+            const retryTimeout = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Retry timeout (2s)')), 2000)
+            )
+
+            const { data: retryData, error: retryError } = await Promise.race([retryQuery, retryTimeout])
+
+            if (retryError) {
+              console.error('[ProfileStore] Profile retry error:', retryError)
+              continue
+            }
+
+            if (retryData) {
+              console.log('[ProfileStore] Profile found on attempt', attempt + 1)
+              profile.value = retryData
+              return true
+            }
+          } catch (error: any) {
+            console.error('[ProfileStore] Retry attempt', attempt + 1, 'failed:', error.message)
             continue
-          }
-
-          if (retryData) {
-            console.log('[ProfileStore] Profile found on attempt', attempt + 1)
-            profile.value = retryData
-            return true
           }
         }
 
