@@ -11,8 +11,11 @@ export default defineNuxtPlugin((nuxt) => {
         staleTime: 5 * 60 * 1000, // 5 минут - данные свежие
         gcTime: 10 * 60 * 1000, // 10 минут - время жизни в кэше
         refetchOnWindowFocus: false, // Не перезагружать при фокусе окна
-        refetchOnReconnect: false, // ✅ ИСПРАВЛЕНО: Не перезагружать при возврате из фона
-        retry: 1, // Одна попытка повтора
+        refetchOnReconnect: false, // Не перезагружать при переподключении
+        refetchOnMount: false, // ✅ Не перезагружать при монтировании компонента
+        retry: false, // ✅ ИСПРАВЛЕНО: Отключаем retry - причина зависания
+        retryOnMount: false, // ✅ Не повторять неудачные запросы при монтировании
+        networkMode: 'online', // ✅ Запросы только в онлайн режиме
       },
     },
   })
