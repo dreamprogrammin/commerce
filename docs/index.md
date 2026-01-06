@@ -14,6 +14,7 @@
 
 ## 🛠️ Технические настройки
 - [**VUE_QUERY_SETUP.md**](./VUE_QUERY_SETUP.md) — Настройка и использование Vue Query.
+- [**TANSTACK_QUERY_PERSISTENCE.md**](./TANSTACK_QUERY_PERSISTENCE.md) — TanStack Query persistence в localStorage (кеш между перезагрузками).
 - [**MIGRATION_CODE.md**](./MIGRATION_CODE.md) — Заметки по миграции кода.
 
 ## 🤖 Интеграции

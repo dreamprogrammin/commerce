@@ -45,6 +45,9 @@ const processedSlides = computed(() => {
   }))
 })
 
+// ✅ Показываем skeleton только если идёт загрузка И слайдов нет
+const showSkeleton = computed(() => props.isLoading && processedSlides.value.length === 0)
+
 /**
  * Инициализация карусели при загрузке
  */
@@ -94,8 +97,32 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
       </p>
     </div>
 
-    <!-- 🎬 ОСНОВНАЯ КАРУСЕЛЬ -->
-    <!-- ✅ ИСПРАВЛЕНО: Показываем карусель если есть слайды (приоритет над skeleton) -->
+    <!-- 🎨 СКЕЛЕТОН - показываем если идёт загрузка И слайдов нет -->
+    <div v-else-if="showSkeleton" :class="carouselContainerClass">
+      <div class="py-4">
+        <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
+          <!-- Главный видимый слайд-скелетон -->
+          <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+            <div class="p-1">
+              <Skeleton
+                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
+              />
+            </div>
+          </div>
+
+          <!-- Частично видимый следующий слайд -->
+          <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
+            <div class="p-1">
+              <Skeleton
+                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🎬 ОСНОВНАЯ КАРУСЕЛЬ - показываем когда есть слайды -->
     <ClientOnly v-else-if="processedSlides.length > 0">
       <Carousel
         :class="carouselContainerClass"
@@ -182,34 +209,9 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
       </template>
     </ClientOnly>
 
-    <!-- 🎨 СКЕЛЕТОН (только если загрузка И слайдов нет) -->
-    <div v-else-if="props.isLoading && processedSlides.length === 0" :class="carouselContainerClass">
-      <div class="py-4">
-        <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
-          <!-- Главный видимый слайд-скелетон -->
-          <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
-            <div class="p-1">
-              <Skeleton
-                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
-              />
-            </div>
-          </div>
-
-          <!-- Частично видимый следующий слайд -->
-          <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
-            <div class="p-1">
-              <Skeleton
-                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 📭 ПУСТОЕ СОСТОЯНИЕ (только если НЕ загрузка и слайды пусты) -->
+    <!-- 📭 ПУСТОЕ СОСТОЯНИЕ - показываем только если НЕ загрузка и слайдов нет -->
     <div
-      v-else-if="!props.isLoading && processedSlides.length === 0"
+      v-else-if="!showSkeleton && processedSlides.length === 0"
       :class="`${containerClass} w-full aspect-21/9 bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"
     >
       <p class="text-muted-foreground">

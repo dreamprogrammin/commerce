@@ -1,5 +1,7 @@
 import type { DehydratedState, VueQueryPluginOptions } from '@tanstack/vue-query'
 import { dehydrate, hydrate, QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { persistQueryClient } from '@tanstack/query-persist-client-core'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 
 export default defineNuxtPlugin((nuxt) => {
   const vueQueryState = useState<DehydratedState | null>('vue-query')
@@ -26,6 +28,26 @@ export default defineNuxtPlugin((nuxt) => {
 
   // 🔥 Гидратация на клиенте (для SSR)
   if (import.meta.client) {
+    // ✅ Настройка persistence в localStorage
+    const persister = createSyncStoragePersister({
+      storage: window.localStorage,
+      key: 'tanstack-query-cache',
+      throttleTime: 1000, // Сохранять не чаще раза в секунду
+    })
+
+    persistQueryClient({
+      queryClient,
+      persister,
+      maxAge: 1000 * 60 * 60 * 24, // 24 часа - максимальный возраст кеша в localStorage
+      dehydrateOptions: {
+        // Сохраняем только успешные запросы
+        shouldDehydrateQuery: (query) => {
+          return query.state.status === 'success'
+        },
+      },
+    })
+
+    // Гидратация из SSR state (приоритет над localStorage)
     if (vueQueryState.value) {
       hydrate(queryClient, vueQueryState.value)
     }
