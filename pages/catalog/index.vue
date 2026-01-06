@@ -113,7 +113,6 @@ const { data: catalogData, pending } = useAsyncData(
     lazy: true, // ✅ Неблокирующая загрузка - страница рендерится сразу
     server: true, // ✅ SSR сохраняется для SEO
     dedupe: 'defer', // ✅ Предотвращает дублирующие запросы
-    default: () => ({ categories: [], additional: [] }), // ✅ Начальные данные
     // ✅ Упрощенное кеширование
     getCachedData(key) {
       const data = useNuxtData(key)
@@ -121,6 +120,9 @@ const { data: catalogData, pending } = useAsyncData(
     },
   },
 )
+
+// ✅ Показываем skeleton только если идёт загрузка И данных нет
+const showSkeleton = computed(() => pending.value && !catalogData.value)
 
 // Дополнительные пункты (Акции, Новинки)
 const additionalItems = computed(() => catalogData.value?.additional || [])
@@ -205,8 +207,8 @@ const additionalItemStyles = {
 
     <!-- Основной контент -->
     <div class="px-2 py-4">
-      <!-- 🎨 Улучшенный скелетон - точная имитация реального контента -->
-      <div v-if="pending" class="space-y-2">
+      <!-- 🎨 Улучшенный скелетон - показываем только если идёт загрузка И данных нет -->
+      <div v-if="showSkeleton" class="space-y-2">
         <!-- Блоки Акции и Новинки -->
         <div class="grid grid-cols-2 gap-2">
           <Skeleton class="w-full h-[200px] rounded-3xl" />
