@@ -29,7 +29,7 @@ const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 const desktopContainedClass = carouselContainerVariants({ contained: 'desktop' })
 
 // 🔥 TanStack Query - рекомендации и избранное с автоматическим кешированием
-const { data: mainPersonalData, isLoading: isLoadingRecommendations } = useQuery({
+const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching: isFetchingRecommendations } = useQuery({
   queryKey: ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value],
   queryFn: async () => {
     const [recommended, wishlist] = await Promise.all([
@@ -42,7 +42,6 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations } = useQuery
       wishlist: Array.isArray(wishlist) ? wishlist : [],
     }
   },
-  placeholderData: { recommended: [], wishlist: [] },
   staleTime: 5 * 60 * 1000, // 5 минут
   gcTime: 10 * 60 * 1000, // 10 минут
 })
@@ -50,11 +49,16 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations } = useQuery
 const recommendedProducts = computed(() => mainPersonalData.value?.recommended || [])
 const wishlistProducts = computed(() => mainPersonalData.value?.wishlist || [])
 
+// ✅ Показываем skeleton если идёт загрузка И данных нет
+const showRecommendationsSkeleton = computed(() =>
+  (isLoadingRecommendations.value || isFetchingRecommendations.value) &&
+  (!mainPersonalData.value || (mainPersonalData.value.recommended.length === 0 && mainPersonalData.value.wishlist.length === 0))
+)
+
 // 🔥 TanStack Query - популярные товары с автоматическим кешированием
-const { data: popularProductsData, isLoading: isLoadingPopular } = useQuery({
+const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFetchingPopular } = useQuery({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
-  placeholderData: [],
   staleTime: 5 * 60 * 1000, // 5 минут
   gcTime: 10 * 60 * 1000, // 10 минут
 })
@@ -62,17 +66,24 @@ const { data: popularProductsData, isLoading: isLoadingPopular } = useQuery({
 const popularProducts = computed(() => popularProductsData.value || [])
 
 // 🔥 TanStack Query - новые поступления с автоматическим кешированием
-const { data: newestProductsData, isLoading: isLoadingNewest } = useQuery({
+const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery({
   queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
-  placeholderData: [],
   staleTime: 5 * 60 * 1000, // 5 минут
   gcTime: 10 * 60 * 1000, // 10 минут
 })
 
 const newestProducts = computed(() => newestProductsData.value || [])
 
-const isLoadingMainBlock = computed(() => isLoadingRecommendations.value || isLoadingPopular.value)
+const showPopularSkeleton = computed(() =>
+  (isLoadingPopular.value || isFetchingPopular.value) && !popularProductsData.value
+)
+
+const showNewestSkeleton = computed(() =>
+  (isLoadingNewest.value || isFetchingNewest.value) && !newestProductsData.value
+)
+
+const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value || showPopularSkeleton.value)
 
 // ========================================
 // SEO META TAGS
@@ -313,15 +324,17 @@ useRobotsRule({
 
     <!-- Карусели товаров -->
     <ClientOnly>
+      <!-- ✅ Skeleton только если идёт загрузка И данных нет -->
       <div v-if="isLoadingMainBlock" :class="alwaysContainedClass" class="py-8 md:py-12">
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
       </div>
 
+      <!-- ✅ Контент показывается когда загрузка завершена ИЛИ есть данные -->
       <template v-else>
         <HomeProductsCarousel
           v-if="isLoggedIn && wishlistProducts.length > 0"
-          :is-loading="isLoadingRecommendations"
+          :is-loading="isFetchingRecommendations"
           :products="wishlistProducts"
           title="Ваше избранное"
           see-all-link="/profile/wishlist"
@@ -330,7 +343,7 @@ useRobotsRule({
 
         <HomeProductsCarousel
           v-if="recommendedProducts && recommendedProducts.length > 0"
-          :is-loading="isLoadingRecommendations"
+          :is-loading="isFetchingRecommendations"
           :products="recommendedProducts"
           title="Вам может понравиться"
           see-all-link="/catalog/all?recommended=true"
@@ -339,7 +352,7 @@ useRobotsRule({
 
         <HomeProductsCarousel
           v-else
-          :is-loading="isLoadingPopular"
+          :is-loading="isFetchingPopular"
           :products="popularProducts"
           title="Популярные товары"
           see-all-link="/catalog/all?sort_by=popularity"
@@ -357,19 +370,21 @@ useRobotsRule({
 
     <!-- Новые поступления -->
     <ClientOnly>
+      <!-- ✅ Skeleton только если идёт загрузка И данных нет -->
+      <div v-if="showNewestSkeleton" :class="alwaysContainedClass" class="py-8 md:py-12">
+        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
+        <ProductCarouselSkeleton />
+      </div>
+
+      <!-- ✅ Контент показывается когда есть данные -->
       <HomeProductsCarousel
-        v-if="newestProducts && newestProducts.length > 0"
-        :is-loading="isLoadingNewest"
+        v-else-if="newestProducts && newestProducts.length > 0"
+        :is-loading="isFetchingNewest"
         :products="newestProducts"
         title="Новые поступления"
         see-all-link="/catalog/all?sort_by=newest"
         class="pt-4 border-t"
       />
-
-      <div v-else-if="isLoadingNewest" :class="alwaysContainedClass" class="py-8 md:py-12">
-        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-        <ProductCarouselSkeleton />
-      </div>
 
       <template #fallback>
         <div :class="alwaysContainedClass" class="py-8 md:py-12">

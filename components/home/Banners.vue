@@ -24,7 +24,6 @@ const { data: banners, pending } = useAsyncData(
   },
   {
     lazy: true,
-    default: () => [],
     // 🔥 Кешируем данные - вернуть из кеша если существуют
     getCachedData(key) {
       const data = useNuxtData(key)
@@ -32,6 +31,9 @@ const { data: banners, pending } = useAsyncData(
     },
   },
 )
+
+// ✅ Показываем skeleton только если идёт загрузка И данных нет
+const showSkeleton = computed(() => pending.value && (!banners.value || banners.value.length === 0))
 
 const { getPublicUrl } = useSupabaseStorage()
 
@@ -44,8 +46,8 @@ function getBannerImageUrl(imageUrl: string | null) {
 
 <template>
   <div class="py-8 md:py-12">
-    <!-- Улучшенный скелетон при загрузке -->
-    <div v-if="pending" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Улучшенный скелетон при загрузке - только если идёт загрузка И данных нет -->
+    <div v-if="showSkeleton" class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Skeleton 1 -->
       <div class="relative h-48 md:h-80 lg:h-96 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 via-gray-200 to-gray-100 animate-pulse">
         <div class="absolute bottom-0 left-0 right-0 p-6 space-y-3">
@@ -123,7 +125,7 @@ function getBannerImageUrl(imageUrl: string | null) {
 
     <!-- Пустое состояние (только если НЕ загрузка и баннеры пусты) -->
     <div
-      v-else-if="!pending && (!banners || banners.length === 0)"
+      v-else-if="!showSkeleton && !pending && (!banners || banners.length === 0)"
       class="text-center py-12 text-muted-foreground"
     >
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">

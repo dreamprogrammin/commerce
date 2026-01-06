@@ -9,8 +9,18 @@ const { getImageUrl } = useSupabaseStorage()
 const { data: products, pending: isLoading } = useAsyncData(
   'featured-products',
   () => productStore.fetchFeaturedProducts(),
-  { lazy: true },
+  {
+    lazy: true,
+    // ✅ Используем getCachedData для использования кеша
+    getCachedData(key) {
+      const data = useNuxtData(key)
+      return data.data.value
+    },
+  },
 )
+
+// ✅ Показываем skeleton только если идёт загрузка И данных нет
+const showSkeleton = computed(() => isLoading.value && !products.value)
 
 const currentSlide = ref(0)
 const emblaApi = ref<any>(null)
@@ -66,8 +76,8 @@ function calculateDiscount(price: number, discount: number) {
 
 <template>
   <div class="relative">
-    <!-- Loading State -->
-    <div v-if="isLoading" class="relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 shadow-sm">
+    <!-- Loading State - только если идёт загрузка И данных нет -->
+    <div v-if="showSkeleton" class="relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 shadow-sm">
       <div class="space-y-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">

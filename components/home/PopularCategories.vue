@@ -10,16 +10,18 @@ const popularCategoriesStore = usePopularCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
 // 🔥 TanStack Query - популярные категории с автоматическим кешированием
-const { data: popularCategories, isLoading } = useQuery({
+const { data: popularCategories, isLoading, isFetching } = useQuery({
   queryKey: ['home-popular-categories'],
   queryFn: async () => {
     await popularCategoriesStore.fetchPopularCategories()
     return popularCategoriesStore.popularCategories
   },
-  placeholderData: [],
   staleTime: 5 * 60 * 1000, // 5 минут
   gcTime: 10 * 60 * 1000, // 10 минут
 })
+
+// ✅ Показываем skeleton только если идёт загрузка И данных нет
+const showSkeleton = computed(() => (isLoading.value || isFetching.value) && !popularCategories.value)
 
 function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
@@ -74,8 +76,8 @@ onMounted(() => {
       Популярные категории
     </h2>
 
-    <!-- Loading State -->
-    <div v-if="isLoading">
+    <!-- Loading State - показываем только если идёт загрузка И данных нет -->
+    <div v-if="showSkeleton">
       <!-- Mobile Loading -->
       <div class="md:hidden overflow-x-auto hide-scrollbar">
         <div class="flex gap-3 px-4 pb-2">
@@ -93,6 +95,7 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Content - показываем когда есть данные -->
     <template v-else-if="popularCategories && popularCategories.length > 0">
       <!-- MOBILE: Горизонтальный скролл в 2 ряда -->
       <div
