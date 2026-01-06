@@ -55,10 +55,11 @@ export default defineNuxtPlugin(async () => {
     processedEvents.add(eventKey)
 
     if (event === 'SIGNED_IN') {
-      console.log('[Auth Plugin] User signed in, loading profile...')
+      console.log('[Auth Plugin] User signed in')
 
-      // Ждем создания профиля для новых пользователей
-      const hasProfile = await profileStore.loadProfile(true, true)
+      // ✅ ИСПРАВЛЕНО: Используем кеш если профиль уже есть
+      // force=false - возьмёт из localStorage если есть
+      const hasProfile = await profileStore.loadProfile(false, true)
 
       if (hasProfile) {
         toast.success('С возвращением!', {
