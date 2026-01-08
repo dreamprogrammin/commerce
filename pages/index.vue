@@ -44,7 +44,7 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
   },
   staleTime: 3 * 60 * 1000, // ✅ 3 минуты - персональные данные
   gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: true, // Проверить при монтировании
+  refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
   refetchOnWindowFocus: true, // Проверить при возврате на вкладку
 })
 
@@ -63,7 +63,7 @@ const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFe
   queryFn: () => productsStore.fetchPopularProducts(10),
   staleTime: 3 * 60 * 1000, // ✅ 3 минуты - списки товаров
   gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: true, // Проверить при монтировании
+  refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
   refetchOnWindowFocus: true, // Проверить при возврате на вкладку
 })
 
@@ -75,7 +75,7 @@ const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetc
   queryFn: () => productsStore.fetchNewestProducts(10),
   staleTime: 3 * 60 * 1000, // ✅ 3 минуты - списки товаров
   gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: true, // Проверить при монтировании
+  refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
   refetchOnWindowFocus: true, // Проверить при возврате на вкладку
 })
 

@@ -37,7 +37,7 @@ export function useCatalogQuery(
     return result
   }
 
-  // ✅ Stale-While-Revalidate подход
+  // ✅ Stale-While-Revalidate подход с принудительной проверкой при перезагрузке
   const query = useQuery({
     queryKey,
     queryFn,
@@ -45,7 +45,7 @@ export function useCatalogQuery(
     gcTime: 10 * 60 * 1000, // 10 минут в памяти
     retry: false, // Отключаем retry для быстроты
     refetchOnWindowFocus: true, // Проверить при возврате на вкладку
-    refetchOnMount: true, // Проверить при монтировании (если данные старше staleTime)
+    refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
     refetchOnReconnect: false,
   })
 
