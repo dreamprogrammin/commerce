@@ -41,11 +41,11 @@ export function useCatalogQuery(
   const query = useQuery({
     queryKey,
     queryFn,
-    staleTime: 0, // ❌ Отключаем staleTime - всегда свежие данные
+    staleTime: 30 * 1000, // 🔥 30 секунд - баланс между производительностью и свежестью
     gcTime: 5 * 60 * 1000, // 5 минут в кеше
     retry: false, // ❌ Отключаем retry для быстроты
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnWindowFocus: true, // 🔥 Обновлять при возврате на вкладку
+    refetchOnMount: true, // 🔥 Обновлять при монтировании, если данные устарели
     refetchOnReconnect: false,
   })
 
