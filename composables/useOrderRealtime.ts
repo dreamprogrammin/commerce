@@ -9,10 +9,11 @@ import { useProductCacheInvalidation } from './useProductCacheInvalidation'
 
 export function useOrderRealtime() {
   const supabase = useSupabaseClient()
-  const { invalidateAllProducts } = useProductCacheInvalidation()
+  const { refetchAllProducts } = useProductCacheInvalidation()
 
   let ordersChannel: RealtimeChannel | null = null
   let guestCheckoutsChannel: RealtimeChannel | null = null
+  let lastProcessedOrderId: string | null = null
 
   /**
    * Подписаться на изменения заказов
@@ -36,15 +37,31 @@ export function useOrderRealtime() {
           filter: 'status=eq.confirmed', // Только подтверждённые заказы
         },
         (payload) => {
-          console.log('🔔 Order confirmed (realtime):', payload.new.id)
+          const orderId = payload.new.id
 
-          // Инвалидируем кеш всех товаров
-          invalidateAllProducts()
+          // 🔥 Защита от дублирования: проверяем, не обработали ли уже это событие
+          if (lastProcessedOrderId === orderId) {
+            console.log('⚠️ Duplicate event ignored:', orderId)
+            return
+          }
+
+          lastProcessedOrderId = orderId
+          console.log('🔔 Order confirmed (realtime):', orderId)
+
+          // 🔥 ПРИНУДИТЕЛЬНО перезагружаем данные (не просто инвалидируем!)
+          refetchAllProducts()
 
           // Показываем уведомление (опционально)
           if (import.meta.client) {
             console.log('✅ Product stocks updated (order confirmed)')
           }
+
+          // Сбрасываем защиту от дублирования через 5 секунд
+          setTimeout(() => {
+            if (lastProcessedOrderId === orderId) {
+              lastProcessedOrderId = null
+            }
+          }, 5000)
         }
       )
       .subscribe((status) => {
@@ -78,14 +95,30 @@ export function useOrderRealtime() {
           filter: 'status=eq.confirmed',
         },
         (payload) => {
-          console.log('🔔 Guest checkout confirmed (realtime):', payload.new.id)
+          const checkoutId = payload.new.id
 
-          // Инвалидируем кеш всех товаров
-          invalidateAllProducts()
+          // 🔥 Защита от дублирования
+          if (lastProcessedOrderId === checkoutId) {
+            console.log('⚠️ Duplicate event ignored:', checkoutId)
+            return
+          }
+
+          lastProcessedOrderId = checkoutId
+          console.log('🔔 Guest checkout confirmed (realtime):', checkoutId)
+
+          // 🔥 ПРИНУДИТЕЛЬНО перезагружаем данные
+          refetchAllProducts()
 
           if (import.meta.client) {
             console.log('✅ Product stocks updated (guest checkout confirmed)')
           }
+
+          // Сбрасываем защиту от дублирования через 5 секунд
+          setTimeout(() => {
+            if (lastProcessedOrderId === checkoutId) {
+              lastProcessedOrderId = null
+            }
+          }, 5000)
         }
       )
       .subscribe((status) => {
@@ -116,14 +149,8 @@ export function useOrderRealtime() {
         (payload) => {
           console.log('🔔 Product updated (realtime):', payload.new.id)
 
-          // Инвалидируем кеш конкретного товара
-          if (payload.new.slug) {
-            const { invalidateProduct } = useProductCacheInvalidation()
-            invalidateProduct(payload.new.slug as string)
-          }
-
-          // Также инвалидируем каталог
-          invalidateAllProducts()
+          // 🔥 ПРИНУДИТЕЛЬНО перезагружаем данные
+          refetchAllProducts()
         }
       )
       .subscribe((status) => {

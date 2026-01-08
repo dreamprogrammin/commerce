@@ -79,6 +79,42 @@ export function useProductCacheInvalidation() {
   }
 
   /**
+   * Перезагрузить весь кеш товаров ПРИНУДИТЕЛЬНО
+   * Используется для Realtime обновлений - данные загружаются сразу
+   */
+  function refetchAllProducts() {
+    // Принудительно перезагружаем все запросы с товарами
+    queryClient.refetchQueries({
+      queryKey: ['catalog-products'],
+      exact: false,
+      type: 'active' // Только активные запросы
+    })
+
+    queryClient.refetchQueries({
+      queryKey: ['home-popular'],
+      type: 'active'
+    })
+
+    queryClient.refetchQueries({
+      queryKey: ['home-newest'],
+      type: 'active'
+    })
+
+    queryClient.refetchQueries({
+      queryKey: ['home-recommendations'],
+      type: 'active'
+    })
+
+    queryClient.refetchQueries({
+      queryKey: ['product'],
+      exact: false,
+      type: 'active'
+    })
+
+    console.log('🔄 Refetched ALL active product queries')
+  }
+
+  /**
    * Очистить весь кеш приложения
    * ВНИМАНИЕ: Используйте осторожно!
    */
@@ -93,6 +129,7 @@ export function useProductCacheInvalidation() {
     invalidateHomeProducts,
     invalidateCategoryProducts,
     invalidateAllProducts,
+    refetchAllProducts,
     clearAllCache,
   }
 }
