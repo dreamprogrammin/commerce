@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // 🆕 Управление LoadingBar при навигации
 import 'vue-sonner/style.css'
+import { useOrderRealtime } from '@/composables/useOrderRealtime'
+
 const nuxtApp = useNuxtApp()
 const isPageLoading = ref(false)
 
@@ -18,6 +20,20 @@ nuxtApp.hook('page:finish', () => {
 // Скрываем при ошибках
 nuxtApp.hook('vue:error', () => {
   isPageLoading.value = false
+})
+
+// 🔔 Realtime подписка на изменения заказов
+// Автоматически обновляет остатки товаров при подтверждении заказов
+const { subscribeAll, unsubscribe } = useOrderRealtime()
+
+onMounted(() => {
+  // Подписываемся на все необходимые события
+  subscribeAll()
+})
+
+onUnmounted(() => {
+  // Отписываемся при размонтировании
+  unsubscribe()
 })
 
 const siteUrl = 'https://uhti.kz'
