@@ -42,10 +42,10 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
       wishlist: Array.isArray(wishlist) ? wishlist : [],
     }
   },
-  staleTime: 60 * 1000, // 🔥 1 минута - рекомендации персональные, обновляем чаще
+  staleTime: 3 * 60 * 1000, // ✅ 3 минуты - персональные данные
   gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: true, // 🔥 Обновлять при монтировании
-  refetchOnWindowFocus: true, // 🔥 Обновлять при возврате на вкладку
+  refetchOnMount: true, // Проверить при монтировании
+  refetchOnWindowFocus: true, // Проверить при возврате на вкладку
 })
 
 const recommendedProducts = computed(() => mainPersonalData.value?.recommended || [])
@@ -61,10 +61,10 @@ const showRecommendationsSkeleton = computed(() =>
 const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFetchingPopular } = useQuery({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
-  staleTime: 60 * 1000, // 🔥 1 минута - обновляем чаще для актуальных остатков
+  staleTime: 3 * 60 * 1000, // ✅ 3 минуты - списки товаров
   gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: true, // 🔥 Обновлять при монтировании
-  refetchOnWindowFocus: true, // 🔥 Обновлять при возврате на вкладку
+  refetchOnMount: true, // Проверить при монтировании
+  refetchOnWindowFocus: true, // Проверить при возврате на вкладку
 })
 
 const popularProducts = computed(() => popularProductsData.value || [])
@@ -73,10 +73,10 @@ const popularProducts = computed(() => popularProductsData.value || [])
 const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery({
   queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
-  staleTime: 60 * 1000, // 🔥 1 минута - обновляем чаще для актуальных остатков
+  staleTime: 3 * 60 * 1000, // ✅ 3 минуты - списки товаров
   gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: true, // 🔥 Обновлять при монтировании
-  refetchOnWindowFocus: true, // 🔥 Обновлять при возврате на вкладку
+  refetchOnMount: true, // Проверить при монтировании
+  refetchOnWindowFocus: true, // Проверить при возврате на вкладку
 })
 
 const newestProducts = computed(() => newestProductsData.value || [])
