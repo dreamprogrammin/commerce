@@ -55,7 +55,7 @@ export const useCartStore = defineStore('cartStore', () => {
 
     const productId = typeof productIdOrObject === 'string'
       ? productIdOrObject
-      : productIdOrObject.id
+      : productIdOrObject?.id
 
     if (!productId || typeof productId !== 'string') {
       toast.error('Неверный ID товара')

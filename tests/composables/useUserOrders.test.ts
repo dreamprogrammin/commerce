@@ -1,49 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
 import type { UserOrder } from '@/composables/orders/useUserOrders'
-
-// Mock toast
-const mockToast = vi.fn()
-
-// Mock router
-const mockRouterPush = vi.fn()
-
-// Mock user
-const mockUser = ref({
-  id: 'user-123',
-  email: 'test@example.com',
-})
-
-// Mock query builder для Supabase - будет переопределяться в beforeEach
-let mockQueryBuilder: any
-
-// Mock channel для Supabase Realtime
-const mockChannel = {
-  on: vi.fn().mockReturnThis(),
-  subscribe: vi.fn().mockReturnThis(),
-  unsubscribe: vi.fn(),
-}
-
-// Mock Supabase client
-const mockSupabaseClient = {
-  from: vi.fn(() => mockQueryBuilder),
-  channel: vi.fn(() => mockChannel),
-  rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-}
-
-// Mock Nuxt composables
-vi.mock('#app', () => ({
-  useSupabaseClient: () => mockSupabaseClient,
-  useSupabaseUser: () => mockUser,
-  useRouter: () => ({
-    push: mockRouterPush,
-  }),
-}))
-
-vi.mock('vue-sonner', () => ({
-  toast: mockToast,
-}))
+import { mockSupabaseClient, mockQueryBuilder, mockChannel, mockRouter } from '../setup'
 
 const mockOrder: UserOrder = {
   id: 'order-123',
@@ -78,28 +36,26 @@ describe('useUserOrders', () => {
   beforeEach(async () => {
     setActivePinia(createPinia())
 
-    // Создаем новый query builder перед каждым тестом
-    mockQueryBuilder = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }
+    // ✅ Очищаем и пересоздаем моки с дефолтным поведением
+    mockQueryBuilder.select.mockClear().mockReturnThis()
+    mockQueryBuilder.eq.mockClear().mockReturnThis()
+    mockQueryBuilder.order.mockClear().mockResolvedValue({ data: [], error: null })
+    mockQueryBuilder.single.mockClear().mockResolvedValue({ data: null, error: null })
 
     mockSupabaseClient.from.mockClear()
     mockSupabaseClient.channel.mockClear()
     mockSupabaseClient.rpc.mockClear()
+
     mockChannel.on.mockClear()
     mockChannel.subscribe.mockClear()
     mockChannel.unsubscribe.mockClear()
-    mockToast.mockClear()
-    mockRouterPush.mockClear()
 
-    // Reset user
-    mockUser.value = {
-      id: 'user-123',
-      email: 'test@example.com',
-    }
+    mockRouter.push.mockClear()
+
+    // ✅ Устанавливаем пользователя по умолчанию
+    global.useSupabaseUser = vi.fn(() => ({
+      value: { id: 'user-123', email: 'test@example.com' }
+    }))
   })
 
   describe('fetchOrders', () => {
@@ -140,7 +96,8 @@ describe('useUserOrders', () => {
     })
 
     it('не должен загружать для неавторизованного пользователя', async () => {
-      mockUser.value = null
+      // ✅ Устанавливаем неавторизованного пользователя
+      global.useSupabaseUser = vi.fn(() => ({ value: null }))
 
       const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { fetchOrders, orders } = useUserOrders()
@@ -166,7 +123,8 @@ describe('useUserOrders', () => {
     })
 
     it('не должен создавать подписку для неавторизованного пользователя', async () => {
-      mockUser.value = null
+      // ✅ Устанавливаем неавторизованного пользователя
+      global.useSupabaseUser = vi.fn(() => ({ value: null }))
 
       const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { subscribeToOrderUpdates } = useUserOrders()

@@ -43,17 +43,7 @@ const mockChannel = {
 
 // Mock Supabase client
 const mockSupabaseClient = {
-  from: vi.fn(() => {
-    // Каждый вызов from() возвращает НОВЫЙ query builder
-    const newBuilder = createMockQueryBuilder()
-    // Но копируем моки из глобального для совместимости с существующими тестами
-    Object.keys(mockQueryBuilder).forEach(key => {
-      if (mockQueryBuilder[key].getMockImplementation) {
-        newBuilder[key].mockImplementation(mockQueryBuilder[key].getMockImplementation())
-      }
-    })
-    return newBuilder
-  }),
+  from: vi.fn(() => mockQueryBuilder),
   rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   channel: vi.fn(() => mockChannel),
   auth: {
@@ -70,14 +60,29 @@ const mockRouter = {
   forward: vi.fn(),
 }
 
+// Mock toast globally
+const mockToast = {
+  success: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  warning: vi.fn(),
+  loading: vi.fn(),
+}
+
 // Make Nuxt composables available globally
 global.useSupabaseClient = () => mockSupabaseClient
 global.useSupabaseUser = () => ({ value: null })
 global.useRouter = () => mockRouter
 global.navigateTo = vi.fn()
+global.toast = mockToast
+
+// Mock vue-sonner globally
+vi.mock('vue-sonner', () => ({
+  toast: mockToast,
+}))
 
 // Export mocks for test files
-export { mockSupabaseClient, mockQueryBuilder, mockRouter, mockChannel }
+export { mockSupabaseClient, mockQueryBuilder, mockRouter, mockChannel, mockToast }
 
 // Configure Vue Test Utils
 config.global.stubs = {

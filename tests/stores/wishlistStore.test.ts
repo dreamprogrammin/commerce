@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import type { ProductWithGallery } from '@/types'
+import { mockSupabaseClient, mockQueryBuilder, mockToast } from '../setup'
 
 const mockProduct: ProductWithGallery = {
   id: 'product-1',
@@ -29,19 +30,6 @@ const mockProduct: ProductWithGallery = {
   ],
 }
 
-// ✅ Создаем query builder один раз, чтобы моки работали правильно
-const mockQueryBuilder = {
-  select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
-  delete: vi.fn().mockReturnThis(),
-  insert: vi.fn(),
-  match: vi.fn(),
-}
-
-const mockSupabaseClient = {
-  from: vi.fn(() => mockQueryBuilder),
-}
-
 const mockAuthStore = {
   isLoggedIn: true,
   user: { id: 'user-123', email: 'test@example.com' },
@@ -50,21 +38,6 @@ const mockAuthStore = {
 const mockProductsStore = {
   fetchProductsByIds: vi.fn(),
 }
-
-vi.mock('#app', () => ({
-  useSupabaseClient: () => mockSupabaseClient,
-  defineStore: (name: string, setup: any) => {
-    return setup
-  },
-}))
-
-vi.mock('vue-sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-  },
-}))
 
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => mockAuthStore,
@@ -77,14 +50,20 @@ vi.mock('@/stores/publicStore/productsStore', () => ({
 describe('wishlistStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    // ✅ Очищаем только историю вызовов, но не настройки моков
-    mockQueryBuilder.select.mockClear()
-    mockQueryBuilder.eq.mockClear()
-    mockQueryBuilder.delete.mockClear()
-    mockQueryBuilder.insert.mockClear()
-    mockQueryBuilder.match.mockClear()
+
+    // ✅ Очищаем и пересоздаем моки с дефолтным поведением
+    mockQueryBuilder.select.mockClear().mockReturnThis()
+    mockQueryBuilder.eq.mockClear().mockReturnThis()
+    mockQueryBuilder.delete.mockClear().mockReturnThis()
+    mockQueryBuilder.insert.mockClear().mockResolvedValue({ data: null, error: null })
+    mockQueryBuilder.match.mockClear().mockReturnThis()
     mockSupabaseClient.from.mockClear()
     mockProductsStore.fetchProductsByIds.mockClear()
+    mockToast.success.mockClear()
+    mockToast.error.mockClear()
+    mockToast.info.mockClear()
+
+    // ✅ Сбрасываем authStore
     mockAuthStore.isLoggedIn = true
     mockAuthStore.user = { id: 'user-123', email: 'test@example.com' }
   })
@@ -147,7 +126,7 @@ describe('wishlistStore', () => {
 
       expect(store.isLoading).toBe(false)
       // Toast.error должен быть вызван с правильным сообщением
-      expect(global.toast.error).toHaveBeenCalled()
+      expect(mockToast.error).toHaveBeenCalled()
     })
 
     it('должен загрузить несколько товаров', async () => {
@@ -196,7 +175,7 @@ describe('wishlistStore', () => {
 
       await store.toggleWishlist('product-1', 'Test Product')
 
-      expect(global.toast.success).toHaveBeenCalledWith(
+      expect(mockToast.success).toHaveBeenCalledWith(
         expect.stringContaining('добавлен в избранное'),
       )
       expect(store.wishlistProductIds).toContain('product-1')
@@ -214,7 +193,8 @@ describe('wishlistStore', () => {
       await store.fetchWishlistProducts()
 
       // Удаляем товар
-      mockSupabaseClient.from().match.mockResolvedValueOnce({
+      mockQueryBuilder.delete.mockReturnThis()
+      mockQueryBuilder.match.mockResolvedValueOnce({
         error: null,
       })
 
@@ -225,7 +205,7 @@ describe('wishlistStore', () => {
 
       await store.toggleWishlist('product-1', 'Test Product')
 
-      expect(global.toast.success).toHaveBeenCalledWith(
+      expect(mockToast.success).toHaveBeenCalledWith(
         expect.stringContaining('удален из избранного'),
       )
     })
@@ -237,7 +217,7 @@ describe('wishlistStore', () => {
 
       await store.toggleWishlist('product-1', 'Test Product')
 
-      expect(global.toast.info).toHaveBeenCalledWith(
+      expect(mockToast.info).toHaveBeenCalledWith(
         expect.stringContaining('авторизуйтесь'),
       )
     })
@@ -264,7 +244,7 @@ describe('wishlistStore', () => {
       // Это выведет: "[object Object]Ошибка при обновлении избранного"
       // вместо нормального сообщения
 
-      expect(global.toast.error).toHaveBeenCalled()
+      expect(mockToast.error).toHaveBeenCalled()
 
       // После исправления должно быть:
       // toast.error('Ошибка при обновлении избранного', {

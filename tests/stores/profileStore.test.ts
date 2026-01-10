@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useProfileStore } from '@/stores/core/profileStore'
 import type { ProfileRow } from '@/types'
+import { mockSupabaseClient, mockQueryBuilder, mockToast } from '../setup'
 
 const mockProfile: ProfileRow = {
   id: 'user-123',
@@ -17,47 +18,24 @@ const mockProfile: ProfileRow = {
   updated_at: new Date().toISOString(),
 }
 
-// ✅ Создаем query builder один раз, чтобы моки работали правильно
-const mockQueryBuilder = {
-  select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
-  maybeSingle: vi.fn(),
-  single: vi.fn(),
-  update: vi.fn().mockReturnThis(),
-}
-
-const mockSupabaseClient = {
-  from: vi.fn(() => mockQueryBuilder),
-}
-
-const mockUser = { value: { id: 'user-123', email: 'test@example.com' } }
-
-vi.mock('#app', () => ({
-  useSupabaseClient: () => mockSupabaseClient,
-  useSupabaseUser: () => mockUser,
-  defineStore: (name: string, setup: any) => {
-    return setup
-  },
-}))
-
-vi.mock('vue-sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}))
-
 describe('profileStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    // ✅ Очищаем только историю вызовов, но не настройки моков
-    mockQueryBuilder.select.mockClear()
-    mockQueryBuilder.eq.mockClear()
-    mockQueryBuilder.maybeSingle.mockClear()
-    mockQueryBuilder.single.mockClear()
-    mockQueryBuilder.update.mockClear()
+
+    // ✅ Очищаем и пересоздаем моки с дефолтным поведением
+    mockQueryBuilder.select.mockClear().mockReturnThis()
+    mockQueryBuilder.eq.mockClear().mockReturnThis()
+    mockQueryBuilder.maybeSingle.mockClear().mockResolvedValue({ data: null, error: null })
+    mockQueryBuilder.single.mockClear().mockResolvedValue({ data: null, error: null })
+    mockQueryBuilder.update.mockClear().mockReturnThis()
     mockSupabaseClient.from.mockClear()
-    mockUser.value = { id: 'user-123', email: 'test@example.com' }
+    mockToast.success.mockClear()
+    mockToast.error.mockClear()
+
+    // ✅ Устанавливаем пользователя по умолчанию
+    global.useSupabaseUser = vi.fn(() => ({
+      value: { id: 'user-123', email: 'test@example.com' }
+    }))
   })
 
   describe('loadProfile', () => {
@@ -77,9 +55,10 @@ describe('profileStore', () => {
     })
 
     it('должен вернуть false если пользователь не авторизован', async () => {
-      const store = useProfileStore()
-      mockUser.value = null
+      // ✅ Устанавливаем неавторизованного пользователя
+      global.useSupabaseUser = vi.fn(() => ({ value: null }))
 
+      const store = useProfileStore()
       const result = await store.loadProfile()
 
       expect(result).toBe(false)
@@ -179,14 +158,12 @@ describe('profileStore', () => {
     it('должен ждать создания профиля при waitForCreation=true', async () => {
       const store = useProfileStore()
 
-      // Первый запрос - профиль не найден
-      mockSupabaseClient
-        .from()
-        .maybeSingle.mockResolvedValueOnce({
+      // Первый запрос - профиль не найден, второй retry - профиль найден
+      mockQueryBuilder.maybeSingle
+        .mockResolvedValueOnce({
           data: null,
           error: null,
         })
-        // Второй retry - профиль найден
         .mockResolvedValueOnce({
           data: mockProfile,
           error: null,
@@ -315,7 +292,8 @@ describe('profileStore', () => {
         error: null,
       })
 
-      await store.loadProfile()
+      // Используем force=true чтобы перезагрузить профиль
+      await store.loadProfile(true)
 
       expect(store.fullName).toBe('test@example.com')
     })
@@ -334,7 +312,8 @@ describe('profileStore', () => {
         error: null,
       })
 
-      await store.loadProfile()
+      // Используем force=true чтобы перезагрузить профиль
+      await store.loadProfile(true)
 
       expect(store.isAdmin).toBe(true)
     })
@@ -347,7 +326,8 @@ describe('profileStore', () => {
         error: null,
       })
 
-      await store.loadProfile()
+      // Используем force=true чтобы перезагрузить профиль
+      await store.loadProfile(true)
 
       expect(store.isAdmin).toBe(false)
     })
@@ -379,9 +359,10 @@ describe('profileStore', () => {
     })
 
     it('должен вернуть false если пользователь не авторизован', async () => {
-      const store = useProfileStore()
-      mockUser.value = null
+      // ✅ Устанавливаем неавторизованного пользователя
+      global.useSupabaseUser = vi.fn(() => ({ value: null }))
 
+      const store = useProfileStore()
       const result = await store.updateProfile({ first_name: 'Петр' })
 
       expect(result).toBe(false)

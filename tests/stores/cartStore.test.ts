@@ -2,40 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import type { ProductWithImages } from '@/types'
-
-// ✅ Создаем query builder один раз, чтобы моки работали правильно
-const mockQueryBuilder = {
-  select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
-  order: vi.fn().mockReturnThis(),
-  single: vi.fn().mockResolvedValue({ data: null, error: null }), // Default value
-}
-
-// Mock Supabase client
-const mockSupabaseClient = {
-  from: vi.fn(() => mockQueryBuilder),
-  rpc: vi.fn(),
-}
-
-// Mock Nuxt composables
-vi.mock('#app', () => ({
-  useSupabaseClient: () => mockSupabaseClient,
-  useSupabaseUser: () => ({ value: null }),
-  useRouter: () => ({
-    push: vi.fn(),
-  }),
-  defineStore: (name: string, setup: any) => {
-    return setup
-  },
-}))
-
-vi.mock('vue-sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-  },
-}))
+import { mockSupabaseClient, mockQueryBuilder, mockToast } from '../setup'
 
 const mockProduct: ProductWithImages = {
   id: 'product-1',
@@ -66,6 +33,7 @@ const mockProduct: ProductWithImages = {
 describe('cartStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+
     // ✅ Пересоздаем моки, сохраняя дефолтное поведение
     mockQueryBuilder.select.mockClear().mockReturnThis()
     mockQueryBuilder.eq.mockClear().mockReturnThis()
@@ -73,6 +41,9 @@ describe('cartStore', () => {
     mockQueryBuilder.single.mockClear().mockResolvedValue({ data: null, error: null })
     mockSupabaseClient.from.mockClear()
     mockSupabaseClient.rpc.mockClear().mockResolvedValue({ data: null, error: null })
+    mockToast.success.mockClear()
+    mockToast.error.mockClear()
+    mockToast.info.mockClear()
   })
 
   describe('addItem', () => {
@@ -250,6 +221,11 @@ describe('cartStore', () => {
     })
 
     it('должен правильно вычислить bonusesToAward', async () => {
+      // ✅ Устанавливаем авторизованного пользователя
+      global.useSupabaseUser = vi.fn(() => ({
+        value: { id: 'user-123', email: 'test@example.com' }
+      }))
+
       const store = useCartStore()
 
       mockQueryBuilder.single.mockResolvedValueOnce({
@@ -265,6 +241,11 @@ describe('cartStore', () => {
 
   describe('clearCart', () => {
     it('должен очистить корзину и бонусы', async () => {
+      // ✅ Устанавливаем авторизованного пользователя
+      global.useSupabaseUser = vi.fn(() => ({
+        value: { id: 'user-123', email: 'test@example.com' }
+      }))
+
       const store = useCartStore()
 
       mockQueryBuilder.single.mockResolvedValueOnce({
