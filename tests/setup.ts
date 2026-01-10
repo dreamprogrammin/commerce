@@ -16,11 +16,11 @@ global.onUnmounted = onUnmounted
 const mockQueryBuilder = {
   select: vi.fn().mockReturnThis(),
   eq: vi.fn().mockReturnThis(),
-  maybeSingle: vi.fn(),
-  single: vi.fn(),
+  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+  single: vi.fn().mockResolvedValue({ data: null, error: null }),
   update: vi.fn().mockReturnThis(),
   delete: vi.fn().mockReturnThis(),
-  insert: vi.fn(),
+  insert: vi.fn().mockResolvedValue({ data: null, error: null }),
   match: vi.fn().mockReturnThis(),
   order: vi.fn().mockReturnThis(),
 }
