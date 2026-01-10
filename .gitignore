@@ -25,3 +25,7 @@ logs
 !.env.dev
 *storybook.log
 storybook-static
+
+# Google Service Account (secret key)
+service-account.json
+*.json.key
