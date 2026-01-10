@@ -212,7 +212,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
   >
     <NuxtLink
       v-if="!isLoading && displayOrder && shouldShowCard && orderColorScheme"
-      :to="`/profile/order/${displayOrder.id}`"
+      :to="`/order/${displayOrder.id}`"
       class="block mb-4"
     >
       <Card
