@@ -193,6 +193,51 @@ export const useUserOrders = () => {
     return orders.value[0] || null
   })
 
+  // Отмена заказа пользователем
+  const cancelOrder = async (orderId: string) => {
+    if (!user.value) {
+      toast.error('Необходима авторизация')
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    try {
+      // Вызываем RPC функцию отмены заказа
+      const { data, error: cancelError } = await supabase.rpc('cancel_order', {
+        p_order_id: orderId,
+        p_table_name: 'orders', // Пользовательский заказ
+      })
+
+      if (cancelError) {
+        console.error('Ошибка отмены заказа:', cancelError)
+        toast.error('Не удалось отменить заказ', {
+          description: cancelError.message,
+        })
+        return { success: false, error: cancelError.message }
+      }
+
+      // Обновляем локальный список заказов
+      await fetchOrders()
+
+      toast.success('Заказ успешно отменён', {
+        description: 'Бонусы возвращены на ваш счёт',
+      })
+
+      return { success: true, data }
+    }
+    catch (err: any) {
+      console.error('Критическая ошибка при отмене:', err)
+      toast.error('Произошла ошибка', {
+        description: err.message || 'Попробуйте позже',
+      })
+      return { success: false, error: err.message }
+    }
+  }
+
+  // Проверить можно ли отменить заказ
+  const canCancelOrder = (status: string) => {
+    return status === 'new' || status === 'confirmed'
+  }
+
   return {
     orders,
     isLoading,
@@ -203,5 +248,7 @@ export const useUserOrders = () => {
     subscribeToOrderUpdates,
     getStatusColor,
     getStatusLabel,
+    cancelOrder,
+    canCancelOrder,
   }
 }

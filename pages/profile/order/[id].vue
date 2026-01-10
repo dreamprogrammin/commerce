@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Package, Calendar, CreditCard, MapPin, Gift } from 'lucide-vue-next'
+import { Package, Calendar, CreditCard, MapPin, Gift, XCircle } from 'lucide-vue-next'
 import type { UserOrder } from '@/composables/orders/useUserOrders'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -12,7 +12,11 @@ const { getPublicUrl } = useSupabaseStorage()
 
 const orderId = route.params.id as string
 
-const { getStatusColor, getStatusLabel, subscribeToOrderUpdates } = useUserOrders()
+const { getStatusColor, getStatusLabel, subscribeToOrderUpdates, cancelOrder, canCancelOrder } = useUserOrders()
+
+// Состояние для отмены
+const isCancelling = ref(false)
+const showCancelDialog = ref(false)
 
 // Загрузка заказа
 const order = ref<UserOrder | null>(null)
@@ -130,6 +134,22 @@ const paymentMethodLabel = computed(() => {
       return method
   }
 })
+
+// Обработчик отмены заказа
+const handleCancelOrder = async () => {
+  if (!order.value) return
+
+  isCancelling.value = true
+  const result = await cancelOrder(order.value.id)
+
+  if (result.success) {
+    // Обновляем локальный order
+    await fetchOrder()
+    showCancelDialog.value = false
+  }
+
+  isCancelling.value = false
+}
 
 // Мета
 definePageMeta({
@@ -298,13 +318,50 @@ useHead({
         </CardContent>
       </Card>
 
-      <!-- Кнопка назад -->
-      <div class="pt-4">
+      <!-- Кнопки управления -->
+      <div class="pt-4 flex flex-wrap gap-3">
         <Button variant="outline" @click="router.push('/profile/order')">
           <Icon name="lucide:arrow-left" class="w-4 h-4 mr-2" />
           Вернуться к списку заказов
         </Button>
+
+        <!-- Кнопка отмены (только для new и confirmed) -->
+        <Button
+          v-if="canCancelOrder(order.status)"
+          variant="destructive"
+          @click="showCancelDialog = true"
+        >
+          <XCircle class="w-4 h-4 mr-2" />
+          Отменить заказ
+        </Button>
       </div>
     </div>
+
+    <!-- Диалог подтверждения отмены -->
+    <AlertDialog v-model:open="showCancelDialog">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Отменить заказ?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Вы уверены, что хотите отменить заказ №{{ orderId.slice(-6) }}?
+            <br><br>
+            Потраченные бонусы будут возвращены на ваш счёт.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isCancelling">
+            Нет, оставить
+          </AlertDialogCancel>
+          <AlertDialogAction
+            @click="handleCancelOrder"
+            :disabled="isCancelling"
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            <span v-if="isCancelling">Отменяем...</span>
+            <span v-else>Да, отменить</span>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
