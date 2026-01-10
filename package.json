@@ -41,6 +41,7 @@
     "debounce": "^2.2.0",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-vue": "^8.6.0",
+    "googleapis": "^170.0.0",
     "gsap": "^3.13.0",
     "install": "^0.13.0",
     "lightningcss": "^1.30.2",
