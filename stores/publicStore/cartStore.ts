@@ -193,6 +193,11 @@ export const useCartStore = defineStore('cartStore', () => {
           throw error
         orderId = data
 
+        // Сохраняем email гостя для автозаполнения на странице заказа
+        if (typeof window !== 'undefined' && orderData.guestInfo.email) {
+          sessionStorage.setItem('guest_order_email', orderData.guestInfo.email)
+        }
+
         toast.success('Заказ успешно оформлен!', {
           description: 'Спасибо за покупку! Мы свяжемся с вами в ближайшее время.',
           duration: 5000,
@@ -230,7 +235,16 @@ export const useCartStore = defineStore('cartStore', () => {
       }
 
       clearCart()
-      await router.push(`/order/success/${orderId}`)
+
+      // Редирект в зависимости от типа пользователя
+      if (!user.value) {
+        // Гости - на публичную страницу заказа (с авто-верификацией)
+        await router.push(`/order/${orderId}`)
+      }
+      else {
+        // Авторизованные - на страницу успеха или на /order/{id}
+        await router.push(`/order/${orderId}`)
+      }
     }
     catch (error: any) {
       console.error('Checkout error:', error)

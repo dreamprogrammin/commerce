@@ -257,6 +257,19 @@ const getStatusLabel = (status: string) => {
 
 // Инициализация
 onMounted(() => {
+  // Проверяем sessionStorage для гостей
+  if (typeof window !== 'undefined') {
+    const savedEmail = sessionStorage.getItem('guest_order_email')
+    if (savedEmail) {
+      verificationEmail.value = savedEmail
+      // Автоматически верифицируем если есть email
+      fetchOrder(true)
+      // Очищаем после использования
+      sessionStorage.removeItem('guest_order_email')
+      return
+    }
+  }
+
   fetchOrder()
 })
 
