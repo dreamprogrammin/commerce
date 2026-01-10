@@ -196,6 +196,14 @@ export const useCartStore = defineStore('cartStore', () => {
         // Сохраняем email гостя для автозаполнения на странице заказа
         if (typeof window !== 'undefined' && orderData.guestInfo.email) {
           sessionStorage.setItem('guest_order_email', orderData.guestInfo.email)
+
+          // Сохраняем информацию о гостевом заказе в localStorage для ActiveOrderStatus
+          const guestOrderData = {
+            orderId: data,
+            email: orderData.guestInfo.email,
+            timestamp: Date.now(),
+          }
+          localStorage.setItem('tracked_guest_order', JSON.stringify(guestOrderData))
         }
 
         toast.success('Заказ успешно оформлен!', {

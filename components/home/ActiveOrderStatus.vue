@@ -1,26 +1,52 @@
 <script setup lang="ts">
 import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { useGuestOrder } from '@/composables/orders/useGuestOrder'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
+const user = useSupabaseUser()
+
+// Для авторизованных пользователей
 const {
   activeOrder,
-  isLoading,
+  isLoading: isLoadingUser,
   getStatusColor,
   getStatusLabel,
   fetchOrders,
   subscribeToOrderUpdates,
 } = useUserOrders()
 
+// Для гостей
+const {
+  order: guestOrder,
+  isLoading: isLoadingGuest,
+  getStatusColor: getGuestStatusColor,
+  getStatusLabel: getGuestStatusLabel,
+  loadTrackedOrder,
+  subscribeToOrderUpdates: subscribeToGuestOrderUpdates,
+} = useGuestOrder()
+
 const { getImageUrl } = useSupabaseStorage()
+
+// Общий флаг загрузки
+const isLoading = computed(() => isLoadingUser.value || isLoadingGuest.value)
 
 // Подписка на обновления заказов
 let channel: any = null
 
 onMounted(async () => {
-  await fetchOrders()
-  channel = subscribeToOrderUpdates()
+  if (user.value) {
+    // Авторизованный пользователь
+    await fetchOrders()
+    channel = subscribeToOrderUpdates()
+  } else {
+    // Гость - загружаем из localStorage
+    await loadTrackedOrder()
+    if (guestOrder.value) {
+      channel = subscribeToGuestOrderUpdates(guestOrder.value.id)
+    }
+  }
 })
 
 onUnmounted(() => {
@@ -147,12 +173,16 @@ const displayOrder = ref<typeof activeOrder.value>(null)
 // Флаг блокировки обновления displayOrder (когда показываем финальный статус)
 const isShowingFinalStatus = ref(false)
 
-// Обновляем displayOrder когда меняется activeOrder
-watch(activeOrder, (newOrder, oldOrder) => {
+// Обновляем displayOrder когда меняется activeOrder или guestOrder
+watch([activeOrder, guestOrder], ([newUserOrder, newGuestOrder], [oldUserOrder, oldGuestOrder]) => {
   // Если показываем финальный статус - не обновляем displayOrder
   if (isShowingFinalStatus.value) {
     return
   }
+
+  // Приоритет у заказа авторизованного пользователя
+  const newOrder = user.value ? newUserOrder : newGuestOrder
+  const oldOrder = user.value ? oldUserOrder : oldGuestOrder
 
   if (newOrder) {
     displayOrder.value = newOrder
@@ -165,7 +195,7 @@ watch(activeOrder, (newOrder, oldOrder) => {
 }, { immediate: true })
 
 // Когда заказ подтвержден, запускаем таймер на скрытие (10 секунд)
-watch(() => activeOrder.value?.status, (newStatus, oldStatus) => {
+watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
   if (newStatus === 'confirmed' && oldStatus === 'pending') {
     // Заказ только что подтвердили - запускаем таймер на 10 секунд
     setTimeout(() => {
@@ -189,8 +219,9 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
       isShowingFinalStatus.value = false
 
       // Переключаемся на следующий активный заказ если есть
-      if (activeOrder.value) {
-        displayOrder.value = activeOrder.value
+      const currentOrder = user.value ? activeOrder.value : guestOrder.value
+      if (currentOrder) {
+        displayOrder.value = currentOrder
         shouldShowCard.value = true
       } else {
         displayOrder.value = null
