@@ -12,27 +12,54 @@ global.watch = watch
 global.onMounted = onMounted
 global.onUnmounted = onUnmounted
 
-// ✅ Создаем query builder один раз, чтобы моки работали правильно
-const mockQueryBuilder = {
-  select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
-  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-  single: vi.fn().mockResolvedValue({ data: null, error: null }),
-  update: vi.fn().mockReturnThis(),
-  delete: vi.fn().mockReturnThis(),
-  insert: vi.fn().mockResolvedValue({ data: null, error: null }),
-  match: vi.fn().mockReturnThis(),
-  order: vi.fn().mockReturnThis(),
+// ✅ Создаем фабрику query builder для правильной работы моков
+function createMockQueryBuilder() {
+  const builder = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+    match: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    range: vi.fn().mockReturnThis(),
+  }
+  return builder
+}
+
+// Глобальный query builder для доступа в тестах
+const mockQueryBuilder = createMockQueryBuilder()
+
+// Mock для Supabase Realtime channel
+const mockChannel = {
+  on: vi.fn().mockReturnThis(),
+  subscribe: vi.fn().mockReturnThis(),
+  unsubscribe: vi.fn(),
 }
 
 // Mock Supabase client
 const mockSupabaseClient = {
-  from: vi.fn(() => mockQueryBuilder),
-  rpc: vi.fn(),
+  from: vi.fn(() => {
+    // Каждый вызов from() возвращает НОВЫЙ query builder
+    const newBuilder = createMockQueryBuilder()
+    // Но копируем моки из глобального для совместимости с существующими тестами
+    Object.keys(mockQueryBuilder).forEach(key => {
+      if (mockQueryBuilder[key].getMockImplementation) {
+        newBuilder[key].mockImplementation(mockQueryBuilder[key].getMockImplementation())
+      }
+    })
+    return newBuilder
+  }),
+  rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+  channel: vi.fn(() => mockChannel),
   auth: {
-    getSession: vi.fn(),
-    onAuthStateChange: vi.fn(),
-    signOut: vi.fn(),
+    getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+    onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    signOut: vi.fn().mockResolvedValue({ error: null }),
   },
 }
 
@@ -50,7 +77,7 @@ global.useRouter = () => mockRouter
 global.navigateTo = vi.fn()
 
 // Export mocks for test files
-export { mockSupabaseClient, mockQueryBuilder, mockRouter }
+export { mockSupabaseClient, mockQueryBuilder, mockRouter, mockChannel }
 
 // Configure Vue Test Utils
 config.global.stubs = {

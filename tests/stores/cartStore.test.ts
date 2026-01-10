@@ -66,13 +66,13 @@ const mockProduct: ProductWithImages = {
 describe('cartStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    // ✅ Очищаем только историю вызовов, но не настройки моков
-    mockQueryBuilder.select.mockClear()
-    mockQueryBuilder.eq.mockClear()
-    mockQueryBuilder.order.mockClear()
-    // НЕ очищаем single - у него есть дефолтное значение
+    // ✅ Пересоздаем моки, сохраняя дефолтное поведение
+    mockQueryBuilder.select.mockClear().mockReturnThis()
+    mockQueryBuilder.eq.mockClear().mockReturnThis()
+    mockQueryBuilder.order.mockClear().mockReturnThis()
+    mockQueryBuilder.single.mockClear().mockResolvedValue({ data: null, error: null })
     mockSupabaseClient.from.mockClear()
-    mockSupabaseClient.rpc.mockClear()
+    mockSupabaseClient.rpc.mockClear().mockResolvedValue({ data: null, error: null })
   })
 
   describe('addItem', () => {

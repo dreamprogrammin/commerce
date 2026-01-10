@@ -15,13 +15,8 @@ const mockUser = ref({
   email: 'test@example.com',
 })
 
-// Mock query builder для Supabase
-const mockQueryBuilder = {
-  select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
-  order: vi.fn().mockReturnThis(),
-  single: vi.fn().mockResolvedValue({ data: null, error: null }),
-}
+// Mock query builder для Supabase - будет переопределяться в beforeEach
+let mockQueryBuilder: any
 
 // Mock channel для Supabase Realtime
 const mockChannel = {
@@ -34,6 +29,7 @@ const mockChannel = {
 const mockSupabaseClient = {
   from: vi.fn(() => mockQueryBuilder),
   channel: vi.fn(() => mockChannel),
+  rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
 }
 
 // Mock Nuxt composables
@@ -79,14 +75,20 @@ const mockOrder: UserOrder = {
 }
 
 describe('useUserOrders', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia())
-    mockQueryBuilder.select.mockClear()
-    mockQueryBuilder.eq.mockClear()
-    mockQueryBuilder.order.mockClear()
-    mockQueryBuilder.single.mockClear()
+
+    // Создаем новый query builder перед каждым тестом
+    mockQueryBuilder = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    }
+
     mockSupabaseClient.from.mockClear()
     mockSupabaseClient.channel.mockClear()
+    mockSupabaseClient.rpc.mockClear()
     mockChannel.on.mockClear()
     mockChannel.subscribe.mockClear()
     mockChannel.unsubscribe.mockClear()
@@ -102,7 +104,7 @@ describe('useUserOrders', () => {
 
   describe('fetchOrders', () => {
     it('должен загрузить заказы пользователя', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { fetchOrders, orders, isLoading } = useUserOrders()
 
       mockQueryBuilder.select.mockReturnThis()
@@ -123,7 +125,7 @@ describe('useUserOrders', () => {
     })
 
     it('должен обработать ошибку при загрузке', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { fetchOrders, error, isLoading } = useUserOrders()
 
       mockQueryBuilder.order.mockResolvedValueOnce({
@@ -140,7 +142,7 @@ describe('useUserOrders', () => {
     it('не должен загружать для неавторизованного пользователя', async () => {
       mockUser.value = null
 
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { fetchOrders, orders } = useUserOrders()
 
       await fetchOrders()
@@ -152,7 +154,7 @@ describe('useUserOrders', () => {
 
   describe('subscribeToOrderUpdates', () => {
     it('должен создать подписку на обновления', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { subscribeToOrderUpdates } = useUserOrders()
 
       const channel = subscribeToOrderUpdates()
@@ -166,7 +168,7 @@ describe('useUserOrders', () => {
     it('не должен создавать подписку для неавторизованного пользователя', async () => {
       mockUser.value = null
 
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { subscribeToOrderUpdates } = useUserOrders()
 
       const channel = subscribeToOrderUpdates()
@@ -178,7 +180,8 @@ describe('useUserOrders', () => {
 
   describe('getStatusLabel', () => {
     it('должен вернуть правильные метки статусов', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { getStatusLabel } = useUserOrders()
 
       expect(getStatusLabel('pending')).toBe('Ожидает обработки')
@@ -191,7 +194,8 @@ describe('useUserOrders', () => {
     })
 
     it('должен вернуть исходный статус для неизвестного', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { getStatusLabel } = useUserOrders()
 
       expect(getStatusLabel('unknown')).toBe('unknown')
@@ -200,7 +204,8 @@ describe('useUserOrders', () => {
 
   describe('getStatusColor', () => {
     it('должен вернуть правильные цвета статусов', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { getStatusColor } = useUserOrders()
 
       expect(getStatusColor('pending')).toBe('bg-gray-100 text-gray-800')
@@ -213,7 +218,8 @@ describe('useUserOrders', () => {
     })
 
     it('должен вернуть цвет по умолчанию для неизвестного статуса', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { getStatusColor } = useUserOrders()
 
       expect(getStatusColor('unknown')).toBe('bg-gray-100 text-gray-800')
@@ -222,7 +228,8 @@ describe('useUserOrders', () => {
 
   describe('activeOrder', () => {
     it('должен вернуть активный заказ (не завершённый)', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { orders, activeOrder } = useUserOrders()
 
       orders.value = [
@@ -236,7 +243,8 @@ describe('useUserOrders', () => {
     })
 
     it('должен вернуть undefined если нет активных заказов', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { orders, activeOrder } = useUserOrders()
 
       orders.value = [
@@ -250,7 +258,8 @@ describe('useUserOrders', () => {
 
   describe('latestOrder', () => {
     it('должен вернуть последний заказ', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { orders, latestOrder } = useUserOrders()
 
       orders.value = [
@@ -262,7 +271,8 @@ describe('useUserOrders', () => {
     })
 
     it('должен вернуть null если нет заказов', async () => {
-      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      
+      const { useUserOrders } = await import("@/composables/orders/useUserOrders")
       const { latestOrder } = useUserOrders()
 
       expect(latestOrder.value).toBeNull()
