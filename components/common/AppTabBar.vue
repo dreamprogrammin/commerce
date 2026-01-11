@@ -11,25 +11,10 @@ import {
 } from '@/components/ui/navigation-menu'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { HeaderOverlayKey } from '@/types/app'
-
-const searchSuggestions = [
-  {
-    title: 'Популярные запросы',
-    items: ['футболки', 'джинсы', 'кроссовки', 'куртки'],
-  },
-  {
-    title: 'Недавние поиски',
-    items: ['платья', 'шорты', 'рюкзаки'],
-  },
-  {
-    title: 'Рекомендуемые категории',
-    items: ['Спортивная одежда', 'Школьная форма', 'Праздничные наряды'],
-  },
-]
 
 const headerOverlay = inject(HeaderOverlayKey)
 
@@ -37,6 +22,82 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 
 const activeMenuValue = ref<string | undefined>()
 const isSearchOpen = ref(false)
+
+// Поиск товаров
+const {
+  searchQuery,
+  searchResults,
+  isSearching,
+  suggestions,
+  hasResults,
+  hasQuery,
+  brandSuggestions,
+  debouncedSearch,
+  performSearch,
+  selectSuggestion,
+  removeHistoryItem,
+  clearSearchHistory,
+} = useProductSearch()
+
+const { getImageUrl: getSupabaseImageUrl } = useSupabaseStorage()
+
+// Живой поиск при вводе
+watch(searchQuery, (newQuery) => {
+  if (newQuery.trim().length >= 4) {
+    debouncedSearch(newQuery)
+  }
+  else {
+    searchResults.value = []
+  }
+})
+
+// Очистка при закрытии
+watch(isSearchOpen, (isOpen) => {
+  if (isOpen !== undefined && activeMenuValue.value) {
+    activeMenuValue.value = undefined
+  }
+  if (!isOpen) {
+    searchQuery.value = ''
+    searchResults.value = []
+  }
+})
+
+function handleSearch() {
+  performSearch()
+  isSearchOpen.value = false
+}
+
+function handleSelectSuggestion(suggestion: string) {
+  selectSuggestion(suggestion)
+  isSearchOpen.value = false
+}
+
+function handleRemoveHistory(text: string, event: Event) {
+  event.stopPropagation()
+  removeHistoryItem(text)
+}
+
+function getProductImageUrl(imageUrl: string | null): string | null {
+  if (!imageUrl)
+    return null
+  return getSupabaseImageUrl(BUCKET_NAME_PRODUCT, imageUrl, {
+    width: IMAGE_SIZES.THUMBNAIL.width,
+    height: IMAGE_SIZES.THUMBNAIL.height,
+    quality: 80,
+    format: 'webp',
+    resize: 'cover',
+  })
+}
+
+function formatPrice(price: number, discount?: number): { original: string, final: string, hasDiscount: boolean } {
+  const original = price.toLocaleString('ru-RU')
+  const hasDiscount = !!discount && discount > 0
+  const final = hasDiscount
+    ? (price * (1 - discount / 100)).toLocaleString('ru-RU')
+    : original
+
+  return { original, final, hasDiscount }
+}
 
 // 🆕 Отслеживание загруженных изображений для каждой категории
 const loadedImages = ref<Set<string>>(new Set())
@@ -77,12 +138,6 @@ watch(activeMenuValue, (newValue) => {
     }
     // Отмечаем, что изображения для этой категории нужно загрузить
     loadedImages.value.add(newValue)
-  }
-})
-
-watch(isSearchOpen, (isOpen) => {
-  if (isOpen !== undefined && activeMenuValue.value) {
-    activeMenuValue.value = undefined
   }
 })
 
@@ -148,7 +203,7 @@ defineExpose({ closeAllPopups })
 
 <template>
   <div class="flex w-full items-center gap-3">
-    <!-- Поиск с инпутом -->
+    <!-- Поиск с Popover -->
     <Popover v-model:open="isSearchOpen">
       <PopoverTrigger as-child>
         <button
@@ -164,33 +219,216 @@ defineExpose({ closeAllPopups })
           </div>
         </button>
       </PopoverTrigger>
-      <PopoverContent class="p-0 min-w-screen rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden bg-white dark:bg-gray-900">
+      <PopoverContent
+        class="p-0 min-w-screen rounded-2xl border border-gray-200 shadow-2xl overflow-hidden bg-white"
+        align="start"
+      >
         <div :class="`w-full ${containerClass}`">
-          <div class="relative mb-6 p-6 sm:p-8 pb-0">
+          <!-- Поле поиска -->
+          <div class="relative p-6 pb-4 border-b border-gray-100">
             <Input
-              id="search-input"
+              v-model="searchQuery"
               type="text"
-              placeholder="Поиск товаров..."
-              class="pl-12 h-14 text-base rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 placeholder:text-gray-400"
+              placeholder="Поиск игрушек..."
+              class="pl-12 h-12 text-base rounded-xl border-2 border-gray-200 bg-white focus:border-blue-500 transition-all duration-200 placeholder:text-gray-400"
               autofocus
+              @keydown.enter="handleSearch"
+              @keydown.esc="isSearchOpen = false"
             />
-            <span class="absolute start-6 sm:start-8 top-6 sm:top-8 inset-y-0 flex items-center justify-center px-2">
+            <span class="absolute start-6 top-6 inset-y-0 flex items-center justify-center px-2">
               <Search class="size-5 text-gray-400" />
             </span>
+
+            <!-- Кнопка очистки -->
+            <button
+              v-if="hasQuery"
+              type="button"
+              class="absolute right-6 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100"
+              @click="searchQuery = ''"
+            >
+              <Icon name="lucide:x" class="w-4 h-4" />
+            </button>
           </div>
 
-          <div class="space-y-6 px-6 sm:px-8 pb-6 sm:pb-8">
-            <div v-for="section in searchSuggestions" :key="section.title">
-              <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">
-                {{ section.title }}
-              </h4>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="item in section.items"
-                  :key="item"
-                  class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 cursor-pointer bg-gray-100 dark:bg-gray-800 hover:bg-blue-500 text-gray-700 dark:text-gray-300 hover:text-white"
+          <!-- Индикатор загрузки -->
+          <div v-if="isSearching" class="p-8 flex justify-center">
+            <div class="flex items-center gap-3 text-blue-500">
+              <Icon name="lucide:loader-2" class="w-5 h-5 animate-spin" />
+              <span class="text-sm font-medium">Поиск...</span>
+            </div>
+          </div>
+
+          <!-- Результаты поиска -->
+          <div v-else-if="hasResults || brandSuggestions.length > 0" class="max-h-[60vh] overflow-y-auto p-4 space-y-4">
+            <!-- Бренды -->
+            <div v-if="brandSuggestions.length > 0" class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
+                Бренды
+              </h3>
+              <div class="grid grid-cols-2 gap-2">
+                <NuxtLink
+                  v-for="brand in brandSuggestions"
+                  :key="brand.id"
+                  :to="`/brand/all?brand=${brand.slug}`"
+                  class="flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg hover:shadow-md transition-all border border-blue-100"
+                  @click="isSearchOpen = false"
                 >
-                  {{ item }}
+                  <Icon name="lucide:tag" class="w-4 h-4 text-blue-600 shrink-0" />
+                  <span class="text-sm font-medium text-gray-900 truncate">
+                    {{ brand.name }}
+                  </span>
+                </NuxtLink>
+              </div>
+            </div>
+
+            <!-- Товары -->
+            <div v-if="hasResults" class="space-y-2">
+              <div class="flex items-center justify-between px-2">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Товары · {{ searchResults.length }}
+                </h3>
+                <button
+                  type="button"
+                  class="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  @click="handleSearch"
+                >
+                  Показать все
+                </button>
+              </div>
+
+              <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <NuxtLink
+                  v-for="product in searchResults.slice(0, 6)"
+                  :key="product.id"
+                  :to="`/catalog/products/${product.slug}`"
+                  class="group flex flex-col gap-2 p-3 bg-white rounded-xl hover:shadow-lg transition-all duration-200 border border-gray-100 hover:border-blue-200"
+                  @click="isSearchOpen = false"
+                >
+                  <!-- Изображение товара -->
+                  <div class="aspect-square rounded-lg overflow-hidden bg-gray-50">
+                    <ProgressiveImage
+                      v-if="product.product_images[0]?.image_url"
+                      :src="getProductImageUrl(product.product_images[0].image_url)"
+                      :alt="product.name"
+                      aspect-ratio="square"
+                      object-fit="cover"
+                      placeholder-type="lqip"
+                      :blur-data-url="product.product_images[0].blur_placeholder"
+                      :bucket-name="BUCKET_NAME_PRODUCT"
+                      :file-path="product.product_images[0].image_url"
+                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      eager
+                    />
+                    <div v-else class="w-full h-full flex items-center justify-center">
+                      <Icon name="lucide:package" class="w-8 h-8 text-gray-300" />
+                    </div>
+                  </div>
+
+                  <!-- Информация о товаре -->
+                  <div class="flex-1 flex flex-col gap-1">
+                    <h4 class="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">
+                      {{ product.name }}
+                    </h4>
+
+                    <div class="flex items-center gap-1.5 mt-auto">
+                      <span
+                        class="text-base font-bold"
+                        :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-red-600' : 'text-gray-900'"
+                      >
+                        {{ formatPrice(product.price, product.discount_percentage).final }} ₸
+                      </span>
+
+                      <span
+                        v-if="formatPrice(product.price, product.discount_percentage).hasDiscount"
+                        class="text-xs text-gray-400 line-through"
+                      >
+                        {{ formatPrice(product.price, product.discount_percentage).original }} ₸
+                      </span>
+                    </div>
+
+                    <div
+                      v-if="product.stock_quantity > 0"
+                      class="flex items-center gap-1 text-xs text-green-600"
+                    >
+                      <Icon name="lucide:check-circle" class="w-3 h-3" />
+                      <span>В наличии</span>
+                    </div>
+                    <div
+                      v-else
+                      class="text-xs text-gray-400"
+                    >
+                      Нет в наличии
+                    </div>
+                  </div>
+                </NuxtLink>
+              </div>
+            </div>
+          </div>
+
+          <!-- Нет результатов -->
+          <div v-else-if="hasQuery && !isSearching" class="p-8 text-center">
+            <Icon name="lucide:search-x" class="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">
+              Ничего не найдено
+            </h3>
+            <p class="text-sm text-gray-500 mb-4">
+              Попробуйте изменить поисковый запрос
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              @click="searchQuery = ''"
+            >
+              Очистить поиск
+            </Button>
+          </div>
+
+          <!-- Подсказки и история -->
+          <div v-else class="max-h-[60vh] overflow-y-auto p-4 space-y-4">
+            <div v-if="suggestions.length > 0">
+              <div class="flex items-center justify-between px-2 mb-3">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {{ hasQuery ? 'Из истории' : 'Недавние запросы' }}
+                </h3>
+                <button
+                  v-if="suggestions.some(s => s.type === 'history')"
+                  type="button"
+                  class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  @click="clearSearchHistory"
+                >
+                  Очистить
+                </button>
+              </div>
+
+              <div class="space-y-1">
+                <button
+                  v-for="(item, index) in suggestions"
+                  :key="index"
+                  type="button"
+                  class="w-full flex items-center gap-3 px-4 py-3 text-base rounded-lg hover:bg-blue-50 active:bg-blue-100 transition-all duration-200 text-left group"
+                  @click="handleSelectSuggestion(item.text)"
+                >
+                  <div
+                    class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
+                    :class="item.type === 'history' ? 'bg-gray-100 group-hover:bg-blue-100' : 'bg-blue-50 group-hover:bg-blue-100'"
+                  >
+                    <Icon
+                      :name="item.type === 'history' ? 'lucide:history' : 'lucide:trending-up'"
+                      class="w-4 h-4 transition-colors"
+                      :class="item.type === 'history' ? 'text-gray-600 group-hover:text-blue-600' : 'text-blue-500'"
+                    />
+                  </div>
+                  <span class="flex-1 truncate text-gray-700 group-hover:text-gray-900 font-medium">
+                    {{ item.text }}
+                  </span>
+                  <button
+                    v-if="item.type === 'history'"
+                    type="button"
+                    class="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 transition-all"
+                    @click="handleRemoveHistory(item.text, $event)"
+                  >
+                    <Icon name="lucide:x" class="w-4 h-4 text-gray-400 hover:text-red-600" />
+                  </button>
                 </button>
               </div>
             </div>
