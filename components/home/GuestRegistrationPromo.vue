@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useMediaQuery } from '@vueuse/core'
 import { useModalStore } from '@/stores/modal/useModalStore'
 
 const user = useSupabaseUser()
@@ -8,8 +7,8 @@ const modalStore = useModalStore()
 // Проверяем, гость ли пользователь
 const isGuest = computed(() => !user.value)
 
-// Медиа-запрос для определения мобильного устройства
-const isMobile = useMediaQuery('(max-width: 768px)')
+// ✅ Медиа-запрос инициализируем на клиенте чтобы избежать hydration mismatch
+const isMobile = ref(false)
 
 // Состояние показа промо (Dialog или Drawer)
 const showPromo = ref(false)
@@ -18,6 +17,15 @@ const showPromo = ref(false)
 const STORAGE_KEY = 'guest_promo_shown'
 
 onMounted(() => {
+  // ✅ Определяем размер экрана на клиенте
+  isMobile.value = window.innerWidth <= 768
+
+  // Слушаем изменения размера экрана
+  const handleResize = () => {
+    isMobile.value = window.innerWidth <= 768
+  }
+  window.addEventListener('resize', handleResize)
+
   // Показываем только гостям
   if (!isGuest.value) return
 
@@ -30,6 +38,11 @@ onMounted(() => {
     showPromo.value = true
     sessionStorage.setItem(STORAGE_KEY, 'true')
   }, 3000) // 3 секунды после загрузки
+
+  // Очистка
+  onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+  })
 })
 
 // Открытие модального окна авторизации

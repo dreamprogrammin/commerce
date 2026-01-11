@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { IBreadcrumbItem } from '@/types'
-import { useMediaQuery } from '@vueuse/core'
 import { ArrowLeft, ChevronRight, Home } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -8,7 +7,24 @@ const props = defineProps<{
   compact?: boolean // 🆕 Режим для страницы товара
 }>()
 
-const isDesktop = useMediaQuery('(min-width: 768px)')
+// ✅ Медиа-запрос инициализируем на клиенте чтобы избежать hydration mismatch
+const isDesktop = ref(false)
+
+onMounted(() => {
+  // ✅ Определяем размер экрана на клиенте
+  isDesktop.value = window.innerWidth >= 768
+
+  // Слушаем изменения размера экрана
+  const handleResize = () => {
+    isDesktop.value = window.innerWidth >= 768
+  }
+  window.addEventListener('resize', handleResize)
+
+  // Очистка
+  onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+  })
+})
 
 // Родительская категория (для кнопки "Назад" на мобилке)
 const parentItem = computed(() => {

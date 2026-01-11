@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { BaseProduct } from '@/types'
-import { useMediaQuery } from '@vueuse/core'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
 const props = defineProps<{
@@ -10,7 +9,24 @@ const props = defineProps<{
 const isOpen = ref(false)
 const cartStore = useCartStore()
 
-const isDesktop = useMediaQuery('(min-width: 768px)')
+// ✅ Медиа-запрос инициализируем на клиенте чтобы избежать hydration mismatch
+const isDesktop = ref(false)
+
+onMounted(() => {
+  // ✅ Определяем размер экрана на клиенте
+  isDesktop.value = window.innerWidth >= 768
+
+  // Слушаем изменения размера экрана
+  const handleResize = () => {
+    isDesktop.value = window.innerWidth >= 768
+  }
+  window.addEventListener('resize', handleResize)
+
+  // Очистка
+  onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+  })
+})
 /**
  * Вычисляет максимальное количество товара, доступное для заказа (80% от остатка).
  * Минимум - 1.
