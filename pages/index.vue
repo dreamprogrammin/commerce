@@ -449,5 +449,10 @@ useRobotsRule({
         </div>
       </div>
     </div>
+
+    <!-- Промо регистрации для гостей -->
+    <ClientOnly>
+      <HomeGuestRegistrationPromo />
+    </ClientOnly>
   </div>
 </template>

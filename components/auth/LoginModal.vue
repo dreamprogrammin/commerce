@@ -62,6 +62,34 @@ async function onGoogleSignIn() {
         </DialogDescription>
       </DialogHeader>
 
+      <!-- Преимущества авторизации -->
+      <div class="space-y-2 py-2">
+        <div class="flex items-center gap-3 text-sm">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+            <Icon name="lucide:gift" class="w-4 h-4 text-orange-600" />
+          </div>
+          <span class="text-muted-foreground">Накапливайте и тратьте бонусы</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+            <Icon name="lucide:package" class="w-4 h-4 text-blue-600" />
+          </div>
+          <span class="text-muted-foreground">Отслеживайте статус заказов</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center">
+            <Icon name="lucide:heart" class="w-4 h-4 text-pink-600" />
+          </div>
+          <span class="text-muted-foreground">Сохраняйте избранные товары</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+            <Icon name="lucide:clock" class="w-4 h-4 text-green-600" />
+          </div>
+          <span class="text-muted-foreground">Просматривайте историю покупок</span>
+        </div>
+      </div>
+
       <div class="space-y-4">
         <!-- Кнопка Google -->
         <Button

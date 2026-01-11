@@ -35,7 +35,8 @@
       "Bash(supabase db push:*)",
       "Bash(supabase db diff:*)",
       "Bash(pnpm run build)",
-      "Bash(pnpm test:*)"
+      "Bash(pnpm test:*)",
+      "Bash(supabase db reset:*)"
     ]
   }
 }
