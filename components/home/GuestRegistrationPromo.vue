@@ -45,7 +45,8 @@ const handleClose = () => {
 </script>
 
 <template>
-  <div>
+  <!-- Показываем только для гостей -->
+  <div v-if="isGuest">
     <!-- Desktop: Dialog -->
     <Dialog v-if="!isMobile" v-model:open="showPromo">
       <DialogContent class="sm:max-w-lg">
