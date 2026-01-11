@@ -242,6 +242,18 @@ export default defineNuxtConfig({
     },
   },
 
+  // 🔍 Детальное логирование hydration ошибок (Vue 3.4+)
+  vue: {
+    compilerOptions: {
+      // Показывает точное место где произошла hydration mismatch
+      hydrationMismatchDetails: true,
+    },
+    runtimeCompiler: false,
+  },
+
+  // 🐛 Debug режим для отладки в development
+  debug: process.env.NODE_ENV === 'development',
+
   shadcn: {
     prefix: '',
     componentDir: './components/ui',
