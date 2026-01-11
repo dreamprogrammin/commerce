@@ -3,12 +3,13 @@ import { Package, Calendar, CreditCard, MapPin, Gift, XCircle } from 'lucide-vue
 import type { UserOrder } from '@/composables/orders/useUserOrders'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabaseClient()
-const { getPublicUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 
 const orderId = route.params.id as string
 
@@ -151,6 +152,12 @@ const handleCancelOrder = async () => {
   isCancelling.value = false
 }
 
+// Получить URL изображения товара
+function getProductImageUrl(imageUrl: string | null): string | null {
+  if (!imageUrl) return null
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
+}
+
 // Мета
 definePageMeta({
   layout: 'profile',
@@ -283,10 +290,12 @@ useHead({
               <!-- Изображение -->
               <div class="flex-shrink-0 w-20 h-20 bg-muted rounded-lg overflow-hidden">
                 <ProgressiveImage
-                  v-if="item.product.product_images?.[0]"
-                  :src="getPublicUrl(BUCKET_NAME_PRODUCT, item.product.product_images[0].image_url)"
+                  v-if="item.product.product_images?.[0] && getProductImageUrl(item.product.product_images[0].image_url)"
+                  :src="getProductImageUrl(item.product.product_images[0].image_url)"
                   :alt="item.product.name"
                   :blur-data-url="item.product.product_images[0].blur_placeholder"
+                  :bucket-name="BUCKET_NAME_PRODUCT"
+                  :file-path="item.product.product_images[0].image_url"
                   aspect-ratio="square"
                   object-fit="cover"
                   placeholder-type="lqip"
