@@ -193,21 +193,8 @@ export const useCartStore = defineStore('cartStore', () => {
           throw error
         orderId = data
 
-        // Сохраняем email гостя для автозаполнения на странице заказа
-        if (typeof window !== 'undefined' && orderData.guestInfo.email) {
-          sessionStorage.setItem('guest_order_email', orderData.guestInfo.email)
-
-          // Сохраняем информацию о гостевом заказе в localStorage для ActiveOrderStatus
-          const guestOrderData = {
-            orderId: data,
-            email: orderData.guestInfo.email,
-            timestamp: Date.now(),
-          }
-          localStorage.setItem('tracked_guest_order', JSON.stringify(guestOrderData))
-        }
-
         toast.success('Заказ успешно оформлен!', {
-          description: 'Спасибо за покупку! Мы свяжемся с вами в ближайшее время.',
+          description: 'Спасибо за покупку! Мы свяжемся с вами в ближайшее время. Корзина сохранена для повторных заказов.',
           duration: 5000,
         })
       }
@@ -242,17 +229,14 @@ export const useCartStore = defineStore('cartStore', () => {
         throw new Error('Не удалось получить ID заказа')
       }
 
-      clearCart()
+      // ✅ Очищаем корзину ТОЛЬКО для авторизованных пользователей
+      // Для гостей сохраняем корзину в localStorage, чтобы не пришлось заново набирать
+      if (user.value) {
+        clearCart()
+      }
 
-      // Редирект в зависимости от типа пользователя
-      if (!user.value) {
-        // Гости - на публичную страницу заказа (с авто-верификацией)
-        await router.push(`/order/${orderId}`)
-      }
-      else {
-        // Авторизованные - на страницу успеха или на /order/{id}
-        await router.push(`/order/${orderId}`)
-      }
+      // Редирект на страницу успеха
+      await router.push(`/order/success/${orderId}`)
     }
     catch (error: any) {
       console.error('Checkout error:', error)

@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { CheckCircle2, Package } from 'lucide-vue-next'
+import { CheckCircle2, Package, ShoppingCart, Trash2 } from 'lucide-vue-next'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
+import { useCartStore } from '@/stores/publicStore/cartStore'
 
 const route = useRoute()
+const router = useRouter()
 const user = useSupabaseUser()
+const cartStore = useCartStore()
 
 const orderId = computed(() => (route.params.id as string).substring(0, 8)) // Показываем только часть
 const fullOrderId = computed(() => route.params.id as string)
@@ -12,6 +15,15 @@ const personalizationStore = usePersonalizationStore()
 
 // Проверяем авторизован ли пользователь
 const isAuthenticated = computed(() => !!user.value)
+
+// Для гостей: проверяем, есть ли товары в корзине
+const hasCartItems = computed(() => cartStore.items.length > 0)
+
+// Очистка корзины для гостя
+const clearGuestCart = () => {
+  cartStore.clearCart()
+  router.push('/')
+}
 
 onMounted(() => {
   personalizationStore.invalidate()
@@ -63,6 +75,34 @@ onMounted(() => {
             </ul>
           </div>
         </div>
+      </CardContent>
+    </Card>
+
+    <!-- Информация о сохраненной корзине для гостей -->
+    <Card v-if="!isAuthenticated && hasCartItems" class="mb-6 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50">
+      <CardHeader>
+        <div class="flex items-start gap-3">
+          <div class="p-2 bg-blue-100 rounded-full flex-shrink-0">
+            <ShoppingCart class="w-5 h-5 text-blue-600" />
+          </div>
+          <div class="flex-1">
+            <CardTitle class="text-lg">Корзина сохранена</CardTitle>
+            <CardDescription class="mt-1">
+              Товары в корзине остались, вы можете оформить еще один заказ или очистить корзину
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent class="flex gap-3">
+        <NuxtLink to="/cart" class="flex-1">
+          <Button variant="outline" class="w-full">
+            <ShoppingCart class="w-4 h-4 mr-2" />
+            Перейти в корзину
+          </Button>
+        </NuxtLink>
+        <Button variant="ghost" size="icon" @click="clearGuestCart" class="flex-shrink-0">
+          <Trash2 class="w-4 h-4" />
+        </Button>
       </CardContent>
     </Card>
 
