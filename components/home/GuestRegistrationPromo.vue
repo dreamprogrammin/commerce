@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMediaQuery } from '@vueuse/core'
-import { useModalStore } from '@/stores/modal/modalStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 
 const user = useSupabaseUser()
 const modalStore = useModalStore()
