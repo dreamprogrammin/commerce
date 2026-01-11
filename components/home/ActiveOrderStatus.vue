@@ -1,51 +1,30 @@
 <script setup lang="ts">
 import { useUserOrders } from '@/composables/orders/useUserOrders'
-import { useGuestOrder } from '@/composables/orders/useGuestOrder'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const user = useSupabaseUser()
 
-// Для авторизованных пользователей
+// Только для авторизованных пользователей
 const {
   activeOrder,
-  isLoading: isLoadingUser,
+  isLoading,
   getStatusColor,
   getStatusLabel,
   fetchOrders,
   subscribeToOrderUpdates,
 } = useUserOrders()
 
-// Для гостей
-const {
-  order: guestOrder,
-  isLoading: isLoadingGuest,
-  getStatusColor: getGuestStatusColor,
-  getStatusLabel: getGuestStatusLabel,
-  loadTrackedOrder,
-  subscribeToOrderUpdates: subscribeToGuestOrderUpdates,
-} = useGuestOrder()
-
 const { getImageUrl } = useSupabaseStorage()
-
-// Общий флаг загрузки
-const isLoading = computed(() => isLoadingUser.value || isLoadingGuest.value)
 
 // Подписка на обновления заказов
 let channel: any = null
 
 onMounted(async () => {
   if (user.value) {
-    // Авторизованный пользователь
     await fetchOrders()
     channel = subscribeToOrderUpdates()
-  } else {
-    // Гость - загружаем из localStorage
-    await loadTrackedOrder()
-    if (guestOrder.value) {
-      channel = subscribeToGuestOrderUpdates(guestOrder.value.id)
-    }
   }
 })
 
@@ -173,16 +152,12 @@ const displayOrder = ref<typeof activeOrder.value>(null)
 // Флаг блокировки обновления displayOrder (когда показываем финальный статус)
 const isShowingFinalStatus = ref(false)
 
-// Обновляем displayOrder когда меняется activeOrder или guestOrder
-watch([activeOrder, guestOrder], ([newUserOrder, newGuestOrder], [oldUserOrder, oldGuestOrder]) => {
+// Обновляем displayOrder когда меняется activeOrder
+watch(activeOrder, (newOrder, oldOrder) => {
   // Если показываем финальный статус - не обновляем displayOrder
   if (isShowingFinalStatus.value) {
     return
   }
-
-  // Приоритет у заказа авторизованного пользователя
-  const newOrder = user.value ? newUserOrder : newGuestOrder
-  const oldOrder = user.value ? oldUserOrder : oldGuestOrder
 
   if (newOrder) {
     displayOrder.value = newOrder
@@ -219,11 +194,11 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
       isShowingFinalStatus.value = false
 
       // Переключаемся на следующий активный заказ если есть
-      const currentOrder = user.value ? activeOrder.value : guestOrder.value
-      if (currentOrder) {
-        displayOrder.value = currentOrder
+      if (activeOrder.value) {
+        displayOrder.value = activeOrder.value
         shouldShowCard.value = true
-      } else {
+      }
+      else {
         displayOrder.value = null
       }
     }, 5000) // 5 секунд
@@ -243,7 +218,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
   >
     <NuxtLink
       v-if="!isLoading && displayOrder && shouldShowCard && orderColorScheme"
-      :to="`/order/${displayOrder.id}`"
+      :to="`/profile/order/${displayOrder.id}`"
       class="block mb-4"
     >
       <Card
