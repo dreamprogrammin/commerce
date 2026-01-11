@@ -7,13 +7,15 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { useProductCacheInvalidation } from './useProductCacheInvalidation'
 
+// ✅ Глобальные переменные на уровне модуля
+// Это гарантирует что подписки сохраняются между вызовами composable
+let ordersChannel: RealtimeChannel | null = null
+let guestCheckoutsChannel: RealtimeChannel | null = null
+let lastProcessedOrderId: string | null = null
+
 export function useOrderRealtime() {
   const supabase = useSupabaseClient()
   const { refetchAllProducts } = useProductCacheInvalidation()
-
-  let ordersChannel: RealtimeChannel | null = null
-  let guestCheckoutsChannel: RealtimeChannel | null = null
-  let lastProcessedOrderId: string | null = null
 
   /**
    * Подписаться на изменения заказов
