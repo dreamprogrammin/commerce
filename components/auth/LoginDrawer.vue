@@ -4,7 +4,6 @@ import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
@@ -55,7 +54,7 @@ async function onGoogleSignIn() {
 <template>
   <Drawer v-model:open="isOpen">
     <DrawerContent>
-      <div class="mx-auto w-full max-w-md px-4 pb-6">
+      <div class="mx-auto w-full max-w-md px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <DrawerHeader class="px-0">
           <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br bg-primary">
             <Icon name="lucide:user-circle" class="h-8 w-8 text-white" />
@@ -134,13 +133,6 @@ async function onGoogleSignIn() {
           и
           <a href="#" class="underline underline-offset-4 hover:text-primary">политикой</a>
         </p>
-
-        <!-- Кнопка закрытия -->
-        <DrawerClose as-child>
-          <Button variant="ghost" class="w-full mt-4">
-            Закрыть
-          </Button>
-        </DrawerClose>
       </div>
     </DrawerContent>
   </Drawer>
