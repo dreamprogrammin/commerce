@@ -1,8 +1,16 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { useAuthStore } from '@/stores/core/useAuthStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 
 const route = useRoute()
+const router = useRouter()
 const cartStore = useCartStore()
+const authStore = useAuthStore()
+const modalStore = useModalStore()
+
+const { isLoggedIn } = storeToRefs(authStore)
 
 interface NavItem {
   path: string
@@ -43,6 +51,13 @@ function isActive(path: string) {
 const cartItemsCount = computed(() => {
   return cartStore.items.reduce((total, item) => total + item.quantity, 0)
 })
+
+function handleNavClick(path: string, event: Event) {
+  if (path === '/profile' && !isLoggedIn.value) {
+    event.preventDefault()
+    modalStore.openLoginModal()
+  }
+}
 </script>
 
 <template>
@@ -55,6 +70,7 @@ const cartItemsCount = computed(() => {
         :key="item.path"
         :to="item.path"
         class="flex flex-col items-center justify-end gap-0.5 transition-all relative"
+        @click="handleNavClick(item.path, $event)"
       >
         <div
           class="relative flex items-center justify-center rounded-full transition-all duration-300"

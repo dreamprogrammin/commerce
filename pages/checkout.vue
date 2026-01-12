@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Star } from 'lucide-vue-next'
+import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
@@ -35,6 +36,46 @@ const orderForm = ref({
 })
 const bonusesInput = ref(0)
 const showGuestModal = ref(false)
+
+// Маска для казахстанского телефона
+const phoneMask = { mask: '+7 (###) ###-##-##' }
+
+// Валидация email
+const isValidEmail = computed(() => {
+  const email = orderForm.value.email
+  if (!email) return true // пустой - не показываем ошибку
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+})
+
+// Валидация имени (минимум 2 символа)
+const isValidName = computed(() => {
+  const name = orderForm.value.name.trim()
+  if (!name) return true
+  return name.length >= 2
+})
+
+// Валидация телефона (полный номер)
+const isValidPhone = computed(() => {
+  const phone = orderForm.value.phone
+  if (!phone) return true
+  // Должно быть 11 цифр (без маски)
+  const digits = phone.replace(/\D/g, '')
+  return digits.length === 11
+})
+
+// Проверка готовности формы к отправке
+const isFormValid = computed(() => {
+  const { name, email, phone, deliveryMethod, address } = orderForm.value
+
+  // Базовые поля
+  if (!name.trim() || !email.trim() || !phone.trim()) return false
+  if (!isValidName.value || !isValidEmail.value || !isValidPhone.value) return false
+
+  // Адрес для курьера
+  if (deliveryMethod === 'courier' && !address.line1.trim()) return false
+
+  return true
+})
 
 // Предзаполнение формы
 watch(
@@ -97,9 +138,27 @@ function applyBonuses() {
 }
 
 async function placeOrder() {
-  // Валидация
+  // Валидация обязательных полей
   if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !orderForm.value.phone.trim()) {
     toast.error('Заполните все обязательные поля')
+    return
+  }
+
+  // Валидация имени
+  if (!isValidName.value) {
+    toast.error('Имя должно содержать минимум 2 символа')
+    return
+  }
+
+  // Валидация телефона
+  if (!isValidPhone.value) {
+    toast.error('Введите полный номер телефона')
+    return
+  }
+
+  // Валидация email
+  if (!isValidEmail.value) {
+    toast.error('Введите корректный email')
     return
   }
 
@@ -167,28 +226,38 @@ async function placeOrder() {
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label for="name">Имя и Фамилия *</Label>
+              <div class="space-y-1">
+                <Label for="name">Имя *</Label>
                 <Input
                   id="name"
                   v-model="orderForm.name"
                   required
                   autocomplete="name"
-                  placeholder="Иван Иванов"
+                  placeholder="Иван"
+                  :class="{ 'border-destructive': orderForm.name && !isValidName }"
                 />
+                <p v-if="orderForm.name && !isValidName" class="text-xs text-destructive">
+                  Минимум 2 символа
+                </p>
               </div>
-              <div>
+              <div class="space-y-1">
                 <Label for="phone">Телефон *</Label>
                 <Input
                   id="phone"
                   v-model="orderForm.phone"
+                  v-maska:[phoneMask]
                   required
                   autocomplete="tel"
-                  placeholder="+7 (777) 123-45-67"
+                  placeholder="+7 (___) ___-__-__"
+                  inputmode="tel"
+                  :class="{ 'border-destructive': orderForm.phone && !isValidPhone }"
                 />
+                <p v-if="orderForm.phone && !isValidPhone" class="text-xs text-destructive">
+                  Введите полный номер
+                </p>
               </div>
             </div>
-            <div>
+            <div class="space-y-1">
               <Label for="email">Email *</Label>
               <Input
                 id="email"
@@ -197,7 +266,12 @@ async function placeOrder() {
                 required
                 autocomplete="email"
                 placeholder="example@mail.com"
+                inputmode="email"
+                :class="{ 'border-destructive': orderForm.email && !isValidEmail }"
               />
+              <p v-if="orderForm.email && !isValidEmail" class="text-xs text-destructive">
+                Введите корректный email
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -311,7 +385,7 @@ async function placeOrder() {
           type="button"
           size="lg"
           class="w-full text-lg"
-          :disabled="isProcessing"
+          :disabled="isProcessing || !isFormValid"
           @click="placeOrder"
         >
           <span v-if="isProcessing">Оформляем заказ...</span>

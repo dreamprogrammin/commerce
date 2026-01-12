@@ -47,6 +47,7 @@
     "lightningcss": "^1.30.2",
     "lodash-es": "^4.17.21",
     "lucide-vue-next": "^0.536.0",
+    "maska": "^3.2.0",
     "nuxt": "^4.0.2",
     "nuxt-og-image": "^5.1.12",
     "nuxt-schema-org": "^5.0.9",
