@@ -105,20 +105,22 @@ function openLoginModal() {
         </NuxtLink>
 
         <!-- ✅ Cashback Button - ТОЛЬКО для авторизованных -->
-        <NuxtLink
-          v-if="isAuth"
-          to="/profile/bonus"
-          class="hidden md:flex items-center gap-2.5 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg group"
-        >
-          <div class="relative">
-            <Icon name="lucide:star" class="size-5 text-yellow-400 group-hover:text-yellow-300 transition-colors" />
-            <div v-if="bonusBalance > 0" class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-          </div>
-          <div class="flex flex-col items-start">
-            <span class="text-[10px] text-white/60 leading-none mb-0.5">Бонусы</span>
-            <span class="text-sm font-bold text-white leading-none">{{ formattedBonus }} ₸</span>
-          </div>
-        </NuxtLink>
+        <ClientOnly>
+          <NuxtLink
+            v-if="isAuth"
+            to="/profile/bonus"
+            class="hidden md:flex items-center gap-2.5 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg group"
+          >
+            <div class="relative">
+              <Icon name="lucide:star" class="size-5 text-yellow-400 group-hover:text-yellow-300 transition-colors" />
+              <div v-if="bonusBalance > 0" class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+            </div>
+            <div class="flex flex-col items-start">
+              <span class="text-[10px] text-white/60 leading-none mb-0.5">Бонусы</span>
+              <span class="text-sm font-bold text-white leading-none">{{ formattedBonus }} ₸</span>
+            </div>
+          </NuxtLink>
+        </ClientOnly>
 
         <!-- ✅ Profile Button / Login Button -->
         <ClientOnly>
