@@ -9,7 +9,7 @@
     </div>
 
     <!-- Добавляем отступ сверху чтобы контент не прятался под fixed header -->
-    <main class="pt-[56px] lg:pt-0">
+    <main class="pt-[56px] lg:pt-0 lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]">
       <slot />
     </main>
   </div>

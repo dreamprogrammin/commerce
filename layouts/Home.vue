@@ -16,7 +16,7 @@
     </div>
 
     <!-- Main без padding-top, т.к. mobile header статичный -->
-    <main class="flex-1  pt-[65px] lg:pt-0">
+    <main class="flex-1 pt-[65px] lg:pt-0 lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]">
       <slot />
     </main>
   </div>

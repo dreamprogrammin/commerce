@@ -10,7 +10,7 @@
       <CommonAppTabBarMobile />
     </div>
 
-    <main class="flex-1 lg:pt-0 pt-[76px]">
+    <main class="flex-1 lg:pt-0 pt-[76px] lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]">
       <slot />
     </main>
   </div>
