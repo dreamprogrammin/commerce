@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // 🆕 Управление LoadingBar при навигации
 import 'vue-sonner/style.css'
+import { useMediaQuery } from '@vueuse/core'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
 
 const nuxtApp = useNuxtApp()
+const isMobile = useMediaQuery('(max-width: 1023px)')
 const isPageLoading = ref(false)
 
 nuxtApp.hook('page:start', () => {
@@ -126,9 +128,10 @@ useSchemaOrg([
       <MobileBottomNav />
     </ClientOnly>
 
-    <!-- ✅ ИСПРАВЛЕНО: Модалка всегда в DOM, управляется через v-model внутри -->
+    <!-- Авторизация: Drawer на мобильных, Modal на десктопе -->
     <ClientOnly>
-      <AuthLoginModal />
+      <AuthLoginDrawer v-if="isMobile" />
+      <AuthLoginModal v-else />
     </ClientOnly>
   </div>
 </template>
