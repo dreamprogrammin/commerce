@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { useModalStore } from '@/stores/modal/useModalStore'
+import { toast } from 'vue-sonner'
+import { useAuth } from '@/composables/auth/useAuth'
 
 const user = useSupabaseUser()
-const modalStore = useModalStore()
+const { handleAuthGoogle } = useAuth()
 
 // Проверяем, гость ли пользователь
 const isGuest = computed(() => !user.value)
@@ -12,6 +13,9 @@ const isMobile = ref(false)
 
 // Состояние показа промо (Dialog или Drawer)
 const showPromo = ref(false)
+
+// Состояние загрузки
+const isLoading = ref(false)
 
 // Проверяем localStorage - показывали ли промо в этой сессии
 const STORAGE_KEY = 'guest_promo_shown'
@@ -45,10 +49,23 @@ onMounted(() => {
   })
 })
 
-// Открытие модального окна авторизации
-const handleLoginClick = () => {
-  showPromo.value = false
-  modalStore.openLoginModal()
+// ✅ Вход через Google напрямую
+async function handleLoginClick() {
+  try {
+    isLoading.value = true
+    await handleAuthGoogle()
+    toast.success('Перенаправление на Google...')
+    showPromo.value = false
+  }
+  catch (error: any) {
+    console.error('Google sign in failed:', error)
+    toast.error('Ошибка входа', {
+      description: error.message || 'Попробуйте еще раз',
+    })
+  }
+  finally {
+    isLoading.value = false
+  }
 }
 
 // Закрытие промо
@@ -119,12 +136,13 @@ const handleClose = () => {
 
         <!-- Кнопки -->
         <DialogFooter class="flex-col sm:flex-row gap-2">
-          <Button variant="outline" @click="handleClose" class="w-full sm:w-auto">
+          <Button variant="outline" :disabled="isLoading" class="w-full sm:w-auto" @click="handleClose">
             Может позже
           </Button>
-          <Button @click="handleLoginClick" class="w-full sm:w-auto">
-            <Icon name="lucide:user-plus" class="w-4 h-4 mr-2" />
-            Зарегистрироваться
+          <Button :disabled="isLoading" class="w-full sm:w-auto gap-2" @click="handleLoginClick">
+            <Icon v-if="!isLoading" name="logos:google-icon" class="w-4 h-4" />
+            <Icon v-else name="line-md:loading-twotone-loop" class="w-4 h-4" />
+            {{ isLoading ? 'Загрузка...' : 'Войти через Google' }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -190,12 +208,13 @@ const handleClose = () => {
 
         <!-- Кнопки -->
         <DrawerFooter>
-          <Button @click="handleLoginClick">
-            <Icon name="lucide:user-plus" class="w-4 h-4 mr-2" />
-            Зарегистрироваться
+          <Button :disabled="isLoading" class="gap-2" @click="handleLoginClick">
+            <Icon v-if="!isLoading" name="logos:google-icon" class="w-4 h-4" />
+            <Icon v-else name="line-md:loading-twotone-loop" class="w-4 h-4" />
+            {{ isLoading ? 'Загрузка...' : 'Войти через Google' }}
           </Button>
           <DrawerClose as-child>
-            <Button variant="outline" @click="handleClose">
+            <Button variant="outline" :disabled="isLoading" @click="handleClose">
               Может позже
             </Button>
           </DrawerClose>
