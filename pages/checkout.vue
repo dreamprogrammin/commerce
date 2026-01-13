@@ -325,7 +325,7 @@ async function placeOrder() {
               </div>
               <div class="space-y-1">
                 <Label for="phone">Телефон *</Label>
-                <Input
+                <input
                   id="phone"
                   v-model="orderForm.phone"
                   v-maska:[phoneMaskOptions]
