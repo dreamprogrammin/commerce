@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { Star } from 'lucide-vue-next'
-import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { usePhoneMask } from '@/composables/usePhoneMask'
 
 const authStore = useAuthStore()
 const cartStore = useCartStore()
@@ -23,9 +23,11 @@ const {
   bonusesToAward,
 } = storeToRefs(cartStore)
 
+// Композабл для маски телефона
+const phone = usePhoneMask()
+
 const orderForm = ref({
   name: '',
-  phone: '',
   email: '',
   deliveryMethod: 'pickup' as 'pickup' | 'courier',
   paymentMethod: 'kaspi',
@@ -36,84 +38,6 @@ const orderForm = ref({
 })
 const bonusesInput = ref(0)
 const showGuestModal = ref(false)
-
-// Строгая маска для казахстанского мобильного
-// +7 (7XX) XXX-XX-XX - где первый X может быть только 0,4,5,6,7,8
-const phoneMask = {
-  mask: '+7 (###) ###-##-##',
-  eager: true,
-  tokens: {
-    '#': { pattern: /[0-9]/ },
-  },
-  preprocessor: (value: string) => {
-    // Если пользователь начал вводить с 8, заменяем на +7
-    if (value.startsWith('8')) {
-      return '+7' + value.substring(1)
-    }
-    // Если начал без +7, добавляем
-    if (!value.startsWith('+')) {
-      return '+7' + value
-    }
-    return value
-  },
-}
-
-// Автофокус при клике на пустое поле (устанавливает курсор после +7 ()
-function handlePhoneFocus(event: FocusEvent) {
-  const input = event.target as HTMLInputElement
-  if (!orderForm.value.phone || orderForm.value.phone.length <= 4) {
-    // Если поле пустое или только +7 (, позиционируем курсор для ввода
-    setTimeout(() => {
-      const cursorPos = 4 // После "+7 ("
-      input.setSelectionRange(cursorPos, cursorPos)
-    }, 10)
-  }
-}
-
-// Валидация казахстанского мобильного телефона
-const isValidPhone = computed(() => {
-  const phone = orderForm.value.phone
-  if (!phone) return true
-
-  const digits = phone.replace(/\D/g, '')
-
-  // Должно быть ровно 11 цифр
-  if (digits.length !== 11) return false
-
-  // Должно начинаться с 7
-  if (!digits.startsWith('7')) return false
-
-  // Проверка мобильных кодов: 70X, 74X, 75X, 76X, 77X, 78X
-  const mobileCode = digits.substring(1, 3)
-  const validCodes = ['70', '74', '75', '76', '77', '78']
-
-  return validCodes.includes(mobileCode)
-})
-
-// Сообщение об ошибке для телефона
-const phoneErrorMessage = computed(() => {
-  const phone = orderForm.value.phone
-  if (!phone) return ''
-
-  const digits = phone.replace(/\D/g, '')
-
-  if (digits.length < 11) {
-    return 'Введите полный номер телефона'
-  }
-
-  if (!digits.startsWith('7')) {
-    return 'Номер должен начинаться с +7'
-  }
-
-  const mobileCode = digits.substring(1, 3)
-  const validCodes = ['70', '74', '75', '76', '77', '78']
-
-  if (!validCodes.includes(mobileCode)) {
-    return 'Код оператора должен быть 700-709, 747-749, 750-759, 760-769, 770-779, 780-789'
-  }
-
-  return ''
-})
 
 // Валидация email
 const isValidEmail = computed(() => {
@@ -131,11 +55,11 @@ const isValidName = computed(() => {
 
 // Проверка готовности формы к отправке
 const isFormValid = computed(() => {
-  const { name, email, phone, deliveryMethod, address } = orderForm.value
+  const { name, email, deliveryMethod, address } = orderForm.value
 
   // Базовые поля
-  if (!name.trim() || !email.trim() || !phone.trim()) return false
-  if (!isValidName.value || !isValidEmail.value || !isValidPhone.value) return false
+  if (!name.trim() || !email.trim() || !phone.rawValue.value.trim()) return false
+  if (!isValidName.value || !isValidEmail.value || !phone.isValid.value) return false
 
   // Адрес для курьера
   if (deliveryMethod === 'courier' && !address.line1.trim()) return false
@@ -149,7 +73,9 @@ watch(
   (newProfile) => {
     if (newProfile) {
       orderForm.value.name = `${newProfile.first_name || ''} ${newProfile.last_name || ''}`.trim()
-      orderForm.value.phone = newProfile.phone || ''
+      if (newProfile.phone) {
+        phone.setValue(newProfile.phone)
+      }
     }
     if (user.value) {
       orderForm.value.email = user.value.email || ''
@@ -205,7 +131,7 @@ function applyBonuses() {
 
 async function placeOrder() {
   // Валидация обязательных полей
-  if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !orderForm.value.phone.trim()) {
+  if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !phone.rawValue.value.trim()) {
     toast.error('Заполните все обязательные поля')
     return
   }
@@ -217,8 +143,8 @@ async function placeOrder() {
   }
 
   // Валидация телефона
-  if (!isValidPhone.value) {
-    toast.error(phoneErrorMessage.value || 'Введите корректный казахстанский мобильный номер')
+  if (!phone.isValid.value) {
+    toast.error(phone.errorMessage.value || 'Введите корректный казахстанский мобильный номер')
     return
   }
 
@@ -228,17 +154,12 @@ async function placeOrder() {
     return
   }
 
-  // Форматируем номер для отправки в бэк: +77771234567
-  // Удобно для WhatsApp (wa.me/77771234567) и звонков (tel:+77771234567)
-  const cleanPhone = orderForm.value.phone.replace(/\D/g, '') // Только цифры: 77771234567
-  const formattedPhone = `+${cleanPhone}` // Добавляем +: +77771234567
-
   // Для гостей обязательны данные
   const guestInfo = !isLoggedIn.value
     ? {
         name: orderForm.value.name.trim(),
         email: orderForm.value.email.trim(),
-        phone: formattedPhone, // Отправляем в формате +77771234567
+        phone: phone.getInternationalFormat(), // +77001234567
       }
     : undefined
 
@@ -315,19 +236,19 @@ async function placeOrder() {
                 <Label for="phone">Телефон *</Label>
                 <Input
                   id="phone"
-                  v-model="orderForm.phone"
-                  v-maska:[phoneMask]
+                  type="tel"
+                  :value="phone.formattedValue.value"
                   required
                   autocomplete="tel"
                   placeholder="+7 (___) ___-__-__"
                   inputmode="tel"
-                  @focus="handlePhoneFocus"
-                  :class="{ 'border-destructive': orderForm.phone && !isValidPhone }"
+                  @input="phone.handleInput"
+                  :class="{ 'border-destructive': phone.rawValue.value && !phone.isValid.value }"
                 />
-                <p v-if="orderForm.phone && phoneErrorMessage" class="text-xs text-destructive">
-                  {{ phoneErrorMessage }}
+                <p v-if="phone.rawValue.value && phone.errorMessage.value" class="text-xs text-destructive">
+                  {{ phone.errorMessage.value }}
                 </p>
-                <p v-else-if="orderForm.phone && isValidPhone" class="text-xs text-green-600">
+                <p v-else-if="phone.rawValue.value && phone.isValid.value" class="text-xs text-green-600">
                   ✓ Номер введен корректно
                 </p>
               </div>
