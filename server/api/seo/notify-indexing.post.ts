@@ -2,11 +2,12 @@
  * API для автоматического уведомления поисковиков о новых/обновлённых страницах
  *
  * Поддерживает:
- * - Google Sitemap Ping (уведомление об обновлении sitemap)
  * - IndexNow (мгновенная индексация для Yandex, Bing, Seznam, Naver)
  *
- * ВАЖНО: Google Indexing API НЕ работает для обычных страниц (только JobPosting/BroadcastEvent)
- * Поэтому используем ping sitemap - это официальный способ от Google
+ * ПРИМЕЧАНИЕ:
+ * - Google Sitemap Ping deprecated (удалён в 2023)
+ * - Google Indexing API работает ТОЛЬКО для JobPosting/BroadcastEvent
+ * - Для Google используйте Search Console или ждите естественного краулинга
  */
 
 interface NotifyRequest {
@@ -16,7 +17,6 @@ interface NotifyRequest {
 
 interface NotifyResult {
   success: boolean
-  google: { pinged: boolean, error?: string }
   indexnow: { submitted: boolean, error?: string, urls_count: number }
 }
 
@@ -48,33 +48,10 @@ export default defineEventHandler(async (event): Promise<NotifyResult> => {
 
   const result: NotifyResult = {
     success: false,
-    google: { pinged: false },
     indexnow: { submitted: false, urls_count: 0 },
   }
 
-  // 1. Ping Google Sitemap
-  try {
-    const sitemapUrl = `${siteUrl}/sitemap.xml`
-    const googlePingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
-
-    const googleResponse = await fetch(googlePingUrl, {
-      method: 'GET',
-      headers: { 'User-Agent': 'Uhti-SEO-Bot/1.0' },
-    })
-
-    result.google.pinged = googleResponse.ok
-    if (!googleResponse.ok) {
-      result.google.error = `HTTP ${googleResponse.status}`
-    }
-
-    // Логируем результат (warn разрешён eslint)
-  }
-  catch (error: any) {
-    result.google.error = error.message
-    console.error('[SEO] Google ping error:', error.message)
-  }
-
-  // 2. IndexNow для Yandex/Bing/других
+  // IndexNow для Yandex/Bing/Seznam/Naver
   const indexNowKey = config.indexnowKey
 
   if (indexNowKey) {
@@ -103,8 +80,6 @@ export default defineEventHandler(async (event): Promise<NotifyResult> => {
         const errorText = await indexNowResponse.text()
         result.indexnow.error = `HTTP ${indexNowResponse.status}: ${errorText}`
       }
-
-      // Успешно отправлено в IndexNow
     }
     catch (error: any) {
       result.indexnow.error = error.message
@@ -116,7 +91,7 @@ export default defineEventHandler(async (event): Promise<NotifyResult> => {
     console.warn('[SEO] IndexNow key not found, skipping')
   }
 
-  result.success = result.google.pinged || result.indexnow.submitted
+  result.success = result.indexnow.submitted
 
   return result
 })
