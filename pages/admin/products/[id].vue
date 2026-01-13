@@ -2,6 +2,7 @@
 import type { AttributeValuePayload, ProductImageRow, ProductUpdate } from '@/types'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
+import { toast } from 'vue-sonner'
 
 definePageMeta({ layout: 'admin' })
 
