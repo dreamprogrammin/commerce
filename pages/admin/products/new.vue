@@ -9,6 +9,9 @@ definePageMeta({ layout: 'admin' })
 const adminProductsStore = useAdminProductsStore()
 const router = useRouter()
 
+// ✅ Добавляем SEO composable
+const { notifyProduct } = useSeoIndexing()
+
 const initialSku = ref('')
 const isSearchingSku = ref(false)
 const initialBarcode = ref('')
@@ -60,6 +63,7 @@ async function searchProductByBarcode() {
     toast.info(`Товар со штрихкодом "${barcode}" не найден.`)
   }
 }
+
 /**
  * Обработчик события @create от компонента ProductForm.
  */
@@ -85,6 +89,17 @@ async function handleCreate(payload: {
       product_id: newProduct.id, // Используем ID из `newProduct`
     }))
     await adminProductsStore.saveProductAttributeValues(newProduct.id, valuesToSave)
+
+    // ✅ Уведомляем поисковики о новом товаре
+    if (newProduct.slug) {
+      try {
+        await notifyProduct(newProduct.slug)
+        toast.success('✅ Товар создан и отправлен в поисковики')
+      } catch (error) {
+        console.error('SEO notification error:', error)
+        toast.warning('⚠️ Товар создан, но не удалось уведомить поисковики')
+      }
+    }
 
     router.push('/admin/products')
   }

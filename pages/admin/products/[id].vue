@@ -10,6 +10,9 @@ const route = useRoute()
 const router = useRouter()
 const productId = route.params.id as string
 
+// ✅ Добавляем SEO composable
+const { notifyProduct } = useSeoIndexing()
+
 // --- 1. ЗАГРУЗКА ДАННЫХ ---
 // Мы используем `data`, `pending`, `error` как есть, без переименования.
 const { data, pending, error } = await useAsyncData(
@@ -46,6 +49,18 @@ async function handleUpdate(payload: {
       product_id: productId,
     }))
     await adminProductsStore.saveProductAttributeValues(productId, valuesToSave)
+
+    // ✅ Уведомляем поисковики об обновлении товара
+    if (updatedProduct.slug) {
+      try {
+        await notifyProduct(updatedProduct.slug)
+        toast.success('✅ Товар обновлен и отправлен в поисковики')
+      } catch (error) {
+        console.error('SEO notification error:', error)
+        toast.warning('⚠️ Товар обновлен, но не удалось уведомить поисковики')
+      }
+    }
+
     router.push('/admin/products')
   }
 }
