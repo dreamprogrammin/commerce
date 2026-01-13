@@ -3,6 +3,11 @@ import tailwindcss from '@tailwindcss/vite'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
+
+  runtimeConfig: {
+    // Серверные переменные (не доступны на клиенте)
+    indexnowKey: process.env.INDEXNOW_KEY || '07d3f5086f59e65326ce9d66b1d1f57c',
+  },
   modules: [
     '@pinia/nuxt',
     '@nuxtjs/supabase',
@@ -240,15 +245,6 @@ export default defineNuxtConfig({
         },
       },
     },
-  },
-
-  // 🔍 Детальное логирование hydration ошибок (Vue 3.4+)
-  vue: {
-    compilerOptions: {
-      // Показывает точное место где произошла hydration mismatch
-      hydrationMismatchDetails: true,
-    },
-    runtimeCompiler: false,
   },
 
   // 🐛 Debug режим для отладки в development

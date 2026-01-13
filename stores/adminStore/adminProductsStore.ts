@@ -29,6 +29,21 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
   const { uploadFile, removeFile } = useSupabaseStorage()
 
+  // --- SEO: Уведомление поисковиков о новых страницах ---
+  async function notifySearchEngines(productSlug: string) {
+    try {
+      const url = `/catalog/products/${productSlug}`
+      await $fetch('/api/seo/notify-indexing', {
+        method: 'POST',
+        body: { urls: [url], type: 'created' },
+      })
+      // Уведомление успешно отправлено
+    }
+    catch {
+      // Не блокируем основной флоу если SEO уведомление не прошло
+    }
+  }
+
   // --- СОСТОЯНИЕ (State) ---
   const products = ref<ProductListAdmin[]>([])
   const currentProduct = ref<FullProduct | null>(null)
@@ -245,7 +260,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       const { data: newProduct, error } = await supabase
         .from('products')
         .insert(productData)
-        .select('id, name')
+        .select('id, name, slug')
         .single()
 
       if (error || !newProduct)
@@ -253,6 +268,11 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
       // 🎯 Управляем картинками с blur
       await _manageProductImages(newProduct.id, newImageFiles, [], 0)
+
+      // 🔍 SEO: Уведомляем поисковики о новом товаре
+      if (newProduct.slug) {
+        notifySearchEngines(newProduct.slug)
+      }
 
       toast.success(`Товар "${newProduct.name}" успешно создан.`)
       return newProduct
