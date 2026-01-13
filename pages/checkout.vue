@@ -37,10 +37,40 @@ const orderForm = ref({
 const bonusesInput = ref(0)
 const showGuestModal = ref(false)
 
-// Опции маски для телефона
+// Опции маски для телефона (как в Kaspi)
 const phoneMaskOptions = {
   mask: '+7 (###) ###-##-##',
-  eager: true,
+  eager: true, // Показывать маску сразу
+  reversed: false,
+}
+
+// Обработчик ввода - автоматически добавляет +7 если пусто
+const handlePhoneInput = (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const value = input.value
+  
+  // Если пользователь начинает вводить и поле пустое, добавляем +7 (
+  if (!value || value === '+') {
+    orderForm.value.phone = '+7 ('
+    nextTick(() => {
+      input.setSelectionRange(4, 4)
+    })
+  }
+  // Если пользователь вводит 8, заменяем на +7
+  else if (value.startsWith('8') || value.startsWith('+8')) {
+    orderForm.value.phone = '+7 (' + value.replace(/[^0-9]/g, '').substring(1)
+  }
+}
+
+// При фокусе добавляем +7 ( если поле пустое
+const handlePhoneFocus = (e: FocusEvent) => {
+  const input = e.target as HTMLInputElement
+  if (!orderForm.value.phone || orderForm.value.phone.length < 4) {
+    orderForm.value.phone = '+7 ('
+    nextTick(() => {
+      input.setSelectionRange(4, 4)
+    })
+  }
 }
 
 // Валидация email
@@ -294,9 +324,11 @@ async function placeOrder() {
                   autocomplete="tel"
                   placeholder="+7 (___) ___-__-__"
                   inputmode="tel"
-                  :class="{ 'border-destructive': orderForm.phone && !isValidPhone }"
+                  @focus="handlePhoneFocus"
+                  @input="handlePhoneInput"
+                  :class="{ 'border-destructive': orderForm.phone && orderForm.phone.length > 4 && !isValidPhone }"
                 />
-                <p v-if="orderForm.phone && phoneErrorMessage" class="text-xs text-destructive">
+                <p v-if="orderForm.phone && orderForm.phone.length > 4 && phoneErrorMessage" class="text-xs text-destructive">
                   {{ phoneErrorMessage }}
                 </p>
                 <p v-else-if="orderForm.phone && isValidPhone" class="text-xs text-green-600">
