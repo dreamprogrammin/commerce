@@ -38,38 +38,47 @@ const bonusesInput = ref(0)
 const showGuestModal = ref(false)
 
 // Опции маски для телефона (как в Kaspi)
+// Опции маски для телефона (как в Kaspi)
 const phoneMaskOptions = {
   mask: '+7 (###) ###-##-##',
-  eager: true, // Показывать маску сразу
-  reversed: false,
+  eager: false, // Не показывать маску заранее - она появится при вводе
+  tokens: {
+    '#': { pattern: /[0-9]/, optional: true }
+  }
 }
 
-// Обработчик ввода - автоматически добавляет +7 если пусто
+// Обработчик ввода - обрабатываем замену 8 на 7
 const handlePhoneInput = (e: Event) => {
   const input = e.target as HTMLInputElement
   const value = input.value
   
-  // Если пользователь начинает вводить и поле пустое, добавляем +7 (
-  if (!value || value === '+') {
-    orderForm.value.phone = '+7 ('
+  // Если пользователь ввел 8 в начале, заменяем на +7
+  if (value.startsWith('8') || value.startsWith('+8')) {
+    const digits = value.replace(/\D/g, '').substring(1) // Убираем 8 и оставляем остальные цифры
+    orderForm.value.phone = '+7' + (digits ? ' (' + digits : '')
     nextTick(() => {
-      input.setSelectionRange(4, 4)
+      // Устанавливаем курсор после +7 (
+      const cursorPos = digits.length > 0 ? 4 + Math.min(digits.length, 3) : 4
+      input.setSelectionRange(cursorPos, cursorPos)
     })
-  }
-  // Если пользователь вводит 8, заменяем на +7
-  else if (value.startsWith('8') || value.startsWith('+8')) {
-    orderForm.value.phone = '+7 (' + value.replace(/[^0-9]/g, '').substring(1)
   }
 }
 
-// При фокусе добавляем +7 ( если поле пустое
+// При фокусе добавляем +7 если поле пустое
 const handlePhoneFocus = (e: FocusEvent) => {
   const input = e.target as HTMLInputElement
-  if (!orderForm.value.phone || orderForm.value.phone.length < 4) {
-    orderForm.value.phone = '+7 ('
+  if (!orderForm.value.phone) {
+    orderForm.value.phone = '+7 '
     nextTick(() => {
-      input.setSelectionRange(4, 4)
+      input.setSelectionRange(3, 3) // Курсор после +7 и пробела
     })
+  }
+}
+
+// При потере фокуса очищаем если только +7
+const handlePhoneBlur = () => {
+  if (orderForm.value.phone === '+7' || orderForm.value.phone === '+7 ') {
+    orderForm.value.phone = ''
   }
 }
 
