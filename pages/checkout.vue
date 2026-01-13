@@ -6,7 +6,6 @@ import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
-import { carouselContainerVariants } from '@/lib/variants'
 
 const authStore = useAuthStore()
 const cartStore = useCartStore()
@@ -41,37 +40,31 @@ const showGuestModal = ref(false)
 // Строгая маска для казахстанского мобильного
 // +7 (7XX) XXX-XX-XX - где первый X может быть только 0,4,5,6,7,8
 const phoneMask = {
-  mask: '+7 (7##) ###-##-##',
+  mask: '+7 (###) ###-##-##',
   eager: true,
   tokens: {
     '#': { pattern: /[0-9]/ },
   },
+  preprocessor: (value: string) => {
+    // Если пользователь начал вводить с 8, заменяем на +7
+    if (value.startsWith('8')) {
+      return '+7' + value.substring(1)
+    }
+    // Если начал без +7, добавляем
+    if (!value.startsWith('+')) {
+      return '+7' + value
+    }
+    return value
+  },
 }
 
-// Обработчик ввода телефона - заменяет 8 на +7
-function handlePhoneInput(event: Event) {
-  const input = event.target as HTMLInputElement
-  let value = input.value
-
-  // Если пользователь начал вводить с 8, заменяем на +7
-  if (value.startsWith('8')) {
-    value = '+7' + value.substring(1)
-    orderForm.value.phone = value
-    
-    // Небольшая задержка чтобы маска успела примениться
-    nextTick(() => {
-      input.value = orderForm.value.phone
-    })
-  }
-}
-
-// Автофокус при клике на пустое поле (устанавливает курсор после +7 (7)
+// Автофокус при клике на пустое поле (устанавливает курсор после +7 ()
 function handlePhoneFocus(event: FocusEvent) {
   const input = event.target as HTMLInputElement
-  if (!orderForm.value.phone || orderForm.value.phone.length <= 5) {
-    // Если поле пустое или только +7 (7, позиционируем курсор для ввода
+  if (!orderForm.value.phone || orderForm.value.phone.length <= 4) {
+    // Если поле пустое или только +7 (, позиционируем курсор для ввода
     setTimeout(() => {
-      const cursorPos = 6 // После "+7 (7"
+      const cursorPos = 4 // После "+7 ("
       input.setSelectionRange(cursorPos, cursorPos)
     }, 10)
   }
@@ -261,11 +254,10 @@ async function placeOrder() {
     guestInfo,
   })
 }
-const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 </script>
 
 <template>
-  <div :class="`${alwaysContainedClass} py-12`">
+  <div class="container py-12">
     <!-- Модалка для гостей -->
     <GuestBonusModal v-model:open="showGuestModal" />
 
@@ -327,9 +319,8 @@ const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
                   v-maska:[phoneMask]
                   required
                   autocomplete="tel"
-                  placeholder="+7 (7__) ___-__-__"
+                  placeholder="+7 (___) ___-__-__"
                   inputmode="tel"
-                  @input="handlePhoneInput"
                   @focus="handlePhoneFocus"
                   :class="{ 'border-destructive': orderForm.phone && !isValidPhone }"
                 />
