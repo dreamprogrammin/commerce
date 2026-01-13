@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { carouselContainerVariants } from '@/lib/variants'
 
 const authStore = useAuthStore()
 const cartStore = useCartStore()
@@ -260,10 +261,11 @@ async function placeOrder() {
     guestInfo,
   })
 }
+const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 </script>
 
 <template>
-  <div class="container py-12">
+  <div :class="`${alwaysContainedClass} py-12`">
     <!-- Модалка для гостей -->
     <GuestBonusModal v-model:open="showGuestModal" />
 
