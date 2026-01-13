@@ -37,13 +37,94 @@ const orderForm = ref({
 const bonusesInput = ref(0)
 const showGuestModal = ref(false)
 
-// Маска для казахстанского телефона
-const phoneMask = { mask: '+7 (###) ###-##-##' }
+// Строгая маска для казахстанского мобильного
+// +7 (7XX) XXX-XX-XX - где первый X может быть только 0,4,5,6,7,8
+const phoneMask = {
+  mask: '+7 (7##) ###-##-##',
+  eager: true,
+  tokens: {
+    '#': { pattern: /[0-9]/ },
+  },
+}
+
+// Обработчик ввода телефона - заменяет 8 на +7
+function handlePhoneInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  let value = input.value
+
+  // Если пользователь начал вводить с 8, заменяем на +7
+  if (value.startsWith('8')) {
+    value = '+7' + value.substring(1)
+    orderForm.value.phone = value
+    
+    // Небольшая задержка чтобы маска успела примениться
+    nextTick(() => {
+      input.value = orderForm.value.phone
+    })
+  }
+}
+
+// Автофокус при клике на пустое поле (устанавливает курсор после +7 (7)
+function handlePhoneFocus(event: FocusEvent) {
+  const input = event.target as HTMLInputElement
+  if (!orderForm.value.phone || orderForm.value.phone.length <= 5) {
+    // Если поле пустое или только +7 (7, позиционируем курсор для ввода
+    setTimeout(() => {
+      const cursorPos = 6 // После "+7 (7"
+      input.setSelectionRange(cursorPos, cursorPos)
+    }, 10)
+  }
+}
+
+// Валидация казахстанского мобильного телефона
+const isValidPhone = computed(() => {
+  const phone = orderForm.value.phone
+  if (!phone) return true
+
+  const digits = phone.replace(/\D/g, '')
+
+  // Должно быть ровно 11 цифр
+  if (digits.length !== 11) return false
+
+  // Должно начинаться с 7
+  if (!digits.startsWith('7')) return false
+
+  // Проверка мобильных кодов: 70X, 74X, 75X, 76X, 77X, 78X
+  const mobileCode = digits.substring(1, 3)
+  const validCodes = ['70', '74', '75', '76', '77', '78']
+
+  return validCodes.includes(mobileCode)
+})
+
+// Сообщение об ошибке для телефона
+const phoneErrorMessage = computed(() => {
+  const phone = orderForm.value.phone
+  if (!phone) return ''
+
+  const digits = phone.replace(/\D/g, '')
+
+  if (digits.length < 11) {
+    return 'Введите полный номер телефона'
+  }
+
+  if (!digits.startsWith('7')) {
+    return 'Номер должен начинаться с +7'
+  }
+
+  const mobileCode = digits.substring(1, 3)
+  const validCodes = ['70', '74', '75', '76', '77', '78']
+
+  if (!validCodes.includes(mobileCode)) {
+    return 'Код оператора должен быть 700-709, 747-749, 750-759, 760-769, 770-779, 780-789'
+  }
+
+  return ''
+})
 
 // Валидация email
 const isValidEmail = computed(() => {
   const email = orderForm.value.email
-  if (!email) return true // пустой - не показываем ошибку
+  if (!email) return true
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 })
 
@@ -52,15 +133,6 @@ const isValidName = computed(() => {
   const name = orderForm.value.name.trim()
   if (!name) return true
   return name.length >= 2
-})
-
-// Валидация телефона (полный номер)
-const isValidPhone = computed(() => {
-  const phone = orderForm.value.phone
-  if (!phone) return true
-  // Должно быть 11 цифр (без маски)
-  const digits = phone.replace(/\D/g, '')
-  return digits.length === 11
 })
 
 // Проверка готовности формы к отправке
@@ -152,7 +224,7 @@ async function placeOrder() {
 
   // Валидация телефона
   if (!isValidPhone.value) {
-    toast.error('Введите полный номер телефона')
+    toast.error(phoneErrorMessage.value || 'Введите корректный казахстанский мобильный номер')
     return
   }
 
@@ -162,12 +234,17 @@ async function placeOrder() {
     return
   }
 
+  // Форматируем номер для отправки в бэк: +77771234567
+  // Удобно для WhatsApp (wa.me/77771234567) и звонков (tel:+77771234567)
+  const cleanPhone = orderForm.value.phone.replace(/\D/g, '') // Только цифры: 77771234567
+  const formattedPhone = `+${cleanPhone}` // Добавляем +: +77771234567
+
   // Для гостей обязательны данные
   const guestInfo = !isLoggedIn.value
     ? {
         name: orderForm.value.name.trim(),
         email: orderForm.value.email.trim(),
-        phone: orderForm.value.phone.trim(),
+        phone: formattedPhone, // Отправляем в формате +77771234567
       }
     : undefined
 
@@ -248,12 +325,17 @@ async function placeOrder() {
                   v-maska:[phoneMask]
                   required
                   autocomplete="tel"
-                  placeholder="+7 (___) ___-__-__"
+                  placeholder="+7 (7__) ___-__-__"
                   inputmode="tel"
+                  @input="handlePhoneInput"
+                  @focus="handlePhoneFocus"
                   :class="{ 'border-destructive': orderForm.phone && !isValidPhone }"
                 />
-                <p v-if="orderForm.phone && !isValidPhone" class="text-xs text-destructive">
-                  Введите полный номер
+                <p v-if="orderForm.phone && phoneErrorMessage" class="text-xs text-destructive">
+                  {{ phoneErrorMessage }}
+                </p>
+                <p v-else-if="orderForm.phone && isValidPhone" class="text-xs text-green-600">
+                  ✓ Номер введен корректно
                 </p>
               </div>
             </div>
