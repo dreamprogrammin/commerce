@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { Star } from 'lucide-vue-next'
+import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
-import { carouselContainerVariants } from '@/lib/variants'
-import { usePhoneMask } from '@/composables/usePhoneMask'
 
 const authStore = useAuthStore()
 const cartStore = useCartStore()
@@ -24,13 +23,9 @@ const {
   bonusesToAward,
 } = storeToRefs(cartStore)
 
-const containedClass = carouselContainerVariants({ contained: 'always' })
-
-// Композабл для маски телефона
-const phone = usePhoneMask()
-
 const orderForm = ref({
   name: '',
+  phone: '',
   email: '',
   deliveryMethod: 'pickup' as 'pickup' | 'courier',
   paymentMethod: 'kaspi',
@@ -41,6 +36,12 @@ const orderForm = ref({
 })
 const bonusesInput = ref(0)
 const showGuestModal = ref(false)
+
+// Опции маски для телефона
+const phoneMaskOptions = {
+  mask: '+7 (###) ###-##-##',
+  eager: true,
+}
 
 // Валидация email
 const isValidEmail = computed(() => {
@@ -56,13 +57,58 @@ const isValidName = computed(() => {
   return name.length >= 2
 })
 
+// Валидация казахстанского мобильного телефона
+const isValidPhone = computed(() => {
+  const phone = orderForm.value.phone
+  if (!phone) return true
+
+  const digits = phone.replace(/\D/g, '')
+
+  // Должно быть ровно 11 цифр
+  if (digits.length !== 11) return false
+
+  // Должно начинаться с 7
+  if (!digits.startsWith('7')) return false
+
+  // Проверка мобильных кодов: 70X, 74X, 75X, 76X, 77X, 78X
+  const mobileCode = digits.substring(1, 3)
+  const validCodes = ['70', '74', '75', '76', '77', '78']
+
+  return validCodes.includes(mobileCode)
+})
+
+// Сообщение об ошибке для телефона
+const phoneErrorMessage = computed(() => {
+  const phone = orderForm.value.phone
+  if (!phone) return ''
+
+  const digits = phone.replace(/\D/g, '')
+
+  if (digits.length < 11) {
+    return 'Введите полный номер телефона'
+  }
+
+  if (!digits.startsWith('7')) {
+    return 'Номер должен начинаться с +7'
+  }
+
+  const mobileCode = digits.substring(1, 3)
+  const validCodes = ['70', '74', '75', '76', '77', '78']
+
+  if (!validCodes.includes(mobileCode)) {
+    return 'Неверный код оператора (700-709, 747-749, 750-759, 760-769, 770-779, 780-789)'
+  }
+
+  return ''
+})
+
 // Проверка готовности формы к отправке
 const isFormValid = computed(() => {
-  const { name, email, deliveryMethod, address } = orderForm.value
+  const { name, email, phone, deliveryMethod, address } = orderForm.value
 
   // Базовые поля
-  if (!name.trim() || !email.trim() || !phone.rawValue.value.trim()) return false
-  if (!isValidName.value || !isValidEmail.value || !phone.isValid.value) return false
+  if (!name.trim() || !email.trim() || !phone.trim()) return false
+  if (!isValidName.value || !isValidEmail.value || !isValidPhone.value) return false
 
   // Адрес для курьера
   if (deliveryMethod === 'courier' && !address.line1.trim()) return false
@@ -76,9 +122,7 @@ watch(
   (newProfile) => {
     if (newProfile) {
       orderForm.value.name = `${newProfile.first_name || ''} ${newProfile.last_name || ''}`.trim()
-      if (newProfile.phone) {
-        phone.setValue(newProfile.phone)
-      }
+      orderForm.value.phone = newProfile.phone || ''
     }
     if (user.value) {
       orderForm.value.email = user.value.email || ''
@@ -134,7 +178,7 @@ function applyBonuses() {
 
 async function placeOrder() {
   // Валидация обязательных полей
-  if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !phone.rawValue.value.trim()) {
+  if (!orderForm.value.name.trim() || !orderForm.value.email.trim() || !orderForm.value.phone.trim()) {
     toast.error('Заполните все обязательные поля')
     return
   }
@@ -146,8 +190,8 @@ async function placeOrder() {
   }
 
   // Валидация телефона
-  if (!phone.isValid.value) {
-    toast.error(phone.errorMessage.value || 'Введите корректный казахстанский мобильный номер')
+  if (!isValidPhone.value) {
+    toast.error(phoneErrorMessage.value || 'Введите корректный казахстанский мобильный номер')
     return
   }
 
@@ -157,12 +201,17 @@ async function placeOrder() {
     return
   }
 
+  // Форматируем номер для отправки в бэк: +77771234567
+  // Удобно для WhatsApp (wa.me/77771234567) и звонков (tel:+77771234567)
+  const cleanPhone = orderForm.value.phone.replace(/\D/g, '') // Только цифры: 77771234567
+  const formattedPhone = `+${cleanPhone}` // Добавляем +: +77771234567
+
   // Для гостей обязательны данные
   const guestInfo = !isLoggedIn.value
     ? {
         name: orderForm.value.name.trim(),
         email: orderForm.value.email.trim(),
-        phone: phone.getInternationalFormat(), // +77001234567
+        phone: formattedPhone, // Отправляем в формате +77771234567
       }
     : undefined
 
@@ -181,14 +230,14 @@ async function placeOrder() {
 </script>
 
 <template>
-  <div :class="`${containedClass} py-12`">
+  <div class="container py-12">
     <!-- Модалка для гостей -->
     <GuestBonusModal v-model:open="showGuestModal" />
 
     <!-- Корзина пуста -->
     <div
       v-if="items.length === 0"
-      :class="`${containedClass} text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4`"
+      class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4"
     >
       <h1 class="text-3xl font-bold mb-4">
         Ваша корзина пуста
@@ -216,7 +265,7 @@ async function placeOrder() {
               >
                 Зарегистрируйтесь
               </button>
-               получите 1000 бонусов после подтверждения первого заказа! 🎁
+               и получите 1000 бонусов после подтверждения первого заказа! 🎁
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
@@ -239,20 +288,18 @@ async function placeOrder() {
                 <Label for="phone">Телефон *</Label>
                 <Input
                   id="phone"
-                  type="tel"
-                  :value="phone.formattedValue.value"
+                  v-model="orderForm.phone"
+                  v-maska:[phoneMaskOptions]
                   required
                   autocomplete="tel"
                   placeholder="+7 (___) ___-__-__"
                   inputmode="tel"
-                  @input="phone.handleInput"
-                  @focus="phone.handleFocus"
-                  :class="{ 'border-destructive': phone.rawValue.value && !phone.isValid.value }"
+                  :class="{ 'border-destructive': orderForm.phone && !isValidPhone }"
                 />
-                <p v-if="phone.rawValue.value && phone.errorMessage.value" class="text-xs text-destructive">
-                  {{ phone.errorMessage.value }}
+                <p v-if="orderForm.phone && phoneErrorMessage" class="text-xs text-destructive">
+                  {{ phoneErrorMessage }}
                 </p>
-                <p v-else-if="phone.rawValue.value && phone.isValid.value" class="text-xs text-green-600">
+                <p v-else-if="orderForm.phone && isValidPhone" class="text-xs text-green-600">
                   ✓ Номер введен корректно
                 </p>
               </div>
