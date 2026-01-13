@@ -5,6 +5,7 @@ import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { carouselContainerVariants } from '@/lib/variants'
 import { usePhoneMask } from '@/composables/usePhoneMask'
 
 const authStore = useAuthStore()
@@ -22,6 +23,8 @@ const {
   bonusesToSpend,
   bonusesToAward,
 } = storeToRefs(cartStore)
+
+const containedClass = carouselContainerVariants({ contained: 'always' })
 
 // Композабл для маски телефона
 const phone = usePhoneMask()
@@ -178,14 +181,14 @@ async function placeOrder() {
 </script>
 
 <template>
-  <div class="container py-12">
+  <div :class="`${containedClass} py-12`">
     <!-- Модалка для гостей -->
     <GuestBonusModal v-model:open="showGuestModal" />
 
     <!-- Корзина пуста -->
     <div
       v-if="items.length === 0"
-      class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4"
+      :class="`${containedClass} text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4`"
     >
       <h1 class="text-3xl font-bold mb-4">
         Ваша корзина пуста
@@ -243,6 +246,7 @@ async function placeOrder() {
                   placeholder="+7 (___) ___-__-__"
                   inputmode="tel"
                   @input="phone.handleInput"
+                  @focus="phone.handleFocus"
                   :class="{ 'border-destructive': phone.rawValue.value && !phone.isValid.value }"
                 />
                 <p v-if="phone.rawValue.value && phone.errorMessage.value" class="text-xs text-destructive">

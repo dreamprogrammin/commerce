@@ -9,6 +9,7 @@ interface PhoneMaskReturn {
   errorMessage: Readonly<Ref<string>>
   setValue: (value: string) => void
   handleInput: (event: Event) => void
+  handleFocus: (event: FocusEvent) => void
   getInternationalFormat: () => string
   getDigits: () => string
   clear: () => void
@@ -17,6 +18,7 @@ interface PhoneMaskReturn {
 export function usePhoneMask(initialValue = ''): PhoneMaskReturn {
   // Храним только цифры
   const rawValue = ref(normalizeDigits(initialValue))
+  const isFocused = ref(false)
 
   /**
    * Нормализует строку в чистые цифры
@@ -24,13 +26,13 @@ export function usePhoneMask(initialValue = ''): PhoneMaskReturn {
   function normalizeDigits(value: string): string {
     let digits = value.replace(/\D/g, '')
 
-    // 8 -> 7
-    if (digits.startsWith('8')) {
+    // 8 -> 7 (только если это первая цифра)
+    if (digits.startsWith('8') && digits.length > 1) {
       digits = '7' + digits.substring(1)
     }
 
-    // Добавляем 7 если нет
-    if (digits && !digits.startsWith('7')) {
+    // Добавляем 7 если начинается не с 7 или 8
+    if (digits && !digits.startsWith('7') && !digits.startsWith('8')) {
       digits = '7' + digits
     }
 
@@ -43,22 +45,31 @@ export function usePhoneMask(initialValue = ''): PhoneMaskReturn {
   function formatDigits(digits: string): string {
     if (!digits) return ''
 
+    // Если только одна цифра 8, показываем как есть пока пользователь вводит
+    if (digits === '8') return '8'
+
+    // Нормализуем 8 -> 7 для отображения
+    let normalized = digits
+    if (normalized.startsWith('8') && normalized.length > 1) {
+      normalized = '7' + normalized.substring(1)
+    }
+
     let result = '+7'
 
-    if (digits.length > 1) {
-      result += ` (${digits.substring(1, 4)}`
+    if (normalized.length > 1) {
+      result += ` (${normalized.substring(1, 4)}`
     }
 
-    if (digits.length >= 5) {
-      result += `) ${digits.substring(4, 7)}`
+    if (normalized.length >= 5) {
+      result += `) ${normalized.substring(4, 7)}`
     }
 
-    if (digits.length >= 8) {
-      result += `-${digits.substring(7, 9)}`
+    if (normalized.length >= 8) {
+      result += `-${normalized.substring(7, 9)}`
     }
 
-    if (digits.length >= 10) {
-      result += `-${digits.substring(9, 11)}`
+    if (normalized.length >= 10) {
+      result += `-${normalized.substring(9, 11)}`
     }
 
     return result
@@ -73,7 +84,12 @@ export function usePhoneMask(initialValue = ''): PhoneMaskReturn {
    * Проверка валидности номера
    */
   const isValid = computed(() => {
-    const digits = rawValue.value
+    let digits = rawValue.value
+
+    // Нормализуем для проверки
+    if (digits.startsWith('8')) {
+      digits = '7' + digits.substring(1)
+    }
 
     if (digits.length !== PHONE_LENGTH) return false
     if (!digits.startsWith('7')) return false
@@ -86,9 +102,14 @@ export function usePhoneMask(initialValue = ''): PhoneMaskReturn {
    * Сообщение об ошибке
    */
   const errorMessage = computed(() => {
-    const digits = rawValue.value
+    let digits = rawValue.value
 
     if (!digits) return ''
+
+    // Нормализуем для проверки
+    if (digits.startsWith('8')) {
+      digits = '7' + digits.substring(1)
+    }
 
     if (digits.length < PHONE_LENGTH) {
       return 'Введите полный номер телефона'
@@ -110,25 +131,96 @@ export function usePhoneMask(initialValue = ''): PhoneMaskReturn {
   }
 
   /**
-   * Обработчик события input - для использования с @input
+   * Обработчик события input
    */
   function handleInput(event: Event): void {
     const target = event.target as HTMLInputElement
-    setValue(target.value)
+    const inputValue = target.value
+    const cursorPosition = target.selectionStart || 0
+
+    // Извлекаем цифры
+    let digits = inputValue.replace(/\D/g, '')
+
+    // Специальная логика для "8": оставляем как есть если это единственная цифра
+    // Это позволяет пользователю начать с 8, а затем мы заменим на 7
+    if (digits.length === 1 && digits === '8') {
+      rawValue.value = '8'
+    } else {
+      rawValue.value = normalizeDigits(inputValue)
+    }
+
+    // Форматируем для отображения
+    const formatted = formatDigits(rawValue.value)
+    
+    // Вычисляем позицию курсора
+    const digitsBeforeCursor = inputValue.substring(0, cursorPosition).replace(/\D/g, '').length
+    let newCursorPosition = 0
+    let digitCount = 0
+
+    for (let i = 0; i < formatted.length; i++) {
+      const char = formatted[i]
+      if (char && /\d/.test(char)) {
+        digitCount++
+        if (digitCount >= digitsBeforeCursor) {
+          newCursorPosition = i + 1
+          break
+        }
+      }
+    }
+
+    // Обновляем input
+    target.value = formatted
+
+    // Восстанавливаем курсор
+    nextTick(() => {
+      target.setSelectionRange(newCursorPosition, newCursorPosition)
+    })
+  }
+
+  /**
+   * Обработчик фокуса
+   */
+  function handleFocus(event: FocusEvent): void {
+    isFocused.value = true
+    const target = event.target as HTMLInputElement
+
+    // Если поле пустое, устанавливаем начальное значение
+    if (!rawValue.value) {
+      rawValue.value = ''
+      target.value = '+7 ('
+      
+      nextTick(() => {
+        target.setSelectionRange(4, 4)
+      })
+    }
   }
 
   /**
    * Получить номер в международном формате +77001234567
    */
   function getInternationalFormat(): string {
-    return rawValue.value ? `+${rawValue.value}` : ''
+    let digits = rawValue.value
+
+    // Нормализуем 8 -> 7
+    if (digits.startsWith('8')) {
+      digits = '7' + digits.substring(1)
+    }
+
+    return digits ? `+${digits}` : ''
   }
 
   /**
    * Получить только цифры 77001234567
    */
   function getDigits(): string {
-    return rawValue.value
+    let digits = rawValue.value
+
+    // Нормализуем 8 -> 7
+    if (digits.startsWith('8')) {
+      digits = '7' + digits.substring(1)
+    }
+
+    return digits
   }
 
   /**
@@ -148,6 +240,7 @@ export function usePhoneMask(initialValue = ''): PhoneMaskReturn {
     // Методы
     setValue,
     handleInput,
+    handleFocus,
     getInternationalFormat,
     getDigits,
     clear,
