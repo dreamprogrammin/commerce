@@ -34,7 +34,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     v-bind="forwarded"
     :class="
       cn(
-        'group/navigation-menu relative flex w-full flex-1 items-center justify-center bg-blue',
+        'group/navigation-menu relative flex w-full flex-1 items-center justify-end bg-blue',
         props.class,
       )
     "
