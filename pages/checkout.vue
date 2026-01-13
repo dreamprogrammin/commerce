@@ -37,47 +37,26 @@ const orderForm = ref({
 const bonusesInput = ref(0)
 const showGuestModal = ref(false)
 
-// Опции маски для телефона (как в Kaspi)
-// Опции маски для телефона (как в Kaspi)
-const phoneMaskOptions = {
+// Маска для телефона (как в Kaspi)
+const phoneMaskOptions = reactive({
   mask: '+7 (###) ###-##-##',
-  eager: false, // Не показывать маску заранее - она появится при вводе
-  tokens: {
-    '#': { pattern: /[0-9]/, optional: true }
-  }
-}
+  eager: false, // Маска появляется только при вводе
+})
 
-// Обработчик ввода - обрабатываем замену 8 на 7
-const handlePhoneInput = (e: Event) => {
-  const input = e.target as HTMLInputElement
-  const value = input.value
-  
-  // Если пользователь ввел 8 в начале, заменяем на +7
-  if (value.startsWith('8') || value.startsWith('+8')) {
-    const digits = value.replace(/\D/g, '').substring(1) // Убираем 8 и оставляем остальные цифры
-    orderForm.value.phone = '+7' + (digits ? ' (' + digits : '')
-    nextTick(() => {
-      // Устанавливаем курсор после +7 (
-      const cursorPos = digits.length > 0 ? 4 + Math.min(digits.length, 3) : 4
-      input.setSelectionRange(cursorPos, cursorPos)
-    })
-  }
-}
+// Unmasked значение (только цифры)
+const phoneUnmasked = ref('')
 
-// При фокусе добавляем +7 если поле пустое
-const handlePhoneFocus = (e: FocusEvent) => {
-  const input = e.target as HTMLInputElement
+// При фокусе показываем +7 если поле пустое
+const handlePhoneFocus = () => {
   if (!orderForm.value.phone) {
     orderForm.value.phone = '+7 '
-    nextTick(() => {
-      input.setSelectionRange(3, 3) // Курсор после +7 и пробела
-    })
   }
 }
 
 // При потере фокуса очищаем если только +7
 const handlePhoneBlur = () => {
-  if (orderForm.value.phone === '+7' || orderForm.value.phone === '+7 ') {
+  const trimmed = orderForm.value.phone.trim()
+  if (trimmed === '+7' || trimmed === '+7 (' || trimmed === '+7 ()') {
     orderForm.value.phone = ''
   }
 }
@@ -98,10 +77,8 @@ const isValidName = computed(() => {
 
 // Валидация казахстанского мобильного телефона
 const isValidPhone = computed(() => {
-  const phone = orderForm.value.phone
-  if (!phone) return true
-
-  const digits = phone.replace(/\D/g, '')
+  const digits = phoneUnmasked.value
+  if (!digits) return true
 
   // Должно быть ровно 11 цифр
   if (digits.length !== 11) return false
@@ -118,10 +95,8 @@ const isValidPhone = computed(() => {
 
 // Сообщение об ошибке для телефона
 const phoneErrorMessage = computed(() => {
-  const phone = orderForm.value.phone
-  if (!phone) return ''
-
-  const digits = phone.replace(/\D/g, '')
+  const digits = phoneUnmasked.value
+  if (!digits) return ''
 
   if (digits.length < 11) {
     return 'Введите полный номер телефона'
@@ -241,9 +216,7 @@ async function placeOrder() {
   }
 
   // Форматируем номер для отправки в бэк: +77771234567
-  // Удобно для WhatsApp (wa.me/77771234567) и звонков (tel:+77771234567)
-  const cleanPhone = orderForm.value.phone.replace(/\D/g, '') // Только цифры: 77771234567
-  const formattedPhone = `+${cleanPhone}` // Добавляем +: +77771234567
+  const formattedPhone = `+${phoneUnmasked.value}`
 
   // Для гостей обязательны данные
   const guestInfo = !isLoggedIn.value
@@ -325,16 +298,16 @@ async function placeOrder() {
               </div>
               <div class="space-y-1">
                 <Label for="phone">Телефон *</Label>
-                <input
+                <Input
                   id="phone"
                   v-model="orderForm.phone"
-                  v-maska:[phoneMaskOptions]
+                  v-maska:phoneUnmasked.unmasked="phoneMaskOptions"
                   required
                   autocomplete="tel"
                   placeholder="+7 (___) ___-__-__"
                   inputmode="tel"
                   @focus="handlePhoneFocus"
-                  @input="handlePhoneInput"
+                  @blur="handlePhoneBlur"
                   :class="{ 'border-destructive': orderForm.phone && orderForm.phone.length > 4 && !isValidPhone }"
                 />
                 <p v-if="orderForm.phone && orderForm.phone.length > 4 && phoneErrorMessage" class="text-xs text-destructive">
