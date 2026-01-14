@@ -4,13 +4,18 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
 
+  devServer: {
+    host: 'localhost',
+    port: 3000,
+  },
+
   runtimeConfig: {
-    // Серверные переменные (не доступны на клиенте)
     indexnowKey: process.env.INDEXNOW_KEY || '07d3f5086f59e65326ce9d66b1d1f57c',
     public: {
-      siteUrl: 'https://uhti.kz', // Публичная переменная, доступна на клиенте
+      siteUrl: 'https://uhti.kz',
     }
   },
+
   modules: [
     '@pinia/nuxt',
     '@nuxtjs/supabase',
@@ -23,7 +28,8 @@ export default defineNuxtConfig({
     'nuxt-og-image',
     'nuxt-schema-org',
     '@nuxt/fonts',
-    '@nuxtjs/storybook',
+    // 🔥 Отключаем Storybook в dev режиме
+    ...(process.env.NODE_ENV === 'production' ? ['@nuxtjs/storybook'] : []),
   ],
 
   site: {
@@ -32,14 +38,13 @@ export default defineNuxtConfig({
     description: 'Интернет-магазин с широким ассортиментом игрушек.',
     defaultLocale: 'ru',
   },
+
   ogImage: {
-    // Включаем кеширование
     runtimeCacheStorage: true,
     defaults: {
       width: 1200,
       height: 630,
     },
-    // 🔥 ВАЖНО: Явно указываем шрифты для Satori
     fonts: [
       'Inter:400',
       'Inter:700',
@@ -134,32 +139,20 @@ export default defineNuxtConfig({
           'Cache-Control': 'public, max-age=31536000, immutable',
         },
       },
-      // 🔥 Правило для OG Image эндпоинта
       '/__og-image__/**': {
         headers: {
           'Cache-Control': 'public, max-age=604800, immutable',
         },
       },
-      '/': { swr: 600 }, // 10 мин - часто меняется
-      '/catalog': { swr: 1800 }, // 30 мин - средне
-      '/catalog/products/**': { swr: 300 }, // 5 минут - часто обновляется (остатки товаров)
-      // 🔥 Отключаем prerender для несуществующих страниц
+      '/': { swr: 600 },
+      '/catalog': { swr: 1800 },
+      '/catalog/products/**': { swr: 300 },
       '/about': { prerender: false },
       '/contacts': { prerender: false },
-      '/profile/**': {
-        ssr: false, // Отключаем серверный рендеринг
-      },
-
-      // Отключаем для других защищенных страниц
-      '/checkout': {
-        ssr: false,
-      },
-      '/cart': {
-        ssr: false,
-      },
-      '/order/**': {
-        ssr: false,
-      },
+      '/profile/**': { ssr: false },
+      '/checkout': { ssr: false },
+      '/cart': { ssr: false },
+      '/order/**': { ssr: false },
     },
     compressPublicAssets: true,
     minify: true,
@@ -185,7 +178,6 @@ export default defineNuxtConfig({
         lang: 'ru',
       },
       link: [
-      // Preconnect
         {
           rel: 'preconnect',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
@@ -195,28 +187,18 @@ export default defineNuxtConfig({
           rel: 'dns-prefetch',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
         },
-
-        // Favicon для разных устройств и браузеров
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png' },
         { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
-
-        // Apple Touch Icon
         { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
-
-        // Android Chrome
         { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/android-chrome-192x192.png' },
         { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/android-chrome-512x512.png' },
-
-        // Web App Manifest
         { rel: 'manifest', href: '/site.webmanifest' },
       ],
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'format-detection', content: 'telephone=yes' },
-
-        // Тема для мобильных браузеров (можете изменить цвет)
         { name: 'theme-color', content: '#ffffff' },
         { name: 'msapplication-TileColor', content: '#ffffff' },
       ],
@@ -232,6 +214,12 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      hmr: {
+        protocol: 'ws',
+        host: 'localhost',
+      },
+    },
     build: {
       minify: 'terser',
       terserOptions: {
@@ -250,7 +238,6 @@ export default defineNuxtConfig({
     },
   },
 
-  // 🐛 Debug режим для отладки в development
   debug: process.env.NODE_ENV === 'development',
 
   shadcn: {
