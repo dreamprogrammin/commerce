@@ -1,23 +1,24 @@
 import type { DehydratedState, VueQueryPluginOptions } from '@tanstack/vue-query'
 import { dehydrate, hydrate, QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { persistQueryClient } from '@tanstack/query-persist-client-core'
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
+
 
 export default defineNuxtPlugin((nuxt) => {
   const vueQueryState = useState<DehydratedState | null>('vue-query')
 
-  // 🔥 Конфигурация QueryClient
+  // 🔥 ИСПРАВЛЕННАЯ конфигурация QueryClient
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 5 * 60 * 1000, // 5 минут - данные свежие
         gcTime: 10 * 60 * 1000, // 10 минут - время жизни в кэше
-        refetchOnWindowFocus: false, // Не перезагружать при фокусе окна
-        refetchOnReconnect: false, // Не перезагружать при переподключении
-        refetchOnMount: false, // ✅ Не перезагружать при монтировании компонента
-        retry: false, // ✅ ИСПРАВЛЕНО: Отключаем retry - причина зависания
-        retryOnMount: false, // ✅ Не повторять неудачные запросы при монтировании
-        networkMode: 'online', // ✅ Запросы только в онлайн режиме
+        refetchOnWindowFocus: true, // ✅ ИСПРАВЛЕНО: Проверять при возврате на вкладку
+        refetchOnReconnect: true, // ✅ ИСПРАВЛЕНО: Проверять при переподключении
+        refetchOnMount: true, // ✅ ИСПРАВЛЕНО: Разрешить refetch при монтировании (можно переопределить локально)
+        retry: 1, // ✅ ИСПРАВЛЕНО: Одна попытка повтора вместо полного отключения
+        retryDelay: 1000, // 1 секунда между попытками
+        networkMode: 'online', // Запросы только в онлайн режиме
       },
     },
   })
@@ -28,11 +29,18 @@ export default defineNuxtPlugin((nuxt) => {
 
   // 🔥 Гидратация на клиенте (для SSR)
   if (import.meta.client) {
-    // ✅ Настройка persistence в localStorage
-    const persister = createSyncStoragePersister({
+    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Сначала гидратируем SSR state, ПОТОМ persistence
+    if (vueQueryState.value) {
+      hydrate(queryClient, vueQueryState.value)
+    }
+
+    // ✅ Настройка persistence в localStorage (ПОСЛЕ гидратации SSR)
+    const persister = createAsyncStoragePersister({
       storage: window.localStorage,
       key: 'tanstack-query-cache',
-      throttleTime: 1000, // Сохранять не чаще раза в секунду
+      throttleTime: 1000,
+      serialize: JSON.stringify,    // Явная сериализация
+      deserialize: JSON.parse,       // Явная десериализация
     })
 
     persistQueryClient({
@@ -46,11 +54,6 @@ export default defineNuxtPlugin((nuxt) => {
         },
       },
     })
-
-    // Гидратация из SSR state (приоритет над localStorage)
-    if (vueQueryState.value) {
-      hydrate(queryClient, vueQueryState.value)
-    }
   }
 
   // 🔥 Дегидратация на сервере (для SSR)
@@ -58,5 +61,12 @@ export default defineNuxtPlugin((nuxt) => {
     nuxt.hooks.hook('app:rendered', () => {
       vueQueryState.value = dehydrate(queryClient)
     })
+  }
+
+  // ✅ Экспортируем queryClient для доступа из других мест
+  return {
+    provide: {
+      queryClient,
+    },
   }
 })

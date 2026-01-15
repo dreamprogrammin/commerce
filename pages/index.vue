@@ -28,7 +28,7 @@ definePageMeta({
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 const desktopContainedClass = carouselContainerVariants({ contained: 'desktop' })
 
-// 🔥 TanStack Query - рекомендации и избранное с автоматическим кешированием
+// TanStack Query
 const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching: isFetchingRecommendations } = useQuery({
   queryKey: ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value],
   queryFn: async () => {
@@ -36,47 +36,43 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
       recommendationsStore.fetchRecommendations(),
       isLoggedIn.value ? wishlistStore.fetchWishlistProducts() : [],
     ])
-
     return {
       recommended: recommended || [],
       wishlist: Array.isArray(wishlist) ? wishlist : [],
     }
   },
-  staleTime: 3 * 60 * 1000, // ✅ 3 минуты - персональные данные
-  gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
-  refetchOnWindowFocus: true, // Проверить при возврате на вкладку
+  staleTime: 3 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: true,
 })
 
 const recommendedProducts = computed(() => mainPersonalData.value?.recommended || [])
 const wishlistProducts = computed(() => mainPersonalData.value?.wishlist || [])
 
-// ✅ Показываем skeleton если идёт загрузка И данных нет
 const showRecommendationsSkeleton = computed(() =>
   (isLoadingRecommendations.value || isFetchingRecommendations.value) &&
   (!mainPersonalData.value || (mainPersonalData.value.recommended.length === 0 && mainPersonalData.value.wishlist.length === 0))
 )
 
-// 🔥 TanStack Query - популярные товары с автоматическим кешированием
 const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFetchingPopular } = useQuery({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
-  staleTime: 3 * 60 * 1000, // ✅ 3 минуты - списки товаров
-  gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
-  refetchOnWindowFocus: true, // Проверить при возврате на вкладку
+  staleTime: 3 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: true,
 })
 
 const popularProducts = computed(() => popularProductsData.value || [])
 
-// 🔥 TanStack Query - новые поступления с автоматическим кешированием
 const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery({
   queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
-  staleTime: 3 * 60 * 1000, // ✅ 3 минуты - списки товаров
-  gcTime: 10 * 60 * 1000, // 10 минут
-  refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
-  refetchOnWindowFocus: true, // Проверить при возврате на вкладку
+  staleTime: 3 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: true,
 })
 
 const newestProducts = computed(() => newestProductsData.value || [])
@@ -91,15 +87,11 @@ const showNewestSkeleton = computed(() =>
 
 const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value || showPopularSkeleton.value)
 
-// ========================================
-// SEO META TAGS
-// ========================================
+// SEO
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
-
 const metaTitle = `Купить детские игрушки в Алматы и Казахстане | ${siteName}`
 const metaDescription = `Интернет-магазин детских игрушек ${siteName} ⭐ Развивающие игры, конструкторы, куклы, машинки для детей всех возрастов ✓ Быстрая доставка по Казахстану ✓ Бонусная программа ✓ Гарантия качества`
-
 const keywords = [
   'детские игрушки',
   'игрушки для детей',
@@ -115,16 +107,12 @@ const keywords = [
   'настольные игры',
   'пазлы',
 ].join(', ')
-
 const ogImageUrl = `${siteUrl}/og-home-toys.jpeg`
 
-// ✅ 1. useSeoMeta - Основные мета-теги
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
   keywords,
-
-  // Open Graph
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: siteUrl,
@@ -136,8 +124,6 @@ useSeoMeta({
   ogImageWidth: '1200',
   ogImageHeight: '630',
   ogImageAlt: `${siteName} - Детские игрушки`,
-
-  // Twitter Card
   twitterCard: 'summary_large_image',
   twitterSite: '@uhtikz',
   twitterCreator: '@uhtikz',
@@ -145,19 +131,12 @@ useSeoMeta({
   twitterDescription: metaDescription,
   twitterImage: ogImageUrl,
   twitterImageAlt: `${siteName} - Детские игрушки`,
-
-  // Robots
   robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
-  // googlebot: 'index, follow',
 })
 
-// ✅ 2. useHead - Структурированные данные и дополнительные теги
 useHead({
-  link: [
-    { rel: 'canonical', href: siteUrl },
-  ],
+  link: [{ rel: 'canonical', href: siteUrl }],
   script: [
-    // WebSite Schema (только на главной!)
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
@@ -169,9 +148,7 @@ useHead({
         'url': siteUrl,
         'description': metaDescription,
         'inLanguage': 'ru-KZ',
-        'publisher': {
-          '@id': `${siteUrl}/#organization`,
-        },
+        'publisher': { '@id': `${siteUrl}/#organization` },
         'potentialAction': {
           '@type': 'SearchAction',
           'target': {
@@ -182,8 +159,6 @@ useHead({
         },
       }),
     },
-
-    // Store Schema
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
@@ -209,33 +184,22 @@ useHead({
           'latitude': 43.2220,
           'longitude': 76.8512,
         },
-        'areaServed': {
-          '@type': 'Country',
-          'name': 'Kazakhstan',
-        },
+        'areaServed': { '@type': 'Country', 'name': 'Kazakhstan' },
       }),
     },
-
-    // BreadcrumbList
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'BreadcrumbList',
         'itemListElement': [
-          {
-            '@type': 'ListItem',
-            'position': 1,
-            'name': 'Главная',
-            'item': siteUrl,
-          },
+          { '@type': 'ListItem', 'position': 1, 'name': 'Главная', 'item': siteUrl },
         ],
       }),
     },
   ],
 })
 
-// ✅ 3. useSchemaOrg - WebPage Schema
 useSchemaOrg([
   {
     '@type': 'WebPage',
@@ -244,80 +208,71 @@ useSchemaOrg([
     'name': metaTitle,
     'description': metaDescription,
     'inLanguage': 'ru-KZ',
-    'isPartOf': {
-      '@id': `${siteUrl}/#website`,
-    },
-    'about': {
-      '@id': `${siteUrl}/#organization`,
-    },
-    'primaryImageOfPage': {
-      '@type': 'ImageObject',
-      'url': ogImageUrl,
-    },
+    'isPartOf': { '@id': `${siteUrl}/#website` },
+    'about': { '@id': `${siteUrl}/#organization` },
+    'primaryImageOfPage': { '@type': 'ImageObject', 'url': ogImageUrl },
   },
 ])
 
-// Robots правило
-useRobotsRule({
-  index: true,
-  follow: true,
-})
+useRobotsRule({ index: true, follow: true })
 </script>
 
 <template>
   <div>
-    <!-- Скрытый SEO-текст для поисковиков -->
+    <!-- ✅ Скрытый SEO-текст - строго одна строка без переносов -->
     <div class="sr-only">
       <h1>{{ siteName }} - Интернет-магазин детских игрушек в Казахстане</h1>
-      <p>
-        Купить детские игрушки в Алматы и по всему Казахстану. Развивающие игрушки,
-        конструкторы, куклы, машинки, настольные игры и многое другое. Быстрая доставка,
-        бонусная программа, гарантия качества.
-      </p>
+      <p>Купить детские игрушки в Алматы и по всему Казахстану. Развивающие игрушки, конструкторы, куклы, машинки, настольные игры и многое другое. Быстрая доставка, бонусная программа, гарантия качества.</p>
     </div>
 
-    <!-- Статус активного заказа и приветствие -->
+    <!-- Статус активного заказа -->
     <div :class="alwaysContainedClass" class="py-4">
       <ClientOnly>
-        <!-- Для авторизованных пользователей -->
         <div v-if="isLoggedIn">
-          <!-- Админ -->
           <div v-if="isAdmin" class="p-4 bg-blue-50 border border-blue-200 rounded-md">
             <NuxtLink to="/admin" class="font-semibold text-primary hover:underline">
               Перейти в панель администратора
             </NuxtLink>
           </div>
-          <!-- Обычный пользователь - показываем статус заказа -->
-          <template v-else>
-            <HomeActiveOrderStatus />
-          </template>
+          <HomeActiveOrderStatus v-else />
         </div>
         <template #fallback>
-          <div class="p-4 bg-gray-100 border rounded-md animate-pulse">
-            <div class="h-5 w-1/3 bg-gray-200 rounded" />
-          </div>
+          <!-- Пустой div той же высоты для предотвращения layout shift -->
+          <div class="h-0" />
         </template>
       </ClientOnly>
     </div>
 
-    <!-- Слайдер -->
-    <CommonAppCarousel
-      :is-loading="isLoadingSlides"
-      :error="slidesError"
-      :slides="slides || []"
-    />
+    <!-- ✅ Слайдер в ClientOnly -->
+    <ClientOnly>
+      <CommonAppCarousel
+        :is-loading="isLoadingSlides"
+        :error="slidesError"
+        :slides="slides || []"
+      />
+      <template #fallback>
+        <!-- Простой скелетон без условной логики -->
+        <div :class="carouselContainerVariants({ contained: 'desktop' })">
+          <div class="py-4">
+            <div class="p-1">
+              <div class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9 bg-muted animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </template>
+    </ClientOnly>
 
     <!-- Баннеры -->
     <div :class="alwaysContainedClass">
       <HomeBanners />
     </div>
 
-    <!-- Популярные категории -->
+    <!-- Популярные категории - без ClientOnly -->
     <div :class="desktopContainedClass">
       <HomePopularCategories />
     </div>
 
-    <!-- Карточки бонусов и избранного -->
+    <!-- Карточки бонусов -->
     <div :class="alwaysContainedClass" class="py-8 md:py-12">
       <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-start mb-8">
         Акции и бонусы
@@ -330,13 +285,10 @@ useRobotsRule({
 
     <!-- Карусели товаров -->
     <ClientOnly>
-      <!-- ✅ Skeleton только если идёт загрузка И данных нет -->
       <div v-if="isLoadingMainBlock" :class="alwaysContainedClass" class="py-8 md:py-12">
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
       </div>
-
-      <!-- ✅ Контент показывается когда загрузка завершена ИЛИ есть данные -->
       <template v-else>
         <HomeProductsCarousel
           v-if="isLoggedIn && wishlistProducts.length > 0"
@@ -346,7 +298,6 @@ useRobotsRule({
           see-all-link="/profile/wishlist"
           class="mt-16 pt-8 border-t"
         />
-
         <HomeProductsCarousel
           v-if="recommendedProducts && recommendedProducts.length > 0"
           :is-loading="isFetchingRecommendations"
@@ -355,7 +306,6 @@ useRobotsRule({
           see-all-link="/catalog/all?recommended=true"
           :class="{ 'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0 }"
         />
-
         <HomeProductsCarousel
           v-else
           :is-loading="isFetchingPopular"
@@ -365,7 +315,6 @@ useRobotsRule({
           class="mt-16 pt-8 border-t"
         />
       </template>
-
       <template #fallback>
         <div :class="alwaysContainedClass" class="py-8 md:py-12">
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
@@ -376,13 +325,10 @@ useRobotsRule({
 
     <!-- Новые поступления -->
     <ClientOnly>
-      <!-- ✅ Skeleton только если идёт загрузка И данных нет -->
       <div v-if="showNewestSkeleton" :class="alwaysContainedClass" class="py-8 md:py-12">
         <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
         <ProductCarouselSkeleton />
       </div>
-
-      <!-- ✅ Контент показывается когда есть данные -->
       <HomeProductsCarousel
         v-else-if="newestProducts && newestProducts.length > 0"
         :is-loading="isFetchingNewest"
@@ -391,7 +337,6 @@ useRobotsRule({
         see-all-link="/catalog/all?sort_by=newest"
         class="pt-4 border-t"
       />
-
       <template #fallback>
         <div :class="alwaysContainedClass" class="py-8 md:py-12">
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
@@ -400,7 +345,7 @@ useRobotsRule({
       </template>
     </ClientOnly>
 
-    <!-- SEO-блок с текстом -->
+    <!-- ✅ SEO-блок - весь текст в одну строку без переносов -->
     <div :class="alwaysContainedClass" class="py-12 md:py-16 border-t">
       <div class="prose prose-lg max-w-none">
         <h2 class="text-2xl md:text-3xl font-bold mb-6">
@@ -411,10 +356,7 @@ useRobotsRule({
             <h3 class="text-xl font-semibold text-foreground mb-3">
               Широкий ассортимент игрушек
             </h3>
-            <p class="mb-4">
-              В нашем интернет-магазине вы найдете огромный выбор детских игрушек для детей всех возрастов:
-              от развивающих игрушек для малышей до конструкторов и настольных игр для школьников.
-            </p>
+            <p class="mb-4">В нашем интернет-магазине вы найдете огромный выбор детских игрушек для детей всех возрастов: от развивающих игрушек для малышей до конструкторов и настольных игр для школьников.</p>
             <ul class="space-y-2 list-disc list-inside">
               <li>Развивающие игрушки и игры</li>
               <li>Конструкторы и пазлы</li>
@@ -450,9 +392,13 @@ useRobotsRule({
       </div>
     </div>
 
-    <!-- Промо регистрации для гостей -->
+    <!-- Промо регистрации -->
     <ClientOnly>
       <HomeGuestRegistrationPromo />
+      <template #fallback>
+        <!-- Пустой div для предотвращения layout shift -->
+        <div class="h-0" />
+      </template>
     </ClientOnly>
   </div>
 </template>

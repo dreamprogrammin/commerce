@@ -76,9 +76,9 @@ onMounted(() => {
       Популярные категории
     </h2>
 
-    <!-- ✅ ИСПРАВЛЕНИЕ: Используем ClientOnly для условного рендеринга -->
-    <ClientOnly>
-      <!-- Loading State - показываем только если идёт загрузка И данных нет -->
+    <!-- ✅ Обертка для всех состояний -->
+    <div>
+      <!-- Loading State -->
       <div v-if="showSkeleton">
         <!-- Mobile Loading -->
         <div class="md:hidden overflow-x-auto hide-scrollbar">
@@ -97,8 +97,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Content - показываем когда есть данные -->
-      <div v-else-if="popularCategories && popularCategories.length > 0">
+      <!-- Content -->
+      <ClientOnly v-else-if="popularCategories && popularCategories.length > 0">
         <!-- MOBILE: Горизонтальный скролл в 2 ряда -->
         <div
           ref="scrollContainer"
@@ -235,28 +235,29 @@ onMounted(() => {
             </NuxtLink>
           </div>
         </div>
-      </div>
 
+        <!-- Fallback для SSR -->
+        <template #fallback>
+          <div class="md:hidden overflow-x-auto hide-scrollbar">
+            <div class="flex gap-3 px-4 pb-2">
+              <div v-for="i in 6" :key="i">
+                <Skeleton class="h-20 w-40 rounded-2xl flex-shrink-0" />
+              </div>
+            </div>
+          </div>
+          <div class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto px-4">
+            <div v-for="i in 8" :key="i">
+              <Skeleton class="h-48 rounded-3xl" />
+            </div>
+          </div>
+        </template>
+      </ClientOnly>
+
+      <!-- Empty state -->
       <div v-else class="text-center text-muted-foreground py-10">
         <p>Популярные категории скоро появятся здесь.</p>
       </div>
-
-      <!-- Fallback для SSR -->
-      <template #fallback>
-        <div class="md:hidden overflow-x-auto hide-scrollbar">
-          <div class="flex gap-3 px-4 pb-2">
-            <div v-for="i in 6" :key="i">
-              <Skeleton class="h-20 w-40 rounded-2xl flex-shrink-0" />
-            </div>
-          </div>
-        </div>
-        <div class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto px-4">
-          <div v-for="i in 8" :key="i">
-            <Skeleton class="h-48 rounded-3xl" />
-          </div>
-        </div>
-      </template>
-    </ClientOnly>
+    </div>
   </div>
 </template>
 

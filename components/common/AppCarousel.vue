@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import type { CarouselApi } from '../ui/carousel'
 import type { SlideRow } from '@/types'
-import Autoplay from 'embla-carousel-autoplay'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
-// 🔥 Принимаем данные через props (загружаются в useSlides composable с TanStack Query)
 interface Props {
   slides?: SlideRow[] | null
   isLoading?: boolean
@@ -18,22 +16,27 @@ const props = defineProps<Props>()
 
 const { getImageUrl } = useSupabaseStorage()
 
-// --- CAROUSEL CONFIG ---
 const carouselContainerClass = carouselContainerVariants({ contained: 'desktop' })
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
-const autoplayPlugin = Autoplay({
-  delay: 4000,
-  stopOnInteraction: false,
-  stopOnMouseEnter: true,
+// ✅ Динамический импорт Autoplay только на клиенте
+const Autoplay = ref<any>(null)
+const autoplayPlugin = ref<any>(null)
+
+onMounted(async () => {
+  if (process.client) {
+    const AutoplayModule = await import('embla-carousel-autoplay')
+    Autoplay.value = AutoplayModule.default
+    autoplayPlugin.value = Autoplay.value({
+      delay: 4000,
+      stopOnInteraction: false,
+      stopOnMouseEnter: true,
+    })
+  }
 })
 
 const emblaApi = ref<CarouselApi>()
 
-/**
- * 🔥 КЕШИРОВАНИЕ URL ИЗОБРАЖЕНИЙ
- * Подготавливаем URL для каждого слайда из props
- */
 const processedSlides = computed(() => {
   if (!props.slides || !Array.isArray(props.slides))
     return []
@@ -45,26 +48,16 @@ const processedSlides = computed(() => {
   }))
 })
 
-// ✅ Показываем skeleton только если идёт загрузка И слайдов нет
 const showSkeleton = computed(() => props.isLoading && processedSlides.value.length === 0)
 
-/**
- * Инициализация карусели при загрузке
- */
 function onInit(api: CarouselApi) {
   emblaApi.value = api
 }
 
-/**
- * Остановить автопроигрывание при наведении мышью
- */
 function stopAutoplay() {
   emblaApi.value?.plugins()?.autoplay?.stop()
 }
 
-/**
- * Возобновить автопроигрывание при уходе мышью
- */
 function playAutoplay() {
   emblaApi.value?.plugins()?.autoplay?.play()
 }
@@ -97,40 +90,30 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
       </p>
     </div>
 
-    <!-- 🎨 СКЕЛЕТОН - показываем если идёт загрузка И слайдов нет -->
+    <!-- 🎨 СКЕЛЕТОН -->
     <div v-else-if="showSkeleton" :class="carouselContainerClass">
       <div class="py-4">
         <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
-          <!-- Главный видимый слайд-скелетон -->
           <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
             <div class="p-1">
-              <Skeleton
-                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
-              />
+              <div class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9 bg-muted animate-pulse" />
             </div>
           </div>
-
-          <!-- Частично видимый следующий слайд -->
           <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
             <div class="p-1">
-              <Skeleton
-                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
-              />
+              <div class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9 bg-muted animate-pulse" />
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 🎬 ОСНОВНАЯ КАРУСЕЛЬ - показываем когда есть слайды -->
-    <ClientOnly v-else-if="processedSlides.length > 0">
+    <!-- 🎬 КАРУСЕЛЬ -->
+    <template v-else-if="processedSlides.length > 0">
       <Carousel
         :class="carouselContainerClass"
-        :plugins="[autoplayPlugin]"
-        :opts="{
-          align: 'start',
-          loop: true,
-        }"
+        :plugins="autoplayPlugin ? [autoplayPlugin] : []"
+        :opts="{ align: 'start', loop: true }"
         @init-api="onInit"
         @mouseenter="stopAutoplay"
         @mouseleave="playAutoplay"
@@ -143,15 +126,12 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
           >
             <div class="p-1">
               <Card class="overflow-hidden border-none rounded-2xl group py-0">
-                <!-- 🔗 Ссылка на CTA -->
                 <NuxtLink
                   :to="slide.cta_link || ''"
                   :external="!!slide.cta_link?.startsWith('http')"
                   class="block"
                 >
-                  <!-- 🎯 Контейнер изображения с ProgressiveImage -->
                   <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-3/2 md:aspect-19/6 lg:aspect-21/9">
-                    <!-- ✅ Используем ProgressiveImage с закешированными URL -->
                     <ProgressiveImage
                       v-if="slide.desktopUrl"
                       :src="slide.mobileUrl || slide.desktopUrl"
@@ -163,8 +143,6 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                       class="w-full h-full"
                       :eager="true"
                     />
-
-                    <!-- Градиент fallback если нет изображения -->
                     <div
                       v-else
                       class="w-full h-full bg-linear-to-br from-primary to-secondary"
@@ -176,40 +154,15 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
           </CarouselItem>
         </CarouselContent>
 
-        <!-- 🔘 Кнопки навигации (только на десктопе) -->
-        <CarouselPrevious class="absolute left-4 hidden sm:inline-flex" />
-        <CarouselNext class="absolute right-4 hidden sm:inline-flex" />
+        <!-- ✅ Кнопки только на клиенте -->
+        <ClientOnly>
+          <CarouselPrevious class="absolute left-4 hidden sm:inline-flex" />
+          <CarouselNext class="absolute right-4 hidden sm:inline-flex" />
+        </ClientOnly>
       </Carousel>
+    </template>
 
-      <!-- ⚙️ Fallback для SSR -->
-      <template #fallback>
-        <div :class="carouselContainerClass">
-          <div class="py-4">
-            <div class="flex gap-3 md:gap-4 overflow-hidden ml-0 md:-ml-5">
-              <!-- Главный видимый слайд-скелетон -->
-              <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
-                <div class="p-1">
-                  <Skeleton
-                    class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
-                  />
-                </div>
-              </div>
-
-              <!-- Частично видимый следующий слайд -->
-              <div class="shrink-0 pl-3 basis-4/5 md:basis-5/6 lg:pl-4 md:pl-4">
-                <div class="p-1">
-                  <Skeleton
-                    class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-    </ClientOnly>
-
-    <!-- 📭 ПУСТОЕ СОСТОЯНИЕ - показываем только если НЕ загрузка и слайдов нет -->
+    <!-- 📭 ПУСТОЕ СОСТОЯНИЕ -->
     <div
       v-else-if="!showSkeleton && processedSlides.length === 0"
       :class="`${containerClass} w-full aspect-21/9 bg-secondary/50 rounded-lg flex items-center justify-center border-2 border-dashed`"

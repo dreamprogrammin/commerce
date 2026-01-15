@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 🆕 Управление LoadingBar при навигации
+import { Toaster } from 'vue-sonner'
 import 'vue-sonner/style.css'
 import { useMediaQuery } from '@vueuse/core'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
@@ -13,28 +13,23 @@ nuxtApp.hook('page:start', () => {
 })
 
 nuxtApp.hook('page:finish', () => {
-  // Небольшая задержка для плавности
   setTimeout(() => {
     isPageLoading.value = false
   }, 100)
 })
 
-// Скрываем при ошибках
 nuxtApp.hook('vue:error', () => {
   isPageLoading.value = false
 })
 
 // 🔔 Realtime подписка на изменения заказов
-// Автоматически обновляет остатки товаров при подтверждении заказов
 const { subscribeAll, unsubscribe } = useOrderRealtime()
 
 onMounted(() => {
-  // Подписываемся на все необходимые события
   subscribeAll()
 })
 
 onUnmounted(() => {
-  // Отписываемся при размонтировании
   unsubscribe()
 })
 
@@ -42,12 +37,10 @@ const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
 const route = useRoute()
 
-// ✅ Динамичный шаблон для title всех страниц + hreflang
 useHead({
   titleTemplate: (titleChunk) => {
     return titleChunk ? `${titleChunk}` : `${siteName} - Интернет-магазин детских игрушек`
   },
-  // ✅ Глобальные hreflang теги для русского/казахского языков
   link: () => {
     const currentPath = route.fullPath
     const currentUrl = `${siteUrl}${currentPath}`
@@ -60,7 +53,6 @@ useHead({
   },
 })
 
-// ✅ Глобальная Schema.org Organization (используется на всех страницах)
 useSchemaOrg([
   {
     '@type': 'Organization',
@@ -112,15 +104,19 @@ useSchemaOrg([
 
     <NuxtLayout>
       <NuxtPage />
-      <Toaster
-        position="top-center"
-        :offset="16"
-        :mobile-offset="{ top: 70, left: 16, right: 16 }"
-        :toast-options="{
-          duration: 3000,
-        }"
-        rich-colors
-      />
+      
+      <!-- ✅ ИСПРАВЛЕНИЕ: Toaster только на клиенте -->
+      <ClientOnly>
+        <Toaster
+          position="top-center"
+          :offset="16"
+          :mobile-offset="{ top: 70, left: 16, right: 16 }"
+          :toast-options="{
+            duration: 3000,
+          }"
+          rich-colors
+        />
+      </ClientOnly>
     </NuxtLayout>
 
     <!-- 🆕 Мобильная навигация -->
