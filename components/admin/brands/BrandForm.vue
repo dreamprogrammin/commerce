@@ -23,6 +23,9 @@ const formData = ref<Partial<BrandInsert | BrandUpdate>>({
   slug: props.initialData?.slug || '',
   description: props.initialData?.description || null,
   logo_url: props.initialData?.logo_url || null,
+  // SEO поля
+  seo_description: props.initialData?.seo_description || null,
+  seo_keywords: props.initialData?.seo_keywords || null,
 })
 
 const newLogoFile = ref<File | null>(null)
@@ -64,6 +67,26 @@ const descriptionValue = computed({
   get: () => formData.value.description ?? '',
   set: (value: string) => {
     formData.value.description = value === '' ? null : value
+  },
+})
+
+// --- SEO ПОЛЯ ---
+
+const seoDescriptionValue = computed({
+  get: () => formData.value.seo_description ?? '',
+  set: (value: string) => {
+    formData.value.seo_description = value === '' ? null : value
+  },
+})
+
+const seoKeywordsString = computed({
+  get: () => formData.value.seo_keywords?.join(', ') ?? '',
+  set: (value: string) => {
+    const keywords = value
+      .split(',')
+      .map(k => k.trim())
+      .filter(k => k.length > 0)
+    formData.value.seo_keywords = keywords.length > 0 ? keywords : null
   },
 })
 
@@ -135,6 +158,61 @@ onBeforeUnmount(() => {
         </p>
       </div>
       <Input type="file" accept="image/*" @change="handleFileChange" />
+    </div>
+
+    <!-- 🔍 SEO секция -->
+    <div class="space-y-4 pt-6 border-t">
+      <h3 class="font-semibold flex items-center gap-2">
+        <Icon name="lucide:search" class="w-4 h-4" />
+        SEO оптимизация
+      </h3>
+
+      <div>
+        <div class="flex items-center justify-between">
+          <Label for="seo-description">SEO описание</Label>
+          <span
+            class="text-xs"
+            :class="seoDescriptionValue.length > 160 ? 'text-destructive' : seoDescriptionValue.length > 120 ? 'text-amber-500' : 'text-muted-foreground'"
+          >
+            {{ seoDescriptionValue.length }}/160
+          </span>
+        </div>
+        <Textarea
+          id="seo-description"
+          v-model="seoDescriptionValue"
+          rows="3"
+          placeholder="Товары бренда L.O.L. Surprise в Алматы. Оригинальная продукция с доставкой по Казахстану."
+        />
+        <p class="text-xs text-muted-foreground mt-1">
+          Описание для Google. Оптимально 120-160 символов.
+        </p>
+      </div>
+
+      <div>
+        <Label for="seo-keywords">Ключевые слова</Label>
+        <Input
+          id="seo-keywords"
+          v-model="seoKeywordsString"
+          placeholder="L.O.L. Surprise, куклы, игрушки для девочек, купить в Алматы"
+        />
+        <p class="text-xs text-muted-foreground mt-1">
+          Введите через запятую. Помогают поисковикам найти бренд.
+        </p>
+      </div>
+
+      <!-- Предпросмотр в Google -->
+      <div v-if="formData.name" class="p-3 bg-muted/50 rounded-lg space-y-1">
+        <p class="text-xs text-muted-foreground mb-2">Предпросмотр в Google:</p>
+        <p class="text-blue-600 text-sm hover:underline cursor-pointer truncate">
+          {{ formData.name }} - Купить товары бренда | Ухтышка
+        </p>
+        <p class="text-green-700 text-xs">
+          uhti.kz › brand › {{ formData.slug || '...' }}
+        </p>
+        <p class="text-xs text-muted-foreground line-clamp-2">
+          {{ seoDescriptionValue || descriptionValue || 'Описание бренда будет показано здесь...' }}
+        </p>
+      </div>
     </div>
 
     <Button type="submit" class="w-full">

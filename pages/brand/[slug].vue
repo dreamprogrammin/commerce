@@ -103,7 +103,33 @@ const siteName = 'Ухтышка'
 
 const brandUrl = computed(() => `${siteUrl}/brand/${brandSlug}`)
 const metaTitle = computed(() => brand.value ? `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}` : 'Бренд не найден')
-const metaDescription = computed(() => brand.value ? `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName} ⭐ Оригинальная продукция ✓ Гарантия качества ✓ Доставка по Казахстану ✓ Бонусная программа` : `Товары бренда в ${siteName}`)
+
+// SEO описание: приоритет у seo_description, потом description, потом fallback
+const metaDescription = computed(() => {
+  if (!brand.value)
+    return `Товары бренда в ${siteName}`
+
+  // Используем seo_description если заполнено
+  if (brand.value.seo_description) {
+    return brand.value.seo_description
+  }
+
+  // Используем description если есть
+  if (brand.value.description) {
+    return `${brand.value.description.substring(0, 140)}. Доставка по Казахстану.`
+  }
+
+  // Fallback
+  return `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
+})
+
+// Ключевые слова: приоритет у seo_keywords
+const metaKeywords = computed(() => {
+  if (brand.value?.seo_keywords?.length) {
+    return brand.value.seo_keywords.join(', ')
+  }
+  return `${brand.value?.name || 'бренд'}, товары бренда, оригинальная продукция, Алматы, Казахстан`
+})
 
 useHead({
   title: metaTitle,
@@ -112,7 +138,7 @@ useHead({
   ],
   meta: [
     { name: 'description', content: metaDescription },
-    { name: 'keywords', content: () => `${brand.value?.name || 'бренд'}, товары бренда, оригинальная продукция, Алматы, Казахстан` },
+    { name: 'keywords', content: metaKeywords },
 
     // Open Graph
     { property: 'og:title', content: metaTitle },
@@ -171,10 +197,15 @@ useHead({
             '@context': 'https://schema.org',
             '@type': 'Brand',
             'name': brand.value.name,
+            'description': brand.value.seo_description || brand.value.description || undefined,
             'url': brandUrl.value,
             ...(brandLogoUrl.value && {
               logo: brandLogoUrl.value,
               image: brandLogoUrl.value,
+            }),
+            // Ключевые слова
+            ...(brand.value.seo_keywords?.length && {
+              keywords: brand.value.seo_keywords.join(', '),
             }),
           })
         : '{}',

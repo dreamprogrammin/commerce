@@ -254,13 +254,24 @@ const metaDescription = computed(() => {
   if (!product.value)
     return ''
 
+  // Приоритет: seo_description > description > fallback
+  if (product.value.seo_description) {
+    return product.value.seo_description
+  }
+
   const priceInfo = `Цена: ${Math.round(product.value.price).toLocaleString()} ₸`
   const stockInfo = product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ'
   const desc = product.value.description
-    ? `${product.value.description.substring(0, 120)}...`
+    ? `${product.value.description.substring(0, 100)}`
     : 'Качественный товар по выгодной цене'
 
-  return `${desc} ${priceInfo}. ${stockInfo}. Быстрая доставка по Казахстану.`
+  return `${desc}. ${priceInfo}. ${stockInfo}. Доставка по Казахстану.`
+})
+
+const metaKeywords = computed(() => {
+  if (!product.value?.seo_keywords?.length)
+    return null
+  return product.value.seo_keywords.join(', ')
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
@@ -299,6 +310,7 @@ defineOgImage({
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
+  keywords: metaKeywords,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: canonicalUrl,
@@ -329,8 +341,9 @@ useHead(() => ({
         '@context': 'https://schema.org',
         '@type': 'Product',
         'name': product.value?.name,
-        'description': product.value?.description,
+        'description': product.value?.seo_description || product.value?.description,
         'image': ogImageUrl.value,
+        'sku': product.value?.sku || undefined,
         'brand': {
           '@type': 'Brand',
           'name': brandName.value || 'Ухтышка',
@@ -343,7 +356,16 @@ useHead(() => ({
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
           'url': canonicalUrl.value,
+          'seller': {
+            '@type': 'Organization',
+            'name': 'Ухтышка',
+            'url': 'https://uhti.kz',
+          },
         },
+        // Ключевые слова для поиска
+        ...(product.value?.seo_keywords?.length && {
+          keywords: product.value.seo_keywords.join(', '),
+        }),
       }),
     },
   ],

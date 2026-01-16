@@ -228,6 +228,9 @@ export interface ProductFormData {
   barcode: string | null
   is_featured?: boolean
   featured_order?: number
+  // SEO поля
+  seo_description: string | null
+  seo_keywords: string[] | null
 }
 
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>

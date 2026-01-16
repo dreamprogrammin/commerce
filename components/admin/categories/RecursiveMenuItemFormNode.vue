@@ -262,14 +262,27 @@ function removeImage() {
       </div>
 
       <div>
-        <Label :for="`desc-${props.item._tempId || props.item.id}`">Описание</Label>
+        <div class="flex items-center justify-between">
+          <Label :for="`desc-${props.item._tempId || props.item.id}`">
+            SEO описание
+          </Label>
+          <span
+            class="text-xs"
+            :class="description.length > 160 ? 'text-destructive' : description.length > 120 ? 'text-amber-500' : 'text-muted-foreground'"
+          >
+            {{ description.length }}/160
+          </span>
+        </div>
         <Textarea
           :id="`desc-${props.item._tempId || props.item.id}`"
           v-model="description"
-          rows="2"
-          placeholder="Краткое описание для SEO и меню..."
+          rows="3"
+          placeholder="Игрушки для девочек в Алматы: куклы, мягкие игрушки, наборы для творчества. Доставка по Казахстану."
           :disabled="isDeleted"
         />
+        <p class="text-xs text-muted-foreground mt-1">
+          Это описание отображается в Google. Оптимально 120-160 символов.
+        </p>
       </div>
 
       <!-- Порядок и видимость -->

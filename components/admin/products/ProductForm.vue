@@ -131,6 +131,9 @@ function setupFormData(product: FullProduct | null | undefined) {
       barcode: product.barcode,
       is_featured: product.is_featured || false,
       featured_order: product.featured_order || 0,
+      // SEO поля
+      seo_description: product.seo_description || null,
+      seo_keywords: product.seo_keywords || null,
     }
     existingImages.value = [...(product.product_images || [])]
 
@@ -167,6 +170,9 @@ function setupFormData(product: FullProduct | null | undefined) {
       barcode: null,
       is_featured: false,
       featured_order: 0,
+      // SEO поля
+      seo_description: null,
+      seo_keywords: null,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -488,6 +494,32 @@ const maxAgeYearsValue = computed({
     }
   },
 })
+
+// --- 12. SEO ПОЛЯ ---
+
+const seoDescriptionValue = computed({
+  get() { return formData.value.seo_description ?? '' },
+  set(value) {
+    if (formData.value) {
+      formData.value.seo_description = value || null
+    }
+  },
+})
+
+const seoKeywordsString = computed({
+  get() {
+    return formData.value.seo_keywords?.join(', ') ?? ''
+  },
+  set(value: string) {
+    if (formData.value) {
+      const keywords = value
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => k.length > 0)
+      formData.value.seo_keywords = keywords.length > 0 ? keywords : null
+    }
+  },
+})
 </script>
 
 <template>
@@ -541,6 +573,67 @@ const maxAgeYearsValue = computed({
               placeholder="Подробное описание товара, его особенности и преимущества..."
               rows="5"
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- 🔍 SEO оптимизация -->
+      <Card>
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2">
+            <Icon name="lucide:search" class="w-5 h-5" />
+            SEO оптимизация
+          </CardTitle>
+          <CardDescription>
+            Эти данные помогут товару лучше отображаться в Google и Яндекс
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div>
+            <div class="flex items-center justify-between">
+              <Label for="seo_description">SEO описание</Label>
+              <span
+                class="text-xs"
+                :class="seoDescriptionValue.length > 160 ? 'text-destructive' : seoDescriptionValue.length > 120 ? 'text-amber-500' : 'text-muted-foreground'"
+              >
+                {{ seoDescriptionValue.length }}/160
+              </span>
+            </div>
+            <Textarea
+              id="seo_description"
+              v-model="seoDescriptionValue"
+              placeholder="Купить развивающую игрушку в Алматы. Доставка по Казахстану. Бонусы за покупку."
+              rows="3"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Это описание показывается в результатах Google. Оптимально 120-160 символов.
+            </p>
+          </div>
+
+          <div>
+            <Label for="seo_keywords">Ключевые слова</Label>
+            <Input
+              id="seo_keywords"
+              v-model="seoKeywordsString"
+              placeholder="игрушки для детей, развивающие игрушки, купить в Алматы"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Введите ключевые слова через запятую. Они помогут поисковикам найти товар.
+            </p>
+          </div>
+
+          <!-- Предпросмотр в Google -->
+          <div v-if="formData.name" class="p-4 bg-muted/50 rounded-lg space-y-1">
+            <p class="text-xs text-muted-foreground mb-2">Предпросмотр в Google:</p>
+            <p class="text-blue-600 text-base hover:underline cursor-pointer truncate">
+              {{ formData.name }} - Купить в интернет-магазине | Ухтышка
+            </p>
+            <p class="text-green-700 text-xs">
+              uhti.kz › catalog › products › {{ formData.slug || '...' }}
+            </p>
+            <p class="text-sm text-muted-foreground line-clamp-2">
+              {{ seoDescriptionValue || formData.description || 'Описание товара будет показано здесь...' }}
+            </p>
           </div>
         </CardContent>
       </Card>

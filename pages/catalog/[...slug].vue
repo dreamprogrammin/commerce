@@ -381,11 +381,20 @@ const hasActiveFilters = computed(() => {
   return activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity'
 })
 
+// SEO описание: приоритет у описания из БД
+const categoryDescription = computed(() => currentCategory.value?.description || null)
+
 const metaDescription = computed(() => {
+  // Если есть фильтры - показываем общее описание
   if (hasActiveFilters.value) {
     return `Результаты фильтрации для категории "${title.value}". Широкий выбор товаров.`
   }
-  return `Каталог товаров в категории "${title.value}". Широкий ассортимент качественных товаров по выгодным ценам.`
+  // Если есть описание категории из БД - используем его
+  if (categoryDescription.value) {
+    return categoryDescription.value
+  }
+  // Фоллбэк на стандартное описание
+  return `Купить ${title.value?.toLowerCase()} в интернет-магазине Ухтышка в Алматы. Большой выбор качественных игрушек с доставкой по Казахстану.`
 })
 
 const metaTitle = computed(() => {
@@ -573,9 +582,17 @@ useRobotsRule(robotsRule)
       </template>
     </ClientOnly>
 
-    <h1 class="text-xl md:text-3xl font-bold mb-6 capitalize">
+    <h1 class="text-xl md:text-3xl font-bold mb-4 capitalize">
       {{ title }}
     </h1>
+
+    <!-- SEO описание категории (показываем на странице для индексации Google) -->
+    <p
+      v-if="categoryDescription && !hasActiveFilters"
+      class="text-muted-foreground mb-6 max-w-3xl leading-relaxed"
+    >
+      {{ categoryDescription }}
+    </p>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- Десктоп фильтры -->
