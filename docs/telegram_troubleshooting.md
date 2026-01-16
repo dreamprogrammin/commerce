@@ -9,6 +9,7 @@ pnpm supabase db push
 ```
 
 Эта миграция:
+
 - ✅ Включит расширение `pg_net` (для HTTP запросов)
 - ✅ Проверит наличие триггеров
 - ✅ Создаст триггеры, если их нет
@@ -29,6 +30,7 @@ ADMIN_SECRET=ваш_секрет (опционально)
 ### 3. Проверьте таблицу, в которую создается заказ
 
 **Важно!** Уведомления работают только для:
+
 - `orders` - заказы авторизованных пользователей
 - `guest_checkouts` - гостевые заказы
 
@@ -37,6 +39,7 @@ ADMIN_SECRET=ваш_секрет (опционально)
 ### 4. Проверьте логи Edge Function
 
 После создания заказа:
+
 1. Откройте: https://supabase.com/dashboard/project/gvsdevsvzgcivpphcuai/functions/notify-order-to-telegram/invocations
 2. Посмотрите, есть ли вызовы функции
 3. Если вызовов нет - триггер не срабатывает
@@ -82,18 +85,23 @@ SELECT public.notify_order_to_telegram();
 ## 🐛 Возможные проблемы
 
 ### Проблема 1: pg_net не установлен
+
 **Решение**: Миграция `20251219060200_check_and_fix_telegram.sql` установит его автоматически
 
 ### Проблема 2: Триггеры не созданы
+
 **Решение**: Миграция создаст их автоматически
 
 ### Проблема 3: Переменные окружения не установлены
+
 **Решение**: Установите в Supabase Dashboard → Settings → Edge Functions → Secrets
 
 ### Проблема 4: Старая структура таблиц
+
 **Решение**: Убедитесь, что используете `orders` или `guest_checkouts`, а не старую структуру
 
 ### Проблема 5: RLS блокирует триггер
+
 **Решение**: Функция использует `SECURITY DEFINER`, должна работать
 
 ## ✅ Чеклист проверки
@@ -112,32 +120,32 @@ SELECT public.notify_order_to_telegram();
 
 ```sql
 -- Проверка всех компонентов
-SELECT 
+SELECT
   'Триггеры' as component,
   COUNT(*) as count,
   string_agg(trigger_name, ', ') as details
 FROM information_schema.triggers
 WHERE trigger_name IN ('trigger_notify_user_order', 'trigger_notify_guest_checkout')
 UNION ALL
-SELECT 
+SELECT
   'Функция notify_order_to_telegram' as component,
   COUNT(*) as count,
   NULL as details
 FROM information_schema.routines
-WHERE routine_schema = 'public' 
+WHERE routine_schema = 'public'
   AND routine_name = 'notify_order_to_telegram'
 UNION ALL
-SELECT 
+SELECT
   'Расширение pg_net' as component,
   COUNT(*) as count,
   NULL as details
 FROM pg_extension
 WHERE extname = 'pg_net'
 UNION ALL
-SELECT 
+SELECT
   'Настройки URL' as component,
   COUNT(*) as count,
   value->>'url' as details
-FROM public.settings 
+FROM public.settings
 WHERE key = 'telegram_function_url';
 ```

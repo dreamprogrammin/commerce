@@ -28,11 +28,11 @@ lib/variants.ts
 
 #### Варианты
 
-| Вариант | Описание | Когда использовать |
-|---------|----------|-------------------|
+| Вариант     | Описание                                                                | Когда использовать                                                                           |
+| ----------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `'desktop'` | На mobile: full width без padding<br>На desktop: ограниченный контейнер | **Карусели товаров**<br>Когда карточки должны "выглядывать" за края на мобильных устройствах |
-| `'always'` | Всегда ограниченный контейнер с padding на всех экранах | **Заголовки, текст, формы**<br>Обычный контент, который должен иметь отступы везде |
-| `false` | Всегда full width с padding на всех экранах | **Full-width секции**<br>Секции, которые должны занимать всю ширину экрана |
+| `'always'`  | Всегда ограниченный контейнер с padding на всех экранах                 | **Заголовки, текст, формы**<br>Обычный контент, который должен иметь отступы везде           |
+| `false`     | Всегда full width с padding на всех экранах                             | **Full-width секции**<br>Секции, которые должны занимать всю ширину экрана                   |
 
 #### CSS классы
 
@@ -86,6 +86,7 @@ const carouselClass = carouselContainerVariants({ contained: 'desktop' })
 ```
 
 **Результат:**
+
 - 📱 Mobile: карусель на всю ширину, карточки выглядывают
 - 💻 Desktop: карусель в контейнере с отступами
 
@@ -107,7 +108,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
   <div :class="containerClass" class="py-8">
     <h1>Заголовок страницы</h1>
     <p>Текстовый контент...</p>
-    
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Card>...</Card>
       <Card>...</Card>
@@ -117,6 +118,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 ```
 
 **Результат:**
+
 - 📱 Mobile: padding: 16px (px-4)
 - 🖥️ Tablet: padding: 24px (sm:px-6)
 - 💻 Desktop: padding: 48px (lg:px-12)
@@ -146,6 +148,7 @@ const containerClass = carouselContainerVariants({ contained: false })
 ```
 
 **Результат:**
+
 - Фон занимает всю ширину экрана
 - Контент внутри имеет отступы от краев
 
@@ -156,6 +159,7 @@ const containerClass = carouselContainerVariants({ contained: false })
 ### Почему не `app-container`?
 
 ❌ **Старый подход:**
+
 ```vue
 <div class="app-container">
   <h2>Заголовок</h2>
@@ -167,12 +171,14 @@ const containerClass = carouselContainerVariants({ contained: false })
 ```
 
 **Проблемы:**
+
 - Дублирование класса везде
 - Нет гибкости (один размер для всех)
 - Сложно изменить отступы глобально
 - Нет адаптивного поведения для каруселей
 
 ✅ **Новый подход:**
+
 ```vue
 <div :class="alwaysContainedClass">
   <h2>Заголовок</h2>
@@ -184,6 +190,7 @@ const containerClass = carouselContainerVariants({ contained: false })
 ```
 
 **Преимущества:**
+
 - Один источник правды в `lib/variants.ts`
 - Гибкие варианты под разные нужды
 - Легко менять отступы глобально
@@ -204,10 +211,10 @@ export const carouselContainerVariants = cva(
       contained: {
         desktop: '...',
         always: '...',
-        
+
         // 👇 Новый вариант
         narrow: 'container max-w-4xl mx-auto px-4 sm:px-6',
-        
+
         false: '...',
       },
     },
@@ -219,6 +226,7 @@ export const carouselContainerVariants = cva(
 ```
 
 Использование:
+
 ```typescript
 const narrowClass = carouselContainerVariants({ contained: 'narrow' })
 ```
@@ -227,11 +235,11 @@ const narrowClass = carouselContainerVariants({ contained: 'narrow' })
 
 ## 📊 Сравнение вариантов
 
-| Экран | `'desktop'` | `'always'` | `false` |
-|-------|-------------|-----------|---------|
-| Mobile (< 640px) | Full width, **без padding** | px-4 (16px) | px-4 (16px) |
-| Tablet (640-1024px) | Full width, **без padding** | px-6 (24px) | px-6 (24px) |
-| Desktop (> 1024px) | Container + px-12 (48px) | Container + px-12 (48px) | px-12 (48px) |
+| Экран               | `'desktop'`                 | `'always'`               | `false`      |
+| ------------------- | --------------------------- | ------------------------ | ------------ |
+| Mobile (< 640px)    | Full width, **без padding** | px-4 (16px)              | px-4 (16px)  |
+| Tablet (640-1024px) | Full width, **без padding** | px-6 (24px)              | px-6 (24px)  |
+| Desktop (> 1024px)  | Container + px-12 (48px)    | Container + px-12 (48px) | px-12 (48px) |
 
 ---
 
@@ -290,7 +298,7 @@ const carouselClass = carouselContainerVariants({ contained: 'desktop' })
   <div :class="headerClass">
     <h2>Title</h2>
   </div>
-  
+
   <Carousel :class="carouselClass">
     ...
   </Carousel>
@@ -305,12 +313,12 @@ const carouselClass = carouselContainerVariants({ contained: 'desktop' })
   <div :class="carouselContainerVariants({ contained: 'always' })">
     ...
   </div>
-  
+
   <!-- Не дублируйте app-container -->
   <div class="app-container">
     ...
   </div>
-  
+
   <!-- Не пишите классы вручную -->
   <div class="container max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
     ...
@@ -366,6 +374,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 **Проблема:** Используется `contained: 'always'` вместо `contained: 'desktop'`
 
 **Решение:**
+
 ```typescript
 // ❌ Неправильно
 const carouselClass = carouselContainerVariants({ contained: 'always' })
@@ -379,6 +388,7 @@ const carouselClass = carouselContainerVariants({ contained: 'desktop' })
 **Проблема:** Используется `contained: 'desktop'` для обычного контента
 
 **Решение:**
+
 ```typescript
 // ❌ Неправильно
 const contentClass = carouselContainerVariants({ contained: 'desktop' })
@@ -392,6 +402,7 @@ const contentClass = carouselContainerVariants({ contained: 'always' })
 ## 📝 Changelog
 
 ### v1.0.0 (Current)
+
 - ✅ Добавлен вариант `'desktop'` для каруселей
 - ✅ Добавлен вариант `'always'` для контента
 - ✅ Добавлен вариант `false` для full-width секций
@@ -411,6 +422,6 @@ const contentClass = carouselContainerVariants({ contained: 'always' })
 
 ---
 
-**Автор:** Development Team  
-**Последнее обновление:** 2025  
+**Автор:** Development Team
+**Последнее обновление:** 2025
 **Версия:** 1.0.0

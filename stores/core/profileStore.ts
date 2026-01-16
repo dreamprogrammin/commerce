@@ -8,7 +8,7 @@ export const useProfileStore = defineStore('profileStore', () => {
   const profile = ref<ProfileRow | null>(null)
   const isLoading = ref(false)
   const isSaving = ref(false)
-  
+
   // ✅ Добавляем флаг для предотвращения множественных загрузок
   let loadingPromise: Promise<boolean> | null = null
 

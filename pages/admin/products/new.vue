@@ -95,7 +95,8 @@ async function handleCreate(payload: {
       try {
         await notifyProduct(newProduct.slug)
         toast.success('✅ Товар создан и отправлен в поисковики')
-      } catch (error) {
+      }
+      catch (error) {
         console.error('SEO notification error:', error)
         toast.warning('⚠️ Товар создан, но не удалось уведомить поисковики')
       }

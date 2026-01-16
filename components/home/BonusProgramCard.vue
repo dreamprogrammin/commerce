@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { useProfileStore } from '@/stores/core/profileStore'
-import { useModalStore } from '@/stores/modal/useModalStore'
-
 import { useAuthStore } from '@/stores/core/useAuthStore'
+
+import { useModalStore } from '@/stores/modal/useModalStore'
 
 const profileStore = useProfileStore()
 const authStore = useAuthStore()

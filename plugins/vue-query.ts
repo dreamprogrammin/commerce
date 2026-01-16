@@ -1,8 +1,7 @@
 import type { DehydratedState, VueQueryPluginOptions } from '@tanstack/vue-query'
-import { dehydrate, hydrate, QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { persistQueryClient } from '@tanstack/query-persist-client-core'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
-
+import { persistQueryClient } from '@tanstack/query-persist-client-core'
+import { dehydrate, hydrate, QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 
 export default defineNuxtPlugin((nuxt) => {
   const vueQueryState = useState<DehydratedState | null>('vue-query')
@@ -39,8 +38,8 @@ export default defineNuxtPlugin((nuxt) => {
       storage: window.localStorage,
       key: 'tanstack-query-cache',
       throttleTime: 1000,
-      serialize: JSON.stringify,    // Явная сериализация
-      deserialize: JSON.parse,       // Явная десериализация
+      serialize: JSON.stringify, // Явная сериализация
+      deserialize: JSON.parse, // Явная десериализация
     })
 
     persistQueryClient({

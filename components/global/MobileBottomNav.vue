@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
+import { useCartStore } from '@/stores/publicStore/cartStore'
 
 const route = useRoute()
 const router = useRouter()

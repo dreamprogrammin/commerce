@@ -17,7 +17,7 @@ interface ReindexResult {
   failedBatches: number
 }
 
-export const useSeoIndexing = () => {
+export function useSeoIndexing() {
   const config = useRuntimeConfig()
   const baseUrl = config.public.siteUrl || 'https://uhti.kz'
 
@@ -26,19 +26,19 @@ export const useSeoIndexing = () => {
    */
   const notifySearchEngines = async (
     urls: string | string[],
-    options?: { silent?: boolean }
+    options?: { silent?: boolean },
   ): Promise<IndexingResult | null> => {
     const urlArray = Array.isArray(urls) ? urls : [urls]
-    
+
     // Конвертируем относительные пути в абсолютные
-    const absoluteUrls = urlArray.map(url => 
-      url.startsWith('http') ? url : `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`
+    const absoluteUrls = urlArray.map(url =>
+      url.startsWith('http') ? url : `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`,
     )
 
     try {
       const result = await $fetch<IndexingResult>('/api/seo/notify-indexing', {
         method: 'POST',
-        body: { urls: absoluteUrls }
+        body: { urls: absoluteUrls },
       })
 
       if (!options?.silent) {
@@ -51,7 +51,8 @@ export const useSeoIndexing = () => {
       }
 
       return result
-    } catch (error) {
+    }
+    catch (error) {
       if (!options?.silent) {
         console.error('❌ SEO: Ошибка уведомления поисковиков:', error)
       }
@@ -95,11 +96,12 @@ export const useSeoIndexing = () => {
     try {
       // ✅ Типизируем результат
       const result = await $fetch<ReindexResult>('/api/seo/reindex-all', {
-        method: 'POST'
+        method: 'POST',
       })
       console.log(`✅ Переиндексация завершена: ${result.total} товаров`)
       return result
-    } catch (error) {
+    }
+    catch (error) {
       console.error('❌ Ошибка массовой переиндексации:', error)
       throw error
     }

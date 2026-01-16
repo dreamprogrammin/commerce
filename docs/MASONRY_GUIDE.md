@@ -1,5 +1,6 @@
- Динамическая Масонри-сетка с управлением из админки
+Динамическая Масонри-сетка с управлением из админки
 📋 Что было реализовано:
+
 1. Каталог с динамическими размерами (pages/catalog/index.vue)
 
 ✅ CSS Grid масонри с 3 размерами карточек
@@ -15,61 +16,63 @@
 ✅ Автоматическая конвертация в featured_order
 ✅ Визуальная демонстрация размера
 
-
 🚀 Интеграция в админку:
 Шаг 1: Добавить компонент в форму редактирования категории
 vue<!-- В вашей форме редактирования категории -->
 <template>
+
   <form @submit.prevent="handleSave">
     <!-- Существующие поля: название, slug, описание и т.д. -->
-    
+
     <!-- ✨ НОВОЕ: Управление размером карточки -->
     <CategorySizeControl
       :category="editableCategory"
       @update="editableCategory = $event"
     />
-    
+
     <!-- Остальные поля -->
+
   </form>
 </template>
 
 <script setup>
 import CategorySizeControl from '@/components/admin/CategorySizeControl.vue'
 </script>
+
 Шаг 2: Логика уже работает!
 Поле featured_order уже есть в БД и используется так:
 typescript// В каталоге автоматически определяется размер:
 function getCardSize(category: CategoryRow): 'small' | 'medium' | 'large' {
-  const order = category.featured_order ?? 0
-  
-  // Диапазоны:
-  if (order >= 67) return 'large'   // 67-100 → Большая (2 колонки)
-  if (order >= 34) return 'medium'  // 34-66  → Средняя (высокая)
-  return 'small'                     // 0-33   → Обычная
+const order = category.featured_order ?? 0
+
+// Диапазоны:
+if (order >= 67) return 'large' // 67-100 → Большая (2 колонки)
+if (order >= 34) return 'medium' // 34-66 → Средняя (высокая)
+return 'small' // 0-33 → Обычная
 }
 
 📊 Как это выглядит:
 В каталоге (мобильная версия):
 ┌─────────┬─────────┐
-│ Small   │ Small   │  ← Обычные карточки
+│ Small │ Small │ ← Обычные карточки
 ├─────────┼─────────┤
-│ Medium  │ Small   │  ← Средняя + обычная
-│         ├─────────┤
-│         │ Small   │
+│ Medium │ Small │ ← Средняя + обычная
+│ ├─────────┤
+│ │ Small │
 ├─────────┴─────────┤
-│    Large (2x1)    │  ← Акцентная большая
+│ Large (2x1) │ ← Акцентная большая
 ├─────────┬─────────┤
-│ Small   │ Small   │
+│ Small │ Small │
 └─────────┴─────────┘
 В админке:
 ○ Обычная
-  1 колонка, стандартная высота
+1 колонка, стандартная высота
 
-● Средняя  ← Выбрано
-  1 колонка, увеличенная высота
+● Средняя ← Выбрано
+1 колонка, увеличенная высота
 
 ○ Большая
-  2 колонки, акцентная карточка
+2 колонки, акцентная карточка
 
 💡 Примеры использования:
 Обычные категории (small):
@@ -89,17 +92,17 @@ function getCardSize(category: CategoryRow): 'small' | 'medium' | 'large' {
 Сезонные коллекции
 То, на что нужно обратить внимание
 
-
 🎯 Альтернативные варианты управления:
 Вариант 1: Slider вместо Radio (более точный контроль)
 vue<div class="space-y-2">
-  <Label>Размер карточки: {{ featured_order }}</Label>
-  <Slider
+<Label>Размер карточки: {{ featured_order }}</Label>
+<Slider
     v-model="featured_order"
     :min="0"
     :max="100"
     :step="1"
   />
+
   <div class="text-xs text-muted-foreground">
     {{ featured_order < 34 ? 'Обычная' : featured_order < 67 ? 'Средняя' : 'Большая' }}
   </div>
@@ -118,22 +121,22 @@ vue<Select v-model="cardSize">
 
 🔧 Настройка размеров:
 Если нужно изменить размеры карточек в каталоге, отредактируйте CSS:
-css/* В pages/catalog/index.vue */
+css/_ В pages/catalog/index.vue _/
 .masonry-grid {
-  grid-auto-rows: 120px; /* Базовая единица высоты */
+grid-auto-rows: 120px; /_ Базовая единица высоты _/
 }
 
 .size-small {
-  grid-row: span 2; /* 2 × 120px = 240px */
+grid-row: span 2; /_ 2 × 120px = 240px _/
 }
 
 .size-medium {
-  grid-row: span 3; /* 3 × 120px = 360px */
+grid-row: span 3; /_ 3 × 120px = 360px _/
 }
 
 .size-large {
-  grid-column: span 2; /* На всю ширину */
-  grid-row: span 3;    /* 3 × 120px = 360px */
+grid-column: span 2; /_ На всю ширину _/
+grid-row: span 3; /_ 3 × 120px = 360px _/
 }
 
 ✅ Готово к работе!

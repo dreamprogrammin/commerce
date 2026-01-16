@@ -47,7 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-800',
 }
 
-export const useUserOrders = () => {
+export function useUserOrders() {
   const supabase = useSupabaseClient()
   const user = useSupabaseUser()
   const router = useRouter()
@@ -96,20 +96,24 @@ export const useUserOrders = () => {
         .eq('user_id', user.value.id)
         .order('created_at', { ascending: false })
 
-      if (fetchError) throw fetchError
+      if (fetchError)
+        throw fetchError
 
       orders.value = data as UserOrder[]
-    } catch (err: any) {
+    }
+    catch (err: any) {
       console.error('Ошибка загрузки заказов:', err)
       error.value = err.message
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
   }
 
   // Подписка на real-time обновления заказов
   const subscribeToOrderUpdates = () => {
-    if (!user.value) return null
+    if (!user.value)
+      return null
 
     const channel = supabase
       .channel(`user-orders:${user.value.id}`)
@@ -126,7 +130,7 @@ export const useUserOrders = () => {
           const oldOrder = payload.old as UserOrder
 
           // Обновляем заказ в списке
-          const index = orders.value.findIndex((o) => o.id === updatedOrder.id)
+          const index = orders.value.findIndex(o => o.id === updatedOrder.id)
 
           if (index !== -1) {
             // Сохраняем детали заказа (order_items) из старых данных
@@ -140,11 +144,12 @@ export const useUserOrders = () => {
             if (oldOrder.status !== updatedOrder.status) {
               showStatusChangeToast(updatedOrder)
             }
-          } else {
+          }
+          else {
             // Новый заказ - перезагружаем список
             fetchOrders()
           }
-        }
+        },
       )
       .subscribe()
 
@@ -181,10 +186,10 @@ export const useUserOrders = () => {
   // Получить текущий активный заказ (последний не завершённый)
   const activeOrder = computed(() => {
     return orders.value.find(
-      (order) =>
-        order.status !== 'delivered' &&
-        order.status !== 'cancelled' &&
-        order.status !== 'completed'
+      order =>
+        order.status !== 'delivered'
+        && order.status !== 'cancelled'
+        && order.status !== 'completed',
     )
   })
 

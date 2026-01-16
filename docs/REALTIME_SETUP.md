@@ -246,14 +246,14 @@ filter: 'status=eq.confirmed&user_id=eq.abc-123'
 
 ### Операторы фильтров
 
-| Оператор | Описание | Пример |
-|----------|----------|--------|
-| `eq` | Равно | `status=eq.confirmed` |
-| `neq` | Не равно | `status=neq.cancelled` |
-| `gt` | Больше | `total_amount=gt.50000` |
-| `gte` | Больше или равно | `stock_quantity=gte.10` |
-| `lt` | Меньше | `discount=lt.30` |
-| `lte` | Меньше или равно | `price=lte.5000` |
+| Оператор | Описание         | Пример                  |
+| -------- | ---------------- | ----------------------- |
+| `eq`     | Равно            | `status=eq.confirmed`   |
+| `neq`    | Не равно         | `status=neq.cancelled`  |
+| `gt`     | Больше           | `total_amount=gt.50000` |
+| `gte`    | Больше или равно | `stock_quantity=gte.10` |
+| `lt`     | Меньше           | `discount=lt.30`        |
+| `lte`    | Меньше или равно | `price=lte.5000`        |
 
 ---
 
@@ -291,6 +291,7 @@ USING (auth.uid() = user_id);
 - **Pro Plan:** 500 одновременных подключений
 
 **Оптимизация:**
+
 - Использовать один канал для нескольких событий
 - Отписываться при размонтировании компонентов
 - Не создавать дубликаты подписок
@@ -313,7 +314,8 @@ supabase
   })
   .subscribe((status, err) => {
     console.log('Status:', status) // SUBSCRIBED, CLOSED, CHANNEL_ERROR
-    if (err) console.error('Error:', err)
+    if (err)
+      console.error('Error:', err)
   })
 ```
 
@@ -338,6 +340,7 @@ WHERE pubname = 'supabase_realtime';
 ```
 
 Должно показать:
+
 - `public.orders`
 - `public.guest_checkouts`
 - `public.products`
@@ -383,15 +386,6 @@ supabase
 ### Индикатор синхронизации
 
 ```vue
-<template>
-  <div class="fixed bottom-4 right-4">
-    <div v-if="isRealtimeConnected" class="flex items-center gap-2 px-3 py-2 bg-green-100 rounded-lg">
-      <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-      <span class="text-sm text-green-700">Синхронизация активна</span>
-    </div>
-  </div>
-</template>
-
 <script setup>
 const isRealtimeConnected = ref(false)
 
@@ -401,6 +395,15 @@ supabase
     isRealtimeConnected.value = status === 'SUBSCRIBED'
   })
 </script>
+
+<template>
+  <div class="fixed bottom-4 right-4">
+    <div v-if="isRealtimeConnected" class="flex items-center gap-2 px-3 py-2 bg-green-100 rounded-lg">
+      <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+      <span class="text-sm text-green-700">Синхронизация активна</span>
+    </div>
+  </div>
+</template>
 ```
 
 ---
@@ -456,6 +459,7 @@ supabase
 7. **Пользователи** видят актуальные остатки мгновенно ✅
 
 **Результат:**
+
 - ⚡ Мгновенное обновление (< 1 секунды)
 - 🎯 Минимум запросов к БД
 - 🚀 Масштабируемость

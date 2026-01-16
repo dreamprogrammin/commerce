@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ArrowDownCircle, ArrowUpCircle, Clock, Gift, XCircle } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 // UI Components
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -38,15 +37,18 @@ async function loadBonusHistory() {
       p_offset: 0,
     })
 
-    if (error) throw error
+    if (error)
+      throw error
 
     transactions.value = data || []
-  } catch (error: any) {
+  }
+  catch (error: any) {
     console.error('[Bonus History] Error loading:', error)
     toast.error('Ошибка загрузки истории', {
       description: error.message,
     })
-  } finally {
+  }
+  finally {
     isLoading.value = false
   }
 }
@@ -65,7 +67,8 @@ function formatDate(dateString: string) {
 
 // Форматирование даты активации
 function formatActivationDate(dateString: string | null) {
-  if (!dateString) return '—'
+  if (!dateString)
+    return '—'
   const date = new Date(dateString)
   return new Intl.DateTimeFormat('ru-RU', {
     day: '2-digit',
@@ -260,7 +263,7 @@ onMounted(() => {
                   <div class="flex items-center gap-2">
                     <component
                       :is="getTransactionIcon(transaction.transaction_type)"
-                      :class="['h-4 w-4', getTransactionColor(transaction.transaction_type)]"
+                      class="h-4 w-4" :class="[getTransactionColor(transaction.transaction_type)]"
                     />
                     <div>
                       <div class="font-medium">
@@ -279,9 +282,8 @@ onMounted(() => {
                 <!-- Сумма -->
                 <TableCell class="text-right">
                   <span
-                    :class="[
-                      'font-semibold',
-                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                    class="font-semibold" :class="[
+                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600',
                     ]"
                   >
                     {{ transaction.amount > 0 ? '+' : '' }}{{ transaction.amount.toLocaleString('ru-RU') }} ₸

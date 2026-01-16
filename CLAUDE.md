@@ -61,6 +61,7 @@ supabase functions serve <function_name>
 ```
 
 **Local Ports**:
+
 - API: http://localhost:54321
 - Studio: http://localhost:54323
 - Inbucket (email testing): http://localhost:54324
@@ -70,6 +71,7 @@ supabase functions serve <function_name>
 ### Frontend Architecture
 
 **File-based Routing** (`/pages`): Nuxt auto-generates routes from Vue files
+
 - `/pages/index.vue` → Homepage
 - `/pages/catalog/[...slug].vue` → Dynamic catalog (categories/products)
 - `/pages/admin/**` → Admin dashboard
@@ -77,6 +79,7 @@ supabase functions serve <function_name>
 - `/pages/checkout.vue` → Checkout flow (SSR disabled)
 
 **State Management** (`/stores`): Pinia stores with domain-driven organization
+
 - `/stores/core/` - Auth, profile, personalization (cross-cutting concerns)
 - `/stores/publicStore/` - Cart, products, categories, wishlist (customer-facing)
 - `/stores/adminStore/` - Product/category/brand management (admin-only)
@@ -85,6 +88,7 @@ supabase functions serve <function_name>
 All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 
 **Components** (`/components`): Feature-organized structure
+
 - `/components/ui/` - shadcn-nuxt components (Button, Dialog, Input, etc.)
 - `/components/auth/` - Login/register modals
 - `/components/admin/` - Admin panel components
@@ -92,6 +96,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 - `/components/home/` - Homepage sections
 
 **Layouts** (`/layouts`):
+
 - `default.vue` - Main layout with header/footer
 - `admin.vue` - Admin dashboard layout
 - `catalog.vue` - Catalog with filters sidebar
@@ -101,12 +106,14 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 ### Backend Architecture
 
 **Supabase Edge Functions** (`/supabase/functions`):
+
 - `notify-order-to-telegram` - Telegram bot notifications for new orders
 - `confirm-order` - Order confirmation workflow
 - `cancel-order` - Order cancellation logic
 - `image-transformer` - Image transformation service
 
 **Database RPC Functions** (PostgreSQL stored procedures):
+
 - `get_filtered_products()` - Main catalog query with filters (category, brand, price, attributes, materials, countries)
 - `get_recommendations()` - Personalized product recommendations based on user history/age
 - `create_guest_checkout()` - Guest order creation with bonus spending
@@ -117,6 +124,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 - `get_price_range()` - Min/max price for category
 
 **Key Database Tables**:
+
 - `products` - Main product catalog (name, price, description, bonus_points, stock)
 - `product_images` - Gallery images with blur placeholders (LQIP)
 - `categories` - Hierarchical categories (parent_id for nesting)
@@ -130,6 +138,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 - `banners` / `slides` - Marketing content
 
 **Row Level Security (RLS)**: All tables have RLS policies
+
 - Public read access for products, categories, brands
 - Admin-only write access for catalog management
 - User-specific access for profiles, orders, wishlist
@@ -137,12 +146,14 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 ### Authentication Flow
 
 **Google OAuth Integration**:
+
 1. User clicks "Sign in with Google"
 2. Supabase Auth handles OAuth flow
 3. On successful auth, `profiles` table trigger auto-creates profile
 4. Profile includes: `full_name`, `avatar_url`, `bonus_balance`, `role`
 
 **Middleware** (`/middleware/auth.global.ts`):
+
 - Protects `/profile/**` routes (requires authentication)
 - Redirects logged-in users away from `/login` and `/register`
 - Opens login modal if unauthenticated user tries to access protected route
@@ -150,6 +161,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 ### Bonus/Loyalty Program
 
 **How it works**:
+
 1. Products have `bonus_points` field (earn on purchase)
 2. Users have `bonus_balance` in `profiles` table
 3. Orders track `bonus_spent` and `bonus_earned`
@@ -157,6 +169,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 5. Bonuses can be spent as discount during checkout (tracked in `bonuses` table)
 
 **Important Logic**:
+
 - Welcome bonus on signup (handled by database trigger)
 - Bonus activation after 7 days (check `activated_at` timestamp)
 - Bonus refund on order cancellation
@@ -181,6 +194,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
    - **Result**: 33% fewer API calls on navigation
 
 **Nuxt Route Rules** (SSR caching):
+
 - `/` - 10 min SWR
 - `/catalog` - 30 min SWR
 - `/catalog/products/**` - 1 hour SWR
@@ -189,6 +203,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 ### Image Optimization
 
 **Supabase Storage Buckets**:
+
 - `product-images` - Product galleries
 - `category-images` - Category thumbnails
 - `brand-logos` - Brand logos
@@ -196,11 +211,13 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 - `banners` - Marketing banners
 
 **LQIP Implementation** (Low Quality Image Placeholders):
+
 - All images have `blur_placeholder` column (Base64 data URI)
 - Stored during upload for instant blur-up effect
 - See `/docs/LQIP_IMPLEMENTATION.md` for details
 
 **Image Transformation**:
+
 - Supabase Image Transformation API used via `@nuxt/image`
 - WebP format with quality 80
 - Responsive breakpoints: xs(320), sm(640), md(768), lg(1024), xl(1280), xxl(1536)
@@ -208,12 +225,14 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 ### SEO Configuration
 
 **Modules**:
+
 - `@nuxtjs/sitemap` - Dynamic sitemap from `/api/sitemap-routes`
 - `@nuxtjs/robots` - robots.txt generation
 - `nuxt-schema-org` - JSON-LD structured data (Organization schema)
 - `nuxt-og-image` - Open Graph images for social sharing
 
 **Excluded from SEO**:
+
 - `/admin/**` (noindex)
 - `/profile/**`, `/checkout`, `/cart` (private pages)
 - `/order/**`, `/confirm/**` (dynamic pages)
@@ -266,6 +285,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 ### Admin Panel Access
 
 **How to check admin status**:
+
 ```typescript
 const profile = await supabase
   .from('profiles')
@@ -277,6 +297,7 @@ const isAdmin = profile.role === 'admin'
 ```
 
 **Admin routes** (`/pages/admin/**`):
+
 - Products management with image gallery upload
 - Categories (hierarchical tree)
 - Brands management
@@ -286,6 +307,7 @@ const isAdmin = profile.role === 'admin'
 ## Common Patterns
 
 ### Fetching Filtered Products
+
 ```typescript
 // Always use the RPC function for catalog queries
 const { data } = await supabase.rpc('get_filtered_products', {
@@ -303,6 +325,7 @@ const { data } = await supabase.rpc('get_filtered_products', {
 ```
 
 ### Image Upload to Supabase Storage
+
 ```typescript
 // Upload with blur placeholder
 const file = event.target.files[0]
@@ -315,6 +338,7 @@ const { data, error } = await supabase.storage
 ```
 
 ### Using TanStack Query
+
 ```typescript
 // In composable
 const { data, isLoading, isFetching } = useQuery({
@@ -328,6 +352,7 @@ const { data, isLoading, isFetching } = useQuery({
 ```
 
 ### Modal Management
+
 ```typescript
 // Open login modal
 const modalStore = useModalStore()
@@ -357,6 +382,7 @@ modalStore.closeModal()
 ## Documentation
 
 See `/docs/index.md` for complete documentation index:
+
 - Image optimization guides
 - Vue Query setup details
 - Telegram bot troubleshooting

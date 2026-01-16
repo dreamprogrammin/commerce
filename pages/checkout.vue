@@ -47,14 +47,14 @@ const phoneMaskOptions = reactive({
 const phoneUnmasked = ref('')
 
 // При фокусе показываем +7 если поле пустое
-const handlePhoneFocus = () => {
+function handlePhoneFocus() {
   if (!orderForm.value.phone) {
     orderForm.value.phone = '+7 '
   }
 }
 
 // При потере фокуса очищаем если только +7
-const handlePhoneBlur = () => {
+function handlePhoneBlur() {
   const trimmed = orderForm.value.phone.trim()
   if (trimmed === '+7' || trimmed === '+7 (' || trimmed === '+7 ()') {
     orderForm.value.phone = ''
@@ -64,27 +64,32 @@ const handlePhoneBlur = () => {
 // Валидация email
 const isValidEmail = computed(() => {
   const email = orderForm.value.email
-  if (!email) return true
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  if (!email)
+    return true
+  return /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(email)
 })
 
 // Валидация имени (минимум 2 символа)
 const isValidName = computed(() => {
   const name = orderForm.value.name.trim()
-  if (!name) return true
+  if (!name)
+    return true
   return name.length >= 2
 })
 
 // Валидация казахстанского мобильного телефона
 const isValidPhone = computed(() => {
   const digits = phoneUnmasked.value
-  if (!digits) return true
+  if (!digits)
+    return true
 
   // Должно быть ровно 11 цифр
-  if (digits.length !== 11) return false
+  if (digits.length !== 11)
+    return false
 
   // Должно начинаться с 7
-  if (!digits.startsWith('7')) return false
+  if (!digits.startsWith('7'))
+    return false
 
   // Проверка мобильных кодов: 70X, 74X, 75X, 76X, 77X, 78X
   const mobileCode = digits.substring(1, 3)
@@ -96,7 +101,8 @@ const isValidPhone = computed(() => {
 // Сообщение об ошибке для телефона
 const phoneErrorMessage = computed(() => {
   const digits = phoneUnmasked.value
-  if (!digits) return ''
+  if (!digits)
+    return ''
 
   if (digits.length < 11) {
     return 'Введите полный номер телефона'
@@ -121,11 +127,14 @@ const isFormValid = computed(() => {
   const { name, email, phone, deliveryMethod, address } = orderForm.value
 
   // Базовые поля
-  if (!name.trim() || !email.trim() || !phone.trim()) return false
-  if (!isValidName.value || !isValidEmail.value || !isValidPhone.value) return false
+  if (!name.trim() || !email.trim() || !phone.trim())
+    return false
+  if (!isValidName.value || !isValidEmail.value || !isValidPhone.value)
+    return false
 
   // Адрес для курьера
-  if (deliveryMethod === 'courier' && !address.line1.trim()) return false
+  if (deliveryMethod === 'courier' && !address.line1.trim())
+    return false
 
   return true
 })
@@ -277,7 +286,7 @@ async function placeOrder() {
               >
                 Зарегистрируйтесь
               </button>
-               и получите 1000 бонусов после подтверждения первого заказа! 🎁
+              и получите 1000 бонусов после подтверждения первого заказа! 🎁
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
@@ -306,9 +315,9 @@ async function placeOrder() {
                   autocomplete="tel"
                   placeholder="+7 (___) ___-__-__"
                   inputmode="tel"
+                  :class="{ 'border-destructive': orderForm.phone && orderForm.phone.length > 4 && !isValidPhone }"
                   @focus="handlePhoneFocus"
                   @blur="handlePhoneBlur"
-                  :class="{ 'border-destructive': orderForm.phone && orderForm.phone.length > 4 && !isValidPhone }"
                 />
                 <p v-if="orderForm.phone && orderForm.phone.length > 4 && phoneErrorMessage" class="text-xs text-destructive">
                   {{ phoneErrorMessage }}

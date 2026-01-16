@@ -3,6 +3,7 @@
 ## 📊 Диагностика проблемы
 
 ### ✅ Что работает правильно:
+
 1. ✅ **Sitemap генерируется** - https://uhti.kz/sitemap.xml доступен
 2. ✅ **Robots.txt настроен** - `/catalog/**` разрешен для индексации
 3. ✅ **Meta tags присутствуют** - title, description, canonical на всех страницах
@@ -31,8 +32,8 @@
 const { data: products } = await client
   .from('products')
   .select('slug, updated_at')
-  .eq('is_active', true)        // ⚠️ Только активные
-  .not('slug', 'is', null)       // ⚠️ Только с slug
+  .eq('is_active', true) // ⚠️ Только активные
+  .not('slug', 'is', null) // ⚠️ Только с slug
   .order('created_at', { ascending: false })
   .limit(10000)
 ```
@@ -65,6 +66,7 @@ FROM products;
 ```
 
 **Результат покажет:**
+
 - `total_products` - всего товаров в БД
 - `active_products` - активных товаров
 - `products_with_slug` - товаров с slug
@@ -111,6 +113,7 @@ WHERE is_active = false;
 ```
 
 **Проверка после выполнения:**
+
 ```sql
 SELECT COUNT(*) FROM products WHERE is_active = true;
 ```
@@ -182,10 +185,12 @@ WHERE is_active = true
 **После изменения БД sitemap НЕ обновится автоматически!**
 
 Если сайт на **Vercel/Netlify**:
+
 1. Перейдите в dashboard вашего хостинга
 2. Нажмите **Redeploy** или **Trigger deploy**
 
 Если сайт на **VPS**:
+
 ```bash
 # На сервере
 cd /path/to/project
@@ -201,6 +206,7 @@ pm2 restart uhti-commerce
 Откройте: https://uhti.kz/sitemap.xml
 
 **Должны увидеть:**
+
 ```xml
 <url>
   <loc>https://uhti.kz/catalog/products/igrushka-1</loc>
@@ -216,6 +222,7 @@ pm2 restart uhti-commerce
 ```
 
 **Посчитайте количество URL:**
+
 ```bash
 curl -s https://uhti.kz/sitemap.xml | grep -c "catalog/products"
 ```
@@ -295,8 +302,9 @@ FROM categories;
 **Проверка meta robots:**
 
 Откройте страницу товара → View Source → найдите:
+
 ```html
-<meta name="robots" content="index, follow">
+<meta name="robots" content="index, follow" />
 ```
 
 Если видите `noindex` → проблема в коде страницы (файл `/pages/catalog/products/[slug].vue`)

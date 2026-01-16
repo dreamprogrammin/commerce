@@ -31,11 +31,13 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
 
   // Показываем только гостям
-  if (!isGuest.value) return
+  if (!isGuest.value)
+    return
 
   // Проверяем, показывали ли уже в этой сессии
   const wasShown = sessionStorage.getItem(STORAGE_KEY)
-  if (wasShown) return
+  if (wasShown)
+    return
 
   // Показываем с небольшой задержкой для лучшего UX
   setTimeout(() => {
@@ -69,7 +71,7 @@ async function handleLoginClick() {
 }
 
 // Закрытие промо
-const handleClose = () => {
+function handleClose() {
   showPromo.value = false
 }
 </script>
@@ -98,8 +100,12 @@ const handleClose = () => {
               <Icon name="lucide:gift" class="w-5 h-5 text-orange-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Бонусы за покупки</h4>
-              <p class="text-sm text-muted-foreground">Получайте до 10% бонусами от суммы заказа</p>
+              <h4 class="font-medium">
+                Бонусы за покупки
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Получайте до 10% бонусами от суммы заказа
+              </p>
             </div>
           </div>
 
@@ -108,8 +114,12 @@ const handleClose = () => {
               <Icon name="lucide:package" class="w-5 h-5 text-blue-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Отслеживание заказов</h4>
-              <p class="text-sm text-muted-foreground">Следите за статусом доставки в режиме реального времени</p>
+              <h4 class="font-medium">
+                Отслеживание заказов
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Следите за статусом доставки в режиме реального времени
+              </p>
             </div>
           </div>
 
@@ -118,8 +128,12 @@ const handleClose = () => {
               <Icon name="lucide:heart" class="w-5 h-5 text-pink-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Список избранного</h4>
-              <p class="text-sm text-muted-foreground">Сохраняйте понравившиеся товары</p>
+              <h4 class="font-medium">
+                Список избранного
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Сохраняйте понравившиеся товары
+              </p>
             </div>
           </div>
 
@@ -128,8 +142,12 @@ const handleClose = () => {
               <Icon name="lucide:star" class="w-5 h-5 text-green-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Персональные рекомендации</h4>
-              <p class="text-sm text-muted-foreground">Подборки товаров специально для вас</p>
+              <h4 class="font-medium">
+                Персональные рекомендации
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Подборки товаров специально для вас
+              </p>
             </div>
           </div>
         </div>
@@ -170,8 +188,12 @@ const handleClose = () => {
               <Icon name="lucide:gift" class="w-5 h-5 text-orange-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Бонусы за покупки</h4>
-              <p class="text-sm text-muted-foreground">Получайте до 10% бонусами от суммы заказа</p>
+              <h4 class="font-medium">
+                Бонусы за покупки
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Получайте до 10% бонусами от суммы заказа
+              </p>
             </div>
           </div>
 
@@ -180,8 +202,12 @@ const handleClose = () => {
               <Icon name="lucide:package" class="w-5 h-5 text-blue-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Отслеживание заказов</h4>
-              <p class="text-sm text-muted-foreground">Следите за статусом доставки в режиме реального времени</p>
+              <h4 class="font-medium">
+                Отслеживание заказов
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Следите за статусом доставки в режиме реального времени
+              </p>
             </div>
           </div>
 
@@ -190,8 +216,12 @@ const handleClose = () => {
               <Icon name="lucide:heart" class="w-5 h-5 text-pink-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Список избранного</h4>
-              <p class="text-sm text-muted-foreground">Сохраняйте понравившиеся товары</p>
+              <h4 class="font-medium">
+                Список избранного
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Сохраняйте понравившиеся товары
+              </p>
             </div>
           </div>
 
@@ -200,8 +230,12 @@ const handleClose = () => {
               <Icon name="lucide:star" class="w-5 h-5 text-green-600" />
             </div>
             <div class="flex-1">
-              <h4 class="font-medium">Персональные рекомендации</h4>
-              <p class="text-sm text-muted-foreground">Подборки товаров специально для вас</p>
+              <h4 class="font-medium">
+                Персональные рекомендации
+              </h4>
+              <p class="text-sm text-muted-foreground">
+                Подборки товаров специально для вас
+              </p>
             </div>
           </div>
         </div>

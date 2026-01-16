@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Package, Calendar, CreditCard, MapPin, Gift, XCircle } from 'lucide-vue-next'
 import type { UserOrder } from '@/composables/orders/useUserOrders'
-import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { Calendar, CreditCard, Gift, MapPin, Package, XCircle } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
@@ -24,7 +24,7 @@ const order = ref<UserOrder | null>(null)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 
-const fetchOrder = async () => {
+async function fetchOrder() {
   isLoading.value = true
   error.value = null
 
@@ -58,10 +58,12 @@ const fetchOrder = async () => {
       .eq('id', orderId)
       .single()
 
-    if (fetchError) throw fetchError
+    if (fetchError)
+      throw fetchError
 
     order.value = data as UserOrder
-  } catch (err: any) {
+  }
+  catch (err: any) {
     console.error('Ошибка загрузки заказа:', err)
     error.value = err.message
 
@@ -71,7 +73,8 @@ const fetchOrder = async () => {
         router.push('/profile/order')
       }, 2000)
     }
-  } finally {
+  }
+  finally {
     isLoading.value = false
   }
 }
@@ -91,22 +94,29 @@ onUnmounted(() => {
 })
 
 // Форматирование адреса доставки
-const formatAddress = (address: any) => {
-  if (!address) return 'Не указан'
-  if (typeof address === 'string') return address
+function formatAddress(address: any) {
+  if (!address)
+    return 'Не указан'
+  if (typeof address === 'string')
+    return address
 
   const parts = []
-  if (address.city) parts.push(address.city)
-  if (address.street) parts.push(address.street)
-  if (address.building) parts.push(`д. ${address.building}`)
-  if (address.apartment) parts.push(`кв. ${address.apartment}`)
+  if (address.city)
+    parts.push(address.city)
+  if (address.street)
+    parts.push(address.street)
+  if (address.building)
+    parts.push(`д. ${address.building}`)
+  if (address.apartment)
+    parts.push(`кв. ${address.apartment}`)
 
   return parts.length > 0 ? parts.join(', ') : 'Не указан'
 }
 
 // Метод доставки
 const deliveryMethodLabel = computed(() => {
-  if (!order.value) return ''
+  if (!order.value)
+    return ''
 
   const method = order.value.delivery_method
   switch (method) {
@@ -121,7 +131,8 @@ const deliveryMethodLabel = computed(() => {
 
 // Метод оплаты
 const paymentMethodLabel = computed(() => {
-  if (!order.value?.payment_method) return 'Не указан'
+  if (!order.value?.payment_method)
+    return 'Не указан'
 
   const method = order.value.payment_method
   switch (method) {
@@ -137,8 +148,9 @@ const paymentMethodLabel = computed(() => {
 })
 
 // Обработчик отмены заказа
-const handleCancelOrder = async () => {
-  if (!order.value) return
+async function handleCancelOrder() {
+  if (!order.value)
+    return
 
   isCancelling.value = true
   const result = await cancelOrder(order.value.id)
@@ -154,7 +166,8 @@ const handleCancelOrder = async () => {
 
 // Получить URL изображения товара
 function getProductImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl) return null
+  if (!imageUrl)
+    return null
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
 }
 
@@ -180,8 +193,12 @@ useHead({
     <!-- Ошибка -->
     <div v-else-if="error" class="text-center py-12 space-y-4">
       <Icon name="lucide:alert-circle" class="w-16 h-16 text-destructive mx-auto" />
-      <h2 class="text-xl font-semibold">Заказ не найден</h2>
-      <p class="text-muted-foreground">{{ error }}</p>
+      <h2 class="text-xl font-semibold">
+        Заказ не найден
+      </h2>
+      <p class="text-muted-foreground">
+        {{ error }}
+      </p>
       <Button @click="router.push('/profile/order')">
         Вернуться к списку заказов
       </Button>
@@ -217,8 +234,12 @@ useHead({
             <div class="flex items-start gap-3">
               <Package class="w-5 h-5 text-muted-foreground mt-0.5" />
               <div class="flex-1">
-                <p class="text-sm font-medium">Способ доставки</p>
-                <p class="text-sm text-muted-foreground">{{ deliveryMethodLabel }}</p>
+                <p class="text-sm font-medium">
+                  Способ доставки
+                </p>
+                <p class="text-sm text-muted-foreground">
+                  {{ deliveryMethodLabel }}
+                </p>
               </div>
             </div>
 
@@ -226,8 +247,12 @@ useHead({
             <div v-if="order.delivery_method === 'delivery'" class="flex items-start gap-3">
               <MapPin class="w-5 h-5 text-muted-foreground mt-0.5" />
               <div class="flex-1">
-                <p class="text-sm font-medium">Адрес доставки</p>
-                <p class="text-sm text-muted-foreground">{{ formatAddress(order.delivery_address) }}</p>
+                <p class="text-sm font-medium">
+                  Адрес доставки
+                </p>
+                <p class="text-sm text-muted-foreground">
+                  {{ formatAddress(order.delivery_address) }}
+                </p>
               </div>
             </div>
 
@@ -235,8 +260,12 @@ useHead({
             <div class="flex items-start gap-3">
               <CreditCard class="w-5 h-5 text-muted-foreground mt-0.5" />
               <div class="flex-1">
-                <p class="text-sm font-medium">Способ оплаты</p>
-                <p class="text-sm text-muted-foreground">{{ paymentMethodLabel }}</p>
+                <p class="text-sm font-medium">
+                  Способ оплаты
+                </p>
+                <p class="text-sm text-muted-foreground">
+                  {{ paymentMethodLabel }}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -362,9 +391,9 @@ useHead({
             Нет, оставить
           </AlertDialogCancel>
           <AlertDialogAction
-            @click="handleCancelOrder"
             :disabled="isCancelling"
             class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            @click="handleCancelOrder"
           >
             <span v-if="isCancelling">Отменяем...</span>
             <span v-else>Да, отменить</span>

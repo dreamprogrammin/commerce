@@ -5,7 +5,7 @@ const { reindexAllProducts } = useSeoIndexing()
 const loading = ref(false)
 const showConfirm = ref(false)
 
-const handleReindex = async () => {
+async function handleReindex() {
   if (!showConfirm.value) {
     showConfirm.value = true
     return
@@ -16,26 +16,28 @@ const handleReindex = async () => {
 
   try {
     const result = await reindexAllProducts()
-    
+
     toast.success(
       `✅ Успешно! Отправлено ${result.submitted} из ${result.total} товаров`,
-      { duration: 5000 }
+      { duration: 5000 },
     )
 
     if (result.failedBatches > 0) {
       toast.warning(
         `⚠️ ${result.failedBatches} батчей не удалось отправить`,
-        { duration: 5000 }
+        { duration: 5000 },
       )
     }
-  } catch (error: any) {
+  }
+  catch (error: any) {
     toast.error(`❌ Ошибка: ${error.data?.message || error.message}`)
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
-const cancelReindex = () => {
+function cancelReindex() {
   showConfirm.value = false
 }
 </script>
@@ -44,9 +46,9 @@ const cancelReindex = () => {
   <div class="space-y-2">
     <button
       v-if="!showConfirm"
-      @click="handleReindex"
       :disabled="loading"
       class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      @click="handleReindex"
     >
       <Icon v-if="!loading" name="lucide:refresh-cw" class="w-4 h-4" />
       <Icon v-else name="lucide:loader-2" class="w-4 h-4 animate-spin" />
@@ -62,20 +64,20 @@ const cancelReindex = () => {
             Подтвердите массовую переиндексацию
           </h3>
           <p class="text-sm text-yellow-800 mb-3">
-            Это отправит все активные товары в Yandex и Bing. 
+            Это отправит все активные товары в Yandex и Bing.
             Процесс может занять несколько минут.
           </p>
           <div class="flex gap-2">
             <button
-              @click="handleReindex"
               :disabled="loading"
               class="px-3 py-1.5 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 text-sm font-medium"
+              @click="handleReindex"
             >
               Да, начать переиндексацию
             </button>
             <button
-              @click="cancelReindex"
               class="px-3 py-1.5 bg-white border border-yellow-300 text-yellow-900 rounded hover:bg-yellow-50 text-sm font-medium"
+              @click="cancelReindex"
             >
               Отмена
             </button>
@@ -86,7 +88,7 @@ const cancelReindex = () => {
 
     <!-- Описание -->
     <p class="text-sm text-gray-600">
-      💡 Используйте это один раз для отправки существующих товаров. 
+      💡 Используйте это один раз для отправки существующих товаров.
       Новые товары отправляются автоматически при сохранении.
     </p>
   </div>

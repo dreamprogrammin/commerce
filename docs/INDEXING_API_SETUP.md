@@ -5,12 +5,14 @@
 **Google Indexing API** - официальный API от Google, который позволяет программно запрашивать индексацию URL без ручного ввода в Google Search Console.
 
 **Преимущества:**
+
 - ✅ Автоматический запрос индексации для всех URL
 - ✅ До 200 URL в день (vs 10 вручную)
 - ✅ Можно интегрировать в CI/CD
 - ✅ Быстрее чем ручной запрос
 
 **Лимиты:**
+
 - 📊 200 URL в день
 - 🔄 100 запросов в минуту
 - 📈 Можно запросить увеличение квоты
@@ -64,6 +66,7 @@
 ### 1.6. Скопируйте email сервисного аккаунта
 
 Он выглядит так:
+
 ```
 uhti-indexing-bot@uhti-indexing.iam.gserviceaccount.com
 ```
@@ -99,6 +102,7 @@ npm install googleapis
 ```
 
 Или если используете pnpm:
+
 ```bash
 pnpm add googleapis
 ```
@@ -117,6 +121,7 @@ service-account.json
 ```
 
 Проверьте:
+
 ```bash
 cat .gitignore | grep service-account
 ```
@@ -160,6 +165,7 @@ node scripts/request-indexing.js
 ```
 
 **Преимущества:**
+
 - ✅ Использует ваш существующий API endpoint `/api/sitemap-routes`
 - ✅ Никакого дублирования кода или логики
 - ✅ Автоматически индексирует все страницы из sitemap
@@ -205,6 +211,7 @@ jobs:
 ```
 
 **Настройка секрета:**
+
 1. GitHub → Settings → Secrets → New repository secret
 2. Name: `GOOGLE_SERVICE_ACCOUNT`
 3. Value: содержимое `service-account.json` (весь JSON)
@@ -230,69 +237,70 @@ crontab -e
 Создайте `/server/api/request-indexing.post.ts`:
 
 ```typescript
-import { google } from 'googleapis';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs'
+import path from 'node:path'
+import { google } from 'googleapis'
 
 export default defineEventHandler(async (event) => {
   // Проверка авторизации (только админ)
-  const user = await serverSupabaseUser(event);
+  const user = await serverSupabaseUser(event)
   if (!user) {
     throw createError({
       statusCode: 401,
       message: 'Unauthorized',
-    });
+    })
   }
 
   // Получаем URL из тела запроса
-  const { url } = await readBody(event);
+  const { url } = await readBody(event)
 
   if (!url || !url.startsWith('https://uhti.kz/')) {
     throw createError({
       statusCode: 400,
       message: 'Invalid URL',
-    });
+    })
   }
 
   try {
     // Инициализация API
-    const keyFilePath = path.join(process.cwd(), 'service-account.json');
+    const keyFilePath = path.join(process.cwd(), 'service-account.json')
 
     if (!fs.existsSync(keyFilePath)) {
-      throw new Error('Service account file not found');
+      throw new Error('Service account file not found')
     }
 
     const auth = new google.auth.GoogleAuth({
       keyFile: keyFilePath,
       scopes: ['https://www.googleapis.com/auth/indexing'],
-    });
+    })
 
-    const authClient = await auth.getClient();
+    const authClient = await auth.getClient()
     const indexing = google.indexing({
       version: 'v3',
       auth: authClient,
-    });
+    })
 
     // Запрос индексации
     const response = await indexing.urlNotifications.publish({
       requestBody: {
-        url: url,
+        url,
         type: 'URL_UPDATED',
       },
-    });
+    })
 
     return {
       success: true,
-      url: url,
+      url,
       data: response.data,
-    };
-  } catch (error: any) {
+    }
+  }
+  catch (error: any) {
     throw createError({
       statusCode: 500,
       message: error.message,
-    });
+    })
   }
-});
+})
 ```
 
 **Использование в компоненте:**
@@ -301,7 +309,7 @@ export default defineEventHandler(async (event) => {
 // При создании товара в админке
 async function createProduct(productData) {
   // Создать товар
-  const product = await productsStore.createProduct(productData);
+  const product = await productsStore.createProduct(productData)
 
   // Запросить индексацию
   await $fetch('/api/request-indexing', {
@@ -309,7 +317,7 @@ async function createProduct(productData) {
     body: {
       url: `https://uhti.kz/catalog/products/${product.slug}`,
     },
-  });
+  })
 }
 ```
 
@@ -320,17 +328,20 @@ async function createProduct(productData) {
 Скрипт автоматически получает все URL из вашего существующего API endpoint:
 
 **Откуда берутся URL:**
+
 - Вызывается ваш endpoint: `https://uhti.kz/api/sitemap-routes`
 - Этот endpoint уже реализован в `/server/api/sitemap-routes.ts`
 - Он возвращает список всех страниц: категории, товары, бренды, статические страницы
 - Скрипт отправляет каждый URL в Google Indexing API
 
 **Что индексируется:**
+
 - Всё, что есть в вашем sitemap.xml
 - Категории, товары, бренды, статические страницы
 - Только активные записи из базы данных
 
 **Лимит Google:**
+
 - Если найдено больше 200 URL → будут обработаны первые 200
 - Остальные можно запросить на следующий день
 
@@ -343,6 +354,7 @@ async function createProduct(productData) {
 **Причина:** Не удалось получить данные из `/api/sitemap-routes`
 
 **Решение:**
+
 1. Проверьте что сайт доступен: `https://uhti.kz`
 2. Проверьте что API работает: `https://uhti.kz/api/sitemap-routes`
    ```bash
@@ -358,6 +370,7 @@ async function createProduct(productData) {
 **Причина:** API вернул пустой массив
 
 **Решение:**
+
 1. Проверьте что в базе данных есть данные (категории, товары, бренды)
 2. Проверьте что endpoint работает:
    ```bash
@@ -372,6 +385,7 @@ async function createProduct(productData) {
 **Причина:** Service Account не добавлен в Google Search Console
 
 **Решение:**
+
 1. Проверьте email сервисного аккаунта
 2. Добавьте его в GSC как Владельца
 
@@ -382,6 +396,7 @@ async function createProduct(productData) {
 **Причина:** Indexing API не включен в Google Cloud
 
 **Решение:**
+
 1. Google Cloud Console → API и сервисы → Библиотека
 2. Найдите "Indexing API"
 3. Нажмите "Включить"
@@ -393,6 +408,7 @@ async function createProduct(productData) {
 **Причина:** Превышен дневной лимит 200 URL
 
 **Решение:**
+
 1. Подождите до следующего дня
 2. Или запросите увеличение квоты в Google Cloud Console
 
@@ -403,6 +419,7 @@ async function createProduct(productData) {
 **Причина:** Файл не найден или не в корне проекта
 
 **Решение:**
+
 1. Проверьте что файл лежит в корне проекта
 2. Проверьте имя файла (должно быть точно `service-account.json`)
 
@@ -422,6 +439,7 @@ site:uhti.kz
 ```
 
 **Прогресс:**
+
 - День 1: 3-5 страниц
 - День 3: 10-15 страниц
 - День 5: 20-25 страниц

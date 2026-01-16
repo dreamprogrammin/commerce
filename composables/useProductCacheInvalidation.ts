@@ -17,7 +17,7 @@ export function useProductCacheInvalidation() {
    */
   function invalidateProduct(productSlug: string) {
     queryClient.invalidateQueries({
-      queryKey: ['product', productSlug]
+      queryKey: ['product', productSlug],
     })
     console.log(`🔄 Invalidated cache for product: ${productSlug}`)
   }
@@ -28,7 +28,7 @@ export function useProductCacheInvalidation() {
    */
   function invalidateAllCatalogProducts() {
     queryClient.invalidateQueries({
-      queryKey: ['catalog-products']
+      queryKey: ['catalog-products'],
     })
     console.log('🔄 Invalidated cache for all catalog products')
   }
@@ -38,13 +38,13 @@ export function useProductCacheInvalidation() {
    */
   function invalidateHomeProducts() {
     queryClient.invalidateQueries({
-      queryKey: ['home-popular']
+      queryKey: ['home-popular'],
     })
     queryClient.invalidateQueries({
-      queryKey: ['home-newest']
+      queryKey: ['home-newest'],
     })
     queryClient.invalidateQueries({
-      queryKey: ['home-recommendations']
+      queryKey: ['home-recommendations'],
     })
     console.log('🔄 Invalidated cache for home products')
   }
@@ -56,7 +56,7 @@ export function useProductCacheInvalidation() {
   function invalidateCategoryProducts(categorySlug: string) {
     queryClient.invalidateQueries({
       queryKey: ['catalog-products', categorySlug],
-      exact: false // Инвалидирует все запросы, начинающиеся с этого ключа
+      exact: false, // Инвалидирует все запросы, начинающиеся с этого ключа
     })
     console.log(`🔄 Invalidated cache for category: ${categorySlug}`)
   }
@@ -72,7 +72,7 @@ export function useProductCacheInvalidation() {
     // Также инвалидируем все отдельные товары
     queryClient.invalidateQueries({
       queryKey: ['product'],
-      exact: false
+      exact: false,
     })
 
     console.log('🔄 Invalidated ALL product caches')
@@ -87,28 +87,28 @@ export function useProductCacheInvalidation() {
     queryClient.refetchQueries({
       queryKey: ['catalog-products'],
       exact: false,
-      type: 'active' // Только активные запросы
+      type: 'active', // Только активные запросы
     })
 
     queryClient.refetchQueries({
       queryKey: ['home-popular'],
-      type: 'active'
+      type: 'active',
     })
 
     queryClient.refetchQueries({
       queryKey: ['home-newest'],
-      type: 'active'
+      type: 'active',
     })
 
     queryClient.refetchQueries({
       queryKey: ['home-recommendations'],
-      type: 'active'
+      type: 'active',
     })
 
     queryClient.refetchQueries({
       queryKey: ['product'],
       exact: false,
-      type: 'active'
+      type: 'active',
     })
 
     console.log('🔄 Refetched ALL active product queries')

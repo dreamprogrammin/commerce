@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('authStore', () => {
   async function signInWithOAuth(provider: 'google', redirectTo: string = '/profile') {
     try {
       console.log('[Auth Store] Starting OAuth flow, redirect to:', redirectTo)
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -31,12 +31,12 @@ export const useAuthStore = defineStore('authStore', () => {
           },
         },
       })
-      
+
       if (error) {
         console.error('[Auth Store] OAuth error:', error)
         throw error
       }
-      
+
       console.log('[Auth Store] OAuth redirect initiated')
     }
     catch (e: any) {
@@ -52,19 +52,19 @@ export const useAuthStore = defineStore('authStore', () => {
   async function signOut() {
     try {
       console.log('[Auth Store] Signing out...')
-      
+
       const { error } = await supabase.auth.signOut()
-      
+
       if (error) {
         console.error('[Auth Store] Sign out error:', error)
         throw error
       }
 
       profileStore.clearProfile()
-      
+
       console.log('[Auth Store] Sign out successful, redirecting to home')
       await router.push('/')
-      
+
       toast.success('Вы успешно вышли из системы')
     }
     catch (e: any) {
@@ -78,7 +78,7 @@ export const useAuthStore = defineStore('authStore', () => {
     console.log('[Auth Store] User state changed:', {
       from: oldUser?.id,
       to: newUser?.id,
-      hasProfile: !!profileStore.profile
+      hasProfile: !!profileStore.profile,
     })
   })
 

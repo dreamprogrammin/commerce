@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { Brand } from '@/types'
+import { Eye, MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
-import { Search, Plus, MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-vue-next'
-import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS } from '@/constants'
 import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_BRANDS } from '@/constants'
+import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 
 definePageMeta({ layout: 'admin' })
 
@@ -17,12 +17,13 @@ const { getImageUrl } = useSupabaseStorage()
 // Поиск
 const searchQuery = ref('')
 const filteredBrands = computed(() => {
-  if (!searchQuery.value) return brands.value
+  if (!searchQuery.value)
+    return brands.value
 
   const query = searchQuery.value.toLowerCase()
   return brands.value.filter(brand =>
-    brand.name.toLowerCase().includes(query) ||
-    brand.slug?.toLowerCase().includes(query)
+    brand.name.toLowerCase().includes(query)
+    || brand.slug?.toLowerCase().includes(query),
   )
 })
 
@@ -40,7 +41,8 @@ function openDeleteDialog(brand: Brand) {
 }
 
 async function handleDelete() {
-  if (!brandToDelete.value) return
+  if (!brandToDelete.value)
+    return
 
   const success = await brandsStore.deleteBrand(brandToDelete.value)
 
@@ -54,7 +56,8 @@ async function handleDelete() {
 
 // Получить URL логотипа бренда
 function getBrandLogoUrl(logoUrl: string | null): string {
-  if (!logoUrl) return '/images/placeholder-brand.svg'
+  if (!logoUrl)
+    return '/images/placeholder-brand.svg'
   return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.CATEGORY_MENU) || '/images/placeholder-brand.svg'
 }
 </script>
@@ -114,11 +117,19 @@ function getBrandLogoUrl(logoUrl: string | null): string {
         <Table v-else>
           <TableHeader>
             <TableRow>
-              <TableHead class="w-16">Лого</TableHead>
+              <TableHead class="w-16">
+                Лого
+              </TableHead>
               <TableHead>Название</TableHead>
-              <TableHead class="hidden md:table-cell">Слаг (URL)</TableHead>
-              <TableHead class="hidden lg:table-cell">Товаров</TableHead>
-              <TableHead class="text-right">Действия</TableHead>
+              <TableHead class="hidden md:table-cell">
+                Слаг (URL)
+              </TableHead>
+              <TableHead class="hidden lg:table-cell">
+                Товаров
+              </TableHead>
+              <TableHead class="text-right">
+                Действия
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

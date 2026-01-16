@@ -1,7 +1,7 @@
-import { vi } from 'vitest'
 import { config } from '@vue/test-utils'
 import { defineStore } from 'pinia'
-import { computed, ref, toRaw, watch, onMounted, onUnmounted } from 'vue'
+import { vi } from 'vitest'
+import { computed, onMounted, onUnmounted, ref, toRaw, watch } from 'vue'
 
 // Make Pinia and Vue composables available globally (Nuxt auto-imports)
 global.defineStore = defineStore
@@ -82,10 +82,9 @@ vi.mock('vue-sonner', () => ({
 }))
 
 // Export mocks for test files
-export { mockSupabaseClient, mockQueryBuilder, mockRouter, mockChannel, mockToast }
+export { mockChannel, mockQueryBuilder, mockRouter, mockSupabaseClient, mockToast }
 
 // Configure Vue Test Utils
 config.global.stubs = {
   teleport: true,
 }
-

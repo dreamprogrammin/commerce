@@ -700,5 +700,6 @@ const maxAgeYearsValue = computed({
         Сохранить товар
       </Button>
     </div>
+
   </form>
 </template>

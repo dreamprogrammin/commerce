@@ -26,7 +26,7 @@ async function checkPage(browser, url) {
   const errors = []
 
   // Слушаем ВСЕ консольные сообщения
-  page.on('console', msg => {
+  page.on('console', (msg) => {
     const text = msg.text()
     const type = msg.type()
 
@@ -35,12 +35,12 @@ async function checkPage(browser, url) {
       allConsoleMessages.push({ url, type, text })
     }
 
-    const isHydrationError =
-      text.toLowerCase().includes('hydration') ||
-      text.toLowerCase().includes('mismatch') ||
-      text.includes('server rendered') ||
-      text.includes('client rendered') ||
-      text.includes('[Vue warn]')
+    const isHydrationError
+      = text.toLowerCase().includes('hydration')
+        || text.toLowerCase().includes('mismatch')
+        || text.includes('server rendered')
+        || text.includes('client rendered')
+        || text.includes('[Vue warn]')
 
     if (isHydrationError) {
       errors.push({
@@ -52,7 +52,7 @@ async function checkPage(browser, url) {
   })
 
   // Слушаем pageerror
-  page.on('pageerror', err => {
+  page.on('pageerror', (err) => {
     if (err.message.includes('hydration') || err.message.includes('Hydration')) {
       errors.push({
         url,
@@ -74,12 +74,15 @@ async function checkPage(browser, url) {
     if (errors.length > 0) {
       console.log(`  ❌ Found ${errors.length} hydration error(s)`)
       hydrationErrors.push(...errors)
-    } else {
+    }
+    else {
       console.log(`  ✅ No hydration errors`)
     }
-  } catch (e) {
+  }
+  catch (e) {
     console.log(`  ⚠️ Error loading page: ${e.message}`)
-  } finally {
+  }
+  finally {
     await page.close()
   }
 }
@@ -98,7 +101,7 @@ async function main() {
 
   await browser.close()
 
-  console.log('\n' + '='.repeat(50))
+  console.log(`\n${'='.repeat(50)}`)
 
   // Показываем все ошибки/warnings для анализа
   if (allConsoleMessages.length > 0) {
@@ -120,7 +123,8 @@ async function main() {
       console.log('-'.repeat(50))
     }
     process.exit(1)
-  } else {
+  }
+  else {
     console.log('\n✅ No hydration errors found!')
     process.exit(0)
   }

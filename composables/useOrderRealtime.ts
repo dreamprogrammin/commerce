@@ -64,12 +64,13 @@ export function useOrderRealtime() {
               lastProcessedOrderId = null
             }
           }, 5000)
-        }
+        },
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('✅ Subscribed to orders channel')
-        } else if (status === 'CHANNEL_ERROR') {
+        }
+        else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Error subscribing to orders channel')
         }
       })
@@ -121,12 +122,13 @@ export function useOrderRealtime() {
               lastProcessedOrderId = null
             }
           }, 5000)
-        }
+        },
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('✅ Subscribed to guest checkouts channel')
-        } else if (status === 'CHANNEL_ERROR') {
+        }
+        else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Error subscribing to guest checkouts channel')
         }
       })
@@ -153,7 +155,7 @@ export function useOrderRealtime() {
 
           // 🔥 ПРИНУДИТЕЛЬНО перезагружаем данные
           refetchAllProducts()
-        }
+        },
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {

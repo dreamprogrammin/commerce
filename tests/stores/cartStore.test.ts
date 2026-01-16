@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { useCartStore } from '@/stores/publicStore/cartStore'
 import type { ProductWithImages } from '@/types'
-import { mockSupabaseClient, mockQueryBuilder, mockToast } from '../setup'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+import { mockQueryBuilder, mockSupabaseClient, mockToast } from '../setup'
 
 const mockProduct: ProductWithImages = {
   id: 'product-1',
@@ -80,7 +80,7 @@ describe('cartStore', () => {
       expect(store.items[0].quantity).toBe(5) // 2 + 3
     })
 
-    it('BUG: позволяет параллельные запросы при двойном клике', async () => {
+    it('bUG: позволяет параллельные запросы при двойном клике', async () => {
       const store = useCartStore()
 
       // Симулируем медленный запрос к БД (300ms)
@@ -223,7 +223,7 @@ describe('cartStore', () => {
     it('должен правильно вычислить bonusesToAward', async () => {
       // ✅ Устанавливаем авторизованного пользователя
       global.useSupabaseUser = vi.fn(() => ({
-        value: { id: 'user-123', email: 'test@example.com' }
+        value: { id: 'user-123', email: 'test@example.com' },
       }))
 
       const store = useCartStore()
@@ -243,7 +243,7 @@ describe('cartStore', () => {
     it('должен очистить корзину и бонусы', async () => {
       // ✅ Устанавливаем авторизованного пользователя
       global.useSupabaseUser = vi.fn(() => ({
-        value: { id: 'user-123', email: 'test@example.com' }
+        value: { id: 'user-123', email: 'test@example.com' },
       }))
 
       const store = useCartStore()

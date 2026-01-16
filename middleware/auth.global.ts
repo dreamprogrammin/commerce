@@ -1,6 +1,6 @@
+import { useProfileStore } from '@/stores/core/profileStore'
 // middleware/auth.global.ts
 import { useModalStore } from '@/stores/modal/useModalStore'
-import { useProfileStore } from '@/stores/core/profileStore'
 
 export default defineNuxtRouteMiddleware(async (to, from) => {
   // ✅ Пропускаем на сервере - проверка только на клиенте
@@ -33,17 +33,17 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   // ✅ ВАЖНО: Даем время на инициализацию после OAuth редиректа
   if (!user.value) {
     console.log('[Auth Middleware] No user detected, waiting for auth initialization...')
-    
+
     // Ждем немного - возможно, auth plugin еще не отработал
     await new Promise(resolve => setTimeout(resolve, 100))
-    
+
     // Проверяем еще раз
     if (!user.value) {
       console.log('[Auth Middleware] Still no user after wait, redirecting to home')
-      
+
       const modalStore = useModalStore()
       modalStore.openLoginModal()
-      
+
       return navigateTo('/')
     }
   }
@@ -55,15 +55,15 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
 
   console.log('[Auth Middleware] Profile state:', {
     exists: !!profileStore.profile,
-    loading: profileStore.isLoading
+    loading: profileStore.isLoading,
   })
 
   // Если профиля нет И он НЕ загружается - запускаем загрузку (не ждем)
   if (!profileStore.profile && !profileStore.isLoading) {
     console.log('[Auth Middleware] Starting profile load (not awaiting)...')
-    
+
     // ✅ Не ждем результат - пусть загружается в фоне
-    profileStore.loadProfile(false, true).catch(error => {
+    profileStore.loadProfile(false, true).catch((error) => {
       console.error('[Auth Middleware] Profile load error:', error)
     })
   }

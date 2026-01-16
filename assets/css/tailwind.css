@@ -122,18 +122,18 @@
   * {
     @apply border-border outline-ring/50;
   }
-  
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings:
       'rlig' 1,
       'calt' 1;
   }
-  
+
   .app-container {
     @apply container max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12;
   }
-  
+
   .sr-only {
     position: absolute;
     width: 1px;

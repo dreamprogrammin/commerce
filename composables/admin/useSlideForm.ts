@@ -1,5 +1,4 @@
 import type { Database, SlideInsert, SlideRow, SlideUpdate } from '@/types'
-import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import {

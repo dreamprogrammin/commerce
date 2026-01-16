@@ -26,6 +26,7 @@ pages/
 ### 1. **Двухуровневое кэширование**
 
 #### Уровень 1: Метаданные фильтров (Pinia Store)
+
 ```typescript
 // stores/publicStore/productsStore.ts
 const brandsByCategory = ref<Record<string, BrandForFilter[]>>({})
@@ -35,8 +36,9 @@ const allCountries = ref<Country[]>([])
 ```
 
 **Что кэшируется:**
+
 - Бренды по категориям
-- Атрибуты по категориям  
+- Атрибуты по категориям
 - Материалы (глобально)
 - Страны (глобально)
 - Диапазоны цен по категориям
@@ -44,6 +46,7 @@ const allCountries = ref<Country[]>([])
 **Время жизни:** До закрытия вкладки
 
 #### Уровень 2: Товары (Vue Query)
+
 ```typescript
 // composables/useCatalogQuery.ts
 const query = useQuery({
@@ -55,24 +58,27 @@ const query = useQuery({
 ```
 
 **Что кэшируется:**
+
 - Списки товаров по комбинациям фильтров
 
-**Время жизни:** 
+**Время жизни:**
+
 - Stale time: 5 минут (свежие данные)
 - GC time: 10 минут (в кэше)
 
 ## 📊 Результаты оптимизации
 
 ### До оптимизации
+
 ```
 Категория А (первый заход):
   ├── 5 запросов метаданных (brands, attributes, etc.)
   └── 1 запрос товаров
-  
+
 Категория Б (переход):
   ├── 5 запросов метаданных ❌
   └── 1 запрос товаров ❌
-  
+
 Категория А (возврат):
   ├── 5 запросов метаданных ❌ (повторно!)
   └── 1 запрос товаров ❌ (повторно!)
@@ -81,15 +87,16 @@ const query = useQuery({
 ```
 
 ### После оптимизации
+
 ```
 Категория А (первый заход):
-  ├── 5 запросов метаданных 
+  ├── 5 запросов метаданных
   └── 1 запрос товаров
-  
+
 Категория Б (переход):
   ├── 5 запросов метаданных
   └── 1 запрос товаров
-  
+
 Категория А (возврат):
   ├── 0 запросов ✅ (из Pinia кэша)
   └── 0 запросов ✅ (из Vue Query кэша)
@@ -98,6 +105,7 @@ const query = useQuery({
 ```
 
 ### При изменении фильтров
+
 ```
 Сортировка: Новизна → Популярность
   └── 0 запросов ✅ (из Vue Query кэша)
@@ -117,11 +125,11 @@ const query = useQuery({
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,        // 5 минут - свежие данные
-      gcTime: 10 * 60 * 1000,          // 10 минут - в кэше
-      refetchOnWindowFocus: false,     // Не перезагружать при фокусе
-      refetchOnReconnect: true,        // Перезагрузить при восстановлении связи
-      retry: 1,                        // 1 попытка повтора
+      staleTime: 5 * 60 * 1000, // 5 минут - свежие данные
+      gcTime: 10 * 60 * 1000, // 10 минут - в кэше
+      refetchOnWindowFocus: false, // Не перезагружать при фокусе
+      refetchOnReconnect: true, // Перезагрузить при восстановлении связи
+      retry: 1, // 1 попытка повтора
     },
   },
 })
@@ -133,7 +141,7 @@ const queryClient = new QueryClient({
 const query = useQuery({
   queryKey: ['custom-key'],
   queryFn: async () => {...},
-  
+
   // Переопределить глобальные настройки
   staleTime: 10 * 60 * 1000,  // 10 минут для этого запроса
   gcTime: 30 * 60 * 1000,     // 30 минут в кэше
@@ -148,12 +156,12 @@ const query = useQuery({
 <template>
   <!-- Первая загрузка -->
   <ProductGridSkeleton v-if="isLoading" />
-  
+
   <!-- Фоновая перезагрузка -->
   <div v-if="isFetching && !isLoading" class="loading-overlay">
     Обновление...
   </div>
-  
+
   <!-- Загрузка следующей страницы -->
   <Button :disabled="isFetching" @click="loadMore">
     <span v-if="isFetching">Загрузка...</span>
@@ -167,7 +175,7 @@ const query = useQuery({
 ```typescript
 const query = useQuery({
   // ...
-  placeholderData: (previousData) => previousData, // Показываем старые данные
+  placeholderData: previousData => previousData, // Показываем старые данные
 })
 ```
 
@@ -194,8 +202,8 @@ const queryClient = useQueryClient()
 queryClient.invalidateQueries({ queryKey: ['catalog-products'] })
 
 // Очистить конкретную комбинацию фильтров
-queryClient.invalidateQueries({ 
-  queryKey: ['catalog-products', 'toys', 'newest'] 
+queryClient.invalidateQueries({
+  queryKey: ['catalog-products', 'toys', 'newest']
 })
 
 // Полная очистка всего кэша
@@ -248,12 +256,12 @@ if (import.meta.dev) {
 // composables/useCatalogQuery.ts
 const queryFn = async () => {
   const startTime = performance.now()
-  
+
   const result = await productStore.fetchProducts(...)
-  
+
   const endTime = performance.now()
   console.log(`⚡ Products loaded in ${Math.round(endTime - startTime)}ms`)
-  
+
   return result
 }
 ```
@@ -263,6 +271,7 @@ const queryFn = async () => {
 В Chrome DevTools → Network вы увидите:
 
 **До оптимизации:**
+
 ```
 [Request 1] GET /brands          200ms
 [Request 2] GET /attributes      180ms
@@ -275,6 +284,7 @@ Total: 1040ms
 ```
 
 **После оптимизации (повторный заход):**
+
 ```
 (no requests - loaded from cache)
 ---
@@ -284,6 +294,7 @@ Total: 0ms ✅
 ## 🎯 Best Practices
 
 ### 1. Не кэшируйте слишком долго
+
 ```typescript
 // ❌ Плохо - год в кэше
 staleTime: 365 * 24 * 60 * 60 * 1000
@@ -293,6 +304,7 @@ staleTime: 5 * 60 * 1000
 ```
 
 ### 2. Инвалидируйте кэш при мутациях
+
 ```typescript
 // После создания товара
 const mutation = useMutation({
@@ -304,6 +316,7 @@ const mutation = useMutation({
 ```
 
 ### 3. Используйте стабильные ключи
+
 ```typescript
 // ❌ Плохо - нестабильный ключ
 queryKey: [Date.now(), Math.random()]
@@ -315,6 +328,7 @@ queryKey: ['catalog-products', categorySlug, sortBy]
 ## 🚀 Дальнейшие улучшения
 
 ### 1. Prefetch следующей страницы
+
 ```typescript
 function prefetchNextPage() {
   queryClient.prefetchQuery({
@@ -325,23 +339,25 @@ function prefetchNextPage() {
 ```
 
 ### 2. Optimistic updates
+
 ```typescript
 mutation.mutate(newProduct, {
   onMutate: async (newProduct) => {
     await queryClient.cancelQueries({ queryKey: ['catalog-products'] })
-    
+
     const previousProducts = queryClient.getQueryData(['catalog-products'])
-    
+
     queryClient.setQueryData(['catalog-products'], (old) => {
       return { ...old, products: [...old.products, newProduct] }
     })
-    
+
     return { previousProducts }
   },
 })
 ```
 
 ### 3. Persistent cache (опционально)
+
 ```bash
 npm install @tanstack/query-sync-storage-persister
 ```

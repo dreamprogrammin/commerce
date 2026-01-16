@@ -20,7 +20,7 @@ const isAuthenticated = computed(() => !!user.value)
 const hasCartItems = computed(() => cartStore.items.length > 0)
 
 // Очистка корзины для гостя
-const clearGuestCart = () => {
+function clearGuestCart() {
   cartStore.clearCart()
   router.push('/')
 }
@@ -51,7 +51,9 @@ onMounted(() => {
         <div class="space-y-4">
           <!-- Номер заказа -->
           <div class="text-center pb-4 border-b">
-            <p class="text-sm text-muted-foreground mb-2">Номер вашего заказа</p>
+            <p class="text-sm text-muted-foreground mb-2">
+              Номер вашего заказа
+            </p>
             <p class="text-2xl font-mono font-bold bg-muted px-4 py-2 rounded-lg inline-block">
               {{ orderId }}
             </p>
@@ -86,7 +88,9 @@ onMounted(() => {
             <ShoppingCart class="w-5 h-5 text-blue-600" />
           </div>
           <div class="flex-1">
-            <CardTitle class="text-lg">Корзина сохранена</CardTitle>
+            <CardTitle class="text-lg">
+              Корзина сохранена
+            </CardTitle>
             <CardDescription class="mt-1">
               Товары в корзине остались, вы можете оформить еще один заказ или очистить корзину
             </CardDescription>
@@ -100,7 +104,7 @@ onMounted(() => {
             Перейти в корзину
           </Button>
         </NuxtLink>
-        <Button variant="ghost" size="icon" @click="clearGuestCart" class="flex-shrink-0">
+        <Button variant="ghost" size="icon" class="flex-shrink-0" @click="clearGuestCart">
           <Trash2 class="w-4 h-4" />
         </Button>
       </CardContent>
@@ -114,7 +118,9 @@ onMounted(() => {
             <Package class="w-5 h-5 text-green-600" />
           </div>
           <div class="flex-1">
-            <CardTitle class="text-lg">Отслеживайте ваш заказ</CardTitle>
+            <CardTitle class="text-lg">
+              Отслеживайте ваш заказ
+            </CardTitle>
             <CardDescription class="mt-1">
               Статус заказа доступен в вашем личном кабинете
             </CardDescription>

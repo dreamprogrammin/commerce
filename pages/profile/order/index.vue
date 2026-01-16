@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Package, ShoppingBag } from 'lucide-vue-next'
-import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const router = useRouter()
@@ -57,8 +57,12 @@ useHead({
     <!-- Ошибка -->
     <div v-else-if="error" class="text-center py-12 space-y-4">
       <Icon name="lucide:alert-circle" class="w-16 h-16 text-destructive mx-auto" />
-      <h2 class="text-xl font-semibold">Ошибка загрузки</h2>
-      <p class="text-muted-foreground">{{ error }}</p>
+      <h2 class="text-xl font-semibold">
+        Ошибка загрузки
+      </h2>
+      <p class="text-muted-foreground">
+        {{ error }}
+      </p>
       <Button @click="fetchOrders">
         Попробовать снова
       </Button>
@@ -70,7 +74,9 @@ useHead({
         <ShoppingBag class="w-12 h-12 text-muted-foreground" />
       </div>
       <div>
-        <h2 class="text-xl font-semibold mb-2">У вас пока нет заказов</h2>
+        <h2 class="text-xl font-semibold mb-2">
+          У вас пока нет заказов
+        </h2>
         <p class="text-muted-foreground mb-6">
           Начните покупки в нашем каталоге
         </p>

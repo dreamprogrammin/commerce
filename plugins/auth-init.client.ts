@@ -33,7 +33,7 @@ export default defineNuxtPlugin(async () => {
     // Загружаем только если СОВСЕМ нет профиля (новый пользователь)
     if (!profileStore.profile && !profileStore.isLoading) {
       // Загружаем только для новых пользователей
-      profileStore.loadProfile(false, true).catch(error => {
+      profileStore.loadProfile(false, true).catch((error) => {
         console.error('[Auth Plugin] Profile load failed:', error)
       })
     }
@@ -61,7 +61,8 @@ export default defineNuxtPlugin(async () => {
         toast.success('С возвращением!', {
           description: `Добро пожаловать, ${profileStore.fullName}!`,
         })
-      } else {
+      }
+      else {
         toast.success('Добро пожаловать!', {
           description: 'Сделайте первую покупку и получите 1000 приветственных бонусов! 🎁',
           duration: 7000,
@@ -72,7 +73,7 @@ export default defineNuxtPlugin(async () => {
       // ✅ ИСПРАВЛЕНО: Обрабатываем INITIAL_SESSION (важно для OAuth редиректов)
       // Загружаем профиль только если его нет (в фоне)
       if (!profileStore.profile && !profileStore.isLoading) {
-        profileStore.loadProfile(false, true).catch(error => {
+        profileStore.loadProfile(false, true).catch((error) => {
           console.error('[Auth Plugin] Profile load failed for initial session:', error)
         })
       }

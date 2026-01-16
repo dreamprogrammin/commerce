@@ -1,4 +1,4 @@
-import { defineStore } from "pinia"
+import { defineStore } from 'pinia'
 
 export const useModalStore = defineStore('modalStore', () => {
   const showLoginModal = ref<boolean>(false)

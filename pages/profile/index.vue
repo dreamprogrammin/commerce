@@ -1,191 +1,446 @@
 <script setup lang="ts">
-import { Hourglass, Star } from 'lucide-vue-next'
+import { ArrowDownCircle, ArrowRight, ArrowUpCircle, Gift, Heart, Package, ShoppingBag, Star, User } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
+import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
-// --- Инициализация сторов ---
+// --- Stores ---
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
+const wishlistStore = useWishlistStore()
+const { getPublicUrl } = useSupabaseStorage()
 
-// --- Реактивные данные ---
-const { profile, fullName, bonusBalance, isLoading, pendingBonuses } = storeToRefs(profileStore)
+// --- Данные профиля ---
+const { profile, fullName, bonusBalance, isLoading: isLoadingProfile, pendingBonuses } = storeToRefs(profileStore)
+const { user } = storeToRefs(authStore)
 
-// --- Метаданные страницы ---
+// --- Заказы ---
+const { orders, isLoading: isLoadingOrders, fetchOrders, getStatusColor, getStatusLabel } = useUserOrders()
+
+// --- Избранное ---
+const { wishlistProducts, isLoading: isLoadingWishlist } = storeToRefs(wishlistStore)
+const { fetchWishlistProducts } = wishlistStore
+
+// --- Бонусные транзакции ---
+const supabase = useSupabaseClient()
+const bonusTransactions = ref<any[]>([])
+const isLoadingBonuses = ref(false)
+
+// --- Computed ---
+const recentOrders = computed(() => orders.value.slice(0, 3))
+const recentWishlist = computed(() => wishlistProducts.value.slice(0, 4))
+
+const userInitial = computed(() => {
+  if (fullName.value)
+    return fullName.value.charAt(0).toUpperCase()
+  if (user.value?.email)
+    return user.value.email.charAt(0).toUpperCase()
+  return 'U'
+})
+
+// --- Методы ---
+async function loadBonusTransactions() {
+  isLoadingBonuses.value = true
+  try {
+    const { data, error } = await supabase.rpc('get_bonus_history', {
+      p_limit: 3,
+      p_offset: 0,
+    })
+    if (!error) {
+      bonusTransactions.value = data || []
+    }
+  }
+  catch (e) {
+    console.error('[Profile] Error loading bonus history:', e)
+  }
+  finally {
+    isLoadingBonuses.value = false
+  }
+}
+
+function formatDate(dateString: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(dateString))
+}
+
+function getTransactionIcon(type: string) {
+  switch (type) {
+    case 'earned':
+    case 'refund_spent':
+      return ArrowUpCircle
+    case 'spent':
+    case 'refund_earned':
+      return ArrowDownCircle
+    case 'welcome':
+      return Gift
+    default:
+      return Star
+  }
+}
+
+function getTransactionColor(type: string) {
+  switch (type) {
+    case 'earned':
+    case 'welcome':
+    case 'refund_spent':
+      return 'text-green-600'
+    case 'spent':
+    case 'refund_earned':
+      return 'text-red-600'
+    default:
+      return 'text-muted-foreground'
+  }
+}
+
+// --- Инициализация ---
+onMounted(async () => {
+  // Загружаем профиль если нет
+  if (!profile.value && !isLoadingProfile.value) {
+    profileStore.loadProfile(false, true)
+  }
+
+  // Загружаем данные параллельно
+  await Promise.all([
+    fetchOrders(),
+    fetchWishlistProducts(),
+    loadBonusTransactions(),
+  ])
+})
+
+// --- Meta ---
 definePageMeta({
   layout: 'profile',
 })
 
-// --- SEO ---
 useHead({
   title: 'Мой профиль',
-})
-
-// ✅ Упрощённая логика - доверяемся кешу
-onMounted(() => {
-  // Загружаем только если профиля вообще нет (новый пользователь)
-  if (!profile.value && !isLoading.value) {
-    profileStore.loadProfile(false, true).catch(error => {
-      console.error('[Profile Page] Load failed:', error)
-    })
-  }
 })
 </script>
 
 <template>
-  <div>
-    <h1 class="text-2xl md:text-3xl font-bold mb-3 md:mb-6">
-      Настройки профиля
-    </h1>
-
-    <!-- Загрузка -->
-    <div v-if="isLoading" class="space-y-4">
-      <Skeleton class="h-40 w-full" />
-      <Skeleton class="h-32 w-full" />
-      <p class="text-sm text-muted-foreground text-center mt-4">
-        Загрузка профиля...
-      </p>
-      <!-- ✅ Кнопка экстренной отмены -->
-      <div class="flex justify-center mt-4">
-        <Button 
-          variant="outline" 
-          size="sm"
-          @click="() => {
-            profileStore.$patch({ isLoading: false })
-            profileStore.loadProfile(true, true)
-          }"
-        >
-          Загрузка зависла? Нажмите здесь
-        </Button>
+  <div class="space-y-6">
+    <!-- Приветствие -->
+    <div class="flex items-center gap-4">
+      <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+        <span class="text-2xl font-bold text-primary">{{ userInitial }}</span>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold">
+          {{ fullName || 'Пользователь' }}
+        </h1>
+        <p class="text-muted-foreground">
+          {{ user?.email }}
+        </p>
       </div>
     </div>
 
-    <!-- Профиль загружен -->
-    <div v-else-if="profile" class="space-y-6">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xl font-semibold">
-          Добро пожаловать, {{ fullName }}!
-        </h2>
-        <Badge v-if="profile.role === 'admin'" variant="destructive">
-          Администратор
-        </Badge>
-      </div>
+    <!-- Быстрые карточки -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <!-- Бонусы -->
+      <NuxtLink to="/profile/bonus" class="group">
+        <Card class="h-full hover:shadow-md transition-shadow">
+          <CardContent class="p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <Star class="w-4 h-4 text-yellow-500 fill-yellow-500" />
+              <span class="text-xs text-muted-foreground">Бонусы</span>
+            </div>
+            <p class="text-2xl font-bold">
+              {{ bonusBalance.toLocaleString('ru-RU') }}
+            </p>
+            <p v-if="pendingBonuses > 0" class="text-xs text-muted-foreground mt-1">
+              +{{ pendingBonuses }} ожидают
+            </p>
+          </CardContent>
+        </Card>
+      </NuxtLink>
 
-      <!-- Личные данные -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Личные данные</CardTitle>
-          <CardDescription>Ваша основная информация</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <div class="flex justify-between items-center">
-            <span class="text-muted-foreground">Телефон</span>
-            <span>{{ profile.phone || 'Не указан' }}</span>
-          </div>
-          <Button variant="outline" class="mt-4">
-            Редактировать
+      <!-- Заказы -->
+      <NuxtLink to="/profile/order" class="group">
+        <Card class="h-full hover:shadow-md transition-shadow">
+          <CardContent class="p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <Package class="w-4 h-4 text-blue-500" />
+              <span class="text-xs text-muted-foreground">Заказы</span>
+            </div>
+            <p class="text-2xl font-bold">
+              {{ orders.length }}
+            </p>
+            <p class="text-xs text-muted-foreground mt-1">
+              всего
+            </p>
+          </CardContent>
+        </Card>
+      </NuxtLink>
+
+      <!-- Избранное -->
+      <NuxtLink to="/profile/wishlist" class="group">
+        <Card class="h-full hover:shadow-md transition-shadow">
+          <CardContent class="p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <Heart class="w-4 h-4 text-red-500" />
+              <span class="text-xs text-muted-foreground">Избранное</span>
+            </div>
+            <p class="text-2xl font-bold">
+              {{ wishlistProducts.length }}
+            </p>
+            <p class="text-xs text-muted-foreground mt-1">
+              товаров
+            </p>
+          </CardContent>
+        </Card>
+      </NuxtLink>
+
+      <!-- Настройки -->
+      <NuxtLink to="/profile/settings" class="group">
+        <Card class="h-full hover:shadow-md transition-shadow">
+          <CardContent class="p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <User class="w-4 h-4 text-gray-500" />
+              <span class="text-xs text-muted-foreground">Профиль</span>
+            </div>
+            <p class="text-sm font-medium mt-2">
+              Настройки
+            </p>
+            <p class="text-xs text-muted-foreground mt-1">
+              данные
+            </p>
+          </CardContent>
+        </Card>
+      </NuxtLink>
+    </div>
+
+    <!-- Последние заказы -->
+    <Card>
+      <CardHeader class="pb-3">
+        <div class="flex items-center justify-between">
+          <CardTitle class="text-lg">
+            Последние заказы
+          </CardTitle>
+          <Button v-if="orders.length > 0" variant="ghost" size="sm" as-child>
+            <NuxtLink to="/profile/order" class="flex items-center gap-1">
+              Все заказы
+              <ArrowRight class="w-4 h-4" />
+            </NuxtLink>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <!-- Загрузка -->
+        <div v-if="isLoadingOrders" class="space-y-3">
+          <Skeleton class="h-16 w-full" />
+          <Skeleton class="h-16 w-full" />
+        </div>
 
-      <!-- Бонусная система -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Мои бонусы</CardTitle>
-          <CardDescription>Управляйте своими бонусами и скидками</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <!-- Активные бонусы -->
-          <div class="flex justify-between items-center p-4 bg-primary/5 rounded-lg">
+        <!-- Пусто -->
+        <div v-else-if="orders.length === 0" class="text-center py-8">
+          <ShoppingBag class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p class="text-muted-foreground mb-4">
+            У вас пока нет заказов
+          </p>
+          <Button as-child>
+            <NuxtLink to="/catalog/all">
+              Перейти в каталог
+            </NuxtLink>
+          </Button>
+        </div>
+
+        <!-- Список -->
+        <div v-else class="space-y-3">
+          <NuxtLink
+            v-for="order in recentOrders"
+            :key="order.id"
+            :to="`/profile/order/${order.id}`"
+            class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+          >
             <div class="flex items-center gap-3">
-              <div class="p-2 bg-primary/10 rounded-full">
-                <Star class="w-6 h-6 text-primary fill-primary" />
+              <!-- Превью товаров -->
+              <div class="flex -space-x-2">
+                <div
+                  v-for="(item, idx) in order.order_items.slice(0, 3)"
+                  :key="item.id"
+                  class="w-10 h-10 rounded-lg bg-muted overflow-hidden border-2 border-background"
+                  :style="{ zIndex: 3 - idx }"
+                >
+                  <ProgressiveImage
+                    v-if="item.product.product_images?.[0]"
+                    :src="getPublicUrl(BUCKET_NAME_PRODUCT, item.product.product_images[0].image_url)"
+                    :alt="item.product.name"
+                    aspect-ratio="square"
+                    object-fit="cover"
+                    eager
+                  />
+                </div>
+                <div
+                  v-if="order.order_items.length > 3"
+                  class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center border-2 border-background text-xs font-medium"
+                >
+                  +{{ order.order_items.length - 3 }}
+                </div>
               </div>
               <div>
-                <p class="font-semibold">
-                  Активные бонусы
+                <p class="font-medium text-sm">
+                  №{{ order.id.slice(-6) }}
                 </p>
                 <p class="text-xs text-muted-foreground">
-                  Доступны к списанию в следующем заказе
+                  {{ formatDate(order.created_at) }}
                 </p>
               </div>
             </div>
-            <Badge variant="secondary" class="text-xl px-4 py-2">
-              {{ bonusBalance }}
-            </Badge>
-          </div>
+            <div class="text-right">
+              <Badge :class="getStatusColor(order.status)" class="mb-1">
+                {{ getStatusLabel(order.status) }}
+              </Badge>
+              <p class="text-sm font-semibold">
+                {{ order.final_amount.toLocaleString('ru-RU') }} ₸
+              </p>
+            </div>
+          </NuxtLink>
+        </div>
+      </CardContent>
+    </Card>
 
-          <!-- Ожидающие бонусы -->
-          <div v-if="pendingBonuses > 0" class="flex justify-between items-center p-4 bg-muted/50 rounded-lg">
+    <!-- Избранное -->
+    <Card>
+      <CardHeader class="pb-3">
+        <div class="flex items-center justify-between">
+          <CardTitle class="text-lg">
+            Избранное
+          </CardTitle>
+          <Button v-if="wishlistProducts.length > 0" variant="ghost" size="sm" as-child>
+            <NuxtLink to="/profile/wishlist" class="flex items-center gap-1">
+              Все товары
+              <ArrowRight class="w-4 h-4" />
+            </NuxtLink>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <!-- Загрузка -->
+        <div v-if="isLoadingWishlist" class="grid grid-cols-4 gap-3">
+          <Skeleton v-for="i in 4" :key="i" class="aspect-square rounded-lg" />
+        </div>
+
+        <!-- Пусто -->
+        <div v-else-if="wishlistProducts.length === 0" class="text-center py-8">
+          <Heart class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p class="text-muted-foreground mb-4">
+            Список избранного пуст
+          </p>
+          <Button variant="outline" as-child>
+            <NuxtLink to="/catalog/all">
+              Найти товары
+            </NuxtLink>
+          </Button>
+        </div>
+
+        <!-- Сетка товаров -->
+        <div v-else class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <NuxtLink
+            v-for="product in recentWishlist"
+            :key="product.id"
+            :to="`/catalog/products/${product.slug}`"
+            class="group"
+          >
+            <div class="aspect-square rounded-lg bg-muted overflow-hidden mb-2">
+              <ProgressiveImage
+                v-if="product.product_images?.[0]"
+                :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url)"
+                :blur-data-url="product.product_images[0].blur_placeholder"
+                :alt="product.name"
+                aspect-ratio="square"
+                object-fit="cover"
+                placeholder-type="lqip"
+                class="group-hover:scale-105 transition-transform"
+              />
+            </div>
+            <p class="text-sm font-medium line-clamp-2">
+              {{ product.name }}
+            </p>
+            <p class="text-sm font-bold text-primary">
+              {{ product.price.toLocaleString('ru-RU') }} ₸
+            </p>
+          </NuxtLink>
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Последние бонусные операции -->
+    <Card>
+      <CardHeader class="pb-3">
+        <div class="flex items-center justify-between">
+          <CardTitle class="text-lg">
+            Бонусные операции
+          </CardTitle>
+          <Button v-if="bonusTransactions.length > 0" variant="ghost" size="sm" as-child>
+            <NuxtLink to="/profile/bonus" class="flex items-center gap-1">
+              История
+              <ArrowRight class="w-4 h-4" />
+            </NuxtLink>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <!-- Загрузка -->
+        <div v-if="isLoadingBonuses" class="space-y-3">
+          <Skeleton class="h-12 w-full" />
+          <Skeleton class="h-12 w-full" />
+        </div>
+
+        <!-- Пусто -->
+        <div v-else-if="bonusTransactions.length === 0" class="text-center py-8">
+          <Star class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p class="text-muted-foreground">
+            Пока нет операций с бонусами
+          </p>
+        </div>
+
+        <!-- Список -->
+        <div v-else class="space-y-2">
+          <div
+            v-for="tx in bonusTransactions"
+            :key="tx.id"
+            class="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+          >
             <div class="flex items-center gap-3">
-              <div class="p-2 bg-muted rounded-full">
-                <Hourglass class="w-6 h-6 text-muted-foreground" />
-              </div>
+              <component
+                :is="getTransactionIcon(tx.transaction_type)"
+                class="w-5 h-5" :class="[getTransactionColor(tx.transaction_type)]"
+              />
               <div>
-                <p class="font-medium text-muted-foreground">
-                  В ожидании (7 дней)
+                <p class="text-sm font-medium">
+                  {{ tx.transaction_type === 'earned' ? 'Начисление'
+                    : tx.transaction_type === 'spent' ? 'Списание'
+                      : tx.transaction_type === 'welcome' ? 'Приветственный бонус'
+                        : tx.transaction_type === 'refund_spent' ? 'Возврат' : 'Операция' }}
                 </p>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger class="text-xs text-left underline decoration-dotted">
-                      Когда станут доступны?
-                    </TooltipTrigger>
-                    <TooltipContent class="max-w-xs">
-                      <p class="space-y-1">
-                        <span class="block">Бонусы активируются через 7 дней после подтверждения заказа администратором.</span>
-                        <span class="block text-muted-foreground text-xs">При отмене заказа в течение этого периода бонусы автоматически аннулируются.</span>
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <p class="text-xs text-muted-foreground">
+                  {{ formatDate(tx.created_at) }}
+                </p>
               </div>
             </div>
-            <Badge variant="outline" class="text-lg px-4 py-2">
-              {{ pendingBonuses }}
-            </Badge>
+            <span
+              class="font-semibold" :class="[
+                tx.amount > 0 ? 'text-green-600' : 'text-red-600',
+              ]"
+            >
+              {{ tx.amount > 0 ? '+' : '' }}{{ tx.amount }} ₸
+            </span>
           </div>
+        </div>
+      </CardContent>
+    </Card>
 
-          <!-- Информация о бонусах -->
-          <div class="text-sm text-muted-foreground space-y-2 pt-2">
-            <p class="font-medium text-foreground">Как работают бонусы:</p>
-            <div class="space-y-1 pl-2">
-              <p>• 1 бонус = 1 ₸ скидки при оплате</p>
-              <p>• Бонусы начисляются при <strong class="text-foreground">подтверждении заказа</strong> администратором</p>
-              <p>• Активация через 7 дней после подтверждения</p>
-              <p>• При отмене заказа бонусы автоматически аннулируются</p>
-              <p>• Приветственный бонус: <strong class="text-foreground">1000 бонусов</strong> после первого подтверждённого заказа</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- Действия -->
-      <div class="flex flex-wrap gap-4 mt-6">
-        <Button variant="outline" @click="profileStore.loadProfile(true, true)">
-          Обновить данные
-        </Button>
-        <Button variant="destructive" @click="authStore.signOut()">
-          Выйти из аккаунта
-        </Button>
-      </div>
-    </div>
-
-    <!-- Ошибка загрузки профиля -->
-    <div v-else class="text-center space-y-4 py-12">
-      <p class="text-destructive">
-        Не удалось загрузить данные профиля
-      </p>
-      <p class="text-sm text-muted-foreground">
-        Возможно, профиль еще создается. Попробуйте обновить страницу.
-      </p>
-      <div class="flex gap-2 justify-center">
-        <Button @click="profileStore.loadProfile(true, true)">
-          Попробовать снова
-        </Button>
-        <Button variant="outline" @click="$router.go(0)">
-          Обновить страницу
-        </Button>
-      </div>
+    <!-- Выход -->
+    <div class="pt-4 border-t">
+      <Button variant="outline" class="text-destructive hover:text-destructive" @click="authStore.signOut()">
+        Выйти из аккаунта
+      </Button>
     </div>
   </div>
 </template>

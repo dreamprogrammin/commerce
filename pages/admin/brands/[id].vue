@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BrandInsert, BrandUpdate } from '@/types'
-import { storeToRefs } from 'pinia'
 import { ArrowLeft } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
 import BrandForm from '@/components/admin/brands/BrandForm.vue'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 

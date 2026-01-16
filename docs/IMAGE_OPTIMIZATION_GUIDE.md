@@ -19,6 +19,7 @@
 ```
 
 **Преимущества:**
+
 - ✅ Intersection Observer - загрузка только видимых изображений
 - ✅ Shimmer-эффект во время загрузки
 - ✅ Автоматический fallback при ошибках
@@ -51,31 +52,31 @@ const {
 
 \`\`\`typescript
 export async function optimizeImageBeforeUpload(
-  file: File,
-  options: {
-    maxWidth?: number
-    maxHeight?: number
-    quality?: number
-  } = {}
+file: File,
+options: {
+maxWidth?: number
+maxHeight?: number
+quality?: number
+} = {}
 ): Promise<File> {
-  const {
-    maxWidth = 800,
-    maxHeight = 800,
-    quality = 0.85,
-  } = options
+const {
+maxWidth = 800,
+maxHeight = 800,
+quality = 0.85,
+} = options
 
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    
+return new Promise((resolve, reject) => {
+const reader = new FileReader()
+
     reader.onload = (e) => {
       const img = new Image()
-      
+
       img.onload = () => {
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')!
-        
+
         let { width, height } = img
-        
+
         // Расчет новых размеров с сохранением пропорций
         if (width > height) {
           if (width > maxWidth) {
@@ -88,13 +89,13 @@ export async function optimizeImageBeforeUpload(
             height = maxHeight
           }
         }
-        
+
         canvas.width = width
         canvas.height = height
-        
+
         // Рисуем изображение
         ctx.drawImage(img, 0, 0, width, height)
-        
+
         // Конвертируем в WebP blob
         canvas.toBlob(
           (blob) => {
@@ -102,7 +103,7 @@ export async function optimizeImageBeforeUpload(
               reject(new Error('Failed to optimize image'))
               return
             }
-            
+
             const optimizedFile = new File(
               [blob],
               file.name.replace(/\.[^.]+$/, '.webp'),
@@ -111,36 +112,38 @@ export async function optimizeImageBeforeUpload(
                 lastModified: Date.now(),
               }
             )
-            
+
             resolve(optimizedFile)
           },
           'image/webp',
           quality
         )
       }
-      
+
       img.onerror = () => reject(new Error('Failed to load image'))
       img.src = e.target?.result as string
     }
-    
+
     reader.onerror = () => reject(new Error('Failed to read file'))
     reader.readAsDataURL(file)
-  })
+
+})
 }
 
 // Вспомогательная функция для проверки размера
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+if (bytes === 0) return '0 Bytes'
+const k = 1024
+const sizes = ['Bytes', 'KB', 'MB', 'GB']
+const i = Math.floor(Math.log(bytes) / Math.log(k))
+return Math.round(bytes / Math.pow(k, i) \* 100) / 100 + ' ' + sizes[i]
 }
 \`\`\`
 
 #### Использование в форме загрузки
 
 \`\`\`vue
+
 <script setup lang="ts">
 import { optimizeImageBeforeUpload, formatFileSize } from '@/utils/imageOptimizer'
 import { toast } from 'vue-sonner'
@@ -148,27 +151,27 @@ import { toast } from 'vue-sonner'
 async function handleImageChange(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
-  
+
   if (!file) return
-  
+
   try {
     const originalSize = file.size
-    
+
     // Оптимизируем изображение
     const optimizedFile = await optimizeImageBeforeUpload(file, {
       maxWidth: 800,
       maxHeight: 800,
       quality: 0.85,
     })
-    
+
     const optimizedSize = optimizedFile.size
     const savings = ((1 - optimizedSize / originalSize) * 100).toFixed(1)
-    
+
     // Показываем пользователю результат оптимизации
     toast.success('Изображение оптимизировано', {
       description: \`\${formatFileSize(originalSize)} → \${formatFileSize(optimizedSize)} (экономия \${savings}%)\`,
     })
-    
+
     // Сохраняем оптимизированный файл
     emit('update:item', {
       ...props.item,
@@ -181,6 +184,7 @@ async function handleImageChange(event: Event) {
   }
 }
 </script>
+
 \`\`\`
 
 #### Вариант 2: Ручная оптимизация
@@ -188,11 +192,13 @@ async function handleImageChange(event: Event) {
 Если не хотите автоматизировать, оптимизируйте изображения вручную перед загрузкой:
 
 **Онлайн-сервисы:**
+
 - [Squoosh.app](https://squoosh.app/) - от Google, WebP оптимизация
 - [TinyPNG](https://tinypng.com/) - PNG/JPEG сжатие
 - [Compressor.io](https://compressor.io/) - универсальный
 
 **Рекомендуемые настройки:**
+
 - Формат: WebP
 - Качество: 80-85%
 - Размер: 800x800px для товаров, 1920x800px для баннеров
@@ -200,10 +206,12 @@ async function handleImageChange(event: Event) {
 ## 📊 Результаты
 
 ### До оптимизации
+
 - Оригинал товара: **2.5 MB** (JPEG, 4000x3000)
 - Время загрузки: **~5-10 сек** на 3G
 
 ### После оптимизации
+
 - Оптимизированный: **180 KB** (WebP, 800x800)
 - Время загрузки: **~0.5-1 сек** на 3G
 - **Экономия: 93%** 🎉
@@ -211,24 +219,30 @@ async function handleImageChange(event: Event) {
 ## 🎨 Варианты плейсхолдеров
 
 ### Shimmer (текущий)
+
 ```vue
 <ProgressiveImage placeholder-type="shimmer" />
 ```
+
 Градиентная анимация (как в Facebook, Instagram)
 
 ### Blur
+
 ```vue
 <ProgressiveImage placeholder-type="blur" />
 ```
+
 Размытый эффект
 
 ### Color
+
 ```vue
-<ProgressiveImage 
+<ProgressiveImage
   placeholder-type="color"
   placeholder-color="from-blue-100 to-blue-200"
 />
 ```
+
 Сплошной цвет или градиент
 
 ## 🔧 Настройка размеров изображений
@@ -237,10 +251,10 @@ async function handleImageChange(event: Event) {
 
 \`\`\`typescript
 export const IMAGE_SIZES = {
-  PRODUCT_CARD: { width: 400, height: 400 },      // Карточки товаров
-  CATEGORY_IMAGE: { width: 300, height: 200 },    // Категории
-  SLIDER_BANNER: { width: 1920, height: 800 },    // Баннеры
-  THUMBNAIL: { width: 100, height: 100 },          // Миниатюры
+PRODUCT_CARD: { width: 400, height: 400 }, // Карточки товаров
+CATEGORY_IMAGE: { width: 300, height: 200 }, // Категории
+SLIDER_BANNER: { width: 1920, height: 800 }, // Баннеры
+THUMBNAIL: { width: 100, height: 100 }, // Миниатюры
 }
 \`\`\`
 
@@ -249,12 +263,13 @@ export const IMAGE_SIZES = {
 ## 🚦 Производительность
 
 ### Intersection Observer
+
 Изображения загружаются только когда попадают в зону видимости + 50px margin:
 
 \`\`\`typescript
 const { imageRef } = useProgressiveImage(imageUrl, {
-  rootMargin: '50px', // Предзагрузка за 50px
-  threshold: 0.01,    // Минимальная видимость 1%
+rootMargin: '50px', // Предзагрузка за 50px
+threshold: 0.01, // Минимальная видимость 1%
 })
 \`\`\`
 
@@ -264,13 +279,13 @@ const { imageRef } = useProgressiveImage(imageUrl, {
 
 \`\`\`typescript
 onMounted(() => {
-  // Предзагружаем первые 6 товаров
-  products.value.slice(0, 6).forEach((product) => {
-    const link = document.createElement('link')
-    link.rel = 'prefetch'
-    link.href = getImageUrl(BUCKET_NAME_PRODUCT, product.image_url, IMAGE_SIZES.PRODUCT_CARD)
-    document.head.appendChild(link)
-  })
+// Предзагружаем первые 6 товаров
+products.value.slice(0, 6).forEach((product) => {
+const link = document.createElement('link')
+link.rel = 'prefetch'
+link.href = getImageUrl(BUCKET_NAME_PRODUCT, product.image_url, IMAGE_SIZES.PRODUCT_CARD)
+document.head.appendChild(link)
+})
 })
 \`\`\`
 
@@ -281,21 +296,22 @@ onMounted(() => {
 \`\`\`typescript
 // plugins/performance-monitor.client.ts
 export default defineNuxtPlugin(() => {
-  if (process.dev) {
-    const images = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        if (entry.initiatorType === 'img') {
-          console.log('[Image Loaded]', {
-            url: entry.name,
-            duration: \`\${Math.round(entry.duration)}ms\`,
-            size: \`\${Math.round(entry.transferSize / 1024)}KB\`,
-          })
-        }
-      }
-    })
-    
+if (process.dev) {
+const images = new PerformanceObserver((list) => {
+for (const entry of list.getEntries()) {
+if (entry.initiatorType === 'img') {
+console.log('[Image Loaded]', {
+url: entry.name,
+duration: \`\${Math.round(entry.duration)}ms\`,
+size: \`\${Math.round(entry.transferSize / 1024)}KB\`,
+})
+}
+}
+})
+
     images.observe({ type: 'resource', buffered: true })
-  }
+
+}
 })
 \`\`\`
 

@@ -3,19 +3,19 @@
  * Только для администраторов
  */
 
-import { serverSupabaseClient } from '#supabase/server'
 import type { Database } from '@/types/supabase'
+import { serverSupabaseClient } from '#supabase/server'
 
 export default defineEventHandler(async (event) => {
   const supabase = await serverSupabaseClient<Database>(event)
 
   // Проверяем авторизацию
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  
+
   if (authError || !user) {
     throw createError({
       statusCode: 401,
-      message: 'Unauthorized: Please login'
+      message: 'Unauthorized: Please login',
     })
   }
 
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
   if (profileError || !profile || profile.role !== 'admin') {
     throw createError({
       statusCode: 403,
-      message: 'Forbidden: Admin access required'
+      message: 'Forbidden: Admin access required',
     })
   }
 
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
     if (error) {
       throw createError({
         statusCode: 500,
-        message: `Database error: ${error.message}`
+        message: `Database error: ${error.message}`,
       })
     }
 
@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
       return {
         success: true,
         total: 0,
-        message: 'No products found'
+        message: 'No products found',
       }
     }
 
@@ -64,14 +64,14 @@ export default defineEventHandler(async (event) => {
 
     for (let i = 0; i < urls.length; i += batchSize) {
       const batch = urls.slice(i, i + batchSize)
-      
+
       const result = await $fetch('/api/seo/notify-indexing', {
         method: 'POST',
-        body: { urls: batch }
+        body: { urls: batch },
       })
-      
+
       results.push(result)
-      
+
       // Небольшая задержка между батчами
       if (i + batchSize < urls.length) {
         await new Promise(resolve => setTimeout(resolve, 1000))
@@ -89,11 +89,12 @@ export default defineEventHandler(async (event) => {
       successfulBatches,
       failedBatches: results.length - successfulBatches,
     }
-  } catch (error: any) {
+  }
+  catch (error: any) {
     console.error('[SEO] Reindex error:', error)
     throw createError({
       statusCode: 500,
-      message: `Reindex failed: ${error.message}`
+      message: `Reindex failed: ${error.message}`,
     })
   }
 })

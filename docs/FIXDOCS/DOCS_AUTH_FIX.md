@@ -5,6 +5,7 @@
 После авторизации через Google OAuth пользователь не мог зайти на страницу `/profile` - возникал белый экран, либо страница зависала на скелетоне загрузки. При этом пользователь успешно создавался в таблице `profiles` на бэкенде.
 
 ### Симптомы:
+
 - Белый экран на странице `/profile`
 - Зависание на скелетоне загрузки
 - Модальное окно авторизации открывалось повторно при попытке войти в профиль
@@ -14,7 +15,9 @@
 ## Причины проблем
 
 ### 1. **Race Condition при загрузке профиля**
+
 Профиль загружался одновременно в нескольких местах:
+
 - В `auth.client.ts` plugin при инициализации
 - В `auth.client.ts` plugin при событии `SIGNED_IN`
 - В middleware `auth.global.ts`
@@ -23,15 +26,19 @@
 Это приводило к конфликтам и зависанию `isLoading` флага.
 
 ### 2. **Игнорирование события `INITIAL_SESSION`**
+
 После OAuth редиректа Supabase отправляет событие `INITIAL_SESSION`, а не `SIGNED_IN`. Предыдущая версия плагина игнорировала это событие, что приводило к тому, что профиль не загружался после авторизации.
 
 ### 3. **Middleware блокировал навигацию**
+
 Middleware ждал завершения загрузки профиля до 5 секунд, что блокировало рендеринг страницы. При этом промис загрузки мог зависнуть из-за race condition.
 
 ### 4. **`isLoading` не сбрасывался**
+
 При множественных попытках загрузки профиля флаг `isLoading` мог остаться в состоянии `true`, что приводило к бесконечному отображению скелетона.
 
 ### 5. **Отсутствие импорта `defineStore`**
+
 В `useModalStore.ts` отсутствовал импорт `defineStore` из Pinia, что вызывало ошибку `defineStore is not defined`.
 
 ## Решение
@@ -39,6 +46,7 @@ Middleware ждал завершения загрузки профиля до 5 
 ### 1. **ProfileStore (`stores/core/profileStore.ts`)**
 
 #### Изменения:
+
 - Добавлен `loadingPromise` для предотвращения множественных одновременных загрузок
 - Если профиль уже загружается, возвращается существующий промис с таймаутом (10 секунд)
 - Улучшена логика повторных попыток загрузки с экспоненциальной задержкой (100ms, 300ms, 500ms, 1000ms, 2000ms)
@@ -55,7 +63,7 @@ let loadingPromise: Promise<boolean> | null = null
 if (loadingPromise && !force) {
   return await Promise.race([
     loadingPromise,
-    new Promise<boolean>((_, reject) => 
+    new Promise<boolean>((_, reject) =>
       setTimeout(() => reject(new Error('Profile load timeout')), 10000)
     )
   ])
@@ -71,6 +79,7 @@ finally {
 ### 2. **Auth Plugin (`plugins/auth.client.ts`)**
 
 #### Изменения:
+
 - Загрузка профиля при инициализации, если найдена существующая сессия
 - **КРИТИЧНО**: Обработка события `INITIAL_SESSION` (важно для OAuth редиректов)
 - Использование `Set` для предотвращения дублирования обработки событий
@@ -96,13 +105,15 @@ else if (event === 'INITIAL_SESSION' && session?.user) {
 // 3. Предотвращение дублирования
 const processedEvents = new Set<string>()
 const eventKey = `${event}-${session?.user?.id}-${Date.now()}`
-if (processedEvents.has(eventKey)) return
+if (processedEvents.has(eventKey))
+  return
 processedEvents.add(eventKey)
 ```
 
 ### 3. **Auth Middleware (`middleware/auth.global.ts`)**
 
 #### Изменения:
+
 - **КРИТИЧНО**: Middleware НЕ ждет завершения загрузки профиля
 - Middleware только запускает загрузку в фоне, но сразу разрешает навигацию
 - Добавлена задержка 100ms для инициализации auth после OAuth редиректа
@@ -115,7 +126,7 @@ processedEvents.add(eventKey)
 // 1. Не ждем загрузку профиля - запускаем в фоне
 if (!profileStore.profile && !profileStore.isLoading) {
   // Не используем await - пусть загружается асинхронно
-  profileStore.loadProfile(false, true).catch(error => {
+  profileStore.loadProfile(false, true).catch((error) => {
     console.error('[Auth Middleware] Profile load error:', error)
   })
 }
@@ -128,6 +139,7 @@ console.log('[Auth Middleware] Allowing navigation immediately')
 ### 4. **Profile Page (`pages/profile/index.vue`)**
 
 #### Изменения:
+
 - Проверка состояния загрузки при монтировании
 - **Аварийный таймер**: если `isLoading=true` больше 2 секунд, принудительно сбрасывается
 - Добавлены `watch`-ры для отладки изменений `isLoading` и `profile`
@@ -156,6 +168,7 @@ watch(isLoading, (val, oldVal) => {
 ### 5. **Modal Store (`stores/modal/useModalStore.ts`)**
 
 #### Изменения:
+
 - Добавлен импорт `defineStore` из Pinia
 
 ```typescript
@@ -169,6 +182,7 @@ export const useModalStore = defineStore('modalStore', () => {
 ### 6. **Auth Store (`stores/core/useAuthStore.ts`)**
 
 #### Изменения:
+
 - Добавлено логирование OAuth процесса
 - Улучшен параметр `redirectTo` по умолчанию (`/profile` вместо `/`)
 - Добавлен `watch` для отслеживания изменений состояния пользователя
@@ -177,6 +191,7 @@ export const useModalStore = defineStore('modalStore', () => {
 ## Порядок выполнения после OAuth
 
 ### До исправления (проблемный):
+
 ```
 1. OAuth редирект → возврат на сайт
 2. Auth Plugin: INITIAL_SESSION (игнорируется ❌)
@@ -186,6 +201,7 @@ export const useModalStore = defineStore('modalStore', () => {
 ```
 
 ### После исправления (правильный):
+
 ```
 1. OAuth редирект → возврат на сайт
 2. Auth Plugin: проверка сессии → загрузка профиля ✅
@@ -221,6 +237,7 @@ export const useModalStore = defineStore('modalStore', () => {
 ### Шаги для тестирования:
 
 1. **Очистка данных:**
+
 ```javascript
 localStorage.clear()
 sessionStorage.clear()
@@ -262,13 +279,14 @@ const { data, error } = await supabase
   .select('*')
   .eq('id', user.value.id)
   .maybeSingle()
-  
+
 console.log({ data, error })
 ```
 
 ## Важные замечания
 
 ### 1. **Триггер создания профиля**
+
 Убедитесь, что в Supabase есть триггер для автоматического создания профиля:
 
 ```sql
@@ -293,6 +311,7 @@ CREATE TRIGGER on_auth_user_created
 ```
 
 ### 2. **RLS политики**
+
 Убедитесь, что настроены правильные Row Level Security политики:
 
 ```sql
@@ -313,6 +332,7 @@ WITH CHECK (auth.uid() = id);
 ```
 
 ### 3. **SSR настройки**
+
 В `nuxt.config.ts` должны быть отключены SSR для защищенных страниц:
 
 ```typescript
@@ -327,19 +347,21 @@ nitro: {
 ```
 
 ### 4. **Защищенные пути в middleware**
+
 Используйте `startsWith()` без wildcards:
 
 ```typescript
 const protectedPaths = [
-  '/profile',    // ✅ Покрывает /profile, /profile/settings и т.д.
+  '/profile', // ✅ Покрывает /profile, /profile/settings и т.д.
   '/checkout',
   '/order',
 ]
 ```
 
 ❌ **НЕ используйте:**
+
 ```typescript
-'/profile/**'  // Не работает со startsWith()
+'/profile/**' // Не работает со startsWith()
 ```
 
 ## Потенциальные проблемы
@@ -369,6 +391,7 @@ const protectedPaths = [
 ## Итог
 
 Система авторизации и загрузки профиля теперь работает корректно:
+
 - ✅ Профиль загружается один раз при инициализации
 - ✅ Нет race conditions и дублирования запросов
 - ✅ Middleware не блокирует навигацию

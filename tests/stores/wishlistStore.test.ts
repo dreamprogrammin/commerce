@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import type { ProductWithGallery } from '@/types'
-import { mockSupabaseClient, mockQueryBuilder, mockToast } from '../setup'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import { mockQueryBuilder, mockSupabaseClient, mockToast } from '../setup'
 
 const mockProduct: ProductWithGallery = {
   id: 'product-1',
@@ -222,7 +222,7 @@ describe('wishlistStore', () => {
       )
     })
 
-    it('BUG: должен правильно форматировать ошибку', async () => {
+    it('bUG: должен правильно форматировать ошибку', async () => {
       const store = useWishlistStore()
 
       // Начальное состояние - пустой wishlist

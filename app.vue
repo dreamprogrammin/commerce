@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Toaster } from 'vue-sonner'
-import 'vue-sonner/style.css'
 import { useMediaQuery } from '@vueuse/core'
+import { Toaster } from 'vue-sonner'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
+import 'vue-sonner/style.css'
 
 const nuxtApp = useNuxtApp()
 const isMobile = useMediaQuery('(max-width: 1023px)')
@@ -104,7 +104,7 @@ useSchemaOrg([
 
     <NuxtLayout>
       <NuxtPage />
-      
+
       <!-- ✅ ИСПРАВЛЕНИЕ: Toaster только на клиенте -->
       <ClientOnly>
         <Toaster

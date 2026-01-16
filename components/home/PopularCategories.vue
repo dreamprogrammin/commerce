@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
+import { onMounted, ref } from 'vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
@@ -8,6 +8,9 @@ import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategorie
 
 const popularCategoriesStore = usePopularCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
+
+// ✅ Флаг для предотвращения hydration mismatch
+const isMounted = ref(false)
 
 // 🔥 TanStack Query - популярные категории с автоматическим кешированием
 const { data: popularCategories, isLoading, isFetching } = useQuery({
@@ -20,8 +23,8 @@ const { data: popularCategories, isLoading, isFetching } = useQuery({
   gcTime: 10 * 60 * 1000, // 10 минут
 })
 
-// ✅ Показываем skeleton только если идёт загрузка И данных нет
-const showSkeleton = computed(() => (isLoading.value || isFetching.value) && !popularCategories.value)
+// ✅ Показываем skeleton на SSR и пока данные загружаются
+const showSkeleton = computed(() => !isMounted.value || ((isLoading.value || isFetching.value) && !popularCategories.value))
 
 function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
@@ -38,6 +41,10 @@ let startX = 0
 let scrollLeft = 0
 
 onMounted(() => {
+  // ✅ Устанавливаем флаг для предотвращения hydration mismatch
+  isMounted.value = true
+
+  // Touch scroll setup
   const container = scrollContainer.value
   if (!container)
     return
@@ -98,7 +105,7 @@ onMounted(() => {
       </div>
 
       <!-- Content -->
-      <ClientOnly v-else-if="popularCategories && popularCategories.length > 0">
+      <template v-else-if="popularCategories && popularCategories.length > 0">
         <!-- MOBILE: Горизонтальный скролл в 2 ряда -->
         <div
           ref="scrollContainer"
@@ -235,23 +242,7 @@ onMounted(() => {
             </NuxtLink>
           </div>
         </div>
-
-        <!-- Fallback для SSR -->
-        <template #fallback>
-          <div class="md:hidden overflow-x-auto hide-scrollbar">
-            <div class="flex gap-3 px-4 pb-2">
-              <div v-for="i in 6" :key="i">
-                <Skeleton class="h-20 w-40 rounded-2xl flex-shrink-0" />
-              </div>
-            </div>
-          </div>
-          <div class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto px-4">
-            <div v-for="i in 8" :key="i">
-              <Skeleton class="h-48 rounded-3xl" />
-            </div>
-          </div>
-        </template>
-      </ClientOnly>
+      </template>
 
       <!-- Empty state -->
       <div v-else class="text-center text-muted-foreground py-10">

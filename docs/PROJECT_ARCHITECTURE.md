@@ -35,6 +35,7 @@
 ### Основные функции
 
 #### Для покупателей:
+
 - ✅ Каталог с многоуровневой фильтрацией (категории, бренды, цена, материалы, страны, динамические атрибуты)
 - ✅ Персонализированные рекомендации на основе профилей детей
 - ✅ Двухуровневая система бонусов (активные + отложенные на 14 дней)
@@ -45,6 +46,7 @@
 - ✅ Прогрессивная загрузка изображений с LQIP (Low Quality Image Placeholders)
 
 #### Для администраторов:
+
 - ✅ Полноценная админ-панель для управления каталогом
 - ✅ Управление продуктами с мультизагрузкой изображений
 - ✅ Иерархические категории
@@ -58,37 +60,37 @@
 
 ### Frontend
 
-| Технология | Версия | Назначение |
-|------------|--------|------------|
-| **Nuxt** | 4.0.2 | SSR фреймворк |
-| **Vue** | 3.x (latest) | UI фреймворк |
-| **TypeScript** | 5.9.2 | Статическая типизация |
-| **Tailwind CSS** | 4.1.11 | Utility-first CSS |
-| **shadcn-nuxt** | 2.2.0 | UI компоненты (142 компонента) |
-| **Pinia** | 3.0.3 | State management |
-| **TanStack Query** | 5.90.5 | Серверное кеширование |
-| **@nuxt/image** | 1.11.0 | Оптимизация изображений |
+| Технология         | Версия       | Назначение                     |
+| ------------------ | ------------ | ------------------------------ |
+| **Nuxt**           | 4.0.2        | SSR фреймворк                  |
+| **Vue**            | 3.x (latest) | UI фреймворк                   |
+| **TypeScript**     | 5.9.2        | Статическая типизация          |
+| **Tailwind CSS**   | 4.1.11       | Utility-first CSS              |
+| **shadcn-nuxt**    | 2.2.0        | UI компоненты (142 компонента) |
+| **Pinia**          | 3.0.3        | State management               |
+| **TanStack Query** | 5.90.5       | Серверное кеширование          |
+| **@nuxt/image**    | 1.11.0       | Оптимизация изображений        |
 
 ### Backend
 
-| Технология | Версия | Назначение |
-|------------|--------|------------|
-| **Supabase** | 2.64.2 | BaaS платформа |
-| **PostgreSQL** | 15 | База данных |
-| **Supabase Edge Functions** | - | Serverless функции (Deno) |
-| **Supabase Storage** | - | Хранение изображений |
-| **Supabase Auth** | - | Аутентификация |
+| Технология                  | Версия | Назначение                |
+| --------------------------- | ------ | ------------------------- |
+| **Supabase**                | 2.64.2 | BaaS платформа            |
+| **PostgreSQL**              | 15     | База данных               |
+| **Supabase Edge Functions** | -      | Serverless функции (Deno) |
+| **Supabase Storage**        | -      | Хранение изображений      |
+| **Supabase Auth**           | -      | Аутентификация            |
 
 ### Инструменты разработки
 
-| Инструмент | Версия | Назначение |
-|------------|--------|------------|
-| **pnpm** | - | Менеджер пакетов |
-| **ESLint** | 9.32.0 | Линтер (@antfu/eslint-config) |
-| **Prettier** | 3.6.2 | Форматирование кода |
-| **Vitest** | 4.0.16 | Unit тестирование |
-| **Storybook** | 10.1.10 | Документация компонентов |
-| **lint-staged** | 16.1.4 | Pre-commit хуки |
+| Инструмент      | Версия  | Назначение                    |
+| --------------- | ------- | ----------------------------- |
+| **pnpm**        | -       | Менеджер пакетов              |
+| **ESLint**      | 9.32.0  | Линтер (@antfu/eslint-config) |
+| **Prettier**    | 3.6.2   | Форматирование кода           |
+| **Vitest**      | 4.0.16  | Unit тестирование             |
+| **Storybook**   | 10.1.10 | Документация компонентов      |
+| **lint-staged** | 16.1.4  | Pre-commit хуки               |
 
 ### Библиотеки UI/UX
 
@@ -175,6 +177,7 @@
 ```
 
 ### Всего файлов в проекте:
+
 - **197 Vue компонентов**
 - **20 composables**
 - **15 Pinia stores**
@@ -190,24 +193,26 @@
 ### nuxt.config.ts - Основная конфигурация
 
 #### Модули (18 total)
+
 ```typescript
 modules: [
-  '@pinia/nuxt',                        // State management
-  '@nuxtjs/supabase',                   // Supabase интеграция
-  'shadcn-nuxt',                        // UI компоненты
-  'pinia-plugin-persistedstate/nuxt',   // LocalStorage persistence
-  '@nuxt/image',                        // Оптимизация изображений
-  '@nuxt/icon',                         // Иконки
-  '@nuxtjs/robots',                     // robots.txt
-  '@nuxtjs/sitemap',                    // Динамический sitemap
-  'nuxt-og-image',                      // Open Graph images
-  'nuxt-schema-org',                    // Структурированные данные
-  '@nuxt/fonts',                        // Оптимизация шрифтов
-  '@tailwindcss/vite',                  // Tailwind CSS v4
+  '@pinia/nuxt', // State management
+  '@nuxtjs/supabase', // Supabase интеграция
+  'shadcn-nuxt', // UI компоненты
+  'pinia-plugin-persistedstate/nuxt', // LocalStorage persistence
+  '@nuxt/image', // Оптимизация изображений
+  '@nuxt/icon', // Иконки
+  '@nuxtjs/robots', // robots.txt
+  '@nuxtjs/sitemap', // Динамический sitemap
+  'nuxt-og-image', // Open Graph images
+  'nuxt-schema-org', // Структурированные данные
+  '@nuxt/fonts', // Оптимизация шрифтов
+  '@tailwindcss/vite', // Tailwind CSS v4
 ]
 ```
 
 #### Правила маршрутизации (Performance)
+
 ```typescript
 routeRules: {
   '/': { swr: 600 },                    // 10 мин кеш
@@ -220,6 +225,7 @@ routeRules: {
 ```
 
 #### Оптимизация изображений
+
 ```typescript
 image: {
   domains: ['gvsdevsvzgcivpphcuai.supabase.co'],
@@ -233,6 +239,7 @@ image: {
 ```
 
 #### Vite Build
+
 ```typescript
 vite: {
   build: {
@@ -253,6 +260,7 @@ vite: {
 **Файл:** `assets/css/tailwind.css`
 
 **Особенности:**
+
 - **Tailwind CSS v4** (через `@tailwindcss/vite`)
 - **CSS Variables** для shadcn тем
 - **Dark mode** поддержка
@@ -270,7 +278,7 @@ vite: {
       "@/*": ["./*"]
     }
   },
-  "exclude": ["supabase/functions"]  // Исключаем Deno функции
+  "exclude": ["supabase/functions"] // Исключаем Deno функции
 }
 ```
 
@@ -342,36 +350,44 @@ stores/
 ### Ключевые хранилища
 
 #### 1. useAuthStore - Аутентификация
+
 **Файл:** `/stores/core/useAuthStore.ts`
 
 **State:**
+
 - `user` (computed) - Текущий пользователь из Supabase
 - `isLoggedIn` (computed) - Статус авторизации
 
 **Actions:**
+
 - `signInWithOAuth(provider, redirectTo)` - Google OAuth
 - `signOut()` - Выход с очисткой профиля
 
 ---
 
 #### 2. profileStore - Профиль пользователя
+
 **Файл:** `/stores/core/profileStore.ts`
 
 **State:**
+
 - `profile` - Полный профиль пользователя
 - `isLoading` / `isSaving` - Статусы загрузки
 
 **Getters:**
+
 - `bonusBalance` - Активный баланс бонусов
 - `pendingBonuses` - Отложенные бонусы
 - `isAdmin` - Проверка роли администратора
 
 **Actions:**
+
 - `loadProfile(force, waitForCreation)` - Загрузка профиля с retry логикой
 - `updateProfile(updates)` - Обновление полей профиля
 - `clearProfile()` - Очистка состояния
 
 **Особенности:**
+
 - **Race condition protection** - кеширование promise
 - **Exponential backoff** - 100ms → 2000ms за 5 попыток
 - **Timeout protection** - 10 секунд
@@ -380,14 +396,17 @@ stores/
 ---
 
 #### 3. cartStore - Корзина
+
 **Файл:** `/stores/publicStore/cartStore.ts`
 
 **State:**
+
 - `items` - Массив товаров в корзине
 - `bonusesToSpend` - Бонусы к списанию
 - `isProcessing` - Статус оформления заказа
 
 **Getters:**
+
 - `totalItems` - Общее количество товаров
 - `subtotal` - Сумма до скидки
 - `discountAmount` - Размер скидки за бонусы
@@ -395,6 +414,7 @@ stores/
 - `bonusesToAward` - Бонусы к начислению
 
 **Actions:**
+
 - `addItem(productIdOrObject, quantity)` - Добавление в корзину
 - `removeItem(productId)` - Удаление товара
 - `updateQuantity(productId, quantity)` - Изменение количества
@@ -403,12 +423,14 @@ stores/
 - `checkout(orderData)` - Оформление заказа
 
 **Особенности:**
+
 - **Race condition protection** - флаг `isAddingItem`
 - **Автоопределение гость/пользователь** - выбор RPC функции
 - **Валидация бонусов** - проверка баланса и лимитов
 - **LocalStorage persistence** - сохранение корзины
 
 **Persistence:**
+
 ```typescript
 {
   persist: {
@@ -421,11 +443,13 @@ stores/
 ---
 
 #### 4. productsStore - Каталог продуктов
+
 **Файл:** `/stores/publicStore/productsStore.ts`
 
 **Двухуровневое кеширование:**
 
 **Level 1: Pinia State (Метаданные)**
+
 - `brands` - Все бренды
 - `brandsByCategory` - Бренды по категориям
 - `attributesByCategory` - Атрибуты по категориям
@@ -434,11 +458,13 @@ stores/
 - `priceRangeByCategory` - Диапазоны цен
 
 **Level 2: TanStack Query (Продукты)**
+
 - Списки продуктов с фильтрами
 - **Stale time:** 5 минут
 - **GC time:** 10 минут
 
 **Actions (Метаданные - Кешируются):**
+
 - `fetchAllBrands()` - Все бренды
 - `fetchBrandsForCategory(slug)` - Бренды категории
 - `fetchAttributesForCategory(slug)` - Атрибуты категории
@@ -447,6 +473,7 @@ stores/
 - `fetchPriceRangeForCategory(slug)` - Диапазон цен
 
 **Actions (Продукты - НЕ кешируются в store):**
+
 - `fetchProducts(filters, page, pageSize)` - Основной каталог
 - `fetchProductBySlug(slug)` - Продукт по slug
 - `fetchFeaturedProducts(limit)` - Избранные
@@ -457,23 +484,28 @@ stores/
 ---
 
 #### 5. categoriesStore - Категории
+
 **Файл:** `/stores/publicStore/categoriesStore.ts`
 
 **State:**
+
 - `allCategories` - Плоский массив категорий
 - `menuTree` - Иерархическое дерево меню
 - `additionalMenuItems` - Кастомные пункты меню
 
 **Getters:**
+
 - `categoriesById` - Map<id, category>
 - `categoriesBySlug` - Map<slug, category>
 
 **Actions:**
+
 - `fetchCategoryData()` - Загрузка с построением дерева
 - `getBreadcrumbs(leafSlug)` - Генерация breadcrumbs
 - `getSubcategories(parentSlug)` - Дочерние категории
 
 **Особенности:**
+
 - **Tree building** - автоматическое построение иерархии
 - **Breadcrumbs** - обход parent_id до корня
 - **Menu filtering** - только `display_in_menu=true`
@@ -483,18 +515,21 @@ stores/
 ### Паттерны управления состоянием
 
 #### 1. Loading States
+
 Все stores используют флаги `isLoading` / `isSaving`:
 
 ```typescript
 isLoading.value = true
 try {
   // async operation
-} finally {
+}
+finally {
   isLoading.value = false
 }
 ```
 
 #### 2. Error Handling
+
 Консистентный паттерн toast errors:
 
 ```typescript
@@ -504,6 +539,7 @@ catch (error: any) {
 ```
 
 #### 3. Optimistic Updates
+
 Пример из CartStore:
 
 ```typescript
@@ -517,12 +553,13 @@ try {
 ```
 
 #### 4. Cache Invalidation
+
 ProductsStore предоставляет гранулярный контроль:
 
 ```typescript
-clearCache()                    // Все метаданные
-clearCategoryCache(slug)        // Конкретная категория
-invalidateBrandsCache()         // Только бренды
+clearCache() // Все метаданные
+clearCategoryCache(slug) // Конкретная категория
+invalidateBrandsCache() // Только бренды
 ```
 
 ### Зависимости между stores
@@ -562,6 +599,7 @@ useAdminCategoriesStore
 ### Основные таблицы
 
 #### profiles - Профили пользователей
+
 ```sql
 CREATE TABLE public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id),
@@ -578,6 +616,7 @@ CREATE TABLE public.profiles (
 ```
 
 **Особенности:**
+
 - Автосоздание при регистрации (триггер `on_auth_user_created`)
 - **Активные бонусы** - доступны для списания
 - **Отложенные бонусы** - активация через 14 дней
@@ -586,6 +625,7 @@ CREATE TABLE public.profiles (
 ---
 
 #### products - Каталог продуктов
+
 ```sql
 CREATE TABLE public.products (
     id UUID PRIMARY KEY,
@@ -620,6 +660,7 @@ CREATE TABLE public.products (
 ```
 
 **Индексы:**
+
 - `idx_products_category_id` - Фильтрация по категории
 - `idx_products_sales_count` - Сортировка по популярности
 - `idx_products_age_range` - Рекомендации
@@ -628,6 +669,7 @@ CREATE TABLE public.products (
 ---
 
 #### product_images - Галерея изображений с LQIP
+
 ```sql
 CREATE TABLE public.product_images (
     id UUID PRIMARY KEY,
@@ -641,6 +683,7 @@ CREATE TABLE public.product_images (
 ```
 
 **Особенности:**
+
 - Множественные изображения на продукт
 - **LQIP (Low Quality Image Placeholder)** для мгновенного blur-up эффекта
 - Каскадное удаление с продуктами
@@ -648,6 +691,7 @@ CREATE TABLE public.product_images (
 ---
 
 #### categories - Иерархические категории
+
 ```sql
 CREATE TABLE public.categories (
     id UUID PRIMARY KEY,
@@ -665,6 +709,7 @@ CREATE TABLE public.categories (
 ```
 
 **Особенности:**
+
 - Самоссылающийся `parent_id`
 - Рекурсивные запросы через `get_category_and_children_ids()` RPC
 - Featured категории для главной страницы
@@ -674,6 +719,7 @@ CREATE TABLE public.categories (
 ### Система динамических атрибутов
 
 #### attributes - Определения атрибутов
+
 ```sql
 CREATE TABLE public.attributes (
     id SERIAL PRIMARY KEY,
@@ -684,6 +730,7 @@ CREATE TABLE public.attributes (
 ```
 
 #### attribute_options - Возможные значения
+
 ```sql
 CREATE TABLE public.attribute_options (
     id SERIAL PRIMARY KEY,
@@ -694,6 +741,7 @@ CREATE TABLE public.attribute_options (
 ```
 
 #### category_attributes - Атрибуты по категориям
+
 ```sql
 CREATE TABLE public.category_attributes (
     category_id UUID REFERENCES categories(id),
@@ -703,6 +751,7 @@ CREATE TABLE public.category_attributes (
 ```
 
 #### product_attribute_values - Значения продуктов
+
 ```sql
 CREATE TABLE public.product_attribute_values (
     product_id UUID REFERENCES products(id),
@@ -713,12 +762,13 @@ CREATE TABLE public.product_attribute_values (
 ```
 
 **Пример использования:**
+
 ```json
 {
   "attribute": "Цвет",
   "options": [
-    {"value": "Красный", "meta": {"hex": "#dc2626"}},
-    {"value": "Синий", "meta": {"hex": "#2563eb"}}
+    { "value": "Красный", "meta": { "hex": "#dc2626" } },
+    { "value": "Синий", "meta": { "hex": "#2563eb" } }
   ]
 }
 ```
@@ -728,6 +778,7 @@ CREATE TABLE public.product_attribute_values (
 ### Двойная архитектура заказов
 
 #### orders - Заказы зарегистрированных пользователей (С БОНУСАМИ)
+
 ```sql
 CREATE TABLE public.orders (
     id UUID PRIMARY KEY,
@@ -748,6 +799,7 @@ CREATE TABLE public.orders (
 ```
 
 **Статусы:**
+
 ```
 new → confirmed → shipped → completed
         ↓
@@ -755,6 +807,7 @@ new → confirmed → shipped → completed
 ```
 
 #### guest_checkouts - Гостевые заказы (БЕЗ БОНУСОВ)
+
 ```sql
 CREATE TABLE public.guest_checkouts (
     id UUID PRIMARY KEY,
@@ -775,16 +828,16 @@ CREATE TABLE public.guest_checkouts (
 
 **Ключевые отличия:**
 
-| Особенность | orders (Зарегистрированные) | guest_checkouts (Гости) |
-|-------------|----------------------------|-------------------------|
-| **User Link** | ✅ `user_id UUID` | ❌ Нет user_id |
-| **Контакт** | Из profiles | `guest_name`, `guest_email`, `guest_phone` |
-| **Бонусы потрачены** | ✅ `bonuses_spent` | ❌ Нет поля |
-| **Бонусы начислены** | ✅ `bonuses_awarded` | ❌ Нет |
-| **Дата активации** | ✅ `bonuses_activation_date` | ❌ Нет |
-| **Welcome bonus** | ✅ 1000 при первом заказе | ❌ Нет |
-| **RLS доступ** | Пользователь видит свои, админы все | **Только админы** |
-| **Истечение** | Никогда | ✅ 90 дней после завершения |
+| Особенность          | orders (Зарегистрированные)         | guest_checkouts (Гости)                    |
+| -------------------- | ----------------------------------- | ------------------------------------------ |
+| **User Link**        | ✅ `user_id UUID`                   | ❌ Нет user_id                             |
+| **Контакт**          | Из profiles                         | `guest_name`, `guest_email`, `guest_phone` |
+| **Бонусы потрачены** | ✅ `bonuses_spent`                  | ❌ Нет поля                                |
+| **Бонусы начислены** | ✅ `bonuses_awarded`                | ❌ Нет                                     |
+| **Дата активации**   | ✅ `bonuses_activation_date`        | ❌ Нет                                     |
+| **Welcome bonus**    | ✅ 1000 при первом заказе           | ❌ Нет                                     |
+| **RLS доступ**       | Пользователь видит свои, админы все | **Только админы**                          |
+| **Истечение**        | Никогда                             | ✅ 90 дней после завершения                |
 
 ---
 
@@ -793,6 +846,7 @@ CREATE TABLE public.guest_checkouts (
 #### Жизненный цикл бонусов
 
 **1. Welcome Bonus (1000)**
+
 ```
 Регистрация пользователя
   ↓
@@ -809,6 +863,7 @@ pending_bonus_balance = 0
 ```
 
 **2. Бонусы за заказ**
+
 ```
 Пользователь создает заказ
   ↓
@@ -829,6 +884,7 @@ status: confirmed → completed
 ```
 
 **3. Списание бонусов**
+
 ```
 Пользователь указывает bonuses_to_spend в checkout
   ↓
@@ -846,6 +902,7 @@ create_user_order() валидирует:
 ```
 
 **4. Отмена заказа**
+
 ```
 Админ/система отменяет заказ
   ↓
@@ -861,6 +918,7 @@ cancel_order(order_id)
 #### Коэффициент конверсии
 
 Хранится в таблице `settings`:
+
 ```json
 {
   "key": "bonus_system",
@@ -877,6 +935,7 @@ cancel_order(order_id)
 ### RPC функции (PostgreSQL)
 
 #### get_filtered_products() - Основной поиск продуктов
+
 ```sql
 CREATE FUNCTION public.get_filtered_products(
     p_category_slug TEXT,
@@ -895,6 +954,7 @@ RETURNS TABLE (...);
 ```
 
 **Особенности:**
+
 - **Рекурсивный поиск по категориям** через `get_category_and_children_ids()`
 - **Специальный slug "all"** - возвращает все не-корневые категории
 - **Мультифильтрация**: бренды, цена, атрибуты, материалы, страны
@@ -905,6 +965,7 @@ RETURNS TABLE (...);
 ---
 
 #### create_user_order() - Оформление заказа (зарегистрированный)
+
 ```sql
 CREATE FUNCTION public.create_user_order(
     p_cart_items JSONB,
@@ -918,6 +979,7 @@ SECURITY DEFINER;
 ```
 
 **Workflow:**
+
 1. Валидация аутентификации (`auth.uid()`)
 2. Вычисление общей суммы
 3. Проверка наличия на складе
@@ -933,6 +995,7 @@ SECURITY DEFINER;
 ---
 
 #### create_guest_checkout() - Гостевой checkout
+
 ```sql
 CREATE FUNCTION public.create_guest_checkout(
     p_cart_items JSONB,
@@ -946,6 +1009,7 @@ SECURITY DEFINER;
 ```
 
 **Workflow:**
+
 1. Валидация guest_info (name, email, phone обязательны)
 2. Вычисление итога и проверка склада
 3. Создание записи `guest_checkout`
@@ -955,6 +1019,7 @@ SECURITY DEFINER;
 ---
 
 #### cancel_order() - Отмена заказа с возвратом бонусов
+
 ```sql
 CREATE FUNCTION public.cancel_order(
     p_order_id UUID,
@@ -965,6 +1030,7 @@ SECURITY DEFINER;
 ```
 
 **Workflow (для пользовательских заказов):**
+
 1. Проверка существования и статуса
 2. **Возврат потраченных бонусов** в `active_bonus_balance`
 3. **Вычет отложенных бонусов** (если еще не активированы)
@@ -973,6 +1039,7 @@ SECURITY DEFINER;
 ---
 
 #### get_personalized_recommendations() - Умные рекомендации
+
 ```sql
 CREATE FUNCTION public.get_personalized_recommendations(
     p_user_id UUID,
@@ -994,6 +1061,7 @@ RETURNS SETOF products;
 ---
 
 #### activate_pending_bonuses() - Автоматическая активация (pg_cron)
+
 ```sql
 CREATE FUNCTION public.activate_pending_bonuses()
 RETURNS TEXT
@@ -1003,6 +1071,7 @@ SECURITY DEFINER;
 **Расписание:** Ежедневно в 2:00 AM UTC
 
 **Workflow:**
+
 1. **Активация welcome bonus** для пользователей зарегистрированных 14+ дней назад
 2. **Активация бонусов за заказы** где `bonuses_activation_date <= NOW()`
 3. **Логирование неудач** в таблицу `bonus_activation_skipped`
@@ -1013,10 +1082,12 @@ SECURITY DEFINER;
 ### Edge Functions (Deno)
 
 #### 1. notify-order-to-telegram
+
 **Путь:** `/supabase/functions/notify-order-to-telegram/`
 **Триггер:** INSERT в `orders` или `guest_checkouts`
 
 **Workflow:**
+
 1. Проверка источника запроса (должен быть `pg_net`)
 2. Загрузка деталей заказа (с join к `profiles` для зарегистрированных)
 3. Загрузка изображений товаров из `product_images`
@@ -1037,10 +1108,12 @@ SECURITY DEFINER;
 ---
 
 #### 2. confirm-order
+
 **Путь:** `/supabase/functions/confirm-order/`
 **Триггер:** Клик на кнопку "Взять в работу"
 
 **Workflow:**
+
 1. Проверка admin secret
 2. Определение типа таблицы (`orders` или `guest_checkouts`)
 3. Проверка текущего статуса
@@ -1052,10 +1125,12 @@ SECURITY DEFINER;
 ---
 
 #### 3. cancel-order
+
 **Путь:** `/supabase/functions/cancel-order/`
 **Триггер:** Клик на кнопку "❌ Отменить"
 
 **Workflow:**
+
 1. Проверка admin secret
 2. Вызов RPC `cancel_order()` - обрабатывает возврат бонусов
 3. Обновление Telegram сообщения:
@@ -1066,10 +1141,12 @@ SECURITY DEFINER;
 ---
 
 #### 4. deliver-order
+
 **Путь:** `/supabase/functions/deliver-order/`
 **Триггер:** Клик на кнопку "✅ Доставлен"
 
 **Workflow:**
+
 1. Проверка admin secret
 2. Обновление статуса на `delivered`
 3. Обновление Telegram сообщения:
@@ -1079,10 +1156,12 @@ SECURITY DEFINER;
 ---
 
 #### 5. image-transformer
+
 **Путь:** `/supabase/functions/image-transformer/`
 **Триггер:** HTTP запросы от `@nuxt/image`
 
 **Параметры:**
+
 - `bucket` - Имя bucket
 - `url` - Путь к изображению
 - `width` - Целевая ширина
@@ -1090,6 +1169,7 @@ SECURITY DEFINER;
 - `quality` - Качество WebP (default: 75)
 
 **Workflow:**
+
 1. Загрузка из Supabase Storage
 2. Изменение размера с Sharp (`fit: 'cover'`)
 3. Конвертация в WebP
@@ -1099,15 +1179,16 @@ SECURITY DEFINER;
 
 ### Storage Buckets
 
-| Bucket | Public | Лимит размера | MIME типы | Использование |
-|--------|--------|--------------|-----------|---------------|
-| **product-images** | ✅ | 50 MiB | image/* | Галереи продуктов |
-| **category-images** | ✅ | 50 MiB | image/* | Миниатюры категорий |
-| **brand-logos** | ✅ | 50 MiB | image/*, svg | Логотипы брендов |
-| **slides-images** | ✅ | 50 MiB | image/* | Карусель главной |
-| **banners-images** | ✅ | 50 MiB | image/* | Маркетинговые баннеры |
+| Bucket              | Public | Лимит размера | MIME типы     | Использование         |
+| ------------------- | ------ | ------------- | ------------- | --------------------- |
+| **product-images**  | ✅     | 50 MiB        | image/\*      | Галереи продуктов     |
+| **category-images** | ✅     | 50 MiB        | image/\*      | Миниатюры категорий   |
+| **brand-logos**     | ✅     | 50 MiB        | image/\*, svg | Логотипы брендов      |
+| **slides-images**   | ✅     | 50 MiB        | image/\*      | Карусель главной      |
+| **banners-images**  | ✅     | 50 MiB        | image/\*      | Маркетинговые баннеры |
 
 **RLS политики:**
+
 - **Public read** для всех buckets
 - **Admin-only write/delete** через проверку `is_admin()`
 
@@ -1118,6 +1199,7 @@ SECURITY DEFINER;
 #### Управление профилями
 
 **on_auth_user_created** - Автосоздание профиля
+
 ```sql
 CREATE TRIGGER on_auth_user_created
 AFTER INSERT ON auth.users
@@ -1125,6 +1207,7 @@ FOR EACH ROW EXECUTE FUNCTION handle_new_user_profile_creation();
 ```
 
 **Логика:**
+
 ```sql
 INSERT INTO public.profiles (id, first_name, role)
 VALUES (
@@ -1137,6 +1220,7 @@ VALUES (
 ---
 
 **on_profile_created_grant_bonus** - Welcome Bonus
+
 ```sql
 CREATE TRIGGER on_profile_created_grant_bonus
 BEFORE INSERT ON public.profiles
@@ -1144,6 +1228,7 @@ FOR EACH ROW EXECUTE FUNCTION grant_welcome_bonus();
 ```
 
 **Устанавливает:**
+
 - `pending_bonus_balance = 1000`
 - `has_received_welcome_bonus = TRUE`
 
@@ -1152,6 +1237,7 @@ FOR EACH ROW EXECUTE FUNCTION grant_welcome_bonus();
 ---
 
 **trigger_protect_profile_role_update** - Защита ролей
+
 ```sql
 CREATE TRIGGER trigger_protect_profile_role_update
 BEFORE UPDATE OF role ON public.profiles
@@ -1165,6 +1251,7 @@ FOR EACH ROW EXECUTE FUNCTION protect_profile_role_update();
 #### Workflow заказов
 
 **on_new_order_created_send_notification** - Telegram уведомление
+
 ```sql
 CREATE TRIGGER on_new_order_created_send_notification
 AFTER INSERT ON public.orders
@@ -1173,6 +1260,7 @@ EXECUTE FUNCTION trigger_order_notification();
 ```
 
 **Вызывает edge function** через `pg_net`:
+
 ```sql
 PERFORM net.http_post(
   url := 'https://[PROJECT].supabase.co/functions/v1/notify-order-to-telegram',
@@ -1185,6 +1273,7 @@ PERFORM net.http_post(
 ---
 
 **on_order_item_insert_update_sales_count** - Счетчик продаж
+
 ```sql
 CREATE TRIGGER on_order_item_insert_update_sales_count
 AFTER INSERT ON public.order_items
@@ -1198,6 +1287,7 @@ FOR EACH ROW EXECUTE FUNCTION update_product_sales_count();
 ### Row Level Security (RLS)
 
 **Все таблицы** имеют RLS enabled:
+
 ```sql
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ```
@@ -1205,21 +1295,25 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 #### Категории политик:
 
 **1. Public read** (данные каталога)
+
 ```sql
 FOR SELECT TO public USING (is_active = true)
 ```
 
 **2. User-scoped** (заказы, wishlist, дети)
+
 ```sql
 USING (auth.uid() = user_id)
 ```
 
 **3. Admin-only** (операции управления)
+
 ```sql
 USING (public.current_user_has_role_internal('admin'))
 ```
 
 **4. Гибридные политики** (создание заказов)
+
 ```sql
 FOR INSERT WITH CHECK (
   (auth.role() = 'authenticated' AND auth.uid() = user_id) OR
@@ -1249,9 +1343,11 @@ components/
 ### Ключевые компоненты
 
 #### 1. ProductCard.vue (Global)
+
 **Назначение:** Универсальная карточка продукта с адаптивными интеракциями
 
 **Особенности:**
+
 - **Desktop:** Галерея изображений по наведению мыши (меняет изображение по mousemove)
 - **Mobile:** Свайпаемая карусель с Embla Carousel
 - Прогрессивная загрузка с LQIP
@@ -1261,12 +1357,14 @@ components/
 - Отображение бонусных баллов
 
 **Зависимости:**
+
 - `useCartStore` - Управление корзиной
 - `useSupabaseStorage` - Генерация URL изображений
 - `ProgressiveImage` - Оптимизированная загрузка
 - `QuantitySelector` - Контролы количества
 
 **Паттерн:** Определение устройства с `isTouchDevice` ref:
+
 ```typescript
 const isTouchDevice = ref(false)
 onMounted(() => {
@@ -1277,9 +1375,11 @@ onMounted(() => {
 ---
 
 #### 2. ProgressiveImage.vue (Global)
+
 **Назначение:** Оптимизированная загрузка изображений с множественными стратегиями placeholder
 
 **Props:**
+
 ```typescript
 interface Props {
   src: string | null
@@ -1296,12 +1396,14 @@ interface Props {
 ```
 
 **4 стратегии placeholder:**
+
 1. **shimmer** - Анимированный градиент
 2. **blur** - Статичный blur CSS
 3. **color** - Цветной фон
 4. **lqip** - Low Quality Image Placeholder (Base64, ~500 байт)
 
 **LQIP реализация:**
+
 ```vue
 <div v-if="placeholderType === 'lqip' && blurDataUrl">
   <!-- Крошечное blur изображение -->
@@ -1316,6 +1418,7 @@ interface Props {
 ```
 
 **Особенности:**
+
 - Intersection Observer для lazy loading
 - Eager loading для above-fold изображений
 - Автоматическая WebP трансформация (когда включена)
@@ -1324,9 +1427,11 @@ interface Props {
 ---
 
 #### 3. DynamicFilters.vue (Global)
+
 **Назначение:** Боковая панель продвинутых фильтров каталога
 
 **Props:**
+
 ```typescript
 {
   modelValue: {
@@ -1346,6 +1451,7 @@ interface Props {
 ```
 
 **Особенности:**
+
 - Фильтрация подкатегорий с градиентными кнопками
 - Мульти-выбор брендов/материалов/стран
 - Динамические фильтры атрибутов (select, color swatch)
@@ -1354,10 +1460,12 @@ interface Props {
 - Функция сброса
 
 **Паттерн:** Реактивные обновления с дедупликацией на основе Set:
+
 ```typescript
 function updateDirectFilter(checked: boolean, key: 'brandIds', id: string) {
   const newSelection = new Set<string>(props.modelValue[key])
-  if (checked) newSelection.add(id)
+  if (checked)
+    newSelection.add(id)
   else newSelection.delete(id)
   emit('update:modelValue', {
     ...props.modelValue,
@@ -1369,9 +1477,11 @@ function updateDirectFilter(checked: boolean, key: 'brandIds', id: string) {
 ---
 
 #### 4. ProductForm.vue (Admin - 1033 строки)
+
 **Назначение:** Комплексная форма создания/редактирования продуктов
 
 **Ключевые возможности:**
+
 - 2-колоночный responsive layout (основная инфо + боковая панель)
 - Загрузка изображений с **автоматической оптимизацией** и LQIP генерацией
 - Debounced поиск аксессуаров
@@ -1382,6 +1492,7 @@ function updateDirectFilter(checked: boolean, key: 'brandIds', id: string) {
 - Обработка файлов с индикаторами прогресса
 
 **Процесс оптимизации изображений:**
+
 ```typescript
 async function handleFilesChange(event: Event) {
   const files = Array.from(target.files)
@@ -1415,32 +1526,38 @@ async function handleFilesChange(event: Event) {
 ### Composables (20 файлов)
 
 #### useImageState.ts
+
 **Назначение:** Прогрессивная загрузка изображений с Intersection Observer
 
 **Особенности:**
+
 - Lazy loading с 200px root margin
 - Debounced URL изменения (150ms) для производительности каруселей
 - Поддержка eager loading
 - Интеграция кеширования браузера
 
 **Использование:**
+
 ```typescript
-const { imageRef, isLoaded, isError, shouldLoad, onLoad, onError } =
-  useImageState(imageUrl, { eager: false })
+const { imageRef, isLoaded, isError, shouldLoad, onLoad, onError }
+  = useImageState(imageUrl, { eager: false })
 ```
 
 ---
 
 #### useProductGallery.ts
+
 **Назначение:** Синхронизированное состояние карусели для галерей продуктов
 
 **Особенности:**
+
 - Синхронизация основная карусель ↔ миниатюры
 - Авто-скролл миниатюр при изменении основной
 - Клик для выбора миниатюры
 - Интеграция Embla API
 
 **Паттерн:** Синхронизация на основе watcher:
+
 ```typescript
 watch(emblaMainApi, (api) => {
   if (api) {
@@ -1455,17 +1572,19 @@ watch(emblaMainApi, (api) => {
 ---
 
 #### useCatalogQuery.ts
+
 **Назначение:** Обертка TanStack Query для продуктов каталога
 
 **Конфигурация:**
+
 ```typescript
 useQuery({
   queryKey: ['catalog-products', categorySlug, sortBy, page, filters],
   queryFn: async ({ signal }) => {
     return await productsStore.fetchProducts(filters, page, pageSize, signal)
   },
-  staleTime: 0,           // Всегда свежие
-  gcTime: 5 * 60 * 1000,  // 5 мин кеш
+  staleTime: 0, // Всегда свежие
+  gcTime: 5 * 60 * 1000, // 5 мин кеш
   retry: false,
   refetchOnWindowFocus: false
 })
@@ -1476,21 +1595,25 @@ useQuery({
 ---
 
 #### useSupabaseStorage.ts
+
 **Назначение:** Унифицированная генерация URL изображений с поддержкой двух режимов
 
 **Режимы:**
 
 **1. FREE TIER** (IMAGE_OPTIMIZATION_ENABLED = false):
+
 - Публичные URL без трансформации
 - Локальная оптимизация перед загрузкой
 - Стабильное кеширование браузера
 
 **2. PAID TIER** (IMAGE_OPTIMIZATION_ENABLED = true):
+
 - Supabase Image Transformation API
 - Изменение размера на лету, конверсия формата
 - Автоматический WebP/AVIF
 
 **Основная функция:**
+
 ```typescript
 function getImageUrl(
   bucketName: string,
@@ -1519,6 +1642,7 @@ function getImageUrl(
 ### Паттерны компонентов
 
 #### 1. Props Definition
+
 Строгая TypeScript типизация:
 
 ```typescript
@@ -1541,16 +1665,20 @@ const props = withDefaults(defineProps<Props>(), {
 ---
 
 #### 2. Loading States
+
 Skeleton компоненты для каждого major view:
+
 - ProductGridSkeleton
 - ProductCarouselSkeleton
 - ProductDetailSkeleton
 
 **Использование:**
+
 ```vue
 <div v-if="isLoading">
   <Skeleton class="h-5 w-3/4" />
 </div>
+
 <div v-else>
   {{ content }}
 </div>
@@ -1559,6 +1687,7 @@ Skeleton компоненты для каждого major view:
 ---
 
 #### 3. Device-Specific Rendering
+
 Определение touch для разного UX:
 
 ```typescript
@@ -1569,10 +1698,13 @@ onMounted(() => {
 ```
 
 **Использование:**
+
 ```vue
 <!-- Desktop: Hover галерея -->
 <template v-if="!isTouchDevice">
-  <div @mousemove="handleMouseMove">...</div>
+  <div @mousemove="handleMouseMove">
+    ...
+  </div>
 </template>
 
 <!-- Mobile: Swipe карусель -->
@@ -1584,15 +1716,18 @@ onMounted(() => {
 ---
 
 #### 4. Image Optimization Pattern
+
 3-уровневая стратегия:
 
 **1. LQIP Генерация** (при загрузке):
+
 ```typescript
 const blurPlaceholder = await generateBlurPlaceholder(file)
 // Хранится в БД: blur_placeholder колонка
 ```
 
 **2. Progressive Loading** (при отображении):
+
 ```vue
 <ProgressiveImage
   :src="imageUrl"
@@ -1602,6 +1737,7 @@ const blurPlaceholder = await generateBlurPlaceholder(file)
 ```
 
 **3. URL Optimization** (настраиваемо):
+
 ```typescript
 const url = getImageUrl(bucket, path, {
   width: 400,
@@ -1619,6 +1755,7 @@ const url = getImageUrl(bucket, path, {
 #### Публичные маршруты
 
 **Главная и основные страницы:**
+
 - **`/`** - Главная (layout: `home`, SSR: SWR 10 мин)
 - **`/catalog`** - Список категорий (layout: `catalog`, SSR: SWR 30 мин)
 - **`/catalog/[...slug]`** - Динамические категории (layout: `catalog`, SSR: SWR 30 мин)
@@ -1628,10 +1765,12 @@ const url = getImageUrl(bucket, path, {
 - **`/cart`** - Корзина (SSR: disabled)
 
 **Checkout и заказы:**
+
 - **`/checkout`** - Оформление заказа (layout: `checkout`, SSR: disabled)
 - **`/order/success/[id]`** - Подтверждение заказа (SSR: disabled)
 
 **Профиль (защищенные):**
+
 - **`/profile`** - Профиль пользователя (layout: `profile`, SSR: disabled, auth: required)
 - **`/profile/children`** - Профили детей (SSR: disabled, auth: required)
 - **`/profile/order`** - История заказов (SSR: disabled, auth: required)
@@ -1641,6 +1780,7 @@ const url = getImageUrl(bucket, path, {
 - **`/profile/settings`** - Настройки (SSR: disabled, auth: required)
 
 **Админ панель (защищенные):**
+
 - **`/admin`** - Dashboard (layout: `admin`, SEO: excluded)
 - **`/admin/products`** - Управление продуктами
 - **`/admin/products/new`** - Создание продукта
@@ -1655,51 +1795,65 @@ const url = getImageUrl(bucket, path, {
 ### Стратегия Layouts (9 layouts)
 
 #### 1. default.vue - Основной layout
+
 **Используется для:** Большинство публичных страниц
 **Особенности:**
+
 - Desktop: CommonHeader
 - Mobile: CommonAppTabBarMobile с фиксированным позиционированием
 - Адаптивные отступы для мобильных (pt-[76px])
 
 #### 2. home.vue - Layout главной страницы
+
 **Используется для:** Только главная страница
 **Особенности:**
+
 - Desktop: CommonHeader
 - Mobile: CommonMobileHeader (статичный)
 - Mobile отступы: pt-[65px]
 
 #### 3. catalog.vue - Layout каталога
+
 **Используется для:** Страницы каталога
 **Особенности:**
+
 - Desktop: CommonHeader
 - Mobile: CommonCatalogMobileHeader (sticky)
 - Mobile отступы: pt-[56px]
 
 #### 4. profile.vue - Layout профиля
+
 **Используется для:** Все страницы профиля
 **Особенности:**
+
 - Desktop: Боковая навигация с инфо пользователя
 - Mobile: Градиентный header с прокручиваемыми табами, нижняя навигационная панель
 - Authentication guard (показывает loader если не авторизован)
 - Пункты навигации: Профиль, Дети, Заказы, Wishlist, Бонусы, Настройки
 
 #### 5. admin.vue - Layout админ панели
+
 **Используется для:** Админ панель
 **Особенности:**
+
 - Только Desktop (скрыт на мобильных)
 - Боковая панель с админ навигацией
 - Header с кнопкой выхода
 - Пункты меню: Категории, Популярные категории, Слайды, Пользователи, Продукты, Бренды, Атрибуты, Баннеры
 
 #### 6. checkout.vue - Layout checkout
+
 **Используется для:** Процесс checkout
 **Особенности:**
+
 - Desktop: CommonHeader
 - Минималистичный layout для фокуса на checkout
 
 #### 7. blank.vue - Пустой layout
+
 **Используется для:** Страница поиска
 **Особенности:**
+
 - Без header или footer
 - Только content slot
 
@@ -1708,9 +1862,11 @@ const url = getImageUrl(bucket, path, {
 ### Middleware: auth.global.ts
 
 **Защищенные пути:**
+
 - `/profile/**`
 
 **Логика:**
+
 1. Выполняется только на клиенте (пропускает сервер)
 2. Проверяет защищенность маршрута
 3. Для защищенных:
@@ -1721,6 +1877,7 @@ const url = getImageUrl(bucket, path, {
 4. Для `/login` и `/register`: Редиректит авторизованных на главную
 
 **Особенности:**
+
 - Не блокирующая загрузка профиля (позволяет немедленную навигацию)
 - 100ms grace period для обработки OAuth callback
 - Модальный login prompt для неавторизованного доступа
@@ -1730,14 +1887,18 @@ const url = getImageUrl(bucket, path, {
 ### Server API Routes
 
 #### 1. /api/sitemap-routes
+
 Загружает продукты, категории и бренды из Supabase для генерации sitemap:
+
 - **Продукты:** 10,000 лимит, приоритет 0.8, changefreq: daily
 - **Категории:** 1,000 лимит, приоритет 0.75, changefreq: weekly
 - **Бренды:** 1,000 лимит, приоритет 0.6, changefreq: monthly
 - **Статичные:** Главная (1.0), Каталог (0.9), Страница брендов (0.7)
 
 #### 2. /api/image-proxy/[...path]
+
 Обход Cloudflare bot detection для Supabase Storage:
+
 - Добавляет правильный User-Agent и headers
 - Поддержка всех форматов изображений
 - Cache-Control: 1 год immutable
@@ -1750,6 +1911,7 @@ const url = getImageUrl(bucket, path, {
 ### SSR/CSR Конфигурация (Nitro Route Rules)
 
 #### Server-Side Rendered (с кешированием):
+
 ```javascript
 '/': { swr: 600 },                    // 10 мин
 '/catalog': { swr: 1800 },            // 30 мин
@@ -1757,6 +1919,7 @@ const url = getImageUrl(bucket, path, {
 ```
 
 #### Client-Side Only (SSR выключен):
+
 ```javascript
 '/profile/**': { ssr: false },
 '/checkout': { ssr: false },
@@ -1769,14 +1932,18 @@ const url = getImageUrl(bucket, path, {
 ### SEO Конфигурация
 
 #### Sitemap (`@nuxtjs/sitemap`)
+
 - **Источник:** `/api/sitemap-routes`
 - **Исключено:** `/admin/**`, `/profile/**`, `/checkout`, `/cart`, `/search`, `/order/**`, `/confirm/**`, `/register/**`
 
 #### Robots.txt (`@nuxtjs/robots`)
+
 **Разрешено:**
+
 - `/`, `/catalog/**`, `/brand/**`
 
 **Запрещено:**
+
 - `/admin`, `/profile`, `/cart`, `/checkout`, `/search`
 - `/confirm`, `/forgot-password`, `/order`, `/register`, `/reset-password`
 - `/api/**`, `/*?*` (все query параметры)
@@ -1786,21 +1953,25 @@ const url = getImageUrl(bucket, path, {
 ### Структурированные данные (JSON-LD)
 
 #### Главная страница:
+
 - WebSite schema с SearchAction
 - Store schema с гео координатами
 - Organization schema (via nuxt-schema-org)
 - BreadcrumbList
 
 #### Страницы каталога:
+
 - BreadcrumbList
 - CollectionPage
 - ItemList (первые 10 продуктов)
 
 #### Страницы продуктов:
+
 - Product schema с brand, offers, availability
 - BreadcrumbList
 
 #### Страницы брендов:
+
 - Brand schema
 - CollectionPage
 - BreadcrumbList
@@ -1808,6 +1979,7 @@ const url = getImageUrl(bucket, path, {
 ---
 
 ### OG Images
+
 - **Главная:** Кастомное статичное изображение
 - **Каталог:** Динамический OG image компонент
 - **Продукты:** Изображение продукта из Supabase Storage
@@ -1820,6 +1992,7 @@ const url = getImageUrl(bucket, path, {
 #### Двухуровневое кеширование:
 
 **Level 1: Pinia Store (Метаданные)**
+
 - Бренды по категориям
 - Атрибуты по категориям
 - Материалы (глобально)
@@ -1828,6 +2001,7 @@ const url = getImageUrl(bucket, path, {
 - **Время жизни:** До закрытия вкладки
 
 **Level 2: TanStack Query (Продукты)**
+
 - Списки продуктов по комбинации фильтров
 - **Stale time:** 5 минут
 - **GC time:** 10 минут
@@ -1838,6 +2012,7 @@ const url = getImageUrl(bucket, path, {
 ### Оптимизация производительности
 
 #### Vite Build
+
 ```typescript
 rollupOptions: {
   output: {
@@ -1850,6 +2025,7 @@ rollupOptions: {
 ```
 
 #### Оптимизация изображений
+
 - **WebP формат** с качеством 80
 - **Responsive breakpoints:** xs(320), sm(640), md(768), lg(1024), xl(1280), xxl(1536)
 - **LQIP (Low Quality Image Placeholders)** - Base64 blur previews (~500 байт)
@@ -1857,6 +2033,7 @@ rollupOptions: {
 - **Eager loading** для above-fold изображений
 
 #### Database Indexes
+
 - `idx_products_category_id` - Фильтрация категорий
 - `idx_products_sales_count` - Сортировка популярности
 - `idx_orders_bonus_activation` - Эффективность cron job
@@ -1869,11 +2046,13 @@ rollupOptions: {
 ### Команды разработки
 
 #### Development
+
 ```bash
 pnpm dev              # Start dev server (http://localhost:3000)
 ```
 
 #### Production
+
 ```bash
 pnpm build            # Production build
 pnpm preview          # Preview production build
@@ -1881,6 +2060,7 @@ pnpm generate         # Static site generation
 ```
 
 #### Code Quality
+
 ```bash
 pnpm lint             # Check for lint errors
 pnpm lint:fix         # Auto-fix lint errors
@@ -1889,6 +2069,7 @@ pnpm format:check     # Check formatting without changes
 ```
 
 #### Testing
+
 ```bash
 pnpm test             # Run tests in watch mode
 pnpm test:ui          # Run tests with UI
@@ -1897,6 +2078,7 @@ pnpm test:run         # Run tests once
 ```
 
 #### Storybook
+
 ```bash
 pnpm storybook        # Start Storybook (port 6006)
 pnpm build-storybook  # Build Storybook
@@ -1907,6 +2089,7 @@ pnpm build-storybook  # Build Storybook
 ### Supabase Local Development
 
 #### Основные команды
+
 ```bash
 # Start local Supabase
 supabase start
@@ -1934,6 +2117,7 @@ supabase functions serve <function_name>
 ```
 
 #### Local Ports
+
 - **API:** http://localhost:54321
 - **Studio:** http://localhost:54323
 - **Inbucket (email):** http://localhost:54324
@@ -1943,6 +2127,7 @@ supabase functions serve <function_name>
 ### Git Workflow
 
 #### Pre-commit Hooks
+
 ```json
 {
   "simple-git-hooks": {
@@ -1956,6 +2141,7 @@ supabase functions serve <function_name>
 ```
 
 #### Commit Guidelines
+
 - **NEVER** изменять существующие миграции - всегда создавать новые
 - **Регенерировать типы** после изменений схемы: `supabase gen types typescript --local > types/supabase.ts`
 - **Тестировать с разными ролями** (anon, authenticated, admin)
@@ -1966,12 +2152,14 @@ supabase functions serve <function_name>
 ### Важные заметки по реализации
 
 #### При работе с продуктами:
+
 1. **Всегда join `product_images`** для получения галереи
 2. **Использовать RPC функции** вместо прямых запросов для фильтрации
 3. **Проверять наличие на складе** перед добавлением в корзину
 4. **Рекурсивная фильтрация категорий** - `get_filtered_products()` ищет parent+children категории
 
 #### При работе с заказами:
+
 1. **Гостевые vs пользовательские:**
    - Гости: `create_guest_checkout()` RPC (требует email/phone)
    - Пользователи: `create_user_order()` RPC (привязка к `profile_id`)
@@ -1982,12 +2170,14 @@ supabase functions serve <function_name>
    - Отмененные заказы возвращают потраченные бонусы
 
 #### При работе с аутентификацией:
+
 1. **Никогда не обходить middleware** - Защищенные маршруты должны оставаться защищенными
 2. **Автосоздание профиля** - Триггер БД обрабатывает создание профиля при регистрации
 3. **Проверки сессии** - Всегда проверять сессию на клиенте для защищенных действий
 4. **Role-based доступ** - Проверять `profiles.role` для админ функций
 
 #### При работе с Supabase:
+
 1. **Type Safety** - Всегда регенерировать типы после изменений схемы
 2. **RLS Policies** - Тестировать с разными ролями
 3. **Миграции** - Никогда не редактировать существующие, всегда создавать новые
@@ -2012,6 +2202,7 @@ Uhti Commerce Platform - это **production-ready e-commerce решение** �
 ### Итоговая сложность:
 
 **Frontend:**
+
 - **197 Vue компонентов** (142 shadcn-nuxt + 55 кастомных)
 - **20 composables** для переиспользуемой логики
 - **15 Pinia stores** с domain-driven организацией
@@ -2019,6 +2210,7 @@ Uhti Commerce Platform - это **production-ready e-commerce решение** �
 - **9 layouts** для различных секций
 
 **Backend:**
+
 - **10,306 строк** SQL миграций
 - **7 edge функций** (Deno/TypeScript)
 - **25+ таблиц** базы данных
@@ -2027,6 +2219,7 @@ Uhti Commerce Platform - это **production-ready e-commerce решение** �
 - **15+ триггеров** автоматизации
 
 **Технологии:**
+
 - Nuxt 4 + Vue 3 + TypeScript
 - Tailwind CSS 4 + shadcn-nuxt
 - Pinia + TanStack Query
@@ -2043,6 +2236,7 @@ Uhti Commerce Platform - это **production-ready e-commerce решение** �
 **Автор:** Автоматически сгенерировано Claude Code
 
 Для дополнительной информации смотрите специализированную документацию в папке `/docs/`:
+
 - [IMAGE_OPTIMIZATION_GUIDE.md](./IMAGE_OPTIMIZATION_GUIDE.md)
 - [LQIP_IMPLEMENTATION.md](./LQIP_IMPLEMENTATION.md)
 - [VUE_QUERY_SETUP.md](./VUE_QUERY_SETUP.md)

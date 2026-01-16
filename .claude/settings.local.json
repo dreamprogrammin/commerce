@@ -38,7 +38,11 @@
       "Bash(pnpm test:*)",
       "Bash(supabase db reset:*)",
       "Bash(git reset:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(docker ps:*)",
+      "Bash(netsh.exe interface ipv4 show excludedportrange protocol=tcp)",
+      "Bash(sudo service docker:*)",
+      "Bash(pnpm lint:fix:*)"
     ]
   }
 }

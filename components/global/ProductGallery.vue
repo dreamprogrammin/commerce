@@ -27,11 +27,11 @@ const slideCount = ref(0)
 function onInitMainCarousel(api: any) {
   onInitMain(api)
   mainCarouselApi.value = api
-  
+
   if (api) {
     slideCount.value = api.scrollSnapList().length
     currentSlide.value = api.selectedScrollSnap()
-    
+
     api.on('select', () => {
       currentSlide.value = api.selectedScrollSnap()
     })
@@ -110,11 +110,10 @@ function getMainUrl(imagePath: string) {
           <button
             v-for="index in slideCount"
             :key="index"
-            :class="[
-              'w-2 h-2 rounded-full transition-all',
-              currentSlide === index - 1 
-                ? 'bg-primary w-6' 
-                : 'bg-muted-foreground/30'
+            class="w-2 h-2 rounded-full transition-all" :class="[
+              currentSlide === index - 1
+                ? 'bg-primary w-6'
+                : 'bg-muted-foreground/30',
             ]"
             @click="mainCarouselApi?.scrollTo(index - 1)"
           />

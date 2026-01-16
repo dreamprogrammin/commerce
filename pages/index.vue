@@ -51,8 +51,8 @@ const recommendedProducts = computed(() => mainPersonalData.value?.recommended |
 const wishlistProducts = computed(() => mainPersonalData.value?.wishlist || [])
 
 const showRecommendationsSkeleton = computed(() =>
-  (isLoadingRecommendations.value || isFetchingRecommendations.value) &&
-  (!mainPersonalData.value || (mainPersonalData.value.recommended.length === 0 && mainPersonalData.value.wishlist.length === 0))
+  (isLoadingRecommendations.value || isFetchingRecommendations.value)
+  && (!mainPersonalData.value || (mainPersonalData.value.recommended.length === 0 && mainPersonalData.value.wishlist.length === 0)),
 )
 
 const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFetchingPopular } = useQuery({
@@ -78,11 +78,11 @@ const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetc
 const newestProducts = computed(() => newestProductsData.value || [])
 
 const showPopularSkeleton = computed(() =>
-  (isLoadingPopular.value || isFetchingPopular.value) && !popularProductsData.value
+  (isLoadingPopular.value || isFetchingPopular.value) && !popularProductsData.value,
 )
 
 const showNewestSkeleton = computed(() =>
-  (isLoadingNewest.value || isFetchingNewest.value) && !newestProductsData.value
+  (isLoadingNewest.value || isFetchingNewest.value) && !newestProductsData.value,
 )
 
 const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value || showPopularSkeleton.value)
@@ -356,7 +356,9 @@ useRobotsRule({ index: true, follow: true })
             <h3 class="text-xl font-semibold text-foreground mb-3">
               Широкий ассортимент игрушек
             </h3>
-            <p class="mb-4">В нашем интернет-магазине вы найдете огромный выбор детских игрушек для детей всех возрастов: от развивающих игрушек для малышей до конструкторов и настольных игр для школьников.</p>
+            <p class="mb-4">
+              В нашем интернет-магазине вы найдете огромный выбор детских игрушек для детей всех возрастов: от развивающих игрушек для малышей до конструкторов и настольных игр для школьников.
+            </p>
             <ul class="space-y-2 list-disc list-inside">
               <li>Развивающие игрушки и игры</li>
               <li>Конструкторы и пазлы</li>

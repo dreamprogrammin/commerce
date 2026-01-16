@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { useProfileStore } from '@/stores/core/profileStore'
 import type { ProfileRow } from '@/types'
-import { mockSupabaseClient, mockQueryBuilder, mockToast } from '../setup'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { mockQueryBuilder, mockSupabaseClient, mockToast } from '../setup'
 
 const mockProfile: ProfileRow = {
   id: 'user-123',
@@ -34,7 +34,7 @@ describe('profileStore', () => {
 
     // ✅ Устанавливаем пользователя по умолчанию
     global.useSupabaseUser = vi.fn(() => ({
-      value: { id: 'user-123', email: 'test@example.com' }
+      value: { id: 'user-123', email: 'test@example.com' },
     }))
   })
 
@@ -194,7 +194,7 @@ describe('profileStore', () => {
       expect(mockQueryBuilder.maybeSingle).toHaveBeenCalledTimes(6)
     }, 10000) // увеличиваем timeout для теста
 
-    it('EDGE CASE: должен обработать таймаут при долгой загрузке', async () => {
+    it('eDGE CASE: должен обработать таймаут при долгой загрузке', async () => {
       const store = useProfileStore()
 
       // Симулируем ОЧЕНЬ медленный запрос (12 секунд - больше таймаута)

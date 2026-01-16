@@ -75,7 +75,7 @@ export const Processing: Story = {
     setup() {
       // Mock composable
       const mockComposable = () => ({
-        activeOrder: ref({...mockOrder, status: 'processing'}),
+        activeOrder: ref({ ...mockOrder, status: 'processing' }),
         isLoading: ref(false),
         getStatusColor: (status: string) => 'bg-yellow-100 text-yellow-800',
         getStatusLabel: (status: string) => 'В обработке',
@@ -97,7 +97,7 @@ export const Confirmed: Story = {
     components: { ActiveOrderStatus },
     setup() {
       const mockComposable = () => ({
-        activeOrder: ref({...mockOrder, status: 'confirmed'}),
+        activeOrder: ref({ ...mockOrder, status: 'confirmed' }),
         isLoading: ref(false),
         getStatusColor: (status: string) => 'bg-green-100 text-green-800',
         getStatusLabel: (status: string) => 'Подтверждён',
@@ -119,7 +119,7 @@ export const NewOrder: Story = {
     components: { ActiveOrderStatus },
     setup() {
       const mockComposable = () => ({
-        activeOrder: ref({...mockOrder, status: 'new'}),
+        activeOrder: ref({ ...mockOrder, status: 'new' }),
         isLoading: ref(false),
         getStatusColor: (status: string) => 'bg-blue-100 text-blue-800',
         getStatusLabel: (status: string) => 'Новый заказ',
@@ -141,7 +141,7 @@ export const Shipped: Story = {
     components: { ActiveOrderStatus },
     setup() {
       const mockComposable = () => ({
-        activeOrder: ref({...mockOrder, status: 'shipped'}),
+        activeOrder: ref({ ...mockOrder, status: 'shipped' }),
         isLoading: ref(false),
         getStatusColor: (status: string) => 'bg-indigo-100 text-indigo-800',
         getStatusLabel: (status: string) => 'Отправлен',

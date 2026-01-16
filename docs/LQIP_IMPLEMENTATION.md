@@ -3,6 +3,7 @@
 ## 📋 Что это?
 
 **LQIP** - техника отображения blur preview изображения (как на Medium.com):
+
 1. Показывается крошечное размытое изображение (~2KB) мгновенно
 2. Пока загружается полное изображение
 3. Плавный переход когда загрузилось
@@ -31,8 +32,8 @@ ADD COLUMN IF NOT EXISTS blur_placeholder TEXT NULL;
 COMMENT ON COLUMN product_images.blur_placeholder IS 'Base64 data URL blur preview для LQIP (~1-3KB)';
 
 -- Индекс
-CREATE INDEX IF NOT EXISTS idx_product_images_has_blur 
-ON product_images (product_id) 
+CREATE INDEX IF NOT EXISTS idx_product_images_has_blur
+ON product_images (product_id)
 WHERE blur_placeholder IS NOT NULL;
 ```
 
@@ -135,7 +136,7 @@ async function uploadProductImage(
 ### 2. Проверьте БД
 
 ```sql
-SELECT 
+SELECT
   id,
   image_url,
   LENGTH(blur_placeholder) as blur_size,
@@ -146,6 +147,7 @@ LIMIT 5;
 ```
 
 Должно быть:
+
 ```
 has_blur: true
 blur_size: ~2000-4000 (это размер base64 строки)
@@ -190,7 +192,8 @@ export default defineEventHandler(async (event) => {
         .from('product-images')
         .download(image.image_url)
 
-      if (!blob) continue
+      if (!blob)
+        continue
 
       // Генерируем blur
       const file = new File([blob], 'temp.jpg')
@@ -203,7 +206,8 @@ export default defineEventHandler(async (event) => {
         .eq('id', image.id)
 
       processed++
-    } catch (error) {
+    }
+    catch (error) {
       console.error(`Failed to process ${image.id}:`, error)
     }
   }
@@ -213,6 +217,7 @@ export default defineEventHandler(async (event) => {
 ```
 
 Запустите:
+
 ```bash
 curl http://localhost:3000/api/admin/generate-blur-placeholders
 ```
@@ -273,8 +278,9 @@ await generateBlurPlaceholder(file, 20, 0.7) // ~3 KB
 
 **Причина:** Изображение маленькое (<500KB) и не оптимизируется
 
-**Решение:** 
-- Уменьшите порог в `shouldOptimizeImage()` 
+**Решение:**
+
+- Уменьшите порог в `shouldOptimizeImage()`
 - Или всегда генерируйте blur: измените логику в `handleFilesChange()`
 
 ### Проблема: blur preview не показывается
@@ -282,6 +288,7 @@ await generateBlurPlaceholder(file, 20, 0.7) // ~3 KB
 **Причина:** `blurDataUrl` undefined или null
 
 **Проверка:**
+
 ```vue
 <template>
   <div>

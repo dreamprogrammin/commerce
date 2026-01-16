@@ -1,5 +1,5 @@
+import type { Database } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
-import type { Database, SlideRow } from '@/types'
 
 /**
  * 🎬 Композабл для работы со слайдами карусели

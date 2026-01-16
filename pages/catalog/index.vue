@@ -119,11 +119,11 @@ useHead(() => {
           'name': category.name,
           'image': category.image_url
             ? getImageUrl(BUCKET_NAME_CATEGORY, category.image_url, {
-              width: 400,
-              height: 400,
-              quality: 80,
-              format: 'webp',
-            })
+                width: 400,
+                height: 400,
+                quality: 80,
+                format: 'webp',
+              })
             : undefined,
         })),
       }),

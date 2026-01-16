@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
@@ -232,105 +232,105 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
             :class="orderColorScheme.overlay"
           />
 
-        <div class="flex items-center gap-4 relative z-10">
-          <!-- Миниатюры товаров вместо аватара -->
-          <div class="relative flex-shrink-0">
-            <div class="product-thumbnails-container">
-              <!-- Стек из 3 изображений с эффектом глубины -->
-              <div class="relative w-16 h-16">
-                <div
-                  v-for="(thumbnail, index) in productThumbnails.slice(0, 3)"
-                  :key="thumbnail.id"
-                  class="absolute rounded-xl overflow-hidden bg-white shadow-md transition-transform duration-300"
-                  :class="{
-                    'w-16 h-16 z-30': index === 0,
-                    'w-14 h-14 z-20 top-1 left-2 opacity-80': index === 1,
-                    'w-12 h-12 z-10 top-2 left-4 opacity-60': index === 2,
-                  }"
-                  :style="{
-                    transform: `translateY(${index * 2}px) scale(${1 - index * 0.1})`,
-                  }"
-                >
-                  <ProgressiveImage
-                    v-if="thumbnail.imageUrl"
-                    :src="thumbnail.imageUrl"
-                    :blur-data-url="thumbnail.blurPlaceholder"
-                    :alt="thumbnail.name"
-                    object-fit="contain"
-                    placeholder-type="lqip"
-                    aspect-ratio="square"
-                    eager
-                    class="w-full h-full"
-                  />
-                  <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
-                    <Icon name="lucide:package" class="w-4 h-4 text-gray-400" />
+          <div class="flex items-center gap-4 relative z-10">
+            <!-- Миниатюры товаров вместо аватара -->
+            <div class="relative flex-shrink-0">
+              <div class="product-thumbnails-container">
+                <!-- Стек из 3 изображений с эффектом глубины -->
+                <div class="relative w-16 h-16">
+                  <div
+                    v-for="(thumbnail, index) in productThumbnails.slice(0, 3)"
+                    :key="thumbnail.id"
+                    class="absolute rounded-xl overflow-hidden bg-white shadow-md transition-transform duration-300"
+                    :class="{
+                      'w-16 h-16 z-30': index === 0,
+                      'w-14 h-14 z-20 top-1 left-2 opacity-80': index === 1,
+                      'w-12 h-12 z-10 top-2 left-4 opacity-60': index === 2,
+                    }"
+                    :style="{
+                      transform: `translateY(${index * 2}px) scale(${1 - index * 0.1})`,
+                    }"
+                  >
+                    <ProgressiveImage
+                      v-if="thumbnail.imageUrl"
+                      :src="thumbnail.imageUrl"
+                      :blur-data-url="thumbnail.blurPlaceholder"
+                      :alt="thumbnail.name"
+                      object-fit="contain"
+                      placeholder-type="lqip"
+                      aspect-ratio="square"
+                      eager
+                      class="w-full h-full"
+                    />
+                    <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
+                      <Icon name="lucide:package" class="w-4 h-4 text-gray-400" />
+                    </div>
+                  </div>
+
+                  <!-- Индикатор дополнительных товаров (цвет зависит от статуса) -->
+                  <div
+                    v-if="displayOrder.order_items.length > 3"
+                    class="absolute -bottom-1 -right-1 z-40 w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shadow-lg ring-2 ring-white"
+                    :class="orderColorScheme.indicator"
+                  >
+                    +{{ displayOrder.order_items.length - 3 }}
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <!-- Индикатор дополнительных товаров (цвет зависит от статуса) -->
-                <div
-                  v-if="displayOrder.order_items.length > 3"
-                  class="absolute -bottom-1 -right-1 z-40 w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shadow-lg ring-2 ring-white"
-                  :class="orderColorScheme.indicator"
+            <!-- Информация о заказе -->
+            <div class="flex-grow min-w-0">
+              <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                <!-- Статус -->
+                <Badge
+                  :class="getStatusColor(displayOrder.status)"
+                  class="text-[11px] px-2.5 py-0.5 rounded-full font-medium"
                 >
-                  +{{ displayOrder.order_items.length - 3 }}
+                  {{ getStatusLabel(displayOrder.status) }}
+                </Badge>
+
+                <!-- Номер заказа -->
+                <h3 class="font-bold text-sm text-card-foreground">
+                  №{{ displayOrder.id.slice(-6) }}
+                </h3>
+              </div>
+
+              <!-- Дата и метрики -->
+              <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <!-- Дата заказа -->
+                <div class="flex items-center gap-1.5">
+                  <Icon name="lucide:calendar" class="w-3.5 h-3.5" />
+                  <span class="font-medium">{{ orderDate }}</span>
                 </div>
+
+                <!-- Стоимость -->
+                <div class="flex items-center gap-1.5">
+                  <Icon name="lucide:wallet" class="w-3.5 h-3.5" />
+                  <span class="font-semibold text-gray-900">{{ totalAmount }} ₸</span>
+                </div>
+
+                <!-- Количество товаров -->
+                <Badge variant="secondary" class="text-[10px] px-2 py-0.5">
+                  {{ totalItems }} {{ totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров' }}
+                </Badge>
               </div>
             </div>
-          </div>
 
-          <!-- Информация о заказе -->
-          <div class="flex-grow min-w-0">
-            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-              <!-- Статус -->
-              <Badge
-                :class="getStatusColor(displayOrder.status)"
-                class="text-[11px] px-2.5 py-0.5 rounded-full font-medium"
-              >
-                {{ getStatusLabel(displayOrder.status) }}
-              </Badge>
-
-              <!-- Номер заказа -->
-              <h3 class="font-bold text-sm text-card-foreground">
-                №{{ displayOrder.id.slice(-6) }}
-              </h3>
-            </div>
-
-            <!-- Дата и метрики -->
-            <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <!-- Дата заказа -->
-              <div class="flex items-center gap-1.5">
-                <Icon name="lucide:calendar" class="w-3.5 h-3.5" />
-                <span class="font-medium">{{ orderDate }}</span>
+            <!-- Стрелка (цвет зависит от статуса) -->
+            <div class="flex-shrink-0">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center" :class="orderColorScheme.badge">
+                <Icon
+                  name="lucide:chevron-right"
+                  class="chevron-icon w-5 h-5 transition-transform duration-300"
+                  :class="orderColorScheme.icon"
+                />
               </div>
-
-              <!-- Стоимость -->
-              <div class="flex items-center gap-1.5">
-                <Icon name="lucide:wallet" class="w-3.5 h-3.5" />
-                <span class="font-semibold text-gray-900">{{ totalAmount }} ₸</span>
-              </div>
-
-              <!-- Количество товаров -->
-              <Badge variant="secondary" class="text-[10px] px-2 py-0.5">
-                {{ totalItems }} {{ totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров' }}
-              </Badge>
-            </div>
-          </div>
-
-          <!-- Стрелка (цвет зависит от статуса) -->
-          <div class="flex-shrink-0">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center" :class="orderColorScheme.badge">
-              <Icon
-                name="lucide:chevron-right"
-                class="chevron-icon w-5 h-5 transition-transform duration-300"
-                :class="orderColorScheme.icon"
-              />
             </div>
           </div>
         </div>
-      </div>
-    </Card>
-  </NuxtLink>
+      </Card>
+    </NuxtLink>
   </Transition>
 </template>
 

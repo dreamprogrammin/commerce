@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { AttributeValuePayload, ProductImageRow, ProductUpdate } from '@/types'
+import { toast } from 'vue-sonner'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
-import { toast } from 'vue-sonner'
 
 definePageMeta({ layout: 'admin' })
 
@@ -56,7 +56,8 @@ async function handleUpdate(payload: {
       try {
         await notifyProduct(updatedProduct.slug)
         toast.success('✅ Товар обновлен и отправлен в поисковики')
-      } catch (error) {
+      }
+      catch (error) {
         console.error('SEO notification error:', error)
         toast.warning('⚠️ Товар обновлен, но не удалось уведомить поисковики')
       }

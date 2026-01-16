@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { IBreadcrumbItem, ProductWithGallery } from '@/types'
+import { ArrowLeft, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import { ArrowLeft, Package, TrendingUp } from 'lucide-vue-next'
 
 const route = useRoute()
 const productsStore = useProductsStore()
@@ -39,7 +39,8 @@ const { data: brand, pending: brandPending } = await useAsyncData(
 
 // 2. Загружаем товары, принадлежащие этому бренду
 async function loadProducts() {
-  if (!brand.value) return
+  if (!brand.value)
+    return
 
   isLoading.value = true
   products.value = []
@@ -151,44 +152,50 @@ useHead({
             'name': 'Бренды',
             'item': `${siteUrl}/brand/all`,
           },
-          ...(brand.value ? [{
-            '@type': 'ListItem',
-            'position': 3,
-            'name': brand.value.name,
-            'item': brandUrl.value,
-          }] : []),
+          ...(brand.value
+            ? [{
+                '@type': 'ListItem',
+                'position': 3,
+                'name': brand.value.name,
+                'item': brandUrl.value,
+              }]
+            : []),
         ],
       }),
     },
     // Brand Schema
     {
       type: 'application/ld+json',
-      innerHTML: () => brand.value ? JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Brand',
-        'name': brand.value.name,
-        'url': brandUrl.value,
-        ...(brandLogoUrl.value && {
-          logo: brandLogoUrl.value,
-          image: brandLogoUrl.value,
-        }),
-      }) : '{}',
+      innerHTML: () => brand.value
+        ? JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Brand',
+            'name': brand.value.name,
+            'url': brandUrl.value,
+            ...(brandLogoUrl.value && {
+              logo: brandLogoUrl.value,
+              image: brandLogoUrl.value,
+            }),
+          })
+        : '{}',
     },
     // CollectionPage Schema
     {
       type: 'application/ld+json',
-      innerHTML: () => brand.value ? JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'CollectionPage',
-        'name': `Товары бренда ${brand.value.name}`,
-        'description': metaDescription.value,
-        'url': brandUrl.value,
-        'isPartOf': {
-          '@type': 'WebSite',
-          'name': siteName,
-          'url': siteUrl,
-        },
-      }) : '{}',
+      innerHTML: () => brand.value
+        ? JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            'name': `Товары бренда ${brand.value.name}`,
+            'description': metaDescription.value,
+            'url': brandUrl.value,
+            'isPartOf': {
+              '@type': 'WebSite',
+              'name': siteName,
+              'url': siteUrl,
+            },
+          })
+        : '{}',
     },
   ],
 })

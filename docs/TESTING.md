@@ -54,8 +54,8 @@ tests/
 ### Базовый шаблон
 
 ```typescript
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useYourStore } from '@/stores/yourStore'
 
 describe('yourStore', () => {
@@ -92,7 +92,7 @@ it('должен обработать асинхронную загрузку', 
 
   // Симуляция медленного запроса
   mockSupabase.from().single.mockImplementation(
-    () => new Promise(resolve => {
+    () => new Promise((resolve) => {
       setTimeout(() => resolve({ data: mockData, error: null }), 500)
     })
   )
@@ -136,16 +136,19 @@ it('должен предотвратить параллельные запро�
 **Статус**: ❌ Тест документирует баг, требуется исправление
 
 **Решение**:
+
 ```typescript
 // stores/publicStore/cartStore.ts
 const isAddingItem = ref(false)
 
 async function addItem(productId: string, quantity: number = 1) {
-  if (isAddingItem.value) return
+  if (isAddingItem.value)
+    return
   isAddingItem.value = true
   try {
     // ... операции
-  } finally {
+  }
+  finally {
     isAddingItem.value = false
   }
 }
@@ -164,6 +167,7 @@ async function addItem(productId: string, quantity: number = 1) {
 **Статус**: ❌ Требуется исправление
 
 **Решение**:
+
 ```typescript
 // stores/publicStore/wishlistStore.ts (строка 84)
 catch (error: any) {
@@ -220,14 +224,16 @@ expect(toast.success).toHaveBeenCalledWith('Ожидаемое сообщени�
 ### 1. Изоляция тестов
 
 ✅ **Хорошо**:
+
 ```typescript
 beforeEach(() => {
   setActivePinia(createPinia()) // Новый экземпляр для каждого теста
-  vi.clearAllMocks()             // Очистка всех моков
+  vi.clearAllMocks() // Очистка всех моков
 })
 ```
 
 ❌ **Плохо**:
+
 ```typescript
 // Переиспользование store между тестами
 const store = useYourStore() // НЕ создавать вне тестов!
@@ -236,6 +242,7 @@ const store = useYourStore() // НЕ создавать вне тестов!
 ### 2. Явные ожидания
 
 ✅ **Хорошо**:
+
 ```typescript
 expect(store.items).toHaveLength(1)
 expect(store.items[0].id).toBe('expected-id')
@@ -243,6 +250,7 @@ expect(store.isLoading).toBe(false)
 ```
 
 ❌ **Плохо**:
+
 ```typescript
 expect(store.items.length).toBeGreaterThan(0) // Нечеткое ожидание
 ```
@@ -296,6 +304,7 @@ pnpm test:coverage
 ```
 
 Отчет сохраняется в `coverage/`:
+
 - `coverage/index.html` - визуальный отчет
 - `coverage/coverage-final.json` - JSON данные
 
@@ -322,7 +331,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: pnpm
       - run: pnpm install
       - run: pnpm test:run
       - run: pnpm test:coverage

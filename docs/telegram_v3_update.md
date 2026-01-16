@@ -3,7 +3,9 @@
 ## Что изменилось
 
 ### Проблема
+
 Миграция `20251218102032_clean_architecture_orders_v3.sql` разделила заказы на две таблицы:
+
 - `orders` - для авторизованных пользователей (с бонусами)
 - `guest_checkouts` - для гостевых заказов (без бонусов)
 
@@ -14,6 +16,7 @@
 #### 1. SQL миграции
 
 **`20251219060000_update_telegram_for_v3.sql`** - Обновление уведомлений
+
 - ✅ Обновлена функция `notify_order_to_telegram()` для передачи информации о таблице
 - ✅ Добавлена обработка ошибок (EXCEPTION блок)
 - ✅ Созданы триггеры для обеих таблиц:
@@ -21,7 +24,8 @@
   - `trigger_notify_guest_checkout` на `guest_checkouts`
 
 **`20251219060100_update_order_functions_for_v3.sql`** - Обновление управления заказами
-- ✅ Обновлена функция `confirm_and_process_order(p_order_id, p_table_name)` 
+
+- ✅ Обновлена функция `confirm_and_process_order(p_order_id, p_table_name)`
   - Поддержка обеих таблиц
   - Списание товаров со склада
   - Обработка бонусов только для пользователей
@@ -35,6 +39,7 @@
 #### 2. TypeScript Edge Functions
 
 **`notify-order-to-telegram/index.ts`** (обновлен)
+
 - ✅ Добавлен параметр `table` в `OrderPayload`
 - ✅ Добавлены новые интерфейсы:
   - `GuestCheckoutItem` - элемент гостевого заказа
@@ -44,12 +49,14 @@
 - ✅ URL кнопок управления включают параметр `table`
 
 **`confirm-order/index.ts`** (обновлен)
+
 - ✅ Добавлен параметр `table` в URL
 - ✅ Автоматическое определение типа заказа через `get_order_table_name()`
 - ✅ Вызов SQL функции с параметром `p_table_name`
 - ✅ Отображение типа заказа в ответе
 
 **`cancel-order/index.ts`** (обновлен)
+
 - ✅ Добавлен параметр `table` в URL
 - ✅ Автоматическое определение типа заказа через `get_order_table_name()`
 - ✅ Вызов SQL функции с параметром `p_table_name`
@@ -59,8 +66,9 @@
 ## Как работает
 
 ### 1. Создание заказа
+
 ```
-Новый заказ → Триггер → notify_order_to_telegram() 
+Новый заказ → Триггер → notify_order_to_telegram()
     ↓
 Передает { record, table: 'orders' | 'guest_checkouts' }
     ↓
@@ -74,6 +82,7 @@ Edge Function определяет таблицу
 ```
 
 ### 2. Подтверждение заказа
+
 ```
 Клик на кнопку "✅ Подтвердить" в Telegram
     ↓
@@ -93,6 +102,7 @@ SQL функция:
 ```
 
 ### 3. Отмена заказа
+
 ```
 Клик на кнопку "❌ Отменить" в Telegram
     ↓
@@ -113,6 +123,7 @@ SQL функция:
 ## Структура данных
 
 ### Для гостевых заказов (`guest_checkouts`)
+
 ```typescript
 {
   id, final_amount, created_at, delivery_method, payment_method,
@@ -122,6 +133,7 @@ SQL функция:
 ```
 
 ### Для пользовательских заказов (`orders`)
+
 ```typescript
 {
   id, final_amount, created_at, delivery_method, payment_method,
@@ -132,7 +144,9 @@ SQL функция:
 ```
 
 ### Унифицированный формат (`OrderData`)
+
 Оба типа заказов преобразуются к единому формату, где:
+
 - Гостевые заказы получают `user_id = null`, `bonuses_* = 0`
 - Пользовательские заказы получают `guest_* = null`
 
@@ -151,7 +165,7 @@ supabase db push
 ### 1. Проверка триггеров
 
 ```sql
-SELECT 
+SELECT
   trigger_name,
   event_object_table as table_name,
   action_timing || ' ' || event_manipulation as trigger_event
@@ -161,18 +175,19 @@ ORDER BY event_object_table;
 ```
 
 Должно вернуть 2 строки:
+
 - `trigger_notify_guest_checkout` на `guest_checkouts`
 - `trigger_notify_user_order` на `orders`
 
 ### 2. Проверка функций
 
 ```sql
-SELECT 
+SELECT
   routine_name,
   routine_type,
   data_type as return_type
 FROM information_schema.routines
-WHERE routine_schema = 'public' 
+WHERE routine_schema = 'public'
   AND routine_name IN ('confirm_and_process_order', 'cancel_order', 'get_order_table_name')
 ORDER BY routine_name;
 ```
@@ -182,6 +197,7 @@ ORDER BY routine_name;
 ### 3. Тестирование
 
 #### Создание гостевого заказа
+
 ```sql
 SELECT public.create_guest_checkout(
   '[{"product_id": "xxx", "quantity": 1}]'::jsonb,
@@ -191,6 +207,7 @@ SELECT public.create_guest_checkout(
 ```
 
 #### Создание пользовательского заказа
+
 ```sql
 SELECT public.create_user_order(
   '[{"product_id": "xxx", "quantity": 1}]'::jsonb,
@@ -202,6 +219,7 @@ SELECT public.create_user_order(
 ```
 
 После создания заказа проверьте:
+
 1. ✅ Пришло уведомление в Telegram
 2. ✅ Есть кнопки "Подтвердить" и "Отменить"
 3. ✅ Клик по кнопкам работает корректно
@@ -209,6 +227,7 @@ SELECT public.create_user_order(
 ## Обратная совместимость
 
 Все функции поддерживают обратную совместимость:
+
 - Если `p_table_name` не указан, используется `'orders'` по умолчанию
 - Если `payload.table` не указан, используется `'orders'` по умолчанию
 - Старые вызовы без параметра `table` продолжат работать
@@ -216,16 +235,19 @@ SELECT public.create_user_order(
 ## Особенности
 
 ### Бонусы
+
 - ✅ Начисляются только для авторизованных пользователей (`orders`)
 - ✅ Гостевые заказы не имеют бонусов
 - ✅ При отмене заказа бонусы корректно откатываются
 
 ### Товары
+
 - ✅ Списание со склада работает для обоих типов заказов
 - ✅ Возврат на склад при отмене работает корректно
 - ✅ Проверка наличия перед подтверждением
 
 ### Уведомления
+
 - ✅ Единый формат сообщений для обоих типов
 - ✅ Указание типа заказа (Гостевой/Пользовательский)
 - ✅ Кнопки управления работают для обоих типов
