@@ -3,11 +3,9 @@
  *
  * Поддерживает:
  * - IndexNow (мгновенная индексация для Yandex, Bing, Seznam, Naver)
- * - Google Sitemap Ping (уведомление Google о обновлении sitemap)
  *
  * ПРИМЕЧАНИЕ:
- * - Google Sitemap Ping официально deprecated, но продолжает работать
- * - Для гарантированной индексации Google используйте Search Console
+ * - Для Google используйте Search Console или ждите естественного краулинга по sitemap
  */
 
 interface NotifyRequest {
@@ -18,7 +16,6 @@ interface NotifyRequest {
 interface NotifyResult {
   success: boolean
   indexnow: { submitted: boolean, error?: string, urls_count: number }
-  google: { pinged: boolean, error?: string }
 }
 
 export default defineEventHandler(async (event): Promise<NotifyResult> => {
@@ -50,33 +47,9 @@ export default defineEventHandler(async (event): Promise<NotifyResult> => {
   const result: NotifyResult = {
     success: false,
     indexnow: { submitted: false, urls_count: 0 },
-    google: { pinged: false },
   }
 
-  // 1️⃣ Google Sitemap Ping
-  // Уведомляем Google об обновлении sitemap (deprecated но работает)
-  try {
-    const sitemapUrl = encodeURIComponent(`${siteUrl}/sitemap.xml`)
-    const googlePingUrl = `https://www.google.com/ping?sitemap=${sitemapUrl}`
-
-    const googleResponse = await fetch(googlePingUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Uhti-SEO-Bot/1.0',
-      },
-    })
-
-    result.google.pinged = googleResponse.ok
-    if (!googleResponse.ok) {
-      result.google.error = `HTTP ${googleResponse.status}`
-    }
-  }
-  catch (error: any) {
-    result.google.error = error.message
-    console.error('[SEO] Google ping error:', error.message)
-  }
-
-  // 2️⃣ IndexNow для Yandex/Bing/Seznam/Naver
+  // IndexNow для Yandex/Bing/Seznam/Naver
   const indexNowKey = config.indexnowKey
 
   if (indexNowKey) {
@@ -116,8 +89,7 @@ export default defineEventHandler(async (event): Promise<NotifyResult> => {
     console.warn('[SEO] IndexNow key not found, skipping')
   }
 
-  // Успех если хотя бы один из сервисов сработал
-  result.success = result.indexnow.submitted || result.google.pinged
+  result.success = result.indexnow.submitted
 
   return result
 })
