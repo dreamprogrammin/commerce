@@ -302,7 +302,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         .from('products')
         .update(productData)
         .eq('id', productId)
-        .select('id, name')
+        .select('id, name, slug')
         .single()
 
       if (error || !updatedProduct)
@@ -310,6 +310,11 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
       // 🎯 Управляем картинками с blur
       await _manageProductImages(productId, newImageFiles, imagesToDelete, existingImages.length)
+
+      // 🔍 SEO: Уведомляем поисковики об обновлённом товаре
+      if (updatedProduct.slug) {
+        notifySearchEngines(updatedProduct.slug)
+      }
 
       toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
       return updatedProduct

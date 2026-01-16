@@ -5,7 +5,8 @@
 interface IndexingResult {
   success: boolean
   indexnow: { submitted: boolean, error?: string, urls_count: number }
-  processed_urls: string[]
+  google: { pinged: boolean, error?: string }
+  processed_urls?: string[]
 }
 
 // ✅ Добавляем интерфейс для результата переиндексации
@@ -44,9 +45,12 @@ export const useSeoIndexing = () => {
 
       if (!options?.silent) {
         if (result.success) {
-          console.log(`✅ SEO: ${result.indexnow.urls_count} URL отправлено в поисковики`)
+          const services = []
+          if (result.indexnow.submitted) services.push('IndexNow')
+          if (result.google.pinged) services.push('Google')
+          console.log(`✅ SEO: ${result.indexnow.urls_count} URL отправлено (${services.join(', ')})`)
         } else {
-          console.warn(`⚠️ SEO: Ошибка индексации - ${result.indexnow.error}`)
+          console.warn(`⚠️ SEO: Ошибка индексации - IndexNow: ${result.indexnow.error}, Google: ${result.google.error}`)
         }
       }
 

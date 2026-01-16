@@ -14,6 +14,19 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
   const currentBrand = ref<Brand | null>(null)
   const isLoading = ref(false)
 
+  // --- SEO: Уведомление поисковиков о изменениях брендов ---
+  async function notifySearchEngines(brandSlug: string) {
+    try {
+      await $fetch('/api/seo/notify-indexing', {
+        method: 'POST',
+        body: { urls: [`/brand/${brandSlug}`], type: 'updated' },
+      })
+    }
+    catch {
+      // Не блокируем основной флоу если SEO уведомление не прошло
+    }
+  }
+
   // -- ЧТЕНИЕ --
   async function fetchBrands() {
     isLoading.value = true
@@ -81,6 +94,11 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
       toast.success(`Бренд "${newBrand.name}" успешно создан.`)
       await fetchBrands()
 
+      // 🔍 SEO: Уведомляем поисковики о новом бренде
+      if (newBrand.slug) {
+        notifySearchEngines(newBrand.slug)
+      }
+
       return newBrand
     }
     catch (error: any) {
@@ -117,6 +135,12 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
 
       toast.success(`Бренд "${brandData.name}" успешно обновлен.`)
       await fetchBrands() // Обновляем список
+
+      // 🔍 SEO: Уведомляем поисковики об обновлённом бренде
+      if (brandData.slug) {
+        notifySearchEngines(brandData.slug)
+      }
+
       return true
     }
     catch (error: any) {

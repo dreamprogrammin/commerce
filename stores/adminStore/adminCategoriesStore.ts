@@ -63,6 +63,22 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
   const isLoading = ref(false)
   const isSaving = ref(false)
 
+  // --- SEO: Уведомление поисковиков о изменениях категорий ---
+  async function notifySearchEngines(categorySlugs: string[]) {
+    if (categorySlugs.length === 0)
+      return
+    try {
+      const urls = categorySlugs.map(slug => `/catalog/${slug}`)
+      await $fetch('/api/seo/notify-indexing', {
+        method: 'POST',
+        body: { urls, type: 'updated' },
+      })
+    }
+    catch {
+      // Не блокируем основной флоу если SEO уведомление не прошло
+    }
+  }
+
   async function fetchAllCategories(force = false) {
     if (allCategories.value.length > 0 && !force)
       return
@@ -144,6 +160,7 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
       const toInsert: CategoryInsert[] = []
       const toUpdate: CategoryUpsertPayload[] = []
       const toDelete: { id: string, imageUrl: string | null }[] = []
+      const changedSlugs: string[] = [] // 🔍 SEO: Собираем slugs изменённых категорий
       const originalItems = new Map(allCategories.value.map(c => [c.id, c]))
 
       async function processTree(items: EditableCategory[], parentId: string | null) {
@@ -207,9 +224,11 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
             if (!item.name || !item.slug || !item.href)
               throw new Error(`Новая категория должна иметь название, слаг и ссылку.`)
             toInsert.push(createInsertPayload(item, parentId, index))
+            changedSlugs.push(item.slug) // 🔍 SEO
           }
           else if (item.id) {
             toUpdate.push(createUpdatePayload(item, parentId, index))
+            changedSlugs.push(item.slug) // 🔍 SEO
           }
 
           if (item.children?.length) {
@@ -247,6 +266,12 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
       toast.success('Категории успешно сохранены!')
       await fetchAllCategories(true)
       await categoriesStore.forceRefetch()
+
+      // 🔍 SEO: Уведомляем поисковики об изменённых категориях
+      if (changedSlugs.length > 0) {
+        notifySearchEngines(changedSlugs)
+      }
+
       return true
     }
     catch (e: any) {
