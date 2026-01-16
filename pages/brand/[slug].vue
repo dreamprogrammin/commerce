@@ -335,23 +335,7 @@ useRobotsRule({
           Каталог товаров
         </h2>
 
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <span class="text-sm text-muted-foreground whitespace-nowrap">Сортировка:</span>
-          <Select v-model="sortBy">
-            <SelectTrigger class="w-full sm:w-[200px]">
-              <SelectValue placeholder="Выберите сортировку" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="option in sortOptions"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <CatalogHeader v-model:sort-by="sortBy" />
       </div>
 
       <!-- Сетка с товарами -->
