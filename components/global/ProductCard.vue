@@ -7,6 +7,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { formatPrice } from '@/utils/formatPrice'
 
 const props = defineProps<{
   product: BaseProduct
@@ -301,10 +302,10 @@ const priceDetails = computed(() => {
       <div class="space-y-1 mt-auto">
         <div class="flex items-baseline gap-2">
           <p class="text-xl font-bold text-primary">
-            {{ priceDetails.finalPrice.toLocaleString() }} ₸
+            {{ formatPrice(priceDetails.finalPrice) }} ₸
           </p>
           <p v-if="priceDetails.hasDiscount" class="text-sm text-muted-foreground line-through">
-            {{ priceDetails.originalPrice.toLocaleString() }} ₸
+            {{ formatPrice(priceDetails.originalPrice) }} ₸
           </p>
         </div>
 

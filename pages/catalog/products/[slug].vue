@@ -11,6 +11,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { formatPrice } from '@/utils/formatPrice'
 
 const route = useRoute()
 const router = useRouter()
@@ -250,28 +251,114 @@ const metaTitle = computed(() => {
   return `${product.value.name} - Купить в интернет-магазине | Ухтышка`
 })
 
+// Хелперы для возраста и пола
+const ageRangeText = computed(() => {
+  if (!product.value)
+    return null
+
+  const minAge = product.value.min_age_years
+  const maxAge = product.value.max_age_years
+
+  if (minAge !== null && maxAge !== null) {
+    if (minAge === maxAge)
+      return `${minAge} лет`
+    return `от ${minAge} до ${maxAge} лет`
+  }
+  if (minAge !== null)
+    return `от ${minAge} лет`
+  if (maxAge !== null)
+    return `до ${maxAge} лет`
+  return null
+})
+
+const genderText = computed(() => {
+  if (!product.value?.gender)
+    return null
+
+  switch (product.value.gender) {
+    case 'female': return 'для девочек'
+    case 'male': return 'для мальчиков'
+    default: return null
+  }
+})
+
+const audienceText = computed(() => {
+  const parts: string[] = []
+  if (genderText.value)
+    parts.push(genderText.value)
+  if (ageRangeText.value)
+    parts.push(ageRangeText.value)
+  return parts.length > 0 ? parts.join(' ') : null
+})
+
 const metaDescription = computed(() => {
   if (!product.value)
     return ''
 
-  // Приоритет: seo_description > description > fallback
+  // Приоритет: seo_description > автогенерация
   if (product.value.seo_description) {
     return product.value.seo_description
   }
 
-  const priceInfo = `Цена: ${Math.round(product.value.price).toLocaleString()} ₸`
-  const stockInfo = product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ'
-  const desc = product.value.description
-    ? `${product.value.description.substring(0, 100)}`
-    : 'Качественный товар по выгодной цене'
+  // Автогенерация с учетом возраста и пола
+  const parts: string[] = []
 
-  return `${desc}. ${priceInfo}. ${stockInfo}. Доставка по Казахстану.`
+  // Название + аудитория
+  if (audienceText.value) {
+    parts.push(`${product.value.name} ${audienceText.value}`)
+  }
+  else {
+    parts.push(product.value.name)
+  }
+
+  // Цена и наличие
+  parts.push(`Цена: ${formatPrice(product.value.price)} ₸`)
+  parts.push(product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ')
+  parts.push('Доставка по Казахстану')
+
+  return parts.join('. ') + '.'
 })
 
 const metaKeywords = computed(() => {
-  if (!product.value?.seo_keywords?.length)
-    return null
-  return product.value.seo_keywords.join(', ')
+  const keywords: string[] = []
+
+  // Пользовательские ключевые слова
+  if (product.value?.seo_keywords?.length) {
+    keywords.push(...product.value.seo_keywords)
+  }
+
+  // Автоматические ключевые слова на основе данных товара
+  if (product.value) {
+    keywords.push(product.value.name)
+
+    // Добавляем возраст в ключевые слова
+    if (product.value.min_age_years !== null) {
+      keywords.push(`игрушки от ${product.value.min_age_years} лет`)
+      keywords.push(`${product.value.min_age_years} года`)
+    }
+
+    // Добавляем пол
+    if (product.value.gender === 'female') {
+      keywords.push('игрушки для девочек', 'подарок девочке')
+    }
+    else if (product.value.gender === 'male') {
+      keywords.push('игрушки для мальчиков', 'подарок мальчику')
+    }
+
+    // Бренд
+    if (brandName.value) {
+      keywords.push(brandName.value)
+    }
+
+    // Категория
+    if (categoryName.value) {
+      keywords.push(categoryName.value)
+    }
+
+    keywords.push('купить в Алматы', 'доставка Казахстан')
+  }
+
+  return keywords.length > 0 ? [...new Set(keywords)].join(', ') : null
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
@@ -362,9 +449,29 @@ useHead(() => ({
             'url': 'https://uhti.kz',
           },
         },
+        // Категория товара
+        ...(categoryName.value && {
+          category: categoryName.value,
+        }),
+        // Рекомендуемый возраст (Schema.org suggestedAge)
+        ...((product.value?.min_age_years !== null || product.value?.max_age_years !== null) && {
+          audience: {
+            '@type': 'PeopleAudience',
+            ...(product.value?.min_age_years !== null && {
+              suggestedMinAge: product.value.min_age_years,
+            }),
+            ...(product.value?.max_age_years !== null && {
+              suggestedMaxAge: product.value.max_age_years,
+            }),
+            // Пол аудитории
+            ...(product.value?.gender && product.value.gender !== 'unisex' && {
+              suggestedGender: product.value.gender === 'female' ? 'female' : 'male',
+            }),
+          },
+        }),
         // Ключевые слова для поиска
-        ...(product.value?.seo_keywords?.length && {
-          keywords: product.value.seo_keywords.join(', '),
+        ...(metaKeywords.value && {
+          keywords: metaKeywords.value,
         }),
       }),
     },
@@ -411,7 +518,7 @@ useHead(() => ({
                 <div class="mb-6 lg:mb-8">
                   <div class="flex items-baseline gap-3 mb-2">
                     <p class="text-3xl lg:text-4xl font-bold text-primary">
-                      {{ Math.round(totalPrice).toLocaleString() }} ₸
+                      {{ formatPrice(totalPrice) }} ₸
                     </p>
                   </div>
 
@@ -646,7 +753,7 @@ useHead(() => ({
                   Цена
                 </p>
                 <p class="text-xl font-bold text-primary">
-                  {{ Math.round(totalPrice).toLocaleString() }} ₸
+                  {{ formatPrice(totalPrice) }} ₸
                 </p>
               </div>
 
