@@ -1,7 +1,6 @@
 // stores/adminStore/useAdminBrandsStore.ts
 
 import type { Brand, BrandInsert, BrandUpdate, Database } from '@/types'
-import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
@@ -72,10 +71,9 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     isLoading.value = true
     try {
       if (logoFile) {
-        const filePath = `${uuidv4()}-${logoFile.name}`
+        // Загружаем без filePathPrefix - uploadFile сам генерирует уникальное имя
         const uploadedPath = await uploadFile(logoFile, {
           bucketName: BUCKET_NAME_BRANDS,
-          filePathPrefix: filePath,
         })
         if (!uploadedPath)
           throw new Error('Не удалось загрузить логотип.')
@@ -118,11 +116,9 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         if (brandData.logo_url) {
           await removeFile(BUCKET_NAME_BRANDS, [brandData.logo_url])
         }
-        // Загружаем новый
-        const filePath = `${uuidv4()}-${newLogoFile.name}`
+        // Загружаем новый - uploadFile сам генерирует уникальное имя
         const uploadedPath = await uploadFile(newLogoFile, {
           bucketName: BUCKET_NAME_BRANDS,
-          filePathPrefix: filePath,
         })
         if (!uploadedPath)
           throw new Error('Не удалось загрузить новый логотип.')

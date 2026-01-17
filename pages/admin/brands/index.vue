@@ -54,11 +54,14 @@ async function handleDelete() {
   brandToDelete.value = null
 }
 
+// Простой SVG плейсхолдер для бренда (data URI)
+const BRAND_PLACEHOLDER = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='1.5'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M9 12h6M12 9v6'/%3E%3C/svg%3E`
+
 // Получить URL логотипа бренда
 function getBrandLogoUrl(logoUrl: string | null): string {
   if (!logoUrl)
-    return '/images/placeholder-brand.svg'
-  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.CATEGORY_MENU) || '/images/placeholder-brand.svg'
+    return BRAND_PLACEHOLDER
+  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.CATEGORY_MENU) || BRAND_PLACEHOLDER
 }
 </script>
 
