@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { IBreadcrumbItem, ProductWithGallery } from '@/types'
-import { ArrowLeft, Package, TrendingUp } from 'lucide-vue-next'
+import { ArrowLeft, ChevronDown, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
@@ -17,6 +17,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 const products = ref<ProductWithGallery[]>([])
 const isLoading = ref(true)
 const sortBy = ref<'newest' | 'price_asc' | 'price_desc' | 'popularity'>('newest')
+const isSeoExpanded = ref(false)
 
 // 1. Умная загрузка информации о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(
@@ -357,26 +358,6 @@ useRobotsRule({
         </div>
       </div>
 
-      <!-- SEO текст для бренда -->
-      <div v-if="brand.seo_description || brand.seo_keywords?.length" class="space-y-4">
-        <!-- SEO описание -->
-        <p v-if="brand.seo_description" class="text-muted-foreground leading-relaxed">
-          {{ brand.seo_description }}
-        </p>
-
-        <!-- Ключевые слова как теги -->
-        <div v-if="brand.seo_keywords?.length" class="flex flex-wrap gap-2">
-          <Badge
-            v-for="keyword in brand.seo_keywords"
-            :key="keyword"
-            variant="secondary"
-            class="text-xs"
-          >
-            {{ keyword }}
-          </Badge>
-        </div>
-      </div>
-
       <!-- Фильтры и сортировка -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 class="text-2xl md:text-3xl font-bold">
@@ -415,6 +396,56 @@ useRobotsRule({
           </CardContent>
         </Card>
       </main>
+
+      <!-- SEO текст для бренда (внизу страницы, разворачивается) -->
+      <div v-if="brand.seo_description" class="mt-12 border-t pt-8">
+        <div class="space-y-4">
+          <!-- Заголовок с кнопкой разворачивания -->
+          <button
+            class="flex items-center gap-2 text-left w-full group"
+            @click="isSeoExpanded = !isSeoExpanded"
+          >
+            <h3 class="text-lg font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+              О бренде {{ brand.name }}
+            </h3>
+            <ChevronDown
+              class="w-5 h-5 text-muted-foreground transition-transform duration-300"
+              :class="{ 'rotate-180': isSeoExpanded }"
+            />
+          </button>
+
+          <!-- Контент (сворачивается/разворачивается) -->
+          <div
+            class="overflow-hidden transition-all duration-300 ease-in-out"
+            :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-24 opacity-70'"
+          >
+            <p class="text-muted-foreground leading-relaxed">
+              {{ brand.seo_description }}
+            </p>
+
+            <!-- Ключевые слова как теги -->
+            <div v-if="brand.seo_keywords?.length" class="flex flex-wrap gap-2 mt-4">
+              <Badge
+                v-for="keyword in brand.seo_keywords"
+                :key="keyword"
+                variant="secondary"
+                class="text-xs"
+              >
+                {{ keyword }}
+              </Badge>
+            </div>
+          </div>
+
+          <!-- Кнопка "Читать далее" / "Свернуть" -->
+          <button
+            v-if="brand.seo_description && brand.seo_description.length > 150"
+            class="text-sm text-primary hover:underline"
+            @click="isSeoExpanded = !isSeoExpanded"
+          >
+            {{ isSeoExpanded ? 'Свернуть' : 'Читать далее' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
