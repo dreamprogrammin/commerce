@@ -2,13 +2,14 @@
 import type { IBreadcrumbItem, ProductWithGallery } from '@/types'
 import { ArrowLeft, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
 const productsStore = useProductsStore()
-const { getOptimizedUrl } = useSupabaseStorage()
+const { getImageUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
@@ -73,27 +74,13 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   return crumbs
 })
 
-// Оптимизированный URL логотипа бренда
+// Оптимизированный URL логотипа бренда (для SEO meta tags)
 const brandLogoUrl = computed(() => {
   if (!brand.value?.logo_url)
     return null
 
-  return getOptimizedUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, {
-    width: 300,
-    height: 150,
-    quality: 90,
-    format: 'webp',
-    resize: 'contain',
-  })
+  return getImageUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, IMAGE_SIZES.BRAND_LOGO)
 })
-
-// Опции сортировки
-const sortOptions = [
-  { value: 'newest', label: 'Новинки' },
-  { value: 'popularity', label: 'Популярные' },
-  { value: 'price_asc', label: 'Цена: по возрастанию' },
-  { value: 'price_desc', label: 'Цена: по убыванию' },
-]
 
 // ========================================
 // SEO META TAGS + STRUCTURED DATA
@@ -302,15 +289,25 @@ useRobotsRule({
         <div class="relative z-10 flex flex-col md:flex-row items-center gap-8">
           <!-- Логотип бренда -->
           <div
-            v-if="brandLogoUrl"
-            class="flex-shrink-0 w-32 h-32 md:w-40 md:h-40 bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center"
+            class="flex-shrink-0 w-32 h-32 md:w-40 md:h-40 bg-white rounded-2xl shadow-lg overflow-hidden"
           >
-            <img
+            <ProgressiveImage
+              v-if="brand.logo_url"
               :src="brandLogoUrl"
               :alt="brand.name"
-              class="w-full h-full object-contain"
-              loading="eager"
-            >
+              :bucket-name="BUCKET_NAME_BRANDS"
+              :file-path="brand.logo_url"
+              aspect-ratio="square"
+              object-fit="contain"
+              placeholder-type="shimmer"
+              eager
+            />
+            <!-- Плейсхолдер если нет логотипа -->
+            <div v-else class="w-full h-full flex items-center justify-center">
+              <span class="text-3xl md:text-4xl font-bold text-primary/60">
+                {{ brand.name.charAt(0).toUpperCase() }}
+              </span>
+            </div>
           </div>
 
           <!-- Информация о бренде -->
@@ -357,6 +354,26 @@ useRobotsRule({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- SEO текст для бренда -->
+      <div v-if="brand.seo_description || brand.seo_keywords?.length" class="space-y-4">
+        <!-- SEO описание -->
+        <p v-if="brand.seo_description" class="text-muted-foreground leading-relaxed">
+          {{ brand.seo_description }}
+        </p>
+
+        <!-- Ключевые слова как теги -->
+        <div v-if="brand.seo_keywords?.length" class="flex flex-wrap gap-2">
+          <Badge
+            v-for="keyword in brand.seo_keywords"
+            :key="keyword"
+            variant="secondary"
+            class="text-xs"
+          >
+            {{ keyword }}
+          </Badge>
         </div>
       </div>
 

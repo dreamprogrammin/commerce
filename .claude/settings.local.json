@@ -42,7 +42,8 @@
       "Bash(docker ps:*)",
       "Bash(netsh.exe interface ipv4 show excludedportrange protocol=tcp)",
       "Bash(sudo service docker:*)",
-      "Bash(pnpm lint:fix:*)"
+      "Bash(pnpm lint:fix:*)",
+      "Bash(pnpm eslint:*)"
     ]
   }
 }
