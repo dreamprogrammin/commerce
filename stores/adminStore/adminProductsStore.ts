@@ -266,8 +266,8 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error || !newProduct)
         throw error
 
-      // 🎯 Управляем картинками с blur
-      await _manageProductImages(newProduct.id, newImageFiles, [], 0)
+      // 🎯 Управляем картинками с blur (🔍 SEO: передаём имя товара для названия файлов)
+      await _manageProductImages(newProduct.id, newProduct.name, newImageFiles, [], 0)
 
       // 🔍 SEO: Уведомляем поисковики о новом товаре
       if (newProduct.slug) {
@@ -308,8 +308,8 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (error || !updatedProduct)
         throw error
 
-      // 🎯 Управляем картинками с blur
-      await _manageProductImages(productId, newImageFiles, imagesToDelete, existingImages.length)
+      // 🎯 Управляем картинками с blur (🔍 SEO: передаём имя товара для названия файлов)
+      await _manageProductImages(productId, updatedProduct.name, newImageFiles, imagesToDelete, existingImages.length)
 
       // 🔍 SEO: Уведомляем поисковики об обновлённом товаре
       if (updatedProduct.slug) {
@@ -385,6 +385,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
    */
   async function _manageProductImages(
     productId: string,
+    productName: string | undefined, // 🔍 SEO: Имя товара для названия файлов
     imagesToUpload: ImageWithBlur[], // 🎯 Изменено: принимаем blur
     imageIdsToDelete: string[],
     currentImageCount: number,
@@ -440,10 +441,11 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           }
         }
 
-        // 3️⃣ Загружаем файл в Storage
+        // 3️⃣ Загружаем файл в Storage (🔍 SEO: имя файла содержит название товара)
         const filePath = await uploadFile(fileToUpload, {
           bucketName: BUCKET_NAME_PRODUCT,
           filePathPrefix: `products/${productId}`,
+          seoName: productName ? `product-${productName}` : undefined,
         })
 
         if (!filePath) {

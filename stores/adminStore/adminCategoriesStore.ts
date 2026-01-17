@@ -179,10 +179,11 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
               await removeFile('category-images', originalItem.image_url)
             }
 
-            // Загружаем новое изображение
+            // Загружаем новое изображение (🔍 SEO: имя файла содержит название категории)
             const newPath = await uploadFile(item._imageFile, {
               bucketName: 'category-images',
               filePathPrefix: `categories/${item.slug || 'new'}`,
+              seoName: item.name ? `category-${item.name}` : undefined,
             })
 
             // 🔥 КРИТИЧНО: Переносим _blurPlaceholder в blur_placeholder

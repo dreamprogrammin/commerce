@@ -69,6 +69,8 @@ export interface IUploadFileOptions {
   upsert?: boolean
   cashControl?: string
   contentType?: string
+  /** SEO-имя для файла (будет в формате: uhti-{seoName}-{uuid}.ext) */
+  seoName?: string
 }
 
 export interface IItemToDelete {

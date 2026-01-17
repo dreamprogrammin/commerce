@@ -36,8 +36,39 @@ export function useSupabaseStorage() {
   // 🗄️ Кеш URLs (стабильные, не меняются при повторных вызовах)
   const imageUrlCache = new Map<string, string>()
 
+  // 🔍 SEO: Имя сайта для файлов (помогает в Google Images)
+  const SITE_NAME_PREFIX = 'uhti'
+
+  /**
+   * 🔧 Создать SEO-friendly имя файла
+   * Формат: uhti-{seoName}-{shortUuid}.{ext} или uhti-{shortUuid}.{ext}
+   */
+  function generateSeoFileName(file: File, seoName?: string): string {
+    const fileExt = file.name.split('.').pop()?.toLowerCase()
+    const shortUuid = uuidv4().split('-')[0] // Первые 8 символов UUID
+
+    // Очищаем SEO имя: только буквы, цифры, дефисы
+    const cleanSeoName = seoName
+      ? seoName
+          .toLowerCase()
+          // eslint-disable-next-line regexp/no-obscure-range -- Кириллица для русских названий
+          .replace(/[^a-zа-яё0-9\s-]/gi, '') // Убираем спецсимволы (включая кириллицу)
+          .replace(/\s+/g, '-') // Пробелы в дефисы
+          .replace(/-+/g, '-') // Множественные дефисы в один
+          .slice(0, 50) // Ограничиваем длину
+      : null
+
+    const nameParts = [SITE_NAME_PREFIX]
+    if (cleanSeoName)
+      nameParts.push(cleanSeoName)
+    nameParts.push(shortUuid)
+
+    return `${nameParts.join('-')}${fileExt ? `.${fileExt}` : ''}`
+  }
+
   /**
    * 📤 Загрузить файл в Supabase Storage
+   * @param options.seoName - SEO имя для файла (опционально)
    */
   async function uploadFile(
     file: File,
@@ -54,8 +85,8 @@ export function useSupabaseStorage() {
       return null
     }
 
-    const fileExt = file.name.split('.').pop()
-    const uniqueFileName = `${uuidv4()}${fileExt ? `.${fileExt}` : ''}`
+    // 🔍 SEO: Генерируем имя с префиксом сайта
+    const uniqueFileName = generateSeoFileName(file, options.seoName)
     const filePath = options.filePathPrefix
       ? `${options.filePathPrefix.replace(/\/$/, '')}/${uniqueFileName}`
       : uniqueFileName

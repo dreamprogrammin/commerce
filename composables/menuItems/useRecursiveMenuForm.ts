@@ -74,9 +74,11 @@ export function useRecursiveMenuForm(initialParentSlug: Ref<string | null>) {
     if (node._imageFile) {
       if (node.image_url)
         await removeFile(BUCKET_NAME, node.image_url)
+      // 🔍 SEO: Имя файла содержит название пункта меню
       const path = await uploadFile(node._imageFile, {
         bucketName: BUCKET_NAME,
         filePathPrefix: `menu/${node.slug || 'new-item'}`,
+        seoName: node.title ? `menu-${node.title}` : undefined,
       })
       if (!path)
         throw new Error(`Ошибка загрузки изображения для "${node.title}"`)

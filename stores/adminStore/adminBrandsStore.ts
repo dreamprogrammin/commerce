@@ -71,9 +71,10 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     isLoading.value = true
     try {
       if (logoFile) {
-        // Загружаем без filePathPrefix - uploadFile сам генерирует уникальное имя
+        // 🔍 SEO: Имя файла будет содержать название бренда (uhti-{brand-name}-{uuid}.ext)
         const uploadedPath = await uploadFile(logoFile, {
           bucketName: BUCKET_NAME_BRANDS,
+          seoName: brandData.name ? `brand-${brandData.name}` : undefined,
         })
         if (!uploadedPath)
           throw new Error('Не удалось загрузить логотип.')
@@ -116,9 +117,10 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         if (brandData.logo_url) {
           await removeFile(BUCKET_NAME_BRANDS, [brandData.logo_url])
         }
-        // Загружаем новый - uploadFile сам генерирует уникальное имя
+        // 🔍 SEO: Имя файла будет содержать название бренда (uhti-{brand-name}-{uuid}.ext)
         const uploadedPath = await uploadFile(newLogoFile, {
           bucketName: BUCKET_NAME_BRANDS,
+          seoName: brandData.name ? `brand-${brandData.name}` : undefined,
         })
         if (!uploadedPath)
           throw new Error('Не удалось загрузить новый логотип.')

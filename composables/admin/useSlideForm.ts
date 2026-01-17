@@ -232,9 +232,12 @@ export function useSlideForm(
       let finalImagePathMobile = formData.value.image_url_mobile
       let finalBlurDataUrlMobile = formData.value.blur_placeholder_mobile
 
-      // 📤 Загружаем новое ДЕСКТОПНОЕ изображение если есть
+      // 📤 Загружаем новое ДЕСКТОПНОЕ изображение если есть (🔍 SEO: имя файла содержит название слайда)
       if (newImageFile.value) {
-        const uploadedPath = await uploadFile(newImageFile.value.file, { bucketName: BUCKET_NAME })
+        const uploadedPath = await uploadFile(newImageFile.value.file, {
+          bucketName: BUCKET_NAME,
+          seoName: formData.value.title ? `slide-${formData.value.title}` : 'slide',
+        })
         if (!uploadedPath)
           throw new Error('Не удалось загрузить десктопное изображение')
         finalImagePath = uploadedPath
@@ -244,9 +247,12 @@ export function useSlideForm(
         }
       }
 
-      // 🆕 📤 Загружаем новое МОБИЛЬНОЕ изображение если есть
+      // 🆕 📤 Загружаем новое МОБИЛЬНОЕ изображение если есть (🔍 SEO: имя файла содержит название слайда)
       if (newImageFileMobile.value) {
-        const uploadedPath = await uploadFile(newImageFileMobile.value.file, { bucketName: BUCKET_NAME })
+        const uploadedPath = await uploadFile(newImageFileMobile.value.file, {
+          bucketName: BUCKET_NAME,
+          seoName: formData.value.title ? `slide-mobile-${formData.value.title}` : 'slide-mobile',
+        })
         if (!uploadedPath)
           throw new Error('Не удалось загрузить мобильное изображение')
         finalImagePathMobile = uploadedPath
