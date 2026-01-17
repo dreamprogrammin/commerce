@@ -40,6 +40,57 @@ export function useSupabaseStorage() {
   const SITE_NAME_PREFIX = 'uhti'
 
   /**
+   * 🔄 Транслитерация кириллицы в латиницу
+   */
+  function transliterate(text: string): string {
+    const cyrillic = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'
+    const latin = [
+      'a',
+      'b',
+      'v',
+      'g',
+      'd',
+      'e',
+      'yo',
+      'zh',
+      'z',
+      'i',
+      'y',
+      'k',
+      'l',
+      'm',
+      'n',
+      'o',
+      'p',
+      'r',
+      's',
+      't',
+      'u',
+      'f',
+      'h',
+      'ts',
+      'ch',
+      'sh',
+      'sch',
+      '',
+      'y',
+      '',
+      'e',
+      'yu',
+      'ya',
+    ]
+
+    return text
+      .toLowerCase()
+      .split('')
+      .map((char) => {
+        const index = cyrillic.indexOf(char)
+        return index !== -1 ? latin[index] : char
+      })
+      .join('')
+  }
+
+  /**
    * 🔧 Создать SEO-friendly имя файла
    * Формат: uhti-{seoName}-{shortUuid}.{ext} или uhti-{shortUuid}.{ext}
    */
@@ -47,14 +98,13 @@ export function useSupabaseStorage() {
     const fileExt = file.name.split('.').pop()?.toLowerCase()
     const shortUuid = uuidv4().split('-')[0] // Первые 8 символов UUID
 
-    // Очищаем SEO имя: только буквы, цифры, дефисы
+    // Очищаем SEO имя: транслитерация + только буквы, цифры, дефисы
     const cleanSeoName = seoName
-      ? seoName
-          .toLowerCase()
-          // eslint-disable-next-line regexp/no-obscure-range -- Кириллица для русских названий
-          .replace(/[^a-zа-яё0-9\s-]/gi, '') // Убираем спецсимволы (включая кириллицу)
+      ? transliterate(seoName)
+          .replace(/[^a-z0-9\s-]/gi, '') // Только латиница, цифры, пробелы, дефисы
           .replace(/\s+/g, '-') // Пробелы в дефисы
           .replace(/-+/g, '-') // Множественные дефисы в один
+          .replace(/^-|-$/g, '') // Убираем дефисы в начале/конце
           .slice(0, 50) // Ограничиваем длину
       : null
 
@@ -68,7 +118,8 @@ export function useSupabaseStorage() {
 
   /**
    * 📤 Загрузить файл в Supabase Storage
-   * @param options.seoName - SEO имя для файла (опционально)
+   * @param file - Файл для загрузки
+   * @param options - Опции загрузки (включая seoName для SEO-имени файла)
    */
   async function uploadFile(
     file: File,
