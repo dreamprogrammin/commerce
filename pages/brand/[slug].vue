@@ -224,6 +224,11 @@ useRobotsRule({
   index: true,
   follow: true,
 })
+
+// Текст описания для нижнего блока (приоритет у seo_description)
+const brandDescriptionText = computed(() => {
+  return brand.value?.seo_description || brand.value?.description || null
+})
 </script>
 
 <template>
@@ -313,12 +318,9 @@ useRobotsRule({
 
           <!-- Информация о бренде -->
           <div class="flex-1 text-center md:text-left">
-            <h1 class="text-3xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+            <h1 class="text-3xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
               {{ brand.name }}
             </h1>
-            <p v-if="brand.description" class="text-lg text-muted-foreground mb-6 max-w-2xl">
-              {{ brand.description }}
-            </p>
 
             <!-- Статистика -->
             <div class="flex flex-wrap gap-4 justify-center md:justify-start">
@@ -397,8 +399,8 @@ useRobotsRule({
         </Card>
       </main>
 
-      <!-- SEO текст для бренда (внизу страницы, разворачивается) -->
-      <div v-if="brand.seo_description" class="mt-12 border-t pt-8">
+      <!-- Описание бренда (внизу страницы, разворачивается) -->
+      <div v-if="brandDescriptionText" class="mt-12 border-t pt-8">
         <div class="space-y-4">
           <!-- Заголовок с кнопкой разворачивания -->
           <button
@@ -419,8 +421,8 @@ useRobotsRule({
             class="overflow-hidden transition-all duration-300 ease-in-out"
             :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-24 opacity-70'"
           >
-            <p class="text-muted-foreground leading-relaxed">
-              {{ brand.seo_description }}
+            <p class="text-gray-700 leading-relaxed text-base">
+              {{ brandDescriptionText }}
             </p>
 
             <!-- Ключевые слова как теги -->
@@ -438,7 +440,7 @@ useRobotsRule({
 
           <!-- Кнопка "Читать далее" / "Свернуть" -->
           <button
-            v-if="brand.seo_description && brand.seo_description.length > 150"
+            v-if="brandDescriptionText && brandDescriptionText.length > 150"
             class="text-sm text-primary hover:underline"
             @click="isSeoExpanded = !isSeoExpanded"
           >
