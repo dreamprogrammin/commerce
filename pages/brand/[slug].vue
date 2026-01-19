@@ -224,11 +224,6 @@ useRobotsRule({
   index: true,
   follow: true,
 })
-
-// Текст описания для нижнего блока (приоритет у seo_description)
-const brandDescriptionText = computed(() => {
-  return brand.value?.seo_description || brand.value?.description || null
-})
 </script>
 
 <template>
@@ -400,7 +395,7 @@ const brandDescriptionText = computed(() => {
       </main>
 
       <!-- Описание бренда (внизу страницы, разворачивается) -->
-      <div v-if="brandDescriptionText" class="mt-12 border-t pt-8">
+      <div v-if="brand.description || brand.seo_description" class="mt-12 border-t pt-8">
         <div class="space-y-4">
           <!-- Заголовок с кнопкой разворачивания -->
           <button
@@ -422,7 +417,7 @@ const brandDescriptionText = computed(() => {
             :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-24 opacity-70'"
           >
             <p class="text-gray-700 leading-relaxed text-base">
-              {{ brandDescriptionText }}
+              {{ brand.seo_description || brand.description }}
             </p>
 
             <!-- Ключевые слова как теги -->
@@ -440,7 +435,7 @@ const brandDescriptionText = computed(() => {
 
           <!-- Кнопка "Читать далее" / "Свернуть" -->
           <button
-            v-if="brandDescriptionText && brandDescriptionText.length > 150"
+            v-if="((brand.seo_description && brand.seo_description.length > 150) || (brand.description && brand.description.length > 150))"
             class="text-sm text-primary hover:underline"
             @click="isSeoExpanded = !isSeoExpanded"
           >
