@@ -437,7 +437,7 @@ useHead(() => ({
         },
         'offers': {
           '@type': 'Offer',
-          'price': product.value?.price,
+          'price': String(Math.round(product.value?.price || 0)),
           'priceCurrency': 'KZT',
           'availability': (product.value?.stock_quantity || 0) > 0
             ? 'https://schema.org/InStock'
