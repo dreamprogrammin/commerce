@@ -362,7 +362,20 @@ const metaKeywords = computed(() => {
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
+const categorySlug = computed(() => product.value?.categories?.slug)
 const brandName = computed(() => product.value?.brands?.name)
+const brandSlug = computed(() => product.value?.brands?.slug)
+
+// Ссылки для SEO блока "Ещё товары"
+const brandLink = computed(() => {
+  if (!brandSlug.value) return null
+  return `/brands/${brandSlug.value}`
+})
+
+const categoryLink = computed(() => {
+  if (!categorySlug.value) return null
+  return `/catalog/${categorySlug.value}`
+})
 
 const robotsRule = computed(() => {
   if (!product.value) {
@@ -438,6 +451,21 @@ useHead(() => ({
     { rel: 'canonical', href: canonicalUrl.value },
   ],
   script: [
+    // 1. BreadcrumbList Schema (хлебные крошки для sitelinks)
+    {
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': breadcrumbs.value.map((crumb, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'name': crumb.name,
+          'item': crumb.href ? `https://uhti.kz${crumb.href}` : undefined,
+        })),
+      }),
+    },
+    // 2. Product Schema
     {
       type: 'application/ld+json',
       children: JSON.stringify({
@@ -450,6 +478,10 @@ useHead(() => ({
         'brand': {
           '@type': 'Brand',
           'name': brandName.value || 'Ухтышка',
+          // 🔥 URL страницы бренда для SEO
+          ...(brandLink.value && {
+            url: `https://uhti.kz${brandLink.value}`,
+          }),
         },
         'offers': {
           '@type': 'Offer',
@@ -465,9 +497,17 @@ useHead(() => ({
             'url': 'https://uhti.kz',
           },
         },
-        // Категория товара
+        // Категория товара с URL
         ...(categoryName.value && {
           category: categoryName.value,
+        }),
+        // 🔥 Связь с категорией для SEO
+        ...(categoryLink.value && {
+          isRelatedTo: {
+            '@type': 'CollectionPage',
+            'name': categoryName.value,
+            'url': `https://uhti.kz${categoryLink.value}`,
+          },
         }),
         // Рекомендуемый возраст (Schema.org suggestedAge)
         ...((product.value?.min_age_years !== null || product.value?.max_age_years !== null) && {
@@ -527,9 +567,20 @@ useHead(() => ({
             <!-- Правая колонка: Информация о товаре -->
             <div class="lg:col-span-5">
               <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border sticky top-4">
-                <h1 class="text-xl lg:text-2xl font-bold mb-3 lg:mb-4 leading-tight">
+                <h1 class="text-xl lg:text-2xl font-bold mb-2 leading-tight">
                   {{ product.name }}
                 </h1>
+
+                <!-- 🔥 Бренд товара (как у detmir.kz) -->
+                <NuxtLink
+                  v-if="brandName && brandLink"
+                  :to="brandLink"
+                  class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-4"
+                >
+                  <Icon name="lucide:building-2" class="w-4 h-4" />
+                  <span>{{ brandName }}</span>
+                  <Icon name="lucide:chevron-right" class="w-3 h-3" />
+                </NuxtLink>
 
                 <div class="mb-6 lg:mb-8">
                   <div class="flex items-baseline gap-3 mb-2">
@@ -726,6 +777,81 @@ useHead(() => ({
               <div v-if="activeTab === 'features'">
                 <ProductFeatures :product="product" />
               </div>
+            </div>
+          </div>
+
+          <!-- 🔥 Секция "Ещё товары" как у detmir.kz -->
+          <div
+            v-if="brandName || categoryName"
+            class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8"
+          >
+            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+              <Icon name="lucide:layers" class="w-5 h-5 text-primary" />
+              Ещё товары
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- Товары бренда -->
+              <NuxtLink
+                v-if="brandName && brandLink"
+                :to="brandLink"
+                class="flex items-center gap-3 p-4 rounded-xl border bg-muted/30 hover:bg-muted/60 hover:border-primary/30 transition-all group"
+              >
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary">
+                  <Icon name="lucide:building-2" class="w-5 h-5" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-sm group-hover:text-primary transition-colors">
+                    {{ brandName }}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Все товары бренда
+                  </p>
+                </div>
+                <Icon name="lucide:chevron-right" class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </NuxtLink>
+
+              <!-- Товары категории -->
+              <NuxtLink
+                v-if="categoryName && categoryLink"
+                :to="categoryLink"
+                class="flex items-center gap-3 p-4 rounded-xl border bg-muted/30 hover:bg-muted/60 hover:border-primary/30 transition-all group"
+              >
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500">
+                  <Icon name="lucide:folder" class="w-5 h-5" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-sm group-hover:text-primary transition-colors">
+                    {{ categoryName }}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Все товары категории
+                  </p>
+                </div>
+                <Icon name="lucide:chevron-right" class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </NuxtLink>
+
+              <!-- Родительские категории из breadcrumbs -->
+              <template v-for="crumb in breadcrumbs.slice(0, -1)" :key="crumb.id">
+                <NuxtLink
+                  v-if="crumb.href && crumb.name !== categoryName"
+                  :to="crumb.href"
+                  class="flex items-center gap-3 p-4 rounded-xl border bg-muted/30 hover:bg-muted/60 hover:border-primary/30 transition-all group"
+                >
+                  <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10 text-green-500">
+                    <Icon name="lucide:folder-tree" class="w-5 h-5" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-medium text-sm group-hover:text-primary transition-colors">
+                      {{ crumb.name }}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      Смотреть категорию
+                    </p>
+                  </div>
+                  <Icon name="lucide:chevron-right" class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </NuxtLink>
+              </template>
             </div>
           </div>
         </div>
