@@ -387,6 +387,17 @@ const ogImageUrl = computed(() => {
   return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
 })
 
+// Массив всех изображений для JSON-LD (Google рекомендует несколько)
+const productImages = computed(() => {
+  if (!product.value?.product_images?.length) {
+    return ['https://uhti.kz/og-default.jpg']
+  }
+
+  return product.value.product_images.map(img =>
+    `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${img.image_url}`,
+  )
+})
+
 defineOgImage({
   url: ogImageUrl.value,
   width: 1200,
@@ -400,12 +411,17 @@ useSeoMeta({
   keywords: metaKeywords,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
+  ogImage: ogImageUrl,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageAlt: computed(() => product.value?.name || 'Товар'),
   ogUrl: canonicalUrl,
   ogSiteName: 'Ухтышка',
   ogLocale: 'ru_RU',
   twitterCard: 'summary_large_image',
   twitterTitle: metaTitle,
   twitterDescription: metaDescription,
+  twitterImage: ogImageUrl,
   robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
 })
 
@@ -429,7 +445,7 @@ useHead(() => ({
         '@type': 'Product',
         'name': product.value?.name,
         'description': product.value?.seo_description || product.value?.description,
-        'image': ogImageUrl.value,
+        'image': productImages.value,
         'sku': product.value?.sku || undefined,
         'brand': {
           '@type': 'Brand',
@@ -458,14 +474,14 @@ useHead(() => ({
           audience: {
             '@type': 'PeopleAudience',
             ...(product.value?.min_age_years !== null && {
-              suggestedMinAge: product.value.min_age_years,
+              suggestedMinAge: product.value?.min_age_years,
             }),
             ...(product.value?.max_age_years !== null && {
-              suggestedMaxAge: product.value.max_age_years,
+              suggestedMaxAge: product.value?.max_age_years,
             }),
             // Пол аудитории
-            ...(product.value?.gender && product.value.gender !== 'unisex' && {
-              suggestedGender: product.value.gender === 'female' ? 'female' : 'male',
+            ...(product.value?.gender && product.value?.gender !== 'unisex' && {
+              suggestedGender: product.value?.gender === 'female' ? 'female' : 'male',
             }),
           },
         }),
