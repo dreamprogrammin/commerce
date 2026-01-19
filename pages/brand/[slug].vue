@@ -229,25 +229,24 @@ useRobotsRule({
 <template>
   <div>
     <!-- Skeleton загрузки бренда -->
-    <div v-if="brandPending" :class="`${containerClass} py-8`">
-      <div class="space-y-6">
+    <div v-if="brandPending" :class="`${containerClass} py-4 md:py-8`">
+      <div class="space-y-4 md:space-y-6">
         <!-- Breadcrumbs skeleton -->
         <div class="flex gap-2">
-          <Skeleton class="h-5 w-24" />
-          <Skeleton class="h-5 w-4" />
-          <Skeleton class="h-5 w-32" />
+          <Skeleton class="h-4 md:h-5 w-20 md:w-24" />
+          <Skeleton class="h-4 md:h-5 w-3 md:w-4" />
+          <Skeleton class="h-4 md:h-5 w-24 md:w-32" />
         </div>
 
         <!-- Hero skeleton -->
-        <div class="bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-3xl p-8 md:p-12">
-          <div class="flex flex-col md:flex-row items-center gap-8">
-            <Skeleton class="w-32 h-32 rounded-2xl" />
-            <div class="flex-1 space-y-4 text-center md:text-left">
-              <Skeleton class="h-10 w-48 mx-auto md:mx-0" />
-              <Skeleton class="h-4 w-full max-w-2xl mx-auto md:mx-0" />
-              <div class="flex gap-4 justify-center md:justify-start">
-                <Skeleton class="h-16 w-24" />
-                <Skeleton class="h-16 w-24" />
+        <div class="bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12">
+          <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
+            <Skeleton class="w-20 h-20 md:w-32 md:h-32 rounded-xl md:rounded-2xl" />
+            <div class="flex-1 space-y-3 md:space-y-4 text-center md:text-left w-full">
+              <Skeleton class="h-7 md:h-10 w-32 md:w-48 mx-auto md:mx-0" />
+              <div class="flex gap-2 md:gap-4 justify-center md:justify-start">
+                <Skeleton class="h-12 md:h-16 w-20 md:w-24 rounded-lg" />
+                <Skeleton class="h-12 md:h-16 w-20 md:w-24 rounded-lg" />
               </div>
             </div>
           </div>
@@ -256,15 +255,15 @@ useRobotsRule({
     </div>
 
     <!-- Бренд не найден -->
-    <div v-else-if="!brand" :class="`${containerClass} py-20`">
+    <div v-else-if="!brand" :class="`${containerClass} py-12 md:py-20`">
       <div class="text-center">
-        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-destructive/10 mb-6">
-          <Package class="w-10 h-10 text-destructive" />
+        <div class="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-full bg-destructive/10 mb-4 md:mb-6">
+          <Package class="w-8 h-8 md:w-10 md:h-10 text-destructive" />
         </div>
-        <h1 class="text-3xl md:text-4xl font-bold mb-3">
+        <h1 class="text-2xl md:text-4xl font-bold mb-2 md:mb-3">
           Бренд не найден
         </h1>
-        <p class="text-muted-foreground mb-8 max-w-md mx-auto">
+        <p class="text-sm md:text-base text-muted-foreground mb-6 md:mb-8 max-w-md mx-auto px-4">
           К сожалению, бренд с таким названием не существует или был удален.
         </p>
         <NuxtLink to="/brand/all">
@@ -277,20 +276,20 @@ useRobotsRule({
     </div>
 
     <!-- Контент бренда -->
-    <div v-else :class="`${containerClass} py-8 space-y-8`">
+    <div v-else :class="`${containerClass} py-4 md:py-8 space-y-4 md:space-y-8`">
       <!-- Breadcrumbs -->
       <Breadcrumbs :items="breadcrumbs" />
 
       <!-- Hero section с градиентом -->
-      <div class="relative overflow-hidden bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-3xl p-8 md:p-12 border border-primary/10">
-        <!-- Декоративные элементы -->
-        <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-0" />
-        <div class="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -z-0" />
+      <div class="relative overflow-hidden bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
+        <!-- Декоративные элементы (скрыты на мобилке для производительности) -->
+        <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-0" />
+        <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -z-0" />
 
-        <div class="relative z-10 flex flex-col md:flex-row items-center gap-8">
+        <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
           <!-- Логотип бренда -->
           <div
-            class="flex-shrink-0 w-32 h-32 md:w-40 md:h-40 bg-white rounded-2xl shadow-lg overflow-hidden"
+            class="flex-shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
           >
             <ProgressiveImage
               v-if="brand.logo_url"
@@ -305,7 +304,7 @@ useRobotsRule({
             />
             <!-- Плейсхолдер если нет логотипа -->
             <div v-else class="w-full h-full flex items-center justify-center">
-              <span class="text-3xl md:text-4xl font-bold text-primary/60">
+              <span class="text-2xl md:text-4xl font-bold text-primary/60">
                 {{ brand.name.charAt(0).toUpperCase() }}
               </span>
             </div>
@@ -313,39 +312,39 @@ useRobotsRule({
 
           <!-- Информация о бренде -->
           <div class="flex-1 text-center md:text-left">
-            <h1 class="text-3xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+            <h1 class="text-2xl md:text-5xl font-bold mb-3 md:mb-6 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
               {{ brand.name }}
             </h1>
 
             <!-- Статистика -->
-            <div class="flex flex-wrap gap-4 justify-center md:justify-start">
-              <div class="bg-white/80 backdrop-blur rounded-xl px-6 py-4 shadow-sm border border-primary/10">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Package class="w-5 h-5 text-primary" />
+            <div class="flex flex-wrap gap-2 md:gap-4 justify-center md:justify-start">
+              <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
+                <div class="flex items-center gap-2 md:gap-3">
+                  <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Package class="w-4 h-4 md:w-5 md:h-5 text-primary" />
                   </div>
                   <div class="text-left">
-                    <div class="text-2xl font-bold text-gray-900">
+                    <div class="text-lg md:text-2xl font-bold text-gray-900">
                       {{ products.length }}
                     </div>
-                    <div class="text-xs text-muted-foreground">
+                    <div class="text-[10px] md:text-xs text-muted-foreground">
                       {{ products.length === 1 ? 'Товар' : products.length < 5 ? 'Товара' : 'Товаров' }}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="bg-white/80 backdrop-blur rounded-xl px-6 py-4 shadow-sm border border-primary/10">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                    <TrendingUp class="w-5 h-5 text-green-600" />
+              <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
+                <div class="flex items-center gap-2 md:gap-3">
+                  <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <TrendingUp class="w-4 h-4 md:w-5 md:h-5 text-green-600" />
                   </div>
                   <div class="text-left">
-                    <div class="text-sm font-semibold text-gray-900">
+                    <div class="text-xs md:text-sm font-semibold text-gray-900">
                       Оригинал
                     </div>
-                    <div class="text-xs text-muted-foreground">
-                      Гарантия качества
+                    <div class="text-[10px] md:text-xs text-muted-foreground">
+                      Гарантия
                     </div>
                   </div>
                 </div>
@@ -356,8 +355,8 @@ useRobotsRule({
       </div>
 
       <!-- Фильтры и сортировка -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 class="text-2xl md:text-3xl font-bold">
+      <div class="flex flex-row justify-between items-center gap-2">
+        <h2 class="text-xl md:text-3xl font-bold">
           Каталог товаров
         </h2>
 
@@ -374,14 +373,14 @@ useRobotsRule({
 
         <!-- Пустое состояние -->
         <Card v-else class="border-2 border-dashed">
-          <CardContent class="flex flex-col items-center justify-center py-16 text-center">
-            <div class="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Package class="w-8 h-8 text-muted-foreground" />
+          <CardContent class="flex flex-col items-center justify-center py-10 md:py-16 text-center px-4">
+            <div class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-muted flex items-center justify-center mb-3 md:mb-4">
+              <Package class="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
             </div>
-            <h3 class="text-xl font-semibold mb-2">
+            <h3 class="text-lg md:text-xl font-semibold mb-2">
               Товаров пока нет
             </h3>
-            <p class="text-muted-foreground mb-6 max-w-sm">
+            <p class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm">
               К сожалению, товары бренда {{ brand.name }} временно отсутствуют в продаже.
             </p>
             <NuxtLink to="/catalog/all">
@@ -395,18 +394,18 @@ useRobotsRule({
       </main>
 
       <!-- Описание бренда (внизу страницы, разворачивается) -->
-      <div v-if="brand.description || brand.seo_description" class="mt-12 border-t pt-8">
-        <div class="space-y-4">
+      <div v-if="brand.description || brand.seo_description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
+        <div class="space-y-3 md:space-y-4">
           <!-- Заголовок с кнопкой разворачивания -->
           <button
             class="flex items-center gap-2 text-left w-full group"
             @click="isSeoExpanded = !isSeoExpanded"
           >
-            <h3 class="text-lg font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+            <h3 class="text-base md:text-lg font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
               О бренде {{ brand.name }}
             </h3>
             <ChevronDown
-              class="w-5 h-5 text-muted-foreground transition-transform duration-300"
+              class="w-4 h-4 md:w-5 md:h-5 text-muted-foreground transition-transform duration-300"
               :class="{ 'rotate-180': isSeoExpanded }"
             />
           </button>
@@ -414,19 +413,19 @@ useRobotsRule({
           <!-- Контент (сворачивается/разворачивается) -->
           <div
             class="overflow-hidden transition-all duration-300 ease-in-out"
-            :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-24 opacity-70'"
+            :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
           >
-            <p class="text-gray-700 leading-relaxed text-base">
+            <p class="text-gray-700 leading-relaxed text-sm md:text-base">
               {{ brand.seo_description || brand.description }}
             </p>
 
             <!-- Ключевые слова как теги -->
-            <div v-if="brand.seo_keywords?.length" class="flex flex-wrap gap-2 mt-4">
+            <div v-if="brand.seo_keywords?.length" class="flex flex-wrap gap-1.5 md:gap-2 mt-3 md:mt-4">
               <Badge
                 v-for="keyword in brand.seo_keywords"
                 :key="keyword"
                 variant="secondary"
-                class="text-xs"
+                class="text-[10px] md:text-xs"
               >
                 {{ keyword }}
               </Badge>
@@ -436,7 +435,7 @@ useRobotsRule({
           <!-- Кнопка "Читать далее" / "Свернуть" -->
           <button
             v-if="((brand.seo_description && brand.seo_description.length > 150) || (brand.description && brand.description.length > 150))"
-            class="text-sm text-primary hover:underline"
+            class="text-xs md:text-sm text-primary hover:underline"
             @click="isSeoExpanded = !isSeoExpanded"
           >
             {{ isSeoExpanded ? 'Свернуть' : 'Читать далее' }}
