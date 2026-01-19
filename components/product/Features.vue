@@ -21,6 +21,9 @@ const props = defineProps({
 
 // 1. Возраст
 const ageRange = computed(() => {
+  if (!props.product)
+    return null
+
   const min = props.product.min_age_years
   const max = props.product.max_age_years
 
@@ -38,6 +41,9 @@ const ageRange = computed(() => {
 
 // 2. Основные атрибуты
 const staticFeatures = computed<FeatureItem[]>(() => {
+  if (!props.product)
+    return []
+
   const features = []
 
   // Бренд
@@ -83,7 +89,7 @@ const staticFeatures = computed<FeatureItem[]>(() => {
 // 3. Динамические атрибуты
 const dynamicAttributes = computed(() => {
   // Теперь product_attribute_values гарантированно есть в FullProduct
-  if (!props.product.product_attribute_values)
+  if (!props.product?.product_attribute_values)
     return []
 
   // Группируем значения по имени атрибута
