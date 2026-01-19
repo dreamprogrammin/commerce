@@ -97,7 +97,8 @@ const categoryOgImageUrl = computed(() => {
   return getImageUrl(BUCKET_NAME_CATEGORY, imageFilename)
 })
 
-const title = computed(() => {
+// Название категории (для breadcrumbs и fallback)
+const categoryName = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
   }
@@ -105,6 +106,14 @@ const title = computed(() => {
   if (path && path.length > 0)
     return path[path.length - 1]?.name
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
+})
+
+// H1 заголовок (приоритет: seo_h1 > name)
+const title = computed(() => {
+  if (currentCategorySlug.value === 'all') {
+    return 'Все товары'
+  }
+  return (currentCategory.value as any)?.seo_h1 || categoryName.value
 })
 
 const priceRange = ref({ min: 0, max: 50000 })
@@ -384,25 +393,70 @@ const hasActiveFilters = computed(() => {
 // SEO описание: приоритет у описания из БД
 const categoryDescription = computed(() => currentCategory.value?.description || null)
 
+// Форматирование цены для SEO
+function formatPriceForSeo(price: number): string {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(price))
+}
+
 const metaDescription = computed(() => {
   // Если есть фильтры - показываем общее описание
   if (hasActiveFilters.value) {
-    return `Результаты фильтрации для категории "${title.value}". Широкий выбор товаров.`
+    return `Результаты фильтрации для категории "${categoryName.value}". Широкий выбор товаров.`
   }
+
   // Если есть описание категории из БД - используем его
   if (categoryDescription.value) {
     return categoryDescription.value
   }
-  // Фоллбэк на стандартное описание
-  return `Купить ${title.value?.toLowerCase()} в интернет-магазине Ухтышка в Алматы. Большой выбор качественных игрушек с доставкой по Казахстану.`
+
+  // 🔥 Автогенерация в стиле detmir.kz
+  const parts: string[] = []
+
+  // Название категории
+  parts.push(`${categoryName.value}`)
+
+  // Диапазон цен (если загружен)
+  if (priceRange.value.min > 0 || priceRange.value.max < 50000) {
+    parts.push(`⚡ по цене от ${formatPriceForSeo(priceRange.value.min)} ₸ до ${formatPriceForSeo(priceRange.value.max)} ₸`)
+  }
+
+  // Количество товаров
+  const productsCount = displayedProducts.value.length
+  if (productsCount > 0) {
+    const productWord = productsCount === 1 ? 'товар' : productsCount < 5 ? 'товара' : 'товаров'
+    parts.push(`В наличии ${productsCount} ${productWord}`)
+  }
+
+  // Магазин и доставка
+  parts.push('в интернет-магазине Ухтышка ✔️ Быстрая доставка в Алматы и по всему Казахстану')
+
+  return parts.join('. ')
 })
 
 const metaTitle = computed(() => {
   if (hasActiveFilters.value) {
-    return `${title.value} - Фильтр | Ухтышка`
+    return `${categoryName.value} - Фильтр | Ухтышка`
   }
-  return `${title.value} - Купить в интернет-магазине | Ухтышка`
+  // Приоритет: seo_title > автогенерация
+  const seoTitle = (currentCategory.value as any)?.seo_title
+  if (seoTitle) {
+    return seoTitle
+  }
+  // 🔥 Формат как у detmir.kz: "Лего Майнкрафт купить в интернет-магазине Ухтышка"
+  return `${categoryName.value} купить в интернет-магазине Ухтышка Казахстан`
 })
+
+// Ключевые слова (из seo_keywords)
+const metaKeywords = computed(() => {
+  const keywords = (currentCategory.value as any)?.seo_keywords as string[] | null
+  if (keywords && keywords.length > 0) {
+    return keywords.join(', ')
+  }
+  return null
+})
+
+// SEO текст для отображения внизу страницы
+const seoText = computed(() => (currentCategory.value as any)?.seo_text || null)
 
 const robotsRule = computed(() => {
   // Если есть фильтры ИЛИ сортировка не по умолчанию
@@ -517,10 +571,41 @@ useHead(() => {
       ...(categoryOgImageUrl.value && {
         image: categoryOgImageUrl.value,
       }),
+      // 🔥 Добавляем информацию о товарах для rich snippets
+      ...(displayedProducts.value.length > 0 && {
+        numberOfItems: displayedProducts.value.length,
+      }),
+      // Диапазон цен
+      ...(priceRange.value.min > 0 && {
+        offers: {
+          '@type': 'AggregateOffer',
+          'lowPrice': priceRange.value.min,
+          'highPrice': priceRange.value.max,
+          'priceCurrency': 'KZT',
+          'offerCount': displayedProducts.value.length,
+        },
+      }),
     }),
   })
 
-  // 3. ItemList Schema (Список товаров в категории)
+  // 🔥 3. SiteNavigationElement Schema (Подкатегории для sitelinks)
+  if (subcategories.value.length > 0) {
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SiteNavigationElement',
+        'name': `Подкатегории ${categoryName.value}`,
+        'hasPart': subcategories.value.slice(0, 6).map(cat => ({
+          '@type': 'WebPage',
+          'name': cat.name,
+          'url': `https://uhti.kz${cat.href}`,
+        })),
+      }),
+    })
+  }
+
+  // 4. ItemList Schema (Список товаров в категории с ценами)
   if (displayedProducts.value.length > 0) {
     schemas.push({
       type: 'application/ld+json',
@@ -531,11 +616,22 @@ useHead(() => {
         'itemListElement': displayedProducts.value.slice(0, 10).map((product, index) => ({
           '@type': 'ListItem',
           'position': index + 1,
-          'url': `https://uhti.kz/catalog/products/${product.slug}`,
-          'name': product.name,
-          'image': product.product_images?.[0]?.image_url
-            ? getImageUrl(BUCKET_NAME_PRODUCT, product.product_images?.[0]?.image_url, IMAGE_SIZES.CARD)
-            : undefined,
+          'item': {
+            '@type': 'Product',
+            'name': product.name,
+            'url': `https://uhti.kz/catalog/products/${product.slug}`,
+            'image': product.product_images?.[0]?.image_url
+              ? getImageUrl(BUCKET_NAME_PRODUCT, product.product_images?.[0]?.image_url, IMAGE_SIZES.CARD)
+              : undefined,
+            'offers': {
+              '@type': 'Offer',
+              'price': product.price,
+              'priceCurrency': 'KZT',
+              'availability': product.stock_quantity > 0
+                ? 'https://schema.org/InStock'
+                : 'https://schema.org/OutOfStock',
+            },
+          },
         })),
       }),
     })
@@ -545,6 +641,8 @@ useHead(() => {
     title: metaTitle.value,
     meta: [
       { name: 'description', content: metaDescription.value },
+      // Ключевые слова (если заданы в админке)
+      ...(metaKeywords.value ? [{ name: 'keywords', content: metaKeywords.value }] : []),
       { property: 'og:title', content: metaTitle.value },
       { property: 'og:description', content: metaDescription.value },
       { property: 'og:url', content: canonicalUrl.value },
@@ -880,6 +978,16 @@ useRobotsRule(robotsRule)
             </div>
           </div>
         </Transition>
+      </div>
+    </div>
+
+    <!-- 🆕 SEO текст внизу страницы (для Google индексации) -->
+    <div
+      v-if="seoText && !hasActiveFilters"
+      class="mt-12 pt-8 border-t"
+    >
+      <div class="prose prose-sm max-w-none text-muted-foreground">
+        <div v-html="seoText" />
       </div>
     </div>
 

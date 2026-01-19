@@ -71,6 +71,36 @@ const description = computed({
   set: value => emit('update:item', { ...props.item, description: value || null }),
 })
 
+// 🆕 SEO поля
+const seoTitle = computed({
+  get: () => (props.item as any).seo_title ?? '',
+  set: value => emit('update:item', { ...props.item, seo_title: value || null }),
+})
+
+const seoH1 = computed({
+  get: () => (props.item as any).seo_h1 ?? '',
+  set: value => emit('update:item', { ...props.item, seo_h1: value || null }),
+})
+
+const seoText = computed({
+  get: () => (props.item as any).seo_text ?? '',
+  set: value => emit('update:item', { ...props.item, seo_text: value || null }),
+})
+
+const seoKeywords = computed({
+  get: () => ((props.item as any).seo_keywords ?? []).join(', '),
+  set: (value) => {
+    const keywords = value
+      .split(',')
+      .map((k: string) => k.trim())
+      .filter((k: string) => k.length > 0)
+    emit('update:item', { ...props.item, seo_keywords: keywords.length > 0 ? keywords : null })
+  },
+})
+
+// Показать/скрыть SEO секцию
+const isSeoExpanded = ref(false)
+
 const display_order = computed({
   get: () => props.item.display_order,
   set: value => emit('update:item', { ...props.item, display_order: value }),
@@ -283,6 +313,108 @@ function removeImage() {
         <p class="text-xs text-muted-foreground mt-1">
           Это описание отображается в Google. Оптимально 120-160 символов.
         </p>
+      </div>
+
+      <!-- 🆕 SEO секция (раскрываемая) -->
+      <div class="border rounded-lg">
+        <button
+          type="button"
+          class="w-full flex items-center justify-between p-3 text-left hover:bg-muted/50 transition-colors"
+          :disabled="isDeleted"
+          @click="isSeoExpanded = !isSeoExpanded"
+        >
+          <div class="flex items-center gap-2">
+            <Icon name="lucide:search" class="w-4 h-4 text-primary" />
+            <span class="font-medium text-sm">Расширенные SEO настройки</span>
+            <span v-if="seoTitle || seoH1 || seoText || seoKeywords" class="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
+              Заполнено
+            </span>
+          </div>
+          <Icon
+            :name="isSeoExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'"
+            class="w-4 h-4 text-muted-foreground"
+          />
+        </button>
+
+        <div v-if="isSeoExpanded" class="p-4 pt-0 space-y-4 border-t">
+          <!-- SEO Title -->
+          <div>
+            <div class="flex items-center justify-between">
+              <Label :for="`seo-title-${props.item._tempId || props.item.id}`">
+                SEO заголовок (Title)
+              </Label>
+              <span
+                class="text-xs"
+                :class="seoTitle.length > 60 ? 'text-destructive' : seoTitle.length > 50 ? 'text-amber-500' : 'text-muted-foreground'"
+              >
+                {{ seoTitle.length }}/60
+              </span>
+            </div>
+            <Input
+              :id="`seo-title-${props.item._tempId || props.item.id}`"
+              v-model="seoTitle"
+              placeholder="Лего Майнкрафт купить в Алматы | Ухтышка"
+              :disabled="isDeleted"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Заголовок для поисковиков. Если пусто, используется название категории.
+            </p>
+          </div>
+
+          <!-- SEO H1 -->
+          <div>
+            <Label :for="`seo-h1-${props.item._tempId || props.item.id}`">
+              H1 заголовок на странице
+            </Label>
+            <Input
+              :id="`seo-h1-${props.item._tempId || props.item.id}`"
+              v-model="seoH1"
+              placeholder="Конструкторы Лего Майнкрафт"
+              :disabled="isDeleted"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Главный заголовок на странице. Если пусто, используется название.
+            </p>
+          </div>
+
+          <!-- SEO Keywords -->
+          <div>
+            <Label :for="`seo-keywords-${props.item._tempId || props.item.id}`">
+              Ключевые слова
+            </Label>
+            <Input
+              :id="`seo-keywords-${props.item._tempId || props.item.id}`"
+              v-model="seoKeywords"
+              placeholder="лего майнкрафт, minecraft lego, конструктор майнкрафт"
+              :disabled="isDeleted"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Через запятую. Используются для meta keywords.
+            </p>
+          </div>
+
+          <!-- SEO Text -->
+          <div>
+            <div class="flex items-center justify-between">
+              <Label :for="`seo-text-${props.item._tempId || props.item.id}`">
+                SEO текст (внизу страницы)
+              </Label>
+              <span class="text-xs text-muted-foreground">
+                {{ seoText.length }} символов
+              </span>
+            </div>
+            <Textarea
+              :id="`seo-text-${props.item._tempId || props.item.id}`"
+              v-model="seoText"
+              rows="6"
+              placeholder="Конструкторы Лего Майнкрафт - это увлекательный мир приключений для детей от 6 лет. В нашем интернет-магазине вы найдете оригинальные наборы LEGO Minecraft по выгодным ценам с доставкой по всему Казахстану..."
+              :disabled="isDeleted"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Длинный текст для SEO, отображается внизу страницы категории. Рекомендуется 300-1000 символов.
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- Порядок и видимость -->

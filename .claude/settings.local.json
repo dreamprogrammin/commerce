@@ -43,7 +43,9 @@
       "Bash(netsh.exe interface ipv4 show excludedportrange protocol=tcp)",
       "Bash(sudo service docker:*)",
       "Bash(pnpm lint:fix:*)",
-      "Bash(pnpm eslint:*)"
+      "Bash(pnpm eslint:*)",
+      "WebFetch(domain:detmir.kz)",
+      "WebFetch(domain:www.google.com)"
     ]
   }
 }
