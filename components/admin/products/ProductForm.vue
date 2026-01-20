@@ -96,6 +96,7 @@ const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
 const brandSearchQuery = ref('')
 const fileInputKey = ref(0)
+const isSlugManuallyEdited = ref(false)
 
 // 🎯 Информация об оптимизации
 const optimizationInfo = computed(() => getOptimizationInfo())
@@ -239,11 +240,21 @@ watch(() => formData.value.category_id, (newCategoryId) => {
   handleCategoryChange(categoryIdForHandler)
 }, { immediate: true })
 
-function autoFillSlug() {
-  if (formData.value?.name && !formData.value.slug) {
-    formData.value.slug = slugify(formData.value.name)
+// Автоматическая генерация slug при изменении названия
+watch(() => formData.value?.name, (newName) => {
+  // Генерируем slug только если он пустой или не был изменён вручную
+  if (newName && formData.value && (!formData.value.slug || !isSlugManuallyEdited.value)) {
+    formData.value.slug = slugify(newName)
   }
-}
+})
+
+// Отслеживаем ручное изменение slug
+watch(() => formData.value?.slug, (newSlug, oldSlug) => {
+  // Если slug изменился и это не первая установка, значит пользователь редактирует вручную
+  if (newSlug && oldSlug !== undefined && newSlug !== oldSlug) {
+    isSlugManuallyEdited.value = true
+  }
+})
 
 watch(
   [() => formData.value.price, selectedBonusPercent],
@@ -538,7 +549,6 @@ const seoKeywordsString = computed({
               id="name"
               v-model="formData.name"
               placeholder="Например: Развивающая игрушка для младенцев"
-              @blur="autoFillSlug"
             />
           </div>
           <div>

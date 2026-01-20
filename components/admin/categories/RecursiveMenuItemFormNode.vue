@@ -37,6 +37,7 @@ const RecursiveCategoryFormNode = defineAsyncComponent(
 
 const isChildrenVisible = ref(true)
 const isProcessingImage = ref(false)
+const isSlugManuallyEdited = ref(false)
 
 // 👇 Используем универсальную функцию getImageUrl
 const { getImageUrl } = useSupabaseStorage()
@@ -47,18 +48,29 @@ const name = computed({
   get: () => props.item.name,
   set: (value) => {
     const updatedItem = { ...props.item, name: value }
-    if (props.item._isNew) { // Автозаполнение при изменении имени
+
+    // Автоматическая генерация slug только если:
+    // 1. Элемент новый (_isNew) ИЛИ
+    // 2. Slug не был изменён вручную
+    if (value && (props.item._isNew || !isSlugManuallyEdited.value)) {
       const newSlug = slugify(value)
       updatedItem.slug = newSlug
       updatedItem.href = `${props.parentHref}/${newSlug}`
     }
+
     emit('update:item', updatedItem)
   },
 })
 
 const slug = computed({
   get: () => props.item.slug,
-  set: value => emit('update:item', { ...props.item, slug: value }),
+  set: (value) => {
+    // Отмечаем что slug был изменён вручную
+    if (value) {
+      isSlugManuallyEdited.value = true
+    }
+    emit('update:item', { ...props.item, slug: value })
+  },
 })
 
 const href = computed({

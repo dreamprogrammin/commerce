@@ -30,12 +30,22 @@ const formData = ref<Partial<BrandInsert | BrandUpdate>>({
 
 const newLogoFile = ref<File | null>(null)
 const logoPreviewUrl = ref<string | null>(null)
+const isSlugManuallyEdited = ref(false)
 
-function autoFillSlug() {
-  if (formData.value.name) {
-    formData.value.slug = slugify(formData.value.name)
+// Автоматическая генерация slug при изменении названия
+watch(() => formData.value.name, (newName) => {
+  // Генерируем slug только если он пустой или не был изменён вручную
+  if (newName && (!formData.value.slug || !isSlugManuallyEdited.value)) {
+    formData.value.slug = slugify(newName)
   }
-}
+})
+
+// Отслеживаем ручное изменение slug
+watch(() => formData.value.slug, () => {
+  if (formData.value.slug) {
+    isSlugManuallyEdited.value = true
+  }
+})
 
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
@@ -130,7 +140,7 @@ onBeforeUnmount(() => {
   <form class="space-y-4" @submit.prevent="handleSubmit">
     <div>
       <Label for="brand-name">Название бренда *</Label>
-      <Input id="brand-name" v-model="formData.name" @blur="autoFillSlug" />
+      <Input id="brand-name" v-model="formData.name" placeholder="Например: L.O.L. Surprise" />
     </div>
 
     <div>
