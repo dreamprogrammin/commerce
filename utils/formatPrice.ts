@@ -25,11 +25,11 @@ export function formatPriceWithDiscount(
   price: number,
   discountPercent?: number | null,
 ): {
-    original: string
-    final: string
-    finalNumber: number
-    hasDiscount: boolean
-  } {
+  original: string
+  final: string
+  finalNumber: number
+  hasDiscount: boolean
+} {
   const hasDiscount = !!discountPercent && discountPercent > 0
   const finalNumber = hasDiscount
     ? Math.round(price * (1 - discountPercent / 100))

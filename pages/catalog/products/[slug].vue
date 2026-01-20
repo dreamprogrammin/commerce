@@ -29,6 +29,14 @@ const activeTab = ref<'description' | 'features'>('description')
 
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
+const isDescriptionExpanded = ref(false)
+const featuresSection = ref<HTMLElement | null>(null)
+
+function scrollToFeatures() {
+  nextTick(() => {
+    featuresSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
 
 // 🔥 КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Загружаем категории и продукт на сервере
 if (import.meta.server) {
@@ -316,7 +324,7 @@ const metaDescription = computed(() => {
   parts.push(product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ')
   parts.push('Доставка по Казахстану')
 
-  return parts.join('. ') + '.'
+  return `${parts.join('. ')}.`
 })
 
 const metaKeywords = computed(() => {
@@ -369,18 +377,21 @@ const brandSlug = computed(() => product.value?.brands?.slug)
 // URL логотипа бренда
 const brandLogoUrl = computed(() => {
   const logoUrl = (product.value?.brands as any)?.logo_url
-  if (!logoUrl) return null
+  if (!logoUrl)
+    return null
   return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
 })
 
 // Ссылки для SEO блока "Ещё товары"
 const brandLink = computed(() => {
-  if (!brandSlug.value) return null
+  if (!brandSlug.value)
+    return null
   return `/brand/${brandSlug.value}`
 })
 
 const categoryLink = computed(() => {
-  if (!categorySlug.value) return null
+  if (!categorySlug.value)
+    return null
   return `/catalog/${categorySlug.value}`
 })
 
@@ -752,8 +763,137 @@ useHead(() => ({
             </div>
           </div>
 
-          <!-- Описание и характеристики -->
+          <!-- О товаре (в стиле detmir.kz) -->
           <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8">
+            <h2 class="text-xl font-bold mb-4">
+              О товаре
+            </h2>
+
+            <!-- Название товара -->
+            <h3 class="font-semibold text-base mb-3">
+              {{ product.name }}
+            </h3>
+
+            <!-- Краткое описание с возможностью раскрытия -->
+            <div v-if="product.description" class="mb-4">
+              <div
+                class="text-sm text-muted-foreground overflow-hidden transition-all duration-300" :class="[
+                  !isDescriptionExpanded && 'line-clamp-2',
+                ]"
+              >
+                {{ product.description.replace(/<[^>]*>/g, '').substring(0, 200) }}{{ product.description.length > 200 && !isDescriptionExpanded ? '...' : '' }}
+              </div>
+              <button
+                v-if="product.description.length > 200"
+                class="text-primary text-sm font-medium mt-1 hover:underline"
+                @click="isDescriptionExpanded = !isDescriptionExpanded"
+              >
+                {{ isDescriptionExpanded ? 'Скрыть' : 'Показать полностью' }}
+              </button>
+            </div>
+
+            <!-- Таблица характеристик с пунктирными линиями -->
+            <dl class="space-y-0">
+              <!-- Бренд -->
+              <div v-if="brandName" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Бренд
+                </dt>
+                <dd class="product-spec-value">
+                  <NuxtLink
+                    v-if="brandLink"
+                    :to="brandLink"
+                    class="text-primary hover:underline"
+                  >
+                    {{ brandName }}
+                  </NuxtLink>
+                  <span v-else>{{ brandName }}</span>
+                </dd>
+              </div>
+
+              <!-- Категория -->
+              <div v-if="categoryName" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Категория
+                </dt>
+                <dd class="product-spec-value">
+                  <NuxtLink
+                    v-if="categoryLink"
+                    :to="categoryLink"
+                    class="text-primary hover:underline"
+                  >
+                    {{ categoryName }}
+                  </NuxtLink>
+                  <span v-else>{{ categoryName }}</span>
+                </dd>
+              </div>
+
+              <!-- Возраст -->
+              <div v-if="ageRangeText" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Рекомендованный возраст
+                </dt>
+                <dd class="product-spec-value">
+                  {{ ageRangeText }}
+                </dd>
+              </div>
+
+              <!-- Материал -->
+              <div v-if="product.materials?.name" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Материал
+                </dt>
+                <dd class="product-spec-value">
+                  {{ product.materials.name }}
+                </dd>
+              </div>
+
+              <!-- Страна -->
+              <div v-if="product.countries?.name" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Страна производитель
+                </dt>
+                <dd class="product-spec-value">
+                  {{ product.countries.name }}
+                </dd>
+              </div>
+
+              <!-- Артикул / Код товара -->
+              <div v-if="product.sku" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Код товара
+                </dt>
+                <dd class="product-spec-value">
+                  {{ product.sku }}
+                </dd>
+              </div>
+
+              <!-- Штрихкод -->
+              <div v-if="product.barcode" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Штрихкод
+                </dt>
+                <dd class="product-spec-value">
+                  {{ product.barcode }}
+                </dd>
+              </div>
+            </dl>
+
+            <!-- Ссылка на все характеристики -->
+            <button
+              class="text-primary text-sm font-medium mt-4 hover:underline flex items-center gap-1"
+              @click="activeTab = 'features'; scrollToFeatures()"
+            >
+              Все характеристики
+              <Icon name="lucide:chevron-down" class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Полные характеристики (скрытая секция, показывается по клику) -->
+          <div
+            ref="featuresSection"
+            class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4"
+          >
             <div class="border-b mb-6">
               <div class="flex gap-6">
                 <button
@@ -1006,6 +1146,37 @@ useHead(() => ({
 </template>
 
 <style scoped>
+/* Стили для таблицы характеристик в стиле detmir.kz */
+.product-spec-row {
+  display: flex;
+  align-items: baseline;
+  padding: 0.625rem 0;
+}
+
+.product-spec-row::after {
+  content: '';
+  flex-grow: 1;
+  border-bottom: 1px dotted hsl(var(--border));
+  margin: 0 0.5rem;
+  min-width: 2rem;
+  order: 1;
+}
+
+.product-spec-label {
+  flex-shrink: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  order: 0;
+}
+
+.product-spec-value {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: right;
+  order: 2;
+}
+
 .digit-column {
   height: 1.75rem;
   line-height: 1.75rem;

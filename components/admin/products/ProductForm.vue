@@ -624,7 +624,9 @@ const seoKeywordsString = computed({
 
           <!-- Предпросмотр в Google -->
           <div v-if="formData.name" class="p-4 bg-muted/50 rounded-lg space-y-1">
-            <p class="text-xs text-muted-foreground mb-2">Предпросмотр в Google:</p>
+            <p class="text-xs text-muted-foreground mb-2">
+              Предпросмотр в Google:
+            </p>
             <p class="text-blue-600 text-base hover:underline cursor-pointer truncate">
               {{ formData.name }} - Купить в интернет-магазине | Ухтышка
             </p>
