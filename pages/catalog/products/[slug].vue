@@ -6,7 +6,7 @@ import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -366,10 +366,17 @@ const categorySlug = computed(() => product.value?.categories?.slug)
 const brandName = computed(() => product.value?.brands?.name)
 const brandSlug = computed(() => product.value?.brands?.slug)
 
+// URL логотипа бренда
+const brandLogoUrl = computed(() => {
+  const logoUrl = (product.value?.brands as any)?.logo_url
+  if (!logoUrl) return null
+  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+})
+
 // Ссылки для SEO блока "Ещё товары"
 const brandLink = computed(() => {
   if (!brandSlug.value) return null
-  return `/brands/${brandSlug.value}`
+  return `/brand/${brandSlug.value}`
 })
 
 const categoryLink = computed(() => {
@@ -575,11 +582,25 @@ useHead(() => ({
                 <NuxtLink
                   v-if="brandName && brandLink"
                   :to="brandLink"
-                  class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-4"
+                  class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-4 group"
                 >
-                  <Icon name="lucide:building-2" class="w-4 h-4" />
-                  <span>{{ brandName }}</span>
-                  <Icon name="lucide:chevron-right" class="w-3 h-3" />
+                  <!-- Логотип бренда или fallback иконка -->
+                  <div class="w-6 h-6 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <ProgressiveImage
+                      v-if="product.brands?.logo_url"
+                      :src="brandLogoUrl"
+                      :alt="brandName || 'Бренд'"
+                      :bucket-name="BUCKET_NAME_BRANDS"
+                      :file-path="product.brands.logo_url"
+                      aspect-ratio="square"
+                      object-fit="contain"
+                      placeholder-type="shimmer"
+                      class="w-full h-full"
+                    />
+                    <Icon v-else name="lucide:building-2" class="w-4 h-4" />
+                  </div>
+                  <span class="group-hover:underline">{{ brandName }}</span>
+                  <Icon name="lucide:chevron-right" class="w-3 h-3 opacity-50" />
                 </NuxtLink>
 
                 <div class="mb-6 lg:mb-8">
@@ -797,8 +818,19 @@ useHead(() => ({
                 :to="brandLink"
                 class="flex items-center gap-3 p-4 rounded-xl border bg-muted/30 hover:bg-muted/60 hover:border-primary/30 transition-all group"
               >
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary">
-                  <Icon name="lucide:building-2" class="w-5 h-5" />
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-white border overflow-hidden flex-shrink-0">
+                  <ProgressiveImage
+                    v-if="product.brands?.logo_url"
+                    :src="brandLogoUrl"
+                    :alt="brandName || 'Бренд'"
+                    :bucket-name="BUCKET_NAME_BRANDS"
+                    :file-path="product.brands.logo_url"
+                    aspect-ratio="square"
+                    object-fit="contain"
+                    placeholder-type="shimmer"
+                    class="w-full h-full p-1"
+                  />
+                  <Icon v-else name="lucide:building-2" class="w-5 h-5 text-primary" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="font-medium text-sm group-hover:text-primary transition-colors">
