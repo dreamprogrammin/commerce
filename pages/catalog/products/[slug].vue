@@ -25,18 +25,10 @@ const { getImageUrl } = useSupabaseStorage()
 const slug = computed(() => route.params.slug as string)
 
 const selectedAccessoryIds = ref<string[]>([])
-const activeTab = ref<'description' | 'features'>('description')
 
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 const isDescriptionExpanded = ref(false)
-const featuresSection = ref<HTMLElement | null>(null)
-
-function scrollToFeatures() {
-  nextTick(() => {
-    featuresSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  })
-}
 
 // 🔥 КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Загружаем категории и продукт на сервере
 if (import.meta.server) {
@@ -327,6 +319,11 @@ const metaDescription = computed(() => {
   return `${parts.join('. ')}.`
 })
 
+const categoryName = computed(() => product.value?.categories?.name)
+const categorySlug = computed(() => product.value?.categories?.slug)
+const brandName = computed(() => product.value?.brands?.name)
+const brandSlug = computed(() => product.value?.brands?.slug)
+
 const metaKeywords = computed(() => {
   const keywords: string[] = []
 
@@ -368,11 +365,6 @@ const metaKeywords = computed(() => {
 
   return keywords.length > 0 ? [...new Set(keywords)].join(', ') : null
 })
-
-const categoryName = computed(() => product.value?.categories?.name)
-const categorySlug = computed(() => product.value?.categories?.slug)
-const brandName = computed(() => product.value?.brands?.name)
-const brandSlug = computed(() => product.value?.brands?.slug)
 
 // URL логотипа бренда
 const brandLogoUrl = computed(() => {
@@ -878,87 +870,25 @@ useHead(() => ({
                 </dd>
               </div>
             </dl>
-
-            <!-- Ссылка на все характеристики -->
-            <button
-              class="text-primary text-sm font-medium mt-4 hover:underline flex items-center gap-1"
-              @click="activeTab = 'features'; scrollToFeatures()"
-            >
-              Все характеристики
-              <Icon name="lucide:chevron-down" class="w-4 h-4" />
-            </button>
           </div>
 
-          <!-- Полные характеристики (скрытая секция, показывается по клику) -->
+          <!-- Секция "Ещё товары" -->
           <div
-            ref="featuresSection"
-            class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4"
-          >
-            <div class="border-b mb-6">
-              <div class="flex gap-6">
-                <button
-                  class="pb-3 px-1 font-semibold text-base transition-colors relative" :class="[
-                    activeTab === 'description'
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground',
-                  ]"
-                  @click="activeTab = 'description'"
-                >
-                  Описание
-                  <div
-                    v-if="activeTab === 'description'"
-                    class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
-                  />
-                </button>
-                <button
-                  class="pb-3 px-1 font-semibold text-base transition-colors relative" :class="[
-                    activeTab === 'features'
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground',
-                  ]"
-                  @click="activeTab = 'features'"
-                >
-                  Характеристики
-                  <div
-                    v-if="activeTab === 'features'"
-                    class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
-                  />
-                </button>
-              </div>
-            </div>
-
-            <div class="prose max-w-none">
-              <div v-if="activeTab === 'description'">
-                <ProductDescription v-if="product.description" :description="product.description" />
-                <p v-else class="text-muted-foreground">
-                  Описание отсутствует
-                </p>
-              </div>
-
-              <div v-if="activeTab === 'features'">
-                <ProductFeatures :product="product" />
-              </div>
-            </div>
-          </div>
-
-          <!-- 🔥 Секция "Ещё товары" как у detmir.kz -->
-          <div
-            v-if="brandName || categoryName"
+            v-if="brandName || categoryName || breadcrumbs.length > 1"
             class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8"
           >
-            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
-              <Icon name="lucide:layers" class="w-5 h-5 text-primary" />
+            <h3 class="font-bold text-xl mb-4">
               Ещё товары
             </h3>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-0 divide-y divide-border">
               <!-- Товары бренда -->
               <NuxtLink
                 v-if="brandName && brandLink"
                 :to="brandLink"
-                class="flex items-center gap-3 p-4 rounded-xl border bg-muted/30 hover:bg-muted/60 hover:border-primary/30 transition-all group"
+                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
               >
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-white border overflow-hidden flex-shrink-0">
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden flex-shrink-0">
                   <ProgressiveImage
                     v-if="product.brands?.logo_url"
                     :src="brandLogoUrl"
@@ -968,39 +898,39 @@ useHead(() => ({
                     aspect-ratio="square"
                     object-fit="contain"
                     placeholder-type="shimmer"
-                    class="w-full h-full p-1"
+                    class="w-full h-full p-1.5"
                   />
-                  <Icon v-else name="lucide:building-2" class="w-5 h-5 text-primary" />
+                  <Icon v-else name="lucide:building-2" class="w-6 h-6 text-muted-foreground" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium text-sm group-hover:text-primary transition-colors">
+                  <p class="font-semibold text-base leading-tight">
                     {{ brandName }}
                   </p>
-                  <p class="text-xs text-muted-foreground">
-                    Все товары бренда
+                  <p class="text-sm text-muted-foreground mt-0.5">
+                    Бренд
                   </p>
                 </div>
-                <Icon name="lucide:chevron-right" class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
               </NuxtLink>
 
               <!-- Товары категории -->
               <NuxtLink
                 v-if="categoryName && categoryLink"
                 :to="categoryLink"
-                class="flex items-center gap-3 p-4 rounded-xl border bg-muted/30 hover:bg-muted/60 hover:border-primary/30 transition-all group"
+                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
               >
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500">
-                  <Icon name="lucide:folder" class="w-5 h-5" />
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border flex-shrink-0">
+                  <Icon name="lucide:box" class="w-6 h-6 text-muted-foreground" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium text-sm group-hover:text-primary transition-colors">
+                  <p class="font-semibold text-base leading-tight">
                     {{ categoryName }}
                   </p>
-                  <p class="text-xs text-muted-foreground">
-                    Все товары категории
+                  <p class="text-sm text-muted-foreground mt-0.5">
+                    Категория
                   </p>
                 </div>
-                <Icon name="lucide:chevron-right" class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
               </NuxtLink>
 
               <!-- Родительские категории из breadcrumbs -->
@@ -1008,20 +938,20 @@ useHead(() => ({
                 <NuxtLink
                   v-if="crumb.href && crumb.name !== categoryName"
                   :to="crumb.href"
-                  class="flex items-center gap-3 p-4 rounded-xl border bg-muted/30 hover:bg-muted/60 hover:border-primary/30 transition-all group"
+                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
                 >
-                  <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10 text-green-500">
-                    <Icon name="lucide:folder-tree" class="w-5 h-5" />
+                  <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border flex-shrink-0">
+                    <Icon name="lucide:layers" class="w-6 h-6 text-muted-foreground" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="font-medium text-sm group-hover:text-primary transition-colors">
+                    <p class="font-semibold text-base leading-tight">
                       {{ crumb.name }}
                     </p>
-                    <p class="text-xs text-muted-foreground">
-                      Смотреть категорию
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                      Категория
                     </p>
                   </div>
-                  <Icon name="lucide:chevron-right" class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
                 </NuxtLink>
               </template>
             </div>
