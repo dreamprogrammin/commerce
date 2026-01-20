@@ -65,13 +65,14 @@ const name = computed({
 const slug = computed({
   get: () => props.item.slug,
   set: (value) => {
-    // Отмечаем что slug был изменён вручную
-    if (value) {
-      isSlugManuallyEdited.value = true
-    }
     emit('update:item', { ...props.item, slug: value })
   },
 })
+
+// Функция для отметки ручного изменения slug
+function onSlugInput() {
+  isSlugManuallyEdited.value = true
+}
 
 const href = computed({
   get: () => props.item.href,
@@ -289,6 +290,7 @@ function removeImage() {
             v-model="slug"
             required
             :disabled="isDeleted"
+            @input="onSlugInput"
           />
         </div>
       </div>

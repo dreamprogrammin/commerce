@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BrandInsert, BrandUpdate } from '@/types'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
@@ -34,18 +34,16 @@ const isSlugManuallyEdited = ref(false)
 
 // Автоматическая генерация slug при изменении названия
 watch(() => formData.value.name, (newName) => {
-  // Генерируем slug только если он пустой или не был изменён вручную
-  if (newName && (!formData.value.slug || !isSlugManuallyEdited.value)) {
+  // Генерируем slug только если не был изменён вручную
+  if (newName && !isSlugManuallyEdited.value) {
     formData.value.slug = slugify(newName)
   }
 })
 
-// Отслеживаем ручное изменение slug
-watch(() => formData.value.slug, () => {
-  if (formData.value.slug) {
-    isSlugManuallyEdited.value = true
-  }
-})
+// Функция для отметки ручного изменения slug
+function onSlugInput() {
+  isSlugManuallyEdited.value = true
+}
 
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
@@ -145,7 +143,7 @@ onBeforeUnmount(() => {
 
     <div>
       <Label for="brand-slug">Слаг (URL) *</Label>
-      <Input id="brand-slug" v-model="formData.slug" />
+      <Input id="brand-slug" v-model="formData.slug" @input="onSlugInput" />
     </div>
 
     <div>

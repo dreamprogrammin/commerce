@@ -248,13 +248,10 @@ watch(() => formData.value?.name, (newName) => {
   }
 })
 
-// Отслеживаем ручное изменение slug
-watch(() => formData.value?.slug, (newSlug, oldSlug) => {
-  // Если slug изменился и это не первая установка, значит пользователь редактирует вручную
-  if (newSlug && oldSlug !== undefined && newSlug !== oldSlug) {
-    isSlugManuallyEdited.value = true
-  }
-})
+// Функция для отметки ручного изменения slug
+function onSlugInput() {
+  isSlugManuallyEdited.value = true
+}
 
 watch(
   [() => formData.value.price, selectedBonusPercent],
@@ -557,6 +554,7 @@ const seoKeywordsString = computed({
               id="slug"
               v-model="formData.slug"
               placeholder="razvivayushchaya-igrushka"
+              @input="onSlugInput"
             />
           </div>
           <div>
