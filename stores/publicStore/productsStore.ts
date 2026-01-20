@@ -313,7 +313,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, product_images(*)')
+        .select('*, product_images(*), categories(name, slug)')
         .in('id', ids)
         .eq('is_active', true)
 

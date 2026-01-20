@@ -24,8 +24,6 @@ const { getImageUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
 
-const selectedAccessoryIds = ref<string[]>([])
-
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 const isDescriptionExpanded = ref(false)
@@ -142,23 +140,13 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
 const totalPrice = computed(() => {
   if (!product.value)
     return 0
-  let total = Number(product.value.price)
-  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
-  for (const acc of selected) {
-    total += Number(acc.price)
-  }
-  return total
+  return Number(product.value.price)
 })
 
 const totalBonuses = computed(() => {
   if (!product.value)
     return 0
-  let total = Number(product.value.bonus_points_award)
-  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
-  for (const acc of selected) {
-    total += Number(acc.bonus_points_award)
-  }
-  return total
+  return Number(product.value.bonus_points_award)
 })
 
 const mainItemInCart = computed(() => {
@@ -177,26 +165,8 @@ function addToCart() {
 
   if (!mainItemInCart.value) {
     cartStore.addItem(product.value, 1)
+    toast.success('Товар добавлен в корзину')
   }
-
-  const selectedAccessories = (accessories.value || []).filter(acc =>
-    selectedAccessoryIds.value.includes(acc.id),
-  )
-  for (const acc of selectedAccessories) {
-    const accInCart = cartStore.items.find(item => item.product.id === acc.id)
-    if (!accInCart) {
-      cartStore.addItem(acc, 1)
-    }
-  }
-
-  toast.success('Товары добавлены в корзину')
-}
-
-function getAccessoryImageUrl(imageUrl: string | null) {
-  if (!imageUrl)
-    return null
-
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
 }
 
 useFlipCounter(totalPrice, digitColumns)
@@ -678,80 +648,11 @@ useHead(() => ({
                 </ClientOnly>
               </div>
 
-              <!-- ✅ Аксессуары с независимой загрузкой -->
-              <div v-if="accessoriesLoading || (accessories && accessories.length > 0)" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4">
-                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
-                  <Icon name="lucide:plus-circle" class="w-5 h-5 text-primary" />
-                  С этим товаром покупают
-                </h3>
-
-                <!-- Скелетон для аксессуаров -->
-                <div v-if="accessoriesLoading" class="space-y-3">
-                  <div v-for="i in 3" :key="i" class="flex items-center gap-3 p-3 rounded-lg border animate-pulse">
-                    <div class="w-4 h-4 bg-muted rounded" />
-                    <div class="w-14 h-14 bg-muted rounded-lg" />
-                    <div class="flex-1 space-y-2">
-                      <div class="h-4 bg-muted rounded w-3/4" />
-                      <div class="h-4 bg-muted rounded w-1/4" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Список аксессуаров -->
-                <div v-else class="space-y-3">
-                  <div
-                    v-for="acc in accessories"
-                    :key="acc.id"
-                    class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer select-none transition-all hover:shadow-md has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
-                    @click="() => {
-                      const isChecked = selectedAccessoryIds.includes(acc.id)
-                      if (isChecked) {
-                        selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
-                      }
-                      else {
-                        selectedAccessoryIds.push(acc.id)
-                      }
-                    }"
-                  >
-                    <div @click.stop>
-                      <Checkbox
-                        :id="`acc-${acc.id}`"
-                        :model-value="selectedAccessoryIds.includes(acc.id)"
-                        @update:model-value="(checkedState) => {
-                          if (checkedState === true) {
-                            if (!selectedAccessoryIds.includes(acc.id)) {
-                              selectedAccessoryIds.push(acc.id)
-                            }
-                          }
-                          else if (checkedState === false) {
-                            selectedAccessoryIds = selectedAccessoryIds.filter(id => id !== acc.id)
-                          }
-                        }"
-                      />
-                    </div>
-                    <div class="w-14 h-14 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                      <img
-                        v-if="acc.product_images && acc.product_images.length > 0"
-                        :src="getAccessoryImageUrl(acc.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
-                        :alt="acc.name"
-                        class="w-full h-full object-cover"
-                        loading="lazy"
-                      >
-                      <div v-else class="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                        Нет фото
-                      </div>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium leading-tight mb-1">
-                        {{ acc.name }}
-                      </p>
-                      <p class="text-sm font-bold text-primary">
-                        + {{ acc.price }} ₸
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <!-- Аксессуары (батарейки и подарочная упаковка) -->
+              <AccessoriesBlock
+                :accessories="accessories || []"
+                :loading="accessoriesLoading"
+              />
             </div>
           </div>
 

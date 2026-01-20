@@ -45,7 +45,9 @@
       "Bash(pnpm lint:fix:*)",
       "Bash(pnpm eslint:*)",
       "WebFetch(domain:detmir.kz)",
-      "WebFetch(domain:www.google.com)"
+      "WebFetch(domain:www.google.com)",
+      "Bash(pnpm vue-tsc:*)",
+      "Bash(pnpm nuxi typecheck:*)"
     ]
   }
 }

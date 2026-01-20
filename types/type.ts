@@ -239,6 +239,7 @@ export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>
 
 export type AccessoryProduct = ProductRow & {
   product_images: ProductImageRow[]
+  categories?: { name: string | null, slug: string | null } | null
 }
 
 export type ProductWithImages = ProductRow & {
