@@ -24,7 +24,8 @@ const kazakhReplacements: [string, string][] = [
 ]
 
 export function slugify(text: string): string {
-  if (!text) return ''
+  if (!text)
+    return ''
 
   // Сначала заменяем казахские буквы
   let processed = text

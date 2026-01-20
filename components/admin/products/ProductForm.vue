@@ -14,6 +14,7 @@ import type {
 } from '@/types'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
+import { VueDraggableNext } from 'vue-draggable-next'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
@@ -89,6 +90,7 @@ const newImageFiles = ref<NewImageFile[]>([])
 const existingImages = ref<ProductImageRow[]>([])
 const imagesToDelete = ref<string[]>([])
 const selectedBonusPercent = ref(5)
+const isDraggingOver = ref(false)
 
 const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([])
 const accessorySearchQuery = ref('')
@@ -265,24 +267,76 @@ watch(
 // --- 7. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ ---
 
 /**
- * 🎯 Обработка загрузки изображений с сохранением blur
+ * 🎯 Обработка загрузки изображений через input
  */
 async function handleFilesChange(event: Event) {
   const target = event.target as HTMLInputElement
   if (!target.files || target.files.length === 0) {
     return
   }
+  await processFiles(Array.from(target.files))
+}
 
-  const filesToProcess = Array.from(target.files)
+function removeNewImage(index: number) {
+  const fileToRemove = newImageFiles.value[index]
+  if (fileToRemove) {
+    URL.revokeObjectURL(fileToRemove.previewUrl)
+  }
+  newImageFiles.value.splice(index, 1)
+}
+
+function removeExistingImage(image: ProductImageRow) {
+  imagesToDelete.value.push(image.id)
+  existingImages.value = existingImages.value.filter(img => img.id !== image.id)
+}
+
+/**
+ * 🎯 Получить оптимизированный URL для существующего изображения
+ * Автоматически использует правильный режим из конфига
+ */
+function getExistingImageUrl(imageUrl: string) {
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL) || ''
+}
+
+// --- DRAG & DROP ФУНКЦИИ ---
+
+function onDragOver(event: DragEvent) {
+  event.preventDefault()
+  isDraggingOver.value = true
+}
+
+function onDragLeave() {
+  isDraggingOver.value = false
+}
+
+async function onDrop(event: DragEvent) {
+  event.preventDefault()
+  isDraggingOver.value = false
+
+  const files = event.dataTransfer?.files
+  if (!files || files.length === 0)
+    return
+
+  // Фильтруем только изображения
+  const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'))
+  if (imageFiles.length === 0) {
+    toast.error('Пожалуйста, загружайте только изображения')
+    return
+  }
+
+  await processFiles(imageFiles)
+}
+
+async function processFiles(files: File[]) {
   isProcessingImages.value = true
 
   const toastId = toast.loading(
-    `${optimizationInfo.value.icon} Обработка ${filesToProcess.length} изображений...`,
+    `${optimizationInfo.value.icon} Обработка ${files.length} изображений...`,
   )
 
   try {
     const processedFiles = await Promise.all(
-      filesToProcess.map(async (file) => {
+      files.map(async (file) => {
         // Проверяем нужна ли оптимизация
         if (shouldOptimizeImage(file)) {
           try {
@@ -344,32 +398,29 @@ async function handleFilesChange(event: Event) {
   }
   catch (error) {
     toast.error('❌ Ошибка при обработке файлов', { id: toastId })
-    console.error('handleFilesChange error:', error)
+    console.error('processFiles error:', error)
   }
   finally {
     isProcessingImages.value = false
   }
 }
 
-function removeNewImage(index: number) {
-  const fileToRemove = newImageFiles.value[index]
-  if (fileToRemove) {
-    URL.revokeObjectURL(fileToRemove.previewUrl)
-  }
-  newImageFiles.value.splice(index, 1)
+// Установка главной картинки для существующих изображений
+function setPrimaryExistingImage(index: number) {
+  if (index === 0)
+    return // Уже первая
+  const [image] = existingImages.value.splice(index, 1)
+  existingImages.value.unshift(image)
+  toast.success('Главная картинка установлена')
 }
 
-function removeExistingImage(image: ProductImageRow) {
-  imagesToDelete.value.push(image.id)
-  existingImages.value = existingImages.value.filter(img => img.id !== image.id)
-}
-
-/**
- * 🎯 Получить оптимизированный URL для существующего изображения
- * Автоматически использует правильный режим из конфига
- */
-function getExistingImageUrl(imageUrl: string) {
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL) || ''
+// Установка главной картинки для новых изображений
+function setPrimaryNewImage(index: number) {
+  if (index === 0)
+    return // Уже первая
+  const [image] = newImageFiles.value.splice(index, 1)
+  newImageFiles.value.unshift(image)
+  toast.success('Главная картинка установлена')
 }
 
 // --- 8. УПРАВЛЕНИЕ АКСЕССУАРАМИ ---
@@ -1021,103 +1072,193 @@ const seoKeywordsString = computed({
             <p class="text-xs text-muted-foreground mt-1">
               {{ optimizationInfo.description }}
             </p>
+            <p class="text-xs text-muted-foreground mt-1">
+              Перетащите изображения для изменения порядка. Первое изображение будет главным.
+            </p>
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
-          <!-- ✏️ Существующие изображения -->
+          <!-- 🎯 Drag & Drop зона -->
+          <div
+            class="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer"
+            :class="[
+              isDraggingOver
+                ? 'border-primary bg-primary/5'
+                : 'border-muted-foreground/25 hover:border-primary/50',
+            ]"
+            @dragover="onDragOver"
+            @dragleave="onDragLeave"
+            @drop="onDrop"
+            @click="$refs.fileInput?.click()"
+          >
+            <div class="flex flex-col items-center gap-2">
+              <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <Icon name="lucide:image-plus" class="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p class="font-medium text-sm">
+                  Перетащите изображения сюда
+                </p>
+                <p class="text-xs text-muted-foreground">
+                  или нажмите для выбора файлов
+                </p>
+              </div>
+            </div>
+            <input
+              ref="fileInput"
+              type="file"
+              multiple
+              accept="image/*"
+              class="hidden"
+              :disabled="isProcessingImages"
+              @change="handleFilesChange"
+            >
+          </div>
+
+          <!-- ⏳ Индикатор загрузки -->
+          <div v-if="isProcessingImages" class="flex items-center justify-center gap-2 py-4">
+            <div class="w-5 h-5 border-2 border-muted-foreground border-t-primary rounded-full animate-spin" />
+            <span class="text-sm text-muted-foreground">{{ optimizationInfo.icon }} Обработка изображений...</span>
+          </div>
+
+          <!-- ✏️ Существующие изображения (с сортировкой) -->
           <div v-if="existingImages.length > 0">
             <p class="text-sm font-medium mb-2">
               Текущие изображения ({{ existingImages.length }})
             </p>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="image in existingImages"
-                :key="image.id"
-                class="relative group aspect-square"
-              >
-                <img
-                  :src="getExistingImageUrl(image.image_url)"
-                  class="w-full h-full object-cover rounded-md"
-                  loading="lazy"
-                  alt="Изображение товара"
+            <VueDraggableNext
+              v-model="existingImages"
+              class="grid grid-cols-3 sm:grid-cols-4 gap-3"
+              item-key="id"
+              handle=".drag-handle"
+            >
+              <template #item="{ element: image, index }">
+                <div
+                  class="relative group aspect-square rounded-lg overflow-hidden border-2 transition-all"
+                  :class="index === 0 ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-muted-foreground/30'"
                 >
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                  @click="removeExistingImage(image)"
-                >
-                  <svg width="15" height="15" viewBox="0 0 15 15">
-                    <path
-                      fill="currentColor"
-                      d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z"
-                    />
-                  </svg>
-                </Button>
-              </div>
-            </div>
+                  <img
+                    :src="getExistingImageUrl(image.image_url)"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    alt="Изображение товара"
+                  >
+                  <!-- Бейдж "Главная" -->
+                  <div
+                    v-if="index === 0"
+                    class="absolute top-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-medium"
+                  >
+                    Главная
+                  </div>
+                  <!-- Overlay с кнопками -->
+                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <!-- Drag handle -->
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      class="drag-handle h-8 w-8 cursor-grab active:cursor-grabbing"
+                    >
+                      <Icon name="lucide:grip-vertical" class="w-4 h-4" />
+                    </Button>
+                    <!-- Сделать главной -->
+                    <Button
+                      v-if="index !== 0"
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      class="h-8 w-8"
+                      title="Сделать главной"
+                      @click="setPrimaryExistingImage(index)"
+                    >
+                      <Icon name="lucide:star" class="w-4 h-4" />
+                    </Button>
+                    <!-- Удалить -->
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      class="h-8 w-8"
+                      @click="removeExistingImage(image)"
+                    >
+                      <Icon name="lucide:trash-2" class="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </template>
+            </VueDraggableNext>
           </div>
 
-          <!-- ➕ Новые изображения -->
+          <!-- ➕ Новые изображения (с сортировкой) -->
           <div v-if="newImageFiles.length > 0">
             <p class="text-sm font-medium mb-2">
               Новые изображения ({{ newImageFiles.length }})
             </p>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="(item, index) in newImageFiles"
-                :key="index"
-                class="relative group aspect-square"
-              >
-                <img
-                  :src="item.previewUrl"
-                  class="w-full h-full object-cover rounded-md"
-                  alt="Превью нового изображения"
+            <VueDraggableNext
+              v-model="newImageFiles"
+              class="grid grid-cols-3 sm:grid-cols-4 gap-3"
+              handle=".drag-handle"
+            >
+              <template #item="{ element: item, index }">
+                <div
+                  class="relative group aspect-square rounded-lg overflow-hidden border-2 transition-all"
+                  :class="existingImages.length === 0 && index === 0 ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-muted-foreground/30'"
                 >
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  class="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                  @click="removeNewImage(index)"
-                >
-                  <svg width="15" height="15" viewBox="0 0 15 15">
-                    <path
-                      fill="currentColor"
-                      d="M11.782 4.032a.575.575 0 1 0-.813-.814L7.5 6.687L4.032 3.218a.575.575 0 0 0-.814.814L6.687 7.5l-3.469 3.468a.575.575 0 0 0 .814.814L7.5 8.313l3.469 3.469a.575.575 0 0 0 .813-.814L8.313 7.5l3.469-3.468Z"
-                    />
-                  </svg>
-                </Button>
-              </div>
-            </div>
+                  <img
+                    :src="item.previewUrl"
+                    class="w-full h-full object-cover"
+                    alt="Превью нового изображения"
+                  >
+                  <!-- Бейдж "Главная" (только если нет существующих) -->
+                  <div
+                    v-if="existingImages.length === 0 && index === 0"
+                    class="absolute top-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-medium"
+                  >
+                    Главная
+                  </div>
+                  <!-- Overlay с кнопками -->
+                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <!-- Drag handle -->
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      class="drag-handle h-8 w-8 cursor-grab active:cursor-grabbing"
+                    >
+                      <Icon name="lucide:grip-vertical" class="w-4 h-4" />
+                    </Button>
+                    <!-- Сделать главной -->
+                    <Button
+                      v-if="existingImages.length === 0 && index !== 0"
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      class="h-8 w-8"
+                      title="Сделать главной"
+                      @click="setPrimaryNewImage(index)"
+                    >
+                      <Icon name="lucide:star" class="w-4 h-4" />
+                    </Button>
+                    <!-- Удалить -->
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      class="h-8 w-8"
+                      @click="removeNewImage(index)"
+                    >
+                      <Icon name="lucide:trash-2" class="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </template>
+            </VueDraggableNext>
           </div>
 
-          <!-- 📤 Input для загрузки файлов -->
-          <div>
-            <Label for="images">
-              {{ newImageFiles.length > 0 || existingImages.length > 0
-                ? 'Добавить еще фото'
-                : 'Добавить фото'
-              }}
-            </Label>
-            <Input
-              id="images"
-              :key="fileInputKey"
-              type="file"
-              multiple
-              accept="image/*"
-              :disabled="isProcessingImages"
-              @change="handleFilesChange"
-            />
-            <div v-if="isProcessingImages" class="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-              <div class="w-4 h-4 border-2 border-muted-foreground border-t-primary rounded-full animate-spin" />
-              {{ optimizationInfo.icon }} Обработка изображений...
-            </div>
-            <p class="text-xs text-muted-foreground mt-2">
-              💡 {{ optimizationInfo.recommendation }}
-            </p>
-          </div>
+          <!-- 💡 Подсказка -->
+          <p class="text-xs text-muted-foreground">
+            💡 {{ optimizationInfo.recommendation }}
+          </p>
         </CardContent>
       </Card>
 
