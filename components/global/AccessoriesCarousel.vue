@@ -5,9 +5,9 @@ import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { formatPrice } from '@/utils/formatPrice'
 
-defineProps<{
+const props = defineProps<{
   accessories: AccessoryProduct[]
-  isSelected: (id: string) => boolean
+  selectedIds: string[]
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +21,10 @@ function getAccessoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
+}
+
+function isSelected(id: string) {
+  return props.selectedIds.includes(id)
 }
 </script>
 

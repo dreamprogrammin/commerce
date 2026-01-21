@@ -29,10 +29,6 @@ function toggleAccessory(id: string) {
   localSelectedIds.value = current
 }
 
-function isSelected(id: string) {
-  return localSelectedIds.value.includes(id)
-}
-
 // Count selected items per category
 const selectedBatteriesCount = computed(() =>
   props.accessories.filter(acc =>
@@ -244,7 +240,7 @@ function closeAll() {
         <div class="py-4">
           <AccessoriesCarousel
             :accessories="currentAccessories"
-            :is-selected="isSelected"
+            :selected-ids="localSelectedIds"
             @toggle="toggleAccessory"
             @close="closeAll"
           />
@@ -272,7 +268,7 @@ function closeAll() {
         <div class="px-4 pb-6 overflow-y-auto">
           <AccessoriesCarousel
             :accessories="currentAccessories"
-            :is-selected="isSelected"
+            :selected-ids="localSelectedIds"
             @toggle="toggleAccessory"
             @close="closeAll"
           />
