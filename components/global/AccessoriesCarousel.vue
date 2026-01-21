@@ -56,9 +56,9 @@ function getAccessoryImageUrl(imageUrl: string | null) {
             <!-- Checkbox in corner -->
             <div class="absolute top-2 right-2 z-10" @click.stop>
               <Checkbox
-                :checked="isSelected(accessory.id)"
+                :model-value="isSelected(accessory.id)"
                 class="h-5 w-5 border-2 bg-white shadow-sm"
-                @update:checked="emit('toggle', accessory.id)"
+                @update:model-value="emit('toggle', accessory.id)"
               />
             </div>
 
