@@ -592,8 +592,7 @@ useHead(() => ({
             <!-- Правая колонка: Информация о товаре -->
             <div class="lg:col-span-5">
               <div 
-                class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
-                :class="{ 'lg:sticky lg:top-4': !accessories?.length }"
+                class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border lg:sticky lg:top-4"
               >
                 <h1 class="text-xl lg:text-2xl font-bold mb-2 leading-tight">
                   {{ product.name }}
@@ -714,12 +713,13 @@ useHead(() => ({
               </div>
 
               <!-- Аксессуары (батарейки и подарочная упаковка) -->
-              <AccessoriesBlock
-                v-model:selected-ids="selectedAccessoryIds"
-                :accessories="accessories || []"
-                :loading="accessoriesLoading"
-                class="mt-4"
-              />
+              <div class="mt-4">
+                <AccessoriesBlock
+                  v-model:selected-ids="selectedAccessoryIds"
+                  :accessories="accessories || []"
+                  :loading="accessoriesLoading"
+                />
+              </div>
             </div>
           </div>
 
