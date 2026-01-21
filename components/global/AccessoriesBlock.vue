@@ -9,7 +9,7 @@ const props = defineProps<{
 const isMobile = ref(false)
 const isModalOpen = ref(false)
 const isDrawerOpen = ref(false)
-const selectedType = ref<'batteries' | 'gift-wrapping' | null>(null)
+const selectedType = ref<'batteries' | 'gift-wrapping' | 'other' | null>(null)
 
 onMounted(() => {
   isMobile.value = window.innerWidth < 1024
@@ -33,14 +33,25 @@ const giftWrappingAccessories = computed(() =>
   props.accessories.filter(acc => acc.categories?.slug === 'gift-wrapping'),
 )
 
+// Accessories that don't match batteries or gift-wrapping
+const otherAccessories = computed(() =>
+  props.accessories.filter(acc =>
+    acc.categories?.slug !== 'batteries' && acc.categories?.slug !== 'gift-wrapping',
+  ),
+)
+
 const hasBatteries = computed(() => batteriesAccessories.value.length > 0)
 const hasGiftWrapping = computed(() => giftWrappingAccessories.value.length > 0)
+const hasOther = computed(() => otherAccessories.value.length > 0)
+const hasAnyAccessories = computed(() => props.accessories.length > 0)
 
 const currentAccessories = computed(() => {
   if (selectedType.value === 'batteries')
     return batteriesAccessories.value
   if (selectedType.value === 'gift-wrapping')
     return giftWrappingAccessories.value
+  if (selectedType.value === 'other')
+    return otherAccessories.value
   return []
 })
 
@@ -49,10 +60,28 @@ const currentTitle = computed(() => {
     return 'Элементы питания'
   if (selectedType.value === 'gift-wrapping')
     return 'Подарочная упаковка'
+  if (selectedType.value === 'other')
+    return 'Аксессуары'
   return ''
 })
 
-function openAccessories(type: 'batteries' | 'gift-wrapping') {
+const currentIcon = computed(() => {
+  if (selectedType.value === 'batteries')
+    return 'mdi:battery'
+  if (selectedType.value === 'gift-wrapping')
+    return 'mdi:gift'
+  return 'lucide:package'
+})
+
+const currentIconClass = computed(() => {
+  if (selectedType.value === 'batteries')
+    return 'text-amber-600'
+  if (selectedType.value === 'gift-wrapping')
+    return 'text-pink-600'
+  return 'text-blue-600'
+})
+
+function openAccessories(type: 'batteries' | 'gift-wrapping' | 'other') {
   selectedType.value = type
   if (isMobile.value) {
     isDrawerOpen.value = true
@@ -70,7 +99,7 @@ function closeAll() {
 </script>
 
 <template>
-  <div v-if="loading || hasBatteries || hasGiftWrapping" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4">
+  <div v-if="loading || hasAnyAccessories" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4">
     <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
       <Icon name="lucide:plus-circle" class="w-5 h-5 text-primary" />
       С этим товаром покупают
@@ -111,6 +140,19 @@ function closeAll() {
         <span class="text-sm font-medium text-center">Подарочная упаковка</span>
         <span class="text-xs text-muted-foreground mt-1">{{ giftWrappingAccessories.length }} шт.</span>
       </button>
+
+      <!-- Other accessories card -->
+      <button
+        v-if="hasOther"
+        class="flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
+        @click="openAccessories('other')"
+      >
+        <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3 group-hover:bg-blue-100 transition-colors">
+          <Icon name="lucide:package" class="w-7 h-7 text-blue-600" />
+        </div>
+        <span class="text-sm font-medium text-center">Аксессуары</span>
+        <span class="text-xs text-muted-foreground mt-1">{{ otherAccessories.length }} шт.</span>
+      </button>
     </div>
 
     <!-- Desktop Modal -->
@@ -119,8 +161,8 @@ function closeAll() {
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2">
             <Icon
-              :name="selectedType === 'batteries' ? 'mdi:battery' : 'mdi:gift'"
-              :class="selectedType === 'batteries' ? 'text-amber-600' : 'text-pink-600'"
+              :name="currentIcon"
+              :class="currentIconClass"
               class="w-5 h-5"
             />
             {{ currentTitle }}
@@ -145,8 +187,8 @@ function closeAll() {
         <DrawerHeader class="text-left">
           <DrawerTitle class="flex items-center gap-2">
             <Icon
-              :name="selectedType === 'batteries' ? 'mdi:battery' : 'mdi:gift'"
-              :class="selectedType === 'batteries' ? 'text-amber-600' : 'text-pink-600'"
+              :name="currentIcon"
+              :class="currentIconClass"
               class="w-5 h-5"
             />
             {{ currentTitle }}

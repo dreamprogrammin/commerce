@@ -47,7 +47,8 @@
       "WebFetch(domain:detmir.kz)",
       "WebFetch(domain:www.google.com)",
       "Bash(pnpm vue-tsc:*)",
-      "Bash(pnpm nuxi typecheck:*)"
+      "Bash(pnpm nuxi typecheck:*)",
+      "Bash(PGPASSWORD=postgres psql:*)"
     ]
   }
 }
