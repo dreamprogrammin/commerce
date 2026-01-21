@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage } from '../_shared/telegramUtils.ts'
+import { updateTelegramMessage, escapeMarkdown } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +18,7 @@ interface StatusUpdatePayload {
   table: 'orders' | 'guest_checkouts'
 }
 
-console.log('✅ Функция sync-order-status-to-telegram инициализирована')
+console.log('✅ Функция sync-order-status-to-telegram v2 инициализирована')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -149,9 +149,10 @@ Deno.serve(async (req) => {
         .single()
 
       if (orderData) {
-        const customerName = orderData.profile
+        const customerNameRaw = orderData.profile
           ? `${orderData.profile.first_name} ${orderData.profile.last_name || ''}`.trim()
           : 'Не указано'
+        const customerName = escapeMarkdown(customerNameRaw)
 
         orderInfo = `\n💰 *Сумма:* ${orderData.final_amount} ₸`
         if (orderData.bonuses_spent > 0) {
@@ -161,9 +162,11 @@ Deno.serve(async (req) => {
 
         // Информация об ответственном админе
         if (orderData.assigned_admin_name) {
-          assignedAdmin = `\n👨‍💼 *Ответственный:* ${orderData.assigned_admin_name}`
-          if (orderData.assigned_admin_username) {
-            assignedAdmin += ` (@${orderData.assigned_admin_username})`
+          const adminName = escapeMarkdown(orderData.assigned_admin_name)
+          const adminUsername = orderData.assigned_admin_username ? escapeMarkdown(orderData.assigned_admin_username) : null
+          assignedAdmin = `\n👨‍💼 *Ответственный:* ${adminName}`
+          if (adminUsername) {
+            assignedAdmin += ` (@${adminUsername})`
           }
         }
       }
@@ -175,14 +178,17 @@ Deno.serve(async (req) => {
         .single()
 
       if (guestData) {
+        const guestName = escapeMarkdown(guestData.guest_name) || 'Гость'
         orderInfo = `\n💰 *Сумма:* ${guestData.final_amount} ₸`
-        orderInfo += `\n👥 *Клиент:* ${guestData.guest_name || 'Гость'}`
+        orderInfo += `\n👥 *Клиент:* ${guestName}`
 
         // Информация об ответственном админе
         if (guestData.assigned_admin_name) {
-          assignedAdmin = `\n👨‍💼 *Ответственный:* ${guestData.assigned_admin_name}`
-          if (guestData.assigned_admin_username) {
-            assignedAdmin += ` (@${guestData.assigned_admin_username})`
+          const adminName = escapeMarkdown(guestData.assigned_admin_name)
+          const adminUsername = guestData.assigned_admin_username ? escapeMarkdown(guestData.assigned_admin_username) : null
+          assignedAdmin = `\n👨‍💼 *Ответственный:* ${adminName}`
+          if (adminUsername) {
+            assignedAdmin += ` (@${adminUsername})`
           }
         }
       }

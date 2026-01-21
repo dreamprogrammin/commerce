@@ -1,7 +1,23 @@
 /**
  * Утилиты для работы с Telegram Bot API
- * @version 3.0 - Fixed button disappearing issue
+ * @version 4.0 - Added Markdown escaping
  */
+
+/**
+ * Экранирует специальные символы Markdown для безопасной отправки в Telegram
+ * @param text - Текст для экранирования
+ * @returns Экранированный текст
+ */
+export function escapeMarkdown(text: string | null | undefined): string {
+  if (!text) return ''
+  return text
+    .replace(/\\/g, '\\\\')  // сначала экранируем backslash
+    .replace(/\*/g, '\\*')
+    .replace(/_/g, '\\_')
+    .replace(/`/g, '\\`')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
+}
 
 /**
  * Обновляет текст сообщения в Telegram

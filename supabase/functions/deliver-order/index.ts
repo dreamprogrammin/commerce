@@ -1,12 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage, removeMessageButtons } from '../_shared/telegramUtils.ts'
+import { updateTelegramMessage, removeMessageButtons, escapeMarkdown } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('✅ Функция deliver-order инициализирована')
+console.log('✅ Функция deliver-order v2 инициализирована')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -191,9 +191,10 @@ Deno.serve(async (req) => {
     if (orderData.telegram_message_id) {
       console.log(`📱 Обновление Telegram сообщения ${orderData.telegram_message_id}...`)
 
-      const customerName = tableName === 'orders'
+      const customerNameRaw = tableName === 'orders'
         ? `${(orderData as any).profile?.first_name || ''} ${(orderData as any).profile?.last_name || ''}`.trim() || 'Не указано'
         : orderData.guest_name || 'Гость'
+      const customerName = escapeMarkdown(customerNameRaw)
 
       const updatedText = `✅ *ДОСТАВЛЕН*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n_Статус: delivered_\n\n📦 Заказ успешно доставлен\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 

@@ -1,12 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage } from '../_shared/telegramUtils.ts'
+import { updateTelegramMessage, escapeMarkdown } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('✅ Функция assign-order-to-admin v3 инициализирована')
+console.log('✅ Функция assign-order-to-admin v5 инициализирована')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -186,11 +186,14 @@ Deno.serve(async (req) => {
     if (orderData.telegram_message_id) {
       console.log(`📱 Обновление Telegram сообщения ${orderData.telegram_message_id}...`)
 
-      const customerName = tableName === 'orders'
+      const customerNameRaw = tableName === 'orders'
         ? `${(orderData as any).profile?.first_name || ''} ${(orderData as any).profile?.last_name || ''}`.trim() || 'Не указано'
         : orderData.guest_name || 'Гость'
+      const customerName = escapeMarkdown(customerNameRaw)
+      const escapedAdminName = escapeMarkdown(adminName)
+      const escapedAdminUsername = adminUsername ? escapeMarkdown(adminUsername) : null
 
-      const updatedText = `⚙️ *В ОБРАБОТКЕ*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n👨‍💼 *Ответственный:* ${adminName}${adminUsername ? ` (@${adminUsername})` : ''}\n\n_Статус: processing_\n\n📝 Заказ взят в работу. Уточните детали с клиентом.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+      const updatedText = `⚙️ *В ОБРАБОТКЕ*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n👨‍💼 *Ответственный:* ${escapedAdminName}${escapedAdminUsername ? ` (@${escapedAdminUsername})` : ''}\n\n_Статус: processing_\n\n📝 Заказ взят в работу. Уточните детали с клиентом.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
       // Формируем параметры для URL кнопок
       const secretParam = adminSecret ? `&secret=${adminSecret}` : ''

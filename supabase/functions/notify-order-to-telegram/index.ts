@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { escapeMarkdown } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,7 +78,7 @@ interface GuestCheckoutData {
   guest_checkout_items: GuestCheckoutItem[]
 }
 
-console.log('✅ Функция notify-order-to-telegram инициализирована v2')
+console.log('✅ Функция notify-order-to-telegram инициализирована v4')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -319,13 +320,14 @@ Deno.serve(async (req) => {
     // 📱 ФОРМИРОВАНИЕ И ОТПРАВКА СООБЩЕНИЯ
     // ========================================
     
-    // Определяем имя клиента в зависимости от типа заказа
-    const customerName = typedOrderData.profile?.first_name
+    // Определяем имя клиента в зависимости от типа заказа (с экранированием)
+    const customerNameRaw = typedOrderData.profile?.first_name
       ? `${typedOrderData.profile.first_name} ${typedOrderData.profile.last_name || ''}`.trim()
       : guestName || 'Не указано'
-    
-    const customerPhone = typedOrderData.profile?.phone || guestPhone || 'Не указан'
-    const customerEmail = guestEmail || 'Не указан'
+    const customerName = escapeMarkdown(customerNameRaw)
+
+    const customerPhone = escapeMarkdown(typedOrderData.profile?.phone || guestPhone || 'Не указан')
+    const customerEmail = escapeMarkdown(guestEmail || 'Не указан')
     const customerType = typedOrderData.user_id ? '👤 Зарегистрированный' : '👥 Гость'
     
     const orderDate = new Date(typedOrderData.created_at).toLocaleString('ru-RU', { 
@@ -342,19 +344,19 @@ Deno.serve(async (req) => {
       const product = item.product
       if (!product) return
 
-      const productName = product.name || 'Неизвестный товар'
+      const productName = escapeMarkdown(product.name) || 'Неизвестный товар'
       const productPrice = product.price || 0
-      
+
       // Формируем текст с артикулом/штрихкодом
       let itemText = `• ${productName}\n`
-      
+
       if (product.sku) {
-        itemText += `  Артикул: \`${product.sku}\`\n`
+        itemText += `  Артикул: \`${escapeMarkdown(product.sku)}\`\n`
       }
       if (product.barcode) {
-        itemText += `  Штрихкод: \`${product.barcode}\`\n`
+        itemText += `  Штрихкод: \`${escapeMarkdown(product.barcode)}\`\n`
       }
-      
+
       itemText += `  Количество: ${item.quantity} шт.\n`
       itemText += `  Цена за шт.: ${productPrice} ₸`
 
@@ -405,11 +407,13 @@ Deno.serve(async (req) => {
       }
     }
     
-    messageText += `*Оплата:* ${typedOrderData.payment_method || 'Не указано'}\n`
+    messageText += `*Оплата:* ${escapeMarkdown(typedOrderData.payment_method) || 'Не указано'}\n`
     messageText += `*Доставка:* ${typedOrderData.delivery_method === 'courier' ? 'Курьер' : 'Самовывоз'}\n`
 
     if (typedOrderData.delivery_method === 'courier' && typedOrderData.delivery_address) {
-      messageText += `*Адрес:* ${typedOrderData.delivery_address.city}, ${typedOrderData.delivery_address.line1}\n`
+      const city = escapeMarkdown(typedOrderData.delivery_address.city)
+      const line1 = escapeMarkdown(typedOrderData.delivery_address.line1)
+      messageText += `*Адрес:* ${city}, ${line1}\n`
     }
 
     messageText += `\n_Статус: ${typedOrderData.status}_`
