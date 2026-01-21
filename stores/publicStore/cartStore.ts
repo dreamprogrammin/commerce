@@ -1,5 +1,6 @@
 import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
+import { formatPriceWithDiscount } from '@/utils/formatPrice'
 import { useProfileStore } from '../core/profileStore'
 
 const CART_STORAGE_KEY = 'krakenshop-cart-v1'
@@ -23,7 +24,14 @@ export const useCartStore = defineStore('cartStore', () => {
   const totalItems = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
 
   const subtotal = computed(() =>
-    items.value.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0),
+    items.value.reduce((sum, item) => {
+      // Используем финальную цену с учетом скидки
+      const priceData = formatPriceWithDiscount(
+        Number(item.product.price),
+        item.product.discount_percentage,
+      )
+      return sum + (priceData.finalNumber * item.quantity)
+    }, 0),
   )
 
   const discountAmount = computed(() => {

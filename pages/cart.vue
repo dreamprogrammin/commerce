@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
 
 const cartStore = useCartStore()
 const { items, subtotal, totalItems } = storeToRefs(cartStore)
@@ -19,6 +20,21 @@ function getProductImage(item: typeof items.value[0]) {
 function getProductBlur(item: typeof items.value[0]) {
   const firstImage = item.product.product_images?.[0]
   return firstImage?.blur_placeholder || undefined
+}
+
+// Хелпер для расчета финальной цены товара с учетом скидки
+function getItemPrice(item: typeof items.value[0]) {
+  const priceData = formatPriceWithDiscount(
+    Number(item.product.price),
+    item.product.discount_percentage,
+  )
+  return priceData
+}
+
+// Хелпер для расчета общей цены за товар (цена * количество)
+function getItemTotal(item: typeof items.value[0]) {
+  const priceData = getItemPrice(item)
+  return priceData.finalNumber * item.quantity
 }
 
 const containerClass = carouselContainerVariants({ contained: 'always' })
@@ -75,11 +91,16 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                 <h3 class="font-semibold text-sm line-clamp-2 mb-1">
                   {{ item.product.name }}
                 </h3>
-                <p class="text-sm text-muted-foreground mb-2">
-                  {{ item.product.price }} ₸ / шт.
-                </p>
+                <div class="flex items-center gap-2 mb-2">
+                  <p class="text-sm font-medium">
+                    {{ formatPrice(getItemPrice(item).finalNumber) }} ₸ / шт.
+                  </p>
+                  <p v-if="getItemPrice(item).hasDiscount" class="text-xs text-muted-foreground line-through">
+                    {{ formatPrice(Number(item.product.price)) }} ₸
+                  </p>
+                </div>
                 <p class="font-bold text-base">
-                  {{ Number(item.product.price) * item.quantity }} ₸
+                  {{ formatPrice(getItemTotal(item)) }} ₸
                 </p>
               </div>
             </div>
@@ -142,9 +163,14 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
               <h3 class="font-semibold">
                 {{ item.product.name }}
               </h3>
-              <p class="text-sm text-muted-foreground">
-                {{ item.product.price }} ₸ / шт.
-              </p>
+              <div class="flex items-center gap-2">
+                <p class="text-sm font-medium">
+                  {{ formatPrice(getItemPrice(item).finalNumber) }} ₸ / шт.
+                </p>
+                <p v-if="getItemPrice(item).hasDiscount" class="text-xs text-muted-foreground line-through">
+                  {{ formatPrice(Number(item.product.price)) }} ₸
+                </p>
+              </div>
             </div>
 
             <!-- Управление количеством и ценой -->
@@ -157,7 +183,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                 @update:model-value="val => cartStore.updateQuantity(item.product.id, Number(val))"
               />
               <p class="font-bold w-24 text-right">
-                {{ Number(item.product.price) * item.quantity }} ₸
+                {{ formatPrice(getItemTotal(item)) }} ₸
               </p>
               <Button
                 variant="ghost"
@@ -178,11 +204,11 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
         </h2>
         <div class="flex justify-between text-sm sm:text-base text-muted-foreground">
           <span>{{ totalItems }} товар(а) на сумму:</span>
-          <span>{{ subtotal }} ₸</span>
+          <span>{{ formatPrice(subtotal) }} ₸</span>
         </div>
         <div class="flex justify-between font-bold text-lg sm:text-xl pt-3 sm:pt-4 border-t">
           <span>К оплате:</span>
-          <span>{{ subtotal }} ₸</span>
+          <span>{{ formatPrice(subtotal) }} ₸</span>
         </div>
         <NuxtLink to="/checkout" class="w-full">
           <Button size="lg" class="w-full">

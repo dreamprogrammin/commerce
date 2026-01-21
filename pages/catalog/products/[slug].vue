@@ -11,7 +11,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import { formatPrice } from '@/utils/formatPrice'
+import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
 
 const route = useRoute()
 const router = useRouter()
@@ -140,13 +140,35 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   return crumbs
 })
 
+// Финальная цена основного товара с учетом скидки
+const mainProductPrice = computed(() => {
+  if (!product.value)
+    return { final: 0, original: 0, hasDiscount: false }
+  const priceData = formatPriceWithDiscount(
+    Number(product.value.price),
+    product.value.discount_percentage,
+  )
+  return {
+    final: priceData.finalNumber,
+    original: Number(product.value.price),
+    hasDiscount: priceData.hasDiscount,
+  }
+})
+
 const totalPrice = computed(() => {
   if (!product.value)
     return 0
-  let total = Number(product.value.price)
+  // Используем финальную цену со скидкой для основного товара
+  let total = mainProductPrice.value.final
+
+  // Добавляем цены выбранных аксессуаров с учетом их скидок
   const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
   for (const acc of selected) {
-    total += Number(acc.price)
+    const accPrice = formatPriceWithDiscount(
+      Number(acc.price),
+      acc.discount_percentage,
+    )
+    total += accPrice.finalNumber
   }
   return total
 })
@@ -189,27 +211,44 @@ const quantityInCart = computed(() => {
   return mainItemInCart.value ? mainItemInCart.value.quantity : 0
 })
 
-function addToCart() {
+async function addToCart() {
   if (!product.value)
     return
 
+  let addedCount = 0
+
+  // Add main product if not in cart
   if (!mainItemInCart.value) {
-    cartStore.addItem(product.value, 1)
+    await cartStore.addItem(product.value, 1)
+    addedCount++
   }
 
   // Add selected accessories to cart
   const selectedAccessories = (accessories.value || []).filter(acc =>
     selectedAccessoryIds.value.includes(acc.id),
   )
+
   for (const acc of selectedAccessories) {
     const accInCart = cartStore.items.find(item => item.product.id === acc.id)
     if (!accInCart) {
-      cartStore.addItem(acc, 1)
+      await cartStore.addItem(acc, 1)
+      addedCount++
     }
   }
 
-  const itemsCount = 1 + selectedAccessories.length
-  toast.success(itemsCount > 1 ? `${itemsCount} товара добавлено в корзину` : 'Товар добавлен в корзину')
+  // Show success message only if we added something
+  if (addedCount > 0) {
+    if (addedCount === 1) {
+      toast.success('Товар добавлен в корзину')
+    }
+    else {
+      toast.success(`${addedCount} товара добавлено в корзину`)
+    }
+  }
+  else if (selectedAccessories.length > 0) {
+    // If we selected accessories but they were already in cart
+    toast.info('Выбранные товары уже в корзине')
+  }
 }
 
 useFlipCounter(totalPrice, digitColumns)
@@ -624,6 +663,16 @@ useHead(() => ({
                 </NuxtLink>
 
                 <div class="mb-6 lg:mb-8">
+                  <!-- Старая цена (зачеркнутая) если есть скидка -->
+                  <div v-if="mainProductPrice.hasDiscount" class="flex items-center gap-2 mb-1">
+                    <span class="text-lg text-muted-foreground line-through">
+                      {{ formatPrice(mainProductPrice.original) }} ₸
+                    </span>
+                    <Badge variant="destructive" class="text-xs">
+                      -{{ product.discount_percentage }}%
+                    </Badge>
+                  </div>
+
                   <!-- Flip Counter Price Animation -->
                   <div class="flex items-baseline gap-1 mb-2">
                     <div class="flex text-3xl lg:text-4xl font-bold text-primary">
