@@ -710,10 +710,8 @@ useHead(() => ({
                     </Button>
                   </div>
                 </ClientOnly>
-              </div>
 
-              <!-- Аксессуары (батарейки и подарочная упаковка) -->
-              <div class="mt-4">
+                <!-- Аксессуары (батарейки и подарочная упаковка) -->
                 <AccessoriesBlock
                   v-model:selected-ids="selectedAccessoryIds"
                   :accessories="accessories || []"
