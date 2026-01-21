@@ -4,7 +4,55 @@ import type { AccessoryProduct } from '@/types'
 const props = defineProps<{
   accessories: AccessoryProduct[]
   loading?: boolean
+  selectedIds?: string[]
 }>()
+
+const emit = defineEmits<{
+  'update:selectedIds': [ids: string[]]
+}>()
+
+// Use local state that syncs with v-model
+const localSelectedIds = computed({
+  get: () => props.selectedIds || [],
+  set: (value: string[]) => emit('update:selectedIds', value),
+})
+
+function toggleAccessory(id: string) {
+  const current = [...localSelectedIds.value]
+  const index = current.indexOf(id)
+  if (index === -1) {
+    current.push(id)
+  }
+  else {
+    current.splice(index, 1)
+  }
+  localSelectedIds.value = current
+}
+
+function isSelected(id: string) {
+  return localSelectedIds.value.includes(id)
+}
+
+// Count selected items per category
+const selectedBatteriesCount = computed(() =>
+  props.accessories.filter(acc =>
+    acc.categories?.slug === 'batteries' && localSelectedIds.value.includes(acc.id),
+  ).length,
+)
+
+const selectedGiftWrappingCount = computed(() =>
+  props.accessories.filter(acc =>
+    acc.categories?.slug === 'gift-wrapping' && localSelectedIds.value.includes(acc.id),
+  ).length,
+)
+
+const selectedOtherCount = computed(() =>
+  props.accessories.filter(acc =>
+    acc.categories?.slug !== 'batteries'
+    && acc.categories?.slug !== 'gift-wrapping'
+    && localSelectedIds.value.includes(acc.id),
+  ).length,
+)
 
 const isMobile = ref(false)
 const isModalOpen = ref(false)
@@ -118,9 +166,16 @@ function closeAll() {
       <!-- Batteries card -->
       <button
         v-if="hasBatteries"
-        class="flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
+        class="relative flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
+        :class="{ 'border-primary bg-primary/5': selectedBatteriesCount > 0 }"
         @click="openAccessories('batteries')"
       >
+        <Badge
+          v-if="selectedBatteriesCount > 0"
+          class="absolute -top-2 -right-2 bg-primary text-white"
+        >
+          {{ selectedBatteriesCount }}
+        </Badge>
         <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mb-3 group-hover:bg-amber-100 transition-colors">
           <Icon name="mdi:battery" class="w-7 h-7 text-amber-600" />
         </div>
@@ -131,9 +186,16 @@ function closeAll() {
       <!-- Gift wrapping card -->
       <button
         v-if="hasGiftWrapping"
-        class="flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
+        class="relative flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
+        :class="{ 'border-primary bg-primary/5': selectedGiftWrappingCount > 0 }"
         @click="openAccessories('gift-wrapping')"
       >
+        <Badge
+          v-if="selectedGiftWrappingCount > 0"
+          class="absolute -top-2 -right-2 bg-primary text-white"
+        >
+          {{ selectedGiftWrappingCount }}
+        </Badge>
         <div class="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center mb-3 group-hover:bg-pink-100 transition-colors">
           <Icon name="mdi:gift" class="w-7 h-7 text-pink-600" />
         </div>
@@ -144,9 +206,16 @@ function closeAll() {
       <!-- Other accessories card -->
       <button
         v-if="hasOther"
-        class="flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
+        class="relative flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
+        :class="{ 'border-primary bg-primary/5': selectedOtherCount > 0 }"
         @click="openAccessories('other')"
       >
+        <Badge
+          v-if="selectedOtherCount > 0"
+          class="absolute -top-2 -right-2 bg-primary text-white"
+        >
+          {{ selectedOtherCount }}
+        </Badge>
         <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3 group-hover:bg-blue-100 transition-colors">
           <Icon name="lucide:package" class="w-7 h-7 text-blue-600" />
         </div>
@@ -175,6 +244,8 @@ function closeAll() {
         <div class="py-4">
           <AccessoriesCarousel
             :accessories="currentAccessories"
+            :is-selected="isSelected"
+            @toggle="toggleAccessory"
             @close="closeAll"
           />
         </div>
@@ -201,6 +272,8 @@ function closeAll() {
         <div class="px-4 pb-6 overflow-y-auto">
           <AccessoriesCarousel
             :accessories="currentAccessories"
+            :is-selected="isSelected"
+            @toggle="toggleAccessory"
             @close="closeAll"
           />
         </div>

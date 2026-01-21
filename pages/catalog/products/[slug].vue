@@ -24,6 +24,9 @@ const { getImageUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
 
+// Selected accessories for adding to cart together with main product
+const selectedAccessoryIds = ref<string[]>([])
+
 const similarProductsRef = ref<HTMLElement | null>(null)
 const showStickyPanel = ref(true)
 const isDescriptionExpanded = ref(false)
@@ -140,13 +143,23 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
 const totalPrice = computed(() => {
   if (!product.value)
     return 0
-  return Number(product.value.price)
+  let total = Number(product.value.price)
+  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  for (const acc of selected) {
+    total += Number(acc.price)
+  }
+  return total
 })
 
 const totalBonuses = computed(() => {
   if (!product.value)
     return 0
-  return Number(product.value.bonus_points_award)
+  let total = Number(product.value.bonus_points_award || 0)
+  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  for (const acc of selected) {
+    total += Number(acc.bonus_points_award || 0)
+  }
+  return total
 })
 
 const mainItemInCart = computed(() => {
@@ -165,8 +178,21 @@ function addToCart() {
 
   if (!mainItemInCart.value) {
     cartStore.addItem(product.value, 1)
-    toast.success('Товар добавлен в корзину')
   }
+
+  // Add selected accessories to cart
+  const selectedAccessories = (accessories.value || []).filter(acc =>
+    selectedAccessoryIds.value.includes(acc.id),
+  )
+  for (const acc of selectedAccessories) {
+    const accInCart = cartStore.items.find(item => item.product.id === acc.id)
+    if (!accInCart) {
+      cartStore.addItem(acc, 1)
+    }
+  }
+
+  const itemsCount = 1 + selectedAccessories.length
+  toast.success(itemsCount > 1 ? `${itemsCount} товара добавлено в корзину` : 'Товар добавлен в корзину')
 }
 
 useFlipCounter(totalPrice, digitColumns)
@@ -650,6 +676,7 @@ useHead(() => ({
 
               <!-- Аксессуары (батарейки и подарочная упаковка) -->
               <AccessoriesBlock
+                v-model:selected-ids="selectedAccessoryIds"
                 :accessories="accessories || []"
                 :loading="accessoriesLoading"
               />

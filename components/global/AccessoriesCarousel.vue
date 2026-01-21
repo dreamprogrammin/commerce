@@ -3,37 +3,24 @@ import type { AccessoryProduct } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
-import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
 
 defineProps<{
   accessories: AccessoryProduct[]
+  isSelected: (id: string) => boolean
 }>()
 
 const emit = defineEmits<{
   close: []
+  toggle: [id: string]
 }>()
 
-const cartStore = useCartStore()
 const { getImageUrl } = useSupabaseStorage()
 
 function getAccessoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
-}
-
-function isInCart(accessoryId: string) {
-  return cartStore.items.some(item => item.product.id === accessoryId)
-}
-
-function getQuantityInCart(accessoryId: string) {
-  const item = cartStore.items.find(item => item.product.id === accessoryId)
-  return item ? item.quantity : 0
-}
-
-function addToCart(accessory: AccessoryProduct) {
-  cartStore.addItem(accessory, 1)
 }
 </script>
 
@@ -56,10 +43,35 @@ function addToCart(accessory: AccessoryProduct) {
         :key="accessory.id"
         class="pl-2 md:pl-4 basis-[80%] sm:basis-1/2 lg:basis-1/3"
       >
-        <div class="bg-white border rounded-xl overflow-hidden h-full flex flex-col">
-          <!-- Image -->
+        <div
+          class="bg-white border rounded-xl overflow-hidden h-full flex flex-col cursor-pointer transition-all"
+          :class="{
+            'border-primary ring-2 ring-primary/20 bg-primary/5': isSelected(accessory.id),
+            'hover:border-gray-300': !isSelected(accessory.id),
+          }"
+          @click="emit('toggle', accessory.id)"
+        >
+          <!-- Image with checkbox overlay -->
           <div class="relative bg-gray-50 aspect-square overflow-hidden">
-            <NuxtLink :to="`/catalog/products/${accessory.slug}`" @click="emit('close')">
+            <!-- Checkbox in corner -->
+            <div class="absolute top-2 right-2 z-10" @click.stop>
+              <Checkbox
+                :checked="isSelected(accessory.id)"
+                class="h-5 w-5 border-2 bg-white shadow-sm"
+                @update:checked="emit('toggle', accessory.id)"
+              />
+            </div>
+
+            <!-- Selected overlay -->
+            <div
+              v-if="isSelected(accessory.id)"
+              class="absolute inset-0 bg-primary/10 pointer-events-none"
+            />
+
+            <NuxtLink
+              :to="`/catalog/products/${accessory.slug}`"
+              @click.stop="emit('close')"
+            >
               <ProgressiveImage
                 v-if="accessory.product_images?.[0]?.image_url"
                 :src="getAccessoryImageUrl(accessory.product_images[0].image_url)"
@@ -83,7 +95,7 @@ function addToCart(accessory: AccessoryProduct) {
             <NuxtLink
               :to="`/catalog/products/${accessory.slug}`"
               class="font-medium text-sm line-clamp-2 hover:text-primary transition-colors mb-2"
-              @click="emit('close')"
+              @click.stop="emit('close')"
             >
               {{ accessory.name }}
             </NuxtLink>
@@ -93,8 +105,8 @@ function addToCart(accessory: AccessoryProduct) {
             </p>
 
             <div class="mt-auto space-y-2">
-              <p class="text-lg font-bold text-primary">
-                {{ formatPrice(accessory.price) }} ₸
+              <p class="text-lg font-bold" :class="isSelected(accessory.id) ? 'text-primary' : ''">
+                + {{ formatPrice(accessory.price) }} ₸
               </p>
 
               <!-- Bonus points -->
@@ -107,35 +119,10 @@ function addToCart(accessory: AccessoryProduct) {
                 +{{ accessory.bonus_points_award }} бонусов
               </Badge>
 
-              <!-- Add to cart button -->
-              <ClientOnly>
-                <Button
-                  v-if="!isInCart(accessory.id)"
-                  size="sm"
-                  class="w-full"
-                  :disabled="!accessory.stock_quantity || accessory.stock_quantity <= 0"
-                  @click="addToCart(accessory)"
-                >
-                  <Icon name="lucide:plus" class="w-4 h-4 mr-1" />
-                  <span v-if="accessory.stock_quantity && accessory.stock_quantity > 0">
-                    В корзину
-                  </span>
-                  <span v-else>
-                    Нет в наличии
-                  </span>
-                </Button>
-
-                <QuantitySelector
-                  v-else
-                  :product="accessory"
-                  :quantity="getQuantityInCart(accessory.id)"
-                  size="sm"
-                />
-
-                <template #fallback>
-                  <div class="h-8 bg-muted rounded animate-pulse" />
-                </template>
-              </ClientOnly>
+              <!-- Stock info -->
+              <p v-if="!accessory.stock_quantity || accessory.stock_quantity <= 0" class="text-xs text-destructive">
+                Нет в наличии
+              </p>
             </div>
           </div>
         </div>
