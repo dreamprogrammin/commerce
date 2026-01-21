@@ -11,7 +11,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  close: []
   toggle: [id: string]
 }>()
 
@@ -55,54 +54,43 @@ function isSelected(id: string) {
           }"
           @click="emit('toggle', accessory.id)"
         >
-          <!-- Image with checkbox overlay -->
+          <!-- Image with selection overlay -->
           <div class="relative bg-gray-50 aspect-square overflow-hidden">
-            <!-- Checkbox in corner -->
-            <div class="absolute top-2 right-2 z-10" @click.stop>
-              <Checkbox
-                :model-value="isSelected(accessory.id)"
-                class="h-5 w-5 border-2 bg-white shadow-sm"
-                @update:model-value="emit('toggle', accessory.id)"
-              />
-            </div>
+            <!-- Hidden checkbox for functionality -->
+            <Checkbox
+              :model-value="isSelected(accessory.id)"
+              class="hidden"
+              @update:model-value="emit('toggle', accessory.id)"
+            />
 
             <!-- Selected overlay -->
             <div
               v-if="isSelected(accessory.id)"
-              class="absolute inset-0 bg-primary/10 pointer-events-none"
+              class="absolute inset-0 bg-primary/10 pointer-events-none z-10"
             />
 
-            <NuxtLink
-              :to="`/catalog/products/${accessory.slug}`"
-              @click.stop="emit('close')"
+            <ProgressiveImage
+              v-if="accessory.product_images?.[0]?.image_url"
+              :src="getAccessoryImageUrl(accessory.product_images[0].image_url)"
+              :alt="accessory.name"
+              aspect-ratio="square"
+              object-fit="cover"
+              placeholder-type="lqip"
+              :blur-data-url="accessory.product_images[0].blur_placeholder"
+            />
+            <div
+              v-else
+              class="w-full h-full flex items-center justify-center text-muted-foreground"
             >
-              <ProgressiveImage
-                v-if="accessory.product_images?.[0]?.image_url"
-                :src="getAccessoryImageUrl(accessory.product_images[0].image_url)"
-                :alt="accessory.name"
-                aspect-ratio="square"
-                object-fit="cover"
-                placeholder-type="lqip"
-                :blur-data-url="accessory.product_images[0].blur_placeholder"
-              />
-              <div
-                v-else
-                class="w-full h-full flex items-center justify-center text-muted-foreground"
-              >
-                <Icon name="lucide:image-off" class="w-8 h-8" />
-              </div>
-            </NuxtLink>
+              <Icon name="lucide:image-off" class="w-8 h-8" />
+            </div>
           </div>
 
           <!-- Info -->
           <div class="p-3 flex-grow flex flex-col">
-            <NuxtLink
-              :to="`/catalog/products/${accessory.slug}`"
-              class="font-medium text-sm line-clamp-2 hover:text-primary transition-colors mb-2"
-              @click.stop="emit('close')"
-            >
+            <h3 class="font-medium text-sm line-clamp-2 mb-2">
               {{ accessory.name }}
-            </NuxtLink>
+            </h3>
 
             <p v-if="accessory.description" class="text-xs text-muted-foreground line-clamp-2 mb-3">
               {{ accessory.description }}
