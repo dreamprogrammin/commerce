@@ -408,18 +408,24 @@ async function processFiles(files: File[]) {
 
 // Установка главной картинки для существующих изображений
 function setPrimaryExistingImage(index: number) {
-  if (index === 0)
-    return // Уже первая
-  const [image] = existingImages.value.splice(index, 1)
+  if (index === 0) return // Уже первая
+  
+  const image = existingImages.value[index]
+  if (!image) return // Проверка на существование
+  
+  existingImages.value.splice(index, 1)
   existingImages.value.unshift(image)
   toast.success('Главная картинка установлена')
 }
 
 // Установка главной картинки для новых изображений
 function setPrimaryNewImage(index: number) {
-  if (index === 0)
-    return // Уже первая
-  const [image] = newImageFiles.value.splice(index, 1)
+  if (index === 0) return // Уже первая
+  
+  const image = newImageFiles.value[index]
+  if (!image) return // Проверка на существование
+  
+  newImageFiles.value.splice(index, 1)
   newImageFiles.value.unshift(image)
   toast.success('Главная картинка установлена')
 }
