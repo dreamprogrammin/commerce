@@ -162,6 +162,23 @@ const totalBonuses = computed(() => {
   return total
 })
 
+// For flip animation: map formatted price chars to digit indices
+const priceChars = computed(() => {
+  const formatted = formatPrice(totalPrice.value)
+  let digitIndex = 0
+  return formatted.split('').map((char) => {
+    const isDigit = !Number.isNaN(Number(char)) && char !== ' '
+    const result = {
+      char,
+      isDigit,
+      digitIndex: isDigit ? digitIndex : -1,
+    }
+    if (isDigit)
+      digitIndex++
+    return result
+  })
+})
+
 const mainItemInCart = computed(() => {
   if (!product.value)
     return undefined
@@ -605,10 +622,27 @@ useHead(() => ({
                 </NuxtLink>
 
                 <div class="mb-6 lg:mb-8">
-                  <div class="flex items-baseline gap-3 mb-2">
-                    <p class="text-3xl lg:text-4xl font-bold text-primary transition-all duration-300">
-                      {{ formatPrice(totalPrice) }} ₸
-                    </p>
+                  <!-- Flip Counter Price Animation -->
+                  <div class="flex items-baseline gap-1 mb-2">
+                    <div class="flex text-3xl lg:text-4xl font-bold text-primary">
+                      <template v-for="(item, index) in priceChars" :key="index">
+                        <!-- Space separator -->
+                        <span v-if="item.char === ' '" class="w-2" />
+                        <!-- Digit with flip animation -->
+                        <div
+                          v-else-if="item.isDigit"
+                          :ref="el => { if (el) digitColumns[item.digitIndex] = el as HTMLElement }"
+                          class="digit-column"
+                        >
+                          <div class="digit-ribbon">
+                            <div v-for="d in 10" :key="d" class="digit-item">
+                              {{ d - 1 }}
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                    <span class="text-3xl lg:text-4xl font-bold text-primary ml-1">₸</span>
                   </div>
 
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium">
