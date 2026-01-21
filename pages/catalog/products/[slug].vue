@@ -591,7 +591,10 @@ useHead(() => ({
 
             <!-- Правая колонка: Информация о товаре -->
             <div class="lg:col-span-5">
-              <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border sticky top-4">
+              <div 
+                class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
+                :class="{ 'lg:sticky lg:top-4': !accessories?.length }"
+              >
                 <h1 class="text-xl lg:text-2xl font-bold mb-2 leading-tight">
                   {{ product.name }}
                 </h1>
@@ -715,6 +718,7 @@ useHead(() => ({
                 v-model:selected-ids="selectedAccessoryIds"
                 :accessories="accessories || []"
                 :loading="accessoriesLoading"
+                class="mt-4"
               />
             </div>
           </div>
