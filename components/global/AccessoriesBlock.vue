@@ -4,21 +4,13 @@ import type { AccessoryProduct } from '@/types'
 const props = defineProps<{
   accessories: AccessoryProduct[]
   loading?: boolean
-  selectedIds?: string[]
 }>()
 
-const emit = defineEmits<{
-  'update:selectedIds': [ids: string[]]
-}>()
-
-// Use local state that syncs with v-model
-const localSelectedIds = computed({
-  get: () => props.selectedIds || [],
-  set: (value: string[]) => emit('update:selectedIds', value),
-})
+// Use defineModel for proper two-way binding
+const selectedIds = defineModel<string[]>('selectedIds', { default: () => [] })
 
 function toggleAccessory(id: string) {
-  const current = [...localSelectedIds.value]
+  const current = [...selectedIds.value]
   const index = current.indexOf(id)
   if (index === -1) {
     current.push(id)
@@ -26,19 +18,19 @@ function toggleAccessory(id: string) {
   else {
     current.splice(index, 1)
   }
-  localSelectedIds.value = current
+  selectedIds.value = current
 }
 
 // Count selected items per category
 const selectedBatteriesCount = computed(() =>
   props.accessories.filter(acc =>
-    acc.categories?.slug === 'batteries' && localSelectedIds.value.includes(acc.id),
+    acc.categories?.slug === 'batteries' && selectedIds.value.includes(acc.id),
   ).length,
 )
 
 const selectedGiftWrappingCount = computed(() =>
   props.accessories.filter(acc =>
-    acc.categories?.slug === 'gift-wrapping' && localSelectedIds.value.includes(acc.id),
+    acc.categories?.slug === 'gift-wrapping' && selectedIds.value.includes(acc.id),
   ).length,
 )
 
@@ -46,7 +38,7 @@ const selectedOtherCount = computed(() =>
   props.accessories.filter(acc =>
     acc.categories?.slug !== 'batteries'
     && acc.categories?.slug !== 'gift-wrapping'
-    && localSelectedIds.value.includes(acc.id),
+    && selectedIds.value.includes(acc.id),
   ).length,
 )
 
@@ -240,7 +232,7 @@ function closeAll() {
         <div class="py-4">
           <AccessoriesCarousel
             :accessories="currentAccessories"
-            :selected-ids="localSelectedIds"
+            :selected-ids="selectedIds"
             @toggle="toggleAccessory"
             @close="closeAll"
           />
@@ -268,7 +260,7 @@ function closeAll() {
         <div class="px-4 pb-6 overflow-y-auto">
           <AccessoriesCarousel
             :accessories="currentAccessories"
-            :selected-ids="localSelectedIds"
+            :selected-ids="selectedIds"
             @toggle="toggleAccessory"
             @close="closeAll"
           />

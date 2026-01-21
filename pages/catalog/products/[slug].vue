@@ -605,27 +605,10 @@ useHead(() => ({
                 </NuxtLink>
 
                 <div class="mb-6 lg:mb-8">
-                  <!-- Flip Counter Price Animation -->
-                  <div class="flex items-baseline gap-1 mb-2">
-                    <div class="flex text-3xl lg:text-4xl font-bold text-primary">
-                      <template v-for="(char, index) in formatPrice(totalPrice).split('')" :key="index">
-                        <!-- Space or separator -->
-                        <span v-if="char === ' '" class="w-2" />
-                        <!-- Digit with flip animation -->
-                        <div
-                          v-else
-                          :ref="el => { if (el && !isNaN(Number(char))) digitColumns[index] = el as HTMLElement }"
-                          class="digit-column"
-                        >
-                          <div class="digit-ribbon">
-                            <div v-for="d in 10" :key="d" class="digit-item">
-                              {{ d - 1 }}
-                            </div>
-                          </div>
-                        </div>
-                      </template>
-                    </div>
-                    <span class="text-3xl lg:text-4xl font-bold text-primary ml-1">₸</span>
+                  <div class="flex items-baseline gap-3 mb-2">
+                    <p class="text-3xl lg:text-4xl font-bold text-primary transition-all duration-300">
+                      {{ formatPrice(totalPrice) }} ₸
+                    </p>
                   </div>
 
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium">
