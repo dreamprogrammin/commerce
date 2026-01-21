@@ -224,6 +224,8 @@ const quantity = ref(1)
 
 watch(() => product.value?.id, () => {
   quantity.value = 1
+  selectedAccessoryIds.value = []
+  digitColumns.value = []
 }, { immediate: true })
 
 function prefetchProduct(productSlug: string) {
@@ -603,10 +605,27 @@ useHead(() => ({
                 </NuxtLink>
 
                 <div class="mb-6 lg:mb-8">
-                  <div class="flex items-baseline gap-3 mb-2">
-                    <p class="text-3xl lg:text-4xl font-bold text-primary">
-                      {{ formatPrice(totalPrice) }} ₸
-                    </p>
+                  <!-- Flip Counter Price Animation -->
+                  <div class="flex items-baseline gap-1 mb-2">
+                    <div class="flex text-3xl lg:text-4xl font-bold text-primary">
+                      <template v-for="(char, index) in formatPrice(totalPrice).split('')" :key="index">
+                        <!-- Space or separator -->
+                        <span v-if="char === ' '" class="w-2" />
+                        <!-- Digit with flip animation -->
+                        <div
+                          v-else
+                          :ref="el => { if (el && !isNaN(Number(char))) digitColumns[index] = el as HTMLElement }"
+                          class="digit-column"
+                        >
+                          <div class="digit-ribbon">
+                            <div v-for="d in 10" :key="d" class="digit-item">
+                              {{ d - 1 }}
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                    <span class="text-3xl lg:text-4xl font-bold text-primary ml-1">₸</span>
                   </div>
 
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium">
@@ -1036,11 +1055,11 @@ useHead(() => ({
 }
 
 .digit-column {
-  height: 1.75rem;
-  line-height: 1.75rem;
+  height: 2.25rem; /* text-3xl = 1.875rem, but we need line height */
+  line-height: 2.25rem;
   overflow: hidden;
   position: relative;
-  width: 1.125rem;
+  width: 1.25rem;
   text-align: center;
   border-radius: 0.25rem;
   transition: background-color 0.3s ease;
@@ -1048,8 +1067,8 @@ useHead(() => ({
 
 @media (min-width: 1024px) {
   .digit-column {
-    height: 2.5rem;
-    line-height: 2.5rem;
+    height: 2.75rem; /* text-4xl = 2.25rem */
+    line-height: 2.75rem;
     width: 1.5rem;
   }
 }
@@ -1060,14 +1079,14 @@ useHead(() => ({
 }
 
 .digit-item {
-  height: 1.75rem;
-  line-height: 1.75rem;
+  height: 2.25rem;
+  line-height: 2.25rem;
 }
 
 @media (min-width: 1024px) {
   .digit-item {
-    height: 2.5rem;
-    line-height: 2.5rem;
+    height: 2.75rem;
+    line-height: 2.75rem;
   }
 }
 </style>

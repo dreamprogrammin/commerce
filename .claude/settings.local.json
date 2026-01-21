@@ -48,7 +48,9 @@
       "WebFetch(domain:www.google.com)",
       "Bash(pnpm vue-tsc:*)",
       "Bash(pnpm nuxi typecheck:*)",
-      "Bash(PGPASSWORD=postgres psql:*)"
+      "Bash(PGPASSWORD=postgres psql:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
     ]
   }
 }
