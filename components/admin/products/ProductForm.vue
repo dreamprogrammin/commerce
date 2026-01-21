@@ -99,6 +99,7 @@ const isSearchingAccessories = ref(false)
 const brandSearchQuery = ref('')
 const fileInputKey = ref(0)
 const isSlugManuallyEdited = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 // 🎯 Информация об оптимизации
 const optimizationInfo = computed(() => getOptimizationInfo())
@@ -1089,7 +1090,7 @@ const seoKeywordsString = computed({
             @dragover="onDragOver"
             @dragleave="onDragLeave"
             @drop="onDrop"
-            @click="$refs.fileInput?.click()"
+            @click="fileInput?.click()"
           >
             <div class="flex flex-col items-center gap-2">
               <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
@@ -1105,6 +1106,7 @@ const seoKeywordsString = computed({
               </div>
             </div>
             <input
+              :key="fileInputKey"
               ref="fileInput"
               type="file"
               multiple
