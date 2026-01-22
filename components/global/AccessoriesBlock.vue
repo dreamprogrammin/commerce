@@ -242,7 +242,7 @@ function closeAll() {
 
     <!-- Mobile Drawer -->
     <Drawer v-model:open="isDrawerOpen">
-      <DrawerContent class="max-h-[85vh]">
+      <DrawerContent class="max-h-[65vh]">
         <DrawerHeader class="text-left">
           <DrawerTitle class="flex items-center gap-2">
             <Icon
