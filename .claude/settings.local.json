@@ -50,7 +50,8 @@
       "Bash(pnpm nuxi typecheck:*)",
       "Bash(PGPASSWORD=postgres psql:*)",
       "Bash(git log:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(pnpm typecheck:*)"
     ]
   }
 }

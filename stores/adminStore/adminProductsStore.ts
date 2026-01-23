@@ -267,7 +267,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         throw error
 
       // 🎯 Управляем картинками с blur (🔍 SEO: передаём имя товара для названия файлов)
-      await _manageProductImages(newProduct.id, newProduct.name, newImageFiles, [], 0)
+      await _manageProductImages(newProduct.id, newProduct.name, newImageFiles, [], 0, [])
 
       // 🔍 SEO: Уведомляем поисковики о новом товаре
       if (newProduct.slug) {
@@ -309,7 +309,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         throw error
 
       // 🎯 Управляем картинками с blur (🔍 SEO: передаём имя товара для названия файлов)
-      await _manageProductImages(productId, updatedProduct.name, newImageFiles, imagesToDelete, existingImages.length)
+      await _manageProductImages(productId, updatedProduct.name, newImageFiles, imagesToDelete, existingImages.length, existingImages)
 
       // 🔍 SEO: Уведомляем поисковики об обновлённом товаре
       if (updatedProduct.slug) {
@@ -389,6 +389,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     imagesToUpload: ImageWithBlur[], // 🎯 Изменено: принимаем blur
     imageIdsToDelete: string[],
     currentImageCount: number,
+    existingImages: ProductImageRow[] = [], // 🆕 Добавлен параметр для обновления порядка
   ) {
     // 1️⃣ Удаляем отмеченные изображения
     if (imageIdsToDelete.length > 0) {
@@ -405,7 +406,21 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
     }
 
-    // 2️⃣ Обрабатываем и загружаем новые изображения
+    // 🆕 2️⃣ Обновляем display_order для существующих изображений
+    if (existingImages.length > 0) {
+      for (let i = 0; i < existingImages.length; i++) {
+        const { error: updateError } = await supabase
+          .from('product_images')
+          .update({ display_order: i })
+          .eq('id', existingImages[i].id)
+
+        if (updateError) {
+          console.error(`❌ Ошибка обновления порядка изображения ${existingImages[i].id}:`, updateError)
+        }
+      }
+    }
+
+    // 3️⃣ Обрабатываем и загружаем новые изображения
     if (imagesToUpload.length > 0) {
       for (let i = 0; i < imagesToUpload.length; i++) {
         const { file, blurDataUrl } = imagesToUpload[i]
@@ -441,7 +456,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           }
         }
 
-        // 3️⃣ Загружаем файл в Storage (🔍 SEO: имя файла содержит название товара)
+        // 4️⃣ Загружаем файл в Storage (🔍 SEO: имя файла содержит название товара)
         const filePath = await uploadFile(fileToUpload, {
           bucketName: BUCKET_NAME_PRODUCT,
           filePathPrefix: `products/${productId}`,
@@ -453,13 +468,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           continue
         }
 
-        // 4️⃣ Сохраняем в БД С blur_placeholder
+        // 5️⃣ Сохраняем в БД С blur_placeholder
         const { error: imageError } = await supabase
           .from('product_images')
           .insert({
             product_id: productId,
             image_url: filePath,
-            display_order: currentImageCount + i,
+            display_order: existingImages.length + i, // 🎯 ИСПРАВЛЕНО: используем existingImages.length
             blur_placeholder: finalBlur || null, // 🎯 СОХРАНЯЕМ BLUR
           })
 

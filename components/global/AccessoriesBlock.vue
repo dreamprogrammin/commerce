@@ -90,33 +90,39 @@ function close() {
     </h3>
 
     <!-- Skeleton -->
-    <div v-if="loading" class="grid grid-cols-3 gap-2">
-      <div v-for="i in 3" :key="i" class="flex flex-col items-center p-3 rounded-lg border animate-pulse">
-        <div class="w-10 h-10 bg-muted rounded-full mb-2" />
-        <div class="h-3 bg-muted rounded w-14" />
+    <div v-if="loading" class="grid grid-cols-1 gap-2">
+      <div v-for="i in 3" :key="i" class="flex items-center p-3 rounded-lg border animate-pulse gap-3">
+        <div class="w-12 h-12 bg-muted rounded-full flex-shrink-0" />
+        <div class="flex-1">
+          <div class="h-4 bg-muted rounded w-24 mb-1" />
+          <div class="h-3 bg-muted rounded w-16" />
+        </div>
       </div>
     </div>
 
     <!-- Category buttons -->
-    <div v-else class="grid grid-cols-3 gap-2">
+    <div v-else class="grid grid-cols-1 gap-2">
       <button
         v-for="key in availableCategories"
         :key="key"
-        class="relative flex flex-col items-center p-3 rounded-lg border transition-all active:scale-95"
+        class="relative flex items-center p-3 rounded-lg border transition-all active:scale-[0.98] gap-3"
         :class="selectedCount[key] > 0 ? 'border-primary bg-primary/5' : 'hover:border-primary/50'"
         @click="openCategory(key)"
       >
         <Badge
           v-if="selectedCount[key] > 0"
-          class="absolute -top-1.5 -right-1.5 h-5 w-5 p-0 flex items-center justify-center text-xs"
+          class="absolute -top-1.5 -right-1.5 h-6 w-6 p-0 flex items-center justify-center text-xs"
         >
           {{ selectedCount[key] }}
         </Badge>
-        <div class="w-10 h-10 rounded-full flex items-center justify-center mb-1.5" :class="categories[key].bg">
-          <Icon :name="categories[key].icon" class="w-5 h-5" :class="categories[key].text" />
+        <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" :class="categories[key].bg">
+          <Icon :name="categories[key].icon" class="w-6 h-6" :class="categories[key].text" />
         </div>
-        <span class="text-xs font-medium text-center leading-tight">{{ categories[key].title }}</span>
-        <span class="text-[10px] text-muted-foreground">{{ groupedAccessories[key].length }} шт</span>
+        <div class="flex-1 text-left">
+          <div class="text-sm font-semibold">{{ categories[key].title }}</div>
+          <div class="text-xs text-muted-foreground">{{ groupedAccessories[key].length }} товаров</div>
+        </div>
+        <Icon name="lucide:chevron-right" class="w-5 h-5 text-muted-foreground flex-shrink-0" />
       </button>
     </div>
 
@@ -141,7 +147,7 @@ function close() {
 
     <!-- Mobile Drawer -->
     <Drawer v-else v-model:open="isOpen">
-      <DrawerContent class="max-h-[65vh]">
+      <DrawerContent class="max-h-[45vh]">
         <DrawerHeader class="text-left pb-2">
           <DrawerTitle v-if="currentConfig" class="flex items-center gap-2 text-base">
             <Icon :name="currentConfig.icon" class="w-5 h-5" :class="currentConfig.text" />

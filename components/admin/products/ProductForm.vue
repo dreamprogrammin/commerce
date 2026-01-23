@@ -139,7 +139,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       seo_description: product.seo_description || null,
       seo_keywords: product.seo_keywords || null,
     }
-    existingImages.value = [...(product.product_images || [])]
+    // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
+    existingImages.value = [...(product.product_images || [])].sort((a, b) => a.display_order - b.display_order)
 
     if (product.accessory_ids && product.accessory_ids.length > 0) {
       productStore.fetchProductsByIds(product.accessory_ids).then(data => linkedAccessories.value = data)
