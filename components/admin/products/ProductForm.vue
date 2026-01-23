@@ -1087,46 +1087,39 @@ const seoKeywordsString = computed({
 
       <!-- 🖼️ Галерея изображений -->
       <Card>
-        <CardHeader>
-          <CardTitle>Галерея изображений</CardTitle>
-          <CardDescription>
-            <div class="flex items-center gap-2 mt-1">
-              <span class="text-sm">
-                {{ optimizationInfo.icon }} {{ optimizationInfo.name }}
-              </span>
-            </div>
-            <p class="text-xs text-muted-foreground mt-1">
-              {{ optimizationInfo.description }}
-            </p>
-            <p class="text-xs font-medium text-primary mt-2">
-              ⭐ Первое изображение в списке будет главным (для анонса)
-            </p>
-          </CardDescription>
+        <CardHeader class="pb-3">
+          <CardTitle class="flex items-center gap-2">
+            <Icon name="lucide:images" class="w-5 h-5" />
+            Фото товара
+          </CardTitle>
         </CardHeader>
         <CardContent class="space-y-4">
-          <!-- 🎯 Drag & Drop зона -->
+          <!-- 🎯 Кнопка загрузки (мобильный) + Drag & Drop (десктоп) -->
           <div
-            class="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer"
+            class="border-2 border-dashed rounded-xl p-4 sm:p-6 text-center transition-colors cursor-pointer active:scale-[0.98]"
             :class="[
               isDraggingOver
                 ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-primary/50',
+                : 'border-muted-foreground/25 hover:border-primary/50 active:border-primary',
             ]"
             @dragover="onDragOver"
             @dragleave="onDragLeave"
             @drop="onDrop"
             @click="fileInput?.click()"
           >
-            <div class="flex flex-col items-center gap-2">
-              <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                <Icon name="lucide:image-plus" class="w-6 h-6 text-muted-foreground" />
+            <div class="flex flex-col items-center gap-3">
+              <div class="w-14 h-14 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Icon name="lucide:camera" class="w-7 h-7 sm:w-6 sm:h-6 text-primary" />
               </div>
-              <div>
-                <p class="font-medium text-sm">
-                  Перетащите изображения сюда
+              <div class="space-y-1">
+                <p class="font-semibold text-base sm:text-sm">
+                  Добавить фото
                 </p>
-                <p class="text-xs text-muted-foreground">
-                  или нажмите для выбора файлов
+                <p class="text-xs text-muted-foreground hidden sm:block">
+                  Перетащите или нажмите для выбора
+                </p>
+                <p class="text-xs text-muted-foreground sm:hidden">
+                  Нажмите для выбора из галереи
                 </p>
               </div>
             </div>
@@ -1136,6 +1129,7 @@ const seoKeywordsString = computed({
               type="file"
               multiple
               accept="image/*"
+              capture="environment"
               class="hidden"
               :disabled="isProcessingImages"
               @change="handleFilesChange"
@@ -1143,21 +1137,24 @@ const seoKeywordsString = computed({
           </div>
 
           <!-- ⏳ Индикатор загрузки -->
-          <div v-if="isProcessingImages" class="flex items-center justify-center gap-2 py-4">
-            <div class="w-5 h-5 border-2 border-muted-foreground border-t-primary rounded-full animate-spin" />
-            <span class="text-sm text-muted-foreground">{{ optimizationInfo.icon }} Обработка изображений...</span>
+          <div v-if="isProcessingImages" class="flex items-center justify-center gap-3 py-6 bg-muted/30 rounded-xl">
+            <div class="w-6 h-6 border-2 border-muted-foreground border-t-primary rounded-full animate-spin" />
+            <span class="text-sm font-medium">Обработка...</span>
           </div>
 
           <!-- 📊 Счётчик изображений -->
-          <div v-if="existingImages.length > 0 || newImageFiles.length > 0" class="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-            <div class="flex items-center gap-2">
+          <div v-if="existingImages.length > 0 || newImageFiles.length > 0" class="flex flex-wrap items-center justify-center gap-2 p-3 bg-muted/50 rounded-xl">
+            <div class="flex items-center gap-1.5 px-3 py-1.5 bg-background rounded-lg">
               <Icon name="lucide:images" class="w-4 h-4 text-muted-foreground" />
-              <span class="text-sm font-medium">
-                Всего изображений: {{ existingImages.length + newImageFiles.length }}
-              </span>
+              <span class="text-sm font-semibold">{{ existingImages.length + newImageFiles.length }}</span>
             </div>
-            <div class="text-xs text-muted-foreground">
-              Текущих: {{ existingImages.length }} | Новых: {{ newImageFiles.length }}
+            <div v-if="existingImages.length > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <Icon name="lucide:check-circle" class="w-4 h-4 text-green-600" />
+              <span class="text-sm text-green-700 dark:text-green-400">{{ existingImages.length }}</span>
+            </div>
+            <div v-if="newImageFiles.length > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Icon name="lucide:plus-circle" class="w-4 h-4 text-blue-600" />
+              <span class="text-sm text-blue-700 dark:text-blue-400">{{ newImageFiles.length }}</span>
             </div>
           </div>
 
@@ -1168,55 +1165,62 @@ const seoKeywordsString = computed({
               <div class="flex items-center gap-2">
                 <Icon name="lucide:image" class="w-4 h-4 text-green-500" />
                 <p class="text-sm font-semibold text-green-600 dark:text-green-400">
-                  Сохранённые изображения ({{ existingImages.length }})
+                  Сохранённые ({{ existingImages.length }})
                 </p>
               </div>
 
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div class="grid grid-cols-2 gap-2 sm:gap-3">
                 <div
                   v-for="(image, index) in existingImages"
                   :key="image.id"
-                  class="relative group aspect-square rounded-lg overflow-hidden border-2 transition-all"
-                  :class="index === 0 ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-muted hover:border-primary/50'"
+                  class="relative rounded-xl overflow-hidden border-2 transition-all bg-muted"
+                  :class="index === 0 ? 'border-amber-500 ring-2 ring-amber-500/20' : 'border-muted'"
                 >
-                  <img
-                    :src="getExistingImageUrl(image.image_url)"
-                    class="w-full h-full object-cover"
-                    loading="lazy"
-                    alt="Изображение товара"
-                  >
+                  <!-- Изображение -->
+                  <div class="aspect-square">
+                    <img
+                      :src="getExistingImageUrl(image.image_url)"
+                      class="w-full h-full object-cover"
+                      loading="lazy"
+                      alt="Изображение товара"
+                    >
+                  </div>
                   <!-- Бейдж главного изображения -->
                   <div
                     v-if="index === 0"
-                    class="absolute top-1.5 left-1.5 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                    class="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-lg font-bold flex items-center gap-1 shadow-lg"
                   >
                     <Icon name="lucide:star" class="w-3 h-3" />
-                    Главное
+                    <span class="hidden xs:inline">Главное</span>
                   </div>
-                  <!-- Overlay с кнопками -->
-                  <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
-                    <!-- Сделать главной (только если не первая) -->
+                  <!-- Панель действий (всегда видна) -->
+                  <div class="flex items-center justify-between gap-1 p-2 bg-background/95 backdrop-blur-sm border-t">
+                    <!-- Сделать главной -->
                     <Button
                       v-if="index > 0"
                       type="button"
-                      variant="secondary"
-                      size="icon"
-                      class="h-8 w-8"
-                      title="Сделать главной"
+                      variant="outline"
+                      size="sm"
+                      class="flex-1 h-10 text-xs gap-1"
                       @click="setPrimaryExistingImage(index)"
                     >
                       <Icon name="lucide:star" class="w-4 h-4" />
+                      <span class="hidden xs:inline">Главное</span>
                     </Button>
+                    <div v-else class="flex-1 h-10 flex items-center justify-center text-xs text-muted-foreground">
+                      <Icon name="lucide:check" class="w-4 h-4 mr-1 text-amber-500" />
+                      <span class="hidden xs:inline">Это главное</span>
+                    </div>
                     <!-- Удалить -->
                     <Button
                       type="button"
                       variant="destructive"
-                      size="icon"
-                      class="h-8 w-8"
-                      title="Удалить"
+                      size="sm"
+                      class="h-10 w-10 sm:w-auto sm:px-3"
                       @click="removeExistingImage(image)"
                     >
                       <Icon name="lucide:trash-2" class="w-4 h-4" />
+                      <span class="hidden sm:inline ml-1">Удалить</span>
                     </Button>
                   </div>
                 </div>
@@ -1228,95 +1232,90 @@ const seoKeywordsString = computed({
               <div class="flex items-center gap-2">
                 <Icon name="lucide:upload" class="w-4 h-4 text-blue-500" />
                 <p class="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                  Новые изображения ({{ newImageFiles.length }})
+                  Новые ({{ newImageFiles.length }})
                 </p>
               </div>
 
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div class="grid grid-cols-2 gap-2 sm:gap-3">
                 <div
                   v-for="(item, index) in newImageFiles"
                   :key="item.id"
-                  class="relative group aspect-square rounded-lg overflow-hidden border-2 transition-all"
-                  :class="existingImages.length === 0 && index === 0 ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-blue-500/30 hover:border-blue-500'"
+                  class="relative rounded-xl overflow-hidden border-2 transition-all bg-muted"
+                  :class="existingImages.length === 0 && index === 0 ? 'border-amber-500 ring-2 ring-amber-500/20' : 'border-blue-500/30'"
                 >
-                  <img
-                    :src="item.previewUrl"
-                    class="w-full h-full object-cover"
-                    alt="Превью нового изображения"
-                  >
-                  <!-- Бейдж главного (только если нет существующих и это первое) -->
+                  <!-- Изображение -->
+                  <div class="aspect-square">
+                    <img
+                      :src="item.previewUrl"
+                      class="w-full h-full object-cover"
+                      alt="Превью нового изображения"
+                    >
+                  </div>
+                  <!-- Бейдж главного -->
                   <div
                     v-if="existingImages.length === 0 && index === 0"
-                    class="absolute top-1.5 left-1.5 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                    class="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-lg font-bold flex items-center gap-1 shadow-lg"
                   >
                     <Icon name="lucide:star" class="w-3 h-3" />
-                    Главное
+                    <span class="hidden xs:inline">Главное</span>
                   </div>
                   <!-- Бейдж "Новое" -->
                   <div
                     v-else
-                    class="absolute top-1.5 right-1.5 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium"
+                    class="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-lg font-medium shadow-lg"
                   >
                     Новое
                   </div>
-                  <!-- Overlay с кнопками -->
-                  <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
-                    <!-- Сделать главной (только если не первая новая при отсутствии существующих) -->
+                  <!-- Панель действий (всегда видна) -->
+                  <div class="flex items-center justify-between gap-1 p-2 bg-background/95 backdrop-blur-sm border-t">
+                    <!-- Сделать главной -->
                     <Button
                       v-if="existingImages.length > 0 || index > 0"
                       type="button"
-                      variant="secondary"
-                      size="icon"
-                      class="h-8 w-8"
-                      title="Сделать главной"
+                      variant="outline"
+                      size="sm"
+                      class="flex-1 h-10 text-xs gap-1"
                       @click="setPrimaryNewImage(index)"
                     >
                       <Icon name="lucide:star" class="w-4 h-4" />
+                      <span class="hidden xs:inline">Главное</span>
                     </Button>
+                    <div v-else class="flex-1 h-10 flex items-center justify-center text-xs text-muted-foreground">
+                      <Icon name="lucide:check" class="w-4 h-4 mr-1 text-amber-500" />
+                      <span class="hidden xs:inline">Это главное</span>
+                    </div>
                     <!-- Удалить -->
                     <Button
                       type="button"
                       variant="destructive"
-                      size="icon"
-                      class="h-8 w-8"
-                      title="Удалить"
+                      size="sm"
+                      class="h-10 w-10 sm:w-auto sm:px-3"
                       @click="removeNewImage(index)"
                     >
                       <Icon name="lucide:trash-2" class="w-4 h-4" />
+                      <span class="hidden sm:inline ml-1">Удалить</span>
                     </Button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- 💡 Подсказка о главном изображении -->
-            <div class="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-              <p class="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                <Icon name="lucide:info" class="w-4 h-4 flex-shrink-0" />
-                <span>Первое изображение в списке будет главным (используется для анонса товара)</span>
-              </p>
-            </div>
-          </div>
-
-          <!-- 💡 Подсказка -->
-          <div class="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-            <p class="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
-              <Icon name="lucide:lightbulb" class="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>{{ optimizationInfo.recommendation }}</span>
-            </p>
           </div>
         </CardContent>
       </Card>
 
       <!-- ✅ Кнопка отправки -->
-      <Button
-        type="submit"
-        size="lg"
-        class="w-full"
-        :disabled="isProcessingImages"
-      >
-        {{ props.initialData ? '💾 Обновить товар' : '✨ Создать товар' }}
-      </Button>
+      <div class="sticky bottom-4 z-10">
+        <Button
+          type="submit"
+          size="lg"
+          class="w-full h-14 text-base font-semibold shadow-lg"
+          :disabled="isProcessingImages"
+        >
+          <Icon :name="props.initialData ? 'lucide:save' : 'lucide:plus'" class="w-5 h-5 mr-2" />
+          {{ props.initialData ? 'Сохранить изменения' : 'Создать товар' }}
+        </Button>
+      </div>
     </div>
   </form>
 </template>
