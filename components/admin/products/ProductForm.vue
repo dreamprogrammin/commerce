@@ -1299,7 +1299,6 @@ const seoKeywordsString = computed({
                 </div>
               </div>
             </div>
-
           </div>
         </CardContent>
       </Card>

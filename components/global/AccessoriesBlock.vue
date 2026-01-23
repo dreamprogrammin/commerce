@@ -6,263 +6,154 @@ const props = defineProps<{
   loading?: boolean
 }>()
 
-// Use defineModel for proper two-way binding
 const selectedIds = defineModel<string[]>('selectedIds', { default: () => [] })
 
-function toggleAccessory(id: string) {
-  const current = [...selectedIds.value]
-  const index = current.indexOf(id)
-  if (index === -1) {
-    current.push(id)
+// Category configuration with explicit Tailwind classes
+const categories = {
+  'batteries': { title: 'Батарейки', icon: 'mdi:battery', bg: 'bg-amber-50', text: 'text-amber-600' },
+  'gift-wrapping': { title: 'Упаковка', icon: 'mdi:gift', bg: 'bg-pink-50', text: 'text-pink-600' },
+  'other': { title: 'Аксессуары', icon: 'lucide:package', bg: 'bg-blue-50', text: 'text-blue-600' },
+} as const
+
+type CategoryKey = keyof typeof categories
+
+// Group accessories by category
+const groupedAccessories = computed(() => {
+  const groups: Record<CategoryKey, AccessoryProduct[]> = {
+    'batteries': [],
+    'gift-wrapping': [],
+    'other': [],
   }
-  else {
-    current.splice(index, 1)
+
+  for (const acc of props.accessories) {
+    const slug = acc.categories?.slug
+    if (slug === 'batteries')
+      groups.batteries.push(acc)
+    else if (slug === 'gift-wrapping')
+      groups['gift-wrapping'].push(acc)
+    else groups.other.push(acc)
   }
-  selectedIds.value = current
-}
 
-// Count selected items per category
-const selectedBatteriesCount = computed(() =>
-  props.accessories.filter(acc =>
-    acc.categories?.slug === 'batteries' && selectedIds.value.includes(acc.id),
-  ).length,
+  return groups
+})
+
+// Available categories (non-empty)
+const availableCategories = computed(() =>
+  (Object.keys(categories) as CategoryKey[]).filter(key => groupedAccessories.value[key].length > 0),
 )
 
-const selectedGiftWrappingCount = computed(() =>
-  props.accessories.filter(acc =>
-    acc.categories?.slug === 'gift-wrapping' && selectedIds.value.includes(acc.id),
-  ).length,
-)
+// Selected count per category
+const selectedCount = computed(() => {
+  const counts: Record<CategoryKey, number> = { 'batteries': 0, 'gift-wrapping': 0, 'other': 0 }
+  for (const key of Object.keys(counts) as CategoryKey[]) {
+    counts[key] = groupedAccessories.value[key].filter(acc => selectedIds.value.includes(acc.id)).length
+  }
+  return counts
+})
 
-const selectedOtherCount = computed(() =>
-  props.accessories.filter(acc =>
-    acc.categories?.slug !== 'batteries'
-    && acc.categories?.slug !== 'gift-wrapping'
-    && selectedIds.value.includes(acc.id),
-  ).length,
-)
-
+// Modal/Drawer state
 const isMobile = ref(false)
-const isModalOpen = ref(false)
-const isDrawerOpen = ref(false)
-const selectedType = ref<'batteries' | 'gift-wrapping' | 'other' | null>(null)
+const isOpen = ref(false)
+const activeCategory = ref<CategoryKey | null>(null)
+
+const currentConfig = computed(() => activeCategory.value ? categories[activeCategory.value] : null)
+const currentAccessories = computed(() => activeCategory.value ? groupedAccessories.value[activeCategory.value] : [])
 
 onMounted(() => {
   isMobile.value = window.innerWidth < 1024
-  window.addEventListener('resize', handleResize)
+  window.addEventListener('resize', () => { isMobile.value = window.innerWidth < 1024 })
 })
 
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-})
-
-function handleResize() {
-  isMobile.value = window.innerWidth < 1024
+function openCategory(key: CategoryKey) {
+  activeCategory.value = key
+  isOpen.value = true
 }
 
-// Group accessories by category slug
-const batteriesAccessories = computed(() =>
-  props.accessories.filter(acc => acc.categories?.slug === 'batteries'),
-)
-
-const giftWrappingAccessories = computed(() =>
-  props.accessories.filter(acc => acc.categories?.slug === 'gift-wrapping'),
-)
-
-// Accessories that don't match batteries or gift-wrapping
-const otherAccessories = computed(() =>
-  props.accessories.filter(acc =>
-    acc.categories?.slug !== 'batteries' && acc.categories?.slug !== 'gift-wrapping',
-  ),
-)
-
-const hasBatteries = computed(() => batteriesAccessories.value.length > 0)
-const hasGiftWrapping = computed(() => giftWrappingAccessories.value.length > 0)
-const hasOther = computed(() => otherAccessories.value.length > 0)
-const hasAnyAccessories = computed(() => props.accessories.length > 0)
-
-const currentAccessories = computed(() => {
-  if (selectedType.value === 'batteries')
-    return batteriesAccessories.value
-  if (selectedType.value === 'gift-wrapping')
-    return giftWrappingAccessories.value
-  if (selectedType.value === 'other')
-    return otherAccessories.value
-  return []
-})
-
-const currentTitle = computed(() => {
-  if (selectedType.value === 'batteries')
-    return 'Элементы питания'
-  if (selectedType.value === 'gift-wrapping')
-    return 'Подарочная упаковка'
-  if (selectedType.value === 'other')
-    return 'Аксессуары'
-  return ''
-})
-
-const currentIcon = computed(() => {
-  if (selectedType.value === 'batteries')
-    return 'mdi:battery'
-  if (selectedType.value === 'gift-wrapping')
-    return 'mdi:gift'
-  return 'lucide:package'
-})
-
-const currentIconClass = computed(() => {
-  if (selectedType.value === 'batteries')
-    return 'text-amber-600'
-  if (selectedType.value === 'gift-wrapping')
-    return 'text-pink-600'
-  return 'text-blue-600'
-})
-
-function openAccessories(type: 'batteries' | 'gift-wrapping' | 'other') {
-  selectedType.value = type
-  if (isMobile.value) {
-    isDrawerOpen.value = true
-  }
-  else {
-    isModalOpen.value = true
-  }
+function toggleAccessory(id: string) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx === -1)
+    selectedIds.value = [...selectedIds.value, id]
+  else selectedIds.value = selectedIds.value.filter(i => i !== id)
 }
 
-function closeAll() {
-  isModalOpen.value = false
-  isDrawerOpen.value = false
-  selectedType.value = null
+function close() {
+  isOpen.value = false
+  activeCategory.value = null
 }
 </script>
 
 <template>
-  <div v-if="loading || hasAnyAccessories" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-4">
-    <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
-      <Icon name="lucide:plus-circle" class="w-5 h-5 text-primary" />
-      С этим товаром покупают
+  <div v-if="loading || accessories.length > 0" class="bg-white rounded-xl p-4 shadow-sm border mt-4">
+    <h3 class="font-bold text-base mb-3 flex items-center gap-2">
+      <Icon name="lucide:plus-circle" class="w-4 h-4 text-primary" />
+      С этим покупают
     </h3>
 
-    <!-- Skeleton during loading -->
-    <div v-if="loading" class="grid grid-cols-2 gap-3">
-      <div v-for="i in 2" :key="i" class="flex flex-col items-center p-4 rounded-xl border animate-pulse">
-        <div class="w-12 h-12 bg-muted rounded-full mb-3" />
-        <div class="h-4 bg-muted rounded w-24" />
+    <!-- Skeleton -->
+    <div v-if="loading" class="grid grid-cols-3 gap-2">
+      <div v-for="i in 3" :key="i" class="flex flex-col items-center p-3 rounded-lg border animate-pulse">
+        <div class="w-10 h-10 bg-muted rounded-full mb-2" />
+        <div class="h-3 bg-muted rounded w-14" />
       </div>
     </div>
 
-    <!-- Accessory type cards -->
-    <div v-else class="grid grid-cols-2 gap-3">
-      <!-- Batteries card -->
+    <!-- Category buttons -->
+    <div v-else class="grid grid-cols-3 gap-2">
       <button
-        v-if="hasBatteries"
-        class="relative flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
-        :class="{ 'border-primary bg-primary/5': selectedBatteriesCount > 0 }"
-        @click="openAccessories('batteries')"
+        v-for="key in availableCategories"
+        :key="key"
+        class="relative flex flex-col items-center p-3 rounded-lg border transition-all active:scale-95"
+        :class="selectedCount[key] > 0 ? 'border-primary bg-primary/5' : 'hover:border-primary/50'"
+        @click="openCategory(key)"
       >
         <Badge
-          v-if="selectedBatteriesCount > 0"
-          class="absolute -top-2 -right-2 bg-primary text-white"
+          v-if="selectedCount[key] > 0"
+          class="absolute -top-1.5 -right-1.5 h-5 w-5 p-0 flex items-center justify-center text-xs"
         >
-          {{ selectedBatteriesCount }}
+          {{ selectedCount[key] }}
         </Badge>
-        <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mb-3 group-hover:bg-amber-100 transition-colors">
-          <Icon name="mdi:battery" class="w-7 h-7 text-amber-600" />
+        <div class="w-10 h-10 rounded-full flex items-center justify-center mb-1.5" :class="categories[key].bg">
+          <Icon :name="categories[key].icon" class="w-5 h-5" :class="categories[key].text" />
         </div>
-        <span class="text-sm font-medium text-center">Батарейки</span>
-        <span class="text-xs text-muted-foreground mt-1">{{ batteriesAccessories.length }} шт.</span>
-      </button>
-
-      <!-- Gift wrapping card -->
-      <button
-        v-if="hasGiftWrapping"
-        class="relative flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
-        :class="{ 'border-primary bg-primary/5': selectedGiftWrappingCount > 0 }"
-        @click="openAccessories('gift-wrapping')"
-      >
-        <Badge
-          v-if="selectedGiftWrappingCount > 0"
-          class="absolute -top-2 -right-2 bg-primary text-white"
-        >
-          {{ selectedGiftWrappingCount }}
-        </Badge>
-        <div class="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center mb-3 group-hover:bg-pink-100 transition-colors">
-          <Icon name="mdi:gift" class="w-7 h-7 text-pink-600" />
-        </div>
-        <span class="text-sm font-medium text-center">Подарочная упаковка</span>
-        <span class="text-xs text-muted-foreground mt-1">{{ giftWrappingAccessories.length }} шт.</span>
-      </button>
-
-      <!-- Other accessories card -->
-      <button
-        v-if="hasOther"
-        class="relative flex flex-col items-center p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md hover:border-primary hover:bg-primary/5 group"
-        :class="{ 'border-primary bg-primary/5': selectedOtherCount > 0 }"
-        @click="openAccessories('other')"
-      >
-        <Badge
-          v-if="selectedOtherCount > 0"
-          class="absolute -top-2 -right-2 bg-primary text-white"
-        >
-          {{ selectedOtherCount }}
-        </Badge>
-        <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3 group-hover:bg-blue-100 transition-colors">
-          <Icon name="lucide:package" class="w-7 h-7 text-blue-600" />
-        </div>
-        <span class="text-sm font-medium text-center">Аксессуары</span>
-        <span class="text-xs text-muted-foreground mt-1">{{ otherAccessories.length }} шт.</span>
+        <span class="text-xs font-medium text-center leading-tight">{{ categories[key].title }}</span>
+        <span class="text-[10px] text-muted-foreground">{{ groupedAccessories[key].length }} шт</span>
       </button>
     </div>
 
     <!-- Desktop Modal -->
-    <Dialog v-model:open="isModalOpen">
+    <Dialog v-if="!isMobile" v-model:open="isOpen">
       <DialogContent class="max-w-2xl">
         <DialogHeader>
-          <DialogTitle class="flex items-center gap-2">
-            <Icon
-              :name="currentIcon"
-              :class="currentIconClass"
-              class="w-5 h-5"
-            />
-            {{ currentTitle }}
+          <DialogTitle v-if="currentConfig" class="flex items-center gap-2">
+            <Icon :name="currentConfig.icon" class="w-5 h-5" :class="currentConfig.text" />
+            {{ currentConfig.title }}
           </DialogTitle>
-          <DialogDescription>
-            Выберите товары, которые хотите добавить к заказу
-          </DialogDescription>
+          <DialogDescription>Выберите товары для заказа</DialogDescription>
         </DialogHeader>
-
-        <div class="py-4">
-          <AccessoriesCarousel
-            :accessories="currentAccessories"
-            :selected-ids="selectedIds"
-            @toggle="toggleAccessory"
-            @close="closeAll"
-          />
-        </div>
+        <AccessoriesCarousel
+          :accessories="currentAccessories"
+          :selected-ids="selectedIds"
+          @toggle="toggleAccessory"
+          @close="close"
+        />
       </DialogContent>
     </Dialog>
 
     <!-- Mobile Drawer -->
-    <Drawer v-model:open="isDrawerOpen">
+    <Drawer v-else v-model:open="isOpen">
       <DrawerContent class="max-h-[65vh]">
-        <DrawerHeader class="text-left">
-          <DrawerTitle class="flex items-center gap-2">
-            <Icon
-              :name="currentIcon"
-              :class="currentIconClass"
-              class="w-5 h-5"
-            />
-            {{ currentTitle }}
+        <DrawerHeader class="text-left pb-2">
+          <DrawerTitle v-if="currentConfig" class="flex items-center gap-2 text-base">
+            <Icon :name="currentConfig.icon" class="w-5 h-5" :class="currentConfig.text" />
+            {{ currentConfig.title }}
           </DrawerTitle>
-          <DrawerDescription>
-            Выберите товары, которые хотите добавить к заказу
-          </DrawerDescription>
         </DrawerHeader>
-
-        <div class="px-4 pb-6 overflow-y-auto">
+        <div class="px-4 pb-4 overflow-y-auto">
           <AccessoriesCarousel
             :accessories="currentAccessories"
             :selected-ids="selectedIds"
             @toggle="toggleAccessory"
-            @close="closeAll"
+            @close="close"
           />
         </div>
       </DrawerContent>
