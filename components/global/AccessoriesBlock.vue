@@ -119,8 +119,12 @@ function close() {
           <Icon :name="categories[key].icon" class="w-6 h-6" :class="categories[key].text" />
         </div>
         <div class="flex-1 text-left">
-          <div class="text-sm font-semibold">{{ categories[key].title }}</div>
-          <div class="text-xs text-muted-foreground">{{ groupedAccessories[key].length }} товаров</div>
+          <div class="text-sm font-semibold">
+            {{ categories[key].title }}
+          </div>
+          <div class="text-xs text-muted-foreground">
+            {{ groupedAccessories[key].length }} товаров
+          </div>
         </div>
         <Icon name="lucide:chevron-right" class="w-5 h-5 text-muted-foreground flex-shrink-0" />
       </button>

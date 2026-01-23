@@ -90,6 +90,10 @@ async function handleCreate(payload: {
     }))
     await adminProductsStore.saveProductAttributeValues(newProduct.id, valuesToSave)
 
+    // 🔥 КРИТИЧНО: Очищаем список товаров в Pinia store после создания
+    // Это нужно, чтобы на странице списка товаров появился новый товар
+    adminProductsStore.products = []
+
     // ✅ Уведомляем поисковики о новом товаре
     if (newProduct.slug) {
       try {
