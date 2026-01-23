@@ -14,7 +14,6 @@ import type {
 } from '@/types'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
-import { VueDraggableNext } from 'vue-draggable-next'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
@@ -33,6 +32,7 @@ import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
 
 interface NewImageFile {
+  id: string
   file: File
   previewUrl: string
   blurDataUrl?: string
@@ -348,6 +348,7 @@ async function processFiles(files: File[]) {
             )
 
             return {
+              id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
               file: result.file,
               previewUrl: URL.createObjectURL(result.file),
               blurDataUrl: result.blurPlaceholder,
@@ -358,6 +359,7 @@ async function processFiles(files: File[]) {
             toast.warning(`Ошибка обработки ${file.name}, используем оригинал`)
 
             return {
+              id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
               file,
               previewUrl: URL.createObjectURL(file),
               blurDataUrl: undefined,
@@ -371,6 +373,7 @@ async function processFiles(files: File[]) {
           console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
 
           return {
+            id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             file,
             previewUrl: URL.createObjectURL(file),
             blurDataUrl: blurResult.dataUrl,
@@ -379,6 +382,7 @@ async function processFiles(files: File[]) {
         catch (error) {
           console.warn(`⚠️ Не удалось сгенерировать blur для ${file.name}`)
           return {
+            id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             file,
             previewUrl: URL.createObjectURL(file),
             blurDataUrl: undefined,
@@ -408,11 +412,13 @@ async function processFiles(files: File[]) {
 
 // Установка главной картинки для существующих изображений
 function setPrimaryExistingImage(index: number) {
-  if (index === 0) return // Уже первая
-  
+  if (index === 0)
+    return // Уже первая
+
   const image = existingImages.value[index]
-  if (!image) return // Проверка на существование
-  
+  if (!image)
+    return // Проверка на существование
+
   existingImages.value.splice(index, 1)
   existingImages.value.unshift(image)
   toast.success('Главная картинка установлена')
@@ -420,11 +426,24 @@ function setPrimaryExistingImage(index: number) {
 
 // Установка главной картинки для новых изображений
 function setPrimaryNewImage(index: number) {
-  if (index === 0) return // Уже первая
-  
   const image = newImageFiles.value[index]
-  if (!image) return // Проверка на существование
-  
+  if (!image)
+    return
+
+  // Если есть существующие изображения, новое изображение не может стать главным напрямую
+  // Нужно сначала удалить существующие или переместить новое в начало списка новых
+  if (existingImages.value.length > 0) {
+    // Перемещаем в начало списка новых (после сохранения будет после существующих)
+    newImageFiles.value.splice(index, 1)
+    newImageFiles.value.unshift(image)
+    toast.info('Изображение перемещено в начало новых. Чтобы сделать его главным, удалите существующие изображения.')
+    return
+  }
+
+  // Если нет существующих - просто перемещаем в начало
+  if (index === 0)
+    return // Уже первая
+
   newImageFiles.value.splice(index, 1)
   newImageFiles.value.unshift(image)
   toast.success('Главная картинка установлена')
@@ -1066,7 +1085,7 @@ const seoKeywordsString = computed({
         </CardContent>
       </Card>
 
-         <!-- 🖼️ Галерея изображений -->
+      <!-- 🖼️ Галерея изображений -->
       <Card>
         <CardHeader>
           <CardTitle>Галерея изображений</CardTitle>
@@ -1142,191 +1161,140 @@ const seoKeywordsString = computed({
             </div>
           </div>
 
-          <!-- 🎨 ОБЪЕДИНЁННАЯ ГАЛЕРЕЯ -->
-          <div v-if="existingImages.length > 0 || newImageFiles.length > 0" class="space-y-3">
-            <!-- ⭐ Главное изображение (всегда первое) -->
-            <div class="space-y-2">
+          <!-- 🎨 ГАЛЕРЕЯ ИЗОБРАЖЕНИЙ -->
+          <div v-if="existingImages.length > 0 || newImageFiles.length > 0" class="space-y-4">
+            <!-- ⭐ Секция: Существующие изображения -->
+            <div v-if="existingImages.length > 0" class="space-y-3">
               <div class="flex items-center gap-2">
-                <Icon name="lucide:star" class="w-4 h-4 text-amber-500" />
-                <p class="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                  Главное изображение (для анонса)
+                <Icon name="lucide:image" class="w-4 h-4 text-green-500" />
+                <p class="text-sm font-semibold text-green-600 dark:text-green-400">
+                  Сохранённые изображения ({{ existingImages.length }})
                 </p>
               </div>
-              
-              <!-- Первое существующее изображение -->
-              <div v-if="existingImages.length > 0 && existingImages[0]" class="relative group aspect-video max-w-md rounded-lg overflow-hidden border-2 border-amber-500 ring-4 ring-amber-500/20">
-                <img
-                  :src="getExistingImageUrl(existingImages[0].image_url)"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
-                  alt="Главное изображение товара"
-                >
-                <div class="absolute top-2 left-2 bg-amber-500 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1">
-                  <Icon name="lucide:star" class="w-3 h-3" />
-                  ГЛАВНОЕ
-                </div>
-                <!-- Overlay с кнопкой удаления -->
-                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    class="h-10 w-10"
-                    @click="existingImages[0] && removeExistingImage(existingImages[0])"
-                  >
-                    <Icon name="lucide:trash-2" class="w-5 h-5" />
-                  </Button>
-                </div>
-              </div>
 
-              <!-- Первое новое изображение (если нет существующих) -->
-              <div v-else-if="newImageFiles.length > 0 && newImageFiles[0]" class="relative group aspect-video max-w-md rounded-lg overflow-hidden border-2 border-amber-500 ring-4 ring-amber-500/20">
-                <img
-                  :src="newImageFiles[0].previewUrl"
-                  class="w-full h-full object-cover"
-                  alt="Главное изображение товара"
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div
+                  v-for="(image, index) in existingImages"
+                  :key="image.id"
+                  class="relative group aspect-square rounded-lg overflow-hidden border-2 transition-all"
+                  :class="index === 0 ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-muted hover:border-primary/50'"
                 >
-                <div class="absolute top-2 left-2 bg-amber-500 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1">
-                  <Icon name="lucide:star" class="w-3 h-3" />
-                  ГЛАВНОЕ
-                </div>
-                <!-- Overlay с кнопкой удаления -->
-                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    class="h-10 w-10"
-                    @click="removeNewImage(0)"
+                  <img
+                    :src="getExistingImageUrl(image.image_url)"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    alt="Изображение товара"
                   >
-                    <Icon name="lucide:trash-2" class="w-5 h-5" />
-                  </Button>
+                  <!-- Бейдж главного изображения -->
+                  <div
+                    v-if="index === 0"
+                    class="absolute top-1.5 left-1.5 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                  >
+                    <Icon name="lucide:star" class="w-3 h-3" />
+                    Главное
+                  </div>
+                  <!-- Overlay с кнопками -->
+                  <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                    <!-- Сделать главной (только если не первая) -->
+                    <Button
+                      v-if="index > 0"
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      class="h-8 w-8"
+                      title="Сделать главной"
+                      @click="setPrimaryExistingImage(index)"
+                    >
+                      <Icon name="lucide:star" class="w-4 h-4" />
+                    </Button>
+                    <!-- Удалить -->
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      class="h-8 w-8"
+                      title="Удалить"
+                      @click="removeExistingImage(image)"
+                    >
+                      <Icon name="lucide:trash-2" class="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- 📸 Остальные изображения -->
-            <div v-if="existingImages.length > 1 || newImageFiles.length > (existingImages.length === 0 ? 1 : 0)" class="space-y-2">
+            <!-- 📤 Секция: Новые изображения -->
+            <div v-if="newImageFiles.length > 0" class="space-y-3">
               <div class="flex items-center gap-2">
-                <Icon name="lucide:images" class="w-4 h-4 text-muted-foreground" />
-                <p class="text-sm font-medium text-muted-foreground">
-                  Дополнительные изображения ({{ (existingImages.length > 1 ? existingImages.length - 1 : 0) + (newImageFiles.length > (existingImages.length === 0 ? 1 : 0) ? newImageFiles.length - (existingImages.length === 0 ? 1 : 0) : 0) }})
+                <Icon name="lucide:upload" class="w-4 h-4 text-blue-500" />
+                <p class="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                  Новые изображения ({{ newImageFiles.length }})
                 </p>
               </div>
 
-              <!-- Существующие изображения (кроме первого) -->
-              <VueDraggableNext
-                v-if="existingImages.length > 1"
-                v-model="existingImages"
-                class="grid grid-cols-3 sm:grid-cols-4 gap-3"
-                item-key="id"
-                handle=".drag-handle"
-              >
-                <template #item="{ element: image, index }">
-                  <div
-                    v-if="index > 0"
-                    class="relative group aspect-square rounded-lg overflow-hidden border-2 border-muted hover:border-primary/50 transition-all"
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div
+                  v-for="(item, index) in newImageFiles"
+                  :key="item.id"
+                  class="relative group aspect-square rounded-lg overflow-hidden border-2 transition-all"
+                  :class="existingImages.length === 0 && index === 0 ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-blue-500/30 hover:border-blue-500'"
+                >
+                  <img
+                    :src="item.previewUrl"
+                    class="w-full h-full object-cover"
+                    alt="Превью нового изображения"
                   >
-                    <img
-                      :src="getExistingImageUrl(image.image_url)"
-                      class="w-full h-full object-cover"
-                      loading="lazy"
-                      alt="Изображение товара"
-                    >
-                    <!-- Overlay с кнопками -->
-                    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                      <!-- Drag handle -->
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        class="drag-handle h-8 w-8 cursor-grab active:cursor-grabbing"
-                      >
-                        <Icon name="lucide:grip-vertical" class="w-4 h-4" />
-                      </Button>
-                      <!-- Сделать главной -->
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        class="h-8 w-8"
-                        title="Сделать главной"
-                        @click="setPrimaryExistingImage(index)"
-                      >
-                        <Icon name="lucide:star" class="w-4 h-4" />
-                      </Button>
-                      <!-- Удалить -->
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        class="h-8 w-8"
-                        @click="removeExistingImage(image)"
-                      >
-                        <Icon name="lucide:trash-2" class="w-4 h-4" />
-                      </Button>
-                    </div>
+                  <!-- Бейдж главного (только если нет существующих и это первое) -->
+                  <div
+                    v-if="existingImages.length === 0 && index === 0"
+                    class="absolute top-1.5 left-1.5 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                  >
+                    <Icon name="lucide:star" class="w-3 h-3" />
+                    Главное
                   </div>
-                </template>
-              </VueDraggableNext>
+                  <!-- Бейдж "Новое" -->
+                  <div
+                    v-else
+                    class="absolute top-1.5 right-1.5 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium"
+                  >
+                    Новое
+                  </div>
+                  <!-- Overlay с кнопками -->
+                  <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                    <!-- Сделать главной (только если не первая новая при отсутствии существующих) -->
+                    <Button
+                      v-if="existingImages.length > 0 || index > 0"
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      class="h-8 w-8"
+                      title="Сделать главной"
+                      @click="setPrimaryNewImage(index)"
+                    >
+                      <Icon name="lucide:star" class="w-4 h-4" />
+                    </Button>
+                    <!-- Удалить -->
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      class="h-8 w-8"
+                      title="Удалить"
+                      @click="removeNewImage(index)"
+                    >
+                      <Icon name="lucide:trash-2" class="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-              <!-- Новые изображения (с учётом главного) -->
-              <VueDraggableNext
-                v-if="newImageFiles.length > (existingImages.length === 0 ? 1 : 0)"
-                v-model="newImageFiles"
-                class="grid grid-cols-3 sm:grid-cols-4 gap-3"
-                :class="{ 'mt-3': existingImages.length > 1 }"
-                handle=".drag-handle"
-              >
-                <template #item="{ element: item, index }">
-                  <div
-                    v-if="existingImages.length > 0 || index > 0"
-                    class="relative group aspect-square rounded-lg overflow-hidden border-2 border-blue-500/30 hover:border-blue-500 transition-all"
-                  >
-                    <img
-                      :src="item.previewUrl"
-                      class="w-full h-full object-cover"
-                      alt="Превью нового изображения"
-                    >
-                    <div class="absolute top-1 right-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
-                      Новое
-                    </div>
-                    <!-- Overlay с кнопками -->
-                    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                      <!-- Drag handle -->
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        class="drag-handle h-8 w-8 cursor-grab active:cursor-grabbing"
-                      >
-                        <Icon name="lucide:grip-vertical" class="w-4 h-4" />
-                      </Button>
-                      <!-- Сделать главной -->
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        class="h-8 w-8"
-                        title="Сделать главной"
-                        @click="setPrimaryNewImage(index)"
-                      >
-                        <Icon name="lucide:star" class="w-4 h-4" />
-                      </Button>
-                      <!-- Удалить -->
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        class="h-8 w-8"
-                        @click="removeNewImage(index)"
-                      >
-                        <Icon name="lucide:trash-2" class="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </template>
-              </VueDraggableNext>
+            <!-- 💡 Подсказка о главном изображении -->
+            <div class="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p class="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                <Icon name="lucide:info" class="w-4 h-4 flex-shrink-0" />
+                <span>Первое изображение в списке будет главным (используется для анонса товара)</span>
+              </p>
             </div>
           </div>
 
