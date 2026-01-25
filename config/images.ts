@@ -94,6 +94,12 @@ export const IMAGE_SIZES = {
     width: 1200,
     height: 630, // Стандарт для OG изображений
   },
+
+  // Логотипы брендов
+  BRAND_LOGO: {
+    width: 200,
+    height: 200,
+  },
 } as const
 
 /**

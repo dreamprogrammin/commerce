@@ -74,6 +74,15 @@ export const useProfileStore = defineStore('profileStore', () => {
         // Если профиль найден - сохраняем и выходим
         if (data) {
           profile.value = data
+
+          // 🔍 DEBUG: Логируем обновление профиля для отладки бонусов
+          if (import.meta.client && force) {
+            console.log('[ProfileStore] Profile updated (force=true):', {
+              active_bonus: data.active_bonus_balance,
+              pending_bonus: data.pending_bonus_balance,
+            })
+          }
+
           return true
         }
 

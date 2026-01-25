@@ -51,6 +51,7 @@ export function useUserOrders() {
   const supabase = useSupabaseClient()
   const user = useSupabaseUser()
   const router = useRouter()
+  const profileStore = useProfileStore() // 🔥 Добавляем profileStore для обновления бонусов
 
   const orders = ref<UserOrder[]>([])
   const isLoading = ref(false)
@@ -220,8 +221,14 @@ export function useUserOrders() {
         return { success: false, error: cancelError.message }
       }
 
-      // Обновляем локальный список заказов
+      // 🔥 КРИТИЧНО: Обновляем профиль для актуализации баланса бонусов СНАЧАЛА
+      await profileStore.loadProfile(true)
+
+      // ✅ Обновляем локальный список заказов
       await fetchOrders()
+
+      // ✅ Принудительно триггерим реактивность через nextTick
+      await nextTick()
 
       toast.success('Заказ успешно отменён', {
         description: 'Бонусы возвращены на ваш счёт',

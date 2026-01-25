@@ -51,7 +51,9 @@
       "Bash(PGPASSWORD=postgres psql:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
-      "Bash(pnpm typecheck:*)"
+      "Bash(pnpm typecheck:*)",
+      "Bash(tail:*)",
+      "Bash(npx vue-tsc:*)"
     ]
   }
 }

@@ -11,10 +11,17 @@ const adminProductsStore = useAdminProductsStore()
 const route = useRoute()
 const router = useRouter()
 const productId = route.params.id as string
-const queryClient = useQueryClient()
+const { clearProductCache } = useCacheManager()
 
 // ✅ Добавляем SEO composable
 const { notifyProduct } = useSeoIndexing()
+
+// 🔄 Функция для принудительного обновления данных
+async function hardRefresh() {
+  await clearProductCache(productId)
+  await refresh()
+  toast.success('🔄 Данные обновлены')
+}
 
 // --- 1. ЗАГРУЗКА ДАННЫХ ---
 // Мы используем `data`, `pending`, `error` как есть, без переименования.
@@ -59,33 +66,29 @@ async function handleUpdate(payload: {
     }))
     await adminProductsStore.saveProductAttributeValues(productId, valuesToSave)
 
-    // 🔥 КРИТИЧНО: Инвалидируем все кеши связанные с этим товаром
-    // 1. Кеш страницы редактирования (admin)
-    await queryClient.invalidateQueries({ queryKey: [`admin-product-${productId}`] })
-
-    // 2. Кеш публичной страницы товара (используется slug, поэтому инвалидируем все 'product')
-    await queryClient.invalidateQueries({ queryKey: ['product'] })
-
-    // 3. Кеш аксессуаров (если товар используется как аксессуар)
-    await queryClient.invalidateQueries({ queryKey: ['product-accessories'] })
+    // 🔥 КРИТИЧНО: Очищаем кеш товара
+    await clearProductCache(productId)
 
     // 4. Очищаем список товаров в Pinia store, чтобы он перезагрузился
-    // Это нужно, чтобы на странице списка товаров отобразились обновленные данные
     adminProductsStore.products = []
+
+    // 🔄 ВАЖНО: Перезагружаем данные на странице
+    await refresh()
 
     // ✅ Уведомляем поисковики об обновлении товара
     if (updatedProduct.slug) {
       try {
         await notifyProduct(updatedProduct.slug)
-        toast.success('✅ Товар обновлен и отправлен в поисковики')
+        toast.success('✅ Товар обновлен успешно')
       }
       catch (error) {
         console.error('SEO notification error:', error)
-        toast.warning('⚠️ Товар обновлен, но не удалось уведомить поисковики')
+        toast.success('✅ Товар обновлен')
       }
     }
 
-    router.push('/admin/products')
+    // Не делаем редирект сразу - пользователь видит обновленные данные
+    // router.push('/admin/products')
   }
 }
 </script>
@@ -93,9 +96,29 @@ async function handleUpdate(payload: {
 <template>
   <div class="p-4 md:p-8">
     <div class="max-w-4xl mx-auto">
-      <h1 class="text-3xl font-bold mb-6">
-        Редактирование товара
-      </h1>
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold">
+          Редактирование товара
+        </h1>
+        <div class="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            @click="router.push('/admin/products')"
+          >
+            <Icon name="lucide:arrow-left" class="w-4 h-4 mr-2" />
+            К списку
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="hardRefresh"
+          >
+            <Icon name="lucide:refresh-cw" class="w-4 h-4 mr-2" />
+            Обновить данные
+          </Button>
+        </div>
+      </div>
       <div v-if="pending" class="text-center py-20">
         Загрузка данных о товаре...
       </div>

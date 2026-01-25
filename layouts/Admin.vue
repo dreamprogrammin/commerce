@@ -3,7 +3,8 @@ import Button from '@/components/ui/button/Button.vue'
 import { useAuth } from '@/composables/auth/useAuth'
 
 const { handleOut } = useAuth()
-</script>
+const { clearAllQueryCache, hardReset } = useCacheManager()
+
 
 <template>
   <div class="hidden md:block">
@@ -88,7 +89,23 @@ const { handleOut } = useAuth()
         <h1 class="text-xl font-semibold">
           Панель администратора
         </h1>
-        <div class="ml-auto flex items-center gap-4">
+        <div class="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            @click="clearAllQueryCache"
+          >
+            <Icon name="lucide:trash-2" class="w-4 h-4 sm:mr-2" />
+            <span class="hidden sm:inline">Очистить кеш</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            @click="hardReset"
+          >
+            <Icon name="lucide:refresh-cw" class="w-4 h-4 sm:mr-2" />
+            <span class="hidden sm:inline">Полный сброс</span>
+          </Button>
           <Button @click="handleOut">
             Выйти
           </Button>

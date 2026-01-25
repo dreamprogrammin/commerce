@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { IBreadcrumbItem } from '@/types'
+import type { IBreadcrumbItem, ProductImageRow, ProductWithImages } from '@/types'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { toast } from 'vue-sonner'
 import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
@@ -27,8 +27,6 @@ const slug = computed(() => route.params.slug as string)
 // Selected accessories for adding to cart together with main product
 const selectedAccessoryIds = ref<string[]>([])
 
-const similarProductsRef = ref<HTMLElement | null>(null)
-const showStickyPanel = ref(true)
 const isDescriptionExpanded = ref(false)
 
 // 🔥 КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Загружаем категории и продукт на сервере
@@ -162,7 +160,7 @@ const totalPrice = computed(() => {
   let total = mainProductPrice.value.final
 
   // Добавляем цены выбранных аксессуаров с учетом их скидок
-  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  const selected = (accessories.value || []).filter((acc: ProductWithImages) => selectedAccessoryIds.value.includes(acc.id))
   for (const acc of selected) {
     const accPrice = formatPriceWithDiscount(
       Number(acc.price),
@@ -177,7 +175,7 @@ const totalBonuses = computed(() => {
   if (!product.value)
     return 0
   let total = Number(product.value.bonus_points_award || 0)
-  const selected = (accessories.value || []).filter(acc => selectedAccessoryIds.value.includes(acc.id))
+  const selected = (accessories.value || []).filter((acc: ProductWithImages) => selectedAccessoryIds.value.includes(acc.id))
   for (const acc of selected) {
     total += Number(acc.bonus_points_award || 0)
   }
@@ -224,7 +222,7 @@ async function addToCart() {
   }
 
   // Add selected accessories to cart
-  const selectedAccessories = (accessories.value || []).filter(acc =>
+  const selectedAccessories = (accessories.value || []).filter((acc: ProductWithImages) =>
     selectedAccessoryIds.value.includes(acc.id),
   )
 
@@ -252,29 +250,6 @@ async function addToCart() {
 }
 
 useFlipCounter(totalPrice, digitColumns)
-
-onMounted(() => {
-  if (!similarProductsRef.value)
-    return
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        showStickyPanel.value = !entry.isIntersecting
-      })
-    },
-    {
-      rootMargin: '-64px 0px 0px 0px',
-      threshold: 0,
-    },
-  )
-
-  observer.observe(similarProductsRef.value)
-
-  onUnmounted(() => {
-    observer.disconnect()
-  })
-})
 
 const quantity = ref(1)
 
@@ -470,7 +445,7 @@ const productImages = computed(() => {
     return ['https://uhti.kz/og-default.jpg']
   }
 
-  return product.value.product_images.map(img =>
+  return product.value.product_images.map((img: ProductImageRow) =>
     `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${img.image_url}`,
   )
 })
@@ -991,73 +966,83 @@ useHead(() => ({
       </ClientOnly>
     </div>
 
-    <!-- Стики панель для мобильных -->
+    <!-- 🎯 Sticky панель для мобильных (компактная версия) -->
     <ClientOnly>
-      <Transition
-        enter-active-class="transition-transform duration-300 ease-out"
-        enter-from-class="translate-y-full"
-        enter-to-class="translate-y-0"
-        leave-active-class="transition-transform duration-300 ease-in"
-        leave-from-class="translate-y-0"
-        leave-to-class="translate-y-full"
+      <div
+        v-if="product"
+        class="lg:hidden fixed bottom-16 left-0 right-0 bg-white border-t shadow-[0_-2px_8px_rgba(0,0,0,0.1)] z-40"
       >
-        <div
-          v-if="product && showStickyPanel"
-          class="lg:hidden sticky bottom-16 left-0 right-0 bg-white border-t shadow-lg z-40"
-        >
-          <div class="px-4 py-3">
-            <div class="flex items-center gap-3 justify-between">
-              <div v-if="!mainItemInCart" class="flex-shrink-0">
-                <p class="text-xs text-muted-foreground mb-0.5">
-                  Цена
-                </p>
-                <p class="text-xl font-bold text-primary">
-                  {{ formatPrice(totalPrice) }} ₸
-                </p>
+        <!-- Если товар НЕ в корзине - показываем цену + кнопку -->
+        <div v-if="!mainItemInCart" class="px-3 py-2">
+          <div class="flex items-center justify-between gap-3">
+            <!-- Блок цены -->
+            <div class="flex flex-col gap-0.5">
+              <!-- Старая цена + скидка (если есть) -->
+              <div v-if="mainProductPrice.hasDiscount" class="flex items-center gap-1.5">
+                <span class="text-xs text-muted-foreground line-through">
+                  {{ formatPrice(mainProductPrice.original) }} ₸
+                </span>
+                <Badge variant="destructive" class="text-[10px] px-1 py-0 h-4">
+                  -{{ product.discount_percentage }}%
+                </Badge>
               </div>
 
-              <template v-if="product.stock_quantity > 0">
-                <Button
-                  v-if="!mainItemInCart"
-                  size="lg"
-                  class="h-11 text-base font-semibold"
-                  @click="addToCart"
-                >
-                  <Icon name="lucide:shopping-cart" class="w-5 h-5 mr-2" />
-                  В корзину
-                </Button>
-
-                <div v-else class="flex justify-between items-center gap-3 flex-grow">
-                  <Button
-                    size="lg"
-                    class="h-11 text-base font-semibold"
-                    @click="router.push('/cart')"
-                  >
-                    <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
-                    В корзине
-                  </Button>
-
-                  <QuantitySelector
-                    :product="product"
-                    :quantity="quantityInCart"
-                    class="w-auto"
-                  />
-                </div>
-              </template>
-
-              <Button v-else size="lg" class="flex-grow h-11" disabled>
-                Нет в наличии
-              </Button>
+              <!-- Текущая цена (компактно) -->
+              <div class="flex items-baseline gap-0.5">
+                <span class="text-2xl font-bold leading-none">
+                  {{ formatPrice(mainProductPrice.final) }}
+                </span>
+                <span class="text-xl font-bold">₸</span>
+              </div>
             </div>
+
+            <!-- Кнопка в корзину -->
+            <Button
+              v-if="product.stock_quantity > 0"
+              size="sm"
+              class="h-9 text-sm font-semibold px-4"
+              @click="addToCart"
+            >
+              <Icon name="lucide:shopping-cart" class="w-4 h-4 mr-1.5" />
+              В корзину
+            </Button>
+
+            <Button
+              v-else
+              size="sm"
+              class="h-9 text-sm px-4"
+              disabled
+            >
+              Нет в наличии
+            </Button>
           </div>
         </div>
-      </Transition>
+
+        <!-- Если товар УЖЕ в корзине - показываем кнопку перехода + селектор количества -->
+        <div v-else class="px-3 py-2">
+          <div class="flex items-center gap-3">
+            <Button
+              size="sm"
+              class="h-9 text-sm font-semibold px-4"
+              @click="router.push('/cart')"
+            >
+              <Icon name="lucide:shopping-bag" class="w-4 h-4 mr-1.5" />
+              В корзине ({{ quantityInCart }})
+            </Button>
+
+            <QuantitySelector
+              :product="product"
+              :quantity="quantityInCart"
+              class="flex-shrink-0"
+            />
+          </div>
+        </div>
+      </div>
     </ClientOnly>
 
     <!-- ✅ Похожие товары с независимой загрузкой -->
     <div
       v-if="similarProductsLoading || (similarProducts && similarProducts.length > 0)"
-      ref="similarProductsRef"
       class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12"
     >
       <!-- Скелетон для похожих товаров -->
