@@ -5,7 +5,7 @@ import { useAuth } from '@/composables/auth/useAuth'
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
 
-
+</script>
 <template>
   <div class="hidden md:block">
     <CommonHeader />
