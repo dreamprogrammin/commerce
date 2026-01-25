@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from '@/components/ui/button/Button.vue'
 import { useAuth } from '@/composables/auth/useAuth'
+import { useCacheManager } from '@/composables/useCacheManager'
 
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
