@@ -5,6 +5,8 @@
 interface IndexingResult {
   success: boolean
   indexnow: { submitted: boolean, error?: string, urls_count: number }
+  yandex_ping: { submitted: boolean, error?: string }
+  bing_ping: { submitted: boolean, error?: string }
 }
 
 // ✅ Добавляем интерфейс для результата переиндексации
@@ -43,10 +45,24 @@ export function useSeoIndexing() {
 
       if (!options?.silent) {
         if (result.success) {
-          console.log(`✅ SEO: ${result.indexnow.urls_count} URL отправлено в IndexNow`)
+          const methods = []
+          if (result.indexnow.submitted) {
+            methods.push(`IndexNow (${result.indexnow.urls_count} URL)`)
+          }
+          if (result.yandex_ping.submitted) {
+            methods.push('Yandex Ping')
+          }
+          if (result.bing_ping.submitted) {
+            methods.push('Bing Ping')
+          }
+          console.log(`✅ SEO: ${methods.join(' + ')}`)
         }
         else {
-          console.warn(`⚠️ SEO: Ошибка индексации - ${result.indexnow.error}`)
+          const errors = []
+          if (result.indexnow.error) errors.push(`IndexNow: ${result.indexnow.error}`)
+          if (result.yandex_ping.error) errors.push(`Yandex: ${result.yandex_ping.error}`)
+          if (result.bing_ping.error) errors.push(`Bing: ${result.bing_ping.error}`)
+          console.warn(`⚠️ SEO: ${errors.join(', ')}`)
         }
       }
 

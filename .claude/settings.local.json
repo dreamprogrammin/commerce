@@ -53,7 +53,9 @@
       "Bash(git show:*)",
       "Bash(pnpm typecheck:*)",
       "Bash(tail:*)",
-      "Bash(npx vue-tsc:*)"
+      "Bash(npx vue-tsc:*)",
+      "WebSearch",
+      "WebFetch(domain:nuxtseo.com)"
     ]
   }
 }

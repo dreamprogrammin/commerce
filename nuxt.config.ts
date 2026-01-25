@@ -112,6 +112,40 @@ export default defineNuxtConfig({
           '/*?*',
         ],
       },
+      // Yandex-специфичная конфигурация для очистки параметров фильтров
+      {
+        userAgent: ['Yandex'],
+        cleanParam: [
+          // Сортировка и пагинация
+          'sort_by',
+          'page',
+
+          // Фильтры каталога
+          'brands',
+          'subcategories',
+          'materials',
+          'countries',
+          'price_min',
+          'price_max',
+
+          // Динамические атрибуты (возраст, размер и т.д.)
+          'attr_age',
+          'attr_size',
+          'attr_color',
+          'attr_material',
+          'attr_gender',
+
+          // UTM метки и tracking
+          'utm_source',
+          'utm_medium',
+          'utm_campaign',
+          'utm_content',
+          'utm_term',
+          'fbclid',
+          'gclid',
+          'yclid',
+        ],
+      },
     ],
     sitemap: [
       'https://uhti.kz/sitemap.xml',

@@ -2,10 +2,14 @@
  * API для автоматического уведомления поисковиков о новых/обновлённых страницах
  *
  * Поддерживает:
- * - IndexNow (мгновенная индексация для Yandex, Bing, Seznam, Naver)
+ * - IndexNow (Yandex, Bing, Seznam, Naver) - БЕЗ ЛИМИТОВ ✅
+ * - Yandex Webmaster Ping (неофициальный) - БЕЗ ЛИМИТОВ ⚠️
+ * - Bing Webmaster Ping (только для новых sitemap) - Ограничен ⚠️
  *
- * ПРИМЕЧАНИЕ:
- * - Для Google используйте Search Console или ждите естественного краулинга по sitemap
+ * Для Google:
+ * - Используется естественный краулинг через sitemap.xml (в robots.txt)
+ * - Google автоматически проверяет sitemap каждые несколько дней
+ * - Для критичных страниц можно использовать Google Indexing API (200 URL/день)
  */
 
 interface NotifyRequest {
@@ -16,6 +20,8 @@ interface NotifyRequest {
 interface NotifyResult {
   success: boolean
   indexnow: { submitted: boolean, error?: string, urls_count: number }
+  yandex_ping: { submitted: boolean, error?: string }
+  bing_ping: { submitted: boolean, error?: string }
 }
 
 export default defineEventHandler(async (event): Promise<NotifyResult> => {
@@ -47,9 +53,11 @@ export default defineEventHandler(async (event): Promise<NotifyResult> => {
   const result: NotifyResult = {
     success: false,
     indexnow: { submitted: false, urls_count: 0 },
+    yandex_ping: { submitted: false },
+    bing_ping: { submitted: false },
   }
 
-  // IndexNow для Yandex/Bing/Seznam/Naver
+  // --- IndexNow для Yandex/Bing/Seznam/Naver (БЕЗ ЛИМИТОВ) ---
   const indexNowKey = config.indexnowKey
 
   if (indexNowKey) {
@@ -89,7 +97,64 @@ export default defineEventHandler(async (event): Promise<NotifyResult> => {
     console.warn('[SEO] IndexNow key not found, skipping')
   }
 
-  result.success = result.indexnow.submitted
+  // --- Yandex Webmaster Ping (неофициальный, но может работать) ---
+  try {
+    const sitemapUrl = `${siteUrl}/sitemap.xml`
+    const yandexPingUrl = `https://webmaster.yandex.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
+
+    const yandexResponse = await fetch(yandexPingUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'UhtiBot/1.0 (+https://uhti.kz)',
+      },
+    })
+
+    result.yandex_ping.submitted = yandexResponse.ok
+
+    if (!yandexResponse.ok) {
+      result.yandex_ping.error = `HTTP ${yandexResponse.status}`
+    }
+    else {
+      console.log(`✅ [SEO] Yandex ping отправлен`)
+    }
+  }
+  catch (error: any) {
+    result.yandex_ping.error = error.message
+    // Не логируем ошибку - это неофициальный API
+  }
+
+  // --- Bing Webmaster Ping (только для новых sitemap) ---
+  try {
+    const sitemapUrl = `${siteUrl}/sitemap.xml`
+    const bingPingUrl = `https://www.bing.com/webmaster/ping.aspx?siteMap=${encodeURIComponent(sitemapUrl)}`
+
+    const bingResponse = await fetch(bingPingUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'UhtiBot/1.0 (+https://uhti.kz)',
+      },
+    })
+
+    result.bing_ping.submitted = bingResponse.ok
+
+    if (!bingResponse.ok) {
+      result.bing_ping.error = `HTTP ${bingResponse.status}`
+    }
+    else {
+      console.log(`✅ [SEO] Bing ping отправлен`)
+    }
+  }
+  catch (error: any) {
+    result.bing_ping.error = error.message
+    // Не логируем ошибку - это ограниченный API
+  }
+
+  // ℹ️ Для Google используется естественный краулинг
+  // Sitemap.xml автоматически краулится Google (указан в robots.txt)
+  // Google проверяет sitemap каждые несколько дней
+  // Sitemap Ping был отключен Google в конце 2023 года
+
+  result.success = result.indexnow.submitted || result.yandex_ping.submitted || result.bing_ping.submitted
 
   return result
 })
