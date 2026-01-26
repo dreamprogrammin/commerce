@@ -273,7 +273,37 @@ useHead({
         ],
       }),
     },
-    // ProductCollection Schema
+    // Brand Schema для линейки (суб-бренд)
+    {
+      type: 'application/ld+json',
+      innerHTML: () => productLine.value && brand.value
+        ? JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Brand',
+            '@id': `${pageUrl.value}#brand`,
+            'name': productLine.value.name,
+            'description': productLine.value.seo_description || productLine.value.description || undefined,
+            'url': pageUrl.value,
+            ...(lineLogoUrl.value && {
+              logo: lineLogoUrl.value,
+              image: lineLogoUrl.value,
+            }),
+            // Связь с родительским брендом
+            'parentOrganization': {
+              '@type': 'Brand',
+              '@id': `${siteUrl}/brand/${brand.value.slug}#brand`,
+              'name': brand.value.name,
+              'url': `${siteUrl}/brand/${brand.value.slug}`,
+              ...(brandLogoUrl.value && { logo: brandLogoUrl.value }),
+            },
+            // Ключевые слова
+            ...(productLine.value.seo_keywords?.length && {
+              keywords: productLine.value.seo_keywords.join(', '),
+            }),
+          })
+        : '{}',
+    },
+    // CollectionPage Schema
     {
       type: 'application/ld+json',
       innerHTML: () => productLine.value && brand.value
@@ -290,9 +320,34 @@ useHead({
               'url': siteUrl,
             },
             'about': {
-              '@type': 'Brand',
-              'name': brand.value.name,
-              'url': `${siteUrl}/brand/${brand.value.slug}`,
+              '@id': `${pageUrl.value}#brand`,
+            },
+            'mainEntity': {
+              '@type': 'ItemList',
+              'numberOfItems': products.value.length,
+              'itemListElement': products.value.slice(0, 10).map((product, index) => ({
+                '@type': 'ListItem',
+                'position': index + 1,
+                'item': {
+                  '@type': 'Product',
+                  'name': product.name,
+                  'url': `${siteUrl}/catalog/products/${product.slug}`,
+                  ...(product.product_images?.[0]?.image_url && {
+                    image: product.product_images[0].image_url,
+                  }),
+                  'offers': {
+                    '@type': 'Offer',
+                    'price': product.price,
+                    'priceCurrency': 'KZT',
+                    'availability': product.stock > 0
+                      ? 'https://schema.org/InStock'
+                      : 'https://schema.org/OutOfStock',
+                  },
+                  'brand': {
+                    '@id': `${pageUrl.value}#brand`,
+                  },
+                },
+              })),
             },
           })
         : '{}',

@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import type { IBreadcrumbItem, ProductWithGallery } from '@/types'
+import type { IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import { ArrowLeft, ChevronDown, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const route = useRoute()
+const supabase = useSupabaseClient()
 const productsStore = useProductsStore()
 const { getImageUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
@@ -57,10 +58,35 @@ async function loadProducts() {
   isLoading.value = false
 }
 
-// Загружаем товары при монтировании и при изменении сортировки
+// Загружаем линейки бренда для Schema
+const brandProductLines = ref<ProductLine[]>([])
+
+async function loadProductLines() {
+  if (!brand.value) {
+    return
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('product_lines')
+      .select('*')
+      .eq('brand_id', brand.value.id)
+      .order('name', { ascending: true })
+
+    if (!error && data) {
+      brandProductLines.value = data as ProductLine[]
+    }
+  }
+  catch (err) {
+    console.error('Error loading product lines:', err)
+  }
+}
+
+// Загружаем товары и линейки при монтировании и при изменении сортировки
 watchEffect(() => {
   if (brand.value) {
     loadProducts()
+    loadProductLines()
   }
 })
 
@@ -177,13 +203,14 @@ useHead({
         ],
       }),
     },
-    // Brand Schema
+    // Brand Schema с линейками как subOrganization
     {
       type: 'application/ld+json',
       innerHTML: () => brand.value
         ? JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'Brand',
+            '@id': `${brandUrl.value}#brand`,
             'name': brand.value.name,
             'description': brand.value.seo_description || brand.value.description || undefined,
             'url': brandUrl.value,
@@ -194,6 +221,19 @@ useHead({
             // Ключевые слова
             ...(brand.value.seo_keywords?.length && {
               keywords: brand.value.seo_keywords.join(', '),
+            }),
+            // Линейки как суб-бренды
+            ...(brandProductLines.value.length > 0 && {
+              subOrganization: brandProductLines.value.map(line => ({
+                '@type': 'Brand',
+                '@id': `${siteUrl}/brand/${brand.value!.slug}/${line.slug}#brand`,
+                'name': line.name,
+                'url': `${siteUrl}/brand/${brand.value!.slug}/${line.slug}`,
+                ...(line.logo_url && {
+                  logo: getImageUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, IMAGE_SIZES.PRODUCT_LINE_LOGO),
+                }),
+                ...(line.description && { description: line.description }),
+              })),
             }),
           })
         : '{}',
