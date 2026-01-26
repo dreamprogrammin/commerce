@@ -8,6 +8,8 @@ import type {
   ProductFormData,
   ProductImageRow,
   ProductInsert,
+  ProductLine,
+  ProductLineInsert,
   ProductSearchResult,
   ProductUpdate,
   ProductWithImages,
@@ -20,6 +22,7 @@ import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
+import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import {
   formatFileSize,
@@ -30,6 +33,7 @@ import {
 } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
+import ProductLineForm from '../product-lines/ProductLineForm.vue'
 
 interface NewImageFile {
   id: string
@@ -68,6 +72,7 @@ const emit = defineEmits<{
 const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
 const brandsStore = useAdminBrandsStore()
+const productLinesStore = useAdminProductLinesStore()
 const { getImageUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
@@ -97,6 +102,10 @@ const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
 const brandSearchQuery = ref('')
+const productLineSearchQuery = ref('')
+const brandProductLines = ref<ProductLine[]>([])
+const isProductLineDialogOpen = ref(false)
+const isLoadingProductLines = ref(false)
 const fileInputKey = ref(0)
 const isSlugManuallyEdited = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -129,6 +138,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       is_accessory: product.is_accessory || false,
       sku: product.sku,
       brand_id: product.brand_id,
+      product_line_id: (product as any).product_line_id || null,
       origin_country_id: product.origin_country_id,
       discount_percentage: product.discount_percentage || 0,
       material_id: product.material_id,
@@ -169,6 +179,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       is_accessory: false,
       sku: null,
       brand_id: null,
+      product_line_id: null,
       origin_country_id: null,
       discount_percentage: 0,
       material_id: null,
@@ -201,6 +212,15 @@ const filteredBrands = computed(() => {
   )
 })
 
+const filteredProductLines = computed(() => {
+  if (!productLineSearchQuery.value) {
+    return brandProductLines.value
+  }
+  return brandProductLines.value.filter(line =>
+    line.name.toLowerCase().includes(productLineSearchQuery.value.toLowerCase()),
+  )
+})
+
 // --- 6. ОБРАБОТЧИКИ СОБЫТИЙ ---
 
 async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
@@ -214,6 +234,41 @@ async function handleBrandCreate(payload: { data: BrandInsert | BrandUpdate, fil
     brandSearchQuery.value = ''
   }
 }
+
+async function handleProductLineCreate(payload: { data: ProductLineInsert, file: File | null }) {
+  const newLine = await productLinesStore.createProductLine(payload.data, payload.file)
+  if (newLine) {
+    isProductLineDialogOpen.value = false
+    // Перезагружаем линейки текущего бренда
+    if (formData.value.brand_id) {
+      brandProductLines.value = await productLinesStore.fetchProductLinesByBrand(formData.value.brand_id)
+    }
+    await nextTick()
+    formData.value.product_line_id = newLine.id
+    productLineSearchQuery.value = ''
+  }
+}
+
+// Загружаем линейки при смене бренда
+watch(() => formData.value.brand_id, async (newBrandId, oldBrandId) => {
+  // Сбрасываем линейку при смене бренда
+  if (newBrandId !== oldBrandId) {
+    formData.value.product_line_id = null
+  }
+
+  if (newBrandId) {
+    isLoadingProductLines.value = true
+    try {
+      brandProductLines.value = await productLinesStore.fetchProductLinesByBrand(newBrandId)
+    }
+    finally {
+      isLoadingProductLines.value = false
+    }
+  }
+  else {
+    brandProductLines.value = []
+  }
+}, { immediate: true })
 
 async function handleCategoryChange(categoryId: string | null) {
   if (!categoryId) {
@@ -975,6 +1030,85 @@ const seoKeywordsString = computed({
                   <DialogTitle>Создать новый бренд</DialogTitle>
                 </DialogHeader>
                 <BrandForm :initial-name="brandSearchQuery" @submit="handleBrandCreate" />
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <!-- Линейка продуктов (показывается только если выбран бренд) -->
+          <div v-if="formData.brand_id">
+            <Label>Линейка (опционально)</Label>
+            <p class="text-xs text-muted-foreground mb-2">
+              Например: Barbie, Hot Wheels для Mattel
+            </p>
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  class="w-full justify-between font-normal"
+                  :disabled="isLoadingProductLines"
+                >
+                  <span v-if="isLoadingProductLines" class="text-muted-foreground">
+                    Загрузка...
+                  </span>
+                  <span v-else-if="formData.product_line_id" class="truncate">
+                    {{ brandProductLines.find(l => l.id === formData.product_line_id)?.name }}
+                  </span>
+                  <span v-else class="text-muted-foreground">
+                    Выберите линейку...
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-[--radix-popover-trigger-width] p-0">
+                <Command v-model:model-value="productLineSearchQuery">
+                  <CommandInput placeholder="Поиск или создание линейки..." />
+                  <CommandList>
+                    <CommandEmpty>
+                      <div
+                        class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                        @click="() => { isProductLineDialogOpen = true }"
+                      >
+                        ➕ Создать новую линейку
+                      </div>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value=""
+                        @select="() => { formData.product_line_id = null }"
+                      >
+                        Без линейки
+                      </CommandItem>
+                      <CommandItem
+                        v-for="line in filteredProductLines"
+                        :key="line.id"
+                        :value="line.name"
+                        @select="() => { formData.product_line_id = line.id }"
+                      >
+                        <Check
+                          :class="formData.product_line_id === line.id ? 'opacity-100' : 'opacity-0'"
+                          class="mr-2 h-4 w-4"
+                        />
+                        {{ line.name }}
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <Dialog v-model:open="isProductLineDialogOpen">
+              <DialogContent class="sm:max-w-[525px]">
+                <DialogHeader>
+                  <DialogTitle>Создать новую линейку</DialogTitle>
+                  <DialogDescription>
+                    Линейка для бренда: {{ brands.find(b => b.id === formData.brand_id)?.name }}
+                  </DialogDescription>
+                </DialogHeader>
+                <ProductLineForm
+                  :brand-id="formData.brand_id!"
+                  :initial-name="productLineSearchQuery"
+                  @submit="handleProductLineCreate"
+                />
               </DialogContent>
             </Dialog>
           </div>

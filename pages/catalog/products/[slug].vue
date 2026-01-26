@@ -352,6 +352,14 @@ const categoryName = computed(() => product.value?.categories?.name)
 const categorySlug = computed(() => product.value?.categories?.slug)
 const brandName = computed(() => product.value?.brands?.name)
 const brandSlug = computed(() => product.value?.brands?.slug)
+const productLineName = computed(() => (product.value as any)?.product_lines?.name)
+const productLineSlug = computed(() => (product.value as any)?.product_lines?.slug)
+
+// Ссылка на страницу линейки (если будет создана)
+const productLineLink = computed(() => {
+  if (!productLineSlug.value || !brandSlug.value) return null
+  return `/brand/${brandSlug.value}/${productLineSlug.value}`
+})
 
 const metaKeywords = computed(() => {
   const keywords: string[] = []
@@ -612,30 +620,48 @@ useHead(() => ({
                   {{ product.name }}
                 </h1>
 
-                <!-- 🔥 Бренд товара (как у detmir.kz) -->
-                <NuxtLink
-                  v-if="brandName && brandLink"
-                  :to="brandLink"
-                  class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-4 group"
-                >
-                  <!-- Логотип бренда или fallback иконка -->
-                  <div class="w-6 h-6 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <ProgressiveImage
-                      v-if="product.brands?.logo_url"
-                      :src="brandLogoUrl"
-                      :alt="brandName || 'Бренд'"
-                      :bucket-name="BUCKET_NAME_BRANDS"
-                      :file-path="product.brands.logo_url"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full"
-                    />
-                    <Icon v-else name="lucide:building-2" class="w-4 h-4" />
-                  </div>
-                  <span class="group-hover:underline">{{ brandName }}</span>
-                  <Icon name="lucide:chevron-right" class="w-3 h-3 opacity-50" />
-                </NuxtLink>
+                <!-- 🔥 Бренд и линейка товара -->
+                <div v-if="brandName || productLineName" class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-4">
+                  <!-- Бренд -->
+                  <NuxtLink
+                    v-if="brandName && brandLink"
+                    :to="brandLink"
+                    class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
+                  >
+                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <ProgressiveImage
+                        v-if="product.brands?.logo_url"
+                        :src="brandLogoUrl"
+                        :alt="brandName || 'Бренд'"
+                        :bucket-name="BUCKET_NAME_BRANDS"
+                        :file-path="product.brands.logo_url"
+                        aspect-ratio="square"
+                        object-fit="contain"
+                        placeholder-type="shimmer"
+                        class="w-full h-full"
+                      />
+                      <Icon v-else name="lucide:building-2" class="w-3 h-3" />
+                    </div>
+                    <span class="group-hover:underline">{{ brandName }}</span>
+                  </NuxtLink>
+
+                  <!-- Разделитель между брендом и линейкой -->
+                  <span v-if="brandName && productLineName" class="text-muted-foreground/50">/</span>
+
+                  <!-- Линейка -->
+                  <NuxtLink
+                    v-if="productLineName && productLineLink"
+                    :to="productLineLink"
+                    class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
+                  >
+                    <Icon name="lucide:sparkles" class="w-4 h-4 text-primary/70" />
+                    <span class="group-hover:underline font-medium">{{ productLineName }}</span>
+                  </NuxtLink>
+                  <span v-else-if="productLineName" class="inline-flex items-center gap-1.5">
+                    <Icon name="lucide:sparkles" class="w-4 h-4 text-primary/70" />
+                    <span class="font-medium">{{ productLineName }}</span>
+                  </span>
+                </div>
 
                 <div class="mb-6 lg:mb-8">
                   <!-- Старая цена (зачеркнутая) если есть скидка -->
@@ -793,6 +819,23 @@ useHead(() => ({
                 </dd>
               </div>
 
+              <!-- Линейка -->
+              <div v-if="productLineName" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Линейка
+                </dt>
+                <dd class="product-spec-value">
+                  <NuxtLink
+                    v-if="productLineLink"
+                    :to="productLineLink"
+                    class="text-primary hover:underline"
+                  >
+                    {{ productLineName }}
+                  </NuxtLink>
+                  <span v-else>{{ productLineName }}</span>
+                </dd>
+              </div>
+
               <!-- Категория -->
               <div v-if="categoryName" class="product-spec-row">
                 <dt class="product-spec-label">
@@ -898,6 +941,26 @@ useHead(() => ({
                   </p>
                   <p class="text-sm text-muted-foreground mt-0.5">
                     Бренд
+                  </p>
+                </div>
+                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
+              </NuxtLink>
+
+              <!-- Товары линейки -->
+              <NuxtLink
+                v-if="productLineName && productLineLink"
+                :to="productLineLink"
+                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
+              >
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border flex-shrink-0">
+                  <Icon name="lucide:sparkles" class="w-6 h-6 text-primary" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-base leading-tight">
+                    {{ productLineName }}
+                  </p>
+                  <p class="text-sm text-muted-foreground mt-0.5">
+                    Линейка {{ brandName }}
                   </p>
                 </div>
                 <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />

@@ -2,6 +2,32 @@ import type { Database, Tables, TablesInsert, TablesUpdate } from './supabase'
 
 export interface Brand extends Tables<'brands'> {}
 
+// Линейка продуктов (подбренд/франшиза, например: Mattel → Barbie, Hot Wheels)
+export interface ProductLine {
+  id: string
+  brand_id: string
+  name: string
+  slug: string
+  description: string | null
+  logo_url: string | null
+  seo_description: string | null
+  seo_keywords: string[] | null
+  created_at: string
+  updated_at: string
+}
+
+export type ProductLineInsert = Omit<ProductLine, 'id' | 'created_at' | 'updated_at'>
+export type ProductLineUpdate = Partial<ProductLineInsert>
+
+// Линейка с информацией о бренде (для фильтров)
+export interface ProductLineWithBrand extends ProductLine {
+  brand_name: string
+  product_count?: number
+}
+
+// Упрощенный тип для отображения
+export type SimpleProductLine = Pick<ProductLine, 'id' | 'name' | 'slug'>
+
 export interface Country extends Tables<'countries'> {}
 
 export interface Material extends Tables<'materials'> {}
@@ -198,6 +224,7 @@ export type FullProduct = ProductWithImages & {
   accessories?: ProductWithImages[]
 
   brands: Brand | null
+  product_lines: ProductLine | null // Линейка (Barbie, Hot Wheels)
   countries: Country | null
   materials: Material | null
 
@@ -224,6 +251,7 @@ export interface ProductFormData {
   max_age_years: number | null
   sku: string | null
   brand_id: string | null
+  product_line_id: string | null // Линейка продуктов (Barbie, Hot Wheels и т.д.)
   discount_percentage: number
   origin_country_id: number | null
   material_id: number | null

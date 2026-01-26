@@ -136,6 +136,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         categories(name, slug),
         product_images(*),
         brands(*),
+        product_lines(*),
         countries(*),
         materials(*),
         product_attribute_values!left(*, attributes!left(*, attribute_options!left(*)))

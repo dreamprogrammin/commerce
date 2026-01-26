@@ -289,6 +289,7 @@ export const useProductsStore = defineStore('productsStore', () => {
           categories(name, slug),
           product_images(*),
           brands(*),
+          product_lines(*),
           countries(*),
           materials(*),
           product_attribute_values(*, attributes(*, attribute_options(*)))

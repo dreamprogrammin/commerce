@@ -3,6 +3,7 @@ export const BUCKET_NAME_PRODUCT = 'product-images'
 export const NO_PARENT_OPTION_NAME = ''
 export const NO_PARENT_SLUG_VALUE_FOR_SELECT = '__NO_PARENT__'
 export const BUCKET_NAME_BRANDS = 'brand-logos'
+export const BUCKET_NAME_PRODUCT_LINES = 'product-line-logos'
 export const BUCKET_NAME_SLIDES = 'slides-images'
 export const BUCKET_NAME_BANNERS = 'banners'
 export const BANNER_PLACEMENTS = {
