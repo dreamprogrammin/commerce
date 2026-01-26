@@ -59,9 +59,12 @@ export function useSeoIndexing() {
         }
         else {
           const errors = []
-          if (result.indexnow.error) errors.push(`IndexNow: ${result.indexnow.error}`)
-          if (result.yandex_ping.error) errors.push(`Yandex: ${result.yandex_ping.error}`)
-          if (result.bing_ping.error) errors.push(`Bing: ${result.bing_ping.error}`)
+          if (result.indexnow.error)
+            errors.push(`IndexNow: ${result.indexnow.error}`)
+          if (result.yandex_ping.error)
+            errors.push(`Yandex: ${result.yandex_ping.error}`)
+          if (result.bing_ping.error)
+            errors.push(`Bing: ${result.bing_ping.error}`)
           console.warn(`⚠️ SEO: ${errors.join(', ')}`)
         }
       }

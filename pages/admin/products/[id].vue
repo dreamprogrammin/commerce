@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { AttributeValuePayload, ProductImageRow, ProductUpdate } from '@/types'
-import { useQueryClient } from '@tanstack/vue-query'
 import { toast } from 'vue-sonner'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'

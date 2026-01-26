@@ -1,18 +1,34 @@
 <script setup lang="ts">
 import type { Brand } from '@/types'
-import { Eye, MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next'
+import { Eye, MoreHorizontal, Pencil, Plus, Search, Sparkles, Trash2 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
+import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
 
 definePageMeta({ layout: 'admin' })
 
 const brandsStore = useAdminBrandsStore()
+const productLinesStore = useAdminProductLinesStore()
 const { brands, isLoading } = storeToRefs(brandsStore)
 const { getImageUrl } = useSupabaseStorage()
+
+// Кеш линеек по брендам
+const brandLinesCount = ref<Record<string, number>>({})
+
+// Загружаем количество линеек для каждого бренда
+async function loadLinesCount() {
+  await productLinesStore.fetchProductLines()
+  const lines = productLinesStore.productLines
+  const counts: Record<string, number> = {}
+  for (const line of lines) {
+    counts[line.brand_id] = (counts[line.brand_id] || 0) + 1
+  }
+  brandLinesCount.value = counts
+}
 
 // Поиск
 const searchQuery = ref('')
@@ -27,8 +43,9 @@ const filteredBrands = computed(() => {
   )
 })
 
-onMounted(() => {
-  brandsStore.fetchBrands()
+onMounted(async () => {
+  await brandsStore.fetchBrands()
+  await loadLinesCount()
 })
 
 // Логика удаления с AlertDialog
@@ -127,6 +144,9 @@ function getBrandLogoUrl(logoUrl: string | null): string {
               <TableHead class="hidden md:table-cell">
                 Слаг (URL)
               </TableHead>
+              <TableHead class="hidden md:table-cell">
+                Линеек
+              </TableHead>
               <TableHead class="hidden lg:table-cell">
                 Товаров
               </TableHead>
@@ -138,7 +158,7 @@ function getBrandLogoUrl(logoUrl: string | null): string {
           <TableBody>
             <!-- Пустое состояние -->
             <TableRow v-if="filteredBrands.length === 0">
-              <TableCell colspan="5" class="h-32 text-center">
+              <TableCell colspan="6" class="h-32 text-center">
                 <div class="flex flex-col items-center justify-center gap-2 text-muted-foreground">
                   <Search class="w-8 h-8 opacity-50" />
                   <p v-if="searchQuery">
@@ -177,6 +197,19 @@ function getBrandLogoUrl(logoUrl: string | null): string {
               <!-- Слаг (скрыт на мобильных) -->
               <TableCell class="hidden md:table-cell text-muted-foreground">
                 <code class="text-xs bg-muted px-2 py-1 rounded">{{ brand.slug }}</code>
+              </TableCell>
+
+              <!-- Количество линеек -->
+              <TableCell class="hidden md:table-cell">
+                <NuxtLink
+                  v-if="brandLinesCount[brand.id]"
+                  :to="`/admin/brands/${brand.id}?tab=lines`"
+                  class="inline-flex items-center gap-1.5 text-primary hover:underline"
+                >
+                  <Sparkles class="w-3.5 h-3.5" />
+                  {{ brandLinesCount[brand.id] }}
+                </NuxtLink>
+                <span v-else class="text-muted-foreground">—</span>
               </TableCell>
 
               <!-- Количество товаров (скрыто на планшетах) -->

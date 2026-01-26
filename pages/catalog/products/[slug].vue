@@ -6,7 +6,7 @@ import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -357,7 +357,8 @@ const productLineSlug = computed(() => (product.value as any)?.product_lines?.sl
 
 // Ссылка на страницу линейки (если будет создана)
 const productLineLink = computed(() => {
-  if (!productLineSlug.value || !brandSlug.value) return null
+  if (!productLineSlug.value || !brandSlug.value)
+    return null
   return `/brand/${brandSlug.value}/${productLineSlug.value}`
 })
 
@@ -409,6 +410,14 @@ const brandLogoUrl = computed(() => {
   if (!logoUrl)
     return null
   return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+})
+
+// URL логотипа линейки
+const productLineLogoUrl = computed(() => {
+  const logoUrl = (product.value as any)?.product_lines?.logo_url
+  if (!logoUrl)
+    return null
+  return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, IMAGE_SIZES.PRODUCT_LINE_LOGO)
 })
 
 // Ссылки для SEO блока "Ещё товары"
@@ -654,11 +663,37 @@ useHead(() => ({
                     :to="productLineLink"
                     class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
                   >
-                    <Icon name="lucide:sparkles" class="w-4 h-4 text-primary/70" />
+                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <ProgressiveImage
+                        v-if="(product as any)?.product_lines?.logo_url"
+                        :src="productLineLogoUrl"
+                        :alt="productLineName || 'Линейка'"
+                        :bucket-name="BUCKET_NAME_PRODUCT_LINES"
+                        :file-path="(product as any).product_lines.logo_url"
+                        aspect-ratio="square"
+                        object-fit="contain"
+                        placeholder-type="shimmer"
+                        class="w-full h-full"
+                      />
+                      <Icon v-else name="lucide:sparkles" class="w-3 h-3 text-primary/70" />
+                    </div>
                     <span class="group-hover:underline font-medium">{{ productLineName }}</span>
                   </NuxtLink>
                   <span v-else-if="productLineName" class="inline-flex items-center gap-1.5">
-                    <Icon name="lucide:sparkles" class="w-4 h-4 text-primary/70" />
+                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <ProgressiveImage
+                        v-if="(product as any)?.product_lines?.logo_url"
+                        :src="productLineLogoUrl"
+                        :alt="productLineName || 'Линейка'"
+                        :bucket-name="BUCKET_NAME_PRODUCT_LINES"
+                        :file-path="(product as any).product_lines.logo_url"
+                        aspect-ratio="square"
+                        object-fit="contain"
+                        placeholder-type="shimmer"
+                        class="w-full h-full"
+                      />
+                      <Icon v-else name="lucide:sparkles" class="w-3 h-3 text-primary/70" />
+                    </div>
                     <span class="font-medium">{{ productLineName }}</span>
                   </span>
                 </div>
@@ -952,8 +987,19 @@ useHead(() => ({
                 :to="productLineLink"
                 class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
               >
-                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border flex-shrink-0">
-                  <Icon name="lucide:sparkles" class="w-6 h-6 text-primary" />
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden flex-shrink-0">
+                  <ProgressiveImage
+                    v-if="(product as any)?.product_lines?.logo_url"
+                    :src="productLineLogoUrl"
+                    :alt="productLineName || 'Линейка'"
+                    :bucket-name="BUCKET_NAME_PRODUCT_LINES"
+                    :file-path="(product as any).product_lines.logo_url"
+                    aspect-ratio="square"
+                    object-fit="contain"
+                    placeholder-type="shimmer"
+                    class="w-full h-full p-1.5"
+                  />
+                  <Icon v-else name="lucide:sparkles" class="w-6 h-6 text-primary" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="font-semibold text-base leading-tight">

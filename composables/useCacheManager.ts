@@ -63,7 +63,8 @@ export function useCacheManager() {
     // Очищаем localStorage от persistence кеша
     try {
       localStorage.removeItem('tanstack-query-cache')
-    } catch (error) {
+    }
+    catch (error) {
       console.warn('Не удалось очистить localStorage:', error)
     }
 

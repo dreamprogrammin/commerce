@@ -48,27 +48,32 @@ async function handleUpdate(payload) {
 ### 3. Кнопки управления кешем
 
 #### В админ layout (доступно везде):
+
 - **Очистить кеш** - мягкая очистка TanStack Query кеша
 - **Полный сброс** - очистка кеша + localStorage + перезагрузка страницы
 
 #### На странице редактирования товара:
+
 - **Обновить данные** - принудительная перезагрузка товара из БД
 - **К списку** - возврат к списку товаров
 
 ## Типы кеша в приложении
 
 ### 1. TanStack Query Cache (в памяти)
+
 - **Lifetime**: До закрытия вкладки
 - **staleTime**: 5 минут
 - **gcTime**: 10 минут
 - **Persistence**: LocalStorage (`tanstack-query-cache`)
 
 ### 2. Nuxt useAsyncData Cache
+
 - **Lifetime**: До перезагрузки страницы
 - **Управление**: `refresh()` функция
 - **Не персистится** между перезагрузками
 
 ### 3. Pinia Store Cache
+
 - **Lifetime**: До закрытия вкладки
 - **Persistence**: LocalStorage (через `pinia-plugin-persistedstate`)
 - **Очистка**: Установка значений в `[]` или `null`
@@ -76,6 +81,7 @@ async function handleUpdate(payload) {
 ## Как работает обновление изображений
 
 ### 1. Пользователь меняет порядок изображений
+
 ```typescript
 // ProductForm.vue
 function setPrimaryExistingImage(index: number) {
@@ -86,6 +92,7 @@ function setPrimaryExistingImage(index: number) {
 ```
 
 ### 2. При сохранении обновляется `display_order`
+
 ```typescript
 // adminProductsStore.ts - _manageProductImages()
 if (existingImages.length > 0) {
@@ -99,19 +106,22 @@ if (existingImages.length > 0) {
 ```
 
 ### 3. Кеш очищается и данные перезагружаются
+
 ```typescript
 await clearProductCache(productId) // Инвалидация запросов
-await refresh()                     // Перезагрузка useAsyncData
+await refresh() // Перезагрузка useAsyncData
 ```
 
 ## Best Practices
 
 ### ✅ DO:
+
 - Используйте `clearProductCache(id)` для очистки кеша конкретного товара
 - Вызывайте `refresh()` после инвалидации для немедленного обновления
 - Используйте кнопку "Обновить данные" если изменения не видны
 
 ### ❌ DON'T:
+
 - Не вызывайте `hardReset()` без необходимости (перезагружает страницу)
 - Не забывайте очищать Pinia store при мутациях (`products = []`)
 - Не полагайтесь только на инвалидацию без `refresh()` для useAsyncData
@@ -119,17 +129,20 @@ await refresh()                     // Перезагрузка useAsyncData
 ## Troubleshooting
 
 ### Изменения не видны после сохранения?
+
 1. Проверьте console на ошибки БД
 2. Нажмите "Обновить данные" на странице
 3. Если не помогло - "Очистить кеш" в header
 4. В крайнем случае - "Полный сброс"
 
 ### Главное изображение не меняется?
+
 1. Убедитесь что порядок сохранен в БД (проверьте `display_order`)
 2. Очистите кеш товара
 3. Обновите страницу вручную (F5)
 
 ### Кеш не очищается?
+
 1. Проверьте localStorage (DevTools → Application → Local Storage)
 2. Очистите `tanstack-query-cache` вручную
 3. Используйте "Полный сброс"

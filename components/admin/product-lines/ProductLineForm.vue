@@ -3,6 +3,7 @@ import type { ProductLine, ProductLineInsert } from '@/types'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_PRESETS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { slugify } from '@/utils/slugify'
 
@@ -31,6 +32,22 @@ const formData = ref<Partial<ProductLineInsert>>({
 const newLogoFile = ref<File | null>(null)
 const logoPreviewUrl = ref<string | null>(null)
 const isSlugManuallyEdited = ref(false)
+
+// Обновляем formData при изменении initialData (для редактирования)
+watch(() => props.initialData, (newData) => {
+  formData.value = {
+    brand_id: props.brandId,
+    name: newData?.name || props.initialName || '',
+    slug: newData?.slug || '',
+    description: newData?.description || null,
+    logo_url: newData?.logo_url || null,
+    seo_description: newData?.seo_description || null,
+    seo_keywords: newData?.seo_keywords || null,
+  }
+  newLogoFile.value = null
+  logoPreviewUrl.value = null
+  isSlugManuallyEdited.value = !!newData?.slug
+}, { immediate: false })
 
 // Автоматическая генерация slug при изменении названия
 watch(() => formData.value.name, (newName) => {
@@ -103,13 +120,7 @@ const displayLogoUrl = computed(() => {
 
   const logoUrl = formData.value.logo_url
   if (logoUrl && typeof logoUrl === 'string') {
-    return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, {
-      width: 200,
-      height: 200,
-      quality: 85,
-      format: 'webp',
-      resize: 'contain',
-    })
+    return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, IMAGE_PRESETS.PRODUCT_LINE_LOGO)
   }
 
   return null

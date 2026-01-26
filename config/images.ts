@@ -100,6 +100,12 @@ export const IMAGE_SIZES = {
     width: 200,
     height: 200,
   },
+
+  // Логотипы линеек продуктов (Barbie, Hot Wheels и т.д.)
+  PRODUCT_LINE_LOGO: {
+    width: 200,
+    height: 200,
+  },
 } as const
 
 /**
@@ -253,6 +259,22 @@ export const IMAGE_PRESETS = {
     quality: IMAGE_QUALITY.MEDIUM,
     format: IMAGE_FORMATS.MODERN,
     resize: 'cover' as const,
+  },
+
+  // Логотипы брендов
+  BRAND_LOGO: {
+    ...IMAGE_SIZES.BRAND_LOGO,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'contain' as const,
+  },
+
+  // Логотипы линеек продуктов (Barbie, Hot Wheels и т.д.)
+  PRODUCT_LINE_LOGO: {
+    ...IMAGE_SIZES.PRODUCT_LINE_LOGO,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'contain' as const,
   },
 } as const
 
