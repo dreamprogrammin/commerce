@@ -393,6 +393,15 @@ const metaKeywords = computed(() => {
       keywords.push(brandName.value)
     }
 
+    // Линейка продуктов (Barbie, Hot Wheels и т.д.)
+    if (productLineName.value) {
+      keywords.push(productLineName.value)
+      // Комбинация бренд + линейка для поиска
+      if (brandName.value) {
+        keywords.push(`${brandName.value} ${productLineName.value}`)
+      }
+    }
+
     // Категория
     if (categoryName.value) {
       keywords.push(categoryName.value)
@@ -501,6 +510,8 @@ useHead(() => ({
     { property: 'product:price:currency', content: 'KZT' },
     { property: 'product:availability', content: (product.value?.stock_quantity || 0) > 0 ? 'in stock' : 'out of stock' },
     { property: 'product:brand', content: brandName.value || '' },
+    // Линейка продуктов (Barbie, Hot Wheels)
+    ...(productLineName.value ? [{ property: 'product:product_line', content: productLineName.value }] : []),
     { property: 'product:category', content: categoryName.value || '' },
   ],
   link: [
@@ -531,14 +542,31 @@ useHead(() => ({
         'description': product.value?.seo_description || product.value?.description,
         'image': productImages.value,
         'sku': product.value?.sku || undefined,
-        'brand': {
-          '@type': 'Brand',
-          'name': brandName.value || 'Ухтышка',
-          // 🔥 URL страницы бренда для SEO
-          ...(brandLink.value && {
-            url: `https://uhti.kz${brandLink.value}`,
-          }),
-        },
+        // 🔥 Если есть линейка - показываем её как бренд с parentOrganization
+        // Это позволяет Google понять иерархию: Mattel → Barbie → Товар
+        'brand': productLineName.value
+          ? {
+              '@type': 'Brand',
+              '@id': `https://uhti.kz${productLineLink.value}#brand`,
+              'name': productLineName.value,
+              'url': `https://uhti.kz${productLineLink.value}`,
+              // Родительский бренд (Mattel для Barbie)
+              'parentOrganization': {
+                '@type': 'Brand',
+                '@id': `https://uhti.kz${brandLink.value}#brand`,
+                'name': brandName.value,
+                ...(brandLink.value && {
+                  url: `https://uhti.kz${brandLink.value}`,
+                }),
+              },
+            }
+          : {
+              '@type': 'Brand',
+              'name': brandName.value || 'Ухтышка',
+              ...(brandLink.value && {
+                url: `https://uhti.kz${brandLink.value}`,
+              }),
+            },
         'offers': {
           '@type': 'Offer',
           'price': String(Math.round(product.value?.price || 0)),
