@@ -146,6 +146,7 @@ export interface IProductFilters {
   categorySlug: string
   subCategoryIds?: string[]
   brandIds?: string[]
+  productLineIds?: string[]
   priceMin?: number
   priceMax?: number
   sortBy?: SortByType

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PropType } from 'vue'
-import type { AttributeWithValue, BrandForFilter, ColorOptionMeta, Country, Material } from '@/types'
+import type { AttributeWithValue, BrandForFilter, ColorOptionMeta, Country, Material, ProductLine } from '@/types'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 // --- 1. PROPS & EMITS ---
@@ -10,6 +10,7 @@ const props = defineProps({
       subCategoryIds: string[]
       price: [number, number]
       brandIds: string[]
+      productLineIds: string[]
       materialIds: string[]
       countryIds: string[]
       attributes: Record<string, (string | number)[]>
@@ -23,6 +24,10 @@ const props = defineProps({
   },
   availableBrands: {
     type: Array as PropType<BrandForFilter[]>,
+    default: () => [],
+  },
+  availableProductLines: {
+    type: Array as PropType<ProductLine[]>,
     default: () => [],
   },
   availableMaterials: {
@@ -55,6 +60,7 @@ const activeFiltersCount = computed(() => {
   let count = 0
   count += props.modelValue.subCategoryIds.length
   count += props.modelValue.brandIds.length
+  count += props.modelValue.productLineIds?.length || 0
   count += props.modelValue.materialIds.length
   count += props.modelValue.countryIds.length
   Object.values(props.modelValue.attributes).forEach((values) => {
@@ -98,7 +104,7 @@ function updateAttribute(checked: boolean, attributeSlug: string, optionId: stri
   })
 }
 
-function updateDirectFilter(checked: boolean, key: 'brandIds' | 'materialIds' | 'countryIds', id: string | number) {
+function updateDirectFilter(checked: boolean, key: 'brandIds' | 'productLineIds' | 'materialIds' | 'countryIds', id: string | number) {
   const stringId = String(id)
   const currentSelection: string[] = (props.modelValue[key] || []).map(String)
   const newSelection = new Set<string>(currentSelection)
@@ -124,6 +130,7 @@ function resetFilters() {
     subCategoryIds: [],
     price: [props.priceRange.min, props.priceRange.max],
     brandIds: [],
+    productLineIds: [],
     materialIds: [],
     countryIds: [],
     attributes: {},
@@ -223,6 +230,41 @@ watch(() => props.priceRange, (newRange) => {
           </div>
           <div class="flex-1 text-left font-medium">
             {{ brand.name }}
+          </div>
+        </button>
+      </div>
+
+      <!-- 2.5. ЛИНЕЙКИ ПРОДУКТОВ -->
+      <div v-if="availableProductLines.length > 0" class="space-y-2 pt-3 border-t">
+        <div class="flex items-center gap-2 mb-2">
+          <Icon name="lucide:sparkles" class="w-4 h-4 text-muted-foreground" />
+          <h4 class="font-semibold text-sm">
+            Линейки
+          </h4>
+        </div>
+        <button
+          v-for="line in availableProductLines"
+          :key="line.id"
+          type="button"
+          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
+          :class="[
+            modelValue.productLineIds?.includes(line.id)
+              ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-md shadow-pink-500/20'
+              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
+          ]"
+          @click="updateDirectFilter(!modelValue.productLineIds?.includes(line.id), 'productLineIds', line.id)"
+        >
+          <div
+            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+            :class="modelValue.productLineIds?.includes(line.id) ? 'bg-white/20' : 'bg-background/50'"
+          >
+            <Icon
+              :name="modelValue.productLineIds?.includes(line.id) ? 'lucide:check' : 'lucide:sparkles'"
+              class="w-4 h-4"
+            />
+          </div>
+          <div class="flex-1 text-left font-medium">
+            {{ line.name }}
           </div>
         </button>
       </div>

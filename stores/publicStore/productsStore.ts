@@ -1,4 +1,4 @@
-import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, Country, Database, FullProduct, IProductFilters, Material, ProductRow, ProductWithGallery, ProductWithImages, SimpleBrand } from '@/types'
+import type { AccessoryProduct, AttributeWithValue, Brand, BrandForFilter, Country, Database, FullProduct, IProductFilters, Material, ProductLine, ProductRow, ProductWithGallery, ProductWithImages, SimpleBrand } from '@/types'
 import { toast } from 'vue-sonner'
 
 export const useProductsStore = defineStore('productsStore', () => {
@@ -9,6 +9,7 @@ export const useProductsStore = defineStore('productsStore', () => {
   // ============================================
   const brands = ref<Brand[]>([])
   const brandsByCategory = ref<Record<string, BrandForFilter[]>>({})
+  const productLinesByCategory = ref<Record<string, ProductLine[]>>({})
   const attributesByCategory = ref<Record<string, AttributeWithValue[]>>({})
   const allMaterials = ref<Material[]>([])
   const allCountries = ref<Country[]>([])
@@ -61,6 +62,49 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
     catch (error: any) {
       console.error('Ошибка загрузки брендов для категории:', error)
+      return []
+    }
+  }
+
+  async function fetchProductLinesForCategory(categorySlug: string): Promise<ProductLine[]> {
+    if (!categorySlug || categorySlug === 'all')
+      return []
+
+    // Проверяем кэш
+    if (productLinesByCategory.value[categorySlug]) {
+      console.warn('✅ Product lines from cache:', categorySlug)
+      return productLinesByCategory.value[categorySlug]
+    }
+
+    console.warn('🌐 Fetching product lines from server:', categorySlug)
+
+    try {
+      const { data, error } = await supabase.rpc('get_product_lines_by_category_slug', {
+        p_category_slug: categorySlug,
+      })
+
+      if (error)
+        throw error
+
+      // Преобразуем результат RPC в ProductLine[]
+      const productLines: ProductLine[] = (data || []).map((line: any) => ({
+        id: line.id,
+        brand_id: line.brand_id,
+        name: line.name,
+        slug: line.slug,
+        description: null,
+        logo_url: null,
+        seo_description: null,
+        seo_keywords: null,
+        created_at: '',
+        updated_at: '',
+      }))
+
+      productLinesByCategory.value[categorySlug] = productLines
+      return productLines
+    }
+    catch (error: any) {
+      console.error('Ошибка загрузки линеек для категории:', error)
       return []
     }
   }
@@ -199,6 +243,7 @@ export const useProductsStore = defineStore('productsStore', () => {
 
   function clearCache() {
     brandsByCategory.value = {}
+    productLinesByCategory.value = {}
     attributesByCategory.value = {}
     allMaterials.value = []
     allCountries.value = []
@@ -209,9 +254,15 @@ export const useProductsStore = defineStore('productsStore', () => {
 
   function clearCategoryCache(categorySlug: string) {
     delete brandsByCategory.value[categorySlug]
+    delete productLinesByCategory.value[categorySlug]
     delete attributesByCategory.value[categorySlug]
     delete priceRangeByCategory.value[categorySlug]
     console.warn('🧹 Cache cleared for category:', categorySlug)
+  }
+
+  function invalidateProductLinesCache() {
+    productLinesByCategory.value = {}
+    console.warn('🧹 Product lines cache invalidated')
   }
 
   function invalidateBrandsCache() {
@@ -252,6 +303,7 @@ export const useProductsStore = defineStore('productsStore', () => {
         p_country_ids: filters.countryIds,
         p_material_ids: filters.materialIds,
         p_attributes: filters.attributes,
+        p_product_line_ids: filters.productLineIds,
       })
 
       if (error)
@@ -570,6 +622,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     // State
     brands,
     brandsByCategory,
+    productLinesByCategory,
     attributesByCategory,
     allMaterials,
     allCountries,
@@ -585,6 +638,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchSimilarProducts,
     fetchProductsByIds,
     fetchBrandsForCategory,
+    fetchProductLinesForCategory,
     fetchAttributesForCategory,
     getProductById,
     fetchPriceRangeForCategory,
@@ -598,6 +652,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     clearCache,
     clearCategoryCache,
     invalidateBrandsCache,
+    invalidateProductLinesCache,
     invalidateMaterialsCache,
     invalidateCountriesCache,
   }

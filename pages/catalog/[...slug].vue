@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
-import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductWithGallery, SortByType } from '@/types'
+import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductLine, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -42,6 +42,7 @@ const currentPage = ref(1)
 const PAGE_SIZE = 12
 const availableFilters = ref<AttributeWithValue[]>([])
 const availableBrands = ref<BrandForFilter[]>([])
+const availableProductLines = ref<ProductLine[]>([])
 const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
@@ -54,6 +55,7 @@ interface ActiveFilters {
   subCategoryIds: string[]
   price: [number, number]
   brandIds: string[]
+  productLineIds: string[]
   materialIds: string[]
   countryIds: string[]
   attributes: Record<string, (string | number)[]>
@@ -64,6 +66,7 @@ const activeFilters = ref<ActiveFilters>({
   subCategoryIds: getArrayFromQuery(route.query.subcategories),
   price: [0, 50000],
   brandIds: getArrayFromQuery(route.query.brands),
+  productLineIds: getArrayFromQuery(route.query.lines),
   materialIds: getArrayFromQuery(route.query.materials),
   countryIds: getArrayFromQuery(route.query.countries),
   attributes: {},
@@ -143,6 +146,7 @@ const activeFiltersCount = computed(() => {
   let count = 0
   count += activeFilters.value.subCategoryIds.length
   count += activeFilters.value.brandIds.length
+  count += activeFilters.value.productLineIds.length
   count += activeFilters.value.materialIds.length
   count += activeFilters.value.countryIds.length
 
@@ -173,6 +177,7 @@ const catalogFilters = computed<IProductFilters>(() => {
     sortBy: activeFilters.value.sortBy,
     subCategoryIds: activeFilters.value.subCategoryIds.length > 0 ? activeFilters.value.subCategoryIds : undefined,
     brandIds: activeFilters.value.brandIds.length > 0 ? activeFilters.value.brandIds : undefined,
+    productLineIds: activeFilters.value.productLineIds.length > 0 ? activeFilters.value.productLineIds : undefined,
     materialIds: activeFilters.value.materialIds.length > 0 ? activeFilters.value.materialIds : undefined,
     countryIds: activeFilters.value.countryIds.length > 0 ? activeFilters.value.countryIds : undefined,
     priceMin: activeFilters.value.price[0],
@@ -231,6 +236,7 @@ async function loadFilterData(slug: string) {
     // 🆕 Используем Promise.allSettled для продолжения при частичных ошибках
     const results = await Promise.allSettled([
       productsStore.fetchBrandsForCategory(slug),
+      productsStore.fetchProductLinesForCategory(slug),
       productsStore.fetchAttributesForCategory(slug),
       productsStore.fetchAllMaterials(),
       productsStore.fetchAllCountries(),
@@ -238,9 +244,10 @@ async function loadFilterData(slug: string) {
     ])
 
     // Обрабатываем успешные результаты
-    const [brandsResult, attributesResult, materialsResult, countriesResult, priceRangeResult] = results
+    const [brandsResult, productLinesResult, attributesResult, materialsResult, countriesResult, priceRangeResult] = results
 
     availableBrands.value = brandsResult.status === 'fulfilled' ? brandsResult.value : []
+    availableProductLines.value = productLinesResult.status === 'fulfilled' ? productLinesResult.value : []
     availableFilters.value = attributesResult.status === 'fulfilled' ? attributesResult.value : []
     availableMaterials.value = materialsResult.status === 'fulfilled' ? materialsResult.value : []
     availableCountries.value = countriesResult.status === 'fulfilled' ? countriesResult.value : []
@@ -268,6 +275,7 @@ async function loadFilterData(slug: string) {
       subCategoryIds: getArrayFromQuery(route.query.subcategories),
       price: [priceMinFromQuery, priceMaxFromQuery],
       brandIds: getArrayFromQuery(route.query.brands),
+      productLineIds: getArrayFromQuery(route.query.lines),
       materialIds: getArrayFromQuery(route.query.materials),
       countryIds: getArrayFromQuery(route.query.countries),
       attributes: newAttributeFilters,
@@ -359,6 +367,10 @@ function updateQueryParams() {
 
   if (activeFilters.value.brandIds.length > 0) {
     query.brands = activeFilters.value.brandIds
+  }
+
+  if (activeFilters.value.productLineIds.length > 0) {
+    query.lines = activeFilters.value.productLineIds
   }
 
   if (activeFilters.value.materialIds.length > 0) {
@@ -700,6 +712,7 @@ useRobotsRule(robotsRule)
             v-model="activeFilters"
             :available-filters="availableFilters"
             :available-brands="availableBrands"
+            :available-product-lines="availableProductLines"
             :price-range="priceRange"
             :available-materials="availableMaterials"
             :available-countries="availableCountries"
@@ -999,6 +1012,7 @@ useRobotsRule(robotsRule)
         :open="isMobileFiltersOpen"
         :available-filters="availableFilters"
         :available-brands="availableBrands"
+        :available-product-lines="availableProductLines"
         :price-range="priceRange"
         :available-materials="availableMaterials"
         :available-countries="availableCountries"

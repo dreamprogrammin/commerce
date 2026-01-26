@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Brand } from '@/types'
+import type { Brand, ProductLine } from '@/types'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 const props = defineProps<{
@@ -8,10 +8,12 @@ const props = defineProps<{
     price: [number, number] | undefined
     sortBy: string
     brandIds: string[]
+    productLineIds: string[]
   }
   isLoading: boolean
   priceRange: { min: number, max: number }
   brands: Brand[]
+  productLines: ProductLine[]
 }>()
 
 const emit = defineEmits<{
@@ -62,6 +64,22 @@ function updateBrand(checked: boolean, brandId: string) {
   emit('update:modelValue', { ...props.modelValue, brandIds: newIds })
 }
 
+function updateProductLine(checked: boolean, lineId: string) {
+  const newIds = [...(props.modelValue.productLineIds || [])]
+  if (checked) {
+    if (!newIds.includes(lineId)) {
+      newIds.push(lineId)
+    }
+  }
+  else {
+    const index = newIds.indexOf(lineId)
+    if (index > -1) {
+      newIds.splice(index, 1)
+    }
+  }
+  emit('update:modelValue', { ...props.modelValue, productLineIds: newIds })
+}
+
 watch(() => props.priceRange, (newRange) => {
   localPrice.value = [newRange.min, newRange.max]
 }, { deep: true })
@@ -100,6 +118,20 @@ watch(() => props.priceRange, (newRange) => {
           @update:model-value="(checked) => updateBrand(!!checked, brand.id)"
         />
         <Label :for="`brand-${brand.id}`" class="font-normal cursor-pointer">{{ brand.name }}</Label>
+      </div>
+    </div>
+
+    <div v-if="productLines.length > 0" class="space-y-4 pt-4 border-t">
+      <h4 class="font-semibold">
+        Линейки
+      </h4>
+      <div v-for="line in productLines" :key="line.id" class="flex items-center space-x-2">
+        <Checkbox
+          :id="`line-${line.id}`"
+          :checked="props.modelValue.productLineIds?.includes(line.id)"
+          @update:model-value="(checked) => updateProductLine(!!checked, line.id)"
+        />
+        <Label :for="`line-${line.id}`" class="font-normal cursor-pointer">{{ line.name }}</Label>
       </div>
     </div>
 
