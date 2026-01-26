@@ -1,4 +1,5 @@
 import { toast } from 'vue-sonner'
+import { useProfileStore } from '@/stores/core/profileStore'
 
 export interface OrderItem {
   id: string
