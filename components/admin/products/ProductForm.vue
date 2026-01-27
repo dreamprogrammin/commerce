@@ -647,7 +647,45 @@ const discountedPrice = computed(() => {
   return null
 })
 
-// --- 13. SEO ПОЛЯ ---
+// --- 13. СКИДКА И ПОРЯДОК ---
+
+const discountPercentageValue = computed({
+  get() { return formData.value.discount_percentage ?? undefined },
+  set(value) {
+    if (formData.value) {
+      formData.value.discount_percentage = typeof value === 'number' && value > 0 ? value : 0
+    }
+  },
+})
+
+const featuredOrderValue = computed({
+  get() { return formData.value.featured_order ?? undefined },
+  set(value) {
+    if (formData.value) {
+      formData.value.featured_order = typeof value === 'number' ? value : 0
+    }
+  },
+})
+
+const priceValue = computed({
+  get() { return formData.value.price ?? 0 },
+  set(value) {
+    if (formData.value) {
+      formData.value.price = typeof value === 'number' && value >= 0 ? value : 0
+    }
+  },
+})
+
+const stockQuantityValue = computed({
+  get() { return formData.value.stock_quantity ?? 0 },
+  set(value) {
+    if (formData.value) {
+      formData.value.stock_quantity = typeof value === 'number' && value >= 0 ? value : 0
+    }
+  },
+})
+
+// --- 14. SEO ПОЛЯ ---
 
 const seoDescriptionValue = computed({
   get() { return formData.value.seo_description ?? '' },
@@ -802,7 +840,7 @@ const seoKeywordsString = computed({
             <Label for="price">Цена в ₸ *</Label>
             <Input
               id="price"
-              v-model.number="formData.price"
+              v-model.number="priceValue"
               type="number"
               placeholder="0"
               min="0"
@@ -812,7 +850,7 @@ const seoKeywordsString = computed({
             <Label for="discount_percentage">Скидка (%)</Label>
             <Input
               id="discount_percentage"
-              v-model.number="formData.discount_percentage"
+              v-model.number="discountPercentageValue"
               type="number"
               min="0"
               max="100"
@@ -985,7 +1023,7 @@ const seoKeywordsString = computed({
             <Label for="featured_order">Порядок в карусели</Label>
             <Input
               id="featured_order"
-              v-model.number="formData.featured_order"
+              v-model.number="featuredOrderValue"
               type="number"
               placeholder="0 - первый, 1 - второй..."
               min="0"
@@ -1184,7 +1222,7 @@ const seoKeywordsString = computed({
             <Label for="stock">Количество на складе</Label>
             <Input
               id="stock"
-              v-model.number="formData.stock_quantity"
+              v-model.number="stockQuantityValue"
               type="number"
               placeholder="0"
               min="0"
