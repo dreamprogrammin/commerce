@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery, SimpleBrand } from '@/types'
+import type { Brand, IBreadcrumbItem, ProductImageRow, ProductLine, ProductWithGallery, SimpleBrand } from '@/types'
 import { ArrowLeft, ChevronDown, Package, Sparkles, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
 const route = useRoute()
@@ -109,7 +109,7 @@ async function loadProducts() {
     products.value = (data || []).map(product => ({
       ...product,
       product_images: Array.isArray(product.product_images)
-        ? product.product_images.sort((a, b) => a.display_order - b.display_order)
+        ? (product.product_images as ProductImageRow[]).sort((a, b) => a.display_order - b.display_order)
         : [],
       brands: product.brands as SimpleBrand | null,
     })) as unknown as ProductWithGallery[]
@@ -207,32 +207,35 @@ const metaKeywords = computed(() => {
   return `${productLine.value?.name || 'линейка'}, ${brand.value?.name || 'бренд'}, товары, оригинальная продукция, Алматы, Казахстан`
 })
 
-useHead({
+const ogImageSrc = computed(() => lineLogoUrl.value || brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`)
+
+defineOgImage({
+  url: ogImageSrc.value,
+  width: 1200,
+  height: 630,
+  alt: computed(() => productLine.value?.name || 'Линейка'),
+})
+
+useSeoMeta({
   title: metaTitle,
+  description: metaDescription,
+  keywords: metaKeywords,
+  ogTitle: metaTitle,
+  ogDescription: metaDescription,
+  ogImage: ogImageSrc,
+  ogUrl: pageUrl,
+  ogSiteName: siteName,
+  ogLocale: 'ru_RU',
+  twitterCard: 'summary',
+  twitterTitle: metaTitle,
+  twitterDescription: metaDescription,
+  twitterImage: ogImageSrc,
+  robots: 'index, follow',
+})
+
+useHead({
   link: [
     { rel: 'canonical', href: pageUrl.value },
-  ],
-  meta: [
-    { name: 'description', content: metaDescription },
-    { name: 'keywords', content: metaKeywords },
-
-    // Open Graph
-    { property: 'og:title', content: metaTitle },
-    { property: 'og:description', content: metaDescription },
-    { property: 'og:url', content: pageUrl.value },
-    { property: 'og:type', content: 'website' },
-    { property: 'og:site_name', content: siteName },
-    { property: 'og:locale', content: 'ru_RU' },
-    { property: 'og:image', content: () => lineLogoUrl.value || brandLogoUrl.value || `${siteUrl}/og-brand.jpeg` },
-
-    // Twitter Card
-    { name: 'twitter:card', content: 'summary' },
-    { name: 'twitter:title', content: metaTitle },
-    { name: 'twitter:description', content: metaDescription },
-    { name: 'twitter:image', content: () => lineLogoUrl.value || brandLogoUrl.value || `${siteUrl}/og-brand.jpeg` },
-
-    // Robots
-    { name: 'robots', content: 'index, follow' },
   ],
   script: [
     // BreadcrumbList Schema
@@ -314,6 +317,21 @@ useHead({
             'description': metaDescription.value,
             'url': pageUrl.value,
             ...(lineLogoUrl.value && { image: lineLogoUrl.value }),
+            ...(metaKeywords.value && {
+              keywords: metaKeywords.value,
+            }),
+            ...(products.value.length > 0 && {
+              numberOfItems: products.value.length,
+            }),
+            ...(products.value.length > 0 && {
+              offers: {
+                '@type': 'AggregateOffer',
+                'lowPrice': Math.min(...products.value.map(p => Number(p.price))),
+                'highPrice': Math.max(...products.value.map(p => Number(p.price))),
+                'priceCurrency': 'KZT',
+                'offerCount': products.value.length,
+              },
+            }),
             'isPartOf': {
               '@type': 'WebSite',
               'name': siteName,
@@ -333,13 +351,13 @@ useHead({
                   'name': product.name,
                   'url': `${siteUrl}/catalog/products/${product.slug}`,
                   ...(product.product_images?.[0]?.image_url && {
-                    image: product.product_images[0].image_url,
+                    image: getImageUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url),
                   }),
                   'offers': {
                     '@type': 'Offer',
                     'price': product.price,
                     'priceCurrency': 'KZT',
-                    'availability': product.stock > 0
+                    'availability': product.stock_quantity > 0
                       ? 'https://schema.org/InStock'
                       : 'https://schema.org/OutOfStock',
                   },
@@ -456,7 +474,7 @@ useRobotsRule({
               :src="lineLogoUrl"
               :alt="productLine.name"
               :bucket-name="BUCKET_NAME_PRODUCT_LINES"
-              :file-path="productLine.logo_url"
+              :file-path="productLine.logo_url ?? undefined"
               aspect-ratio="square"
               object-fit="contain"
               placeholder-type="shimmer"
@@ -467,7 +485,7 @@ useRobotsRule({
               :src="brandLogoUrl"
               :alt="brand.name"
               :bucket-name="BUCKET_NAME_BRANDS"
-              :file-path="brand.logo_url"
+              :file-path="brand.logo_url ?? undefined"
               aspect-ratio="square"
               object-fit="contain"
               placeholder-type="shimmer"

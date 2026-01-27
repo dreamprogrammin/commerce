@@ -442,6 +442,34 @@ const categoryLink = computed(() => {
   return `/catalog/${categorySlug.value}`
 })
 
+// Динамические атрибуты товара для Schema.org additionalProperty
+const schemaAdditionalProperties = computed(() => {
+  const pavs = product.value?.product_attribute_values
+  if (!pavs?.length) return []
+
+  const grouped = new Map<string, string[]>()
+
+  for (const pav of pavs) {
+    const attrName = pav.attributes?.name
+    if (!attrName) continue
+
+    const option = pav.attributes?.attribute_options?.find(o => o.id === pav.option_id)
+    const optionValue = option?.value
+    if (!optionValue) continue
+
+    if (!grouped.has(attrName)) {
+      grouped.set(attrName, [])
+    }
+    grouped.get(attrName)!.push(String(optionValue))
+  }
+
+  return Array.from(grouped.entries()).map(([name, values]) => ({
+    '@type': 'PropertyValue',
+    'name': name,
+    'value': values.join(', '),
+  }))
+})
+
 const robotsRule = computed(() => {
   if (!product.value) {
     return { noindex: true, nofollow: true }
@@ -612,6 +640,10 @@ useHead(() => ({
         // Ключевые слова для поиска
         ...(metaKeywords.value && {
           keywords: metaKeywords.value,
+        }),
+        // Динамические атрибуты (размер, цвет и т.д.)
+        ...(schemaAdditionalProperties.value.length > 0 && {
+          additionalProperty: schemaAdditionalProperties.value,
         }),
       }),
     },

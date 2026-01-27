@@ -636,7 +636,18 @@ const maxAgeYearsValue = computed({
   },
 })
 
-// --- 12. SEO ПОЛЯ ---
+// --- 12. АКТУАЛЬНАЯ ЦЕНА СО СКИДКОЙ ---
+
+const discountedPrice = computed(() => {
+  const price = formData.value.price || 0
+  const discount = formData.value.discount_percentage || 0
+  if (discount > 0 && price > 0) {
+    return Math.round(price * (1 - discount / 100))
+  }
+  return null
+})
+
+// --- 13. SEO ПОЛЯ ---
 
 const seoDescriptionValue = computed({
   get() { return formData.value.seo_description ?? '' },
@@ -807,6 +818,20 @@ const seoKeywordsString = computed({
               max="100"
               placeholder="0-100"
             />
+          </div>
+          <div v-if="discountedPrice !== null" class="sm:col-span-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+            <div class="flex items-center gap-3">
+              <div class="text-sm text-muted-foreground">
+                <span class="line-through">{{ formData.price }} ₸</span>
+                <span class="mx-1">→</span>
+              </div>
+              <span class="text-lg font-bold text-green-600 dark:text-green-400">
+                {{ discountedPrice }} ₸
+              </span>
+              <Badge variant="destructive" class="text-xs">
+                -{{ formData.discount_percentage }}%
+              </Badge>
+            </div>
           </div>
           <div class="p-3 bg-muted/50 rounded-md sm:col-span-2">
             <Label>Процент начисляемых бонусов</Label>

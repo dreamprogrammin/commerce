@@ -514,16 +514,6 @@ watchDebounced(
 
 useRobotsRule(robotsRule)
 
-// SEO метаданные
-useHead(() => ({
-  link: [
-    {
-      rel: 'canonical',
-      href: canonicalUrl.value,
-    },
-  ],
-}))
-
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
 
 // 🔥 Подготовка данных для OG Image
@@ -542,7 +532,22 @@ defineOgImageComponent('OgImageCatalog', {
   productsCount: displayedProducts.value.length || undefined,
 })
 
-// SEO метаданные
+useSeoMeta({
+  title: metaTitle,
+  description: metaDescription,
+  keywords: metaKeywords,
+  ogTitle: metaTitle,
+  ogDescription: metaDescription,
+  ogUrl: canonicalUrl,
+  ogSiteName: 'Ухтышка',
+  ogLocale: 'ru_RU',
+  twitterCard: 'summary_large_image',
+  twitterTitle: metaTitle,
+  twitterDescription: metaDescription,
+  robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
+})
+
+// SEO structured data & canonical
 useHead(() => {
   const schemas = []
 
@@ -583,7 +588,11 @@ useHead(() => {
       ...(categoryOgImageUrl.value && {
         image: categoryOgImageUrl.value,
       }),
-      // 🔥 Добавляем информацию о товарах для rich snippets
+      // Ключевые слова категории
+      ...(metaKeywords.value && {
+        keywords: metaKeywords.value,
+      }),
+      // Добавляем информацию о товарах для rich snippets
       ...(displayedProducts.value.length > 0 && {
         numberOfItems: displayedProducts.value.length,
       }),
@@ -600,7 +609,7 @@ useHead(() => {
     }),
   })
 
-  // 🔥 3. SiteNavigationElement Schema (Подкатегории для sitelinks)
+  // 3. SiteNavigationElement Schema (Подкатегории для sitelinks)
   if (subcategories.value.length > 0) {
     schemas.push({
       type: 'application/ld+json',
@@ -635,6 +644,15 @@ useHead(() => {
             'image': product.product_images?.[0]?.image_url
               ? getImageUrl(BUCKET_NAME_PRODUCT, product.product_images?.[0]?.image_url, IMAGE_SIZES.CARD)
               : undefined,
+            ...(product.brands?.name && {
+              brand: {
+                '@type': 'Brand',
+                'name': product.brands.name,
+                ...(product.brands.slug && {
+                  url: `https://uhti.kz/brand/${product.brands.slug}`,
+                }),
+              },
+            }),
             'offers': {
               '@type': 'Offer',
               'price': product.price,
@@ -650,31 +668,12 @@ useHead(() => {
   }
 
   return {
-    title: metaTitle.value,
-    meta: [
-      { name: 'description', content: metaDescription.value },
-      // Ключевые слова (если заданы в админке)
-      ...(metaKeywords.value ? [{ name: 'keywords', content: metaKeywords.value }] : []),
-      { property: 'og:title', content: metaTitle.value },
-      { property: 'og:description', content: metaDescription.value },
-      { property: 'og:url', content: canonicalUrl.value },
-      { property: 'og:type', content: 'website' },
-      { property: 'og:site_name', content: 'Ухтышка' },
-      { property: 'og:locale', content: 'ru_RU' },
-      { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:title', content: metaTitle.value },
-      { name: 'twitter:description', content: metaDescription.value },
-      { name: 'robots', content: robotsRule.value.noindex ? 'noindex, follow' : 'index, follow' },
-    ],
     link: [
       { rel: 'canonical', href: canonicalUrl.value },
     ],
-    // 🔥 Добавляем все schemas
     script: schemas,
   }
 })
-
-useRobotsRule(robotsRule)
 </script>
 
 <template>

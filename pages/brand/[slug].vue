@@ -3,7 +3,7 @@ import type { IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import { ArrowLeft, ChevronDown, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
@@ -145,32 +145,35 @@ const metaKeywords = computed(() => {
   return `${brand.value?.name || 'бренд'}, товары бренда, оригинальная продукция, Алматы, Казахстан`
 })
 
-useHead({
+const ogImageSrc = computed(() => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`)
+
+defineOgImage({
+  url: ogImageSrc.value,
+  width: 1200,
+  height: 630,
+  alt: computed(() => brand.value?.name || 'Бренд'),
+})
+
+useSeoMeta({
   title: metaTitle,
+  description: metaDescription,
+  keywords: metaKeywords,
+  ogTitle: metaTitle,
+  ogDescription: metaDescription,
+  ogImage: ogImageSrc,
+  ogUrl: brandUrl,
+  ogSiteName: siteName,
+  ogLocale: 'ru_RU',
+  twitterCard: 'summary',
+  twitterTitle: metaTitle,
+  twitterDescription: metaDescription,
+  twitterImage: ogImageSrc,
+  robots: 'index, follow',
+})
+
+useHead({
   link: [
     { rel: 'canonical', href: brandUrl.value },
-  ],
-  meta: [
-    { name: 'description', content: metaDescription },
-    { name: 'keywords', content: metaKeywords },
-
-    // Open Graph
-    { property: 'og:title', content: metaTitle },
-    { property: 'og:description', content: metaDescription },
-    { property: 'og:url', content: brandUrl.value },
-    { property: 'og:type', content: 'website' },
-    { property: 'og:site_name', content: siteName },
-    { property: 'og:locale', content: 'ru_RU' },
-    { property: 'og:image', content: () => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg` },
-
-    // Twitter Card
-    { name: 'twitter:card', content: 'summary' },
-    { name: 'twitter:title', content: metaTitle },
-    { name: 'twitter:description', content: metaDescription },
-    { name: 'twitter:image', content: () => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg` },
-
-    // Robots
-    { name: 'robots', content: 'index, follow' },
   ],
   script: [
     // BreadcrumbList Schema
@@ -214,10 +217,8 @@ useHead({
             'name': brand.value.name,
             'description': brand.value.seo_description || brand.value.description || undefined,
             'url': brandUrl.value,
-            ...(brandLogoUrl.value && {
-              logo: brandLogoUrl.value,
-              image: brandLogoUrl.value,
-            }),
+            'logo': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+            'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
             // Ключевые слова
             ...(brand.value.seo_keywords?.length && {
               keywords: brand.value.seo_keywords.join(', '),
@@ -253,6 +254,54 @@ useHead({
               'name': siteName,
               'url': siteUrl,
             },
+            ...(products.value.length > 0 && {
+              numberOfItems: products.value.length,
+            }),
+            ...(products.value.length > 0 && {
+              offers: {
+                '@type': 'AggregateOffer',
+                'lowPrice': Math.min(...products.value.map(p => Number(p.price))),
+                'highPrice': Math.max(...products.value.map(p => Number(p.price))),
+                'priceCurrency': 'KZT',
+                'offerCount': products.value.length,
+              },
+            }),
+          })
+        : '{}',
+    },
+    // ItemList Schema (товары бренда)
+    {
+      type: 'application/ld+json',
+      innerHTML: () => brand.value && products.value.length > 0
+        ? JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            'numberOfItems': products.value.length,
+            'itemListElement': products.value.slice(0, 10).map((product, index) => ({
+              '@type': 'ListItem',
+              'position': index + 1,
+              'item': {
+                '@type': 'Product',
+                'name': product.name,
+                'url': `${siteUrl}/catalog/products/${product.slug}`,
+                ...(product.product_images?.[0]?.image_url && {
+                  image: getImageUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url),
+                }),
+                'brand': {
+                  '@type': 'Brand',
+                  '@id': `${brandUrl.value}#brand`,
+                  'name': brand.value!.name,
+                },
+                'offers': {
+                  '@type': 'Offer',
+                  'price': product.price,
+                  'priceCurrency': 'KZT',
+                  'availability': product.stock_quantity > 0
+                    ? 'https://schema.org/InStock'
+                    : 'https://schema.org/OutOfStock',
+                },
+              },
+            })),
           })
         : '{}',
     },
