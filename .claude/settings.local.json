@@ -51,15 +51,11 @@
       "Bash(PGPASSWORD=postgres psql:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
-<<<<<<< Updated upstream
       "Bash(pnpm typecheck:*)",
       "Bash(tail:*)",
       "Bash(npx vue-tsc:*)",
       "WebSearch",
       "WebFetch(domain:nuxtseo.com)"
-=======
-      "Bash(npx eslint:*)"
->>>>>>> Stashed changes
     ]
   }
 }
