@@ -8,6 +8,7 @@ interface QuestionPayload {
   answer_text: string
   product_name: string
   product_slug: string
+  trigger_secret?: string
 }
 
 Deno.serve(async (req) => {
@@ -17,6 +18,18 @@ Deno.serve(async (req) => {
 
   try {
     const payload: QuestionPayload = await req.json()
+
+    // Проверка секретного токена для вызовов из триггера БД
+    const expectedSecret = Deno.env.get('TRIGGER_SECRET') || 'uhti-internal-trigger-2026'
+    if (payload.trigger_secret !== expectedSecret) {
+      console.error('Invalid trigger secret. Expected:', expectedSecret, 'Got:', payload.trigger_secret)
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    console.log('Trigger secret validated successfully')
     const { user_id, question_id, question_text, answer_text, product_name, product_slug } = payload
 
     // Задержка 2 минуты для обновления кеша

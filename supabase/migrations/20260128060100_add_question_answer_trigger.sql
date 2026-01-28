@@ -12,16 +12,21 @@ BEGIN
   FROM public.products WHERE id = NEW.product_id;
 
   -- Не создаём уведомление здесь - Edge Function сделает это через 2 минуты
+  -- Используем секретный токен для авторизации внутренних вызовов
 
   PERFORM net.http_post(
     url := 'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/notify-question-answered',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json'
+    ),
     body := jsonb_build_object(
       'user_id', NEW.user_id,
       'question_id', NEW.id,
       'question_text', NEW.question_text,
       'answer_text', NEW.answer_text,
       'product_name', v_product_name,
-      'product_slug', v_product_slug
+      'product_slug', v_product_slug,
+      'trigger_secret', 'uhti-internal-trigger-2026'
     )
   );
 
