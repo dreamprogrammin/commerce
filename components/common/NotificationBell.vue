@@ -37,12 +37,12 @@ function formatDate(dateStr: string) {
   <div>
     <!-- Мобильная версия - ссылка на страницу -->
     <NuxtLink to="/notifications" class="relative lg:hidden">
-      <div class="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95">
-        <Icon
-          name="lucide:bell"
-          class="size-5 text-gray-700 dark:text-gray-300"
-        />
-      </div>
+    <div class="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors active:scale-95">
+      <Icon
+        name="lucide:bell"
+        class="size-5 text-gray-700 dark:text-gray-300"
+      />
+    </div>
       <ClientOnly>
         <Transition
           enter-active-class="transition-all duration-200"
@@ -56,10 +56,10 @@ function formatDate(dateStr: string) {
             {{ store.unreadCount > 9 ? '9+' : store.unreadCount }}
           </div>
         </Transition>
-      </ClientOnly>
-    </NuxtLink>
+    </ClientOnly>
+  </NuxtLink>
 
-    <!-- Десктопная версия - Popover -->
+  <!-- Десктопная версия - Popover -->
     <Popover :open="isOpen" @update:open="onOpen">
       <PopoverTrigger as-child>
         <button class="relative group hidden lg:block">
