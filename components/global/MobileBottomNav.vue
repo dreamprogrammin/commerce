@@ -3,12 +3,14 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const modalStore = useModalStore()
+const notificationsStore = useNotificationsStore()
 
 const { isLoggedIn } = storeToRefs(authStore)
 
@@ -35,6 +37,11 @@ const navItems: NavItem[] = [
     icon: 'lucide:shopping-cart',
   },
   {
+    path: '/notifications',
+    label: 'Уведомления',
+    icon: 'lucide:bell',
+  },
+  {
     path: '/profile',
     label: 'Профиль',
     icon: 'lucide:user',
@@ -53,18 +60,30 @@ const cartItemsCount = computed(() => {
 })
 
 function handleNavClick(path: string, event: Event) {
-  if (path === '/profile' && !isLoggedIn.value) {
+  if ((path === '/profile' || path === '/notifications') && !isLoggedIn.value) {
     event.preventDefault()
     modalStore.openLoginModal()
+    return
+  }
+  if (path === '/notifications') {
+    event.preventDefault()
+    notificationsStore.markAllAsRead()
+    router.push('/profile')
   }
 }
+
+onMounted(() => {
+  if (isLoggedIn.value) {
+    notificationsStore.fetchUnreadCount()
+  }
+})
 </script>
 
 <template>
   <nav
     class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t safe-area-inset-bottom"
   >
-    <div class="grid grid-cols-4 h-16 items-end pb-1">
+    <div class="grid grid-cols-5 h-16 items-end pb-1">
       <NuxtLink
         v-for="item in navItems"
         :key="item.path"
@@ -85,6 +104,12 @@ function handleNavClick(path: string, event: Event) {
           />
 
           <ClientOnly>
+            <div
+              v-if="item.path === '/notifications' && notificationsStore.unreadCount > 0"
+              class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 ring-2 ring-white"
+            >
+              {{ notificationsStore.unreadCount > 9 ? '9+' : notificationsStore.unreadCount }}
+            </div>
             <div
               v-if="item.path === '/cart' && cartItemsCount > 0"
               class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 ring-2 ring-white"
