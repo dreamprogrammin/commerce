@@ -51,10 +51,10 @@ function formatDate(dateStr: string) {
   <div>
     <!-- Мобильная версия - ссылка на страницу -->
     <NuxtLink to="/notifications" class="lg:hidden block">
-      <div class="relative p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors active:scale-95">
+      <div class="relative p-1 hover:opacity-70 transition-opacity active:scale-95">
         <Icon
           name="line-md:bell-alert-loop"
-          class="size-5 text-gray-700 dark:text-gray-300"
+          class="size-7 text-gray-700 dark:text-gray-300"
         />
         <ClientOnly>
           <Transition
@@ -64,7 +64,7 @@ function formatDate(dateStr: string) {
           >
             <div
               v-if="store.unreadCount > 0"
-              class="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 shadow-lg"
+              class="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[11px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 shadow-lg"
             >
               {{ store.unreadCount > 9 ? '9+' : store.unreadCount }}
             </div>
@@ -79,7 +79,7 @@ function formatDate(dateStr: string) {
         <button class="relative group hidden lg:block">
           <div class="p-2 md:p-2.5 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg">
             <Icon
-              name="line-md:bell-alert-loop"
+              name="material-symbols:notifications"
               class="size-5 md:size-5.5 md:text-white"
             />
           </div>

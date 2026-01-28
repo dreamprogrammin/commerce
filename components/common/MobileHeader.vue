@@ -85,7 +85,7 @@ onUnmounted(() => {
         <!-- Логотип -->
         <NuxtLink to="/" class="flex items-center gap-2.5">
           <div class="bg-blue-500 p-1.5 rounded-full">
-            <Icon name="lucide:toy-brick" class="size-5 text-white" />
+            <Icon name="material-symbols:toys" class="size-5 text-white" />
           </div>
           <span class="text-xl font-bold text-blue-500">
             Ухтышка
@@ -93,25 +93,25 @@ onUnmounted(() => {
         </NuxtLink>
 
         <!-- Правая часть с иконками -->
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2">
           <!-- Поиск -->
           <button
-            class="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors active:scale-95"
+            class="p-1 hover:opacity-70 transition-opacity active:scale-95"
             @click="openSearch"
           >
-            <Icon name="lucide:search" class="size-5 text-gray-700 dark:text-gray-300" />
+            <Icon name="material-symbols:search" class="size-7 text-gray-700 dark:text-gray-300" />
           </button>
 
           <!-- Избранное -->
           <NuxtLink
             to="/profile/wishlist"
-            class="relative p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors active:scale-95"
+            class="relative p-1 hover:opacity-70 transition-opacity active:scale-95"
           >
-            <Icon name="lucide:heart" class="size-5 text-gray-700 dark:text-gray-300" />
+            <Icon name="material-symbols:favorite" class="size-7 text-gray-700 dark:text-gray-300" />
             <ClientOnly>
               <div
                 v-if="wishlistCount > 0"
-                class="absolute top-0 right-0 bg-red-500 text-white text-[11px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900"
+                class="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900"
               >
                 {{ wishlistCount > 9 ? '9+' : wishlistCount }}
               </div>
@@ -132,7 +132,7 @@ onUnmounted(() => {
               class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
             >
               <div class="size-6 rounded-full bg-white/20 flex items-center justify-center">
-                <Icon name="lucide:user" class="size-3.5 text-white" />
+                <Icon name="material-symbols:account-circle" class="size-4 text-white" />
               </div>
               <span class="text-sm font-semibold text-white max-w-[80px] truncate">
                 {{ fullName }}
@@ -145,7 +145,7 @@ onUnmounted(() => {
               class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
               @click="openLoginModal"
             >
-              <Icon name="lucide:user" class="size-5 text-white" />
+              <Icon name="material-symbols:account-circle" class="size-5 text-white" />
               <span class="text-sm font-semibold text-white">
                 Войти
               </span>
