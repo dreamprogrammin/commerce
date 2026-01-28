@@ -53,22 +53,68 @@ function formatDate(dateStr: string) {
 }
 
 const highlightedQuestionId = ref<string | null>(null)
+const route = useRoute()
 
 // Автоскролл к вопросу из уведомления
+function scrollToQuestion() {
+  const hash = window.location.hash || route.hash
+  if (!hash || !hash.startsWith('#question-')) return
+
+  const questionId = hash.replace('#question-', '')
+  console.log('[ProductQuestions] Scrolling to question:', questionId)
+
+  // Даём время на рендер списка вопросов
+  const attempts = [300, 600, 1000, 1500] // Попробуем несколько раз с задержкой
+  let attemptIndex = 0
+
+  function tryScroll() {
+    const element = document.querySelector(hash)
+    console.log('[ProductQuestions] Attempt', attemptIndex + 1, 'Element found:', !!element)
+
+    if (element) {
+      // Прокручиваем к элементу
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+      // Подсвечиваем
+      highlightedQuestionId.value = questionId
+      setTimeout(() => {
+        highlightedQuestionId.value = null
+      }, 3000)
+    }
+    else if (attemptIndex < attempts.length - 1) {
+      // Пробуем ещё раз через заданное время
+      attemptIndex++
+      setTimeout(tryScroll, attempts[attemptIndex] - attempts[attemptIndex - 1])
+    }
+    else {
+      console.warn('[ProductQuestions] Failed to find element after all attempts')
+    }
+  }
+
+  setTimeout(tryScroll, attempts[0])
+}
+
 onMounted(() => {
-  const hash = window.location.hash
-  if (hash.startsWith('#question-')) {
-    const questionId = hash.replace('#question-', '')
-    setTimeout(() => {
-      const element = document.querySelector(hash)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        highlightedQuestionId.value = questionId
-        setTimeout(() => {
-          highlightedQuestionId.value = null
-        }, 2000)
-      }
-    }, 500)
+  scrollToQuestion()
+})
+
+// Следим за изменением route (для случая когда переходим с другой страницы)
+watch(() => route.hash, (newHash) => {
+  if (newHash && newHash.startsWith('#question-')) {
+    scrollToQuestion()
+  }
+})
+
+// Следим за загрузкой вопросов (скроллим после загрузки)
+watch(() => questions.value, (newQuestions) => {
+  if (newQuestions && newQuestions.length > 0) {
+    const hash = window.location.hash || route.hash
+    if (hash && hash.startsWith('#question-')) {
+      // Даём время на рендер
+      nextTick(() => {
+        scrollToQuestion()
+      })
+    }
   }
 })
 </script>

@@ -36,25 +36,27 @@ function formatDate(dateStr: string) {
 <template>
   <div>
     <!-- Мобильная версия - ссылка на страницу -->
-    <NuxtLink to="/notifications" class="relative group lg:hidden">
-      <div class="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-all group-hover:scale-105 active:scale-95">
+    <NuxtLink to="/notifications" class="relative lg:hidden">
+      <div class="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95">
         <Icon
           name="lucide:bell"
           class="size-5 text-gray-700 dark:text-gray-300"
         />
       </div>
-      <Transition
-        enter-active-class="transition-all duration-200"
-        enter-from-class="scale-0 opacity-0"
-        enter-to-class="scale-100 opacity-100"
-      >
-        <div
-          v-if="store.unreadCount > 0"
-          class="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 shadow-lg"
+      <ClientOnly>
+        <Transition
+          enter-active-class="transition-all duration-200"
+          enter-from-class="scale-0 opacity-0"
+          enter-to-class="scale-100 opacity-100"
         >
-          {{ store.unreadCount > 9 ? '9+' : store.unreadCount }}
-        </div>
-      </Transition>
+          <div
+            v-if="store.unreadCount > 0"
+            class="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 shadow-lg"
+          >
+            {{ store.unreadCount > 9 ? '9+' : store.unreadCount }}
+          </div>
+        </Transition>
+      </ClientOnly>
     </NuxtLink>
 
     <!-- Десктопная версия - Popover -->

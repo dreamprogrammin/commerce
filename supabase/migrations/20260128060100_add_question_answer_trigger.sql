@@ -11,13 +11,7 @@ BEGIN
   SELECT name, slug INTO v_product_name, v_product_slug
   FROM public.products WHERE id = NEW.product_id;
 
-  INSERT INTO public.notifications (user_id, type, title, body, link)
-  VALUES (
-    NEW.user_id, 'question_answered',
-    'Ответ на ваш вопрос',
-    'На ваш вопрос о товаре "' || v_product_name || '" получен ответ',
-    '/catalog/products/' || v_product_slug || '#question-' || NEW.id
-  );
+  -- Не создаём уведомление здесь - Edge Function сделает это через 2 минуты
 
   PERFORM net.http_post(
     url := 'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/notify-question-answered',

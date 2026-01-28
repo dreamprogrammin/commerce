@@ -20,12 +20,30 @@ Deno.serve(async (req) => {
     const { user_id, question_id, question_text, answer_text, product_name, product_slug } = payload
 
     // Задержка 2 минуты для обновления кеша
+    console.log('Waiting 2 minutes before sending notification...')
     await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000))
+    console.log('Delay complete, sending notification...')
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
+
+    // Создаём in-app уведомление после задержки
+    const productUrl = `/catalog/products/${product_slug}#question-${question_id}`
+    const { error: notifError } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id,
+        type: 'question_answered',
+        title: 'Ответ на ваш вопрос',
+        body: `На ваш вопрос о товаре "${product_name}" получен ответ`,
+        link: productUrl,
+      })
+
+    if (notifError) {
+      console.error('Failed to create in-app notification:', notifError)
+    }
 
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id)
     if (userError || !userData?.user?.email) {

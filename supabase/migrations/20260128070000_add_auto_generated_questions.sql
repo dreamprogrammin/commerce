@@ -172,8 +172,8 @@ END;
 $$;
 
 -- Комментарии для документации
-COMMENT ON FUNCTION public.generate_product_questions(UUID) IS
-'Генерирует умные вопросы для товара на основе его характеристик (возраст, бренд, материал, страна)';
+COMMENT ON FUNCTION public.generate_product_questions(UUID, BOOLEAN) IS
+'Генерирует умные вопросы для товара. Параметры: product_id, skip_ai (true = только SQL, false = SQL + AI для премиум)';
 
 COMMENT ON FUNCTION public.generate_questions_for_all_products() IS
-'Массово генерирует вопросы для всех активных товаров. Используйте с осторожностью!';
+'Массово генерирует БАЗОВЫЕ вопросы (SQL) для всех активных товаров. AI-генерация не используется.';
