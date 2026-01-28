@@ -85,7 +85,7 @@ onUnmounted(() => {
         <!-- Логотип -->
         <NuxtLink to="/" class="flex items-center gap-2.5">
           <div class="bg-blue-500 p-1.5 rounded-full">
-            <Icon name="material-symbols:toys" class="size-5 text-white" />
+            <Icon name="ic:round-toys" class="size-5 text-white" />
           </div>
           <span class="text-xl font-bold text-blue-500">
             Ухтышка
@@ -93,13 +93,13 @@ onUnmounted(() => {
         </NuxtLink>
 
         <!-- Правая часть с иконками -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2.5">
           <!-- Поиск -->
           <button
             class="p-1 hover:opacity-70 transition-opacity active:scale-95"
             @click="openSearch"
           >
-            <Icon name="material-symbols:search" class="size-7 text-gray-700 dark:text-gray-300" />
+            <Icon name="ic:round-search" class="size-8 text-gray-700 dark:text-gray-300" />
           </button>
 
           <!-- Избранное -->
@@ -107,7 +107,7 @@ onUnmounted(() => {
             to="/profile/wishlist"
             class="relative p-1 hover:opacity-70 transition-opacity active:scale-95"
           >
-            <Icon name="material-symbols:favorite" class="size-7 text-gray-700 dark:text-gray-300" />
+            <Icon name="ic:round-favorite" class="size-8 text-gray-700 dark:text-gray-300" />
             <ClientOnly>
               <div
                 v-if="wishlistCount > 0"
@@ -132,7 +132,7 @@ onUnmounted(() => {
               class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
             >
               <div class="size-6 rounded-full bg-white/20 flex items-center justify-center">
-                <Icon name="material-symbols:account-circle" class="size-4 text-white" />
+                <Icon name="ic:round-account-circle" class="size-4 text-white" />
               </div>
               <span class="text-sm font-semibold text-white max-w-[80px] truncate">
                 {{ fullName }}
@@ -145,7 +145,7 @@ onUnmounted(() => {
               class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
               @click="openLoginModal"
             >
-              <Icon name="material-symbols:account-circle" class="size-5 text-white" />
+              <Icon name="ic:round-account-circle" class="size-5 text-white" />
               <span class="text-sm font-semibold text-white">
                 Войти
               </span>

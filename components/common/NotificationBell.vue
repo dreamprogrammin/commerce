@@ -53,8 +53,8 @@ function formatDate(dateStr: string) {
     <NuxtLink to="/notifications" class="lg:hidden block">
       <div class="relative p-1 hover:opacity-70 transition-opacity active:scale-95">
         <Icon
-          name="line-md:bell-alert-loop"
-          class="size-7 text-gray-700 dark:text-gray-300"
+          name="ic:round-notifications"
+          class="size-8 text-gray-700 dark:text-gray-300"
         />
         <ClientOnly>
           <Transition
@@ -79,7 +79,7 @@ function formatDate(dateStr: string) {
         <button class="relative group hidden lg:block">
           <div class="p-2 md:p-2.5 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg">
             <Icon
-              name="material-symbols:notifications"
+              name="ic:round-notifications"
               class="size-5 md:size-5.5 md:text-white"
             />
           </div>
