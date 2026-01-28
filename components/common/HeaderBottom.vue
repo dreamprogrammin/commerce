@@ -104,6 +104,11 @@ function openLoginModal() {
           </ClientOnly>
         </NuxtLink>
 
+        <!-- Notifications -->
+        <ClientOnly>
+          <NotificationBell v-if="isAuth" />
+        </ClientOnly>
+
         <!-- ✅ Cashback Button - ТОЛЬКО для авторизованных -->
         <ClientOnly>
           <NuxtLink

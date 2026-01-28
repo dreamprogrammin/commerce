@@ -19,8 +19,9 @@ const isSubmitting = ref(false)
 const { data: questions, isLoading } = useQuery({
   queryKey: ['product-questions', () => props.productId],
   queryFn: () => questionsStore.fetchQuestions(props.productId),
-  staleTime: 5 * 60 * 1000,
+  staleTime: 2 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
+  refetchOnWindowFocus: true,
 })
 
 async function submitQuestion() {

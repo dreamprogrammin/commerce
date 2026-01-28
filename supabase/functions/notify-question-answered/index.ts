@@ -1,0 +1,98 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
+
+interface QuestionPayload {
+  user_id: string
+  question_text: string
+  answer_text: string
+  product_name: string
+  product_slug: string
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const payload: QuestionPayload = await req.json()
+    const { user_id, question_text, answer_text, product_name, product_slug } = payload
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    )
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id)
+    if (userError || !userData?.user?.email) {
+      console.error('Could not get user email:', userError)
+      return new Response(JSON.stringify({ error: 'User email not found' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const email = userData.user.email
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://uhti.kz'
+    const productUrl = `${siteUrl}/catalog/products/${product_slug}`
+
+    const resendApiKey = Deno.env.get('RESEND_API_KEY')
+    if (!resendApiKey) {
+      console.error('RESEND_API_KEY not set')
+      return new Response(JSON.stringify({ error: 'Email service not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+  <h2 style="color: #2563eb;">Ответ на ваш вопрос</h2>
+  <p>Вы задавали вопрос о товаре <strong>${product_name}</strong>:</p>
+  <blockquote style="border-left: 3px solid #ddd; padding-left: 12px; color: #666; margin: 16px 0;">
+    ${question_text}
+  </blockquote>
+  <p><strong>Ответ:</strong></p>
+  <p style="background: #f0f7ff; padding: 12px; border-radius: 8px;">
+    ${answer_text}
+  </p>
+  <a href="${productUrl}" style="display: inline-block; margin-top: 16px; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 8px;">
+    Перейти к товару
+  </a>
+  <p style="margin-top: 24px; font-size: 12px; color: #999;">
+    Ухтышка — uhti.kz
+  </p>
+</body>
+</html>`
+
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Ухтышка <noreply@uhti.kz>',
+        to: [email],
+        subject: `Ответ на ваш вопрос о "${product_name}"`,
+        html: htmlBody,
+      }),
+    })
+
+    const resendData = await resendRes.json()
+    console.log('Resend response:', resendData)
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (err) {
+    console.error('Error:', err)
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})
