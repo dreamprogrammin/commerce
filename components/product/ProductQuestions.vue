@@ -116,20 +116,33 @@ onMounted(() => {
       >
         <!-- Вопрос -->
         <div class="flex items-start gap-3">
-          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <Icon name="lucide:help-circle" class="w-4 h-4 text-primary" />
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+            :class="q.is_auto_generated ? 'bg-blue-100 dark:bg-blue-950' : 'bg-primary/10'"
+          >
+            <Icon
+              :name="q.is_auto_generated ? 'lucide:sparkles' : 'lucide:help-circle'"
+              class="w-4 h-4"
+              :class="q.is_auto_generated ? 'text-blue-600 dark:text-blue-400' : 'text-primary'"
+            />
           </div>
           <div class="flex-1">
             <p class="text-sm font-medium">
               {{ q.question_text }}
             </p>
             <p class="text-xs text-muted-foreground mt-1">
-              {{ [q.profiles?.first_name, q.profiles?.last_name].filter(Boolean).join(' ') || 'Пользователь' }} · {{ formatDate(q.created_at) }}
+              <span v-if="q.is_auto_generated" class="inline-flex items-center gap-1">
+                <Icon name="lucide:info" class="w-3 h-3" />
+                Часто задаваемый вопрос
+              </span>
+              <span v-else>
+                {{ [q.profiles?.first_name, q.profiles?.last_name].filter(Boolean).join(' ') || 'Пользователь' }} · {{ formatDate(q.created_at) }}
+              </span>
             </p>
           </div>
-          <!-- Удалить свой вопрос -->
+          <!-- Удалить свой вопрос (только для пользовательских) -->
           <button
-            v-if="authStore.user?.id === q.user_id"
+            v-if="!q.is_auto_generated && authStore.user?.id === q.user_id"
             class="text-muted-foreground hover:text-destructive transition-colors"
             title="Удалить вопрос"
             @click="async () => {

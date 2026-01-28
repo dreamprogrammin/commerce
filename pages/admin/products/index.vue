@@ -15,6 +15,29 @@ const router = useRouter()
 
 const { products, isLoading } = storeToRefs(adminProductsStore)
 
+// Массовая генерация вопросов
+const { generateQuestionsForAllProducts } = useProductQuestions()
+const isGeneratingAll = ref(false)
+
+async function handleGenerateAllQuestions() {
+  if (!confirm('⚠️ Это сгенерирует вопросы для ВСЕХ товаров. Это может занять несколько минут. Продолжить?')) {
+    return
+  }
+
+  isGeneratingAll.value = true
+  const result = await generateQuestionsForAllProducts()
+  isGeneratingAll.value = false
+
+  if (result) {
+    const totalProducts = result.length
+    const totalQuestions = result.reduce((sum, item) => sum + item.questions_count, 0)
+    toast.success(`✨ Сгенерировано ${totalQuestions} вопросов для ${totalProducts} товаров!`)
+  }
+  else {
+    toast.error('Ошибка массовой генерации')
+  }
+}
+
 onMounted(() => {
   if (products.value.length === 0) {
     adminProductsStore.fetchProducts()
@@ -41,9 +64,23 @@ function getProductImageUrl(imageUrl: string | null) {
       <h1 class="text-3xl font-bold">
         Управление товарами
       </h1>
-      <NuxtLink to="/admin/products/new">
-        <Button>Добавить товар</Button>
-      </NuxtLink>
+      <div class="flex gap-2">
+        <Button
+          variant="outline"
+          :disabled="isGeneratingAll"
+          @click="handleGenerateAllQuestions"
+        >
+          <Icon
+            :name="isGeneratingAll ? 'lucide:loader-2' : 'lucide:sparkles'"
+            class="w-4 h-4 mr-2"
+            :class="{ 'animate-spin': isGeneratingAll }"
+          />
+          {{ isGeneratingAll ? 'Генерация...' : 'Сгенерировать FAQ для всех' }}
+        </Button>
+        <NuxtLink to="/admin/products/new">
+          <Button>Добавить товар</Button>
+        </NuxtLink>
+      </div>
     </div>
 
     <div v-if="isLoading" class="text-center py-10">

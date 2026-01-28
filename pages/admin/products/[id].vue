@@ -15,6 +15,24 @@ const { clearProductCache } = useCacheManager()
 // ✅ Добавляем SEO composable
 const { notifyProduct } = useSeoIndexing()
 
+// ✅ Генерация вопросов
+const { generateQuestionsForProduct } = useProductQuestions()
+const isGeneratingQuestions = ref(false)
+
+async function handleGenerateQuestions() {
+  isGeneratingQuestions.value = true
+  const success = await generateQuestionsForProduct(productId)
+  isGeneratingQuestions.value = false
+
+  if (success) {
+    toast.success('✨ Умные вопросы сгенерированы!')
+    await hardRefresh()
+  }
+  else {
+    toast.error('Ошибка генерации вопросов')
+  }
+}
+
 // 🔄 Функция для принудительного обновления данных
 async function hardRefresh() {
   await clearProductCache(productId)
@@ -107,6 +125,19 @@ async function handleUpdate(payload: {
           >
             <Icon name="lucide:arrow-left" class="w-4 h-4 mr-2" />
             К списку
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            :disabled="isGeneratingQuestions"
+            @click="handleGenerateQuestions"
+          >
+            <Icon
+              :name="isGeneratingQuestions ? 'lucide:loader-2' : 'lucide:sparkles'"
+              class="w-4 h-4 mr-2"
+              :class="{ 'animate-spin': isGeneratingQuestions }"
+            />
+            {{ isGeneratingQuestions ? 'Генерация...' : 'Сгенерировать FAQ' }}
           </Button>
           <Button
             variant="ghost"

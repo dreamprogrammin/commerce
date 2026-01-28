@@ -861,6 +861,58 @@ export interface Database {
           },
         ]
       }
+      product_questions: {
+        Row: {
+          id: string
+          product_id: string
+          user_id: string | null
+          question_text: string
+          answer_text: string | null
+          answered_at: string | null
+          is_auto_generated: boolean
+          created_at: string
+          profiles: {
+            first_name: string | null
+            last_name: string | null
+          } | null
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          user_id?: string | null
+          question_text: string
+          answer_text?: string | null
+          answered_at?: string | null
+          is_auto_generated?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          user_id?: string | null
+          question_text?: string
+          answer_text?: string | null
+          answered_at?: string | null
+          is_auto_generated?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'product_questions_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'product_questions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       profiles: {
         Row: {
           active_bonus_balance: number

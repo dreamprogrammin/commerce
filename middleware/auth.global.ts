@@ -11,6 +11,7 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   // Пути, требующие авторизации
   const protectedPaths = [
     '/profile/**',
+    '/notifications',
   ]
 
   const isProtectedPath = protectedPaths.some(path => to.path.startsWith(path))
