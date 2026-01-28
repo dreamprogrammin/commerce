@@ -10,6 +10,7 @@ import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } fr
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
 
@@ -18,6 +19,7 @@ const router = useRouter()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
+const questionsStore = useProductQuestionsStore()
 const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl } = useSupabaseStorage()
@@ -114,6 +116,35 @@ const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
   enabled: computed(() => !!product.value?.category_id),
   staleTime: 15 * 60 * 1000,
   gcTime: 30 * 60 * 1000,
+})
+
+// ✅ 5. Вопросы и ответы
+const { data: productQuestions } = useQuery({
+  queryKey: ['product-questions', computed(() => product.value?.id)],
+  queryFn: async () => {
+    if (!product.value?.id)
+      return []
+    return await questionsStore.fetchQuestions(product.value.id)
+  },
+  enabled: computed(() => !!product.value?.id),
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+})
+
+// FAQPage schema — только вопросы с ответами
+const faqSchemaItems = computed(() => {
+  if (!productQuestions.value)
+    return []
+  return productQuestions.value
+    .filter(q => q.answer_text)
+    .map(q => ({
+      '@type': 'Question',
+      'name': q.question_text,
+      'acceptedAnswer': {
+        '@type': 'Answer',
+        'text': q.answer_text,
+      },
+    }))
 })
 
 const digitColumns = ref<HTMLElement[]>([])
@@ -445,17 +476,20 @@ const categoryLink = computed(() => {
 // Динамические атрибуты товара для Schema.org additionalProperty
 const schemaAdditionalProperties = computed(() => {
   const pavs = product.value?.product_attribute_values
-  if (!pavs?.length) return []
+  if (!pavs?.length)
+    return []
 
   const grouped = new Map<string, string[]>()
 
   for (const pav of pavs) {
     const attrName = pav.attributes?.name
-    if (!attrName) continue
+    if (!attrName)
+      continue
 
     const option = pav.attributes?.attribute_options?.find(o => o.id === pav.option_id)
     const optionValue = option?.value
-    if (!optionValue) continue
+    if (!optionValue)
+      continue
 
     if (!grouped.has(attrName)) {
       grouped.set(attrName, [])
@@ -560,7 +594,18 @@ useHead(() => ({
         })),
       }),
     },
-    // 2. Product Schema
+    // 2. FAQPage Schema (вопросы с ответами)
+    ...(faqSchemaItems.value.length > 0
+      ? [{
+          type: 'application/ld+json',
+          children: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            'mainEntity': faqSchemaItems.value,
+          }),
+        }]
+      : []),
+    // 3. Product Schema
     {
       type: 'application/ld+json',
       children: JSON.stringify({
@@ -1115,6 +1160,8 @@ useHead(() => ({
               </template>
             </div>
           </div>
+          <!-- Вопросы и ответы -->
+          <ProductQuestions v-if="product.id" :product-id="product.id" />
         </div>
 
         <div v-else class="text-center py-20">

@@ -55,7 +55,8 @@
       "Bash(tail:*)",
       "Bash(npx vue-tsc:*)",
       "WebSearch",
-      "WebFetch(domain:nuxtseo.com)"
+      "WebFetch(domain:nuxtseo.com)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

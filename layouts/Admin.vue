@@ -2,9 +2,15 @@
 import Button from '@/components/ui/button/Button.vue'
 import { useAuth } from '@/composables/auth/useAuth'
 import { useCacheManager } from '@/composables/useCacheManager'
+import { useAdminQuestionsStore } from '@/stores/adminStore/adminQuestionsStore'
 
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
+const adminQuestionsStore = useAdminQuestionsStore()
+
+onMounted(() => {
+  adminQuestionsStore.fetchUnansweredCount()
+})
 </script>
 
 <template>
@@ -79,6 +85,16 @@ const { clearAllQueryCache, hardReset } = useCacheManager()
           active-class="bg-muted text-primary"
         >
           Управление банерами
+        </NuxtLink>
+        <NuxtLink
+          to="/admin/questions"
+          class="flex items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          <span>Вопросы</span>
+          <Badge v-if="adminQuestionsStore.unansweredCount > 0" variant="destructive" class="text-xs">
+            {{ adminQuestionsStore.unansweredCount }}
+          </Badge>
         </NuxtLink>
       </nav>
     </aside>
