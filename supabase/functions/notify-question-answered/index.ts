@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     )
 
     // Создаём in-app уведомление после задержки
-    const productUrl = `/catalog/products/${product_slug}#question-${question_id}`
+    const notificationLink = `/catalog/products/${product_slug}#question-${question_id}`
     const { error: notifError } = await supabaseAdmin
       .from('notifications')
       .insert({
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
         type: 'question_answered',
         title: 'Ответ на ваш вопрос',
         body: `На ваш вопрос о товаре "${product_name}" получен ответ`,
-        link: productUrl,
+        link: notificationLink,
       })
 
     if (notifError) {
