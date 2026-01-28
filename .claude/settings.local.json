@@ -59,7 +59,8 @@
       "Bash(npx eslint:*)",
       "Bash(npx nuxi typecheck:*)",
       "Bash(chmod:*)",
-      "Bash(supabase secrets set:*)"
+      "Bash(supabase secrets set:*)",
+      "Bash(supabase secrets:*)"
     ]
   }
 }
