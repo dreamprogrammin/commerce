@@ -1,4 +1,6 @@
 import type { Database } from '@/types'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { toast } from 'vue-sonner'
 
 type Notification = Database['public']['Tables']['notifications']['Row']
 
@@ -9,6 +11,7 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
   const unreadCount = ref(0)
   const notifications = ref<Notification[]>([])
   const isLoading = ref(false)
+  let realtimeChannel: RealtimeChannel | null = null
 
   async function fetchUnreadCount() {
     if (!user.value) return
@@ -60,6 +63,55 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
     unreadCount.value = 0
   }
 
+  function subscribeToNotifications() {
+    if (!user.value || realtimeChannel) return
+
+    realtimeChannel = supabase
+      .channel('notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.value.id}`,
+        },
+        (payload) => {
+          const newNotification = payload.new as Notification
+
+          // Добавляем уведомление в список
+          notifications.value.unshift(newNotification)
+          unreadCount.value++
+
+          // Показываем toast уведомление
+          if (newNotification.type === 'question_answered') {
+            toast.success(newNotification.title, {
+              description: newNotification.body,
+              duration: 5000,
+              action: newNotification.link
+                ? {
+                    label: 'Перейти',
+                    onClick: () => {
+                      if (newNotification.link) {
+                        navigateTo(newNotification.link)
+                      }
+                    },
+                  }
+                : undefined,
+            })
+          }
+        }
+      )
+      .subscribe()
+  }
+
+  function unsubscribeFromNotifications() {
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel)
+      realtimeChannel = null
+    }
+  }
+
   return {
     unreadCount,
     notifications,
@@ -68,5 +120,7 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
+    subscribeToNotifications,
+    unsubscribeFromNotifications,
   }
 })

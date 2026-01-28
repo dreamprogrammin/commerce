@@ -6,6 +6,11 @@ const router = useRouter()
 
 onMounted(() => {
   store.fetchUnreadCount()
+  store.subscribeToNotifications()
+})
+
+onUnmounted(() => {
+  store.unsubscribeFromNotifications()
 })
 
 const isOpen = ref(false)

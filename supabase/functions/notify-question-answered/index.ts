@@ -17,6 +17,10 @@ Deno.serve(async (req) => {
     const payload: QuestionPayload = await req.json()
     const { user_id, question_id, product_name, product_slug } = payload
 
+    console.log('Waiting 2 minutes for cache invalidation...')
+    // Ждем 2 минуты, чтобы кеш страницы обновился
+    await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000))
+
     console.log('Creating in-app notification for user:', user_id)
 
     const supabaseAdmin = createClient(
