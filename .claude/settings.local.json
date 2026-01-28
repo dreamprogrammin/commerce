@@ -58,7 +58,8 @@
       "WebFetch(domain:nuxtseo.com)",
       "Bash(npx eslint:*)",
       "Bash(npx nuxi typecheck:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(supabase secrets set:*)"
     ]
   }
 }
