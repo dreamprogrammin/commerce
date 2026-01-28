@@ -3,6 +3,7 @@ import { corsHeaders } from '../_shared/cors.ts'
 
 interface QuestionPayload {
   user_id: string
+  question_id: string
   question_text: string
   answer_text: string
   product_name: string
@@ -16,7 +17,10 @@ Deno.serve(async (req) => {
 
   try {
     const payload: QuestionPayload = await req.json()
-    const { user_id, question_text, answer_text, product_name, product_slug } = payload
+    const { user_id, question_id, question_text, answer_text, product_name, product_slug } = payload
+
+    // Задержка 2 минуты для обновления кеша
+    await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000))
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -34,7 +38,7 @@ Deno.serve(async (req) => {
 
     const email = userData.user.email
     const siteUrl = Deno.env.get('SITE_URL') || 'https://uhti.kz'
-    const productUrl = `${siteUrl}/catalog/products/${product_slug}`
+    const productUrl = `${siteUrl}/catalog/products/${product_slug}#question-${question_id}`
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY')
     if (!resendApiKey) {

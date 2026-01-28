@@ -16,13 +16,14 @@ BEGIN
     NEW.user_id, 'question_answered',
     'Ответ на ваш вопрос',
     'На ваш вопрос о товаре "' || v_product_name || '" получен ответ',
-    '/catalog/products/' || v_product_slug
+    '/catalog/products/' || v_product_slug || '#question-' || NEW.id
   );
 
   PERFORM net.http_post(
     url := 'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/notify-question-answered',
     body := jsonb_build_object(
       'user_id', NEW.user_id,
+      'question_id', NEW.id,
       'question_text', NEW.question_text,
       'answer_text', NEW.answer_text,
       'product_name', v_product_name,

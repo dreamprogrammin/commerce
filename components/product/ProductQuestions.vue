@@ -51,6 +51,21 @@ function formatDate(dateStr: string) {
     year: 'numeric',
   })
 }
+
+// Автоскролл к вопросу из уведомления
+onMounted(() => {
+  const hash = window.location.hash
+  if (hash.startsWith('#question-')) {
+    setTimeout(() => {
+      const element = document.querySelector(hash)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        element.classList.add('highlight-question')
+        setTimeout(() => element.classList.remove('highlight-question'), 2000)
+      }
+    }, 500)
+  }
+})
 </script>
 
 <template>
@@ -95,8 +110,9 @@ function formatDate(dateStr: string) {
     <div v-else-if="questions?.length" class="space-y-4">
       <div
         v-for="q in questions"
+        :id="`question-${q.id}`"
         :key="q.id"
-        class="border rounded-lg p-4"
+        class="border rounded-lg p-4 transition-all duration-500"
       >
         <!-- Вопрос -->
         <div class="flex items-start gap-3">
@@ -147,3 +163,9 @@ function formatDate(dateStr: string) {
     </p>
   </div>
 </template>
+
+<style scoped>
+.highlight-question {
+  @apply ring-2 ring-primary ring-offset-2 bg-primary/5;
+}
+</style>
