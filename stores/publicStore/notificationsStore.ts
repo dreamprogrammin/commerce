@@ -64,17 +64,7 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
   }
 
   function subscribeToNotifications() {
-    if (!user.value) {
-      console.log('[Notifications] User not logged in, skipping subscription')
-      return
-    }
-
-    if (realtimeChannel) {
-      console.log('[Notifications] Already subscribed')
-      return
-    }
-
-    console.log('[Notifications] Setting up realtime subscription for user:', user.value.id)
+    if (!user.value || realtimeChannel) return
 
     realtimeChannel = supabase
       .channel(`notifications:${user.value.id}`)
@@ -87,7 +77,6 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
           filter: `user_id=eq.${user.value.id}`,
         },
         (payload) => {
-          console.log('[Notifications] Received new notification:', payload)
           const newNotification = payload.new as Notification
 
           // Добавляем уведомление в список
@@ -104,7 +93,7 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
                     label: 'Перейти',
                     onClick: () => {
                       if (newNotification.link) {
-                        navigateTo(newNotification.link)
+                        window.location.href = newNotification.link
                       }
                     },
                   }
@@ -113,14 +102,11 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[Notifications] Subscription status:', status)
-      })
+      .subscribe()
   }
 
   function unsubscribeFromNotifications() {
     if (realtimeChannel) {
-      console.log('[Notifications] Unsubscribing from realtime')
       supabase.removeChannel(realtimeChannel)
       realtimeChannel = null
     }
