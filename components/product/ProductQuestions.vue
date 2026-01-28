@@ -179,6 +179,6 @@ onMounted(() => {
 
 <style scoped>
 .highlight-question {
-  @apply ring-2 ring-primary ring-offset-2 bg-primary/5;
+  @apply ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-950;
 }
 </style>
