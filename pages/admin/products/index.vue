@@ -20,7 +20,7 @@ const { generateQuestionsForAllProducts } = useProductQuestions()
 const isGeneratingAll = ref(false)
 
 async function handleGenerateAllQuestions() {
-  if (!confirm('⚠️ Это сгенерирует вопросы для ВСЕХ товаров. Это может занять несколько минут. Продолжить?')) {
+  if (!confirm('⚠️ Это сгенерирует БАЗОВЫЕ вопросы для ВСЕХ товаров (без AI). Продолжить?')) {
     return
   }
 
@@ -29,9 +29,15 @@ async function handleGenerateAllQuestions() {
   isGeneratingAll.value = false
 
   if (result) {
-    const totalProducts = result.length
-    const totalQuestions = result.reduce((sum, item) => sum + item.questions_count, 0)
-    toast.success(`✨ Сгенерировано ${totalQuestions} вопросов для ${totalProducts} товаров!`)
+    const totalProducts = result.total
+    const premiumCount = result.premium_count
+    const totalQuestions = result.data?.reduce((sum: number, item: any) => sum + item.questions_count, 0) || 0
+
+    toast.success(
+      `✨ Сгенерировано ${totalQuestions} базовых вопросов для ${totalProducts} товаров!\n` +
+      `💎 ${premiumCount} премиум товаров требуют AI-генерацию (запускайте индивидуально)`,
+      { duration: 6000 },
+    )
   }
   else {
     toast.error('Ошибка массовой генерации')

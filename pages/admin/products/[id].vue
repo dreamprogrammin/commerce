@@ -20,12 +20,32 @@ const { generateQuestionsForProduct } = useProductQuestions()
 const isGeneratingQuestions = ref(false)
 
 async function handleGenerateQuestions() {
+  const price = data.value?.price || 0
+  const isPremium = price > 50000
+
+  if (isPremium) {
+    const confirmed = confirm(
+      `💎 Премиум-товар (${price.toLocaleString('ru-KZ')} ₸)\n\n` +
+      'Будут сгенерированы:\n' +
+      '✅ Базовые вопросы (SQL)\n' +
+      '✨ AI-вопросы через Claude (уникальные)\n\n' +
+      'Продолжить?',
+    )
+    if (!confirmed)
+      return
+  }
+
   isGeneratingQuestions.value = true
   const success = await generateQuestionsForProduct(productId)
   isGeneratingQuestions.value = false
 
   if (success) {
-    toast.success('✨ Умные вопросы сгенерированы!')
+    toast.success(
+      isPremium
+        ? '✨ Умные вопросы сгенерированы (базовые + AI)!'
+        : '✨ Базовые вопросы сгенерированы!',
+      { duration: 4000 },
+    )
     await hardRefresh()
   }
   else {

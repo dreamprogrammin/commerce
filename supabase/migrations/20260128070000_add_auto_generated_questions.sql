@@ -2,9 +2,12 @@
 ALTER TABLE public.product_questions
 ADD COLUMN is_auto_generated BOOLEAN DEFAULT false;
 
--- Функция для генерации умных вопросов
-CREATE OR REPLACE FUNCTION public.generate_product_questions(p_product_id UUID)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+-- Функция для генерации БАЗОВЫХ вопросов (SQL-генерация)
+CREATE OR REPLACE FUNCTION public.generate_product_questions(
+  p_product_id UUID,
+  p_skip_ai BOOLEAN DEFAULT false
+)
+RETURNS JSON LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_min_age INTEGER;
   v_max_age INTEGER;
@@ -12,6 +15,10 @@ DECLARE
   v_material_name TEXT;
   v_country_name TEXT;
   v_price NUMERIC;
+  v_name TEXT;
+  v_description TEXT;
+  v_category_name TEXT;
+  v_result JSON;
 BEGIN
   -- Получаем данные товара
   SELECT
@@ -20,23 +27,34 @@ BEGIN
     b.name,
     m.name_ru,
     c.name_ru,
-    p.price
+    p.price,
+    p.name,
+    p.description,
+    cat.name
   INTO
     v_min_age,
     v_max_age,
     v_brand_name,
     v_material_name,
     v_country_name,
-    v_price
+    v_price,
+    v_name,
+    v_description,
+    v_category_name
   FROM public.products p
   LEFT JOIN public.brands b ON p.brand_id = b.id
   LEFT JOIN public.materials m ON p.material_id = m.id
   LEFT JOIN public.countries c ON p.origin_country_id = c.id
+  LEFT JOIN public.categories cat ON p.category_id = cat.id
   WHERE p.id = p_product_id;
 
   -- Удаляем старые автогенерированные вопросы для этого товара
   DELETE FROM public.product_questions
   WHERE product_id = p_product_id AND is_auto_generated = true;
+
+  -- ========================================
+  -- БАЗОВЫЕ ВОПРОСЫ (SQL-генерация для всех товаров)
+  -- ========================================
 
   -- Вопрос про возраст (если есть данные)
   IF v_min_age IS NOT NULL OR v_max_age IS NOT NULL THEN
@@ -64,64 +82,7 @@ BEGIN
     );
   END IF;
 
-  -- Вопрос про бренд/оригинальность (если есть бренд)
-  IF v_brand_name IS NOT NULL THEN
-    INSERT INTO public.product_questions (
-      product_id,
-      user_id,
-      question_text,
-      answer_text,
-      is_auto_generated,
-      answered_at
-    ) VALUES (
-      p_product_id,
-      NULL,
-      'Это оригинальный товар?',
-      'Да, это 100% оригинальная продукция бренда ' || v_brand_name || '. Мы работаем только с официальными поставщиками.',
-      true,
-      NOW()
-    );
-  END IF;
-
-  -- Вопрос про материал (если есть)
-  IF v_material_name IS NOT NULL THEN
-    INSERT INTO public.product_questions (
-      product_id,
-      user_id,
-      question_text,
-      answer_text,
-      is_auto_generated,
-      answered_at
-    ) VALUES (
-      p_product_id,
-      NULL,
-      'Из какого материала изготовлена игрушка?',
-      'Игрушка изготовлена из ' || LOWER(v_material_name) || '. Материал безопасен для детей и соответствует стандартам качества.',
-      true,
-      NOW()
-    );
-  END IF;
-
-  -- Вопрос про страну производства (если есть)
-  IF v_country_name IS NOT NULL THEN
-    INSERT INTO public.product_questions (
-      product_id,
-      user_id,
-      question_text,
-      answer_text,
-      is_auto_generated,
-      answered_at
-    ) VALUES (
-      p_product_id,
-      NULL,
-      'Где произведена игрушка?',
-      'Страна производства: ' || v_country_name || '.',
-      true,
-      NOW()
-    );
-  END IF;
-
-  -- Универсальный вопрос про доставку
+  -- Вопрос про доставку (всегда)
   INSERT INTO public.product_questions (
     product_id,
     user_id,
@@ -138,7 +99,7 @@ BEGIN
     NOW()
   );
 
-  -- Вопрос про гарантию/возврат
+  -- Вопрос про возврат (всегда)
   INSERT INTO public.product_questions (
     product_id,
     user_id,
@@ -155,37 +116,48 @@ BEGIN
     NOW()
   );
 
-  -- Вопрос про наличие (если товар дорогой)
-  IF v_price > 20000 THEN
-    INSERT INTO public.product_questions (
-      product_id,
-      user_id,
-      question_text,
-      answer_text,
-      is_auto_generated,
-      answered_at
-    ) VALUES (
-      p_product_id,
-      NULL,
-      'Товар точно есть в наличии?',
-      'Да, товар в наличии на нашем складе в Алматы. Информация о наличии обновляется в режиме реального времени.',
-      true,
-      NOW()
+  -- ========================================
+  -- ПРЕМИУМ ТОВАРЫ: Возвращаем данные для AI-генерации
+  -- ========================================
+
+  -- Если товар дорогой (> 50000) И не пропускаем AI
+  IF v_price > 50000 AND NOT p_skip_ai THEN
+    v_result := json_build_object(
+      'needs_ai', true,
+      'product_id', p_product_id,
+      'name', v_name,
+      'price', v_price,
+      'description', v_description,
+      'brand', v_brand_name,
+      'material', v_material_name,
+      'country', v_country_name,
+      'category', v_category_name,
+      'min_age', v_min_age,
+      'max_age', v_max_age
     );
+  ELSE
+    v_result := json_build_object('needs_ai', false);
   END IF;
 
+  RETURN v_result;
 END;
 $$;
 
--- Функция для массовой генерации вопросов для всех товаров
+-- Функция для массовой генерации вопросов (ТОЛЬКО базовые SQL-вопросы)
+-- AI-генерация не используется, чтобы не расходовать токены
 CREATE OR REPLACE FUNCTION public.generate_questions_for_all_products()
-RETURNS TABLE(product_id UUID, questions_count INTEGER) LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS TABLE(product_id UUID, questions_count INTEGER, is_premium BOOLEAN) LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_product_id UUID;
   v_count INTEGER;
+  v_is_premium BOOLEAN;
+  v_price NUMERIC;
 BEGIN
-  FOR v_product_id IN SELECT id FROM public.products WHERE is_active = true LOOP
-    PERFORM generate_product_questions(v_product_id);
+  FOR v_product_id, v_price IN
+    SELECT id, price FROM public.products WHERE is_active = true
+  LOOP
+    -- Генерируем только базовые вопросы (skip_ai = true)
+    PERFORM generate_product_questions(v_product_id, true);
 
     SELECT COUNT(*) INTO v_count
     FROM public.product_questions
@@ -193,6 +165,7 @@ BEGIN
 
     product_id := v_product_id;
     questions_count := v_count;
+    is_premium := v_price > 50000;
     RETURN NEXT;
   END LOOP;
 END;
