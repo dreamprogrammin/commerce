@@ -3,10 +3,20 @@ import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 
 const store = useNotificationsStore()
 const router = useRouter()
+const user = useSupabaseUser()
+
+// Подписываемся на realtime только когда пользователь загружен
+watchEffect(() => {
+  if (user.value) {
+    console.log('[NotificationBell] User detected, subscribing...')
+    store.subscribeToNotifications()
+  }
+})
 
 onMounted(() => {
-  store.fetchUnreadCount()
-  store.subscribeToNotifications()
+  if (user.value) {
+    store.fetchUnreadCount()
+  }
 })
 
 onUnmounted(() => {
