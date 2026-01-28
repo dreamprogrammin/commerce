@@ -14,7 +14,8 @@ export interface AdminQuestion {
   created_at: string
   updated_at: string
   profiles: {
-    full_name: string | null
+    first_name: string | null
+    last_name: string | null
   } | null
   products: {
     name: string
@@ -29,7 +30,7 @@ export const useAdminQuestionsStore = defineStore('adminQuestionsStore', () => {
   const isLoading = ref(false)
   const unansweredCount = ref(0)
 
-  const selectQuery = 'id, product_id, user_id, question_text, answer_text, answered_by, answered_at, is_published, created_at, updated_at, profiles:user_id(full_name), products:product_id(name, slug)'
+  const selectQuery = 'id, product_id, user_id, question_text, answer_text, answered_by, answered_at, is_published, created_at, updated_at, profiles!product_questions_profile_fk(first_name, last_name), products!product_questions_product_id_fkey(name, slug)'
 
   async function fetchAllQuestions(filter: 'all' | 'unanswered' = 'all') {
     isLoading.value = true

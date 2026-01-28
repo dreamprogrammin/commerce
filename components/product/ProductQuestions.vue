@@ -107,7 +107,7 @@ function formatDate(dateStr: string) {
               {{ q.question_text }}
             </p>
             <p class="text-xs text-muted-foreground mt-1">
-              {{ q.profiles?.full_name || 'Пользователь' }} · {{ formatDate(q.created_at) }}
+              {{ [q.profiles?.first_name, q.profiles?.last_name].filter(Boolean).join(' ') || 'Пользователь' }} · {{ formatDate(q.created_at) }}
             </p>
           </div>
           <!-- Удалить свой вопрос -->
