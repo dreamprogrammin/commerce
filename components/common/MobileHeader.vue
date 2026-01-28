@@ -118,6 +118,11 @@ onUnmounted(() => {
             </ClientOnly>
           </NuxtLink>
 
+          <!-- Уведомления -->
+          <ClientOnly>
+            <CommonNotificationBell v-if="isAuth" />
+          </ClientOnly>
+
           <!-- ✅ Профиль / Логин -->
           <ClientOnly>
             <!-- Авторизованный пользователь -->

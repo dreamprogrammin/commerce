@@ -106,7 +106,7 @@ function openLoginModal() {
 
         <!-- Notifications -->
         <ClientOnly>
-          <NotificationBell v-if="isAuth" />
+          <CommonNotificationBell v-if="isAuth" />
         </ClientOnly>
 
         <!-- ✅ Cashback Button - ТОЛЬКО для авторизованных -->
