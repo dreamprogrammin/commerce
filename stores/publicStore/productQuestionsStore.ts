@@ -11,6 +11,7 @@ export interface ProductQuestion {
   answer_text: string | null
   answered_at: string | null
   is_published: boolean
+  is_auto_generated: boolean
   created_at: string
   profiles: {
     first_name: string | null
@@ -28,7 +29,7 @@ export const useProductQuestionsStore = defineStore('productQuestionsStore', () 
   async function fetchQuestions(productId: string): Promise<ProductQuestion[]> {
     const { data, error } = await supabase
       .from('product_questions')
-      .select('id, product_id, user_id, question_text, answer_text, answered_at, is_published, created_at, profiles!product_questions_profile_fk(first_name, last_name)')
+      .select('id, product_id, user_id, question_text, answer_text, answered_at, is_published, is_auto_generated, created_at, profiles!product_questions_profile_fk(first_name, last_name)')
       .eq('product_id', productId)
       .eq('is_published', true)
       .order('created_at', { ascending: false })
@@ -52,7 +53,7 @@ export const useProductQuestionsStore = defineStore('productQuestionsStore', () 
         user_id: authStore.user.id,
         question_text: text.trim(),
       })
-      .select('id, product_id, user_id, question_text, answer_text, answered_at, is_published, created_at, profiles!product_questions_profile_fk(first_name, last_name)')
+      .select('id, product_id, user_id, question_text, answer_text, answered_at, is_published, is_auto_generated, created_at, profiles!product_questions_profile_fk(first_name, last_name)')
       .single()
 
     if (error) {
