@@ -52,16 +52,21 @@ function formatDate(dateStr: string) {
   })
 }
 
+const highlightedQuestionId = ref<string | null>(null)
+
 // Автоскролл к вопросу из уведомления
 onMounted(() => {
   const hash = window.location.hash
   if (hash.startsWith('#question-')) {
+    const questionId = hash.replace('#question-', '')
     setTimeout(() => {
       const element = document.querySelector(hash)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        element.classList.add('highlight-question')
-        setTimeout(() => element.classList.remove('highlight-question'), 2000)
+        highlightedQuestionId.value = questionId
+        setTimeout(() => {
+          highlightedQuestionId.value = null
+        }, 2000)
       }
     }, 500)
   }
@@ -112,7 +117,10 @@ onMounted(() => {
         v-for="q in questions"
         :id="`question-${q.id}`"
         :key="q.id"
-        class="border rounded-lg p-4 transition-all duration-500"
+        class="border rounded-lg p-4 transition-all duration-500 scroll-mt-4"
+        :class="{
+          'border-blue-500 bg-blue-50 dark:bg-blue-950/20 shadow-lg': highlightedQuestionId === q.id,
+        }"
       >
         <!-- Вопрос -->
         <div class="flex items-start gap-3">
@@ -176,9 +184,3 @@ onMounted(() => {
     </p>
   </div>
 </template>
-
-<style scoped>
-.highlight-question {
-  @apply ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-950;
-}
-</style>
