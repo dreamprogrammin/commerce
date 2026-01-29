@@ -54,7 +54,7 @@ function formatDate(dateStr: string) {
       <div class="relative p-1 hover:opacity-70 transition-opacity active:scale-95">
         <Icon
           name="line-md:bell-filled-loop"
-          class="size-8 text-primary"
+          class="size-6 text-primary"
           mode="svg"
         />
         <ClientOnly>
