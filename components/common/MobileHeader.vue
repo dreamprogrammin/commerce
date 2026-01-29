@@ -93,7 +93,7 @@ onUnmounted(() => {
         </NuxtLink>
 
         <!-- Правая часть с иконками -->
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-1.5">
           <!-- Поиск -->
           <button
             class="p-1 hover:opacity-70 transition-opacity active:scale-95"
