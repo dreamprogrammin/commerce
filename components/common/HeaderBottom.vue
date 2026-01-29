@@ -57,8 +57,9 @@ function openLoginModal() {
         >
           <div class="p-2 md:p-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg">
             <Icon
-              name="lucide:heart"
-              class="size-5 md:size-5.5 text-gray-700 dark:text-gray-300 md:text-white"
+              name="line-md:heart"
+              class="size-5 md:size-7 text-primary md:text-white"
+              mode="svg"
             />
           </div>
           <ClientOnly>
@@ -84,8 +85,9 @@ function openLoginModal() {
         >
           <div class="p-2 md:p-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg">
             <Icon
-              name="lucide:shopping-bag"
-              class="size-5 md:size-5.5 text-gray-700 dark:text-gray-300 md:text-white"
+              name="solar:cart-3-bold"
+              class="size-5 md:size-7 text-gray-700 dark:text-gray-300 md:text-white"
+              mode="svg"
             />
           </div>
           <ClientOnly>
