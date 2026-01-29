@@ -99,7 +99,10 @@ onUnmounted(() => {
             class="p-1 hover:opacity-70 transition-opacity active:scale-95"
             @click="openSearch"
           >
-            <Icon name="line-md:search-twotone" class="size-6 text-primary dark:text-gray-300" mode="svg"/>
+            <CommonIconWithSkeleton 
+              name="line-md:search-twotone" 
+              class="size-6 text-primary dark:text-gray-300" 
+            />
           </button>
 
           <!-- Избранное -->
@@ -107,7 +110,11 @@ onUnmounted(() => {
             to="/profile/wishlist"
             class="relative p-1 hover:opacity-70 transition-opacity active:scale-95"
           >
-            <Icon name="line-md:heart-filled" class="size-6 text-primary dark:text-gray-300" mode="svg" />
+            <CommonIconWithSkeleton 
+              name="line-md:heart-filled" 
+              class="size-6 text-primary dark:text-gray-300" 
+            />
+            
             <ClientOnly>
               <div
                 v-if="wishlistCount > 0"
@@ -117,11 +124,6 @@ onUnmounted(() => {
               </div>
             </ClientOnly>
           </NuxtLink>
-
-          <!-- Уведомления -->
-          <ClientOnly>
-            <CommonNotificationBell v-if="isAuth" />
-          </ClientOnly>
 
           <!-- ✅ Профиль / Логин -->
         </div>
