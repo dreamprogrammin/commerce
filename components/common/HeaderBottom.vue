@@ -41,7 +41,7 @@ function openLoginModal() {
         class="flex items-center gap-2.5 md:gap-3 group transition-transform hover:scale-105 active:scale-95"
       >
         <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow">
-          <Icon name="lucide:toy-brick" class="size-5 md:size-6 text-white" />
+          <Icon name="ic:round-toys" class="size-5 md:size-6 text-white" />
         </div>
         <span class="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 md:from-white md:to-white/90 bg-clip-text text-transparent">
           Ухтышка

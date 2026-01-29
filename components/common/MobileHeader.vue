@@ -99,7 +99,7 @@ onUnmounted(() => {
             class="p-1 hover:opacity-70 transition-opacity active:scale-95"
             @click="openSearch"
           >
-            <Icon name="ic:round-search" class="size-8 text-gray-700 dark:text-gray-300" />
+            <Icon name="line-md:search-twotone" class="size-8 text-primary dark:text-gray-300" mode="svg"/>
           </button>
 
           <!-- Избранное -->
@@ -107,7 +107,7 @@ onUnmounted(() => {
             to="/profile/wishlist"
             class="relative p-1 hover:opacity-70 transition-opacity active:scale-95"
           >
-            <Icon name="ic:round-favorite" class="size-8 text-gray-700 dark:text-gray-300" />
+            <Icon name="line-md:heart-filled" class="size-8 text-primary dark:text-gray-300" mode="svg" />
             <ClientOnly>
               <div
                 v-if="wishlistCount > 0"
