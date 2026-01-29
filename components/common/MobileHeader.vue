@@ -124,40 +124,6 @@ onUnmounted(() => {
           </ClientOnly>
 
           <!-- ✅ Профиль / Логин -->
-          <ClientOnly>
-            <!-- Авторизованный пользователь -->
-            <NuxtLink
-              v-if="isAuth"
-              to="/profile"
-              class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
-            >
-              <div class="size-6 rounded-full bg-white/20 flex items-center justify-center">
-                <Icon name="ic:round-account-circle" class="size-4 text-white" />
-              </div>
-              <span class="text-sm font-semibold text-white max-w-[80px] truncate">
-                {{ fullName }}
-              </span>
-            </NuxtLink>
-
-            <!-- ✅ Неавторизованный пользователь - ОТКРЫВАЕТ МОДАЛКУ -->
-            <button
-              v-else
-              class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors active:scale-95"
-              @click="openLoginModal"
-            >
-              <Icon name="ic:round-account-circle" class="size-5 text-white" />
-              <span class="text-sm font-semibold text-white">
-                Войти
-              </span>
-            </button>
-
-            <template #fallback>
-              <div class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full animate-pulse">
-                <div class="size-6 rounded-full bg-gray-200 dark:bg-gray-700" />
-                <div class="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
-              </div>
-            </template>
-          </ClientOnly>
         </div>
       </div>
     </div>
