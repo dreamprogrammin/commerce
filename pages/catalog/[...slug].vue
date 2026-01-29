@@ -116,7 +116,7 @@ const title = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
   }
-  return (currentCategory.value as any)?.seo_h1 || categoryName.value
+  return currentCategory.value?.seo_h1 || categoryName.value
 })
 
 const priceRange = ref({ min: 0, max: 50000 })
@@ -450,7 +450,7 @@ const metaTitle = computed(() => {
     return `${categoryName.value} - Фильтр | Ухтышка`
   }
   // Приоритет: seo_title > автогенерация
-  const seoTitle = (currentCategory.value as any)?.seo_title
+  const seoTitle = currentCategory.value?.seo_title
   if (seoTitle) {
     return seoTitle
   }
@@ -460,7 +460,7 @@ const metaTitle = computed(() => {
 
 // Ключевые слова (из seo_keywords)
 const metaKeywords = computed(() => {
-  const keywords = (currentCategory.value as any)?.seo_keywords as string[] | null
+  const keywords = currentCategory.value?.seo_keywords
   if (keywords && keywords.length > 0) {
     return keywords.join(', ')
   }
@@ -468,7 +468,7 @@ const metaKeywords = computed(() => {
 })
 
 // SEO текст для отображения внизу страницы
-const seoText = computed(() => (currentCategory.value as any)?.seo_text || null)
+const seoText = computed(() => currentCategory.value?.seo_text || null)
 
 const robotsRule = computed(() => {
   // Если есть фильтры ИЛИ сортировка не по умолчанию

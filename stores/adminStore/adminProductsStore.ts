@@ -8,6 +8,7 @@ import type {
   ProductAttributeValueInsert,
   ProductImageRow,
   ProductInsert,
+  ProductLine,
   ProductListAdmin,
   ProductSearchResult,
   ProductUpdate,
@@ -50,6 +51,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const isLoading = ref(false)
   const isSaving = ref(false)
   const brands = ref<Brand[]>([])
+  const productLines = ref<ProductLine[]>([])
   const countries = ref<Country[]>([])
   const materials = ref<Material[]>([])
 
@@ -67,6 +69,21 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     }
     catch (error: any) {
       toast.error('Ошибка загрузки брендов', { description: error.message })
+    }
+  }
+
+  async function fetchAllProductLines() {
+    try {
+      const { data, error } = await supabase
+        .from('product_lines')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error)
+        throw error
+      productLines.value = data || []
+    }
+    catch (error: any) {
+      toast.error('Ошибка загрузки линеек продуктов', { description: error.message })
     }
   }
 
@@ -595,6 +612,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     products,
     currentProduct,
     brands,
+    productLines,
     countries,
     materials,
     isLoading,
@@ -603,6 +621,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     fetchProductById,
     fetchProductBySku,
     fetchAllBrands,
+    fetchAllProductLines,
     fetchAllCountries,
     fetchAllMaterials,
     fetchProductByBarcode,

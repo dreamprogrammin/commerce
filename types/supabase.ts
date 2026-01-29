@@ -1,16 +1,36 @@
-export type Json
-  = | string
-    | number
-    | boolean
-    | null
-    | { [key: string]: Json | undefined }
-    | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-export interface Database {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: '12.2.3 (519615d)'
+export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -35,11 +55,11 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'attribute_options_attribute_id_fkey'
-            columns: ['attribute_id']
+            foreignKeyName: "attribute_options_attribute_id_fkey"
+            columns: ["attribute_id"]
             isOneToOne: false
-            referencedRelation: 'attributes'
-            referencedColumns: ['id']
+            referencedRelation: "attributes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -145,11 +165,11 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'bonus_activation_skipped_order_id_fkey'
-            columns: ['order_id']
+            foreignKeyName: "bonus_activation_skipped_order_id_fkey"
+            columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: 'orders'
-            referencedColumns: ['id']
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -198,18 +218,18 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'bonus_transactions_order_id_fkey'
-            columns: ['order_id']
+            foreignKeyName: "bonus_transactions_order_id_fkey"
+            columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: 'orders'
-            referencedColumns: ['id']
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'bonus_transactions_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "bonus_transactions_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -265,6 +285,10 @@ export interface Database {
           is_root_category: boolean
           name: string
           parent_id: string | null
+          seo_h1: string | null
+          seo_keywords: string[] | null
+          seo_text: string | null
+          seo_title: string | null
           slug: string
           updated_at: string
         }
@@ -283,6 +307,10 @@ export interface Database {
           is_root_category?: boolean
           name: string
           parent_id?: string | null
+          seo_h1?: string | null
+          seo_keywords?: string[] | null
+          seo_text?: string | null
+          seo_title?: string | null
           slug: string
           updated_at?: string
         }
@@ -301,16 +329,20 @@ export interface Database {
           is_root_category?: boolean
           name?: string
           parent_id?: string | null
+          seo_h1?: string | null
+          seo_keywords?: string[] | null
+          seo_text?: string | null
+          seo_title?: string | null
           slug?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'categories_parent_id_fkey'
-            columns: ['parent_id']
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
-            referencedRelation: 'categories'
-            referencedColumns: ['id']
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -329,18 +361,18 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'category_attributes_attribute_id_fkey'
-            columns: ['attribute_id']
+            foreignKeyName: "category_attributes_attribute_id_fkey"
+            columns: ["attribute_id"]
             isOneToOne: false
-            referencedRelation: 'attributes'
-            referencedColumns: ['id']
+            referencedRelation: "attributes"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'category_attributes_category_id_fkey'
-            columns: ['category_id']
+            foreignKeyName: "category_attributes_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: 'categories'
-            referencedColumns: ['id']
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -416,18 +448,18 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'guest_checkout_items_checkout_id_fkey'
-            columns: ['checkout_id']
+            foreignKeyName: "guest_checkout_items_checkout_id_fkey"
+            columns: ["checkout_id"]
             isOneToOne: false
-            referencedRelation: 'guest_checkouts'
-            referencedColumns: ['id']
+            referencedRelation: "guest_checkouts"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'guest_checkout_items_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "guest_checkout_items_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -509,6 +541,39 @@ export interface Database {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          link: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           bonus_points_per_item: number
@@ -536,53 +601,20 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'order_items_order_id_fkey'
-            columns: ['order_id']
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: 'orders'
-            referencedColumns: ['id']
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'order_items_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
-      }
-      notifications: {
-        Row: {
-          id: string
-          user_id: string
-          type: string
-          title: string
-          body: string | null
-          link: string | null
-          is_read: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          type?: string
-          title: string
-          body?: string | null
-          link?: string | null
-          is_read?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          type?: string
-          title?: string
-          body?: string | null
-          link?: string | null
-          is_read?: boolean
-          created_at?: string
-        }
-        Relationships: []
       }
       orders: {
         Row: {
@@ -656,11 +688,11 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'orders_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "orders_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -682,25 +714,25 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_attribute_values_attribute_id_fkey'
-            columns: ['attribute_id']
+            foreignKeyName: "product_attribute_values_attribute_id_fkey"
+            columns: ["attribute_id"]
             isOneToOne: false
-            referencedRelation: 'attributes'
-            referencedColumns: ['id']
+            referencedRelation: "attributes"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'product_attribute_values_option_id_fkey'
-            columns: ['option_id']
+            foreignKeyName: "product_attribute_values_option_id_fkey"
+            columns: ["option_id"]
             isOneToOne: false
-            referencedRelation: 'attribute_options'
-            referencedColumns: ['id']
+            referencedRelation: "attribute_options"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'product_attribute_values_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "product_attribute_values_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -734,11 +766,115 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_images_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_lines: {
+        Row: {
+          brand_id: string
+          created_at: string
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          seo_description: string | null
+          seo_keywords: string[] | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_lines_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_questions: {
+        Row: {
+          answer_text: string | null
+          answered_at: string | null
+          answered_by: string | null
+          created_at: string | null
+          id: string
+          is_auto_generated: boolean | null
+          is_published: boolean | null
+          product_id: string
+          question_text: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          answer_text?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          is_published?: boolean | null
+          product_id: string
+          question_text: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          answer_text?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          is_published?: boolean | null
+          product_id?: string
+          question_text?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_questions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_questions_profile_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -764,6 +900,7 @@ export interface Database {
           name: string
           origin_country_id: number | null
           price: number
+          product_line_id: string | null
           sales_count: number
           seo_description: string | null
           seo_keywords: string[] | null
@@ -793,6 +930,7 @@ export interface Database {
           name: string
           origin_country_id?: number | null
           price: number
+          product_line_id?: string | null
           sales_count?: number
           seo_description?: string | null
           seo_keywords?: string[] | null
@@ -822,6 +960,7 @@ export interface Database {
           name?: string
           origin_country_id?: number | null
           price?: number
+          product_line_id?: string | null
           sales_count?: number
           seo_description?: string | null
           seo_keywords?: string[] | null
@@ -832,84 +971,39 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'products_brand_id_fkey'
-            columns: ['brand_id']
+            foreignKeyName: "products_brand_id_fkey"
+            columns: ["brand_id"]
             isOneToOne: false
-            referencedRelation: 'brands'
-            referencedColumns: ['id']
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'products_category_id_fkey'
-            columns: ['category_id']
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: 'categories'
-            referencedColumns: ['id']
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'products_material_id_fkey'
-            columns: ['material_id']
+            foreignKeyName: "products_material_id_fkey"
+            columns: ["material_id"]
             isOneToOne: false
-            referencedRelation: 'materials'
-            referencedColumns: ['id']
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'products_origin_country_id_fkey'
-            columns: ['origin_country_id']
+            foreignKeyName: "products_origin_country_id_fkey"
+            columns: ["origin_country_id"]
             isOneToOne: false
-            referencedRelation: 'countries'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      product_questions: {
-        Row: {
-          id: string
-          product_id: string
-          user_id: string | null
-          question_text: string
-          answer_text: string | null
-          answered_at: string | null
-          is_auto_generated: boolean
-          created_at: string
-          profiles: {
-            first_name: string | null
-            last_name: string | null
-          } | null
-        }
-        Insert: {
-          id?: string
-          product_id: string
-          user_id?: string | null
-          question_text: string
-          answer_text?: string | null
-          answered_at?: string | null
-          is_auto_generated?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          product_id?: string
-          user_id?: string | null
-          question_text?: string
-          answer_text?: string | null
-          answered_at?: string | null
-          is_auto_generated?: boolean
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'product_questions_product_id_fkey'
-            columns: ['product_id']
-            isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'product_questions_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "products_product_line_id_fkey"
+            columns: ["product_line_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "product_lines"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1069,11 +1163,11 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'wishlist_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "wishlist_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1102,19 +1196,17 @@ export interface Database {
       }
     }
     Functions: {
-      activate_pending_bonuses: { Args: never, Returns: string }
-      activate_pending_order_bonuses: { Args: never, Returns: number }
+      activate_pending_bonuses: { Args: never; Returns: string }
+      activate_pending_order_bonuses: { Args: never; Returns: number }
       cancel_order: {
-        Args: { p_order_id: string, p_table_name?: string }
+        Args: { p_order_id: string; p_table_name?: string }
         Returns: string
       }
-      cleanup_expired_guest_checkouts: { Args: never, Returns: number }
-      confirm_and_process_order:
-        | { Args: { p_order_id: string }, Returns: string }
-        | {
-          Args: { p_order_id: string, p_table_name?: string }
-          Returns: string
-        }
+      cleanup_expired_guest_checkouts: { Args: never; Returns: number }
+      confirm_and_process_order: {
+        Args: { p_order_id: string }
+        Returns: string
+      }
       create_guest_checkout: {
         Args: {
           p_cart_items: Json
@@ -1150,8 +1242,20 @@ export interface Database {
         Args: { required_role: string }
         Returns: boolean
       }
+      generate_product_questions: {
+        Args: { p_product_id: string; p_skip_ai?: boolean }
+        Returns: Json
+      }
+      generate_questions_for_all_products: {
+        Args: never
+        Returns: {
+          is_premium: boolean
+          product_id: string
+          questions_count: number
+        }[]
+      }
       get_bonus_history: {
-        Args: { p_limit?: number, p_offset?: number }
+        Args: { p_limit?: number; p_offset?: number }
         Returns: {
           activation_date: string
           amount: number
@@ -1203,7 +1307,7 @@ export interface Database {
       }
       get_filtered_products: {
         Args: {
-          p_attributes?: Database['public']['CompositeTypes']['attribute_filter'][]
+          p_attributes?: Database["public"]["CompositeTypes"]["attribute_filter"][]
           p_brand_ids?: string[]
           p_category_slug: string
           p_country_ids?: string[]
@@ -1212,6 +1316,7 @@ export interface Database {
           p_page_size?: number
           p_price_max?: number
           p_price_min?: number
+          p_product_line_ids?: string[]
           p_sort_by?: string
           p_subcategory_ids?: string[]
         }
@@ -1243,9 +1348,8 @@ export interface Database {
           updated_at: string
         }[]
       }
-      get_order_table_name: { Args: { p_order_id: string }, Returns: string }
       get_personalized_recommendations: {
-        Args: { p_limit?: number, p_user_id: string }
+        Args: { p_limit?: number; p_user_id: string }
         Returns: {
           accessory_ids: string[]
           barcode: string
@@ -1272,17 +1376,34 @@ export interface Database {
           updated_at: string
         }[]
       }
-      is_admin: { Args: never, Returns: boolean }
+      get_product_lines_by_brand: {
+        Args: { p_brand_id: string }
+        Returns: {
+          description: string
+          id: string
+          logo_url: string
+          name: string
+          slug: string
+        }[]
+      }
+      get_product_lines_by_category_slug: {
+        Args: { p_category_slug: string }
+        Returns: {
+          brand_id: string
+          brand_name: string
+          id: string
+          name: string
+          product_count: number
+          slug: string
+        }[]
+      }
+      is_admin: { Args: never; Returns: boolean }
       process_confirmed_guest_checkout: {
         Args: { p_checkout_id: string }
         Returns: string
       }
-      process_confirmed_order: { Args: { p_order_id: string }, Returns: string }
-      recalculate_pending_balances: { Args: never, Returns: string }
-      test_telegram_notification: {
-        Args: { p_order_id: string, p_table_name?: string }
-        Returns: string
-      }
+      process_confirmed_order: { Args: { p_order_id: string }; Returns: string }
+      recalculate_pending_balances: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
@@ -1296,125 +1417,129 @@ export interface Database {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-      & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-      ? R
-      : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables']
-    & DefaultSchema['Views'])
-    ? (DefaultSchema['Tables']
-      & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
-        ? R
-        : never
+      ? R
+      : never
     : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema['Tables']
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
-    Insert: infer I
-  }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
       ? I
       : never
     : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema['Tables']
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
-    Update: infer U
-  }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
       ? U
       : never
     : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema['Enums']
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema['CompositeTypes']
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
+

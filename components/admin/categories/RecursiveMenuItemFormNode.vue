@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
@@ -17,6 +18,8 @@ import {
   shouldOptimizeImage,
 } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
+import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
+import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 const props = defineProps<{
   item: EditableCategory
@@ -43,6 +46,18 @@ const isSlugManuallyEdited = ref(false)
 const { getImageUrl } = useSupabaseStorage()
 
 const optimizationInfo = computed(() => getOptimizationInfo())
+
+// 🆕 Загружаем бренды и линейки для фильтрации
+const brandsStore = useAdminBrandsStore()
+const productsStore = useAdminProductsStore()
+
+onMounted(async () => {
+  await brandsStore.fetchBrands()
+  await productsStore.fetchAllProductLines()
+})
+
+const availableBrands = computed(() => brandsStore.brands)
+const availableProductLines = computed(() => productsStore.productLines)
 
 const name = computed({
   get: () => props.item.name,
@@ -86,22 +101,22 @@ const description = computed({
 
 // 🆕 SEO поля
 const seoTitle = computed({
-  get: () => (props.item as any).seo_title ?? '',
+  get: () => props.item.seo_title ?? '',
   set: value => emit('update:item', { ...props.item, seo_title: value || null }),
 })
 
 const seoH1 = computed({
-  get: () => (props.item as any).seo_h1 ?? '',
+  get: () => props.item.seo_h1 ?? '',
   set: value => emit('update:item', { ...props.item, seo_h1: value || null }),
 })
 
 const seoText = computed({
-  get: () => (props.item as any).seo_text ?? '',
+  get: () => props.item.seo_text ?? '',
   set: value => emit('update:item', { ...props.item, seo_text: value || null }),
 })
 
 const seoKeywords = computed({
-  get: () => ((props.item as any).seo_keywords ?? []).join(', '),
+  get: () => (props.item.seo_keywords ?? []).join(', '),
   set: (value) => {
     const keywords = value
       .split(',')
@@ -113,6 +128,50 @@ const seoKeywords = computed({
 
 // Показать/скрыть SEO секцию
 const isSeoExpanded = ref(false)
+
+// 🆕 Показать/скрыть секцию фильтров
+const isFiltersExpanded = ref(false)
+
+// 🆕 Управление фильтрами по брендам
+const selectedBrandIds = computed({
+  get: () => props.item.allowed_brand_ids ?? [],
+  set: (value) => {
+    emit('update:item', { ...props.item, allowed_brand_ids: value.length > 0 ? value : null })
+  },
+})
+
+// 🆕 Управление фильтрами по линейкам
+const selectedProductLineIds = computed({
+  get: () => props.item.allowed_product_line_ids ?? [],
+  set: (value) => {
+    emit('update:item', { ...props.item, allowed_product_line_ids: value.length > 0 ? value : null })
+  },
+})
+
+// 🆕 Функции для управления выбором
+function toggleBrand(brandId: string) {
+  const current = [...selectedBrandIds.value]
+  const index = current.indexOf(brandId)
+  if (index === -1) {
+    current.push(brandId)
+  }
+  else {
+    current.splice(index, 1)
+  }
+  selectedBrandIds.value = current
+}
+
+function toggleProductLine(lineId: string) {
+  const current = [...selectedProductLineIds.value]
+  const index = current.indexOf(lineId)
+  if (index === -1) {
+    current.push(lineId)
+  }
+  else {
+    current.splice(index, 1)
+  }
+  selectedProductLineIds.value = current
+}
 
 const display_order = computed({
   get: () => props.item.display_order,
@@ -327,6 +386,108 @@ function removeImage() {
         <p class="text-xs text-muted-foreground mt-1">
           Это описание отображается в Google. Оптимально 120-160 символов.
         </p>
+      </div>
+
+      <!-- 🆕 Секция фильтров по брендам/линейкам (раскрываемая) -->
+      <div class="border rounded-lg">
+        <button
+          type="button"
+          class="w-full flex items-center justify-between p-3 text-left hover:bg-muted/50 transition-colors"
+          :disabled="isDeleted"
+          @click="isFiltersExpanded = !isFiltersExpanded"
+        >
+          <div class="flex items-center gap-2">
+            <Icon name="lucide:filter" class="w-4 h-4 text-primary" />
+            <span class="font-medium text-sm">Фильтры брендов и линеек</span>
+            <span v-if="selectedBrandIds.length > 0 || selectedProductLineIds.length > 0" class="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
+              {{ selectedBrandIds.length + selectedProductLineIds.length }} выбрано
+            </span>
+          </div>
+          <Icon
+            :name="isFiltersExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'"
+            class="w-4 h-4 text-muted-foreground"
+          />
+        </button>
+
+        <div v-if="isFiltersExpanded" class="p-4 pt-0 space-y-6 border-t">
+          <p class="text-xs text-muted-foreground">
+            Ограничьте отображение товаров только определенными брендами или линейками. Если ничего не выбрано, показываются все товары.
+          </p>
+
+          <!-- Выбор брендов -->
+          <div v-if="availableBrands.length > 0">
+            <div class="flex items-center justify-between mb-3">
+              <Label class="text-sm font-semibold">Разрешенные бренды</Label>
+              <Button
+                v-if="selectedBrandIds.length > 0"
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-xs"
+                @click="selectedBrandIds = []"
+              >
+                <Icon name="lucide:x" class="w-3.5 h-3.5 mr-1" />
+                Очистить
+              </Button>
+            </div>
+            <div class="max-h-48 overflow-y-auto space-y-2 border rounded-md p-2">
+              <div
+                v-for="brand in availableBrands"
+                :key="brand.id"
+                class="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded transition-colors"
+              >
+                <Checkbox
+                  :id="`brand-${brand.id}-${props.item._tempId || props.item.id}`"
+                  :model-value="selectedBrandIds.includes(brand.id)"
+                  :disabled="isDeleted"
+                  @update:model-value="() => toggleBrand(brand.id)"
+                />
+                <Label
+                  :for="`brand-${brand.id}-${props.item._tempId || props.item.id}`"
+                  class="font-normal cursor-pointer text-sm flex-1"
+                >
+                  {{ brand.name }}
+                </Label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Выбор линеек продуктов -->
+          <div v-if="availableProductLines.length > 0">
+            <div class="flex items-center justify-between mb-3">
+              <Label class="text-sm font-semibold">Разрешенные линейки продуктов</Label>
+              <Button
+                v-if="selectedProductLineIds.length > 0"
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-xs"
+                @click="selectedProductLineIds = []"
+              >
+                <Icon name="lucide:x" class="w-3.5 h-3.5 mr-1" />
+                Очистить
+              </Button>
+            </div>
+            <div class="max-h-48 overflow-y-auto space-y-2 border rounded-md p-2">
+              <div
+                v-for="line in availableProductLines"
+                :key="line.id"
+                class="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded transition-colors"
+              >
+                <Checkbox
+                  :id="`line-${line.id}-${props.item._tempId || props.item.id}`"
+                  :model-value="selectedProductLineIds.includes(line.id)"
+                  :disabled="isDeleted"
+                  @update:model-value="() => toggleProductLine(line.id)"
+                />
+                <Label
+                  :for="`line-${line.id}-${props.item._tempId || props.item.id}`"
+                  class="font-normal cursor-pointer text-sm flex-1"
+                >
+                  {{ line.name }}
+                </Label>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 🆕 SEO секция (раскрываемая) -->

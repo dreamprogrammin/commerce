@@ -164,14 +164,38 @@ export interface ICheckoutData {
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row'] & {
   featured_order?: number | null // 🆕 Добавляем поле для управления размером карточки
+  // 🆕 SEO поля (добавляем вручную, пока не обновлены типы Supabase)
+  seo_title?: string | null
+  seo_h1?: string | null
+  seo_text?: string | null
+  seo_keywords?: string[] | null
+  // 🆕 Фильтры по брендам и линейкам
+  allowed_brand_ids?: string[] | null
+  allowed_product_line_ids?: string[] | null
 }
 
 export type CategoryInsert = Database['public']['Tables']['categories']['Insert'] & {
   featured_order?: number | null
+  // 🆕 SEO поля
+  seo_title?: string | null
+  seo_h1?: string | null
+  seo_text?: string | null
+  seo_keywords?: string[] | null
+  // 🆕 Фильтры
+  allowed_brand_ids?: string[] | null
+  allowed_product_line_ids?: string[] | null
 }
 
 export type CategoryUpdate = Database['public']['Tables']['categories']['Update'] & {
   featured_order?: number | null
+  // 🆕 SEO поля
+  seo_title?: string | null
+  seo_h1?: string | null
+  seo_text?: string | null
+  seo_keywords?: string[] | null
+  // 🆕 Фильтры
+  allowed_brand_ids?: string[] | null
+  allowed_product_line_ids?: string[] | null
 }
 
 export type CategoryMenuItem = CategoryRow & {

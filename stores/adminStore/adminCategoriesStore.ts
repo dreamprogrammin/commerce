@@ -18,6 +18,14 @@ interface CategoryUpsertPayload {
   image_url: string | null
   blur_placeholder: string | null
   icon_name: string | null
+  // 🆕 SEO поля
+  seo_title: string | null
+  seo_h1: string | null
+  seo_text: string | null
+  seo_keywords: string[] | null
+  // 🆕 Фильтры по брендам и линейкам
+  allowed_brand_ids: string[] | null
+  allowed_product_line_ids: string[] | null
 }
 
 function createInsertPayload(item: EditableCategory, parentId: string | null, displayOrder: number): CategoryInsert {
@@ -33,6 +41,14 @@ function createInsertPayload(item: EditableCategory, parentId: string | null, di
     image_url: item.image_url,
     blur_placeholder: item.blur_placeholder,
     icon_name: item.icon_name,
+    // 🆕 SEO поля
+    seo_title: item.seo_title || null,
+    seo_h1: item.seo_h1 || null,
+    seo_text: item.seo_text || null,
+    seo_keywords: item.seo_keywords || null,
+    // 🆕 Фильтры
+    allowed_brand_ids: item.allowed_brand_ids || null,
+    allowed_product_line_ids: item.allowed_product_line_ids || null,
   }
 }
 
@@ -50,6 +66,14 @@ function createUpdatePayload(item: EditableCategory, parentId: string | null, di
     image_url: item.image_url,
     blur_placeholder: item.blur_placeholder,
     icon_name: item.icon_name,
+    // 🆕 SEO поля
+    seo_title: item.seo_title || null,
+    seo_h1: item.seo_h1 || null,
+    seo_text: item.seo_text || null,
+    seo_keywords: item.seo_keywords || null,
+    // 🆕 Фильтры
+    allowed_brand_ids: item.allowed_brand_ids || null,
+    allowed_product_line_ids: item.allowed_product_line_ids || null,
   }
 }
 
