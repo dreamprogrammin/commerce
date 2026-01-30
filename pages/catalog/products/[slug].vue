@@ -590,7 +590,8 @@ useHead(() => ({
           '@type': 'ListItem',
           'position': index + 1,
           'name': crumb.name,
-          'item': crumb.href ? `https://uhti.kz${crumb.href}` : undefined,
+          // Для последнего элемента используем canonicalUrl, для остальных - crumb.href
+          'item': crumb.href ? `https://uhti.kz${crumb.href}` : canonicalUrl.value,
         })),
       }),
     },
