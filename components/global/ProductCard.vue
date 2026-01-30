@@ -132,7 +132,7 @@ const priceDetails = computed(() => {
   <div class="bg-white border rounded-xl overflow-hidden group transition-all hover:shadow-xl flex flex-col h-full">
     <!-- 🖼️ ГАЛЕРЕЯ ИЗОБРАЖЕНИЙ -->
     <div
-      class="relative bg-gray-50 aspect-[3/4] overflow-hidden"
+      class="relative bg-white aspect-square overflow-hidden"
       @mousemove="handleMouseMove"
       @mouseleave="handleMouseLeave"
     >
@@ -154,12 +154,12 @@ const priceDetails = computed(() => {
       <ClientOnly>
         <!-- 🖥️ ДЕСКТОП: Наведение мышью меняет изображение -->
         <template v-if="!isTouchDevice">
-          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
+          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full p-4">
             <ProgressiveImage
               :src="activeImageUrl"
               :alt="`${product.name}`"
-              aspect-ratio="3/4"
-              object-fit="cover"
+              aspect-ratio="1/1"
+              object-fit="contain"
               placeholder-type="lqip"
               :blur-data-url="product.product_images?.[activeImageIndex]?.blur_placeholder"
               eager
@@ -185,13 +185,13 @@ const priceDetails = computed(() => {
               >
                 <NuxtLink
                   :to="`/catalog/products/${product.slug}`"
-                  class="block h-full aspect-3/4"
+                  class="block h-full aspect-square p-4"
                 >
                   <ProgressiveImage
                     :src="getImageUrlByIndex(index)"
                     :alt="`${product.name} - фото ${index + 1}`"
-                    aspect-ratio="3/4"
-                    object-fit="cover"
+                    aspect-ratio="1/1"
+                    object-fit="contain"
                     placeholder-type="lqip"
                     :blur-data-url="image.blur_placeholder"
                     eager
@@ -202,13 +202,13 @@ const priceDetails = computed(() => {
           </Carousel>
 
           <!-- 📷 Одно изображение на мобилке -->
-          <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full">
+          <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full p-4">
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
               :alt="`${product.name}`"
-              aspect-ratio="3/4"
-              object-fit="cover"
+              aspect-ratio="1/1"
+              object-fit="contain"
               placeholder-type="shimmer"
               eager
             />
@@ -223,13 +223,13 @@ const priceDetails = computed(() => {
 
         <!-- ⚙️ Fallback для SSR -->
         <template #fallback>
-          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full">
+          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full p-4">
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
               :alt="`${product.name}`"
-              aspect-ratio="3/4"
-              object-fit="cover"
+              aspect-ratio="1/1"
+              object-fit="contain"
               placeholder-type="shimmer"
               eager
             />
