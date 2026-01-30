@@ -52,7 +52,7 @@ function formatDate(dateStr: string) {
     <NuxtLink to="/notifications" class="lg:hidden block">
       <div class="relative p-1 hover:opacity-70 transition-opacity active:scale-95">
         <CommonIconWithSkeleton
-          name="line-md:bell-filled-loop"
+          name="line-md:bell-twotone-loop"
           class="size-6 text-primary"
         />
         

@@ -111,7 +111,7 @@ onUnmounted(() => {
             class="relative p-1 hover:opacity-70 transition-opacity active:scale-95"
           >
             <CommonIconWithSkeleton 
-              name="line-md:heart-filled" 
+              name="line-md:heart-twotone" 
               class="size-6 text-primary dark:text-gray-300" 
             />
             
