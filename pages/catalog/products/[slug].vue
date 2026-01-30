@@ -615,6 +615,10 @@ useHead(() => ({
         'description': product.value?.seo_description || product.value?.description,
         'image': productImages.value,
         'sku': product.value?.sku || undefined,
+        // TODO: Добавить GTIN (штрих-код) когда появится в БД
+        // 'gtin13': product.value?.gtin || undefined,
+        // TODO: Добавить MPN (номер производителя) когда появится
+        // 'mpn': product.value?.mpn || undefined,
         // 🔥 Если есть линейка - показываем её как бренд с parentOrganization
         // Это позволяет Google понять иерархию: Mattel → Barbie → Товар
         'brand': productLineName.value
@@ -648,6 +652,8 @@ useHead(() => ({
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
           'url': canonicalUrl.value,
+          'priceValidUntil': new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 дней
+          'itemCondition': 'https://schema.org/NewCondition',
           'seller': {
             '@type': 'Organization',
             'name': 'Ухтышка',
@@ -690,6 +696,28 @@ useHead(() => ({
         ...(schemaAdditionalProperties.value.length > 0 && {
           additionalProperty: schemaAdditionalProperties.value,
         }),
+        // TODO: Добавить когда появится система отзывов
+        // 'aggregateRating': {
+        //   '@type': 'AggregateRating',
+        //   'ratingValue': '4.5',
+        //   'reviewCount': '24',
+        //   'bestRating': '5',
+        //   'worstRating': '1',
+        // },
+        // 'review': [
+        //   {
+        //     '@type': 'Review',
+        //     'author': { '@type': 'Person', 'name': 'Имя автора' },
+        //     'datePublished': '2026-01-15',
+        //     'reviewBody': 'Текст отзыва...',
+        //     'reviewRating': {
+        //       '@type': 'Rating',
+        //       'ratingValue': '5',
+        //       'bestRating': '5',
+        //       'worstRating': '1',
+        //     },
+        //   },
+        // ],
       }),
     },
   ],
