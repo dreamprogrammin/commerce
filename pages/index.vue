@@ -8,6 +8,7 @@ import { useProfileStore } from '@/stores/core/profileStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
@@ -15,6 +16,7 @@ const recommendationsStore = useRecommendationsStore()
 const personalizationStore = usePersonalizationStore()
 const productsStore = useProductsStore()
 const wishlistStore = useWishlistStore()
+const popularCategoriesStore = usePopularCategoriesStore()
 const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
 
 const { isLoggedIn, user } = storeToRefs(authStore)
@@ -87,32 +89,91 @@ const showNewestSkeleton = computed(() =>
 
 const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value || showPopularSkeleton.value)
 
+// Загрузка категорий для SEO schema
+const { data: categoriesData } = await useQuery({
+  queryKey: ['home-categories-schema'],
+  queryFn: async () => {
+    await popularCategoriesStore.fetchPopularCategories()
+    return popularCategoriesStore.popularCategories
+  },
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+})
+
+const popularCategoriesForSchema = computed(() => categoriesData.value || [])
+
+// Загрузка брендов для SEO schema
+const supabase = useSupabaseClient()
+const { data: brandsData } = await useQuery({
+  queryKey: ['home-brands-schema'],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('brands')
+      .select('id, name, slug, logo_url, description, seo_description, seo_keywords')
+      .order('name', { ascending: true })
+      .limit(20)
+
+    if (error) throw error
+    return data || []
+  },
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+})
+
+const brandsForSchema = computed(() => brandsData.value || [])
+
+// Загрузка товарных линеек для SEO schema
+const { data: productLinesData } = await useQuery({
+  queryKey: ['home-product-lines-schema'],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('product_lines')
+      .select('id, name, slug, logo_url, description, brand_id')
+      .order('name', { ascending: true })
+      .limit(30)
+
+    if (error) throw error
+    return data || []
+  },
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+})
+
+const productLinesForSchema = computed(() => productLinesData.value || [])
+
 // SEO
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
-const metaTitle = `Купить детские игрушки в Алматы и Казахстане | ${siteName}`
-const metaDescription = `Интернет-магазин детских игрушек ${siteName} ⭐ Развивающие игры, конструкторы, куклы, машинки для детей всех возрастов ✓ Быстрая доставка по Казахстану ✓ Бонусная программа ✓ Гарантия качества`
-const keywords = [
-  'детские игрушки',
-  'игрушки для детей',
-  'купить игрушки',
-  'интернет магазин игрушек',
-  'игрушки Алматы',
-  'детские товары Казахстан',
-  'развивающие игрушки',
-  'конструкторы для детей',
-  'куклы',
-  'машинки',
-  'мягкие игрушки',
-  'настольные игры',
-  'пазлы',
-].join(', ')
+const metaTitle = `Купить детские игрушки в Алматы | ${siteName}`
+const metaDescription = `Интернет-магазин детских игрушек ${siteName} в Алматы ⭐ Развивающие игры, конструкторы, куклы, машинки ✓ Официальные бренды ✓ Доставка по Алматы ✓ Бонусная программа ✓ Гарантия качества`
+
+// Динамические keywords с брендами
+const keywords = computed(() => {
+  const baseKeywords = [
+    'детские игрушки Алматы',
+    'купить игрушки Алматы',
+    'интернет магазин игрушек',
+    'игрушки для детей',
+    'развивающие игрушки',
+    'конструкторы для детей',
+    'куклы',
+    'машинки',
+    'мягкие игрушки',
+    'настольные игры',
+  ]
+
+  // Добавляем топ-5 брендов в keywords
+  const topBrands = brandsForSchema.value.slice(0, 5).map(b => b.name)
+
+  return [...baseKeywords, ...topBrands].join(', ')
+})
+
 const ogImageUrl = `${siteUrl}/og-home-toys.jpeg`
 
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
-  keywords,
+  keywords: () => keywords.value,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: siteUrl,
@@ -134,71 +195,268 @@ useSeoMeta({
   robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
 })
 
-useHead({
+// Computed schema для динамических данных
+const organizationSchema = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': `${siteUrl}/#organization`,
+  'name': siteName,
+  'alternateName': 'Uhti.kz',
+  'url': siteUrl,
+  'logo': {
+    '@type': 'ImageObject',
+    'url': `${siteUrl}/logo.png`,
+    'width': 250,
+    'height': 60,
+  },
+  'image': ogImageUrl,
+  'description': metaDescription,
+  'telephone': '+7-702-537-94-73',
+  'email': 'info@uhti.kz',
+  'address': {
+    '@type': 'PostalAddress',
+    'addressCountry': 'KZ',
+    'addressLocality': 'Алматы',
+    'addressRegion': 'Алматы',
+  },
+  'geo': {
+    '@type': 'GeoCoordinates',
+    'latitude': 43.2220,
+    'longitude': 76.8512,
+  },
+  'areaServed': {
+    '@type': 'City',
+    'name': 'Алматы',
+    'containedInPlace': {
+      '@type': 'Country',
+      'name': 'Kazakhstan',
+    },
+  },
+  'sameAs': [
+    'https://www.instagram.com/uhtikz',
+    'https://twitter.com/uhtikz',
+  ],
+}))
+
+const webSiteSchema = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': `${siteUrl}/#website`,
+  'name': siteName,
+  'alternateName': 'Uhti.kz',
+  'url': siteUrl,
+  'description': metaDescription,
+  'inLanguage': 'ru-KZ',
+  'publisher': { '@id': `${siteUrl}/#organization` },
+  'potentialAction': {
+    '@type': 'SearchAction',
+    'target': {
+      '@type': 'EntryPoint',
+      'urlTemplate': `${siteUrl}/search?q={search_term_string}`,
+    },
+    'query-input': 'required name=search_term_string',
+  },
+}))
+
+const storeSchema = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'Store',
+  '@id': `${siteUrl}/#store`,
+  'name': `${siteName} - Магазин детских игрушек`,
+  'url': siteUrl,
+  'image': ogImageUrl,
+  'description': metaDescription,
+  'telephone': '+7-702-537-94-73',
+  'priceRange': '₸₸',
+  'paymentAccepted': ['Наличные', 'Карты', 'Каспи'],
+  'currenciesAccepted': 'KZT',
+  'openingHours': 'Mo-Su 09:00-21:00',
+  'address': {
+    '@type': 'PostalAddress',
+    'addressCountry': 'KZ',
+    'addressLocality': 'Алматы',
+  },
+  'geo': {
+    '@type': 'GeoCoordinates',
+    'latitude': 43.2220,
+    'longitude': 76.8512,
+  },
+  'areaServed': {
+    '@type': 'City',
+    'name': 'Алматы',
+    'containedInPlace': {
+      '@type': 'Country',
+      'name': 'Kazakhstan',
+    },
+  },
+  'hasOfferCatalog': popularCategoriesForSchema.value.length > 0
+    ? {
+        '@type': 'OfferCatalog',
+        'name': 'Каталог детских игрушек',
+        'itemListElement': popularCategoriesForSchema.value.map((cat, index) => ({
+          '@type': 'OfferCatalog',
+          'name': cat.name,
+          'url': `${siteUrl}${cat.href}`,
+          'position': index + 1,
+        })),
+      }
+    : undefined,
+}))
+
+const categoriesListSchema = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  'name': 'Популярные категории игрушек',
+  'description': 'Основные категории детских игрушек в магазине Ухтышка',
+  'numberOfItems': popularCategoriesForSchema.value.length,
+  'itemListElement': popularCategoriesForSchema.value.map((cat, index) => ({
+    '@type': 'ListItem',
+    'position': index + 1,
+    'item': {
+      '@type': 'ProductGroup',
+      '@id': `${siteUrl}${cat.href}`,
+      'name': cat.name,
+      'url': `${siteUrl}${cat.href}`,
+      'description': cat.description || cat.seo_title || `Купить ${cat.name.toLowerCase()} в интернет-магазине Ухтышка. Широкий выбор, доставка по Казахстану.`,
+    },
+  })),
+}))
+
+const breadcrumbSchema = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  'itemListElement': [
+    { '@type': 'ListItem', 'position': 1, 'name': 'Главная', 'item': siteUrl },
+  ],
+}))
+
+// Collection Page schema для главной страницы с товарами
+const collectionPageSchema = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  '@id': `${siteUrl}/#collectionpage`,
+  'url': siteUrl,
+  'name': metaTitle,
+  'description': metaDescription,
+  'isPartOf': { '@id': `${siteUrl}/#website` },
+  'about': {
+    '@type': 'ItemList',
+    'name': 'Категории детских игрушек',
+    'numberOfItems': popularCategoriesForSchema.value.length,
+  },
+  'mainEntity': {
+    '@type': 'ItemList',
+    'numberOfItems': popularCategoriesForSchema.value.length,
+    'itemListElement': popularCategoriesForSchema.value.map((cat, index) => ({
+      '@type': 'ListItem',
+      'position': index + 1,
+      'url': `${siteUrl}${cat.href}`,
+    })),
+  },
+}))
+
+// ItemList schema для брендов
+const brandsListSchema = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  'name': 'Бренды детских игрушек в магазине Ухтышка',
+  'description': 'Официальные бренды игрушек с гарантией качества и доставкой по Алматы',
+  'numberOfItems': brandsForSchema.value.length,
+  'itemListElement': brandsForSchema.value.map((brand, index) => ({
+    '@type': 'ListItem',
+    'position': index + 1,
+    'item': {
+      '@type': 'Brand',
+      '@id': `${siteUrl}/brand/${brand.slug}#brand`,
+      'name': brand.name,
+      'url': `${siteUrl}/brand/${brand.slug}`,
+      'description': brand.seo_description || brand.description || `Товары бренда ${brand.name} в интернет-магазине Ухтышка`,
+      ...(brand.logo_url && {
+        logo: `${siteUrl}/storage/brand-logos/${brand.logo_url}`,
+      }),
+    },
+  })),
+}))
+
+// ItemList schema для товарных линеек
+const productLinesListSchema = computed(() => {
+  // Группируем линейки по брендам для лучшей структуры
+  const linesByBrand = productLinesForSchema.value.reduce((acc, line) => {
+    const brandId = line.brand_id
+    if (!acc[brandId]) {
+      acc[brandId] = []
+    }
+    acc[brandId].push(line)
+    return acc
+  }, {} as Record<string, typeof productLinesForSchema.value>)
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    'name': 'Товарные линейки брендов',
+    'description': 'Коллекции и серии игрушек от ведущих производителей',
+    'numberOfItems': productLinesForSchema.value.length,
+    'itemListElement': productLinesForSchema.value.map((line, index) => {
+      const brand = brandsForSchema.value.find(b => b.id === line.brand_id)
+      return {
+        '@type': 'ListItem',
+        'position': index + 1,
+        'item': {
+          '@type': 'ProductCollection',
+          '@id': `${siteUrl}/brand/${brand?.slug || 'unknown'}/${line.slug}#collection`,
+          'name': line.name,
+          'url': `${siteUrl}/brand/${brand?.slug || 'unknown'}/${line.slug}`,
+          'description': line.description || `Коллекция ${line.name} от бренда ${brand?.name || 'Unknown'}`,
+          ...(brand && {
+            brand: {
+              '@type': 'Brand',
+              '@id': `${siteUrl}/brand/${brand.slug}#brand`,
+              'name': brand.name,
+            },
+          }),
+        },
+      }
+    }),
+  }
+})
+
+useHead(() => ({
   link: [{ rel: 'canonical', href: siteUrl }],
   script: [
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'WebSite',
-        '@id': `${siteUrl}/#website`,
-        'name': siteName,
-        'alternateName': 'Uhti.kz',
-        'url': siteUrl,
-        'description': metaDescription,
-        'inLanguage': 'ru-KZ',
-        'publisher': { '@id': `${siteUrl}/#organization` },
-        'potentialAction': {
-          '@type': 'SearchAction',
-          'target': {
-            '@type': 'EntryPoint',
-            'urlTemplate': `${siteUrl}/search?q={search_term_string}`,
-          },
-          'query-input': 'required name=search_term_string',
-        },
-      }),
+      innerHTML: JSON.stringify(organizationSchema.value),
     },
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Store',
-        '@id': `${siteUrl}/#store`,
-        'name': `${siteName} - Магазин детских игрушек`,
-        'url': siteUrl,
-        'image': ogImageUrl,
-        'description': metaDescription,
-        'telephone': '+7-702-537-94-73',
-        'priceRange': '₸₸',
-        'paymentAccepted': ['Наличные', 'Карты', 'Каспи'],
-        'currenciesAccepted': 'KZT',
-        'openingHours': 'Mo-Su 09:00-21:00',
-        'address': {
-          '@type': 'PostalAddress',
-          'addressCountry': 'KZ',
-          'addressLocality': 'Алматы',
-        },
-        'geo': {
-          '@type': 'GeoCoordinates',
-          'latitude': 43.2220,
-          'longitude': 76.8512,
-        },
-        'areaServed': { '@type': 'Country', 'name': 'Kazakhstan' },
-      }),
+      innerHTML: JSON.stringify(webSiteSchema.value),
     },
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        'itemListElement': [
-          { '@type': 'ListItem', 'position': 1, 'name': 'Главная', 'item': siteUrl },
-        ],
-      }),
+      innerHTML: JSON.stringify(storeSchema.value),
+    },
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify(categoriesListSchema.value),
+    },
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify(brandsListSchema.value),
+    },
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify(productLinesListSchema.value),
+    },
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify(collectionPageSchema.value),
+    },
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify(breadcrumbSchema.value),
     },
   ],
-})
+}))
 
 useSchemaOrg([
   {
@@ -211,6 +469,11 @@ useSchemaOrg([
     'isPartOf': { '@id': `${siteUrl}/#website` },
     'about': { '@id': `${siteUrl}/#organization` },
     'primaryImageOfPage': { '@type': 'ImageObject', 'url': ogImageUrl },
+    'breadcrumb': { '@id': `${siteUrl}/#breadcrumb` },
+    'speakable': {
+      '@type': 'SpeakableSpecification',
+      'cssSelector': ['h1', 'h2', '.prose'],
+    },
   },
 ])
 
@@ -349,7 +612,7 @@ useRobotsRule({ index: true, follow: true })
     <div :class="alwaysContainedClass" class="py-12 md:py-16 border-t">
       <div class="prose prose-lg max-w-none">
         <h2 class="text-2xl md:text-3xl font-bold mb-6">
-          Интернет-магазин детских игрушек {{ siteName }}
+          Интернет-магазин детских игрушек {{ siteName }} в Алматы
         </h2>
         <div class="grid md:grid-cols-2 gap-8 text-muted-foreground">
           <div>
@@ -357,7 +620,7 @@ useRobotsRule({ index: true, follow: true })
               Широкий ассортимент игрушек
             </h3>
             <p class="mb-4">
-              В нашем интернет-магазине вы найдете огромный выбор детских игрушек для детей всех возрастов: от развивающих игрушек для малышей до конструкторов и настольных игр для школьников.
+              В нашем интернет-магазине в Алматы вы найдете огромный выбор детских игрушек для детей всех возрастов: от развивающих игрушек для малышей до конструкторов и настольных игр для школьников.
             </p>
             <ul class="space-y-2 list-disc list-inside">
               <li>Развивающие игрушки и игры</li>
@@ -369,27 +632,47 @@ useRobotsRule({ index: true, follow: true })
           </div>
           <div>
             <h3 class="text-xl font-semibold text-foreground mb-3">
-              Преимущества покупки у нас
+              Официальные бренды
             </h3>
-            <ul class="space-y-3">
-              <li class="flex items-start gap-2">
-                <Icon name="lucide:check-circle" class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                <span><strong>Быстрая доставка</strong> по Алматы и всему Казахстану</span>
-              </li>
-              <li class="flex items-start gap-2">
-                <Icon name="lucide:gift" class="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                <span><strong>Бонусная программа</strong> - накапливайте баллы за покупки</span>
-              </li>
-              <li class="flex items-start gap-2">
-                <Icon name="lucide:shield-check" class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <span><strong>Гарантия качества</strong> - только сертифицированные товары</span>
-              </li>
-              <li class="flex items-start gap-2">
-                <Icon name="lucide:headphones" class="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                <span><strong>Поддержка 24/7</strong> - всегда рады помочь</span>
-              </li>
-            </ul>
+            <p class="mb-4">
+              Мы работаем с ведущими производителями детских игрушек. В нашем каталоге представлены только оригинальные товары от проверенных брендов с гарантией качества.
+            </p>
+            <ClientOnly>
+              <div v-if="brandsForSchema.length > 0" class="flex flex-wrap gap-2 mb-4">
+                <NuxtLink
+                  v-for="brand in brandsForSchema.slice(0, 8)"
+                  :key="brand.id"
+                  :to="`/brand/${brand.slug}`"
+                  class="text-sm px-3 py-1 bg-primary/5 hover:bg-primary/10 rounded-full transition-colors"
+                >
+                  {{ brand.name }}
+                </NuxtLink>
+              </div>
+            </ClientOnly>
           </div>
+        </div>
+        <div class="mt-8 pt-8 border-t">
+          <h3 class="text-xl font-semibold text-foreground mb-3">
+            Преимущества покупки в {{ siteName }}
+          </h3>
+          <ul class="grid md:grid-cols-2 gap-3">
+            <li class="flex items-start gap-2">
+              <Icon name="lucide:map-pin" class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <span><strong>Доставка по Алматы</strong> - быстрая и удобная</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <Icon name="lucide:gift" class="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <span><strong>Бонусная программа</strong> - накапливайте баллы за покупки</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <Icon name="lucide:shield-check" class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <span><strong>Гарантия качества</strong> - только сертифицированные товары</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <Icon name="lucide:headphones" class="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+              <span><strong>Поддержка 24/7</strong> - всегда рады помочь</span>
+            </li>
+          </ul>
         </div>
       </div>
     </div>
