@@ -1,8 +1,8 @@
--- Добавляем поле для маркировки автогенерированных вопросов
-ALTER TABLE public.product_questions
-ADD COLUMN is_auto_generated BOOLEAN DEFAULT false;
+-- Исправление ошибки в функции generate_product_questions
+-- Проблема: использовались несуществующие колонки m.name_ru и c.name_ru
+-- Решение: заменить на m.name и c.name
 
--- Функция для генерации БАЗОВЫХ вопросов (SQL-генерация)
+-- Пересоздаем функцию с правильными именами колонок
 CREATE OR REPLACE FUNCTION public.generate_product_questions(
   p_product_id UUID,
   p_skip_ai BOOLEAN DEFAULT false
@@ -20,7 +20,7 @@ DECLARE
   v_category_name TEXT;
   v_result JSON;
 BEGIN
-  -- Получаем данные товара
+  -- Получаем данные товара (ИСПРАВЛЕНО: m.name вместо m.name_ru, c.name вместо c.name_ru)
   SELECT
     p.min_age_years,
     p.max_age_years,
@@ -143,37 +143,5 @@ BEGIN
 END;
 $$;
 
--- Функция для массовой генерации вопросов (ТОЛЬКО базовые SQL-вопросы)
--- AI-генерация не используется, чтобы не расходовать токены
-CREATE OR REPLACE FUNCTION public.generate_questions_for_all_products()
-RETURNS TABLE(product_id UUID, questions_count INTEGER, is_premium BOOLEAN) LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  v_product_id UUID;
-  v_count INTEGER;
-  v_is_premium BOOLEAN;
-  v_price NUMERIC;
-BEGIN
-  FOR v_product_id, v_price IN
-    SELECT id, price FROM public.products WHERE is_active = true
-  LOOP
-    -- Генерируем только базовые вопросы (skip_ai = true)
-    PERFORM generate_product_questions(v_product_id, true);
-
-    SELECT COUNT(*) INTO v_count
-    FROM public.product_questions
-    WHERE product_questions.product_id = v_product_id AND is_auto_generated = true;
-
-    product_id := v_product_id;
-    questions_count := v_count;
-    is_premium := v_price > 50000;
-    RETURN NEXT;
-  END LOOP;
-END;
-$$;
-
--- Комментарии для документации
 COMMENT ON FUNCTION public.generate_product_questions(UUID, BOOLEAN) IS
-'Генерирует умные вопросы для товара. Параметры: product_id, skip_ai (true = только SQL, false = SQL + AI для премиум)';
-
-COMMENT ON FUNCTION public.generate_questions_for_all_products() IS
-'Массово генерирует БАЗОВЫЕ вопросы (SQL) для всех активных товаров. AI-генерация не используется.';
+'Генерирует умные вопросы для товара. Параметры: product_id, skip_ai (true = только SQL, false = SQL + AI для премиум). ИСПРАВЛЕНО: использует правильные имена колонок m.name и c.name';
