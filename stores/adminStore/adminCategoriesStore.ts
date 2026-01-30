@@ -23,6 +23,10 @@ interface CategoryUpsertPayload {
   seo_h1: string | null
   seo_text: string | null
   seo_keywords: string[] | null
+  // 🆕 Meta-теги для поисковых систем
+  meta_title: string | null
+  meta_description: string | null
+  meta_keywords: string | null
   // 🆕 Фильтры по брендам и линейкам
   allowed_brand_ids: string[] | null
   allowed_product_line_ids: string[] | null
@@ -46,6 +50,10 @@ function createInsertPayload(item: EditableCategory, parentId: string | null, di
     seo_h1: item.seo_h1 || null,
     seo_text: item.seo_text || null,
     seo_keywords: item.seo_keywords || null,
+    // 🆕 Meta-теги для поисковых систем
+    meta_title: item.meta_title || null,
+    meta_description: item.meta_description || null,
+    meta_keywords: item.meta_keywords || null,
     // 🆕 Фильтры
     allowed_brand_ids: item.allowed_brand_ids || null,
     allowed_product_line_ids: item.allowed_product_line_ids || null,
@@ -71,6 +79,10 @@ function createUpdatePayload(item: EditableCategory, parentId: string | null, di
     seo_h1: item.seo_h1 || null,
     seo_text: item.seo_text || null,
     seo_keywords: item.seo_keywords || null,
+    // 🆕 Meta-теги для поисковых систем
+    meta_title: item.meta_title || null,
+    meta_description: item.meta_description || null,
+    meta_keywords: item.meta_keywords || null,
     // 🆕 Фильтры
     allowed_brand_ids: item.allowed_brand_ids || null,
     allowed_product_line_ids: item.allowed_product_line_ids || null,

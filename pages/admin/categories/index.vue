@@ -5,6 +5,8 @@ import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import RecursiveMenuItemFormNode from '@/components/admin/categories/RecursiveMenuItemFormNode.vue'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 
 definePageMeta({ layout: 'admin' })
@@ -129,6 +131,11 @@ async function saveAllChanges() {
 
   if (categoryToUpdate) {
     categoryToUpdate.children = toRaw(formTree)
+
+    // 🆕 Обновляем SEO поля корневой категории
+    categoryToUpdate.meta_title = selectedRootCategory.value.meta_title
+    categoryToUpdate.meta_description = selectedRootCategory.value.meta_description
+    categoryToUpdate.meta_keywords = selectedRootCategory.value.meta_keywords
   }
   else {
     toast.error('Критическая ошибка: не удалось найти корневую категорию.')
@@ -223,14 +230,67 @@ function handleRemove(itemToRemove: EditableCategory) {
       </aside>
 
       <main class="lg:col-span-3">
-        <div v-if="selectedRootCategory" class="bg-card p-6 rounded-lg shadow-md space-y-4">
-          <h2 class="text-xl font-bold">
-            Редактирование подкатегорий для: <span class="text-primary">{{ selectedRootCategory.name }}</span>
-          </h2>
+        <div v-if="selectedRootCategory" class="space-y-6">
+          <!-- SEO ПОЛЯ КОРНЕВОЙ КАТЕГОРИИ -->
+          <div class="bg-card p-6 rounded-lg shadow-md space-y-4">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <Icon name="lucide:search" class="w-5 h-5 text-primary" />
+              SEO настройки: <span class="text-primary">{{ selectedRootCategory.name }}</span>
+            </h2>
+            <p class="text-sm text-muted-foreground">
+              Эти meta-теги используются поисковыми системами для индексации страницы категории
+            </p>
 
-          <div v-if="!formTree.length" class="text-center py-5 border-dashed border-2 rounded-md">
-            Нет подкатегорий. Нажмите кнопку ниже, чтобы добавить.
+            <div class="space-y-4">
+              <div class="space-y-2">
+                <label class="text-sm font-medium">Meta Title (заголовок для поисковых систем)</label>
+                <Input
+                  v-model="selectedRootCategory.meta_title"
+                  placeholder="Например: Купить игрушки в Алматы | Uhti.kz"
+                  class="w-full"
+                  maxlength="60"
+                />
+                <p class="text-xs text-muted-foreground">
+                  Рекомендуемая длина: до 60 символов. Текущая длина: {{ selectedRootCategory.meta_title?.length || 0 }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-medium">Meta Description (описание для поисковых систем)</label>
+                <Textarea
+                  v-model="selectedRootCategory.meta_description"
+                  placeholder="Например: Широкий выбор качественных игрушек для детей всех возрастов. Доставка по Алматы. Низкие цены и бонусная программа."
+                  class="w-full min-h-[80px]"
+                  maxlength="160"
+                />
+                <p class="text-xs text-muted-foreground">
+                  Рекомендуемая длина: до 160 символов. Текущая длина: {{ selectedRootCategory.meta_description?.length || 0 }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-medium">Meta Keywords (ключевые слова, через запятую)</label>
+                <Input
+                  v-model="selectedRootCategory.meta_keywords"
+                  placeholder="Например: игрушки, детские товары, игры, развивающие игрушки"
+                  class="w-full"
+                />
+                <p class="text-xs text-muted-foreground">
+                  Ключевые слова через запятую. Рекомендуется 5-10 слов.
+                </p>
+              </div>
+            </div>
           </div>
+
+          <!-- ПОДКАТЕГОРИИ -->
+          <div class="bg-card p-6 rounded-lg shadow-md space-y-4">
+            <h2 class="text-xl font-bold">
+              Редактирование подкатегорий для: <span class="text-primary">{{ selectedRootCategory.name }}</span>
+            </h2>
+
+            <div v-if="!formTree.length" class="text-center py-5 border-dashed border-2 rounded-md">
+              Нет подкатегорий. Нажмите кнопку ниже, чтобы добавить.
+            </div>
 
           <div v-for="(item, index) in formTree" :key="item.id || item._tempId!">
             <RecursiveMenuItemFormNode
@@ -255,6 +315,7 @@ function handleRemove(itemToRemove: EditableCategory) {
             <Button variant="outline" class="w-full border-dashed" @click="addNodeToRoot">
               Добавить подкатегорию в "{{ selectedRootCategory.name }}"
             </Button>
+          </div>
           </div>
         </div>
         <div v-else class="flex items-center justify-center h-64 bg-card rounded-lg text-muted-foreground shadow-md">

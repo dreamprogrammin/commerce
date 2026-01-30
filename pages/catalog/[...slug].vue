@@ -416,6 +416,11 @@ const metaDescription = computed(() => {
     return `Результаты фильтрации для категории "${categoryName.value}". Широкий выбор товаров.`
   }
 
+  // 🆕 Приоритет: meta_description > description > автогенерация
+  if (currentCategory.value?.meta_description) {
+    return currentCategory.value.meta_description
+  }
+
   // Если есть описание категории из БД - используем его
   if (categoryDescription.value) {
     return categoryDescription.value
@@ -449,7 +454,10 @@ const metaTitle = computed(() => {
   if (hasActiveFilters.value) {
     return `${categoryName.value} - Фильтр | Ухтышка`
   }
-  // Приоритет: seo_title > автогенерация
+  // 🆕 Приоритет: meta_title > seo_title > автогенерация
+  if (currentCategory.value?.meta_title) {
+    return currentCategory.value.meta_title
+  }
   const seoTitle = currentCategory.value?.seo_title
   if (seoTitle) {
     return seoTitle
@@ -458,8 +466,13 @@ const metaTitle = computed(() => {
   return `${categoryName.value} купить в интернет-магазине Ухтышка Казахстан`
 })
 
-// Ключевые слова (из seo_keywords)
+// 🆕 Ключевые слова (приоритет: meta_keywords > seo_keywords)
 const metaKeywords = computed(() => {
+  // Приоритет новому полю meta_keywords
+  if (currentCategory.value?.meta_keywords) {
+    return currentCategory.value.meta_keywords
+  }
+  // Fallback на старое поле seo_keywords
   const keywords = currentCategory.value?.seo_keywords
   if (keywords && keywords.length > 0) {
     return keywords.join(', ')
@@ -626,7 +639,140 @@ useHead(() => {
     })
   }
 
-  // 4. ItemList Schema (Список товаров в категории с ценами)
+  // 4. Brands Schema (Список брендов в категории)
+  if (availableBrands.value.length > 0) {
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        'name': `Бренды в категории ${categoryName.value}`,
+        'numberOfItems': availableBrands.value.length,
+        'itemListElement': availableBrands.value.slice(0, 10).map((brand, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'item': {
+            '@type': 'Brand',
+            'name': brand.name,
+            'url': `https://uhti.kz/brand/${brand.slug}`,
+          },
+        })),
+      }),
+    })
+  }
+
+  // 5. Product Lines Schema (Список линеек продуктов в категории)
+  if (availableProductLines.value.length > 0) {
+    // Создаем мапу брендов для быстрого доступа
+    const brandsMap = new Map(availableBrands.value.map(b => [b.id, b]))
+
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        'name': `Линейки продуктов в категории ${categoryName.value}`,
+        'numberOfItems': availableProductLines.value.length,
+        'itemListElement': availableProductLines.value.slice(0, 10).map((line, index) => {
+          const brand = brandsMap.get(line.brand_id)
+          const lineUrl = brand
+            ? `https://uhti.kz/brand/${brand.slug}/${line.slug}`
+            : `https://uhti.kz/brand/unknown/${line.slug}`
+
+          return {
+            '@type': 'ListItem',
+            'position': index + 1,
+            'item': {
+              '@type': 'ProductCollection',
+              'name': line.name,
+              'url': lineUrl,
+              'description': line.description || undefined,
+              // Добавляем информацию о бренде
+              ...(brand && {
+                brand: {
+                  '@type': 'Brand',
+                  'name': brand.name,
+                  'url': `https://uhti.kz/brand/${brand.slug}`,
+                },
+              }),
+            },
+          }
+        }),
+      }),
+    })
+  }
+
+  // 6. Materials Schema (Материалы доступные в категории)
+  if (availableMaterials.value.length > 0) {
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        'name': `Материалы товаров в категории ${categoryName.value}`,
+        'numberOfItems': availableMaterials.value.length,
+        'itemListElement': availableMaterials.value.map((material, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'item': {
+            '@type': 'Thing',
+            'name': material.name,
+            'additionalType': 'Material',
+          },
+        })),
+      }),
+    })
+  }
+
+  // 7. Countries Schema (Страны происхождения товаров)
+  if (availableCountries.value.length > 0) {
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        'name': `Страны производства товаров в категории ${categoryName.value}`,
+        'numberOfItems': availableCountries.value.length,
+        'itemListElement': availableCountries.value.map((country, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'item': {
+            '@type': 'Country',
+            'name': country.name,
+          },
+        })),
+      }),
+    })
+  }
+
+  // 8. Product Attributes Schema (Динамические атрибуты товаров)
+  if (availableFilters.value.length > 0) {
+    availableFilters.value.forEach((filter) => {
+      if (filter.attribute_options && filter.attribute_options.length > 0) {
+        schemas.push({
+          type: 'application/ld+json',
+          children: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            'name': `${filter.name} для категории ${categoryName.value}`,
+            'numberOfItems': filter.attribute_options.length,
+            'itemListElement': filter.attribute_options.map((option, index) => ({
+              '@type': 'ListItem',
+              'position': index + 1,
+              'item': {
+                '@type': 'PropertyValue',
+                'name': filter.name,
+                'value': option.value,
+                'propertyID': filter.slug,
+              },
+            })),
+          }),
+        })
+      }
+    })
+  }
+
+  // 9. ItemList Schema (Список товаров в категории с ценами)
   if (displayedProducts.value.length > 0) {
     schemas.push({
       type: 'application/ld+json',
