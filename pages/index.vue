@@ -350,7 +350,12 @@ const collectionPageSchema = computed(() => ({
     'itemListElement': popularCategoriesForSchema.value.map((cat, index) => ({
       '@type': 'ListItem',
       'position': index + 1,
-      'url': `${siteUrl}${cat.href}`,
+      'item': {
+        '@type': 'ProductGroup',
+        '@id': `${siteUrl}${cat.href}`,
+        'name': cat.name,
+        'url': `${siteUrl}${cat.href}`,
+      },
     })),
   },
 }))
