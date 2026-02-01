@@ -804,7 +804,9 @@ useHead(() => {
           'item': {
             '@type': 'Product',
             'name': product.name,
+            'description': product.description || product.name,
             'url': `https://uhti.kz/catalog/products/${product.slug}`,
+            'sku': product.id,
             'image': product.product_images?.[0]?.image_url
               ? getImageUrl(BUCKET_NAME_PRODUCT, product.product_images?.[0]?.image_url, IMAGE_SIZES.CARD)
               : undefined,
@@ -824,6 +826,12 @@ useHead(() => {
               'availability': product.stock_quantity > 0
                 ? 'https://schema.org/InStock'
                 : 'https://schema.org/OutOfStock',
+              'url': `https://uhti.kz/catalog/products/${product.slug}`,
+              'priceValidUntil': new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+              'seller': {
+                '@type': 'Organization',
+                'name': 'Ухтышка',
+              },
             },
           },
         })),
