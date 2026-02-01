@@ -503,12 +503,6 @@ defineExpose({ closeAllPopups })
                         <div class="text-sm font-bold leading-tight text-gray-900 dark:text-gray-100 mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {{ childItem.name }}
                         </div>
-                        <p
-                          v-if="childItem.description"
-                          class="text-xs line-clamp-2 leading-relaxed text-gray-500 dark:text-gray-400"
-                        >
-                          {{ childItem.description }}
-                        </p>
                       </NuxtLink>
                       <ul
                         v-if="childItem.children && childItem.children.length > 0"

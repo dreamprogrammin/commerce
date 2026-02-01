@@ -233,6 +233,57 @@ export type Database = {
           },
         ]
       }
+      brand_questions: {
+        Row: {
+          answer_text: string | null
+          answered_at: string | null
+          brand_id: string
+          created_at: string
+          id: string
+          is_auto_generated: boolean | null
+          question_text: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          answer_text?: string | null
+          answered_at?: string | null
+          brand_id: string
+          created_at?: string
+          id?: string
+          is_auto_generated?: boolean | null
+          question_text: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          answer_text?: string | null
+          answered_at?: string | null
+          brand_id?: string
+          created_at?: string
+          id?: string
+          is_auto_generated?: boolean | null
+          question_text?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_questions_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_questions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           created_at: string
@@ -271,6 +322,8 @@ export type Database = {
       }
       categories: {
         Row: {
+          allowed_brand_ids: string[] | null
+          allowed_product_line_ids: string[] | null
           blur_placeholder: string | null
           created_at: string
           description: string | null
@@ -283,6 +336,9 @@ export type Database = {
           image_url: string | null
           is_featured: boolean
           is_root_category: boolean
+          meta_description: string | null
+          meta_keywords: string | null
+          meta_title: string | null
           name: string
           parent_id: string | null
           seo_h1: string | null
@@ -293,6 +349,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allowed_brand_ids?: string[] | null
+          allowed_product_line_ids?: string[] | null
           blur_placeholder?: string | null
           created_at?: string
           description?: string | null
@@ -305,6 +363,9 @@ export type Database = {
           image_url?: string | null
           is_featured?: boolean
           is_root_category?: boolean
+          meta_description?: string | null
+          meta_keywords?: string | null
+          meta_title?: string | null
           name: string
           parent_id?: string | null
           seo_h1?: string | null
@@ -315,6 +376,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allowed_brand_ids?: string[] | null
+          allowed_product_line_ids?: string[] | null
           blur_placeholder?: string | null
           created_at?: string
           description?: string | null
@@ -327,6 +390,9 @@ export type Database = {
           image_url?: string | null
           is_featured?: boolean
           is_root_category?: boolean
+          meta_description?: string | null
+          meta_keywords?: string | null
+          meta_title?: string | null
           name?: string
           parent_id?: string | null
           seo_h1?: string | null
@@ -372,6 +438,57 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      category_questions: {
+        Row: {
+          answer_text: string | null
+          answered_at: string | null
+          category_id: string
+          created_at: string
+          id: string
+          is_auto_generated: boolean | null
+          question_text: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          answer_text?: string | null
+          answered_at?: string | null
+          category_id: string
+          created_at?: string
+          id?: string
+          is_auto_generated?: boolean | null
+          question_text: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          answer_text?: string | null
+          answered_at?: string | null
+          category_id?: string
+          created_at?: string
+          id?: string
+          is_auto_generated?: boolean | null
+          question_text?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_questions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "category_questions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -423,6 +540,57 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      country_questions: {
+        Row: {
+          answer_text: string | null
+          answered_at: string | null
+          country_id: number
+          created_at: string | null
+          id: string
+          is_auto_generated: boolean | null
+          question_text: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          answer_text?: string | null
+          answered_at?: string | null
+          country_id: number
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          question_text: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          answer_text?: string | null
+          answered_at?: string | null
+          country_id?: number
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          question_text?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "country_questions_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "country_questions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       guest_checkout_items: {
         Row: {
@@ -525,6 +693,57 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      material_questions: {
+        Row: {
+          answer_text: string | null
+          answered_at: string | null
+          created_at: string | null
+          id: string
+          is_auto_generated: boolean | null
+          material_id: number
+          question_text: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          answer_text?: string | null
+          answered_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          material_id: number
+          question_text: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          answer_text?: string | null
+          answered_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          material_id?: number
+          question_text?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_questions_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_questions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       materials: {
         Row: {
@@ -774,6 +993,57 @@ export type Database = {
           },
         ]
       }
+      product_line_questions: {
+        Row: {
+          answer_text: string | null
+          answered_at: string | null
+          created_at: string | null
+          id: string
+          is_auto_generated: boolean | null
+          product_line_id: string
+          question_text: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          answer_text?: string | null
+          answered_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          product_line_id: string
+          question_text: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          answer_text?: string | null
+          answered_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_auto_generated?: boolean | null
+          product_line_id?: string
+          question_text?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_line_questions_product_line_id_fkey"
+            columns: ["product_line_id"]
+            isOneToOne: false
+            referencedRelation: "product_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_line_questions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_lines: {
         Row: {
           brand_id: string
@@ -833,7 +1103,7 @@ export type Database = {
           product_id: string
           question_text: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           answer_text?: string | null
@@ -846,7 +1116,7 @@ export type Database = {
           product_id: string
           question_text: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           answer_text?: string | null
@@ -859,7 +1129,7 @@ export type Database = {
           product_id?: string
           question_text?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1242,9 +1512,69 @@ export type Database = {
         Args: { required_role: string }
         Returns: boolean
       }
+      generate_brand_questions: {
+        Args: { p_brand_id: string; p_skip_ai?: boolean }
+        Returns: Json
+      }
+      generate_category_questions: {
+        Args: { p_category_id: string; p_skip_ai?: boolean }
+        Returns: Json
+      }
+      generate_country_questions: {
+        Args: { p_country_id: number; p_skip_ai?: boolean }
+        Returns: Json
+      }
+      generate_material_questions: {
+        Args: { p_material_id: number; p_skip_ai?: boolean }
+        Returns: Json
+      }
+      generate_product_line_questions: {
+        Args: { p_product_line_id: string; p_skip_ai?: boolean }
+        Returns: Json
+      }
       generate_product_questions: {
         Args: { p_product_id: string; p_skip_ai?: boolean }
         Returns: Json
+      }
+      generate_questions_for_all_brands: {
+        Args: never
+        Returns: {
+          brand_id: string
+          is_premium: boolean
+          questions_count: number
+        }[]
+      }
+      generate_questions_for_all_categories: {
+        Args: never
+        Returns: {
+          category_id: string
+          is_premium: boolean
+          questions_count: number
+        }[]
+      }
+      generate_questions_for_all_countries: {
+        Args: never
+        Returns: {
+          country_id: number
+          is_premium: boolean
+          questions_count: number
+        }[]
+      }
+      generate_questions_for_all_materials: {
+        Args: never
+        Returns: {
+          is_premium: boolean
+          material_id: number
+          questions_count: number
+        }[]
+      }
+      generate_questions_for_all_product_lines: {
+        Args: never
+        Returns: {
+          is_premium: boolean
+          product_line_id: string
+          questions_count: number
+        }[]
       }
       generate_questions_for_all_products: {
         Args: never
@@ -1273,12 +1603,20 @@ export type Database = {
         Args: { p_category_slug: string }
         Returns: {
           id: string
+          logo_url: string
           name: string
+          products_count: number
           slug: string
         }[]
       }
       get_category_and_children_ids: {
         Args: { p_category_slug: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      get_category_and_children_ids_by_uuid: {
+        Args: { p_category_id: string }
         Returns: {
           id: string
         }[]

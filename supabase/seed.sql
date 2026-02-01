@@ -13,11 +13,11 @@ TRUNCATE TABLE public.products, public.categories RESTART IDENTITY CASCADE;
 
 
 -- 2. Создаем КОРНЕВЫЕ категории (1-й уровень)
-INSERT INTO public.categories 
+INSERT INTO public.categories
     (name, slug, href, description, is_root_category, display_order, icon_name)
 VALUES
-    ('Мальчикам', 'boys', '/catalog/boys', 'Игрушки, одежда и все для мальчиков', TRUE, 10, 'lucide:user'),
-    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, наряды и мечты для девочек', TRUE, 20, 'lucide:female'),
+    ('Мальчикам', 'boys', '/catalog/boys', 'Игрушки и товары для мальчиков', TRUE, 10, 'lucide:user'),
+    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, 20, 'lucide:female'),
     ('Малышам', 'kiddy', '/catalog/kiddy', 'Безопасные и развивающие игрушки 0-3', TRUE, 30, 'lucide:baby'),
     ('Игры и пазлы', 'games', '/catalog/games', 'Настольные игры и пазлы для всей семьи', TRUE, 40, 'lucide:gamepad-2'),
     ('Творчество', 'crafts', '/catalog/crafts', 'Наборы для лепки, рисования и хобби', TRUE, 50, 'lucide:pencil-ruler'),
@@ -97,7 +97,7 @@ DECLARE
 BEGIN
     -- 1. Находим ID пользователя в служебной таблице `auth.users` по его email.
     --    ВАЖНО: Замени 'твой-email@example.com' на свой реальный email!
-    SELECT id INTO admin_user_id FROM auth.users WHERE email = 'твой-email@example.com';
+    SELECT id INTO admin_user_id FROM auth.users WHERE email = 'richardmy503@gmail.com';
 
     -- 2. Если пользователь с таким email найден...
     IF admin_user_id IS NOT NULL THEN
@@ -110,7 +110,7 @@ BEGIN
         WHERE id = admin_user_id;
 
         -- Выводим сообщение в консоль, что все прошло успешно.
-        RAISE NOTICE 'Пользователю с email % успешно присвоена роль АДМИНИСТРАТОРА.', 'твой-email@example.com';
+        RAISE NOTICE 'Пользователю с email % успешно присвоена роль АДМИНИСТРАТОРА.', 'richardmy503@gmail.com';
     ELSE
         -- Выводим предупреждение, если пользователь не найден.
         RAISE NOTICE 'ПРЕДУПРЕЖДЕНИЕ: Пользователь с email % не найден. Роль администратора не присвоена.', 'richardmy503@gmail.com';

@@ -2,21 +2,44 @@
 import type { EditableCategory } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { computed, onMounted, ref } from 'vue'
+import { Sparkles } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import RecursiveMenuItemFormNode from '@/components/admin/categories/RecursiveMenuItemFormNode.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
+import { useCategoryQuestions } from '@/composables/useCategoryQuestions'
 
 definePageMeta({ layout: 'admin' })
 
 const adminCategoriesStore = useAdminCategoriesStore()
+const { generateQuestionsForAllCategories } = useCategoryQuestions()
 
 const rootCategories = computed(() => adminCategoriesStore.buildCategoryTree(null))
 const selectedRootCategory = ref<EditableCategory | null>(null)
 const formTree = reactive<EditableCategory[]>([])
 const isSaving = ref(false)
+const isGeneratingAll = ref(false)
+
+async function handleGenerateAllQuestions() {
+  isGeneratingAll.value = true
+
+  toast.info('Запуск генерации FAQ для всех категорий...')
+
+  const result = await generateQuestionsForAllCategories()
+
+  isGeneratingAll.value = false
+
+  if (result) {
+    toast.success(`FAQ сгенерировано для ${result.total} категорий!`, {
+      description: `Из них ${result.premium_count} популярных категорий`,
+    })
+  }
+  else {
+    toast.error('Ошибка при генерации FAQ')
+  }
+}
 
 onMounted(() => {
   adminCategoriesStore.fetchAllCategories()
@@ -198,10 +221,20 @@ function handleRemove(itemToRemove: EditableCategory) {
       <h1 class="text-3xl font-bold text-foreground">
         Управление Категориями
       </h1>
-      <Button v-if="selectedRootCategory" :disabled="isSaving" @click="saveAllChanges">
-        <span v-if="isSaving">Сохранение...</span>
-        <span v-else>Сохранить все изменения</span>
-      </Button>
+      <div class="flex gap-2">
+        <Button
+          variant="outline"
+          :disabled="isGeneratingAll"
+          @click="handleGenerateAllQuestions"
+        >
+          <Sparkles class="w-4 h-4 mr-2" />
+          {{ isGeneratingAll ? 'Генерация...' : 'FAQ для всех' }}
+        </Button>
+        <Button v-if="selectedRootCategory" :disabled="isSaving" @click="saveAllChanges">
+          <span v-if="isSaving">Сохранение...</span>
+          <span v-else>Сохранить все изменения</span>
+        </Button>
+      </div>
     </div>
 
     <div v-if="adminCategoriesStore.isLoading" class="text-center py-20">

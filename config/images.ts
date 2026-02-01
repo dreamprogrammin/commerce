@@ -77,6 +77,12 @@ export const IMAGE_SIZES = {
     height: 150,
   },
 
+  // Изображения категорий
+  CATEGORY_IMAGE: {
+    width: 800,
+    height: 600,
+  },
+
   // Галерея товара - миниатюры
   PRODUCT_GALLERY_THUMB: {
     width: 120,

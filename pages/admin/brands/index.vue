@@ -8,6 +8,7 @@ import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
+import { useBrandQuestions } from '@/composables/useBrandQuestions'
 
 definePageMeta({ layout: 'admin' })
 
@@ -15,6 +16,29 @@ const brandsStore = useAdminBrandsStore()
 const productLinesStore = useAdminProductLinesStore()
 const { brands, isLoading } = storeToRefs(brandsStore)
 const { getImageUrl } = useSupabaseStorage()
+const { generateQuestionsForAllBrands } = useBrandQuestions()
+
+// Генерация FAQ
+const isGeneratingAll = ref(false)
+
+async function handleGenerateAllQuestions() {
+  isGeneratingAll.value = true
+
+  toast.info('Запуск генерации FAQ для всех брендов...')
+
+  const result = await generateQuestionsForAllBrands()
+
+  isGeneratingAll.value = false
+
+  if (result) {
+    toast.success(`FAQ сгенерировано для ${result.total} брендов!`, {
+      description: `Из них ${result.premium_count} популярных брендов`,
+    })
+  }
+  else {
+    toast.error('Ошибка при генерации FAQ')
+  }
+}
 
 // Кеш линеек по брендам
 const brandLinesCount = ref<Record<string, number>>({})
@@ -84,7 +108,7 @@ function getBrandLogoUrl(logoUrl: string | null): string {
 
 <template>
   <div class="container mx-auto p-4 md:p-8 space-y-6">
-    <!-- Заголовок и кнопка добавления -->
+    <!-- Заголовок и кнопки -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
         <h1 class="text-2xl md:text-3xl font-bold tracking-tight">
@@ -94,12 +118,23 @@ function getBrandLogoUrl(logoUrl: string | null): string {
           Просмотр и редактирование брендов товаров
         </p>
       </div>
-      <NuxtLink to="/admin/brands/new">
-        <Button class="w-full sm:w-auto">
-          <Plus class="w-4 h-4 mr-2" />
-          Добавить бренд
+      <div class="flex gap-2 w-full sm:w-auto">
+        <Button
+          variant="outline"
+          :disabled="isGeneratingAll"
+          class="flex-1 sm:flex-initial"
+          @click="handleGenerateAllQuestions"
+        >
+          <Sparkles class="w-4 h-4 mr-2" />
+          {{ isGeneratingAll ? 'Генерация...' : 'Сгенерировать FAQ для всех' }}
         </Button>
-      </NuxtLink>
+        <NuxtLink to="/admin/brands/new" class="flex-1 sm:flex-initial">
+          <Button class="w-full">
+            <Plus class="w-4 h-4 mr-2" />
+            Добавить бренд
+          </Button>
+        </NuxtLink>
+      </div>
     </div>
 
     <!-- Поиск -->

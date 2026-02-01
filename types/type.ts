@@ -335,6 +335,8 @@ export interface BrandForFilter {
   id: string
   name: string
   slug: string
+  logo_url?: string | null
+  products_count?: number
 }
 
 export interface ColorOptionMeta {

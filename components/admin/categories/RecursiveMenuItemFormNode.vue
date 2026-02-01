@@ -7,7 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useSafeHtml } from '@/composables/useSafeHtml'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import {
@@ -44,6 +46,7 @@ const isSlugManuallyEdited = ref(false)
 
 // 👇 Используем универсальную функцию getImageUrl
 const { getImageUrl } = useSupabaseStorage()
+const { sanitizeHtml } = useSafeHtml()
 
 const optimizationInfo = computed(() => getOptimizationInfo())
 
@@ -114,6 +117,9 @@ const seoText = computed({
   get: () => props.item.seo_text ?? '',
   set: value => emit('update:item', { ...props.item, seo_text: value || null }),
 })
+
+// Санитизированный SEO текст для preview
+const sanitizedSeoText = computed(() => sanitizeHtml(seoText.value))
 
 const seoKeywords = computed({
   get: () => (props.item.seo_keywords ?? []).join(', '),
@@ -367,24 +373,18 @@ function removeImage() {
       <div>
         <div class="flex items-center justify-between">
           <Label :for="`desc-${props.item._tempId || props.item.id}`">
-            SEO описание
+            📝 Описание НАД товарами (с изображением)
           </Label>
-          <span
-            class="text-xs"
-            :class="description.length > 160 ? 'text-destructive' : description.length > 120 ? 'text-amber-500' : 'text-muted-foreground'"
-          >
-            {{ description.length }}/160
-          </span>
         </div>
         <Textarea
           :id="`desc-${props.item._tempId || props.item.id}`"
           v-model="description"
           rows="3"
-          placeholder="Игрушки для девочек в Алматы: куклы, мягкие игрушки, наборы для творчества. Доставка по Казахстану."
+          placeholder="Игрушки и товары для мальчиков"
           :disabled="isDeleted"
         />
         <p class="text-xs text-muted-foreground mt-1">
-          Это описание отображается в Google. Оптимально 120-160 символов.
+          Краткое описание категории. Отображается НАД каталогом товаров с изображением категории.
         </p>
       </div>
 
@@ -568,25 +568,71 @@ function removeImage() {
             </p>
           </div>
 
-          <!-- SEO Text -->
+          <!-- SEO Text с вкладками -->
           <div>
-            <div class="flex items-center justify-between">
-              <Label :for="`seo-text-${props.item._tempId || props.item.id}`">
-                SEO текст (внизу страницы)
+            <div class="flex items-center justify-between mb-2">
+              <Label>
+                📄 Описание ПОД товарами (SEO текст)
               </Label>
               <span class="text-xs text-muted-foreground">
                 {{ seoText.length }} символов
               </span>
             </div>
-            <Textarea
-              :id="`seo-text-${props.item._tempId || props.item.id}`"
-              v-model="seoText"
-              rows="6"
-              placeholder="Конструкторы Лего Майнкрафт - это увлекательный мир приключений для детей от 6 лет. В нашем интернет-магазине вы найдете оригинальные наборы LEGO Minecraft по выгодным ценам с доставкой по всему Казахстану..."
-              :disabled="isDeleted"
-            />
-            <p class="text-xs text-muted-foreground mt-1">
-              Длинный текст для SEO, отображается внизу страницы категории. Рекомендуется 300-1000 символов.
+
+            <Tabs default-value="edit" class="w-full">
+              <TabsList class="grid w-full grid-cols-2">
+                <TabsTrigger value="edit">
+                  <Icon name="lucide:code" class="w-4 h-4 mr-2" />
+                  Редактирование
+                </TabsTrigger>
+                <TabsTrigger value="preview">
+                  <Icon name="lucide:eye" class="w-4 h-4 mr-2" />
+                  Предпросмотр
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="edit" class="mt-2">
+                <Textarea
+                  :id="`seo-text-${props.item._tempId || props.item.id}`"
+                  v-model="seoText"
+                  rows="8"
+                  placeholder="<p>Конструкторы <strong>Лего Майнкрафт</strong> - это увлекательный мир приключений для детей от 6 лет.</p><h3>Преимущества покупки у нас:</h3><ul><li>Оригинальные наборы LEGO</li><li>Выгодные цены</li><li>Доставка по Казахстану</li></ul>"
+                  :disabled="isDeleted"
+                  class="font-mono text-sm"
+                />
+                <p class="text-xs text-muted-foreground mt-2">
+                  Поддерживает HTML: &lt;p&gt;, &lt;h2&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;strong&gt;, &lt;a&gt;. Отображается ВНИЗУ страницы ПОД товарами и FAQ.
+                </p>
+              </TabsContent>
+
+              <TabsContent value="preview" class="mt-2">
+                <div class="border rounded-lg p-4 bg-white min-h-[200px]">
+                  <div
+                    v-if="sanitizedSeoText"
+                    class="prose prose-sm max-w-none text-muted-foreground
+                           prose-headings:font-bold prose-headings:text-foreground
+                           prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3
+                           prose-h3:text-lg prose-h3:mt-4 prose-h3:mb-2
+                           prose-p:leading-relaxed prose-p:mb-4
+                           prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-a:font-medium
+                           prose-strong:text-gray-900 prose-strong:font-semibold
+                           prose-ul:list-disc prose-ul:ml-6 prose-ul:my-4
+                           prose-ol:list-decimal prose-ol:ml-6 prose-ol:my-4
+                           prose-li:my-1 prose-li:leading-relaxed
+                           prose-blockquote:border-l-4 prose-blockquote:border-blue-300 prose-blockquote:pl-4 prose-blockquote:italic
+                           prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+                           prose-img:rounded-lg prose-img:shadow-md"
+                    v-html="sanitizedSeoText"
+                  />
+                  <div v-else class="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                    Введите HTML текст для предпросмотра
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <p class="text-xs text-muted-foreground mt-2">
+              💡 Длинный SEO текст с HTML разметкой. Рекомендуется 300-1000 символов.
             </p>
           </div>
         </div>
@@ -616,7 +662,7 @@ function removeImage() {
       <!-- 🆕 Изображение с обработкой и blur -->
       <div>
         <Label :for="`image-${props.item._tempId || props.item.id}`">
-          Изображение для меню
+          🖼️ Изображение категории (показывается НАД товарами)
           <span v-if="isProcessingImage" class="text-xs text-muted-foreground ml-2">
             {{ optimizationInfo.icon }} Обработка...
           </span>

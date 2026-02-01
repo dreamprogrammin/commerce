@@ -60,7 +60,9 @@
       "Bash(npx nuxi typecheck:*)",
       "Bash(chmod:*)",
       "Bash(supabase secrets set:*)",
-      "Bash(supabase secrets:*)"
+      "Bash(supabase secrets:*)",
+      "Bash(supabase db execute:*)",
+      "Bash(supabase storage ls:*)"
     ]
   }
 }

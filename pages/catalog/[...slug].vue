@@ -6,6 +6,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
+import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
+import CategoryBrands from '@/components/category/CategoryBrands.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import { IMAGE_SIZES } from '@/config/images'
@@ -13,13 +15,17 @@ import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants' // Пр�
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
+import { useSafeHtml } from '@/composables/useSafeHtml'
 
 // --- 1. Инициализация ---
 const route = useRoute()
 const router = useRouter()
 const categoriesStore = useCategoriesStore()
+const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl } = useSupabaseStorage()
+const { sanitizeHtml } = useSafeHtml()
 // Флаг монтирования для корректной гидратации
 const isMounted = ref(false)
 
@@ -93,11 +99,8 @@ const categoryOgImageUrl = computed(() => {
   if (!imageFilename)
     return undefined
 
-  // Используем твой композабл.
-  // Важно: OG Image требует полный URL. Supabase composable обычно возвращает полный.
-  // Третий аргумент (размер) можно не передавать, чтобы получить оригинал,
-  // или передать 'lg'/'xl', если у тебя есть такие пресеты для лучшего качества.
-  return getImageUrl(BUCKET_NAME_CATEGORY, imageFilename)
+  // Используем пресет OG_IMAGE для Open Graph (1200x630)
+  return getImageUrl(BUCKET_NAME_CATEGORY, imageFilename, IMAGE_SIZES.OG_IMAGE)
 })
 
 // Название категории (для breadcrumbs и fallback)
@@ -480,8 +483,11 @@ const metaKeywords = computed(() => {
   return null
 })
 
-// SEO текст для отображения внизу страницы
-const seoText = computed(() => currentCategory.value?.seo_text || null)
+// SEO текст для отображения внизу страницы (с санитизацией)
+const seoText = computed(() => {
+  const text = currentCategory.value?.seo_text
+  return text ? sanitizeHtml(text) : null
+})
 
 const robotsRule = computed(() => {
   // Если есть фильтры ИЛИ сортировка не по умолчанию
@@ -604,6 +610,18 @@ useHead(() => {
       // Ключевые слова категории
       ...(metaKeywords.value && {
         keywords: metaKeywords.value,
+      }),
+      // 🆕 Добавляем основной контент страницы (если есть SEO текст)
+      ...(seoText.value && {
+        mainEntity: {
+          '@type': 'Article',
+          'headline': title.value,
+          'articleBody': seoText.value.replace(/<[^>]*>/g, '').substring(0, 500), // Убираем HTML теги для articleBody
+          'author': {
+            '@type': 'Organization',
+            'name': 'Ухтышка',
+          },
+        },
       }),
       // Добавляем информацию о товарах для rich snippets
       ...(displayedProducts.value.length > 0 && {
@@ -813,6 +831,72 @@ useHead(() => {
     })
   }
 
+  // 10. FAQPage Schema (Часто задаваемые вопросы категории)
+  if (currentCategory.value && !hasActiveFilters.value) {
+    categoryQuestionsStore.fetchQuestions(currentCategory.value.id).then((questions) => {
+      if (questions && questions.length > 0) {
+        schemas.push({
+          type: 'application/ld+json',
+          children: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            'mainEntity': questions.map(q => ({
+              '@type': 'Question',
+              'name': q.question_text,
+              'acceptedAnswer': {
+                '@type': 'Answer',
+                'text': q.answer_text || 'Ответ скоро будет добавлен.',
+              },
+            })),
+          }),
+        })
+      }
+    })
+  }
+
+  // 11. 🆕 Article Schema для SEO описания
+  if (seoText.value && currentCategory.value) {
+    // Очищаем HTML теги для текстового контента
+    const plainText = seoText.value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        'headline': `${categoryName.value} - Полное руководство`,
+        'articleBody': plainText,
+        'description': plainText.substring(0, 200),
+        'author': {
+          '@type': 'Organization',
+          'name': 'Интернет-магазин Ухтышка',
+          'url': 'https://uhti.kz',
+        },
+        'publisher': {
+          '@type': 'Organization',
+          'name': 'Ухтышка',
+          'url': 'https://uhti.kz',
+        },
+        'mainEntityOfPage': {
+          '@type': 'WebPage',
+          '@id': canonicalUrl.value,
+        },
+        'inLanguage': 'ru-RU',
+        'about': {
+          '@type': 'Thing',
+          'name': categoryName.value,
+        },
+        ...(categoryOgImageUrl.value && {
+          image: {
+            '@type': 'ImageObject',
+            'url': categoryOgImageUrl.value,
+            'caption': categoryName.value,
+          },
+        }),
+      }),
+    })
+  }
+
   return {
     link: [
       { rel: 'canonical', href: canonicalUrl.value },
@@ -837,17 +921,67 @@ useHead(() => {
       </template>
     </ClientOnly>
 
-    <h1 class="text-xl md:text-3xl font-bold mb-4 capitalize">
+    <!-- Блок с картинкой и описанием категории -->
+    <div
+      v-if="currentCategory && currentCategory.description"
+      class="bg-white dark:bg-card rounded-xl p-6 lg:p-8 mb-8 border shadow-sm"
+    >
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Картинка категории слева -->
+        <div
+          v-if="currentCategory.image_url"
+          class="lg:col-span-3"
+        >
+          <div class="w-full max-w-[220px] h-[160px] rounded-lg overflow-hidden shadow-md bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+            <ProgressiveImage
+              :src="getImageUrl(BUCKET_NAME_CATEGORY, currentCategory.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+              :alt="currentCategory.name"
+              object-fit="contain"
+              placeholder-type="lqip"
+              :blur-data-url="currentCategory.blur_placeholder"
+              :eager="true"
+              class="w-full h-full"
+            />
+          </div>
+        </div>
+
+        <!-- Текстовый блок справа -->
+        <div :class="currentCategory.image_url ? 'lg:col-span-9' : 'lg:col-span-12'" class="space-y-4">
+          <h1 class="text-2xl md:text-3xl font-bold capitalize">
+            {{ title }}
+          </h1>
+
+          <!-- Описание категории из БД -->
+          <p
+            v-if="currentCategory.description"
+            class="text-base text-muted-foreground leading-relaxed"
+          >
+            {{ currentCategory.description }}
+          </p>
+
+          <!-- Статистика категории -->
+          <div class="flex flex-wrap gap-4 pt-2">
+            <div class="flex items-center gap-2 text-sm text-muted-foreground">
+              <Icon name="lucide:package" class="w-4 h-4 text-blue-500" />
+              <span>{{ displayedProducts.length }} товаров</span>
+            </div>
+            <div v-if="availableBrands.length > 0" class="flex items-center gap-2 text-sm text-muted-foreground">
+              <Icon name="lucide:award" class="w-4 h-4 text-purple-500" />
+              <span>{{ availableBrands.length }} брендов</span>
+            </div>
+            <div v-if="priceRange.min > 0 || priceRange.max < 50000" class="flex items-center gap-2 text-sm text-muted-foreground">
+              <Icon name="lucide:tag" class="w-4 h-4 text-green-500" />
+              <span>от {{ new Intl.NumberFormat('ru-RU').format(priceRange.min) }} ₸</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Заголовок для случая с активными фильтрами или без описания -->
+    <h1 v-else class="text-xl md:text-3xl font-bold mb-4 capitalize">
       {{ title }}
     </h1>
-
-    <!-- SEO описание категории (показываем на странице для индексации Google) -->
-    <p
-      v-if="categoryDescription && !hasActiveFilters"
-      class="text-muted-foreground mb-6 max-w-3xl leading-relaxed"
-    >
-      {{ categoryDescription }}
-    </p>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- Десктоп фильтры -->
@@ -1139,15 +1273,45 @@ useHead(() => {
       </div>
     </div>
 
-    <!-- 🆕 SEO текст внизу страницы (для Google индексации) -->
+    <!-- 📄 SEO описание после каталога (для Google индексации) -->
     <div
-      v-if="seoText && !hasActiveFilters"
+      v-if="seoText"
       class="mt-12 pt-8 border-t"
     >
-      <div class="prose prose-sm max-w-none text-muted-foreground">
-        <div v-html="seoText" />
-      </div>
+      <div
+        class="prose prose-sm max-w-none text-gray-700
+               prose-headings:font-bold prose-headings:text-gray-900
+               prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3
+               prose-h3:text-lg prose-h3:mt-4 prose-h3:mb-2
+               prose-p:leading-relaxed prose-p:mb-4
+               prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-a:font-medium
+               prose-strong:text-gray-900 prose-strong:font-semibold
+               prose-ul:list-disc prose-ul:ml-6 prose-ul:my-4
+               prose-ol:list-decimal prose-ol:ml-6 prose-ol:my-4
+               prose-li:my-1 prose-li:leading-relaxed
+               prose-blockquote:border-l-4 prose-blockquote:border-blue-300 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-600
+               prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono
+               prose-pre:bg-gray-100 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+               prose-img:rounded-lg prose-img:shadow-md"
+        v-html="seoText"
+      />
     </div>
+
+    <!-- FAQ блок для категории -->
+    <ClientOnly>
+      <CategoryQuestions
+        v-if="currentCategory"
+        :category-id="currentCategory.id"
+        :category-name="currentCategory.name"
+      />
+    </ClientOnly>
+
+    <!-- Бренды и линейки в категории -->
+    <CategoryBrands
+      v-if="availableBrands.length > 0"
+      :brands="availableBrands"
+      :product-lines="availableProductLines"
+    />
 
     <!-- Мобильные компоненты -->
     <ClientOnly>
