@@ -41,41 +41,41 @@ SET value = EXCLUDED.value,
 
 -- 3. Создаем КОРНЕВЫЕ категории (1-й уровень)
 INSERT INTO public.categories
-    (name, slug, href, description, is_root_category, display_order, icon_name)
+    (name, slug, href, description, is_root_category, display_in_menu, display_order, icon_name)
 VALUES
-    ('Мальчикам', 'boys', '/catalog/boys', 'Игрушки и товары для мальчиков', TRUE, 10, 'lucide:user'),
-    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, 20, 'lucide:female'),
-    ('Малышам', 'kiddy', '/catalog/kiddy', 'Безопасные и развивающие игрушки 0-3', TRUE, 30, 'lucide:baby'),
-    ('Конструкторы', 'constructors-root', '/catalog/constructors-root', 'Конструкторы для детей всех возрастов', TRUE, 40, 'lucide:blocks'),
-    ('Игры', 'games', '/catalog/games', 'Настольные игры и пазлы для всей семьи', TRUE, 50, 'lucide:gamepad-2'),
-    ('Творчество', 'crafts', '/catalog/crafts', 'Наборы для лепки, рисования и хобби', TRUE, 60, 'lucide:pencil-ruler'),
-    ('Отдых', 'outdoor', '/catalog/outdoor', 'Товары для активного отдыха и спорта', TRUE, 70, 'lucide:sun');
+    ('Мальчикам', 'boys', '/catalog/boys', 'Игрушки и товары для мальчиков', TRUE, TRUE, 10, 'lucide:user'),
+    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, TRUE, 20, 'lucide:female'),
+    ('Малышам', 'kiddy', '/catalog/kiddy', 'Безопасные и развивающие игрушки 0-3', TRUE, TRUE, 30, 'lucide:baby'),
+    ('Конструкторы', 'constructors-root', '/catalog/constructors-root', 'Конструкторы для детей всех возрастов', TRUE, TRUE, 40, 'lucide:blocks'),
+    ('Игры', 'games', '/catalog/games', 'Настольные игры и пазлы для всей семьи', TRUE, TRUE, 50, 'lucide:gamepad-2'),
+    ('Творчество', 'crafts', '/catalog/crafts', 'Наборы для лепки, рисования и хобби', TRUE, TRUE, 60, 'lucide:pencil-ruler'),
+    ('Отдых', 'outdoor', '/catalog/outdoor', 'Товары для активного отдыха и спорта', TRUE, TRUE, 70, 'lucide:sun');
 
 
 -- 4. Создаем ПОДКАТЕГОРИИ (2-й уровень)
 
 -- Подкатегории для "Мальчикам"
-INSERT INTO public.categories (name, slug, href, parent_id, display_order) VALUES
-    ('Машинки и транспорт', 'cars', '/catalog/boys/cars', (SELECT id FROM public.categories WHERE slug = 'boys'), 1),
-    ('Конструкторы', 'constructors', '/catalog/boys/constructors', (SELECT id FROM public.categories WHERE slug = 'boys'), 2),
-    ('Роботы и трансформеры', 'robots', '/catalog/boys/robots', (SELECT id FROM public.categories WHERE slug = 'boys'), 3);
+INSERT INTO public.categories (name, slug, href, parent_id, display_in_menu, display_order) VALUES
+    ('Машинки и транспорт', 'cars', '/catalog/boys/cars', (SELECT id FROM public.categories WHERE slug = 'boys'), TRUE, 1),
+    ('Конструкторы', 'constructors', '/catalog/boys/constructors', (SELECT id FROM public.categories WHERE slug = 'boys'), TRUE, 2),
+    ('Роботы и трансформеры', 'robots', '/catalog/boys/robots', (SELECT id FROM public.categories WHERE slug = 'boys'), TRUE, 3);
 
 -- Подкатегории для "Девочкам"
-INSERT INTO public.categories (name, slug, href, parent_id, display_order) VALUES
-    ('Куклы и пупсы', 'dolls', '/catalog/girls/dolls', (SELECT id FROM public.categories WHERE slug = 'girls'), 1),
-    ('Игровые наборы', 'playsets', '/catalog/girls/playsets', (SELECT id FROM public.categories WHERE slug = 'girls'), 2),
-    ('Мягкие игрушки', 'plush-toys', '/catalog/girls/plush-toys', (SELECT id FROM public.categories WHERE slug = 'girls'), 3);
+INSERT INTO public.categories (name, slug, href, parent_id, display_in_menu, display_order) VALUES
+    ('Куклы и пупсы', 'dolls', '/catalog/girls/dolls', (SELECT id FROM public.categories WHERE slug = 'girls'), TRUE, 1),
+    ('Игровые наборы', 'playsets', '/catalog/girls/playsets', (SELECT id FROM public.categories WHERE slug = 'girls'), TRUE, 2),
+    ('Мягкие игрушки', 'plush-toys', '/catalog/girls/plush-toys', (SELECT id FROM public.categories WHERE slug = 'girls'), TRUE, 3);
 
 -- Подкатегории для "Малышам"
-INSERT INTO public.categories (name, slug, href, parent_id, display_order) VALUES
-    ('Погремушки и грызунки', 'rattles', '/catalog/kiddy/rattles', (SELECT id FROM public.categories WHERE slug = 'kiddy'), 1),
-    ('Развивающие коврики', 'playmats', '/catalog/kiddy/playmats', (SELECT id FROM public.categories WHERE slug = 'kiddy'), 2),
-    ('Сортеры и пирамидки', 'sorters', '/catalog/kiddy/sorters', (SELECT id FROM public.categories WHERE slug = 'kiddy'), 3);
+INSERT INTO public.categories (name, slug, href, parent_id, display_in_menu, display_order) VALUES
+    ('Погремушки и грызунки', 'rattles', '/catalog/kiddy/rattles', (SELECT id FROM public.categories WHERE slug = 'kiddy'), TRUE, 1),
+    ('Развивающие коврики', 'playmats', '/catalog/kiddy/playmats', (SELECT id FROM public.categories WHERE slug = 'kiddy'), TRUE, 2),
+    ('Сортеры и пирамидки', 'sorters', '/catalog/kiddy/sorters', (SELECT id FROM public.categories WHERE slug = 'kiddy'), TRUE, 3);
 
 -- Подкатегории для "Игры и пазлы"
-INSERT INTO public.categories (name, slug, href, parent_id, display_order) VALUES
-    ('Настольные игры', 'board-games', '/catalog/games/board-games', (SELECT id FROM public.categories WHERE slug = 'games'), 1),
-    ('Пазлы', 'puzzles', '/catalog/games/puzzles', (SELECT id FROM public.categories WHERE slug = 'games'), 2);
+INSERT INTO public.categories (name, slug, href, parent_id, display_in_menu, display_order) VALUES
+    ('Настольные игры', 'board-games', '/catalog/games/board-games', (SELECT id FROM public.categories WHERE slug = 'games'), TRUE, 1),
+    ('Пазлы', 'puzzles', '/catalog/games/puzzles', (SELECT id FROM public.categories WHERE slug = 'games'), TRUE, 2);
 
 
 -- 5. Наполняем ТОВАРАМИ
