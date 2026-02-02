@@ -2,7 +2,7 @@
 import type { BrandForFilter, ProductLine } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 
 const props = defineProps<{
   brands: BrandForFilter[]
@@ -16,6 +16,13 @@ function getBrandLogoUrl(logoUrl: string | null): string | null {
   if (!logoUrl)
     return null
   return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+}
+
+// Получить URL логотипа линейки с оптимизацией
+function getProductLineLogoUrl(logoUrl: string | null): string | null {
+  if (!logoUrl)
+    return null
+  return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, IMAGE_SIZES.BRAND_LOGO)
 }
 
 // Группируем линейки по брендам
@@ -106,11 +113,11 @@ function getBrandForLine(lineId: string) {
             :to="`/brand/${brands.find(b => b.id === line.brand_id)?.slug}/${line.slug}`"
             class="group flex flex-col items-center gap-2 p-3 rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-lg transition-all duration-200 w-[100px] h-[160px] sm:w-[110px] sm:h-[165px] md:w-[120px] md:h-[170px] lg:w-[130px] lg:h-[175px]"
           >
-            <!-- Логотип бренда линейки -->
+            <!-- Логотип линейки -->
             <div class="flex-1 w-full rounded-lg overflow-hidden border border-border/50 group-hover:border-primary/30 transition-colors flex items-center justify-center bg-background">
               <ProgressiveImage
-                v-if="brands.find(b => b.id === line.brand_id)?.logo_url"
-                :src="getBrandLogoUrl(brands.find(b => b.id === line.brand_id)?.logo_url || null)"
+                v-if="line.logo_url"
+                :src="getProductLineLogoUrl(line.logo_url)"
                 :alt="line.name"
                 object-fit="contain"
                 placeholder-type="shimmer"
