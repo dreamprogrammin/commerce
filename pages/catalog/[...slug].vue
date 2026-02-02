@@ -520,6 +520,31 @@ await useAsyncData(
   },
 )
 
+// 🆕 Загружаем FAQ вопросы для Schema.org
+const { data: categoryQuestions } = await useAsyncData(
+  `catalog-faq-${currentCategorySlug.value}`,
+  async () => {
+    // Получаем ID категории по slug
+    const category = categoriesStore.allCategories.find(c => c.slug === currentCategorySlug.value)
+    if (!category?.id || currentCategorySlug.value === 'all')
+      return []
+
+    try {
+      return await categoryQuestionsStore.fetchQuestions(category.id)
+    }
+    catch (error) {
+      console.error('Error fetching FAQ:', error)
+      return []
+    }
+  },
+  {
+    watch: [currentCategorySlug],
+    server: true,
+  },
+)
+
+const faqQuestions = computed(() => categoryQuestions.value || [])
+
 // 🆕 Уменьшен debounce до 300ms
 watchDebounced(
   activeFilters,
@@ -844,25 +869,21 @@ useHead(() => {
   }
 
   // 10. FAQPage Schema (Часто задаваемые вопросы категории)
-  if (currentCategory.value && !hasActiveFilters.value) {
-    categoryQuestionsStore.fetchQuestions(currentCategory.value.id).then((questions) => {
-      if (questions && questions.length > 0) {
-        schemas.push({
-          type: 'application/ld+json',
-          children: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            'mainEntity': questions.map(q => ({
-              '@type': 'Question',
-              'name': q.question_text,
-              'acceptedAnswer': {
-                '@type': 'Answer',
-                'text': q.answer_text || 'Ответ скоро будет добавлен.',
-              },
-            })),
-          }),
-        })
-      }
+  if (faqQuestions.value.length > 0 && !hasActiveFilters.value) {
+    schemas.push({
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        'mainEntity': faqQuestions.value.map(q => ({
+          '@type': 'Question',
+          'name': q.question_text,
+          'acceptedAnswer': {
+            '@type': 'Answer',
+            'text': q.answer_text || 'Ответ скоро будет добавлен.',
+          },
+        })),
+      }),
     })
   }
 
