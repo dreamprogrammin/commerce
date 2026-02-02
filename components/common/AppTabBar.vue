@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core'
 import { Search } from 'lucide-vue-next'
 import {
   NavigationMenu,
@@ -99,12 +98,6 @@ function formatPrice(price: number, discount?: number): { original: string, fina
   return { original, final, hasDiscount }
 }
 
-// 🆕 Отслеживание загруженных изображений для каждой категории
-const loadedImages = ref<Set<string>>(new Set())
-
-// 🆕 Предзагрузка изображений при наведении (prefetch)
-const imagePreloadQueue = ref<Set<string>>(new Set())
-
 const categoriesStore = useCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
@@ -130,14 +123,10 @@ watch(isAnyPopupOpenInTabBar, (isOpen) => {
   }
 })
 
-// Загружаем изображения при открытии конкретного меню
+// Закрываем поиск при открытии меню
 watch(activeMenuValue, (newValue) => {
-  if (newValue !== undefined) {
-    if (isSearchOpen.value) {
-      isSearchOpen.value = false
-    }
-    // Отмечаем, что изображения для этой категории нужно загрузить
-    loadedImages.value.add(newValue)
+  if (newValue !== undefined && isSearchOpen.value) {
+    isSearchOpen.value = false
   }
 })
 
@@ -157,41 +146,6 @@ function getCategoryImageUrl(imageUrl: string | null): string | null {
     return null
   return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_MENU)
 }
-
-// Проверяем, нужно ли загружать изображение
-function shouldLoadImage(parentSlug: string): boolean {
-  return loadedImages.value.has(parentSlug)
-}
-
-// 🆕 Безопасное получение URL изображения
-function getImageSrc(imageUrl: string | null): string | undefined {
-  const url = getCategoryImageUrl(imageUrl)
-  return url ?? undefined
-}
-
-// 🆕 Предзагрузка изображений при наведении
-function prefetchImages(parentSlug: string, children: any[]) {
-  if (imagePreloadQueue.value.has(parentSlug))
-    return
-
-  imagePreloadQueue.value.add(parentSlug)
-
-  // Предзагружаем первые 3-4 изображения
-  children.slice(0, 4).forEach((child) => {
-    if (child.image_url) {
-      const imgUrl = getImageSrc(child.image_url)
-      if (imgUrl) {
-        const img = new Image()
-        img.src = imgUrl
-      }
-    }
-  })
-}
-
-// 🆕 Дебаунс для предзагрузки (предотвращаем спам)
-const debouncedPrefetch = useDebounceFn((parentSlug: string, children: any[]) => {
-  prefetchImages(parentSlug, children)
-}, 200)
 
 // Функция для закрытия меню после клика по ссылке
 function handleLinkClick() {
@@ -451,7 +405,6 @@ defineExpose({ closeAllPopups })
                 <NavigationMenuTrigger
                   :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-5 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl`"
                   @click="handleLinkClick"
-                  @mouseenter="debouncedPrefetch(rootItem.slug, rootItem.children)"
                 >
                   {{ rootItem.name }}
                 </NavigationMenuTrigger>
@@ -477,28 +430,15 @@ defineExpose({ closeAllPopups })
                           v-if="childItem.image_url"
                           class="mb-3 overflow-hidden dark:border-gray-800 dark:bg-gray-800 rounded-lg aspect-square w-16"
                         >
-                          <!-- 🆕 Transition для плавной загрузки -->
-                          <Transition
-                            enter-active-class="transition-opacity duration-300"
-                            enter-from-class="opacity-0"
-                            leave-active-class="transition-opacity duration-200"
-                            leave-to-class="opacity-0"
-                          >
-                            <img
-                              v-if="shouldLoadImage(rootItem.slug) && getImageSrc(childItem.image_url)"
-                              :src="getImageSrc(childItem.image_url)"
-                              :alt="childItem.name"
-                              loading="lazy"
-                              decoding="async"
-                              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            >
-                            <div
-                              v-else
-                              class="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700"
-                            >
-                              <Icon name="lucide:image" class="w-8 h-8 text-gray-300 dark:text-gray-600 animate-pulse" />
-                            </div>
-                          </Transition>
+                          <ProgressiveImage
+                            :src="getCategoryImageUrl(childItem.image_url)"
+                            :alt="childItem.name"
+                            aspect-ratio="square"
+                            object-fit="cover"
+                            placeholder-type="shimmer"
+                            :blur-data-url="childItem.blur_placeholder"
+                            class="w-full h-full transition-transform duration-300 group-hover:scale-105"
+                          />
                         </div>
                         <div class="text-sm font-bold leading-tight text-gray-900 dark:text-gray-100 mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {{ childItem.name }}
