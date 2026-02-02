@@ -1163,6 +1163,8 @@ export type Database = {
           product_line_id: string | null
           product_type: string | null
           sales_count: number
+          seo_description: string | null
+          seo_keywords: string[] | null
           sku: string | null
           slug: string
           stock_quantity: number
@@ -1195,6 +1197,8 @@ export type Database = {
           product_line_id?: string | null
           product_type?: string | null
           sales_count?: number
+          seo_description?: string | null
+          seo_keywords?: string[] | null
           sku?: string | null
           slug: string
           stock_quantity?: number
@@ -1227,6 +1231,8 @@ export type Database = {
           product_line_id?: string | null
           product_type?: string | null
           sales_count?: number
+          seo_description?: string | null
+          seo_keywords?: string[] | null
           sku?: string | null
           slug?: string
           stock_quantity?: number
