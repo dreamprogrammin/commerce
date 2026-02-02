@@ -102,6 +102,7 @@ const categoriesStore = useCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
 const menuTree = computed(() => categoriesStore.menuTree)
+const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems)
 
 useAsyncData('category-data', () => categoriesStore.fetchCategoryData())
 useAsyncData('additional-menu-items', () => categoriesStore.fetchAdditionalMenuItems())
@@ -398,6 +399,20 @@ defineExpose({ closeAllPopups })
       :delay-duration="150"
     >
       <NavigationMenuList class="flex w-full items-center justify-end gap-2">
+        <!-- Дополнительные пункты меню: Новинки, Акции -->
+        <template v-for="additionalItem in additionalMenuItems" :key="additionalItem.id">
+          <NavigationMenuItem :value="additionalItem.id">
+            <NuxtLink
+              :to="additionalItem.href"
+              :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-5 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl flex items-center gap-2`"
+            >
+              <Icon v-if="additionalItem.icon" :name="additionalItem.icon" class="w-4 h-4" />
+              {{ additionalItem.name }}
+            </NuxtLink>
+          </NavigationMenuItem>
+        </template>
+
+        <!-- Основные категории -->
         <template v-for="rootItem in menuTree" :key="rootItem.id">
           <NavigationMenuItem :value="rootItem.slug">
             <template v-if="rootItem.children && rootItem.children.length > 0">

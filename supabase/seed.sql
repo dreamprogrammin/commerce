@@ -12,19 +12,47 @@
 TRUNCATE TABLE public.products, public.categories RESTART IDENTITY CASCADE;
 
 
--- 2. Создаем КОРНЕВЫЕ категории (1-й уровень)
+-- 2. Создаем дополнительные пункты меню (Новинки, Акции)
+INSERT INTO public.settings (key, value, description)
+VALUES (
+    'additional_menu_items',
+    '[
+        {
+            "id": "new-items",
+            "name": "Новинки",
+            "href": "/catalog/new",
+            "icon": "lucide:sparkles",
+            "display_order": 1
+        },
+        {
+            "id": "promotions",
+            "name": "Акции",
+            "href": "/catalog/promotions",
+            "icon": "lucide:badge-percent",
+            "display_order": 2
+        }
+    ]'::jsonb,
+    'Дополнительные пункты меню (Новинки, Акции)'
+)
+ON CONFLICT (key) DO UPDATE
+SET value = EXCLUDED.value,
+    description = EXCLUDED.description,
+    updated_at = now();
+
+-- 3. Создаем КОРНЕВЫЕ категории (1-й уровень)
 INSERT INTO public.categories
     (name, slug, href, description, is_root_category, display_order, icon_name)
 VALUES
     ('Мальчикам', 'boys', '/catalog/boys', 'Игрушки и товары для мальчиков', TRUE, 10, 'lucide:user'),
     ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, 20, 'lucide:female'),
     ('Малышам', 'kiddy', '/catalog/kiddy', 'Безопасные и развивающие игрушки 0-3', TRUE, 30, 'lucide:baby'),
-    ('Игры и пазлы', 'games', '/catalog/games', 'Настольные игры и пазлы для всей семьи', TRUE, 40, 'lucide:gamepad-2'),
-    ('Творчество', 'crafts', '/catalog/crafts', 'Наборы для лепки, рисования и хобби', TRUE, 50, 'lucide:pencil-ruler'),
-    ('Школа', 'school', '/catalog/school', 'Рюкзаки, пеналы и канцтовары', TRUE, 60, 'lucide:backpack');
+    ('Конструкторы', 'constructors-root', '/catalog/constructors-root', 'Конструкторы для детей всех возрастов', TRUE, 40, 'lucide:blocks'),
+    ('Игры', 'games', '/catalog/games', 'Настольные игры и пазлы для всей семьи', TRUE, 50, 'lucide:gamepad-2'),
+    ('Творчество', 'crafts', '/catalog/crafts', 'Наборы для лепки, рисования и хобби', TRUE, 60, 'lucide:pencil-ruler'),
+    ('Отдых', 'outdoor', '/catalog/outdoor', 'Товары для активного отдыха и спорта', TRUE, 70, 'lucide:sun');
 
 
--- 3. Создаем ПОДКАТЕГОРИИ (2-й уровень)
+-- 4. Создаем ПОДКАТЕГОРИИ (2-й уровень)
 
 -- Подкатегории для "Мальчикам"
 INSERT INTO public.categories (name, slug, href, parent_id, display_order) VALUES
@@ -50,7 +78,7 @@ INSERT INTO public.categories (name, slug, href, parent_id, display_order) VALUE
     ('Пазлы', 'puzzles', '/catalog/games/puzzles', (SELECT id FROM public.categories WHERE slug = 'games'), 2);
 
 
--- 4. Наполняем ТОВАРАМИ
+-- 5. Наполняем ТОВАРАМИ
 
 -- Товары в категории "Машинки и транспорт"
 INSERT INTO public.products (name, slug, description, price, category_id, stock_quantity, bonus_points_award, is_active) VALUES
