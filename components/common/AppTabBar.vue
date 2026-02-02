@@ -404,7 +404,7 @@ defineExpose({ closeAllPopups })
           <NavigationMenuItem :value="additionalItem.id">
             <NuxtLink
               :to="additionalItem.href"
-              :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-5 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl flex items-center gap-2`"
+              :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-4 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl flex items-center gap-2`"
             >
               <Icon v-if="additionalItem.icon" :name="additionalItem.icon" class="w-4 h-4" />
               {{ additionalItem.name }}
@@ -418,7 +418,7 @@ defineExpose({ closeAllPopups })
             <template v-if="rootItem.children && rootItem.children.length > 0">
               <NuxtLink :to="rootItem.href" as-child>
                 <NavigationMenuTrigger
-                  :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-5 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl`"
+                  :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-4 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl`"
                   @click="handleLinkClick"
                 >
                   {{ rootItem.name }}
