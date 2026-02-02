@@ -34,6 +34,6 @@ FOR ALL
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
 
--- Обновляем триггер для `updated_at` (если у вас есть общая функция)
+-- Обновляем триггер для `updated_at`
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.children
-FOR EACH ROW EXECUTE PROCEDURE moddatetime (updated_at);
+FOR EACH ROW EXECUTE PROCEDURE extensions.moddatetime (updated_at);

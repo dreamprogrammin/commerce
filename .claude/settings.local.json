@@ -62,7 +62,9 @@
       "Bash(supabase secrets set:*)",
       "Bash(supabase secrets:*)",
       "Bash(supabase db execute:*)",
-      "Bash(supabase storage ls:*)"
+      "Bash(supabase storage ls:*)",
+      "Bash(npm install:*)",
+      "Bash(snap refresh:*)"
     ]
   }
 }
