@@ -17,7 +17,7 @@ export const carouselContainerVariants = cva(
       contained: {
         // На mobile: full width БЕЗ padding, на desktop: ограниченный контейнер
         // Используется для каруселей, чтобы карточки "выглядывали" на mobile
-        desktop: 'lg:container lg:max-w-screen-4xl lg:mx-auto lg:px-12',
+        desktop: 'lg:container lg:max-w-screen-2xl lg:mx-auto lg:px-12',
 
         // Всегда ограниченный контейнер с padding на всех экранах
         // Используется для заголовков, текста, обычного контента
