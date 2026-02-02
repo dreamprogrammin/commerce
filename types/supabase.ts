@@ -1480,6 +1480,30 @@ export type Database = {
         Args: { required_role: string }
         Returns: boolean
       }
+      generate_brand_questions: {
+        Args: { p_brand_id: string; p_skip_ai?: boolean }
+        Returns: Json
+      }
+      generate_category_questions: {
+        Args: { p_category_id: string; p_skip_ai?: boolean }
+        Returns: Json
+      }
+      generate_questions_for_all_brands: {
+        Args: never
+        Returns: {
+          brand_id: string
+          is_premium: boolean
+          questions_count: number
+        }[]
+      }
+      generate_questions_for_all_categories: {
+        Args: never
+        Returns: {
+          category_id: string
+          is_premium: boolean
+          questions_count: number
+        }[]
+      }
       get_bonus_history: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {
