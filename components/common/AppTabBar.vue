@@ -162,11 +162,11 @@ defineExpose({ closeAllPopups })
     <Popover v-model:open="isSearchOpen">
       <PopoverTrigger as-child>
         <button
-          class="group max-w-xs flex-shrink-0 w-full justify-start bg-white/15 hover:bg-white/20 transition-all duration-200 p-0 h-11 rounded-xl px-4 relative backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg"
+          class="group max-w-3xs shrink-0 w-full justify-start bg-white/15 hover:bg-white/20 transition-all duration-200 p-0 h-11 rounded-xl px-4 relative backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg"
         >
           <div class="relative w-full items-center flex">
             <span class="absolute start-0 inset-y-0 flex items-center justify-center px-2">
-              <Search class="size-[18px] text-white/80 transition-all duration-200 group-hover:text-white group-hover:scale-110" />
+              <Search class="size-4.5 text-white/80 transition-all duration-200 group-hover:text-white group-hover:scale-110" />
             </span>
             <span class="pl-8 pr-4 text-sm text-white/80 w-full text-left font-medium group-hover:text-white transition-colors duration-200">
               Поиск товаров
@@ -225,7 +225,7 @@ defineExpose({ closeAllPopups })
                   v-for="brand in brandSuggestions"
                   :key="brand.id"
                   :to="`/brand/all?brand=${brand.slug}`"
-                  class="flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg hover:shadow-md transition-all border border-blue-100"
+                  class="flex items-center gap-3 px-3 py-2.5 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg hover:shadow-md transition-all border border-blue-100"
                   @click="isSearchOpen = false"
                 >
                   <Icon name="lucide:tag" class="w-4 h-4 text-blue-600 shrink-0" />
