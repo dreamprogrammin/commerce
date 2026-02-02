@@ -5,6 +5,7 @@ import { watchDebounced } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CategoryBrands from '@/components/category/CategoryBrands.vue'
+import CategoryProductLines from '@/components/category/CategoryProductLines.vue'
 import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
@@ -1339,11 +1340,17 @@ useHead(() => {
       />
     </ClientOnly>
 
-    <!-- Бренды и линейки в категории -->
+    <!-- Бренды в категории -->
     <CategoryBrands
       v-if="availableBrands.length > 0"
       :brands="availableBrands"
+    />
+
+    <!-- Линейки продуктов в категории -->
+    <CategoryProductLines
+      v-if="availableProductLines.length > 0"
       :product-lines="availableProductLines"
+      :brands="availableBrands"
     />
 
     <!-- Мобильные компоненты -->
