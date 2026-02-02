@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage';
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 

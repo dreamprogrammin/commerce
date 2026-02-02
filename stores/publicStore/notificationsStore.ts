@@ -1,5 +1,5 @@
-import type { Database } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { Database } from '@/types'
 import { toast } from 'vue-sonner'
 
 type Notification = Database['public']['Tables']['notifications']['Row']
@@ -14,7 +14,8 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
   let realtimeChannel: RealtimeChannel | null = null
 
   async function fetchUnreadCount() {
-    if (!user.value) return
+    if (!user.value)
+      return
     const { count } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
@@ -25,7 +26,8 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
   }
 
   async function fetchNotifications() {
-    if (!user.value) return
+    if (!user.value)
+      return
     isLoading.value = true
     const { data } = await supabase
       .from('notifications')
@@ -52,7 +54,8 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
   }
 
   async function markAllAsRead() {
-    if (!user.value) return
+    if (!user.value)
+      return
     await supabase
       .from('notifications')
       .update({ is_read: true })
@@ -64,7 +67,8 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
   }
 
   function subscribeToNotifications() {
-    if (!user.value || realtimeChannel) return
+    if (!user.value || realtimeChannel)
+      return
 
     realtimeChannel = supabase
       .channel(`notifications:${user.value.id}`)
@@ -100,7 +104,7 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
                 : undefined,
             })
           }
-        }
+        },
       )
       .subscribe()
   }

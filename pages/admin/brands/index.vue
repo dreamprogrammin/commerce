@@ -4,11 +4,11 @@ import { Eye, MoreHorizontal, Pencil, Plus, Search, Sparkles, Trash2 } from 'luc
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useBrandQuestions } from '@/composables/useBrandQuestions'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
-import { useBrandQuestions } from '@/composables/useBrandQuestions'
 
 definePageMeta({ layout: 'admin' })
 

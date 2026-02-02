@@ -13,7 +13,8 @@ const { getImageUrl } = useSupabaseStorage()
 
 // Получить URL логотипа бренда с оптимизацией
 function getBrandLogoUrl(logoUrl: string | null): string | null {
-  if (!logoUrl) return null
+  if (!logoUrl)
+    return null
   return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
 }
 
@@ -33,7 +34,8 @@ const linesByBrand = computed(() => {
 // Получаем логотип бренда для линейки
 function getBrandForLine(lineId: string) {
   const line = props.productLines.find(l => l.id === lineId)
-  if (!line) return null
+  if (!line)
+    return null
   return props.brands.find(b => b.id === line.brand_id)
 }
 </script>

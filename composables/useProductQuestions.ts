@@ -1,6 +1,6 @@
 import type { Database } from '@/types'
 
-export const useProductQuestions = () => {
+export function useProductQuestions() {
   const supabase = useSupabaseClient<Database>()
 
   /**

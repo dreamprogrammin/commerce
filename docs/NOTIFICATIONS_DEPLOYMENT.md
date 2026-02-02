@@ -51,6 +51,7 @@ supabase secrets list
 ```
 
 Должны быть:
+
 - ✅ `TRIGGER_SECRET` (или будет использован дефолт)
 - ✅ `RESEND_API_KEY`
 - ✅ `SITE_URL`
@@ -82,6 +83,7 @@ supabase functions logs notify-question-answered --tail
 ```
 
 Должно быть:
+
 ```
 Trigger secret validated successfully
 Waiting 2 minutes before sending notification...
@@ -92,6 +94,7 @@ Resend response: { id: "..." }
 ### 4. Проверить уведомление
 
 **Через 2 минуты:**
+
 - In-app уведомление появится в колокольчике
 - Email придёт на почту пользователя
 
@@ -102,6 +105,7 @@ Resend response: { id: "..." }
 **Причина:** Секрет в триггере не совпадает с секретом в Edge Function
 
 **Решение:**
+
 ```bash
 # Установить секрет
 supabase secrets set TRIGGER_SECRET=uhti-internal-trigger-2026
@@ -121,6 +125,7 @@ supabase functions deploy notify-question-answered
 **Причина:** RESEND_API_KEY не установлен или неверный
 
 **Решение:**
+
 ```bash
 # Проверить секреты
 supabase secrets list
@@ -137,6 +142,7 @@ supabase functions deploy notify-question-answered
 **Причина:** Старая версия Edge Function без задержки
 
 **Решение:**
+
 ```bash
 # Передеплоить последнюю версию
 supabase functions deploy notify-question-answered
@@ -149,6 +155,7 @@ supabase functions deploy notify-question-answered
 Триггеры PostgreSQL **не могут безопасно получить env переменные** из Supabase Secrets.
 
 Варианты решения:
+
 1. ✅ **Текущий:** Hardcoded секрет в миграции (простой, работает)
 2. ❌ **Vault:** `vault.decrypted_secrets` требует специальные права
 3. ❌ **Config таблица:** Секрет в plaintext в БД (небезопасно)
@@ -184,7 +191,7 @@ supabase functions deploy notify-question-answered
 Файл: `supabase/functions/notify-question-answered/index.ts`
 
 ```typescript
-const expectedSecret = Deno.env.get('TRIGGER_SECRET') || 'your-new-secret-here'  // ← Изменить
+const expectedSecret = Deno.env.get('TRIGGER_SECRET') || 'your-new-secret-here' // ← Изменить
 ```
 
 ### 3. Применить

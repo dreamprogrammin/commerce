@@ -11,7 +11,8 @@ export function useSafeHtml() {
    * @returns Безопасный HTML
    */
   function sanitizeHtml(dirty: string | null | undefined): string {
-    if (!dirty) return ''
+    if (!dirty)
+      return ''
 
     // Проверяем окружение (server/client)
     if (import.meta.server) {

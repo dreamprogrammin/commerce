@@ -99,9 +99,9 @@ onUnmounted(() => {
             class="p-1 hover:opacity-70 transition-opacity active:scale-95"
             @click="openSearch"
           >
-            <CommonIconWithSkeleton 
-              name="line-md:search-twotone" 
-              class="size-6 text-primary dark:text-gray-300" 
+            <CommonIconWithSkeleton
+              name="line-md:search-twotone"
+              class="size-6 text-primary dark:text-gray-300"
             />
           </button>
 
@@ -110,11 +110,11 @@ onUnmounted(() => {
             to="/profile/wishlist"
             class="relative p-1 hover:opacity-70 transition-opacity active:scale-95"
           >
-            <CommonIconWithSkeleton 
-              name="line-md:heart-twotone" 
-              class="size-6 text-primary dark:text-gray-300" 
+            <CommonIconWithSkeleton
+              name="line-md:heart-twotone"
+              class="size-6 text-primary dark:text-gray-300"
             />
-            
+
             <ClientOnly>
               <div
                 v-if="wishlistCount > 0"

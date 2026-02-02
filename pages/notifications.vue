@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
+import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 
 definePageMeta({
   layout: 'default',
@@ -14,7 +14,7 @@ onMounted(() => {
   store.fetchNotifications()
 })
 
-async function handleClick(notification: { id: string; link: string | null; is_read: boolean }) {
+async function handleClick(notification: { id: string, link: string | null, is_read: boolean }) {
   if (!notification.is_read) {
     await store.markAsRead(notification.id)
   }

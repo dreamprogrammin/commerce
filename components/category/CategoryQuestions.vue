@@ -18,7 +18,8 @@ const { data: questions, isLoading } = useQuery({
 
 // Показать все вопросы
 const displayedQuestions = computed(() => {
-  if (!questions.value) return []
+  if (!questions.value)
+    return []
   return questions.value
 })
 

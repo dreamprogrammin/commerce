@@ -2,16 +2,18 @@
 import type { EditableCategory } from '@/types'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
+import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import {
   formatFileSize,
   generateBlurPlaceholder,
@@ -20,8 +22,6 @@ import {
   shouldOptimizeImage,
 } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
-import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
-import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 const props = defineProps<{
   item: EditableCategory

@@ -5,10 +5,10 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
+import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
-import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
@@ -113,7 +113,8 @@ const { data: brandsData } = await useQuery({
       .order('name', { ascending: true })
       .limit(20)
 
-    if (error) throw error
+    if (error)
+      throw error
     return data || []
   },
   staleTime: 5 * 60 * 1000,
@@ -132,7 +133,8 @@ const { data: productLinesData } = await useQuery({
       .order('name', { ascending: true })
       .limit(30)
 
-    if (error) throw error
+    if (error)
+      throw error
     return data || []
   },
   staleTime: 5 * 60 * 1000,
@@ -313,7 +315,8 @@ const categoriesListSchema = computed(() => ({
     '@type': 'ListItem',
     'position': index + 1,
     'item': {
-      '@type': 'ProductGroup',
+      '@type': 'Thing',
+      'additionalType': 'ProductCategory',
       '@id': `${siteUrl}${cat.href}`,
       'name': cat.name,
       'url': `${siteUrl}${cat.href}`,
@@ -325,6 +328,7 @@ const categoriesListSchema = computed(() => ({
 const breadcrumbSchema = computed(() => ({
   '@context': 'https://schema.org',
   '@type': 'BreadcrumbList',
+  '@id': `${siteUrl}/#breadcrumb`,
   'itemListElement': [
     { '@type': 'ListItem', 'position': 1, 'name': 'Главная', 'item': siteUrl },
   ],
@@ -351,7 +355,8 @@ const collectionPageSchema = computed(() => ({
       '@type': 'ListItem',
       'position': index + 1,
       'item': {
-        '@type': 'ProductGroup',
+        '@type': 'Thing',
+        'additionalType': 'ProductCategory',
         '@id': `${siteUrl}${cat.href}`,
         'name': cat.name,
         'url': `${siteUrl}${cat.href}`,

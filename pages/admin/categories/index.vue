@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { EditableCategory } from '@/types'
+import { Sparkles } from 'lucide-vue-next'
 import { v4 as uuidv4 } from 'uuid'
 import { computed, onMounted, ref } from 'vue'
-import { Sparkles } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import RecursiveMenuItemFormNode from '@/components/admin/categories/RecursiveMenuItemFormNode.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useCategoryQuestions } from '@/composables/useCategoryQuestions'
+import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 
 definePageMeta({ layout: 'admin' })
 
@@ -325,30 +325,30 @@ function handleRemove(itemToRemove: EditableCategory) {
               Нет подкатегорий. Нажмите кнопку ниже, чтобы добавить.
             </div>
 
-          <div v-for="(item, index) in formTree" :key="item.id || item._tempId!">
-            <RecursiveMenuItemFormNode
-              :item="item"
-              :level="0"
-              :parent-href="selectedRootCategory.href || ''"
-              @remove-self="handleRemove(item)"
-              @update:item="(updateItem) => {
-                console.log('🔄 update:item получен:', {
-                  name: updateItem.name,
-                  hasBlur: !!updateItem._blurPlaceholder,
-                  blurLength: updateItem._blurPlaceholder?.length,
-                })
-                formTree[index] = updateItem
-              }"
-              @remove-child="handleRemove"
-              @add-child="handleAddChild"
-            />
-          </div>
+            <div v-for="(item, index) in formTree" :key="item.id || item._tempId!">
+              <RecursiveMenuItemFormNode
+                :item="item"
+                :level="0"
+                :parent-href="selectedRootCategory.href || ''"
+                @remove-self="handleRemove(item)"
+                @update:item="(updateItem) => {
+                  console.log('🔄 update:item получен:', {
+                    name: updateItem.name,
+                    hasBlur: !!updateItem._blurPlaceholder,
+                    blurLength: updateItem._blurPlaceholder?.length,
+                  })
+                  formTree[index] = updateItem
+                }"
+                @remove-child="handleRemove"
+                @add-child="handleAddChild"
+              />
+            </div>
 
-          <div class="pt-4 border-t">
-            <Button variant="outline" class="w-full border-dashed" @click="addNodeToRoot">
-              Добавить подкатегорию в "{{ selectedRootCategory.name }}"
-            </Button>
-          </div>
+            <div class="pt-4 border-t">
+              <Button variant="outline" class="w-full border-dashed" @click="addNodeToRoot">
+                Добавить подкатегорию в "{{ selectedRootCategory.name }}"
+              </Button>
+            </div>
           </div>
         </div>
         <div v-else class="flex items-center justify-center h-64 bg-card rounded-lg text-muted-foreground shadow-md">

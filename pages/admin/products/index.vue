@@ -34,8 +34,8 @@ async function handleGenerateAllQuestions() {
     const totalQuestions = result.data?.reduce((sum: number, item: any) => sum + item.questions_count, 0) || 0
 
     toast.success(
-      `✨ Сгенерировано ${totalQuestions} базовых вопросов для ${totalProducts} товаров!\n` +
-      `💎 ${premiumCount} премиум товаров требуют AI-генерацию (запускайте индивидуально)`,
+      `✨ Сгенерировано ${totalQuestions} базовых вопросов для ${totalProducts} товаров!\n`
+      + `💎 ${premiumCount} премиум товаров требуют AI-генерацию (запускайте индивидуально)`,
       { duration: 6000 },
     )
   }

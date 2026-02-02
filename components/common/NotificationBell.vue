@@ -30,7 +30,7 @@ function onOpen(open: boolean) {
   }
 }
 
-async function handleClick(notification: { id: string; link: string | null; is_read: boolean }) {
+async function handleClick(notification: { id: string, link: string | null, is_read: boolean }) {
   if (!notification.is_read) {
     await store.markAsRead(notification.id)
   }
@@ -55,7 +55,7 @@ function formatDate(dateStr: string) {
           name="line-md:bell-twotone-loop"
           class="size-6 text-primary"
         />
-        
+
         <ClientOnly>
           <Transition
             enter-active-class="transition-all duration-200"
@@ -83,7 +83,7 @@ function formatDate(dateStr: string) {
               class="size-5 md:size-7 md:text-white"
             />
           </div>
-          
+
           <ClientOnly>
             <Transition
               enter-active-class="transition-all duration-200"
@@ -124,11 +124,11 @@ function formatDate(dateStr: string) {
               </div>
             </div>
           </div>
-          
+
           <div v-else-if="store.notifications.length === 0" class="p-4 text-center text-sm text-gray-500">
             Нет уведомлений
           </div>
-          
+
           <button
             v-for="n in store.notifications"
             :key="n.id"
@@ -142,9 +142,15 @@ function formatDate(dateStr: string) {
                 class="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0"
               />
               <div class="min-w-0">
-                <p class="text-sm font-medium truncate">{{ n.title }}</p>
-                <p v-if="n.body" class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ n.body }}</p>
-                <p class="text-[11px] text-gray-400 mt-1">{{ formatDate(n.created_at) }}</p>
+                <p class="text-sm font-medium truncate">
+                  {{ n.title }}
+                </p>
+                <p v-if="n.body" class="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                  {{ n.body }}
+                </p>
+                <p class="text-[11px] text-gray-400 mt-1">
+                  {{ formatDate(n.created_at) }}
+                </p>
               </div>
             </div>
           </button>

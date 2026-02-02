@@ -29,7 +29,8 @@ const { data: questions, isLoading } = useQuery({
 
 // Показать только первые 3 вопроса
 const displayedQuestions = computed(() => {
-  if (!questions.value) return []
+  if (!questions.value)
+    return []
   return questions.value.slice(0, 3)
 })
 
@@ -52,7 +53,8 @@ function openQuestionForm() {
 
 async function submitQuestion() {
   const text = questionText.value.trim()
-  if (!text) return
+  if (!text)
+    return
 
   isSubmitting.value = true
   const result = await questionsStore.askQuestion(props.productId, text)
@@ -81,7 +83,8 @@ const route = useRoute()
 // Автоскролл к вопросу из уведомления
 function scrollToQuestion() {
   const hash = window.location.hash || route.hash
-  if (!hash || !hash.startsWith('#question-')) return
+  if (!hash || !hash.startsWith('#question-'))
+    return
 
   const questionId = hash.replace('#question-', '')
 

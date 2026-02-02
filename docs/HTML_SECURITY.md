@@ -3,6 +3,7 @@
 ## Проблема с v-html
 
 `v-html` в Vue.js может быть опасен из-за XSS (Cross-Site Scripting) атак. Вредоносный HTML может:
+
 - Украсть cookies и токены
 - Перенаправить пользователя на фишинговый сайт
 - Выполнить произвольный JavaScript код
@@ -35,6 +36,7 @@ const safeHtml = sanitizeHtml('<p>Текст с <script>alert("XSS")</script></p
 #### Разрешенные HTML теги
 
 По умолчанию разрешены только безопасные теги:
+
 - **Текст**: `<p>`, `<strong>`, `<em>`, `<br>`
 - **Заголовки**: `<h2>`, `<h3>`, `<h4>`
 - **Списки**: `<ul>`, `<ol>`, `<li>`
@@ -64,8 +66,10 @@ const safeHtml = sanitizeHtml('<p>Текст с <script>alert("XSS")</script></p
 #### ❌ Опасный HTML (будет удален)
 
 ```html
-<script>alert('XSS')</script>
-<img src="x" onerror="alert('XSS')">
+<script>
+  alert('XSS')
+</script>
+<img src="x" onerror="alert('XSS')" />
 <a href="javascript:alert('XSS')">Клик</a>
 <iframe src="https://evil.com"></iframe>
 ```

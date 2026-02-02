@@ -4,19 +4,19 @@ import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBre
 import { watchDebounced } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import CategoryBrands from '@/components/category/CategoryBrands.vue'
+import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
-import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
-import CategoryBrands from '@/components/category/CategoryBrands.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
+import { useSafeHtml } from '@/composables/useSafeHtml'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants' // Проверь правильность пути
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
-import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
-import { useSafeHtml } from '@/composables/useSafeHtml'
+import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 // --- 1. Инициализация ---
 const route = useRoute()
@@ -577,14 +577,18 @@ useHead(() => {
       children: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'BreadcrumbList',
-        'itemListElement': breadcrumbs.value.map((crumb, index) => ({
-          '@type': 'ListItem',
-          'position': index + 1,
-          'name': crumb.name,
-          'item': crumb.href
-            ? `https://uhti.kz${crumb.href}`
-            : undefined,
-        })),
+        'itemListElement': breadcrumbs.value.map((crumb, index) => {
+          const listItem: any = {
+            '@type': 'ListItem',
+            'position': index + 1,
+            'name': crumb.name,
+          }
+          // Добавляем поле item только если есть href
+          if (crumb.href) {
+            listItem.item = `https://uhti.kz${crumb.href}`
+          }
+          return listItem
+        }),
       }),
     })
   }

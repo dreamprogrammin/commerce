@@ -17,6 +17,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 Скрипт автоматически:
+
 1. ✅ Установит секрет в Supabase
 2. ✅ Применит миграции БД
 3. ✅ Задеплоит Edge Function
@@ -118,6 +119,7 @@ curl -X POST \
 ### Ошибка: "ANTHROPIC_API_KEY not set"
 
 **Решение:**
+
 ```bash
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 supabase functions deploy generate-premium-questions --no-verify-jwt
@@ -126,11 +128,13 @@ supabase functions deploy generate-premium-questions --no-verify-jwt
 ### Ошибка: "AI generation failed"
 
 **Возможные причины:**
+
 1. Недостаточно средств в аккаунте Anthropic
 2. Неверный API ключ
 3. Rate limit (слишком много запросов)
 
 **Проверка:**
+
 ```bash
 # Просмотр логов Edge Function
 supabase functions logs generate-premium-questions --tail
@@ -142,6 +146,7 @@ supabase secrets list
 ### AI-вопросы не появляются
 
 **Чеклист:**
+
 - [ ] Цена товара > 50,000₸?
 - [ ] `skip_ai = false` в RPC вызове?
 - [ ] Edge Function задеплоен?
@@ -151,10 +156,12 @@ supabase secrets list
 ### Базовые вопросы не создаются
 
 **Возможно:**
+
 - Миграция не применилась
 - RPC функция не существует
 
 **Проверка:**
+
 ```sql
 -- Проверить существование функции
 SELECT routine_name
@@ -251,6 +258,7 @@ supabase db reset
 ✅ AI-генерация настроена
 
 📖 **Документация:**
+
 - Обзор: `/docs/FAQ_GENERATION_SUMMARY.md`
 - Быстрый старт: `/docs/QUICK_START_FAQ.md`
 - Полная: `/docs/AUTO_GENERATED_FAQ.md`

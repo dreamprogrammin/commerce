@@ -6,16 +6,16 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  mode: 'svg'
+  mode: 'svg',
 })
 </script>
 
 <template>
   <ClientOnly>
-    <Icon 
-      :name="props.name" 
-      :class="props.class" 
-      :mode="props.mode" 
+    <Icon
+      :name="props.name"
+      :class="props.class"
+      :mode="props.mode"
     />
     <template #fallback>
       <Skeleton :class="props.class" class="rounded-md" />
