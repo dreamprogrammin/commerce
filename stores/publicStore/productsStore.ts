@@ -98,9 +98,6 @@ export const useProductsStore = defineStore('productsStore', () => {
       if (error)
         throw error
 
-      // Логируем сырые данные от RPC для отладки
-      console.log('🔍 Raw RPC data sample:', data?.[0])
-
       // Преобразуем результат RPC в ProductLine[]
       const productLines: ProductLine[] = (data || []).map((line: any) => ({
         id: line.id,
@@ -114,8 +111,6 @@ export const useProductsStore = defineStore('productsStore', () => {
         created_at: '',
         updated_at: '',
       }))
-
-      console.log('🔍 Mapped product line sample:', productLines[0])
 
       productLinesByCategory.value[categorySlug] = productLines
       return productLines
