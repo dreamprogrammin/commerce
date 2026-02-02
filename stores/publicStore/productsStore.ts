@@ -66,12 +66,24 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
-  async function fetchProductLinesForCategory(categorySlug: string): Promise<ProductLine[]> {
+  // Очистить кеш линеек продуктов
+  function clearProductLinesCache(categorySlug?: string) {
+    if (categorySlug) {
+      delete productLinesByCategory.value[categorySlug]
+      console.log('🗑️ Cleared product lines cache for:', categorySlug)
+    }
+    else {
+      productLinesByCategory.value = {}
+      console.log('🗑️ Cleared all product lines cache')
+    }
+  }
+
+  async function fetchProductLinesForCategory(categorySlug: string, forceRefresh = false): Promise<ProductLine[]> {
     if (!categorySlug || categorySlug === 'all')
       return []
 
-    // Проверяем кэш
-    if (productLinesByCategory.value[categorySlug]) {
+    // Проверяем кэш (если не форсируем обновление)
+    if (!forceRefresh && productLinesByCategory.value[categorySlug]) {
       console.warn('✅ Product lines from cache:', categorySlug)
       return productLinesByCategory.value[categorySlug]
     }
@@ -86,6 +98,9 @@ export const useProductsStore = defineStore('productsStore', () => {
       if (error)
         throw error
 
+      // Логируем сырые данные от RPC для отладки
+      console.log('🔍 Raw RPC data sample:', data?.[0])
+
       // Преобразуем результат RPC в ProductLine[]
       const productLines: ProductLine[] = (data || []).map((line: any) => ({
         id: line.id,
@@ -99,6 +114,8 @@ export const useProductsStore = defineStore('productsStore', () => {
         created_at: '',
         updated_at: '',
       }))
+
+      console.log('🔍 Mapped product line sample:', productLines[0])
 
       productLinesByCategory.value[categorySlug] = productLines
       return productLines
@@ -639,6 +656,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchProductsByIds,
     fetchBrandsForCategory,
     fetchProductLinesForCategory,
+    clearProductLinesCache,
     fetchAttributesForCategory,
     getProductById,
     fetchPriceRangeForCategory,
