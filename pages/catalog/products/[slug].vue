@@ -771,7 +771,7 @@ useHead(() => ({
                     :to="brandLink"
                     class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
                   >
-                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
                         v-if="product.brands?.logo_url"
                         :src="brandLogoUrl"
@@ -797,7 +797,7 @@ useHead(() => ({
                     :to="productLineLink"
                     class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
                   >
-                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
                         v-if="(product as any)?.product_lines?.logo_url"
                         :src="productLineLogoUrl"
@@ -814,7 +814,7 @@ useHead(() => ({
                     <span class="group-hover:underline font-medium">{{ productLineName }}</span>
                   </NuxtLink>
                   <span v-else-if="productLineName" class="inline-flex items-center gap-1.5">
-                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
                         v-if="(product as any)?.product_lines?.logo_url"
                         :src="productLineLogoUrl"
@@ -904,7 +904,7 @@ useHead(() => ({
                       <div v-else class="flex items-center gap-3">
                         <Button
                           size="lg"
-                          class="flex-grow h-12 text-base font-semibold"
+                          class="grow h-12 text-base font-semibold"
                           @click="router.push('/cart')"
                         >
                           <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
@@ -1090,7 +1090,7 @@ useHead(() => ({
                 :to="brandLink"
                 class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
               >
-                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden flex-shrink-0">
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
                   <ProgressiveImage
                     v-if="product.brands?.logo_url"
                     :src="brandLogoUrl"
@@ -1112,7 +1112,7 @@ useHead(() => ({
                     Бренд
                   </p>
                 </div>
-                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
+                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary shrink-0" />
               </NuxtLink>
 
               <!-- Товары линейки -->
@@ -1121,7 +1121,7 @@ useHead(() => ({
                 :to="productLineLink"
                 class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
               >
-                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden flex-shrink-0">
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
                   <ProgressiveImage
                     v-if="(product as any)?.product_lines?.logo_url"
                     :src="productLineLogoUrl"
@@ -1143,7 +1143,7 @@ useHead(() => ({
                     Линейка {{ brandName }}
                   </p>
                 </div>
-                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
+                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary shrink-0" />
               </NuxtLink>
 
               <!-- Товары категории -->
@@ -1152,7 +1152,7 @@ useHead(() => ({
                 :to="categoryLink"
                 class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
               >
-                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border flex-shrink-0">
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border shrink-0">
                   <Icon name="lucide:box" class="w-6 h-6 text-muted-foreground" />
                 </div>
                 <div class="flex-1 min-w-0">
@@ -1163,7 +1163,7 @@ useHead(() => ({
                     Категория
                   </p>
                 </div>
-                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
+                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary shrink-0" />
               </NuxtLink>
 
               <!-- Родительские категории из breadcrumbs -->
@@ -1173,7 +1173,7 @@ useHead(() => ({
                   :to="crumb.href"
                   class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
                 >
-                  <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border flex-shrink-0">
+                  <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border shrink-0">
                     <Icon name="lucide:layers" class="w-6 h-6 text-muted-foreground" />
                   </div>
                   <div class="flex-1 min-w-0">
@@ -1184,7 +1184,7 @@ useHead(() => ({
                       Категория
                     </p>
                   </div>
-                  <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary flex-shrink-0" />
+                  <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary shrink-0" />
                 </NuxtLink>
               </template>
             </div>
@@ -1278,7 +1278,7 @@ useHead(() => ({
             <QuantitySelector
               :product="product"
               :quantity="quantityInCart"
-              class="flex-shrink-0"
+              class="shrink-0"
             />
           </div>
         </div>
