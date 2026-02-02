@@ -91,6 +91,7 @@ export type Database = {
       }
       banners: {
         Row: {
+          blur_placeholder: string | null
           created_at: string
           cta_link: string | null
           description: string | null
@@ -103,6 +104,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          blur_placeholder?: string | null
           created_at?: string
           cta_link?: string | null
           description?: string | null
@@ -115,6 +117,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          blur_placeholder?: string | null
           created_at?: string
           cta_link?: string | null
           description?: string | null
@@ -319,6 +322,7 @@ export type Database = {
           description: string | null
           display_in_menu: boolean
           display_order: number
+          featured_order: number | null
           href: string
           icon_name: string | null
           id: string
@@ -335,6 +339,7 @@ export type Database = {
           description?: string | null
           display_in_menu?: boolean
           display_order?: number
+          featured_order?: number | null
           href: string
           icon_name?: string | null
           id?: string
@@ -351,6 +356,7 @@ export type Database = {
           description?: string | null
           display_in_menu?: boolean
           display_order?: number
+          featured_order?: number | null
           href?: string
           icon_name?: string | null
           id?: string
@@ -1140,10 +1146,12 @@ export type Database = {
           custom_fields_data: Json | null
           description: string | null
           discount_percentage: number
+          featured_order: number | null
           gender: string | null
           id: string
           is_accessory: boolean
           is_active: boolean
+          is_featured: boolean | null
           is_new: boolean
           is_on_promotion: boolean
           material_id: number | null
@@ -1170,10 +1178,12 @@ export type Database = {
           custom_fields_data?: Json | null
           description?: string | null
           discount_percentage?: number
+          featured_order?: number | null
           gender?: string | null
           id?: string
           is_accessory?: boolean
           is_active?: boolean
+          is_featured?: boolean | null
           is_new?: boolean
           is_on_promotion?: boolean
           material_id?: number | null
@@ -1200,10 +1210,12 @@ export type Database = {
           custom_fields_data?: Json | null
           description?: string | null
           discount_percentage?: number
+          featured_order?: number | null
           gender?: string | null
           id?: string
           is_accessory?: boolean
           is_active?: boolean
+          is_featured?: boolean | null
           is_new?: boolean
           is_on_promotion?: boolean
           material_id?: number | null
@@ -1327,6 +1339,7 @@ export type Database = {
       }
       slides: {
         Row: {
+          blur_placeholder: string | null
           created_at: string
           cta_link: string | null
           cta_text: string | null
@@ -1339,6 +1352,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          blur_placeholder?: string | null
           created_at?: string
           cta_link?: string | null
           cta_text?: string | null
@@ -1351,6 +1365,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          blur_placeholder?: string | null
           created_at?: string
           cta_link?: string | null
           cta_text?: string | null
