@@ -75,7 +75,8 @@
       "Bash(fi)",
       "Bash(supabase projects:*)",
       "Bash(comm:*)",
-      "Bash(supabase storage list:*)"
+      "Bash(supabase storage list:*)",
+      "Bash(docker exec:*)"
     ]
   }
 }
