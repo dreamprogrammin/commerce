@@ -1798,9 +1798,11 @@ export type Database = {
       get_product_lines_by_category_slug: {
         Args: { p_category_slug: string }
         Returns: {
+          blur_placeholder: string
           brand_id: string
           brand_name: string
           id: string
+          logo_url: string
           name: string
           product_count: number
           slug: string
