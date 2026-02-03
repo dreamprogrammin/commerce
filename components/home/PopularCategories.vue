@@ -9,9 +9,6 @@ import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategorie
 const popularCategoriesStore = usePopularCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
-// ✅ Флаг для предотвращения hydration mismatch
-const isMounted = ref(false)
-
 // 🔥 TanStack Query - популярные категории с автоматическим кешированием
 const { data: popularCategories, isLoading, isFetching } = useQuery({
   queryKey: ['home-popular-categories'],
@@ -23,8 +20,8 @@ const { data: popularCategories, isLoading, isFetching } = useQuery({
   gcTime: 10 * 60 * 1000, // 10 минут
 })
 
-// ✅ Показываем skeleton на SSR и пока данные загружаются
-const showSkeleton = computed(() => !isMounted.value || ((isLoading.value || isFetching.value) && !popularCategories.value))
+// ✅ Показываем skeleton только когда данных нет И идёт загрузка
+const showSkeleton = computed(() => (isLoading.value || isFetching.value) && !popularCategories.value)
 
 function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
@@ -41,9 +38,6 @@ let startX = 0
 let scrollLeft = 0
 
 onMounted(() => {
-  // ✅ Устанавливаем флаг для предотвращения hydration mismatch
-  isMounted.value = true
-
   // Touch scroll setup
   const container = scrollContainer.value
   if (!container)
