@@ -27,15 +27,9 @@ const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
-// Флаг монтирования для корректной гидратации
-const isMounted = ref(false)
 
 // 🆕 Отмена запросов при размонтировании
 const abortController = ref<AbortController | null>(null)
-
-onMounted(() => {
-  isMounted.value = true
-})
 
 onUnmounted(() => {
   // Отменяем все активные запросы при уходе со страницы
@@ -1271,7 +1265,7 @@ useHead(() => {
         >
           <div :key="isLoading ? 'loading' : 'content'">
             <ProductGridSkeleton
-              v-if="(isLoading && isMounted) || (isLoading && displayedProducts.length === 0)"
+              v-if="isLoading && displayedProducts.length === 0"
             />
 
             <div v-else-if="displayedProducts.length > 0" class="space-y-8">
