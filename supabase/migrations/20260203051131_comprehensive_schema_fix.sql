@@ -118,3 +118,7 @@ BEGIN
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = 'categories' AND column_name = 'blur_placeholder'
     ) THEN
+        ALTER TABLE public.categories ADD COLUMN blur_placeholder TEXT;
+        RAISE NOTICE 'Added: categories.blur_placeholder';
+    END IF;
+END $$;
