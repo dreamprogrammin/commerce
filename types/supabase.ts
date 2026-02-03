@@ -91,6 +91,7 @@ export type Database = {
       }
       banners: {
         Row: {
+          blur_data_url: string | null
           blur_placeholder: string | null
           created_at: string
           cta_link: string | null
@@ -104,6 +105,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           created_at?: string
           cta_link?: string | null
@@ -117,6 +119,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           created_at?: string
           cta_link?: string | null
@@ -282,6 +285,7 @@ export type Database = {
       }
       brands: {
         Row: {
+          blur_data_url: string | null
           blur_placeholder: string | null
           canonical_url: string | null
           created_at: string
@@ -304,6 +308,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           canonical_url?: string | null
           created_at?: string
@@ -326,6 +331,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           canonical_url?: string | null
           created_at?: string
@@ -353,6 +359,7 @@ export type Database = {
         Row: {
           allowed_brand_ids: string[] | null
           allowed_product_line_ids: string[] | null
+          blur_data_url: string | null
           blur_placeholder: string | null
           canonical_url: string | null
           created_at: string
@@ -385,6 +392,7 @@ export type Database = {
         Insert: {
           allowed_brand_ids?: string[] | null
           allowed_product_line_ids?: string[] | null
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           canonical_url?: string | null
           created_at?: string
@@ -417,6 +425,7 @@ export type Database = {
         Update: {
           allowed_brand_ids?: string[] | null
           allowed_product_line_ids?: string[] | null
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           canonical_url?: string | null
           created_at?: string
@@ -1003,6 +1012,7 @@ export type Database = {
       product_images: {
         Row: {
           alt_text: string | null
+          blur_data_url: string | null
           blur_placeholder: string | null
           created_at: string
           display_order: number
@@ -1012,6 +1022,7 @@ export type Database = {
         }
         Insert: {
           alt_text?: string | null
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           created_at?: string
           display_order?: number
@@ -1021,6 +1032,7 @@ export type Database = {
         }
         Update: {
           alt_text?: string | null
+          blur_data_url?: string | null
           blur_placeholder?: string | null
           created_at?: string
           display_order?: number
@@ -1475,6 +1487,8 @@ export type Database = {
       slides: {
         Row: {
           alt_text: string | null
+          blur_data_url: string | null
+          blur_data_url_mobile: string | null
           blur_placeholder: string | null
           blur_placeholder_mobile: string | null
           created_at: string
@@ -1494,6 +1508,8 @@ export type Database = {
         }
         Insert: {
           alt_text?: string | null
+          blur_data_url?: string | null
+          blur_data_url_mobile?: string | null
           blur_placeholder?: string | null
           blur_placeholder_mobile?: string | null
           created_at?: string
@@ -1513,6 +1529,8 @@ export type Database = {
         }
         Update: {
           alt_text?: string | null
+          blur_data_url?: string | null
+          blur_data_url_mobile?: string | null
           blur_placeholder?: string | null
           blur_placeholder_mobile?: string | null
           created_at?: string
