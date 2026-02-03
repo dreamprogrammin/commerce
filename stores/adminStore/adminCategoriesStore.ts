@@ -26,7 +26,7 @@ interface CategoryUpsertPayload {
   // 🆕 Meta-теги для поисковых систем
   meta_title: string | null
   meta_description: string | null
-  meta_keywords: string | null
+  meta_keywords: string[] | null
   // 🆕 Фильтры по брендам и линейкам
   allowed_brand_ids: string[] | null
   allowed_product_line_ids: string[] | null
