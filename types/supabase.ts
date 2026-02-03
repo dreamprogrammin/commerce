@@ -298,6 +298,7 @@ export type Database = {
           seo_description: string | null
           seo_h1: string | null
           seo_keywords: string[] | null
+          seo_text: string | null
           seo_title: string | null
           slug: string
           updated_at: string
@@ -319,6 +320,7 @@ export type Database = {
           seo_description?: string | null
           seo_h1?: string | null
           seo_keywords?: string[] | null
+          seo_text?: string | null
           seo_title?: string | null
           slug: string
           updated_at?: string
@@ -340,6 +342,7 @@ export type Database = {
           seo_description?: string | null
           seo_h1?: string | null
           seo_keywords?: string[] | null
+          seo_text?: string | null
           seo_title?: string | null
           slug?: string
           updated_at?: string
@@ -374,6 +377,7 @@ export type Database = {
           seo_description: string | null
           seo_h1: string | null
           seo_keywords: string[] | null
+          seo_text: string | null
           seo_title: string | null
           slug: string
           updated_at: string
@@ -405,6 +409,7 @@ export type Database = {
           seo_description?: string | null
           seo_h1?: string | null
           seo_keywords?: string[] | null
+          seo_text?: string | null
           seo_title?: string | null
           slug: string
           updated_at?: string
@@ -436,6 +441,7 @@ export type Database = {
           seo_description?: string | null
           seo_h1?: string | null
           seo_keywords?: string[] | null
+          seo_text?: string | null
           seo_title?: string | null
           slug?: string
           updated_at?: string
@@ -1254,6 +1260,7 @@ export type Database = {
           seo_description: string | null
           seo_h1: string | null
           seo_keywords: string[] | null
+          seo_text: string | null
           seo_title: string | null
           sku: string | null
           slug: string
@@ -1303,6 +1310,7 @@ export type Database = {
           seo_description?: string | null
           seo_h1?: string | null
           seo_keywords?: string[] | null
+          seo_text?: string | null
           seo_title?: string | null
           sku?: string | null
           slug: string
@@ -1352,6 +1360,7 @@ export type Database = {
           seo_description?: string | null
           seo_h1?: string | null
           seo_keywords?: string[] | null
+          seo_text?: string | null
           seo_title?: string | null
           sku?: string | null
           slug?: string
@@ -1477,7 +1486,9 @@ export type Database = {
           image_url: string | null
           image_url_mobile: string | null
           is_active: boolean
+          link_url: string | null
           meta_description: string | null
+          subtitle: string | null
           title: string
           updated_at: string
         }
@@ -1494,7 +1505,9 @@ export type Database = {
           image_url?: string | null
           image_url_mobile?: string | null
           is_active?: boolean
+          link_url?: string | null
           meta_description?: string | null
+          subtitle?: string | null
           title: string
           updated_at?: string
         }
@@ -1511,7 +1524,9 @@ export type Database = {
           image_url?: string | null
           image_url_mobile?: string | null
           is_active?: boolean
+          link_url?: string | null
           meta_description?: string | null
+          subtitle?: string | null
           title?: string
           updated_at?: string
         }
