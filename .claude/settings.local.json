@@ -73,7 +73,8 @@
       "Bash(then cat supabase/.temp/project-ref)",
       "Bash(else echo \"Project not linked\")",
       "Bash(fi)",
-      "Bash(supabase projects:*)"
+      "Bash(supabase projects:*)",
+      "Bash(comm:*)"
     ]
   }
 }
