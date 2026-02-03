@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_PRODUCT, BUCKET_NAME_BRANDS } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
 
@@ -65,6 +65,17 @@ function getImageUrlByIndex(index: number): string | null {
     return null
 
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
+}
+
+/**
+ * Получить URL логотипа бренда
+ */
+function getBrandLogoUrl(): string | null {
+  const logoUrl = props.product.brands?.logo_url
+  if (!logoUrl)
+    return null
+
+  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
 }
 
 /**
@@ -284,10 +295,26 @@ const priceDetails = computed(() => {
       <div v-if="product.brands" class="min-h-[16px]">
         <NuxtLink
           :to="`/brand/${product.brands.slug}`"
-          class="text-xs text-muted-foreground hover:text-primary transition-colors font-medium"
+          class="flex items-center gap-2 group"
           @click.stop
         >
-          {{ product.brands.name }}
+          <!-- Логотип бренда -->
+          <div
+            v-if="getBrandLogoUrl()"
+            class="w-8 h-8 flex items-center justify-center rounded border border-border/50 group-hover:border-primary/30 transition-colors bg-background overflow-hidden flex-shrink-0"
+          >
+            <ProgressiveImage
+              :src="getBrandLogoUrl()!"
+              :alt="product.brands.name"
+              object-fit="contain"
+              placeholder-type="shimmer"
+              class="w-full h-full p-0.5"
+            />
+          </div>
+          <!-- Название бренда -->
+          <span class="text-xs text-muted-foreground group-hover:text-primary transition-colors font-medium line-clamp-1">
+            {{ product.brands.name }}
+          </span>
         </NuxtLink>
       </div>
 
