@@ -283,6 +283,7 @@ export type Database = {
       brands: {
         Row: {
           blur_placeholder: string | null
+          canonical_url: string | null
           created_at: string
           description: string | null
           id: string
@@ -291,7 +292,11 @@ export type Database = {
           meta_keywords: string[] | null
           meta_title: string | null
           name: string
+          og_description: string | null
+          og_image: string | null
+          og_title: string | null
           seo_description: string | null
+          seo_h1: string | null
           seo_keywords: string[] | null
           seo_title: string | null
           slug: string
@@ -299,6 +304,7 @@ export type Database = {
         }
         Insert: {
           blur_placeholder?: string | null
+          canonical_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -307,7 +313,11 @@ export type Database = {
           meta_keywords?: string[] | null
           meta_title?: string | null
           name: string
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
           seo_description?: string | null
+          seo_h1?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
           slug: string
@@ -315,6 +325,7 @@ export type Database = {
         }
         Update: {
           blur_placeholder?: string | null
+          canonical_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -323,7 +334,11 @@ export type Database = {
           meta_keywords?: string[] | null
           meta_title?: string | null
           name?: string
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
           seo_description?: string | null
+          seo_h1?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
           slug?: string
@@ -336,6 +351,7 @@ export type Database = {
           allowed_brand_ids: string[] | null
           allowed_product_line_ids: string[] | null
           blur_placeholder: string | null
+          canonical_url: string | null
           created_at: string
           description: string | null
           display_in_menu: boolean
@@ -351,8 +367,12 @@ export type Database = {
           meta_keywords: string[] | null
           meta_title: string | null
           name: string
+          og_description: string | null
+          og_image: string | null
+          og_title: string | null
           parent_id: string | null
           seo_description: string | null
+          seo_h1: string | null
           seo_keywords: string[] | null
           seo_title: string | null
           slug: string
@@ -362,6 +382,7 @@ export type Database = {
           allowed_brand_ids?: string[] | null
           allowed_product_line_ids?: string[] | null
           blur_placeholder?: string | null
+          canonical_url?: string | null
           created_at?: string
           description?: string | null
           display_in_menu?: boolean
@@ -377,8 +398,12 @@ export type Database = {
           meta_keywords?: string[] | null
           meta_title?: string | null
           name: string
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
           parent_id?: string | null
           seo_description?: string | null
+          seo_h1?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
           slug: string
@@ -388,6 +413,7 @@ export type Database = {
           allowed_brand_ids?: string[] | null
           allowed_product_line_ids?: string[] | null
           blur_placeholder?: string | null
+          canonical_url?: string | null
           created_at?: string
           description?: string | null
           display_in_menu?: boolean
@@ -403,8 +429,12 @@ export type Database = {
           meta_keywords?: string[] | null
           meta_title?: string | null
           name?: string
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
           parent_id?: string | null
           seo_description?: string | null
+          seo_h1?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
           slug?: string
@@ -1186,6 +1216,7 @@ export type Database = {
           barcode: string | null
           bonus_points_award: number
           brand_id: string | null
+          canonical_url: string | null
           category_id: string | null
           country_id: number | null
           created_at: string
@@ -1211,6 +1242,9 @@ export type Database = {
           min_age: number | null
           min_age_years: number | null
           name: string
+          og_description: string | null
+          og_image: string | null
+          og_title: string | null
           origin_country_id: number | null
           price: number
           product_line_id: string | null
@@ -1218,6 +1252,7 @@ export type Database = {
           product_type_id: number | null
           sales_count: number
           seo_description: string | null
+          seo_h1: string | null
           seo_keywords: string[] | null
           seo_title: string | null
           sku: string | null
@@ -1230,6 +1265,7 @@ export type Database = {
           barcode?: string | null
           bonus_points_award?: number
           brand_id?: string | null
+          canonical_url?: string | null
           category_id?: string | null
           country_id?: number | null
           created_at?: string
@@ -1255,6 +1291,9 @@ export type Database = {
           min_age?: number | null
           min_age_years?: number | null
           name: string
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
           origin_country_id?: number | null
           price: number
           product_line_id?: string | null
@@ -1262,6 +1301,7 @@ export type Database = {
           product_type_id?: number | null
           sales_count?: number
           seo_description?: string | null
+          seo_h1?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
           sku?: string | null
@@ -1274,6 +1314,7 @@ export type Database = {
           barcode?: string | null
           bonus_points_award?: number
           brand_id?: string | null
+          canonical_url?: string | null
           category_id?: string | null
           country_id?: number | null
           created_at?: string
@@ -1299,6 +1340,9 @@ export type Database = {
           min_age?: number | null
           min_age_years?: number | null
           name?: string
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
           origin_country_id?: number | null
           price?: number
           product_line_id?: string | null
@@ -1306,6 +1350,7 @@ export type Database = {
           product_type_id?: number | null
           sales_count?: number
           seo_description?: string | null
+          seo_h1?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
           sku?: string | null
