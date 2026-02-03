@@ -32,6 +32,18 @@ interface CategoryUpsertPayload {
   allowed_product_line_ids: string[] | null
 }
 
+// Хелпер для нормализации полей-массивов (строка -> массив)
+function normalizeArrayField(value: any): string[] | null {
+  if (!value) return null
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    // Разбиваем строку по запятым и очищаем
+    const items = value.split(',').map(s => s.trim()).filter(s => s.length > 0)
+    return items.length > 0 ? items : null
+  }
+  return null
+}
+
 function createInsertPayload(item: EditableCategory, parentId: string | null, displayOrder: number): CategoryInsert {
   return {
     name: item.name,
@@ -49,14 +61,14 @@ function createInsertPayload(item: EditableCategory, parentId: string | null, di
     seo_title: item.seo_title || null,
     seo_h1: item.seo_h1 || null,
     seo_text: item.seo_text || null,
-    seo_keywords: item.seo_keywords || null,
+    seo_keywords: normalizeArrayField(item.seo_keywords),
     // 🆕 Meta-теги для поисковых систем
     meta_title: item.meta_title || null,
     meta_description: item.meta_description || null,
-    meta_keywords: item.meta_keywords || null,
+    meta_keywords: normalizeArrayField(item.meta_keywords),
     // 🆕 Фильтры
-    allowed_brand_ids: item.allowed_brand_ids || null,
-    allowed_product_line_ids: item.allowed_product_line_ids || null,
+    allowed_brand_ids: normalizeArrayField(item.allowed_brand_ids),
+    allowed_product_line_ids: normalizeArrayField(item.allowed_product_line_ids),
   }
 }
 
@@ -78,14 +90,14 @@ function createUpdatePayload(item: EditableCategory, parentId: string | null, di
     seo_title: item.seo_title || null,
     seo_h1: item.seo_h1 || null,
     seo_text: item.seo_text || null,
-    seo_keywords: item.seo_keywords || null,
+    seo_keywords: normalizeArrayField(item.seo_keywords),
     // 🆕 Meta-теги для поисковых систем
     meta_title: item.meta_title || null,
     meta_description: item.meta_description || null,
-    meta_keywords: item.meta_keywords || null,
+    meta_keywords: normalizeArrayField(item.meta_keywords),
     // 🆕 Фильтры
-    allowed_brand_ids: item.allowed_brand_ids || null,
-    allowed_product_line_ids: item.allowed_product_line_ids || null,
+    allowed_brand_ids: normalizeArrayField(item.allowed_brand_ids),
+    allowed_product_line_ids: normalizeArrayField(item.allowed_product_line_ids),
   }
 }
 
