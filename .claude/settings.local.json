@@ -68,7 +68,12 @@
       "Bash(git checkout:*)",
       "Bash(echo:*)",
       "Bash(supabase db dump:*)",
-      "Bash(supabase db pull:*)"
+      "Bash(supabase db pull:*)",
+      "Bash(if [ -f supabase/.temp/project-ref ])",
+      "Bash(then cat supabase/.temp/project-ref)",
+      "Bash(else echo \"Project not linked\")",
+      "Bash(fi)",
+      "Bash(supabase projects:*)"
     ]
   }
 }

@@ -289,6 +289,7 @@ export type Database = {
           name: string
           seo_description: string | null
           seo_keywords: string[] | null
+          seo_title: string | null
           slug: string
           updated_at: string
         }
@@ -300,6 +301,7 @@ export type Database = {
           name: string
           seo_description?: string | null
           seo_keywords?: string[] | null
+          seo_title?: string | null
           slug: string
           updated_at?: string
         }
@@ -311,6 +313,7 @@ export type Database = {
           name?: string
           seo_description?: string | null
           seo_keywords?: string[] | null
+          seo_title?: string | null
           slug?: string
           updated_at?: string
         }
@@ -318,6 +321,9 @@ export type Database = {
       }
       categories: {
         Row: {
+          allowed_brand_ids: string[] | null
+          allowed_product_line_ids: string[] | null
+          blur_placeholder: string | null
           created_at: string
           description: string | null
           display_in_menu: boolean
@@ -331,10 +337,16 @@ export type Database = {
           is_root_category: boolean
           name: string
           parent_id: string | null
+          seo_description: string | null
+          seo_keywords: string[] | null
+          seo_title: string | null
           slug: string
           updated_at: string
         }
         Insert: {
+          allowed_brand_ids?: string[] | null
+          allowed_product_line_ids?: string[] | null
+          blur_placeholder?: string | null
           created_at?: string
           description?: string | null
           display_in_menu?: boolean
@@ -348,10 +360,16 @@ export type Database = {
           is_root_category?: boolean
           name: string
           parent_id?: string | null
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          seo_title?: string | null
           slug: string
           updated_at?: string
         }
         Update: {
+          allowed_brand_ids?: string[] | null
+          allowed_product_line_ids?: string[] | null
+          blur_placeholder?: string | null
           created_at?: string
           description?: string | null
           display_in_menu?: boolean
@@ -365,6 +383,9 @@ export type Database = {
           is_root_category?: boolean
           name?: string
           parent_id?: string | null
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          seo_title?: string | null
           slug?: string
           updated_at?: string
         }
@@ -1154,6 +1175,7 @@ export type Database = {
           is_featured: boolean | null
           is_new: boolean
           is_on_promotion: boolean
+          is_on_sale: boolean | null
           material_id: number | null
           max_age_years: number | null
           min_age_years: number | null
@@ -1165,6 +1187,7 @@ export type Database = {
           sales_count: number
           seo_description: string | null
           seo_keywords: string[] | null
+          seo_title: string | null
           sku: string | null
           slug: string
           stock_quantity: number
@@ -1188,6 +1211,7 @@ export type Database = {
           is_featured?: boolean | null
           is_new?: boolean
           is_on_promotion?: boolean
+          is_on_sale?: boolean | null
           material_id?: number | null
           max_age_years?: number | null
           min_age_years?: number | null
@@ -1199,6 +1223,7 @@ export type Database = {
           sales_count?: number
           seo_description?: string | null
           seo_keywords?: string[] | null
+          seo_title?: string | null
           sku?: string | null
           slug: string
           stock_quantity?: number
@@ -1222,6 +1247,7 @@ export type Database = {
           is_featured?: boolean | null
           is_new?: boolean
           is_on_promotion?: boolean
+          is_on_sale?: boolean | null
           material_id?: number | null
           max_age_years?: number | null
           min_age_years?: number | null
@@ -1233,6 +1259,7 @@ export type Database = {
           sales_count?: number
           seo_description?: string | null
           seo_keywords?: string[] | null
+          seo_title?: string | null
           sku?: string | null
           slug?: string
           stock_quantity?: number
@@ -1346,6 +1373,7 @@ export type Database = {
       slides: {
         Row: {
           blur_placeholder: string | null
+          blur_placeholder_mobile: string | null
           created_at: string
           cta_link: string | null
           cta_text: string | null
@@ -1353,12 +1381,14 @@ export type Database = {
           display_order: number
           id: string
           image_url: string | null
+          image_url_mobile: string | null
           is_active: boolean
           title: string
           updated_at: string
         }
         Insert: {
           blur_placeholder?: string | null
+          blur_placeholder_mobile?: string | null
           created_at?: string
           cta_link?: string | null
           cta_text?: string | null
@@ -1366,12 +1396,14 @@ export type Database = {
           display_order?: number
           id?: string
           image_url?: string | null
+          image_url_mobile?: string | null
           is_active?: boolean
           title: string
           updated_at?: string
         }
         Update: {
           blur_placeholder?: string | null
+          blur_placeholder_mobile?: string | null
           created_at?: string
           cta_link?: string | null
           cta_text?: string | null
@@ -1379,6 +1411,7 @@ export type Database = {
           display_order?: number
           id?: string
           image_url?: string | null
+          image_url_mobile?: string | null
           is_active?: boolean
           title?: string
           updated_at?: string
