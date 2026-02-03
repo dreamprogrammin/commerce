@@ -993,14 +993,18 @@ useHead(() => {
               <Icon name="lucide:package" class="w-4 h-4 text-blue-500" />
               <span>{{ displayedProducts.length }} товаров</span>
             </div>
-            <div v-if="availableBrands.length > 0" class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Icon name="lucide:award" class="w-4 h-4 text-purple-500" />
-              <span>{{ availableBrands.length }} брендов</span>
-            </div>
-            <div v-if="priceRange.min > 0 || priceRange.max < 50000" class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Icon name="lucide:tag" class="w-4 h-4 text-green-500" />
-              <span>от {{ new Intl.NumberFormat('ru-RU').format(priceRange.min) }} ₸</span>
-            </div>
+            <ClientOnly>
+              <div v-if="availableBrands.length > 0" class="flex items-center gap-2 text-sm text-muted-foreground">
+                <Icon name="lucide:award" class="w-4 h-4 text-purple-500" />
+                <span>{{ availableBrands.length }} брендов</span>
+              </div>
+            </ClientOnly>
+            <ClientOnly>
+              <div v-if="priceRange.min > 0 || priceRange.max < 50000" class="flex items-center gap-2 text-sm text-muted-foreground">
+                <Icon name="lucide:tag" class="w-4 h-4 text-green-500" />
+                <span>от {{ new Intl.NumberFormat('ru-RU').format(priceRange.min) }} ₸</span>
+              </div>
+            </ClientOnly>
           </div>
         </div>
       </div>
