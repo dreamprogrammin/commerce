@@ -282,6 +282,7 @@ export type Database = {
       }
       brands: {
         Row: {
+          blur_placeholder: string | null
           created_at: string
           description: string | null
           id: string
@@ -294,6 +295,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          blur_placeholder?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -306,6 +308,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          blur_placeholder?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -817,6 +820,7 @@ export type Database = {
           delivery_method: string
           discount_amount: number
           final_amount: number
+          guest_checkout_id: string | null
           guest_email: string | null
           guest_name: string | null
           guest_phone: string | null
@@ -836,6 +840,7 @@ export type Database = {
           delivery_method: string
           discount_amount?: number
           final_amount: number
+          guest_checkout_id?: string | null
           guest_email?: string | null
           guest_name?: string | null
           guest_phone?: string | null
@@ -855,6 +860,7 @@ export type Database = {
           delivery_method?: string
           discount_amount?: number
           final_amount?: number
+          guest_checkout_id?: string | null
           guest_email?: string | null
           guest_name?: string | null
           guest_phone?: string | null
@@ -1163,6 +1169,7 @@ export type Database = {
           bonus_points_award: number
           brand_id: string | null
           category_id: string | null
+          country_id: number | null
           created_at: string
           custom_fields_data: Json | null
           description: string | null
@@ -1177,13 +1184,17 @@ export type Database = {
           is_on_promotion: boolean
           is_on_sale: boolean | null
           material_id: number | null
+          material_ids: number[] | null
+          max_age: number | null
           max_age_years: number | null
+          min_age: number | null
           min_age_years: number | null
           name: string
           origin_country_id: number | null
           price: number
           product_line_id: string | null
           product_type: string | null
+          product_type_id: number | null
           sales_count: number
           seo_description: string | null
           seo_keywords: string[] | null
@@ -1199,6 +1210,7 @@ export type Database = {
           bonus_points_award?: number
           brand_id?: string | null
           category_id?: string | null
+          country_id?: number | null
           created_at?: string
           custom_fields_data?: Json | null
           description?: string | null
@@ -1213,13 +1225,17 @@ export type Database = {
           is_on_promotion?: boolean
           is_on_sale?: boolean | null
           material_id?: number | null
+          material_ids?: number[] | null
+          max_age?: number | null
           max_age_years?: number | null
+          min_age?: number | null
           min_age_years?: number | null
           name: string
           origin_country_id?: number | null
           price: number
           product_line_id?: string | null
           product_type?: string | null
+          product_type_id?: number | null
           sales_count?: number
           seo_description?: string | null
           seo_keywords?: string[] | null
@@ -1235,6 +1251,7 @@ export type Database = {
           bonus_points_award?: number
           brand_id?: string | null
           category_id?: string | null
+          country_id?: number | null
           created_at?: string
           custom_fields_data?: Json | null
           description?: string | null
@@ -1249,13 +1266,17 @@ export type Database = {
           is_on_promotion?: boolean
           is_on_sale?: boolean | null
           material_id?: number | null
+          material_ids?: number[] | null
+          max_age?: number | null
           max_age_years?: number | null
+          min_age?: number | null
           min_age_years?: number | null
           name?: string
           origin_country_id?: number | null
           price?: number
           product_line_id?: string | null
           product_type?: string | null
+          product_type_id?: number | null
           sales_count?: number
           seo_description?: string | null
           seo_keywords?: string[] | null
