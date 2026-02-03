@@ -287,6 +287,9 @@ export type Database = {
           description: string | null
           id: string
           logo_url: string | null
+          meta_description: string | null
+          meta_keywords: string[] | null
+          meta_title: string | null
           name: string
           seo_description: string | null
           seo_keywords: string[] | null
@@ -300,6 +303,9 @@ export type Database = {
           description?: string | null
           id?: string
           logo_url?: string | null
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           name: string
           seo_description?: string | null
           seo_keywords?: string[] | null
@@ -313,6 +319,9 @@ export type Database = {
           description?: string | null
           id?: string
           logo_url?: string | null
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           name?: string
           seo_description?: string | null
           seo_keywords?: string[] | null
@@ -338,6 +347,9 @@ export type Database = {
           image_url: string | null
           is_featured: boolean
           is_root_category: boolean
+          meta_description: string | null
+          meta_keywords: string[] | null
+          meta_title: string | null
           name: string
           parent_id: string | null
           seo_description: string | null
@@ -361,6 +373,9 @@ export type Database = {
           image_url?: string | null
           is_featured?: boolean
           is_root_category?: boolean
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           name: string
           parent_id?: string | null
           seo_description?: string | null
@@ -384,6 +399,9 @@ export type Database = {
           image_url?: string | null
           is_featured?: boolean
           is_root_category?: boolean
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           name?: string
           parent_id?: string | null
           seo_description?: string | null
@@ -1187,6 +1205,9 @@ export type Database = {
           material_ids: number[] | null
           max_age: number | null
           max_age_years: number | null
+          meta_description: string | null
+          meta_keywords: string[] | null
+          meta_title: string | null
           min_age: number | null
           min_age_years: number | null
           name: string
@@ -1228,6 +1249,9 @@ export type Database = {
           material_ids?: number[] | null
           max_age?: number | null
           max_age_years?: number | null
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           min_age?: number | null
           min_age_years?: number | null
           name: string
@@ -1269,6 +1293,9 @@ export type Database = {
           material_ids?: number[] | null
           max_age?: number | null
           max_age_years?: number | null
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           min_age?: number | null
           min_age_years?: number | null
           name?: string
@@ -1393,6 +1420,7 @@ export type Database = {
       }
       slides: {
         Row: {
+          alt_text: string | null
           blur_placeholder: string | null
           blur_placeholder_mobile: string | null
           created_at: string
@@ -1404,10 +1432,12 @@ export type Database = {
           image_url: string | null
           image_url_mobile: string | null
           is_active: boolean
+          meta_description: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          alt_text?: string | null
           blur_placeholder?: string | null
           blur_placeholder_mobile?: string | null
           created_at?: string
@@ -1419,10 +1449,12 @@ export type Database = {
           image_url?: string | null
           image_url_mobile?: string | null
           is_active?: boolean
+          meta_description?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          alt_text?: string | null
           blur_placeholder?: string | null
           blur_placeholder_mobile?: string | null
           created_at?: string
@@ -1434,6 +1466,7 @@ export type Database = {
           image_url?: string | null
           image_url_mobile?: string | null
           is_active?: boolean
+          meta_description?: string | null
           title?: string
           updated_at?: string
         }
