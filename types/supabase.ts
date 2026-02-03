@@ -91,6 +91,7 @@ export type Database = {
       }
       banners: {
         Row: {
+          alt_text: string | null
           blur_data_url: string | null
           blur_placeholder: string | null
           created_at: string
@@ -100,11 +101,18 @@ export type Database = {
           id: string
           image_url: string | null
           is_active: boolean
+          meta_description: string | null
+          meta_keywords: string[] | null
+          meta_title: string | null
           placement: string
+          seo_description: string | null
+          seo_keywords: string[] | null
+          seo_title: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          alt_text?: string | null
           blur_data_url?: string | null
           blur_placeholder?: string | null
           created_at?: string
@@ -114,11 +122,18 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           placement?: string
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          seo_title?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          alt_text?: string | null
           blur_data_url?: string | null
           blur_placeholder?: string | null
           created_at?: string
@@ -128,7 +143,13 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          meta_description?: string | null
+          meta_keywords?: string[] | null
+          meta_title?: string | null
           placement?: string
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          seo_title?: string | null
           title?: string
           updated_at?: string
         }
