@@ -190,14 +190,15 @@ Deno.serve(async (req) => {
     } else {
       // Заказ авторизованного пользователя - С бонусами
       console.log('👤 Обработка заказа зарегистрированного пользователя')
+
+      // Получаем заказ БЕЗ вложенного запроса к profiles
       const result = await supabaseAdmin
         .from('orders')
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, user_id, status, bonuses_awarded, bonuses_spent,
-          profile:profiles(first_name, last_name, phone),
           order_items(
-            quantity, 
+            quantity,
             product_id,
             product:products(
               id, name, price, sku, barcode
@@ -206,9 +207,25 @@ Deno.serve(async (req) => {
         `)
         .eq('id', orderId)
         .single()
-      
+
       orderData = result.data as unknown as OrderData | null
       orderError = result.error
+
+      // Если заказ найден и есть user_id - получаем профиль отдельным запросом
+      if (orderData?.user_id) {
+        const { data: profileData, error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .select('first_name, last_name, phone')
+          .eq('id', orderData.user_id)
+          .single()
+
+        if (profileError) {
+          console.warn('⚠️ Не удалось получить профиль пользователя:', profileError)
+        } else {
+          // Добавляем профиль к данным заказа
+          orderData.profile = profileData as OrderProfile
+        }
+      }
     }
 
     if (orderError) {
