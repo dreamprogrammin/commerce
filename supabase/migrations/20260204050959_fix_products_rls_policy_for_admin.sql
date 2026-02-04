@@ -14,6 +14,8 @@
 -- Удаляем старые политики
 DROP POLICY IF EXISTS "Admins can manage products" ON public.products;
 DROP POLICY IF EXISTS "Public can read active products" ON public.products;
+DROP POLICY IF EXISTS "Admins can manage all products" ON public.products;
+DROP POLICY IF EXISTS "Service role can manage products" ON public.products;
 
 -- Создаём новые политики
 

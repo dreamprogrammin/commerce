@@ -77,7 +77,8 @@
       "Bash(comm:*)",
       "Bash(supabase storage list:*)",
       "Bash(docker exec:*)",
-      "Bash(supabase functions logs:*)"
+      "Bash(supabase functions logs:*)",
+      "Bash(tee:*)"
     ]
   }
 }

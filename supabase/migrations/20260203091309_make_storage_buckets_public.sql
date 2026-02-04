@@ -19,6 +19,7 @@ WHERE name IN (
 DROP POLICY IF EXISTS "Public read access" ON storage.objects;
 DROP POLICY IF EXISTS "Public Access" ON storage.objects;
 DROP POLICY IF EXISTS "Anyone can view images" ON storage.objects;
+DROP POLICY IF EXISTS "Public read access to image buckets" ON storage.objects;
 
 -- Создать единую политику для публичного чтения
 CREATE POLICY "Public read access to image buckets"
