@@ -166,7 +166,12 @@ Deno.serve(async (req) => {
         guestName = guestData.guest_name
         guestPhone = guestData.guest_phone
         guestEmail = guestData.guest_email
-        
+
+        console.log(`📋 Данные гостя:`)
+        console.log(`   Имя: ${guestName}`)
+        console.log(`   Телефон: ${guestPhone}`)
+        console.log(`   Email: ${guestEmail}`)
+
         // Преобразуем структуру гостевого заказа к общему формату
         orderData = {
           id: guestData.id,
@@ -342,6 +347,11 @@ Deno.serve(async (req) => {
       ? `${typedOrderData.profile.first_name} ${typedOrderData.profile.last_name || ''}`.trim()
       : guestName || 'Не указано'
     const customerName = escapeMarkdown(customerNameRaw)
+
+    console.log(`📱 Формирование контактов для сообщения:`)
+    console.log(`   typedOrderData.profile?.phone: ${typedOrderData.profile?.phone}`)
+    console.log(`   guestPhone: ${guestPhone}`)
+    console.log(`   Будет использовано: ${typedOrderData.profile?.phone || guestPhone || 'Не указан'}`)
 
     const customerPhone = escapeMarkdown(typedOrderData.profile?.phone || guestPhone || 'Не указан')
     const customerEmail = escapeMarkdown(guestEmail || 'Не указан')
