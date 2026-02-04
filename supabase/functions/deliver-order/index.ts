@@ -105,15 +105,31 @@ Deno.serve(async (req) => {
       telegram_message_id?: string | null
       final_amount?: number
       guest_name?: string
+      user_id?: string | null
+      profile?: { first_name: string | null; last_name: string | null } | null
     } | null = null
 
     if (tableName === 'orders') {
+      // Получаем заказ БЕЗ вложенного запроса к profiles
       const { data } = await supabase
         .from('orders')
-        .select('status, telegram_message_id, final_amount, profile:profiles(first_name, last_name)')
+        .select('status, telegram_message_id, final_amount, user_id')
         .eq('id', orderId)
         .single()
       orderData = data as any
+
+      // Если есть user_id - получаем профиль отдельным запросом
+      if (orderData?.user_id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', orderData.user_id)
+          .single()
+
+        if (profileData) {
+          orderData.profile = profileData
+        }
+      }
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
