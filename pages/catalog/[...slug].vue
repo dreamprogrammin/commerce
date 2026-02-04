@@ -574,7 +574,6 @@ defineOgImageComponent('OgImageCatalog', {
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
-  keywords: metaKeywords,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: canonicalUrl,
@@ -584,6 +583,16 @@ useSeoMeta({
   twitterTitle: metaTitle,
   twitterDescription: metaDescription,
   robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
+})
+
+// Добавляем keywords через useHead для совместимости
+useHead({
+  meta: [
+    {
+      name: 'keywords',
+      content: () => metaKeywords.value || '',
+    },
+  ],
 })
 
 // SEO structured data & canonical
@@ -619,7 +628,7 @@ useHead(() => {
     children: JSON.stringify({
       '@context': 'https://schema.org',
       '@type': 'CollectionPage',
-      'name': title.value,
+      'name': metaTitle.value,
       'description': metaDescription.value,
       'url': canonicalUrl.value,
       'isPartOf': {

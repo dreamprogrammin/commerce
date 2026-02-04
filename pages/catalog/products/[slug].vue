@@ -308,6 +308,15 @@ const canonicalUrl = computed(() => {
 const metaTitle = computed(() => {
   if (!product.value)
     return 'Товар | Ухтышка'
+
+  // Приоритет: meta_title > seo_title > автогенерация
+  if (product.value.meta_title) {
+    return product.value.meta_title
+  }
+  if (product.value.seo_title) {
+    return product.value.seo_title
+  }
+
   return `${product.value.name} - Купить в интернет-магазине | Ухтышка`
 })
 
@@ -355,7 +364,10 @@ const metaDescription = computed(() => {
   if (!product.value)
     return ''
 
-  // Приоритет: seo_description > автогенерация
+  // Приоритет: meta_description > seo_description > автогенерация
+  if (product.value.meta_description) {
+    return product.value.meta_description
+  }
   if (product.value.seo_description) {
     return product.value.seo_description
   }
@@ -548,7 +560,6 @@ defineOgImage({
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
-  keywords: metaKeywords,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogImage: ogImageUrl,
@@ -567,6 +578,7 @@ useSeoMeta({
 
 useHead(() => ({
   meta: [
+    { name: 'keywords', content: metaKeywords.value || '' },
     { property: 'og:type', content: 'product' },
     { property: 'product:price:amount', content: String(product.value?.price || 0) },
     { property: 'product:price:currency', content: 'KZT' },
@@ -612,8 +624,8 @@ useHead(() => ({
       children: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'Product',
-        'name': product.value?.name,
-        'description': product.value?.seo_description || product.value?.description,
+        'name': metaTitle.value,
+        'description': metaDescription.value,
         'image': productImages.value,
         'sku': product.value?.sku || undefined,
         // TODO: Добавить GTIN (штрих-код) когда появится в БД

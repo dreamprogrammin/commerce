@@ -116,14 +116,33 @@ const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
 
 const brandUrl = computed(() => `${siteUrl}/brand/${brandSlug}`)
-const metaTitle = computed(() => brand.value ? `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}` : 'Бренд не найден')
 
-// SEO описание: приоритет у seo_description, потом description, потом fallback
+// Meta Title: приоритет meta_title > seo_title > автогенерация
+const metaTitle = computed(() => {
+  if (!brand.value)
+    return 'Бренд не найден'
+
+  // Приоритет: meta_title > seo_title > автогенерация
+  if (brand.value.meta_title) {
+    return brand.value.meta_title
+  }
+  if (brand.value.seo_title) {
+    return brand.value.seo_title
+  }
+
+  return `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}`
+})
+
+// SEO описание: приоритет meta_description > seo_description > description > fallback
 const metaDescription = computed(() => {
   if (!brand.value)
     return `Товары бренда в ${siteName}`
 
-  // Используем seo_description если заполнено
+  // Приоритет: meta_description > seo_description > description > автогенерация
+  if (brand.value.meta_description) {
+    return brand.value.meta_description
+  }
+
   if (brand.value.seo_description) {
     return brand.value.seo_description
   }
@@ -157,7 +176,6 @@ defineOgImage({
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
-  keywords: metaKeywords,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogImage: ogImageSrc,
@@ -172,6 +190,12 @@ useSeoMeta({
 })
 
 useHead({
+  meta: [
+    {
+      name: 'keywords',
+      content: () => metaKeywords.value || '',
+    },
+  ],
   link: [
     { rel: 'canonical', href: brandUrl.value },
   ],
@@ -214,8 +238,8 @@ useHead({
             '@context': 'https://schema.org',
             '@type': 'Brand',
             '@id': `${brandUrl.value}#brand`,
-            'name': brand.value.name,
-            'description': brand.value.seo_description || brand.value.description || undefined,
+            'name': metaTitle.value,
+            'description': metaDescription.value,
             'url': brandUrl.value,
             'logo': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
             'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,

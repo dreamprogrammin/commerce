@@ -175,17 +175,32 @@ const siteName = 'Ухтышка'
 
 const pageUrl = computed(() => `${siteUrl}/brand/${brandSlug}/${lineSlug}`)
 
+// Meta Title: приоритет meta_title > seo_title > автогенерация
 const metaTitle = computed(() => {
   if (!productLine.value || !brand.value) {
     return 'Линейка не найдена'
   }
+
+  // Приоритет: meta_title > seo_title > автогенерация
+  if (productLine.value.meta_title) {
+    return productLine.value.meta_title
+  }
+  if (productLine.value.seo_title) {
+    return productLine.value.seo_title
+  }
+
   return `${productLine.value.name} от ${brand.value.name} - Купить в Алматы | ${siteName}`
 })
 
-// SEO описание
+// SEO описание: приоритет meta_description > seo_description > description > автогенерация
 const metaDescription = computed(() => {
   if (!productLine.value || !brand.value) {
     return `Товары линейки в ${siteName}`
+  }
+
+  // Приоритет: meta_description > seo_description > description > автогенерация
+  if (productLine.value.meta_description) {
+    return productLine.value.meta_description
   }
 
   if (productLine.value.seo_description) {
@@ -219,7 +234,6 @@ defineOgImage({
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
-  keywords: metaKeywords,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogImage: ogImageSrc,
@@ -234,6 +248,12 @@ useSeoMeta({
 })
 
 useHead({
+  meta: [
+    {
+      name: 'keywords',
+      content: () => metaKeywords.value || '',
+    },
+  ],
   link: [
     { rel: 'canonical', href: pageUrl.value },
   ],
@@ -284,8 +304,8 @@ useHead({
             '@context': 'https://schema.org',
             '@type': 'Brand',
             '@id': `${pageUrl.value}#brand`,
-            'name': productLine.value.name,
-            'description': productLine.value.seo_description || productLine.value.description || undefined,
+            'name': metaTitle.value,
+            'description': metaDescription.value,
             'url': pageUrl.value,
             ...(lineLogoUrl.value && {
               logo: lineLogoUrl.value,
@@ -313,7 +333,7 @@ useHead({
         ? JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'CollectionPage',
-            'name': `${productLine.value.name} - ${brand.value.name}`,
+            'name': metaTitle.value,
             'description': metaDescription.value,
             'url': pageUrl.value,
             ...(lineLogoUrl.value && { image: lineLogoUrl.value }),

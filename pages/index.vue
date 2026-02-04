@@ -205,7 +205,6 @@ const ogImageUrl = `${siteUrl}/og-home-toys.jpeg`
 useSeoMeta({
   title: metaTitle,
   description: metaDescription,
-  keywords: () => keywords.value,
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: siteUrl,
@@ -461,6 +460,12 @@ const productLinesListSchema = computed(() => {
 })
 
 useHead(() => ({
+  meta: [
+    {
+      name: 'keywords',
+      content: keywords.value || '',
+    },
+  ],
   link: [{ rel: 'canonical', href: siteUrl }],
   script: [
     {
