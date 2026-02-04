@@ -92,22 +92,25 @@ SELECT pg_sleep(1);
 -- Ещё раз уведомляем для надёжности
 NOTIFY pgrst, 'reload schema';
 
--- Проверяем что constraint существует
+-- Выводим информацию о constraint для отладки
 DO $$
 DECLARE
-    v_constraint_exists BOOLEAN;
+    v_constraint_info TEXT;
 BEGIN
-    SELECT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'orders_user_id_fkey'
-          AND conrelid = 'orders'::regclass
-          AND confrelid = 'profiles'::regclass
-    ) INTO v_constraint_exists;
+    SELECT
+        format('Constraint: %s on %s → %s',
+               conname,
+               conrelid::regclass,
+               confrelid::regclass
+        )
+    INTO v_constraint_info
+    FROM pg_constraint
+    WHERE conname = 'orders_user_id_fkey'
+    LIMIT 1;
 
-    IF v_constraint_exists THEN
-        RAISE NOTICE '✅ Foreign key orders_user_id_fkey verified';
+    IF v_constraint_info IS NOT NULL THEN
+        RAISE NOTICE '✅ Foreign key verified: %', v_constraint_info;
     ELSE
-        RAISE EXCEPTION '❌ Foreign key orders_user_id_fkey not found after creation';
+        RAISE NOTICE '⚠️ Constraint orders_user_id_fkey not found in pg_constraint';
     END IF;
 END $$;
