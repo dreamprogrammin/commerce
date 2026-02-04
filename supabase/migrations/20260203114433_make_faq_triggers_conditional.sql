@@ -158,8 +158,8 @@ $$;
 -- Отключаем его полностью, FAQ можно генерировать вручную из админки
 DROP TRIGGER IF EXISTS trigger_update_category_faq_on_product ON public.products;
 
-COMMENT ON FUNCTION public.update_category_faq_on_product_change() IS
-'⚠️ ОТКЛЮЧЕНО для производительности. Обновление FAQ теперь только вручную из админки.';
+-- Удаляем устаревшую функцию, если она существует
+DROP FUNCTION IF EXISTS public.update_category_faq_on_product_change();
 
 -- Комментарии
 COMMENT ON FUNCTION public.auto_generate_category_faq() IS

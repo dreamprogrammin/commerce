@@ -10,11 +10,14 @@ CREATE TABLE IF NOT EXISTS public.product_types (
     slug TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     description TEXT,
-    custom_fields_schema JSONB,
     display_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
+
+-- Добавляем колонку, если её нет (для случаев, когда таблица уже существует)
+ALTER TABLE public.product_types
+ADD COLUMN IF NOT EXISTS custom_fields_schema JSONB;
 
 ALTER TABLE public.product_types OWNER TO postgres;
 

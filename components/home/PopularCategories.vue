@@ -9,6 +9,19 @@ import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategorie
 const popularCategoriesStore = usePopularCategoriesStore()
 const { getImageUrl } = useSupabaseStorage()
 
+// ✅ Prefetch data during SSR to prevent hydration mismatch
+const { data: ssrData } = await useAsyncData(
+  'home-popular-categories-ssr',
+  async () => {
+    await popularCategoriesStore.fetchPopularCategories()
+    return popularCategoriesStore.popularCategories
+  },
+  {
+    server: true, // Only fetch on server
+    lazy: false,
+  },
+)
+
 // 🔥 TanStack Query - популярные категории с автоматическим кешированием
 const { data: popularCategories, isLoading, isFetching } = useQuery({
   queryKey: ['home-popular-categories'],
@@ -18,6 +31,7 @@ const { data: popularCategories, isLoading, isFetching } = useQuery({
   },
   staleTime: 5 * 60 * 1000, // 5 минут
   gcTime: 10 * 60 * 1000, // 10 минут
+  initialData: ssrData.value || undefined, // Use SSR data as initial data
 })
 
 // ✅ Показываем skeleton только когда данных нет И идёт загрузка
@@ -99,7 +113,7 @@ onMounted(() => {
       </div>
 
       <!-- Content -->
-      <template v-else-if="popularCategories && popularCategories.length > 0">
+      <div v-else-if="popularCategories && popularCategories.length > 0">
         <!-- MOBILE: Горизонтальный скролл в 2 ряда -->
         <div
           ref="scrollContainer"
@@ -236,7 +250,7 @@ onMounted(() => {
             </NuxtLink>
           </div>
         </div>
-      </template>
+      </div>
 
       <!-- Empty state -->
       <div v-else class="text-center text-muted-foreground py-10">

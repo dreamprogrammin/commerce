@@ -16,11 +16,20 @@ let lastProcessedOrderId: string | null = null
 export function useOrderRealtime() {
   const supabase = useSupabaseClient()
   const { refetchAllProducts } = useProductCacheInvalidation()
+  const config = useRuntimeConfig()
+
+  // 🔥 Отключаем realtime для локальной разработки (избегаем ошибок WebSocket)
+  const isLocal = config.public.supabase.url.includes('127.0.0.1') || config.public.supabase.url.includes('localhost')
 
   /**
    * Подписаться на изменения заказов
    */
   function subscribeToOrders() {
+    if (isLocal) {
+      console.log('⚠️ Realtime disabled for local development')
+      return
+    }
+
     if (ordersChannel) {
       console.warn('⚠️ Already subscribed to orders channel')
       return
@@ -80,6 +89,11 @@ export function useOrderRealtime() {
    * Подписаться на изменения гостевых заказов
    */
   function subscribeToGuestCheckouts() {
+    if (isLocal) {
+      console.log('⚠️ Realtime disabled for local development')
+      return
+    }
+
     if (guestCheckoutsChannel) {
       console.warn('⚠️ Already subscribed to guest checkouts channel')
       return

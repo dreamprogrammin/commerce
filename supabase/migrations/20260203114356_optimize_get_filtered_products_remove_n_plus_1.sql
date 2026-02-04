@@ -25,10 +25,26 @@ BEGIN
     END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.get_filtered_products(
+-- Удаляем все версии функции get_filtered_products (чтобы избежать конфликтов перегрузки)
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT oid::regprocedure as func_signature
+        FROM pg_proc
+        WHERE proname = 'get_filtered_products'
+          AND pronamespace = 'public'::regnamespace
+    LOOP
+        EXECUTE format('DROP FUNCTION %s CASCADE', r.func_signature);
+    END LOOP;
+END $$;
+
+-- Создаем оптимизированную версию с правильной сигнатурой
+CREATE FUNCTION public.get_filtered_products(
     p_category_slug TEXT,
     p_subcategory_ids UUID[] DEFAULT NULL,
-    p_brand_ids UUID[] DEFAULT NULL,
+    p_brand_ids TEXT[] DEFAULT NULL,
     p_price_min NUMERIC DEFAULT NULL,
     p_price_max NUMERIC DEFAULT NULL,
     p_sort_by TEXT DEFAULT 'popularity',
@@ -36,7 +52,8 @@ CREATE OR REPLACE FUNCTION public.get_filtered_products(
     p_page_size INT DEFAULT 12,
     p_attributes public.attribute_filter[] DEFAULT NULL,
     p_country_ids TEXT[] DEFAULT NULL,
-    p_material_ids TEXT[] DEFAULT NULL
+    p_material_ids TEXT[] DEFAULT NULL,
+    p_product_line_ids TEXT[] DEFAULT NULL
 )
 RETURNS TABLE (
     -- Все поля из `products`
@@ -52,12 +69,23 @@ RETURNS TABLE (
     brand_slug TEXT
 )
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_offset INT;
     v_category_ids UUID[];
+    v_subcategory_ids_expanded UUID[];
 BEGIN
     v_offset := (p_page_number - 1) * p_page_size;
+
+    -- Если переданы подкатегории, расширяем их рекурсивно (включая дочерние категории)
+    IF p_subcategory_ids IS NOT NULL AND CARDINALITY(p_subcategory_ids) > 0 THEN
+        SELECT ARRAY(
+            SELECT DISTINCT cat.id
+            FROM unnest(p_subcategory_ids) AS parent_id
+            CROSS JOIN LATERAL public.get_category_and_children_ids_by_uuid(parent_id) cat
+        ) INTO v_subcategory_ids_expanded;
+    END IF;
 
     -- Логика для получения всех ID категорий, если slug не 'all'
     IF p_category_slug <> 'all' THEN
@@ -78,27 +106,34 @@ BEGIN
             public.brands b ON p.brand_id = b.id
         WHERE
             p.is_active = TRUE
-            -- 1. Фильтр по категориям / подкатегориям
+            -- 1. Фильтр по категориям / подкатегориям (с рекурсивной поддержкой дочерних категорий)
             AND (
-                (p_subcategory_ids IS NOT NULL AND CARDINALITY(p_subcategory_ids) > 0 AND p.category_id = ANY(p_subcategory_ids))
+                -- Если выбраны подкатегории, используем расширенный массив (включая дочерние)
+                (v_subcategory_ids_expanded IS NOT NULL AND CARDINALITY(v_subcategory_ids_expanded) > 0
+                    AND p.category_id = ANY(v_subcategory_ids_expanded))
                 OR
+                -- Иначе используем категорию из slug
                 (
-                    (p_subcategory_ids IS NULL OR CARDINALITY(p_subcategory_ids) = 0)
+                    (v_subcategory_ids_expanded IS NULL OR CARDINALITY(v_subcategory_ids_expanded) = 0)
                     AND (p_category_slug = 'all' OR p.category_id = ANY(v_category_ids))
                 )
             )
-            -- 2. Фильтр по брендам
-            AND (p_brand_ids IS NULL OR CARDINALITY(p_brand_ids) = 0 OR p.brand_id = ANY(p_brand_ids))
-            -- 3. Фильтр по цене
+            -- 2. Фильтр по брендам (TEXT[] -> UUID[])
+            AND (p_brand_ids IS NULL OR CARDINALITY(p_brand_ids) = 0
+                OR p.brand_id = ANY(ARRAY(SELECT unnest(p_brand_ids)::UUID)))
+            -- 3. Фильтр по линейкам продуктов (TEXT[] -> UUID[])
+            AND (p_product_line_ids IS NULL OR CARDINALITY(p_product_line_ids) = 0
+                OR p.product_line_id = ANY(ARRAY(SELECT unnest(p_product_line_ids)::UUID)))
+            -- 4. Фильтр по цене
             AND (p_price_min IS NULL OR p.price >= p_price_min)
             AND (p_price_max IS NULL OR p.price <= p_price_max)
-            -- 4. Фильтр по стране происхождения
+            -- 5. Фильтр по стране происхождения (TEXT[] -> INTEGER[])
             AND (p_country_ids IS NULL OR CARDINALITY(p_country_ids) = 0
                 OR p.origin_country_id = ANY(ARRAY(SELECT unnest(p_country_ids)::INTEGER)))
-            -- 5. Фильтр по материалу
+            -- 6. Фильтр по материалу (TEXT[] -> INTEGER[])
             AND (p_material_ids IS NULL OR CARDINALITY(p_material_ids) = 0
                 OR p.material_id = ANY(ARRAY(SELECT unnest(p_material_ids)::INTEGER)))
-            -- 6. Фильтр по динамическим атрибутам
+            -- 7. Фильтр по динамическим атрибутам
             AND (
                 p_attributes IS NULL OR
                 (
@@ -138,8 +173,7 @@ BEGIN
                     'alt_text', pi.alt_text,
                     'display_order', pi.display_order,
                     'blur_placeholder', pi.blur_placeholder,
-                    'created_at', pi.created_at,
-                    'updated_at', pi.updated_at
+                    'created_at', pi.created_at
                 ) ORDER BY pi.display_order
             ) FILTER (WHERE pi.id IS NOT NULL),
             '[]'::json
@@ -168,8 +202,10 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.get_filtered_products IS
-'Возвращает отфильтрованный список товаров с изображениями. Оптимизировано: убран N+1 query для product_images.';
+COMMENT ON FUNCTION public.get_filtered_products(
+    TEXT, UUID[], TEXT[], NUMERIC, NUMERIC, TEXT, INT, INT, public.attribute_filter[], TEXT[], TEXT[], TEXT[]
+) IS
+'Возвращает отфильтрованный список товаров с изображениями. Оптимизировано: убран N+1 query для product_images. Поддерживает рекурсивный поиск по дочерним категориям.';
 
 -- Обновление кэша PostgREST
 NOTIFY pgrst, 'reload schema';
