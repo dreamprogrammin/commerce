@@ -99,11 +99,10 @@ DECLARE
 BEGIN
     SELECT EXISTS (
         SELECT 1
-        FROM pg_constraint c
-        JOIN pg_namespace n ON n.oid = c.connamespace
-        WHERE c.conname = 'orders_user_id_fkey'
-          AND c.conrelid = 'public.orders'::regclass
-          AND c.confrelid = 'public.profiles'::regclass
+        FROM pg_constraint
+        WHERE conname = 'orders_user_id_fkey'
+          AND conrelid = 'orders'::regclass
+          AND confrelid = 'profiles'::regclass
     ) INTO v_constraint_exists;
 
     IF v_constraint_exists THEN
