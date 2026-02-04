@@ -30,7 +30,20 @@ definePageMeta({
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 const desktopContainedClass = carouselContainerVariants({ contained: 'desktop' })
 
-// TanStack Query
+// ✅ SSR prefetch для рекомендаций
+const { data: recommendationsSsrData } = await useAsyncData(
+  'home-recommendations-ssr',
+  async () => {
+    const recommended = await recommendationsStore.fetchRecommendations()
+    return {
+      recommended: recommended || [],
+      wishlist: [], // Wishlist только на клиенте (требует auth)
+    }
+  },
+  { server: true, lazy: false },
+)
+
+// TanStack Query с SSR данными
 const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching: isFetchingRecommendations } = useQuery({
   queryKey: ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value],
   queryFn: async () => {
@@ -43,10 +56,11 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
       wishlist: Array.isArray(wishlist) ? wishlist : [],
     }
   },
-  staleTime: 3 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  refetchOnMount: 'always',
-  refetchOnWindowFocus: true,
+  staleTime: 5 * 60 * 1000, // 5 минут (было 3)
+  gcTime: 15 * 60 * 1000, // 15 минут (было 10)
+  initialData: recommendationsSsrData.value || undefined, // Используем SSR данные
+  refetchOnMount: false, // ⚡ Не перезагружать при каждом монтировании
+  refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
 })
 
 const recommendedProducts = computed(() => mainPersonalData.value?.recommended || [])
@@ -57,24 +71,40 @@ const showRecommendationsSkeleton = computed(() =>
   && (!mainPersonalData.value || (mainPersonalData.value.recommended.length === 0 && mainPersonalData.value.wishlist.length === 0)),
 )
 
+// ✅ SSR prefetch для популярных товаров
+const { data: popularSsrData } = await useAsyncData(
+  'home-popular-ssr',
+  () => productsStore.fetchPopularProducts(10),
+  { server: true, lazy: false },
+)
+
 const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFetchingPopular } = useQuery({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
-  staleTime: 3 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  refetchOnMount: 'always',
-  refetchOnWindowFocus: true,
+  staleTime: 5 * 60 * 1000, // 5 минут (было 3)
+  gcTime: 15 * 60 * 1000, // 15 минут (было 10)
+  initialData: popularSsrData.value || undefined, // Используем SSR данные
+  refetchOnMount: false, // ⚡ Не перезагружать при каждом монтировании
+  refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
 })
 
 const popularProducts = computed(() => popularProductsData.value || [])
 
+// ✅ SSR prefetch для новинок
+const { data: newestSsrData } = await useAsyncData(
+  'home-newest-ssr',
+  () => productsStore.fetchNewestProducts(10),
+  { server: true, lazy: false },
+)
+
 const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery({
   queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
-  staleTime: 3 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  refetchOnMount: 'always',
-  refetchOnWindowFocus: true,
+  staleTime: 5 * 60 * 1000, // 5 минут (было 3)
+  gcTime: 15 * 60 * 1000, // 15 минут (было 10)
+  initialData: newestSsrData.value || undefined, // Используем SSR данные
+  refetchOnMount: false, // ⚡ Не перезагружать при каждом монтировании
+  refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
 })
 
 const newestProducts = computed(() => newestProductsData.value || [])

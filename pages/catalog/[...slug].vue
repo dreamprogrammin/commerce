@@ -935,30 +935,83 @@ useHead(() => {
 </script>
 
 <template>
-  <div :class="`${containerClass} py-8`">
+  <div :class="`${containerClass} py-4 lg:py-8`">
     <!-- Breadcrumbs и заголовок -->
     <ClientOnly>
       <Breadcrumbs
         v-if="breadcrumbs && breadcrumbs.length > 0"
         :items="breadcrumbs"
-        class="mb-6"
+        class="mb-3 lg:mb-6"
         compact
       />
       <template #fallback>
-        <div class="h-6 w-1/3 bg-muted rounded mb-6 animate-pulse" />
+        <div class="h-6 w-1/3 bg-muted rounded mb-3 lg:mb-6 animate-pulse" />
       </template>
     </ClientOnly>
 
     <!-- Блок с картинкой и описанием категории -->
     <div
       v-if="currentCategory && currentCategory.description"
-      class="bg-white dark:bg-card rounded-xl p-6 lg:p-8 mb-8 border shadow-sm"
+      class="bg-white dark:bg-card rounded-xl p-4 lg:p-8 mb-6 lg:mb-8 border shadow-sm"
     >
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <!-- Мобильная версия (компактная) -->
+      <div class="lg:hidden space-y-3">
+        <!-- Заголовок и картинка в одну строку -->
+        <div class="flex items-start gap-3">
+          <!-- Компактная картинка -->
+          <div
+            v-if="currentCategory.image_url"
+            class="shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center"
+          >
+            <ProgressiveImage
+              :src="getImageUrl(BUCKET_NAME_CATEGORY, currentCategory.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+              :alt="currentCategory.name"
+              object-fit="contain"
+              placeholder-type="lqip"
+              :blur-data-url="currentCategory.blur_placeholder"
+              :eager="true"
+              class="w-full h-full"
+            />
+          </div>
+
+          <!-- Заголовок -->
+          <h1 class="text-xl font-bold capitalize flex-1 leading-tight">
+            {{ title }}
+          </h1>
+        </div>
+
+        <!-- Описание (обрезанное) -->
+        <p class="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+          {{ currentCategory.description }}
+        </p>
+
+        <!-- Компактная статистика -->
+        <div class="flex items-center gap-3 text-xs text-muted-foreground">
+          <div class="flex items-center gap-1.5">
+            <Icon name="lucide:package" class="w-3.5 h-3.5 text-blue-500" />
+            <span>{{ displayedProducts.length }}</span>
+          </div>
+          <ClientOnly>
+            <div v-if="availableBrands.length > 0" class="flex items-center gap-1.5">
+              <Icon name="lucide:award" class="w-3.5 h-3.5 text-purple-500" />
+              <span>{{ availableBrands.length }}</span>
+            </div>
+          </ClientOnly>
+          <ClientOnly>
+            <div v-if="priceRange.min > 0 || priceRange.max < 50000" class="flex items-center gap-1.5">
+              <Icon name="lucide:tag" class="w-3.5 h-3.5 text-green-500" />
+              <span>от {{ new Intl.NumberFormat('ru-RU').format(priceRange.min) }} ₸</span>
+            </div>
+          </ClientOnly>
+        </div>
+      </div>
+
+      <!-- Десктопная версия (оригинальная) -->
+      <div class="hidden lg:grid grid-cols-12 gap-6 items-start">
         <!-- Картинка категории слева -->
         <div
           v-if="currentCategory.image_url"
-          class="lg:col-span-3"
+          class="col-span-3"
         >
           <div class="w-full max-w-[220px] h-[160px] rounded-lg overflow-hidden shadow-md bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
             <ProgressiveImage
@@ -974,7 +1027,7 @@ useHead(() => {
         </div>
 
         <!-- Текстовый блок справа -->
-        <div :class="currentCategory.image_url ? 'lg:col-span-9' : 'lg:col-span-12'" class="space-y-4">
+        <div :class="currentCategory.image_url ? 'col-span-9' : 'col-span-12'" class="space-y-4">
           <h1 class="text-2xl md:text-3xl font-bold capitalize">
             {{ title }}
           </h1>
@@ -1011,7 +1064,7 @@ useHead(() => {
     </div>
 
     <!-- Заголовок для случая с активными фильтрами или без описания -->
-    <h1 v-else class="text-xl md:text-3xl font-bold mb-4 capitalize">
+    <h1 v-else class="text-xl md:text-3xl font-bold mb-3 lg:mb-4 capitalize">
       {{ title }}
     </h1>
 
