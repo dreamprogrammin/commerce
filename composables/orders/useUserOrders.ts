@@ -59,7 +59,7 @@ export function useUserOrders() {
   const error = ref<string | null>(null)
 
   // Загрузка заказов пользователя
-  const fetchOrders = async () => {
+  const fetchOrders = async (limit?: number) => {
     if (!user.value) {
       console.log('Пользователь не авторизован')
       return
@@ -69,7 +69,7 @@ export function useUserOrders() {
     error.value = null
 
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           id,
@@ -88,15 +88,23 @@ export function useUserOrders() {
               id,
               name,
               price,
-              product_images(
+              product_images!inner(
                 image_url,
-                blur_placeholder
+                blur_placeholder,
+                sort_order
               )
             )
           )
         `)
         .eq('user_id', user.value.id)
         .order('created_at', { ascending: false })
+
+      // ✅ Добавляем лимит если передан (для оптимизации)
+      if (limit) {
+        query = query.limit(limit)
+      }
+
+      const { data, error: fetchError } = await query
 
       if (fetchError)
         throw fetchError

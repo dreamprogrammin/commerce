@@ -7,16 +7,36 @@
  * Экранирует специальные символы Markdown для безопасной отправки в Telegram
  * @param text - Текст для экранирования
  * @returns Экранированный текст
+ *
+ * ВАЖНО: Telegram использует специальный диалект Markdown.
+ * Нужно экранировать: _ * [ ] ( ) ~ ` > # + - = | { } . !
  */
 export function escapeMarkdown(text: string | null | undefined): string {
   if (!text) return ''
-  return text
-    .replace(/\\/g, '\\\\')  // сначала экранируем backslash
-    .replace(/\*/g, '\\*')
-    .replace(/_/g, '\\_')
-    .replace(/`/g, '\\`')
-    .replace(/\[/g, '\\[')
-    .replace(/\]/g, '\\]')
+
+  // Конвертируем в строку если это не строка
+  const str = String(text)
+
+  return str
+    .replace(/\\/g, '\\\\')  // backslash (должен быть первым!)
+    .replace(/\*/g, '\\*')   // asterisk
+    .replace(/_/g, '\\_')    // underscore
+    .replace(/\[/g, '\\[')   // left bracket
+    .replace(/\]/g, '\\]')   // right bracket
+    .replace(/\(/g, '\\(')   // ✅ left parenthesis (для номеров телефонов)
+    .replace(/\)/g, '\\)')   // ✅ right parenthesis
+    .replace(/~/g, '\\~')    // tilde
+    .replace(/`/g, '\\`')    // backtick
+    .replace(/>/g, '\\>')    // greater than
+    .replace(/#/g, '\\#')    // hash
+    .replace(/\+/g, '\\+')   // ✅ plus (для номеров телефонов)
+    .replace(/-/g, '\\-')    // ✅ hyphen (для номеров телефонов)
+    .replace(/=/g, '\\=')    // equals
+    .replace(/\|/g, '\\|')   // pipe
+    .replace(/\{/g, '\\{')   // left brace
+    .replace(/\}/g, '\\}')   // right brace
+    .replace(/\./g, '\\.')   // period
+    .replace(/!/g, '\\!')    // exclamation
 }
 
 /**

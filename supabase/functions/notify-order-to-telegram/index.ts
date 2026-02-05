@@ -350,21 +350,25 @@ Deno.serve(async (req) => {
 
     console.log(`📱 Формирование контактов для сообщения:`)
     console.log(`   typedOrderData.profile?.phone: ${typedOrderData.profile?.phone}`)
-    console.log(`   guestPhone: ${guestPhone}`)
-    console.log(`   Будет использовано: ${typedOrderData.profile?.phone || guestPhone || 'Не указан'}`)
+    console.log(`   guestPhone (raw): "${guestPhone}"`)
+    console.log(`   guestPhone type: ${typeof guestPhone}`)
+    console.log(`   guestPhone length: ${guestPhone?.length || 0}`)
+    console.log(`   Будет использовано: "${typedOrderData.profile?.phone || guestPhone || 'Не указан'}"`)
 
-    const customerPhone = escapeMarkdown(typedOrderData.profile?.phone || guestPhone || 'Не указан')
+    // ✅ Для номера телефона НЕ используем escapeMarkdown - оставляем как есть
+    // Экранирование может нарушить отображение номера в Telegram
+    const customerPhone = typedOrderData.profile?.phone || guestPhone || 'Не указан'
     const customerEmail = escapeMarkdown(guestEmail || 'Не указан')
     const customerType = typedOrderData.user_id ? '👤 Зарегистрированный' : '👥 Гость'
-    
-    const orderDate = new Date(typedOrderData.created_at).toLocaleString('ru-RU', { 
-      timeZone: 'Asia/Almaty' 
+
+    const orderDate = new Date(typedOrderData.created_at).toLocaleString('ru-RU', {
+      timeZone: 'Asia/Almaty'
     })
 
     // Собираем информацию о товарах с изображениями
-    const productsWithImages: Array<{ 
+    const productsWithImages: Array<{
       text: string
-      imageUrl: string | null 
+      imageUrl: string | null
     }> = []
 
     typedOrderData.order_items.forEach((item) => {
@@ -378,10 +382,10 @@ Deno.serve(async (req) => {
       let itemText = `• ${productName}\n`
 
       if (product.sku) {
-        itemText += `  Артикул: \`${escapeMarkdown(product.sku)}\`\n`
+        itemText += `  Артикул: ${escapeMarkdown(product.sku)}\n`  // ✅ Убрали backticks
       }
       if (product.barcode) {
-        itemText += `  Штрихкод: \`${escapeMarkdown(product.barcode)}\`\n`
+        itemText += `  Штрихкод: ${escapeMarkdown(product.barcode)}\n`  // ✅ Убрали backticks
       }
 
       itemText += `  Количество: ${item.quantity} шт.\n`
@@ -408,7 +412,7 @@ Deno.serve(async (req) => {
     messageText += `*Дата:* ${orderDate}\n`
     messageText += `*Тип:* ${customerType}\n`
     messageText += `*Клиент:* ${customerName}\n`
-    messageText += `*Телефон:* \`${customerPhone}\`\n`
+    messageText += `*Телефон:* ${customerPhone}\n`  // ✅ Убрали backticks вокруг номера
     
     // Для гостей показываем email
     if (tableName === 'guest_checkouts' && guestEmail) {

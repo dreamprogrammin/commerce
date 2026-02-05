@@ -31,8 +31,8 @@ const bonusTransactions = ref<any[]>([])
 const isLoadingBonuses = ref(false)
 
 // --- Computed ---
-const recentOrders = computed(() => orders.value.slice(0, 3))
-const recentWishlist = computed(() => wishlistProducts.value.slice(0, 4))
+const recentOrders = computed(() => ordersData.value || [])
+const recentWishlist = computed(() => wishlistData.value || [])
 
 const userInitial = computed(() => {
   if (fullName.value)
@@ -98,19 +98,48 @@ function getTransactionColor(type: string) {
   }
 }
 
+// --- TanStack Query для кэширования ---
+const { data: ordersData, isLoading: isLoadingOrdersQuery } = useQuery({
+  queryKey: ['user-orders-recent', 3],
+  queryFn: async () => {
+    await fetchOrders(3) // ✅ Загружаем только 3 последних заказа
+    return orders.value
+  },
+  staleTime: 2 * 60 * 1000, // 2 минуты
+  gcTime: 5 * 60 * 1000, // 5 минут
+  enabled: computed(() => !!user.value),
+})
+
+const { data: wishlistData, isLoading: isLoadingWishlistQuery } = useQuery({
+  queryKey: ['user-wishlist-recent', 4],
+  queryFn: async () => {
+    await fetchWishlistProducts(4) // ✅ Загружаем только 4 товара
+    return wishlistProducts.value
+  },
+  staleTime: 2 * 60 * 1000,
+  gcTime: 5 * 60 * 1000,
+  enabled: computed(() => !!user.value),
+})
+
+const { data: bonusData, isLoading: isLoadingBonusQuery } = useQuery({
+  queryKey: ['user-bonus-recent', 3],
+  queryFn: async () => {
+    await loadBonusTransactions() // Уже загружает только 3
+    return bonusTransactions.value
+  },
+  staleTime: 2 * 60 * 1000,
+  gcTime: 5 * 60 * 1000,
+  enabled: computed(() => !!user.value),
+})
+
 // --- Инициализация ---
 onMounted(async () => {
-  // Загружаем профиль если нет
+  // ✅ Сначала дожидаемся загрузки профиля
   if (!profile.value && !isLoadingProfile.value) {
-    profileStore.loadProfile(false, true)
+    await profileStore.loadProfile(false, true)
   }
 
-  // Загружаем данные параллельно
-  await Promise.all([
-    fetchOrders(),
-    fetchWishlistProducts(),
-    loadBonusTransactions(),
-  ])
+  // TanStack Query автоматически загружает данные параллельно
 })
 
 // --- Meta ---
@@ -169,10 +198,10 @@ useHead({
               <span class="text-xs text-muted-foreground">Заказы</span>
             </div>
             <p class="text-2xl font-bold">
-              {{ orders.length }}
+              {{ ordersData?.length || 0 }}
             </p>
             <p class="text-xs text-muted-foreground mt-1">
-              всего
+              последние
             </p>
           </CardContent>
         </Card>
@@ -187,10 +216,10 @@ useHead({
               <span class="text-xs text-muted-foreground">Избранное</span>
             </div>
             <p class="text-2xl font-bold">
-              {{ wishlistProducts.length }}
+              {{ wishlistData?.length || 0 }}
             </p>
             <p class="text-xs text-muted-foreground mt-1">
-              товаров
+              последние
             </p>
           </CardContent>
         </Card>
@@ -222,7 +251,7 @@ useHead({
           <CardTitle class="text-lg">
             Последние заказы
           </CardTitle>
-          <Button v-if="orders.length > 0" variant="ghost" size="sm" as-child>
+          <Button v-if="ordersData && ordersData.length > 0" variant="ghost" size="sm" as-child>
             <NuxtLink to="/profile/order" class="flex items-center gap-1">
               Все заказы
               <ArrowRight class="w-4 h-4" />
@@ -232,13 +261,13 @@ useHead({
       </CardHeader>
       <CardContent>
         <!-- Загрузка -->
-        <div v-if="isLoadingOrders" class="space-y-3">
+        <div v-if="isLoadingOrdersQuery" class="space-y-3">
           <Skeleton class="h-16 w-full" />
           <Skeleton class="h-16 w-full" />
         </div>
 
         <!-- Пусто -->
-        <div v-else-if="orders.length === 0" class="text-center py-8">
+        <div v-else-if="!ordersData || ordersData.length === 0" class="text-center py-8">
           <ShoppingBag class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p class="text-muted-foreground mb-4">
             У вас пока нет заказов
@@ -312,7 +341,7 @@ useHead({
           <CardTitle class="text-lg">
             Избранное
           </CardTitle>
-          <Button v-if="wishlistProducts.length > 0" variant="ghost" size="sm" as-child>
+          <Button v-if="wishlistData && wishlistData.length > 0" variant="ghost" size="sm" as-child>
             <NuxtLink to="/profile/wishlist" class="flex items-center gap-1">
               Все товары
               <ArrowRight class="w-4 h-4" />
@@ -322,12 +351,12 @@ useHead({
       </CardHeader>
       <CardContent>
         <!-- Загрузка -->
-        <div v-if="isLoadingWishlist" class="grid grid-cols-4 gap-3">
+        <div v-if="isLoadingWishlistQuery" class="grid grid-cols-4 gap-3">
           <Skeleton v-for="i in 4" :key="i" class="aspect-square rounded-lg" />
         </div>
 
         <!-- Пусто -->
-        <div v-else-if="wishlistProducts.length === 0" class="text-center py-8">
+        <div v-else-if="!wishlistData || wishlistData.length === 0" class="text-center py-8">
           <Heart class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p class="text-muted-foreground mb-4">
             Список избранного пуст
@@ -377,7 +406,7 @@ useHead({
           <CardTitle class="text-lg">
             Бонусные операции
           </CardTitle>
-          <Button v-if="bonusTransactions.length > 0" variant="ghost" size="sm" as-child>
+          <Button v-if="bonusData && bonusData.length > 0" variant="ghost" size="sm" as-child>
             <NuxtLink to="/profile/bonus" class="flex items-center gap-1">
               История
               <ArrowRight class="w-4 h-4" />
@@ -387,13 +416,13 @@ useHead({
       </CardHeader>
       <CardContent>
         <!-- Загрузка -->
-        <div v-if="isLoadingBonuses" class="space-y-3">
+        <div v-if="isLoadingBonusQuery" class="space-y-3">
           <Skeleton class="h-12 w-full" />
           <Skeleton class="h-12 w-full" />
         </div>
 
         <!-- Пусто -->
-        <div v-else-if="bonusTransactions.length === 0" class="text-center py-8">
+        <div v-else-if="!bonusData || bonusData.length === 0" class="text-center py-8">
           <Star class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p class="text-muted-foreground">
             Пока нет операций с бонусами
@@ -403,7 +432,7 @@ useHead({
         <!-- Список -->
         <div v-else class="space-y-2">
           <div
-            v-for="tx in bonusTransactions"
+            v-for="tx in bonusData"
             :key="tx.id"
             class="flex items-center justify-between p-3 rounded-lg bg-muted/50"
           >

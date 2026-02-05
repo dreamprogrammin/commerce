@@ -14,7 +14,7 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
   const isLoading = ref(false)
 
   // --- ЧТЕНИЕ (Загрузка избранного) ---
-  async function fetchWishlistProducts() {
+  async function fetchWishlistProducts(limit?: number) {
     // Выходим, если нет залогиненного пользователя
     if (!authStore.isLoggedIn || !authStore.user?.id) {
       wishlistProductIds.value = []
@@ -24,16 +24,28 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
 
     isLoading.value = true
     try {
-      // 1. Получаем ID всех избранных товаров пользователя
-      const { data: idsData, error: idsError } = await supabase
+      // 1. Получаем ID избранных товаров пользователя (с лимитом если указан)
+      let query = supabase
         .from('wishlist')
         .select('product_id')
         .eq('user_id', authStore.user.id)
+        .order('created_at', { ascending: false })
+
+      // ✅ Добавляем лимит если передан (для оптимизации)
+      if (limit) {
+        query = query.limit(limit)
+      }
+
+      const { data: idsData, error: idsError } = await query
       if (idsError)
         throw idsError
 
       const productIds = idsData.map(item => item.product_id)
-      wishlistProductIds.value = productIds
+
+      // Если лимит не задан, обновляем полный список ID
+      if (!limit) {
+        wishlistProductIds.value = productIds
+      }
 
       // 2. Если есть ID, загружаем сами товары
       if (productIds.length > 0) {
