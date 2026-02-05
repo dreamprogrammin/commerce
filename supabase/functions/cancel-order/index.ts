@@ -105,28 +105,29 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Таблица заказа: ${tableName}`)
 
-    // Получаем данные заказа перед отменой (для информации о бонусах и telegram_message_id)
-    let orderData: { user_id?: string; bonuses_spent?: number; bonuses_awarded?: number; status: string; telegram_message_id?: string | null } | null = null
+    // Получаем данные заказа перед отменой (для информации о бонусах, telegram_message_id и cancelled_by)
+    let orderData: { user_id?: string; bonuses_spent?: number; bonuses_awarded?: number; status: string; telegram_message_id?: string | null; cancelled_by?: string | null } | null = null
     if (tableName === 'orders') {
       const { data } = await supabase
         .from('orders')
-        .select('user_id, bonuses_spent, bonuses_awarded, status, telegram_message_id')
+        .select('user_id, bonuses_spent, bonuses_awarded, status, telegram_message_id, cancelled_by')  // ✅ Добавлен cancelled_by
         .eq('id', orderId)
         .single()
       orderData = data
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, telegram_message_id')
+        .select('status, telegram_message_id, cancelled_by')  // ✅ Добавлен cancelled_by
         .eq('id', orderId)
         .single()
-      orderData = data as { status: string; telegram_message_id?: string | null } | null
+      orderData = data as { status: string; telegram_message_id?: string | null; cancelled_by?: string | null } | null
     }
 
-    // Вызываем функцию отмены заказа с указанием таблицы
+    // ✅ Вызываем функцию отмены заказа с указанием таблицы и cancelled_by='admin'
     const { data, error } = await supabase.rpc('cancel_order', {
       p_order_id: orderId,
-      p_table_name: tableName
+      p_table_name: tableName,
+      p_cancelled_by: 'admin'  // Отмена через Telegram = admin
     })
 
     if (error) {
@@ -153,8 +154,16 @@ Deno.serve(async (req) => {
       if (botToken && chatId) {
         console.log(`📱 Обновление Telegram сообщения ${orderData.telegram_message_id}...`)
 
+        // ✅ Определяем кто отменил заказ (проверяем поле cancelled_by)
+        let cancelledByText = 'администратором'
+        if (orderData.cancelled_by === 'client') {
+          cancelledByText = 'клиентом'
+        } else if (orderData.cancelled_by === 'system') {
+          cancelledByText = 'автоматически'
+        }
+
         // Обновляем текст и удаляем кнопки одним запросом
-        const updatedText = `❌ *ЗАКАЗ ОТМЕНЕН*\n\n🔔 Заказ №${orderId.slice(-6)} был отменен администратором\n\n_Статус: cancelled_\n\n⚠️ Все действия с этим заказом недоступны`
+        const updatedText = `❌ *ЗАКАЗ ОТМЕНЕН*\n\n🔔 Заказ №${orderId.slice(-6)} был отменен ${cancelledByText}\n\n_Статус: cancelled_\n\n⚠️ Все действия с этим заказом недоступны`
 
         const updateResult = await updateTelegramMessage(
           botToken,

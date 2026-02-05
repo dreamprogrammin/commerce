@@ -208,10 +208,11 @@ export function useUserOrders() {
     }
 
     try {
-      // Вызываем RPC функцию отмены заказа
+      // ✅ Вызываем RPC функцию отмены заказа с указанием что отменяет клиент
       const { data, error: cancelError } = await supabase.rpc('cancel_order', {
         p_order_id: orderId,
         p_table_name: 'orders', // Пользовательский заказ
+        p_cancelled_by: 'client', // ✅ Отмена клиентом
       })
 
       if (cancelError) {

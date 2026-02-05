@@ -79,16 +79,52 @@ async function fetchOrder() {
   }
 }
 
-// Подписка на обновления
+// ✅ Подписка на обновления конкретного заказа в realtime
 let channel: any = null
 
 onMounted(async () => {
   await fetchOrder()
-  channel = subscribeToOrderUpdates()
+
+  // ✅ Подписываемся на изменения КОНКРЕТНОГО заказа
+  channel = supabase
+    .channel(`order:${orderId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+        filter: `id=eq.${orderId}`,
+      },
+      async (payload) => {
+        console.log('🔄 Realtime: статус заказа изменён', payload)
+
+        // ✅ Обновляем локальный order.value
+        if (order.value) {
+          const updatedFields = payload.new as Partial<typeof order.value>
+
+          // Обновляем только изменённые поля, сохраняя order_items
+          order.value = {
+            ...order.value,
+            ...updatedFields,
+          }
+
+          // Показываем уведомление если изменился статус
+          if (payload.old.status !== payload.new.status) {
+            const statusLabel = getStatusLabel(payload.new.status)
+            console.log(`📢 Статус изменён на: ${statusLabel}`)
+          }
+        }
+      },
+    )
+    .subscribe()
+
+  console.log('✅ Подписка на realtime обновления заказа активирована')
 })
 
 onUnmounted(() => {
   if (channel) {
+    console.log('🔌 Отписка от realtime')
     channel.unsubscribe()
   }
 })

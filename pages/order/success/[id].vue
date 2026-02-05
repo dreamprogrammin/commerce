@@ -8,7 +8,8 @@ const router = useRouter()
 const user = useSupabaseUser()
 const cartStore = useCartStore()
 
-const orderId = computed(() => (route.params.id as string).substring(0, 8)) // Показываем только часть
+// ✅ ИСПРАВЛЕНИЕ: Используем slice(-6) для консистентности с другими страницами
+const orderId = computed(() => (route.params.id as string).slice(-6)) // Последние 6 символов
 const fullOrderId = computed(() => route.params.id as string)
 
 const personalizationStore = usePersonalizationStore()
