@@ -130,9 +130,10 @@ Deno.serve(async (req) => {
       },
     })
 
-    // Получаем информацию о заказе
+    // Получаем информацию о заказе (включая cancelled_by)
     let orderInfo = ''
     let assignedAdmin = ''
+    let cancelledBy = ''
 
     if (table === 'orders') {
       const { data: orderData } = await supabase
@@ -143,6 +144,7 @@ Deno.serve(async (req) => {
           bonuses_awarded,
           assigned_admin_name,
           assigned_admin_username,
+          cancelled_by,
           profile:profiles(first_name, last_name)
         `)
         .eq('id', record.id)
@@ -169,11 +171,21 @@ Deno.serve(async (req) => {
             assignedAdmin += ` (@${adminUsername})`
           }
         }
+
+        // ✅ Информация о том кто отменил (для cancelled статуса)
+        if (record.status === 'cancelled' && orderData.cancelled_by) {
+          const cancelledByMap: Record<string, string> = {
+            'client': '👤 клиентом',
+            'admin': '👨‍💼 администратором',
+            'system': '🤖 автоматически'
+          }
+          cancelledBy = `\n⚠️ *Отменён:* ${cancelledByMap[orderData.cancelled_by] || orderData.cancelled_by}`
+        }
       }
     } else {
       const { data: guestData } = await supabase
         .from('guest_checkouts')
-        .select('final_amount, guest_name, assigned_admin_name, assigned_admin_username')
+        .select('final_amount, guest_name, assigned_admin_name, assigned_admin_username, cancelled_by')
         .eq('id', record.id)
         .single()
 
@@ -191,11 +203,21 @@ Deno.serve(async (req) => {
             assignedAdmin += ` (@${adminUsername})`
           }
         }
+
+        // ✅ Информация о том кто отменил (для cancelled статуса)
+        if (record.status === 'cancelled' && guestData.cancelled_by) {
+          const cancelledByMap: Record<string, string> = {
+            'client': '👤 клиентом',
+            'admin': '👨‍💼 администратором',
+            'system': '🤖 автоматически'
+          }
+          cancelledBy = `\n⚠️ *Отменён:* ${cancelledByMap[guestData.cancelled_by] || guestData.cancelled_by}`
+        }
       }
     }
 
-    // Формируем обновленное сообщение
-    const updatedText = `${statusEmoji} *${statusText}*\n\n🔔 Заказ №${record.id.slice(-6)}${orderInfo}${assignedAdmin}\n\n_Статус: ${record.status}_\n\n${statusDescription}\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+    // ✅ Формируем обновленное сообщение с информацией о том кто отменил
+    const updatedText = `${statusEmoji} *${statusText}*\n\n🔔 Заказ №${record.id.slice(-6)}${orderInfo}${assignedAdmin}${cancelledBy}\n\n_Статус: ${record.status}_\n\n${statusDescription}\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
     console.log('📝 Текст обновления:')
     console.log(updatedText)

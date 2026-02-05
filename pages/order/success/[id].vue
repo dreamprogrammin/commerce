@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { CheckCircle2, Package, ShoppingCart, Trash2 } from 'lucide-vue-next'
+import { CheckCircle2, Package, ShoppingCart, Trash2, XCircle } from 'lucide-vue-next'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { useUserOrders } from '@/composables/orders/useUserOrders'
 
 const route = useRoute()
 const router = useRouter()
 const user = useSupabaseUser()
+const supabase = useSupabaseClient()
 const cartStore = useCartStore()
 
 // ✅ ИСПРАВЛЕНИЕ: Используем slice(-6) для консистентности с другими страницами
@@ -20,14 +22,56 @@ const isAuthenticated = computed(() => !!user.value)
 // Для гостей: проверяем, есть ли товары в корзине
 const hasCartItems = computed(() => cartStore.items.length > 0)
 
+// ✅ Функционал отмены заказа
+const { cancelOrder, canCancelOrder } = useUserOrders()
+const orderStatus = ref<string | null>(null)
+const isCancelling = ref(false)
+const showCancelDialog = ref(false)
+
+// Загружаем статус заказа
+async function fetchOrderStatus() {
+  if (!isAuthenticated.value) return
+
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('status')
+      .eq('id', fullOrderId.value)
+      .single()
+
+    if (error) throw error
+    orderStatus.value = data.status
+  } catch (err) {
+    console.error('Ошибка загрузки статуса:', err)
+  }
+}
+
+// Обработчик отмены заказа
+async function handleCancelOrder() {
+  isCancelling.value = true
+  const result = await cancelOrder(fullOrderId.value)
+
+  if (result.success) {
+    orderStatus.value = 'cancelled'
+    showCancelDialog.value = false
+  }
+
+  isCancelling.value = false
+}
+
 // Очистка корзины для гостя
 function clearGuestCart() {
   cartStore.clearCart()
   router.push('/')
 }
 
-onMounted(() => {
+onMounted(async () => {
   personalizationStore.invalidate()
+
+  // Загружаем статус заказа для авторизованных пользователей
+  if (isAuthenticated.value) {
+    await fetchOrderStatus()
+  }
 })
 </script>
 
@@ -128,13 +172,25 @@ onMounted(() => {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent class="space-y-3">
         <NuxtLink :to="`/profile/order/${fullOrderId}`">
           <Button class="w-full" size="lg" variant="default">
             <Package class="w-4 h-4 mr-2" />
             Перейти к заказу
           </Button>
         </NuxtLink>
+
+        <!-- ✅ Кнопка отмены заказа (только для new и confirmed) -->
+        <Button
+          v-if="orderStatus && canCancelOrder(orderStatus)"
+          class="w-full"
+          size="lg"
+          variant="outline"
+          @click="showCancelDialog = true"
+        >
+          <XCircle class="w-4 h-4 mr-2" />
+          Отменить заказ
+        </Button>
       </CardContent>
     </Card>
 
@@ -146,5 +202,32 @@ onMounted(() => {
         </Button>
       </NuxtLink>
     </div>
+
+    <!-- ✅ Диалог подтверждения отмены -->
+    <AlertDialog v-model:open="showCancelDialog">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Отменить заказ?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Вы уверены, что хотите отменить заказ №{{ orderId }}?
+            <br><br>
+            Потраченные бонусы будут возвращены на ваш счёт.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isCancelling">
+            Нет, оставить
+          </AlertDialogCancel>
+          <AlertDialogAction
+            :disabled="isCancelling"
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            @click="handleCancelOrder"
+          >
+            <span v-if="isCancelling">Отменяем...</span>
+            <span v-else>Да, отменить</span>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
