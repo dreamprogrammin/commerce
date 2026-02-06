@@ -970,7 +970,7 @@ useHead(() => ({
                   !isDescriptionExpanded && 'line-clamp-2',
                 ]"
               >
-                {{ product.description.replace(/<[^>]*>/g, '').substring(0, 200) }}{{ product.description.length > 200 && !isDescriptionExpanded ? '...' : '' }}
+                {{ isDescriptionExpanded ? product.description.replace(/<[^>]*>/g, '') : product.description.replace(/<[^>]*>/g, '').substring(0, 200) + (product.description.length > 200 ? '...' : '') }}
               </div>
               <button
                 v-if="product.description.length > 200"
