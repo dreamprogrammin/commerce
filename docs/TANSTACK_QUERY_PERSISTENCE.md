@@ -40,11 +40,13 @@ persistQueryClient({
 - **maxAge**: `24 часа` - данные старше удаляются из localStorage
 - **throttleTime**: `1 секунда` - сохранение не чаще раза в секунду (производительность)
 - **key**: `tanstack-query-cache` - ключ в localStorage
-- **shouldDehydrateQuery**: Сохраняем только успешные запросы (игнорируем ошибки)
+- **shouldDehydrateQuery**: Сохраняем только успешные запросы **публичных данных**
+  - ✅ Сохраняются: `home-*`, `catalog-*`, `category-*`, `global-*` (публичные данные)
+  - ❌ НЕ сохраняются: `user-*`, `profile-*` (приватные данные пользователя)
 
 ## Что кешируется
 
-### Автоматически сохраняется:
+### Автоматически сохраняется в localStorage:
 
 - ✅ Слайды главной страницы (`global-slides`)
 - ✅ Популярные категории (`home-popular-categories`)
@@ -52,20 +54,35 @@ persistQueryClient({
 - ✅ Популярные товары (`home-popular`)
 - ✅ Новые поступления (`home-newest`)
 - ✅ Баннеры (`home-banners`)
-- ✅ Избранное пользователя
-- ✅ Все запросы через TanStack Query
+- ✅ Каталог товаров (`catalog-products`)
+- ✅ Все публичные запросы через TanStack Query
 
-### Не сохраняется:
+### НЕ сохраняется в localStorage:
 
+- ❌ **Приватные данные пользователя** (`user-*`, `profile-*`):
+  - Заказы (`user-orders`, `user-orders-recent`)
+  - Избранное (`user-wishlist`, `user-wishlist-recent`)
+  - Бонусы (`user-bonus`, `user-bonus-recent`)
+  - Профиль (`profile-*`)
 - ❌ Неудачные запросы (ошибки)
 - ❌ Данные старше 24 часов
 - ❌ Данные в процессе загрузки
 
 ## Приоритеты загрузки
 
+### Для публичных данных (`home-*`, `catalog-*`, etc.):
+
 1. **SSR state** (если есть) - данные с сервера
 2. **localStorage cache** - сохранённый кеш
 3. **API request** - свежие данные с сервера
+
+### Для приватных данных (`user-*`, `profile-*`):
+
+1. **SSR state** (если есть) - данные с сервера (но `/profile/**` отключен SSR)
+2. **Pinia store cache** - данные из Pinia (с `pinia-plugin-persistedstate`)
+3. **API request** - свежие данные с сервера
+
+⚠️ **Важно**: Приватные данные НЕ используют TanStack Query localStorage persistence из соображений безопасности
 
 ## Проверка работы
 
@@ -136,10 +153,13 @@ queryClient.invalidateQueries({ queryKey: ['home-popular'] })
 
 ## Best Practices
 
-1. **Не кешируй приватные данные** - профиль, заказы используют Pinia persistence
-2. **Используй правильный staleTime** - 5 минут для public данных
+1. **Приватные данные автоматически исключены** - query с ключами `user-*` и `profile-*` НЕ сохраняются в localStorage (используют только Pinia persistence)
+2. **Используй правильный staleTime** - 5 минут для публичных данных, 1-2 минуты для приватных
 3. **Инвалидируй после мутаций** - обновляй кеш после изменений
 4. **Мониторь размер localStorage** - не храни большие изображения
+5. **Именование queryKeys**:
+   - Публичные данные: `home-*`, `catalog-*`, `category-*`, `global-*`
+   - Приватные данные: `user-*`, `profile-*` (не попадут в localStorage)
 
 ## Связанные файлы
 
