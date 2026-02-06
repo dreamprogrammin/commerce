@@ -40,33 +40,37 @@ persistQueryClient({
 - **maxAge**: `24 часа` - данные старше удаляются из localStorage
 - **throttleTime**: `1 секунда` - сохранение не чаще раза в секунду (производительность)
 - **key**: `tanstack-query-cache` - ключ в localStorage
-- **shouldDehydrateQuery**: Сохраняем только успешные запросы **публичных данных**
-  - ✅ Сохраняются: `home-*`, `catalog-*`, `category-*`, `global-*` (публичные данные)
-  - ❌ НЕ сохраняются: `user-*`, `profile-*` (приватные данные пользователя)
+- **shouldDehydrateQuery**: Умное кеширование с контролем
+  - ✅ **Публичные данные** (`home-*`, `catalog-*`, `category-*`, `global-*`) - кешируются всегда
+  - ⚠️ **Приватные данные** (`user-*`, `profile-*`) - кешируются только с флагом `meta: { allowCache: true }`
+  - ❌ Без флага приватные данные НЕ попадают в localStorage
 
 ## Что кешируется
 
-### Автоматически сохраняется в localStorage:
+### ✅ Автоматически сохраняется в localStorage:
 
-- ✅ Слайды главной страницы (`global-slides`)
-- ✅ Популярные категории (`home-popular-categories`)
-- ✅ Рекомендации (`home-recommendations`)
-- ✅ Популярные товары (`home-popular`)
-- ✅ Новые поступления (`home-newest`)
-- ✅ Баннеры (`home-banners`)
-- ✅ Каталог товаров (`catalog-products`)
-- ✅ Все публичные запросы через TanStack Query
+**Публичные данные** (всегда):
+- Слайды главной страницы (`global-slides`)
+- Популярные категории (`home-popular-categories`)
+- Рекомендации (`home-recommendations`)
+- Популярные товары (`home-popular`)
+- Новые поступления (`home-newest`)
+- Баннеры (`home-banners`)
+- Каталог товаров (`catalog-products`)
 
-### НЕ сохраняется в localStorage:
+**Приватные данные** (только с флагом `meta: { allowCache: true }`):
+- ✅ Последние заказы (`user-orders-recent`) - страница `/profile/index.vue`
+- ✅ Последнее избранное (`user-wishlist-recent`) - страница `/profile/index.vue`
+- ✅ Последние бонусы (`user-bonus-recent`) - страница `/profile/index.vue`
 
-- ❌ **Приватные данные пользователя** (`user-*`, `profile-*`):
-  - Заказы (`user-orders`, `user-orders-recent`)
-  - Избранное (`user-wishlist`, `user-wishlist-recent`)
-  - Бонусы (`user-bonus`, `user-bonus-recent`)
-  - Профиль (`profile-*`)
-- ❌ Неудачные запросы (ошибки)
-- ❌ Данные старше 24 часов
-- ❌ Данные в процессе загрузки
+### ❌ НЕ сохраняется в localStorage:
+
+- Полный список заказов (`user-orders`) - без флага allowCache
+- Полный список избранного (`user-wishlist`) - без флага allowCache
+- Полная история бонусов (`user-bonus`) - без флага allowCache
+- Неудачные запросы (ошибки)
+- Данные старше 24 часов
+- Данные в процессе загрузки
 
 ## Приоритеты загрузки
 
@@ -123,11 +127,46 @@ persistQueryClient({
 localStorage.removeItem('tanstack-query-cache')
 ```
 
+## Использование allowCache для приватных данных
+
+### ✅ Правильное использование:
+
+```typescript
+// Страница профиля - краткая сводка (быстрая загрузка)
+const { data: ordersData } = useQuery({
+  queryKey: ['user-orders-recent', 3], // Только последние 3 заказа
+  queryFn: async () => await fetchOrders(3),
+  staleTime: 2 * 60 * 1000, // 2 минуты
+  meta: { allowCache: true }, // ✅ Кешируем для быстрой загрузки dashboard
+})
+```
+
+### ❌ Неправильное использование:
+
+```typescript
+// Полный список заказов - должен быть свежим
+const { data: allOrders } = useQuery({
+  queryKey: ['user-orders-full'],
+  queryFn: async () => await fetchAllOrders(),
+  staleTime: 5 * 60 * 1000,
+  meta: { allowCache: true }, // ❌ НЕ кешируй полные списки приватных данных
+})
+```
+
+### Где использовать allowCache:
+
+| Страница | Query | allowCache | Причина |
+|----------|-------|------------|---------|
+| `/profile` (dashboard) | `user-orders-recent` (3 шт) | ✅ YES | Быстрая загрузка preview |
+| `/profile` (dashboard) | `user-wishlist-recent` (4 шт) | ✅ YES | Быстрая загрузка preview |
+| `/profile/order` (список) | `user-orders-full` | ❌ NO | Свежие данные важнее |
+| `/profile/bonus` (история) | `user-bonus-history` | ❌ NO | Финансовые данные всегда свежие |
+
 ## Обновление кеша
 
 ### Автоматически:
 
-- Каждые 5 минут (`staleTime`) - фоновое обновление
+- Каждые 1-5 минут (`staleTime`) - фоновое обновление
 - После мутаций (добавление в корзину, избранное) - инвалидация
 
 ### Вручную:
@@ -153,13 +192,25 @@ queryClient.invalidateQueries({ queryKey: ['home-popular'] })
 
 ## Best Practices
 
-1. **Приватные данные автоматически исключены** - query с ключами `user-*` и `profile-*` НЕ сохраняются в localStorage (используют только Pinia persistence)
-2. **Используй правильный staleTime** - 5 минут для публичных данных, 1-2 минуты для приватных
-3. **Инвалидируй после мутаций** - обновляй кеш после изменений
-4. **Мониторь размер localStorage** - не храни большие изображения
-5. **Именование queryKeys**:
-   - Публичные данные: `home-*`, `catalog-*`, `category-*`, `global-*`
-   - Приватные данные: `user-*`, `profile-*` (не попадут в localStorage)
+1. **Контроль кеширования приватных данных**:
+   - ✅ Публичные (`home-*`, `catalog-*`, etc.) - кешируются автоматически
+   - ⚠️ Приватные (`user-*`, `profile-*`) - добавляй `meta: { allowCache: true }` только где нужна быстрая загрузка
+   - ❌ Без флага приватные данные НЕ попадут в localStorage (безопасно по умолчанию)
+
+2. **Когда использовать allowCache для приватных данных**:
+   - ✅ Dashboard/главная профиля - краткая сводка (последние 3-5 записей)
+   - ✅ Preview данные - для быстрой загрузки UI
+   - ❌ Полные списки - пусть загружаются свежими с сервера
+   - ❌ Чувствительные данные - платежи, пароли, токены
+
+3. **Правильный staleTime**:
+   - 5 минут для публичных данных
+   - 1-2 минуты для приватных dashboard данных
+   - 30 секунд для критичных данных (баланс, статусы)
+
+4. **Инвалидируй после мутаций** - обновляй кеш после изменений
+
+5. **Мониторь размер localStorage** - не храни большие изображения или огромные списки
 
 ## Связанные файлы
 

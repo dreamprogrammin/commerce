@@ -47,18 +47,24 @@ export default defineNuxtPlugin((nuxt) => {
       persister,
       maxAge: 1000 * 60 * 60 * 24, // 24 часа - максимальный возраст кеша в localStorage
       dehydrateOptions: {
-        // ✅ Сохраняем только публичные данные (не приватные)
+        // ✅ Умное кеширование: публичные данные всегда, приватные - только с флагом
         shouldDehydrateQuery: (query) => {
-          // Проверяем queryKey (первый элемент массива)
-          const queryKey = query.queryKey[0] as string
+          // Только успешные запросы
+          if (query.state.status !== 'success')
+            return false
 
-          // ❌ НЕ сохраняем приватные данные пользователя
+          const queryKey = query.queryKey[0] as string
           const isPrivateData = queryKey?.startsWith('user-') || queryKey?.startsWith('profile-')
 
-          // ✅ Сохраняем только успешные запросы публичных данных
-          // Примеры публичных: home-popular, global-slides, catalog-products, category-*
-          // Примеры приватных (исключаем): user-orders, user-wishlist, user-bonus, profile-*
-          return query.state.status === 'success' && !isPrivateData
+          if (isPrivateData) {
+            // ⚠️ Приватные данные: кешируем только если явно разрешено через meta.allowCache
+            // Используется для ускорения страницы профиля (/pages/profile/index.vue)
+            return query.meta?.allowCache === true
+          }
+
+          // ✅ Публичные данные: кешируем всегда
+          // Примеры: home-popular, global-slides, catalog-products, category-*
+          return true
         },
       },
     })

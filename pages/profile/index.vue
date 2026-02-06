@@ -99,6 +99,7 @@ function getTransactionColor(type: string) {
 }
 
 // --- TanStack Query для кэширования ---
+// ✅ Кешируем в localStorage для мгновенной загрузки страницы профиля
 const { data: ordersData, isLoading: isLoadingOrdersQuery } = useQuery({
   queryKey: ['user-orders-recent', 3],
   queryFn: async () => {
@@ -108,6 +109,7 @@ const { data: ordersData, isLoading: isLoadingOrdersQuery } = useQuery({
   staleTime: 2 * 60 * 1000, // 2 минуты
   gcTime: 5 * 60 * 1000, // 5 минут
   enabled: computed(() => !!user.value),
+  meta: { allowCache: true }, // ✅ Разрешаем кеширование в localStorage для быстрой загрузки
 })
 
 const { data: wishlistData, isLoading: isLoadingWishlistQuery } = useQuery({
@@ -119,6 +121,7 @@ const { data: wishlistData, isLoading: isLoadingWishlistQuery } = useQuery({
   staleTime: 2 * 60 * 1000,
   gcTime: 5 * 60 * 1000,
   enabled: computed(() => !!user.value),
+  meta: { allowCache: true }, // ✅ Разрешаем кеширование в localStorage
 })
 
 const { data: bonusData, isLoading: isLoadingBonusQuery } = useQuery({
@@ -130,6 +133,7 @@ const { data: bonusData, isLoading: isLoadingBonusQuery } = useQuery({
   staleTime: 2 * 60 * 1000,
   gcTime: 5 * 60 * 1000,
   enabled: computed(() => !!user.value),
+  meta: { allowCache: true }, // ✅ Разрешаем кеширование в localStorage
 })
 
 // --- Инициализация ---
