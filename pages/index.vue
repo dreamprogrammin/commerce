@@ -718,6 +718,17 @@ useRobotsRule({ index: true, follow: true })
               <span><strong>Поддержка 24/7</strong> - всегда рады помочь</span>
             </li>
           </ul>
+          <div class="mt-6 pt-6 border-t">
+            <div class="flex items-center gap-3">
+              <Icon name="lucide:phone" class="w-6 h-6 text-primary flex-shrink-0" />
+              <div>
+                <p class="text-sm text-muted-foreground">Свяжитесь с нами:</p>
+                <a href="tel:+77771243843" class="text-lg font-semibold text-foreground hover:text-primary transition-colors">
+                  +7 (777) 124-38-43
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
