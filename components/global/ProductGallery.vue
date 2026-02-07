@@ -98,7 +98,7 @@ function getMainUrl(imagePath: string) {
               <img
                 :src="getMainUrl(image.image_url) || undefined"
                 :alt="image.alt_text || `Изображение товара ${index + 1}`"
-                class="w-full h-full object-cover"
+                class="w-full h-full object-contain"
                 loading="lazy"
               >
             </div>
