@@ -189,12 +189,6 @@ export const useCartStore = defineStore('cartStore', () => {
           throw new Error('Заполните все обязательные поля: имя, email и телефон')
         }
 
-        // DEBUG: Логируем данные гостя перед отправкой
-        console.log('🛒 Guest checkout data:', {
-          guestInfo: orderData.guestInfo,
-          phone: orderData.guestInfo.phone,
-        })
-
         const { data, error } = await supabase.rpc('create_guest_checkout', {
           p_cart_items: cartItems,
           p_guest_info: orderData.guestInfo,
