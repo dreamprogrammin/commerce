@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ArrowDownCircle, ArrowRight, ArrowUpCircle, Gift, Heart, Package, ShoppingBag, Star, User } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
+import { useQuery } from '@tanstack/vue-query'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
