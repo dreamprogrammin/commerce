@@ -91,7 +91,7 @@ export function useUserOrders() {
               product_images!inner(
                 image_url,
                 blur_placeholder,
-                sort_order
+                display_order
               )
             )
           )

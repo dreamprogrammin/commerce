@@ -14,7 +14,7 @@ ON public.wishlist (user_id, created_at DESC);
 
 -- ✅ Индекс для быстрого получения первого изображения товара
 CREATE INDEX IF NOT EXISTS idx_product_images_product_sort
-ON public.product_images (product_id, sort_order ASC);
+ON public.product_images (product_id, display_order ASC);
 
 -- ✅ Индекс для order_items с внешними ключами (для JOIN оптимизации)
 CREATE INDEX IF NOT EXISTS idx_order_items_order_product
@@ -27,7 +27,7 @@ COMMENT ON INDEX idx_wishlist_user_created IS
 'Оптимизирует запросы избранных товаров пользователя с сортировкой';
 
 COMMENT ON INDEX idx_product_images_product_sort IS
-'Оптимизирует получение первого изображения товара по sort_order';
+'Оптимизирует получение первого изображения товара по display_order';
 
 COMMENT ON INDEX idx_order_items_order_product IS
 'Оптимизирует JOIN между заказами и товарами';

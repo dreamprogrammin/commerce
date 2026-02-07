@@ -19,7 +19,11 @@ export function useOrderRealtime() {
   const config = useRuntimeConfig()
 
   // 🔥 Отключаем realtime для локальной разработки (избегаем ошибок WebSocket)
-  const isLocal = config.public.supabase.url.includes('127.0.0.1') || config.public.supabase.url.includes('localhost')
+  const isLocal = config.public.supabase.url.includes('127.0.0.1')
+    || config.public.supabase.url.includes('localhost')
+
+  // 🔥 Проверяем переменную окружения для отключения Realtime
+  const isRealtimeDisabled = process.env.NUXT_PUBLIC_DISABLE_REALTIME === 'true'
 
   /**
    * Подписаться на изменения заказов
@@ -27,6 +31,11 @@ export function useOrderRealtime() {
   function subscribeToOrders() {
     if (isLocal) {
       console.log('⚠️ Realtime disabled for local development')
+      return
+    }
+
+    if (isRealtimeDisabled) {
+      console.log('⚠️ Realtime disabled via environment variable')
       return
     }
 
@@ -38,7 +47,12 @@ export function useOrderRealtime() {
     console.log('🔔 Subscribing to orders realtime updates...')
 
     ordersChannel = supabase
-      .channel('orders-realtime')
+      .channel('orders-realtime', {
+        config: {
+          broadcast: { self: false },
+          presence: { key: '' },
+        },
+      })
       .on(
         'postgres_changes',
         {
@@ -75,12 +89,19 @@ export function useOrderRealtime() {
           }, 5000)
         },
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           console.log('✅ Subscribed to orders channel')
         }
         else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error subscribing to orders channel')
+          console.error('❌ Error subscribing to orders channel:', err)
+          // Graceful degradation - приложение продолжит работать без realtime
+        }
+        else if (status === 'TIMED_OUT') {
+          console.warn('⚠️ Realtime connection timed out')
+        }
+        else if (status === 'CLOSED') {
+          console.warn('⚠️ Realtime channel closed')
         }
       })
   }
@@ -94,6 +115,11 @@ export function useOrderRealtime() {
       return
     }
 
+    if (isRealtimeDisabled) {
+      console.log('⚠️ Realtime disabled via environment variable')
+      return
+    }
+
     if (guestCheckoutsChannel) {
       console.warn('⚠️ Already subscribed to guest checkouts channel')
       return
@@ -102,7 +128,12 @@ export function useOrderRealtime() {
     console.log('🔔 Subscribing to guest checkouts realtime updates...')
 
     guestCheckoutsChannel = supabase
-      .channel('guest-checkouts-realtime')
+      .channel('guest-checkouts-realtime', {
+        config: {
+          broadcast: { self: false },
+          presence: { key: '' },
+        },
+      })
       .on(
         'postgres_changes',
         {
@@ -138,12 +169,19 @@ export function useOrderRealtime() {
           }, 5000)
         },
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           console.log('✅ Subscribed to guest checkouts channel')
         }
         else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error subscribing to guest checkouts channel')
+          console.error('❌ Error subscribing to guest checkouts channel:', err)
+          // Graceful degradation - приложение продолжит работать без realtime
+        }
+        else if (status === 'TIMED_OUT') {
+          console.warn('⚠️ Realtime connection timed out')
+        }
+        else if (status === 'CLOSED') {
+          console.warn('⚠️ Realtime channel closed')
         }
       })
   }
