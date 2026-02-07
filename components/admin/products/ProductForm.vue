@@ -724,88 +724,6 @@ const seoKeywordsString = computed({
   },
 })
 
-// --- 15. АВТО-ВЫБОР ДИАПАЗОНА ДЕТАЛЕЙ ---
-
-/**
- * Определяет в какой диапазон попадает количество деталей
- * Поддерживает форматы: "0-50", "50-100 деталей", "500+" и т.д.
- */
-function findMatchingRangeOption(pieceCount: number, options: { id: number, value: string }[]): number | null {
-  for (const option of options) {
-    const rangeText = option.value.toLowerCase()
-
-    // Формат "500+" или "500 +"
-    const plusMatch = rangeText.match(/^(\d+)\s*\+/)
-    if (plusMatch) {
-      const minValue = Number.parseInt(plusMatch[1], 10)
-      if (pieceCount >= minValue) {
-        return option.id
-      }
-      continue
-    }
-
-    // Формат "0-50" или "50-100 деталей"
-    const rangeMatch = rangeText.match(/^(\d+)\s*[-–—]\s*(\d+)/)
-    if (rangeMatch) {
-      const minValue = Number.parseInt(rangeMatch[1], 10)
-      const maxValue = Number.parseInt(rangeMatch[2], 10)
-      if (pieceCount >= minValue && pieceCount <= maxValue) {
-        return option.id
-      }
-      continue
-    }
-  }
-
-  return null
-}
-
-/**
- * Автоматически выбирает диапазон деталей при изменении piece_count
- */
-watch(() => formData.value.piece_count, (newPieceCount) => {
-  if (!newPieceCount || newPieceCount <= 0) {
-    return
-  }
-
-  console.log('🔍 piece_count изменён:', newPieceCount)
-  console.log('📋 Все атрибуты категории:', categoryAttributes.value.map(a => ({
-    id: a.id,
-    name: a.name,
-    display_type: a.display_type,
-    options: a.attribute_options?.length,
-  })))
-
-  // Находим атрибут типа number_range
-  const numberRangeAttr = categoryAttributes.value.find(
-    attr => attr.display_type === 'number_range',
-  )
-
-  if (!numberRangeAttr) {
-    console.log('⚠️ Атрибут типа number_range не найден в категории')
-    return
-  }
-
-  if (!numberRangeAttr.attribute_options) {
-    console.log('⚠️ У атрибута нет опций')
-    return
-  }
-
-  console.log('✅ Найден атрибут:', numberRangeAttr.name, 'с опциями:', numberRangeAttr.attribute_options)
-
-  // Ищем подходящий диапазон
-  const matchingOptionId = findMatchingRangeOption(
-    newPieceCount,
-    numberRangeAttr.attribute_options,
-  )
-
-  if (matchingOptionId !== null) {
-    productAttributeValues.value[numberRangeAttr.id] = matchingOptionId
-    console.log(`🎯 Авто-выбран диапазон для ${newPieceCount} деталей, option_id:`, matchingOptionId)
-  }
-  else {
-    console.log('⚠️ Подходящий диапазон не найден для значения:', newPieceCount)
-  }
-})
 </script>
 
 <template>
@@ -1331,18 +1249,18 @@ watch(() => formData.value.piece_count, (newPieceCount) => {
 
           <div>
             <Label for="piece_count" class="flex items-center gap-2">
-              <Icon name="lucide:hash" class="w-4 h-4 text-muted-foreground" />
+              <Icon name="lucide:puzzle" class="w-4 h-4 text-muted-foreground" />
               Количество деталей
             </Label>
             <Input
               id="piece_count"
               v-model.number="pieceCountValue"
               type="number"
-              placeholder="Например: 75"
+              placeholder="Например: 175"
               min="1"
             />
             <p class="text-xs text-muted-foreground mt-1">
-              💡 Диапазон деталей выберется автоматически
+              Для конструкторов. Используется в фильтрах.
             </p>
           </div>
 

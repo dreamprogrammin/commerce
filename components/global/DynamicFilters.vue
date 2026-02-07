@@ -9,6 +9,7 @@ const props = defineProps({
     type: Object as PropType<{
       subCategoryIds: string[]
       price: [number, number]
+      pieceCount: [number, number] | null
       brandIds: string[]
       productLineIds: string[]
       materialIds: string[]
@@ -21,6 +22,10 @@ const props = defineProps({
   priceRange: {
     type: Object as PropType<{ min: number, max: number }>,
     required: true,
+  },
+  pieceCountRange: {
+    type: Object as PropType<{ min: number, max: number } | null>,
+    default: null,
   },
   availableBrands: {
     type: Array as PropType<BrandForFilter[]>,
@@ -54,6 +59,7 @@ const currentCategorySlug = computed(() => (route.params.slug as string[]).slice
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
 const localPrice = ref<[number, number]>([...props.modelValue.price])
+const localPieceCount = ref<[number, number] | null>(props.modelValue.pieceCount ? [...props.modelValue.pieceCount] : null)
 
 // Подсчет активных фильтров
 const activeFiltersCount = computed(() => {
@@ -69,6 +75,13 @@ const activeFiltersCount = computed(() => {
   if (props.modelValue.price[0] !== props.priceRange.min
     || props.modelValue.price[1] !== props.priceRange.max) {
     count += 1
+  }
+  // Фильтр по количеству деталей
+  if (props.pieceCountRange && props.modelValue.pieceCount) {
+    if (props.modelValue.pieceCount[0] !== props.pieceCountRange.min
+      || props.modelValue.pieceCount[1] !== props.pieceCountRange.max) {
+      count += 1
+    }
   }
   return count
 })
@@ -125,10 +138,17 @@ function commitPriceToFilters(newPrice: number[]) {
   }
 }
 
+function commitPieceCountToFilters(newPieceCount: number[]) {
+  if (Array.isArray(newPieceCount) && newPieceCount.length === 2) {
+    emit('update:modelValue', { ...props.modelValue, pieceCount: newPieceCount as [number, number] })
+  }
+}
+
 function resetFilters() {
   emit('update:modelValue', {
     subCategoryIds: [],
     price: [props.priceRange.min, props.priceRange.max],
+    pieceCount: props.pieceCountRange ? [props.pieceCountRange.min, props.pieceCountRange.max] : null,
     brandIds: [],
     productLineIds: [],
     materialIds: [],
@@ -144,6 +164,20 @@ watch(() => props.modelValue.price, (newVal) => {
 
 watch(() => props.priceRange, (newRange) => {
   localPrice.value = [newRange.min, newRange.max]
+}, { deep: true })
+
+// Синхронизируем локальное количество деталей с пропсами
+watch(() => props.modelValue.pieceCount, (newVal) => {
+  localPieceCount.value = newVal ? [...newVal] : null
+}, { deep: true })
+
+watch(() => props.pieceCountRange, (newRange) => {
+  if (newRange) {
+    localPieceCount.value = [newRange.min, newRange.max]
+  }
+  else {
+    localPieceCount.value = null
+  }
 }, { deep: true })
 </script>
 
@@ -509,6 +543,71 @@ watch(() => props.priceRange, (newRange) => {
               <Icon name="lucide:wallet" class="w-4 h-4 text-muted-foreground" />
               <h4 class="font-semibold text-sm">
                 Цена
+              </h4>
+            </div>
+            <div class="space-y-3 pt-2">
+              <Skeleton class="h-3 w-full" />
+              <Skeleton class="h-3 w-1/2" />
+            </div>
+          </div>
+        </template>
+      </ClientOnly>
+
+      <!-- 7. ФИЛЬТР ПО КОЛИЧЕСТВУ ДЕТАЛЕЙ (для конструкторов) -->
+      <ClientOnly v-if="pieceCountRange && localPieceCount">
+        <div class="space-y-3 pt-3 border-t">
+          <div class="flex items-center gap-2">
+            <Icon name="lucide:puzzle" class="w-4 h-4 text-muted-foreground" />
+            <h4 class="font-semibold text-sm">
+              Количество деталей
+            </h4>
+          </div>
+
+          <template v-if="isLoading">
+            <div class="space-y-3 pt-2">
+              <Skeleton class="h-3 w-full" />
+              <Skeleton class="h-3 w-1/2" />
+            </div>
+          </template>
+          <template v-else>
+            <div class="px-1 pt-2">
+              <Slider
+                v-model="localPieceCount"
+                :min="pieceCountRange.min"
+                :max="pieceCountRange.max"
+                :step="10"
+                @value-commit="commitPieceCountToFilters"
+              />
+            </div>
+            <div class="flex justify-between items-center gap-2">
+              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
+                <div class="text-[10px] text-muted-foreground mb-0.5">
+                  От
+                </div>
+                <div class="font-semibold text-xs">
+                  {{ localPieceCount[0] }} шт
+                </div>
+              </div>
+              <Icon name="lucide:minus" class="w-3 h-3 text-muted-foreground" />
+              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
+                <div class="text-[10px] text-muted-foreground mb-0.5">
+                  До
+                </div>
+                <div class="font-semibold text-xs">
+                  {{ localPieceCount[1] }} шт
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Fallback для SSR -->
+        <template #fallback>
+          <div class="space-y-3 pt-3 border-t">
+            <div class="flex items-center gap-2">
+              <Icon name="lucide:puzzle" class="w-4 h-4 text-muted-foreground" />
+              <h4 class="font-semibold text-sm">
+                Количество деталей
               </h4>
             </div>
             <div class="space-y-3 pt-2">

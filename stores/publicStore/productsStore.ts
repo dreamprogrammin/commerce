@@ -14,6 +14,7 @@ export const useProductsStore = defineStore('productsStore', () => {
   const allMaterials = ref<Material[]>([])
   const allCountries = ref<Country[]>([])
   const priceRangeByCategory = ref<Record<string, { min_price: number, max_price: number }>>({})
+  const pieceCountRangeByCategory = ref<Record<string, { min_count: number, max_count: number }>>({})
 
   // ============================================
   // 📦 МЕТОДЫ С КЭШИРОВАНИЕМ
@@ -249,6 +250,45 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
+  async function fetchPieceCountRangeForCategory(categorySlug: string): Promise<{ min_count: number, max_count: number } | null> {
+    if (!categorySlug || categorySlug === 'all') {
+      return null
+    }
+
+    // Проверяем кэш
+    if (pieceCountRangeByCategory.value[categorySlug]) {
+      return pieceCountRangeByCategory.value[categorySlug]
+    }
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_category_piece_count_range', { p_category_slug: categorySlug })
+        .overrideTypes<{ min_count: number, max_count: number }[]>()
+
+      if (error)
+        throw error
+
+      const range = data && data.length > 0 ? data[0] : null
+
+      // Если нет товаров с piece_count в категории - возвращаем null
+      if (!range || (range.min_count === null && range.max_count === null)) {
+        return null
+      }
+
+      const result = {
+        min_count: Number(range.min_count || 0),
+        max_count: Number(range.max_count || 1000),
+      }
+
+      pieceCountRangeByCategory.value[categorySlug] = result
+      return result
+    }
+    catch (error: any) {
+      console.error('Ошибка при получении диапазона деталей:', error)
+      return null
+    }
+  }
+
   // ============================================
   // 🧹 УПРАВЛЕНИЕ КЭШЕМ
   // ============================================
@@ -260,6 +300,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     allMaterials.value = []
     allCountries.value = []
     priceRangeByCategory.value = {}
+    pieceCountRangeByCategory.value = {}
     brands.value = []
     console.warn('🧹 All cache cleared')
   }
@@ -269,6 +310,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     delete productLinesByCategory.value[categorySlug]
     delete attributesByCategory.value[categorySlug]
     delete priceRangeByCategory.value[categorySlug]
+    delete pieceCountRangeByCategory.value[categorySlug]
     console.warn('🧹 Cache cleared for category:', categorySlug)
   }
 
@@ -316,6 +358,8 @@ export const useProductsStore = defineStore('productsStore', () => {
         p_material_ids: filters.materialIds,
         p_attributes: filters.attributes,
         p_product_line_ids: filters.productLineIds,
+        p_piece_count_min: filters.pieceCountMin,
+        p_piece_count_max: filters.pieceCountMax,
       })
 
       if (error)
@@ -639,6 +683,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     allMaterials,
     allCountries,
     priceRangeByCategory,
+    pieceCountRangeByCategory,
 
     // Методы
     fetchAllBrands,
@@ -655,6 +700,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     fetchAttributesForCategory,
     getProductById,
     fetchPriceRangeForCategory,
+    fetchPieceCountRangeForCategory,
     fetchAllMaterials,
     fetchAllCountries,
     searchProductsByQuery,

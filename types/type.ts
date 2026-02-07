@@ -149,6 +149,8 @@ export interface IProductFilters {
   productLineIds?: string[]
   priceMin?: number
   priceMax?: number
+  pieceCountMin?: number
+  pieceCountMax?: number
   sortBy?: SortByType
   materialIds?: string[]
   countryIds?: string[]

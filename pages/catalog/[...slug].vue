@@ -55,6 +55,7 @@ interface ActiveFilters {
   sortBy: SortByType
   subCategoryIds: string[]
   price: [number, number]
+  pieceCount: [number, number] | null
   brandIds: string[]
   productLineIds: string[]
   materialIds: string[]
@@ -66,6 +67,7 @@ const activeFilters = ref<ActiveFilters>({
   sortBy: getSortByFromQuery(route.query.sort_by),
   subCategoryIds: getArrayFromQuery(route.query.subcategories),
   price: [0, 50000],
+  pieceCount: null,
   brandIds: getArrayFromQuery(route.query.brands),
   productLineIds: getArrayFromQuery(route.query.lines),
   materialIds: getArrayFromQuery(route.query.materials),
@@ -118,6 +120,7 @@ const title = computed(() => {
 })
 
 const priceRange = ref({ min: 0, max: 50000 })
+const pieceCountRange = ref<{ min: number, max: number } | null>(null)
 
 // Получаем подкатегории из store
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
@@ -157,6 +160,14 @@ const activeFiltersCount = computed(() => {
     count += 1
   }
 
+  // Фильтр по количеству деталей
+  if (pieceCountRange.value && activeFilters.value.pieceCount) {
+    if (activeFilters.value.pieceCount[0] !== pieceCountRange.value.min
+      || activeFilters.value.pieceCount[1] !== pieceCountRange.value.max) {
+      count += 1
+    }
+  }
+
   return count
 })
 const canonicalUrl = computed(() => {
@@ -180,6 +191,8 @@ const catalogFilters = computed<IProductFilters>(() => {
     countryIds: activeFilters.value.countryIds.length > 0 ? activeFilters.value.countryIds : undefined,
     priceMin: activeFilters.value.price[0],
     priceMax: activeFilters.value.price[1],
+    pieceCountMin: activeFilters.value.pieceCount?.[0],
+    pieceCountMax: activeFilters.value.pieceCount?.[1],
     attributes: attributeFilters.length > 0 ? attributeFilters : undefined,
   }
 })
@@ -239,10 +252,11 @@ async function loadFilterData(slug: string) {
       productsStore.fetchAllMaterials(),
       productsStore.fetchAllCountries(),
       productsStore.fetchPriceRangeForCategory(slug),
+      productsStore.fetchPieceCountRangeForCategory(slug),
     ])
 
     // Обрабатываем успешные результаты
-    const [brandsResult, productLinesResult, attributesResult, materialsResult, countriesResult, priceRangeResult] = results
+    const [brandsResult, productLinesResult, attributesResult, materialsResult, countriesResult, priceRangeResult, pieceCountRangeResult] = results
 
     availableBrands.value = brandsResult.status === 'fulfilled' ? brandsResult.value : []
     availableProductLines.value = productLinesResult.status === 'fulfilled' ? productLinesResult.value : []
@@ -258,6 +272,10 @@ async function loadFilterData(slug: string) {
     const priceMax = priceRangeData.max_price
     priceRange.value = { min: priceMin, max: priceMax }
 
+    // Диапазон количества деталей (может быть null если в категории нет товаров с piece_count)
+    const pieceCountRangeData = pieceCountRangeResult.status === 'fulfilled' ? pieceCountRangeResult.value : null
+    pieceCountRange.value = pieceCountRangeData
+
     const newAttributeFilters: Record<string, any[]> = {}
     for (const attr of availableFilters.value) {
       const queryKey = `attr_${attr.slug}`
@@ -268,10 +286,15 @@ async function loadFilterData(slug: string) {
     const priceMinFromQuery = route.query.price_min ? Number(route.query.price_min) : priceMin
     const priceMaxFromQuery = route.query.price_max ? Number(route.query.price_max) : priceMax
 
+    // Диапазон деталей из query (если есть)
+    const pieceCountMinFromQuery = route.query.piece_count_min ? Number(route.query.piece_count_min) : pieceCountRangeData?.min
+    const pieceCountMaxFromQuery = route.query.piece_count_max ? Number(route.query.piece_count_max) : pieceCountRangeData?.max
+
     activeFilters.value = {
       sortBy: getSortByFromQuery(route.query.sort_by),
       subCategoryIds: getArrayFromQuery(route.query.subcategories),
       price: [priceMinFromQuery, priceMaxFromQuery],
+      pieceCount: pieceCountRangeData ? [pieceCountMinFromQuery ?? pieceCountRangeData.min, pieceCountMaxFromQuery ?? pieceCountRangeData.max] : null,
       brandIds: getArrayFromQuery(route.query.brands),
       productLineIds: getArrayFromQuery(route.query.lines),
       materialIds: getArrayFromQuery(route.query.materials),
@@ -1088,6 +1111,7 @@ useHead(() => {
             :available-brands="availableBrands"
             :available-product-lines="availableProductLines"
             :price-range="priceRange"
+            :piece-count-range="pieceCountRange"
             :available-materials="availableMaterials"
             :available-countries="availableCountries"
             :is-loading="isLoadingFilters"
@@ -1487,6 +1511,7 @@ useHead(() => {
         :available-brands="availableBrands"
         :available-product-lines="availableProductLines"
         :price-range="priceRange"
+        :piece-count-range="pieceCountRange"
         :available-materials="availableMaterials"
         :available-countries="availableCountries"
         :is-loading="isLoadingFilters"
