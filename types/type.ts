@@ -172,7 +172,7 @@ export type CategoryRow = Database['public']['Tables']['categories']['Row'] & {
   // 🆕 Meta-теги для поисковых систем
   meta_title?: string | null
   meta_description?: string | null
-  meta_keywords?: string | null
+  meta_keywords?: string[] | null
   // 🆕 Фильтры по брендам и линейкам
   allowed_brand_ids?: string[] | null
   allowed_product_line_ids?: string[] | null
@@ -188,7 +188,7 @@ export type CategoryInsert = Database['public']['Tables']['categories']['Insert'
   // 🆕 Meta-теги для поисковых систем
   meta_title?: string | null
   meta_description?: string | null
-  meta_keywords?: string | null
+  meta_keywords?: string[] | null
   // 🆕 Фильтры
   allowed_brand_ids?: string[] | null
   allowed_product_line_ids?: string[] | null
@@ -204,7 +204,7 @@ export type CategoryUpdate = Database['public']['Tables']['categories']['Update'
   // 🆕 Meta-теги для поисковых систем
   meta_title?: string | null
   meta_description?: string | null
-  meta_keywords?: string | null
+  meta_keywords?: string[] | null
   // 🆕 Фильтры
   allowed_brand_ids?: string[] | null
   allowed_product_line_ids?: string[] | null

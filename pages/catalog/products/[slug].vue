@@ -408,8 +408,11 @@ const productLineLink = computed(() => {
 const metaKeywords = computed(() => {
   const keywords: string[] = []
 
-  // Пользовательские ключевые слова
-  if (product.value?.seo_keywords?.length) {
+  // Пользовательские ключевые слова (приоритет: meta_keywords > seo_keywords)
+  if (product.value?.meta_keywords?.length) {
+    keywords.push(...product.value.meta_keywords)
+  }
+  else if (product.value?.seo_keywords?.length) {
     keywords.push(...product.value.seo_keywords)
   }
 

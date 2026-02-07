@@ -156,8 +156,13 @@ const metaDescription = computed(() => {
   return `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
 
-// Ключевые слова: приоритет у seo_keywords
+// Ключевые слова: приоритет meta_keywords > seo_keywords
 const metaKeywords = computed(() => {
+  // Приоритет meta_keywords
+  if (brand.value?.meta_keywords?.length) {
+    return brand.value.meta_keywords.join(', ')
+  }
+  // Fallback на seo_keywords
   if (brand.value?.seo_keywords?.length) {
     return brand.value.seo_keywords.join(', ')
   }

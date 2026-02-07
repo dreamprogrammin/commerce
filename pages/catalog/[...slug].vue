@@ -467,8 +467,9 @@ const metaTitle = computed(() => {
 // 🆕 Ключевые слова (приоритет: meta_keywords > seo_keywords)
 const metaKeywords = computed(() => {
   // Приоритет новому полю meta_keywords
-  if (currentCategory.value?.meta_keywords) {
-    return currentCategory.value.meta_keywords
+  const metaKw = currentCategory.value?.meta_keywords
+  if (metaKw && metaKw.length > 0) {
+    return metaKw.join(', ')
   }
   // Fallback на старое поле seo_keywords
   const keywords = currentCategory.value?.seo_keywords
