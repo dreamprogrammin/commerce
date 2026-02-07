@@ -295,6 +295,8 @@ export interface ProductFormData {
   barcode: string | null
   is_featured?: boolean
   featured_order?: number
+  // Количество деталей для конструкторов (автоматический выбор диапазона)
+  piece_count?: number | null
   // SEO поля
   seo_description: string | null
   seo_keywords: string[] | null

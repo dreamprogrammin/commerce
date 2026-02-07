@@ -148,6 +148,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       // SEO поля
       seo_description: product.seo_description || null,
       seo_keywords: product.seo_keywords || null,
+      // Количество деталей для конструкторов
+      piece_count: (product as any).piece_count || null,
     }
     // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
     existingImages.value = [...(product.product_images || [])].sort((a, b) => a.display_order - b.display_order)
@@ -189,6 +191,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       // SEO поля
       seo_description: null,
       seo_keywords: null,
+      // Количество деталей для конструкторов
+      piece_count: null,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -685,6 +689,15 @@ const stockQuantityValue = computed({
   },
 })
 
+const pieceCountValue = computed({
+  get() { return formData.value.piece_count ?? undefined },
+  set(value) {
+    if (formData.value) {
+      formData.value.piece_count = typeof value === 'number' && value > 0 ? value : null
+    }
+  },
+})
+
 // --- 14. SEO ПОЛЯ ---
 
 const seoDescriptionValue = computed({
@@ -709,6 +722,70 @@ const seoKeywordsString = computed({
       formData.value.seo_keywords = keywords.length > 0 ? keywords : null
     }
   },
+})
+
+// --- 15. АВТО-ВЫБОР ДИАПАЗОНА ДЕТАЛЕЙ ---
+
+/**
+ * Определяет в какой диапазон попадает количество деталей
+ * Поддерживает форматы: "0-50", "50-100 деталей", "500+" и т.д.
+ */
+function findMatchingRangeOption(pieceCount: number, options: { id: number, value: string }[]): number | null {
+  for (const option of options) {
+    const rangeText = option.value.toLowerCase()
+
+    // Формат "500+" или "500 +"
+    const plusMatch = rangeText.match(/^(\d+)\s*\+/)
+    if (plusMatch) {
+      const minValue = Number.parseInt(plusMatch[1], 10)
+      if (pieceCount >= minValue) {
+        return option.id
+      }
+      continue
+    }
+
+    // Формат "0-50" или "50-100 деталей"
+    const rangeMatch = rangeText.match(/^(\d+)\s*[-–—]\s*(\d+)/)
+    if (rangeMatch) {
+      const minValue = Number.parseInt(rangeMatch[1], 10)
+      const maxValue = Number.parseInt(rangeMatch[2], 10)
+      if (pieceCount >= minValue && pieceCount <= maxValue) {
+        return option.id
+      }
+      continue
+    }
+  }
+
+  return null
+}
+
+/**
+ * Автоматически выбирает диапазон деталей при изменении piece_count
+ */
+watch(() => formData.value.piece_count, (newPieceCount) => {
+  if (!newPieceCount || newPieceCount <= 0) {
+    return
+  }
+
+  // Находим атрибут типа number_range
+  const numberRangeAttr = categoryAttributes.value.find(
+    attr => attr.display_type === 'number_range',
+  )
+
+  if (!numberRangeAttr || !numberRangeAttr.attribute_options) {
+    return
+  }
+
+  // Ищем подходящий диапазон
+  const matchingOptionId = findMatchingRangeOption(
+    newPieceCount,
+    numberRangeAttr.attribute_options,
+  )
+
+  if (matchingOptionId !== null) {
+    productAttributeValues.value[numberRangeAttr.id] = matchingOptionId
+    console.log(`🎯 Авто-выбран диапазон для ${newPieceCount} деталей`)
+  }
 })
 </script>
 
@@ -905,7 +982,7 @@ const seoKeywordsString = computed({
           <div v-for="attribute in categoryAttributes" :key="attribute.id">
             <Label>{{ attribute.name }}</Label>
             <Select
-              v-if="attribute.display_type === 'select' || attribute.display_type === 'color'"
+              v-if="attribute.display_type === 'select' || attribute.display_type === 'color' || attribute.display_type === 'number_range'"
               v-model="productAttributeValues[attribute.id]"
             >
               <SelectTrigger>
@@ -920,7 +997,11 @@ const seoKeywordsString = computed({
                   :key="option.id"
                   :value="option.id"
                 >
-                  {{ option.value }}
+                  <span v-if="attribute.display_type === 'number_range'" class="flex items-center gap-1.5">
+                    <Icon name="lucide:hash" class="w-3.5 h-3.5 text-muted-foreground" />
+                    {{ option.value }}
+                  </span>
+                  <span v-else>{{ option.value }}</span>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -1227,6 +1308,23 @@ const seoKeywordsString = computed({
               placeholder="0"
               min="0"
             />
+          </div>
+
+          <div>
+            <Label for="piece_count" class="flex items-center gap-2">
+              <Icon name="lucide:hash" class="w-4 h-4 text-muted-foreground" />
+              Количество деталей
+            </Label>
+            <Input
+              id="piece_count"
+              v-model.number="pieceCountValue"
+              type="number"
+              placeholder="Например: 75"
+              min="1"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              💡 Диапазон деталей выберется автоматически
+            </p>
           </div>
 
           <div class="flex items-center space-x-2 pt-2">

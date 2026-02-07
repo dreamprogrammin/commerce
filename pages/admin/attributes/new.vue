@@ -58,8 +58,11 @@ async function handleSubmit() {
                 <SelectItem value="color">
                   Кружки с цветом
                 </SelectItem>
+                <SelectItem value="number_range">
+                  Числовые диапазоны (например: 0-50, 50-100)
+                </SelectItem>
                 <SelectItem value="range">
-                  Ползунок (для чисел)
+                  Ползунок (для чисел) - в разработке
                 </SelectItem>
               </SelectContent>
             </Select>

@@ -458,6 +458,39 @@ watch(() => props.priceRange, (newRange) => {
               </button>
             </div>
           </template>
+
+          <!-- Для типа 'number_range' (числовые диапазоны) -->
+          <template v-if="filter.display_type === 'number_range'">
+            <div class="space-y-2">
+              <button
+                v-for="option in filter.attribute_options"
+                :key="option.id"
+                type="button"
+                class="w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-200"
+                :class="[
+                  modelValue.attributes[filter.slug]?.includes(option.id)
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'bg-secondary/60 hover:bg-secondary hover:shadow-md active:scale-[0.98]',
+                ]"
+                @click="updateAttribute(!modelValue.attributes[filter.slug]?.includes(option.id), filter.slug, option.id)"
+              >
+                <div
+                  class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0"
+                  :class="modelValue.attributes[filter.slug]?.includes(option.id) ? 'bg-white/20' : 'bg-background/50'"
+                >
+                  <Icon
+                    :name="modelValue.attributes[filter.slug]?.includes(option.id) ? 'lucide:check' : 'lucide:hash'"
+                    class="w-5 h-5"
+                  />
+                </div>
+                <div class="flex-1 text-left">
+                  <div class="font-semibold text-base">
+                    {{ option.value }}
+                  </div>
+                </div>
+              </button>
+            </div>
+          </template>
         </div>
 
         <!-- 6. ФИЛЬТР ПО ЦЕНЕ -->

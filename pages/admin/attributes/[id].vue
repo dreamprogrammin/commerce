@@ -104,7 +104,12 @@ function clearCategorySelection() {
           <CardHeader>
             <CardTitle>Опции для выбора</CardTitle>
             <CardDescription>
-              Возможные значения для этого фильтра (например, "Красный", "Синий").
+              <template v-if="currentAttribute.display_type === 'number_range'">
+                Числовые диапазоны (например: "0-50", "50-100", "100-200", "200+").
+              </template>
+              <template v-else>
+                Возможные значения для этого фильтра (например, "Красный", "Синий").
+              </template>
             </CardDescription>
           </CardHeader>
           <CardContent>
