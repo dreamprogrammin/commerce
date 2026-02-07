@@ -227,6 +227,13 @@ async function placeOrder() {
   // Форматируем номер для отправки в бэк: +77771234567
   const formattedPhone = `+${phoneDigits.value}`
 
+  // DEBUG: Логируем телефон перед отправкой
+  console.log('📞 Phone debug:', {
+    'orderForm.phone': orderForm.value.phone,
+    'phoneDigits.value': phoneDigits.value,
+    'formattedPhone': formattedPhone,
+  })
+
   // Для гостей обязательны данные
   const guestInfo = !isLoggedIn.value
     ? {
