@@ -46,6 +46,11 @@ const phoneMaskOptions = reactive({
 // Unmasked значение (только цифры)
 const phoneUnmasked = ref('')
 
+// Обработчик события maska для получения unmasked значения
+function handleMaska(event: { masked: string, unmasked: string, completed: boolean }) {
+  phoneUnmasked.value = event.unmasked
+}
+
 // При фокусе показываем +7 если поле пустое
 function handlePhoneFocus() {
   if (!orderForm.value.phone) {
@@ -310,7 +315,7 @@ async function placeOrder() {
                 <Input
                   id="phone"
                   v-model="orderForm.phone"
-                  v-maska:phoneUnmasked.unmasked="phoneMaskOptions"
+                  v-maska="phoneMaskOptions"
                   required
                   autocomplete="tel"
                   placeholder="+7 (___) ___-__-__"
@@ -318,6 +323,7 @@ async function placeOrder() {
                   :class="{ 'border-destructive': orderForm.phone && orderForm.phone.length > 4 && !isValidPhone }"
                   @focus="handlePhoneFocus"
                   @blur="handlePhoneBlur"
+                  @maska="handleMaska"
                 />
                 <p v-if="orderForm.phone && orderForm.phone.length > 4 && phoneErrorMessage" class="text-xs text-destructive">
                   {{ phoneErrorMessage }}
