@@ -767,14 +767,30 @@ watch(() => formData.value.piece_count, (newPieceCount) => {
     return
   }
 
+  console.log('🔍 piece_count изменён:', newPieceCount)
+  console.log('📋 Все атрибуты категории:', categoryAttributes.value.map(a => ({
+    id: a.id,
+    name: a.name,
+    display_type: a.display_type,
+    options: a.attribute_options?.length,
+  })))
+
   // Находим атрибут типа number_range
   const numberRangeAttr = categoryAttributes.value.find(
     attr => attr.display_type === 'number_range',
   )
 
-  if (!numberRangeAttr || !numberRangeAttr.attribute_options) {
+  if (!numberRangeAttr) {
+    console.log('⚠️ Атрибут типа number_range не найден в категории')
     return
   }
+
+  if (!numberRangeAttr.attribute_options) {
+    console.log('⚠️ У атрибута нет опций')
+    return
+  }
+
+  console.log('✅ Найден атрибут:', numberRangeAttr.name, 'с опциями:', numberRangeAttr.attribute_options)
 
   // Ищем подходящий диапазон
   const matchingOptionId = findMatchingRangeOption(
@@ -784,7 +800,10 @@ watch(() => formData.value.piece_count, (newPieceCount) => {
 
   if (matchingOptionId !== null) {
     productAttributeValues.value[numberRangeAttr.id] = matchingOptionId
-    console.log(`🎯 Авто-выбран диапазон для ${newPieceCount} деталей`)
+    console.log(`🎯 Авто-выбран диапазон для ${newPieceCount} деталей, option_id:`, matchingOptionId)
+  }
+  else {
+    console.log('⚠️ Подходящий диапазон не найден для значения:', newPieceCount)
   }
 })
 </script>
