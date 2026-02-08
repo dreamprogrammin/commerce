@@ -592,9 +592,15 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (deleteError)
         throw deleteError
 
+      // Фильтруем только значения с option_id ИЛИ numeric_value
       const valuesToInsert = values
-        .filter(v => v.option_id != null)
-        .map(v => ({ ...v, product_id: productId }))
+        .filter(v => v.option_id != null || (v as any).numeric_value != null)
+        .map(v => ({
+          product_id: productId,
+          attribute_id: v.attribute_id,
+          option_id: v.option_id ?? null,
+          numeric_value: (v as any).numeric_value ?? null,
+        }))
 
       if (valuesToInsert.length > 0) {
         const { error: insertError } = await supabase

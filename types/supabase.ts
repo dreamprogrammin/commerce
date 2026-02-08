@@ -74,18 +74,21 @@ export type Database = {
           id: number
           name: string
           slug: string
+          unit: string | null
         }
         Insert: {
           display_type?: string
           id?: number
           name: string
           slug: string
+          unit?: string | null
         }
         Update: {
           display_type?: string
           id?: number
           name?: string
           slug?: string
+          unit?: string | null
         }
         Relationships: []
       }
@@ -707,6 +710,10 @@ export type Database = {
       }
       guest_checkouts: {
         Row: {
+          assigned_admin_name: string | null
+          assigned_admin_username: string | null
+          assigned_at: string | null
+          cancelled_by: string | null
           created_at: string
           delivery_address: Json | null
           delivery_method: string
@@ -718,10 +725,15 @@ export type Database = {
           id: string
           payment_method: string | null
           status: string
+          telegram_message_id: string | null
           total_amount: number
           updated_at: string
         }
         Insert: {
+          assigned_admin_name?: string | null
+          assigned_admin_username?: string | null
+          assigned_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           delivery_address?: Json | null
           delivery_method: string
@@ -733,10 +745,15 @@ export type Database = {
           id?: string
           payment_method?: string | null
           status?: string
+          telegram_message_id?: string | null
           total_amount: number
           updated_at?: string
         }
         Update: {
+          assigned_admin_name?: string | null
+          assigned_admin_username?: string | null
+          assigned_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           delivery_address?: Json | null
           delivery_method?: string
@@ -748,6 +765,7 @@ export type Database = {
           id?: string
           payment_method?: string | null
           status?: string
+          telegram_message_id?: string | null
           total_amount?: number
           updated_at?: string
         }
@@ -896,9 +914,13 @@ export type Database = {
       }
       orders: {
         Row: {
+          assigned_admin_name: string | null
+          assigned_admin_username: string | null
+          assigned_at: string | null
           bonuses_activation_date: string | null
           bonuses_awarded: number
           bonuses_spent: number
+          cancelled_by: string | null
           created_at: string
           delivery_address: Json | null
           delivery_method: string
@@ -911,14 +933,19 @@ export type Database = {
           id: string
           payment_method: string | null
           status: string
+          telegram_message_id: string | null
           total_amount: number
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          assigned_admin_name?: string | null
+          assigned_admin_username?: string | null
+          assigned_at?: string | null
           bonuses_activation_date?: string | null
           bonuses_awarded?: number
           bonuses_spent?: number
+          cancelled_by?: string | null
           created_at?: string
           delivery_address?: Json | null
           delivery_method: string
@@ -931,14 +958,19 @@ export type Database = {
           id?: string
           payment_method?: string | null
           status?: string
+          telegram_message_id?: string | null
           total_amount: number
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          assigned_admin_name?: string | null
+          assigned_admin_username?: string | null
+          assigned_at?: string | null
           bonuses_activation_date?: string | null
           bonuses_awarded?: number
           bonuses_spent?: number
+          cancelled_by?: string | null
           created_at?: string
           delivery_address?: Json | null
           delivery_method?: string
@@ -951,6 +983,7 @@ export type Database = {
           id?: string
           payment_method?: string | null
           status?: string
+          telegram_message_id?: string | null
           total_amount?: number
           updated_at?: string
           user_id?: string | null
@@ -993,16 +1026,19 @@ export type Database = {
       product_attribute_values: {
         Row: {
           attribute_id: number
+          numeric_value: number | null
           option_id: number | null
           product_id: string
         }
         Insert: {
           attribute_id: number
+          numeric_value?: number | null
           option_id?: number | null
           product_id: string
         }
         Update: {
           attribute_id?: number
+          numeric_value?: number | null
           option_id?: number | null
           product_id?: string
         }
@@ -1285,6 +1321,7 @@ export type Database = {
           og_image: string | null
           og_title: string | null
           origin_country_id: number | null
+          piece_count: number | null
           price: number
           product_line_id: string | null
           product_type: string | null
@@ -1335,6 +1372,7 @@ export type Database = {
           og_image?: string | null
           og_title?: string | null
           origin_country_id?: number | null
+          piece_count?: number | null
           price: number
           product_line_id?: string | null
           product_type?: string | null
@@ -1385,6 +1423,7 @@ export type Database = {
           og_image?: string | null
           og_title?: string | null
           origin_country_id?: number | null
+          piece_count?: number | null
           price?: number
           product_line_id?: string | null
           product_type?: string | null
@@ -1646,9 +1685,31 @@ export type Database = {
     }
     Functions: {
       activate_pending_bonuses: { Args: never; Returns: string }
-      cancel_order: { Args: { p_order_id: string }; Returns: string }
+      cancel_order:
+        | {
+            Args: { p_order_id: string; p_table_name?: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_cancelled_by?: string
+              p_order_id: string
+              p_table_name?: string
+            }
+            Returns: string
+          }
       confirm_and_process_order: {
         Args: { p_order_id: string }
+        Returns: string
+      }
+      create_guest_checkout: {
+        Args: {
+          p_cart_items: Json
+          p_delivery_address?: Json
+          p_delivery_method: string
+          p_guest_info: Json
+          p_payment_method?: string
+        }
         Returns: string
       }
       create_order: {
@@ -1658,6 +1719,16 @@ export type Database = {
           p_delivery_address?: Json
           p_delivery_method: string
           p_guest_info?: Json
+          p_payment_method?: string
+        }
+        Returns: string
+      }
+      create_user_order: {
+        Args: {
+          p_bonuses_to_spend?: number
+          p_cart_items: Json
+          p_delivery_address?: Json
+          p_delivery_method: string
           p_payment_method?: string
         }
         Returns: string
@@ -1721,6 +1792,13 @@ export type Database = {
           id: string
         }[]
       }
+      get_category_piece_count_range: {
+        Args: { p_category_slug: string }
+        Returns: {
+          max_count: number
+          min_count: number
+        }[]
+      }
       get_category_price_range: {
         Args: { p_category_slug: string }
         Returns: {
@@ -1743,10 +1821,14 @@ export type Database = {
           p_category_slug: string
           p_country_ids?: string[]
           p_material_ids?: string[]
+          p_numeric_attributes?: Database["public"]["CompositeTypes"]["numeric_attribute_filter"][]
           p_page_number?: number
           p_page_size?: number
+          p_piece_count_max?: number
+          p_piece_count_min?: number
           p_price_max?: number
           p_price_min?: number
+          p_product_line_ids?: string[]
           p_sort_by?: string
           p_subcategory_ids?: string[]
         }
@@ -1778,6 +1860,14 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_numeric_attribute_range: {
+        Args: { p_attribute_id: number; p_category_slug: string }
+        Returns: {
+          max_value: number
+          min_value: number
+        }[]
+      }
+      get_order_table_name: { Args: { p_order_id: string }; Returns: string }
       get_personalized_recommendations: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
@@ -1842,6 +1932,11 @@ export type Database = {
       attribute_filter: {
         slug: string | null
         option_ids: number[] | null
+      }
+      numeric_attribute_filter: {
+        attribute_id: number | null
+        min_value: number | null
+        max_value: number | null
       }
     }
   }

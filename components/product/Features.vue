@@ -98,18 +98,26 @@ const dynamicAttributes = computed(() => {
   // Используем обновленный тип для итерации
   for (const pav of props.product.product_attribute_values) {
     const attrName = pav.attributes?.name || 'Атрибут'
+    const displayType = pav.attributes?.display_type
+    const unit = (pav.attributes as any)?.unit || ''
 
-    // ВАЖНО: В вашей схеме атрибут-значение может иметь много опций,
-    // но в UI мы обычно показываем одно значение.
-    // Если опций может быть несколько, используйте `join`
-    const optionValue = pav.attributes?.attribute_options?.[0]?.value || '—'
+    let displayValue: string
+
+    // Для числовых атрибутов используем numeric_value
+    if (displayType === 'numeric' && (pav as any).numeric_value !== null) {
+      displayValue = `${(pav as any).numeric_value}${unit ? ` ${unit}` : ''}`
+    }
+    else {
+      // Для select/color используем option_value
+      displayValue = pav.attributes?.attribute_options?.[0]?.value || '—'
+    }
 
     // Если атрибут уже есть в группе, добавляем значение
     if (grouped.has(attrName)) {
-      grouped.get(attrName)!.values.push(optionValue)
+      grouped.get(attrName)!.values.push(displayValue)
     }
     else {
-      grouped.set(attrName, { name: attrName, values: [optionValue] })
+      grouped.set(attrName, { name: attrName, values: [displayValue] })
     }
   }
 

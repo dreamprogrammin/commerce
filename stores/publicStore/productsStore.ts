@@ -15,6 +15,7 @@ export const useProductsStore = defineStore('productsStore', () => {
   const allCountries = ref<Country[]>([])
   const priceRangeByCategory = ref<Record<string, { min_price: number, max_price: number }>>({})
   const pieceCountRangeByCategory = ref<Record<string, { min_count: number, max_count: number }>>({})
+  const numericAttributeRangesByCategory = ref<Record<string, Record<number, { min: number, max: number }>>>({})
 
   // ============================================
   // 📦 МЕТОДЫ С КЭШИРОВАНИЕМ
@@ -289,6 +290,59 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
+  async function fetchNumericAttributeRange(
+    categorySlug: string,
+    attributeId: number,
+  ): Promise<{ min: number, max: number } | null> {
+    if (!categorySlug || categorySlug === 'all') {
+      return null
+    }
+
+    // Проверяем кэш
+    const cached = numericAttributeRangesByCategory.value[categorySlug]?.[attributeId]
+    if (cached) {
+      console.warn('✅ Numeric attribute range from cache:', categorySlug, attributeId)
+      return cached
+    }
+
+    console.warn('🌐 Fetching numeric attribute range from server:', categorySlug, attributeId)
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_numeric_attribute_range', {
+          p_category_slug: categorySlug,
+          p_attribute_id: attributeId,
+        })
+
+      if (error)
+        throw error
+
+      const range = data && data.length > 0 ? data[0] : null
+
+      // Если нет товаров с этим числовым атрибутом - возвращаем null
+      if (!range || (range.min_value === null && range.max_value === null)) {
+        return null
+      }
+
+      const result = {
+        min: Number(range.min_value || 0),
+        max: Number(range.max_value || 1000),
+      }
+
+      // Кэшируем результат
+      if (!numericAttributeRangesByCategory.value[categorySlug]) {
+        numericAttributeRangesByCategory.value[categorySlug] = {}
+      }
+      numericAttributeRangesByCategory.value[categorySlug][attributeId] = result
+
+      return result
+    }
+    catch (error: any) {
+      console.error('Ошибка при получении диапазона числового атрибута:', error)
+      return null
+    }
+  }
+
   // ============================================
   // 🧹 УПРАВЛЕНИЕ КЭШЕМ
   // ============================================
@@ -301,6 +355,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     allCountries.value = []
     priceRangeByCategory.value = {}
     pieceCountRangeByCategory.value = {}
+    numericAttributeRangesByCategory.value = {}
     brands.value = []
     console.warn('🧹 All cache cleared')
   }
@@ -311,6 +366,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     delete attributesByCategory.value[categorySlug]
     delete priceRangeByCategory.value[categorySlug]
     delete pieceCountRangeByCategory.value[categorySlug]
+    delete numericAttributeRangesByCategory.value[categorySlug]
     console.warn('🧹 Cache cleared for category:', categorySlug)
   }
 
@@ -345,6 +401,13 @@ export const useProductsStore = defineStore('productsStore', () => {
     pageSize = 12,
   ): Promise<{ products: ProductWithGallery[], hasMore: boolean }> {
     try {
+      // Преобразуем numericAttributes в формат для RPC
+      const numericAttrsForRpc = filters.numericAttributes?.map(na => ({
+        attribute_id: na.attributeId,
+        min_value: na.minValue ?? null,
+        max_value: na.maxValue ?? null,
+      })) ?? null
+
       const { data: rpcResponse, error } = await supabase.rpc('get_filtered_products', {
         p_category_slug: filters.categorySlug,
         p_subcategory_ids: filters.subCategoryIds,
@@ -360,6 +423,7 @@ export const useProductsStore = defineStore('productsStore', () => {
         p_product_line_ids: filters.productLineIds,
         p_piece_count_min: filters.pieceCountMin,
         p_piece_count_max: filters.pieceCountMax,
+        p_numeric_attributes: numericAttrsForRpc,
       })
 
       if (error)
@@ -684,6 +748,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     allCountries,
     priceRangeByCategory,
     pieceCountRangeByCategory,
+    numericAttributeRangesByCategory,
 
     // Методы
     fetchAllBrands,
@@ -701,6 +766,7 @@ export const useProductsStore = defineStore('productsStore', () => {
     getProductById,
     fetchPriceRangeForCategory,
     fetchPieceCountRangeForCategory,
+    fetchNumericAttributeRange,
     fetchAllMaterials,
     fetchAllCountries,
     searchProductsByQuery,

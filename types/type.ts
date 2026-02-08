@@ -140,6 +140,12 @@ export interface AttributeFilter {
   option_ids: number[]
 }
 
+export interface NumericAttributeFilter {
+  attributeId: number
+  minValue?: number
+  maxValue?: number
+}
+
 export type SortByType = 'popularity' | 'newest' | 'price_asc' | 'price_desc'
 
 export interface IProductFilters {
@@ -155,6 +161,7 @@ export interface IProductFilters {
   materialIds?: string[]
   countryIds?: string[]
   attributes?: AttributeFilter[]
+  numericAttributes?: NumericAttributeFilter[]
 }
 
 export interface ICheckoutData {

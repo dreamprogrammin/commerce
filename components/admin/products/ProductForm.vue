@@ -82,6 +82,7 @@ const formData = ref<Partial<ProductFormData>>({})
 const isBrandDialogOpen = ref(false)
 const categoryAttributes = ref<AttributeWithValue[]>([])
 const productAttributeValues = ref<Record<number, number | null>>({})
+const numericAttributeValues = ref<Record<number, number | null>>({})
 const isProcessingImages = ref(false)
 
 const bonusOptions = [
@@ -282,20 +283,31 @@ async function handleCategoryChange(categoryId: string | null) {
 
   categoryAttributes.value = await productStore.getAttributesForCategory(categoryId)
 
-  const newValues: Record<number, number | null> = {}
+  const newSelectValues: Record<number, number | null> = {}
+  const newNumericValues: Record<number, number | null> = {}
+
   for (const attr of categoryAttributes.value) {
-    newValues[attr.id] = null
+    if (attr.display_type === 'numeric') {
+      newNumericValues[attr.id] = null
+    }
+    else {
+      newSelectValues[attr.id] = null
+    }
   }
 
   if (props.initialData?.id) {
     const savedValues = await productStore.getProductAttributeValues(props.initialData.id)
     for (const savedValue of savedValues) {
-      if (savedValue.attribute_id in newValues) {
-        newValues[savedValue.attribute_id] = savedValue.option_id
+      if (savedValue.attribute_id in newSelectValues) {
+        newSelectValues[savedValue.attribute_id] = savedValue.option_id
+      }
+      if (savedValue.attribute_id in newNumericValues) {
+        newNumericValues[savedValue.attribute_id] = (savedValue as any).numeric_value
       }
     }
   }
-  productAttributeValues.value = newValues
+  productAttributeValues.value = newSelectValues
+  numericAttributeValues.value = newNumericValues
 }
 
 watch(() => formData.value.category_id, (newCategoryId) => {
@@ -553,10 +565,20 @@ function handleSubmit() {
 
   const productData = { ...formData.value }
 
-  const valuesToSave = Object.entries(productAttributeValues.value).map(([attrId, optId]) => ({
+  // Собираем значения select/color атрибутов
+  const selectValues = Object.entries(productAttributeValues.value).map(([attrId, optId]) => ({
     attribute_id: Number(attrId),
     option_id: optId,
   }))
+
+  // Собираем значения числовых атрибутов
+  const numericValues = Object.entries(numericAttributeValues.value).map(([attrId, numVal]) => ({
+    attribute_id: Number(attrId),
+    option_id: null,
+    numeric_value: numVal,
+  }))
+
+  const valuesToSave = [...selectValues, ...numericValues]
 
   if (props.initialData) {
     emit('update', {
@@ -706,8 +728,14 @@ const hasPieceCountAttribute = computed(() => {
 })
 
 // Атрибуты для отображения в секции "Характеристики" (без number_range - он заменён на piece_count)
+// Select и color атрибуты
 const displayableAttributes = computed(() => {
-  return categoryAttributes.value.filter(attr => attr.display_type !== 'number_range')
+  return categoryAttributes.value.filter(attr => attr.display_type !== 'number_range' && attr.display_type !== 'numeric')
+})
+
+// Числовые атрибуты (display_type === 'numeric')
+const numericAttributes = computed(() => {
+  return categoryAttributes.value.filter(attr => attr.display_type === 'numeric')
 })
 
 // --- 14. SEO ПОЛЯ ---
@@ -919,7 +947,7 @@ const seoKeywordsString = computed({
         </CardContent>
       </Card>
 
-      <!-- 🏷️ Характеристики -->
+      <!-- 🏷️ Характеристики (Select/Color) -->
       <Card v-if="displayableAttributes.length > 0">
         <CardHeader>
           <CardTitle>Характеристики</CardTitle>
@@ -950,6 +978,37 @@ const seoKeywordsString = computed({
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- 📏 Числовые характеристики -->
+      <Card v-if="numericAttributes.length > 0">
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2">
+            <Icon name="lucide:ruler" class="w-5 h-5" />
+            Числовые характеристики
+          </CardTitle>
+          <CardDescription>
+            Укажите числовые значения для фильтров (высота, вес и т.д.)
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div v-for="attribute in numericAttributes" :key="attribute.id">
+            <Label :for="`numeric-attr-${attribute.id}`" class="flex items-center gap-2">
+              {{ attribute.name }}
+              <span v-if="(attribute as any).unit" class="text-muted-foreground text-xs">
+                ({{ (attribute as any).unit }})
+              </span>
+            </Label>
+            <Input
+              :id="`numeric-attr-${attribute.id}`"
+              v-model.number="numericAttributeValues[attribute.id]"
+              type="number"
+              :placeholder="`Например: 50${(attribute as any).unit ? ` ${(attribute as any).unit}` : ''}`"
+              min="0"
+              step="any"
+            />
           </div>
         </CardContent>
       </Card>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
-import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, ProductLine, ProductWithGallery, SortByType } from '@/types'
+import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, NumericAttributeFilter, ProductLine, ProductWithGallery, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -48,10 +48,18 @@ const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
 
-// Фильтруем атрибуты - number_range заменён на слайдер piece_count
+// Фильтруем атрибуты - number_range заменён на слайдер piece_count, numeric обрабатывается отдельно
 const displayableFilters = computed(() => {
-  return availableFilters.value.filter(f => f.display_type !== 'number_range')
+  return availableFilters.value.filter(f => f.display_type !== 'number_range' && f.display_type !== 'numeric')
 })
+
+// Числовые атрибуты
+const numericFilters = computed(() => {
+  return availableFilters.value.filter(f => f.display_type === 'numeric')
+})
+
+// Диапазоны числовых атрибутов
+const numericAttributeRanges = ref<Record<number, { min: number, max: number }>>({})
 const accumulatedProducts = ref<ProductWithGallery[]>([])
 const isMobileFiltersOpen = ref(false)
 const isSubcategoriesDrawerOpen = ref(false)
@@ -66,6 +74,7 @@ interface ActiveFilters {
   materialIds: string[]
   countryIds: string[]
   attributes: Record<string, (string | number)[]>
+  numericAttributes: Record<number, [number, number]>
 }
 
 const activeFilters = ref<ActiveFilters>({
@@ -78,6 +87,7 @@ const activeFilters = ref<ActiveFilters>({
   materialIds: getArrayFromQuery(route.query.materials),
   countryIds: getArrayFromQuery(route.query.countries),
   attributes: {},
+  numericAttributes: {},
 })
 
 // --- 3. Вычисляемые свойства ---
@@ -173,6 +183,14 @@ const activeFiltersCount = computed(() => {
     }
   }
 
+  // Числовые атрибуты
+  Object.entries(activeFilters.value.numericAttributes).forEach(([attrId, range]) => {
+    const attrRange = numericAttributeRanges.value[Number(attrId)]
+    if (attrRange && (range[0] !== attrRange.min || range[1] !== attrRange.max)) {
+      count += 1
+    }
+  })
+
   return count
 })
 const canonicalUrl = computed(() => {
@@ -185,6 +203,19 @@ const catalogFilters = computed<IProductFilters>(() => {
   const attributeFilters: AttributeFilter[] = Object.entries(activeFilters.value.attributes)
     .filter(([, optionIds]) => optionIds.length > 0)
     .map(([slug, optionIds]) => ({ slug, option_ids: optionIds as number[] }))
+
+  // Преобразуем числовые атрибуты в формат для API
+  const numericAttributeFilters: NumericAttributeFilter[] = Object.entries(activeFilters.value.numericAttributes)
+    .filter(([attrId, range]) => {
+      const attrRange = numericAttributeRanges.value[Number(attrId)]
+      // Отправляем только если диапазон отличается от полного
+      return attrRange && (range[0] !== attrRange.min || range[1] !== attrRange.max)
+    })
+    .map(([attrId, range]) => ({
+      attributeId: Number(attrId),
+      minValue: range[0],
+      maxValue: range[1],
+    }))
 
   return {
     categorySlug: currentCategorySlug.value,
@@ -199,6 +230,7 @@ const catalogFilters = computed<IProductFilters>(() => {
     pieceCountMin: activeFilters.value.pieceCount?.[0],
     pieceCountMax: activeFilters.value.pieceCount?.[1],
     attributes: attributeFilters.length > 0 ? attributeFilters : undefined,
+    numericAttributes: numericAttributeFilters.length > 0 ? numericAttributeFilters : undefined,
   }
 })
 
@@ -281,6 +313,21 @@ async function loadFilterData(slug: string) {
     const pieceCountRangeData = pieceCountRangeResult.status === 'fulfilled' ? pieceCountRangeResult.value : null
     pieceCountRange.value = pieceCountRangeData
 
+    // Загружаем диапазоны для числовых атрибутов
+    const numericAttrs = availableFilters.value.filter(f => f.display_type === 'numeric')
+    const numericRangesResults = await Promise.allSettled(
+      numericAttrs.map(attr => productsStore.fetchNumericAttributeRange(slug, attr.id)),
+    )
+
+    const newNumericRanges: Record<number, { min: number, max: number }> = {}
+    numericAttrs.forEach((attr, index) => {
+      const result = numericRangesResults[index]
+      if (result.status === 'fulfilled' && result.value) {
+        newNumericRanges[attr.id] = result.value
+      }
+    })
+    numericAttributeRanges.value = newNumericRanges
+
     const newAttributeFilters: Record<string, any[]> = {}
     for (const attr of availableFilters.value) {
       const queryKey = `attr_${attr.slug}`
@@ -295,6 +342,18 @@ async function loadFilterData(slug: string) {
     const pieceCountMinFromQuery = route.query.piece_count_min ? Number(route.query.piece_count_min) : pieceCountRangeData?.min
     const pieceCountMaxFromQuery = route.query.piece_count_max ? Number(route.query.piece_count_max) : pieceCountRangeData?.max
 
+    // Инициализируем числовые атрибуты их диапазонами (или из query)
+    const initNumericAttrs: Record<number, [number, number]> = {}
+    Object.entries(newNumericRanges).forEach(([attrId, range]) => {
+      const id = Number(attrId)
+      const queryMin = route.query[`numeric_${id}_min`]
+      const queryMax = route.query[`numeric_${id}_max`]
+      initNumericAttrs[id] = [
+        queryMin ? Number(queryMin) : range.min,
+        queryMax ? Number(queryMax) : range.max,
+      ]
+    })
+
     activeFilters.value = {
       sortBy: getSortByFromQuery(route.query.sort_by),
       subCategoryIds: getArrayFromQuery(route.query.subcategories),
@@ -305,6 +364,7 @@ async function loadFilterData(slug: string) {
       materialIds: getArrayFromQuery(route.query.materials),
       countryIds: getArrayFromQuery(route.query.countries),
       attributes: newAttributeFilters,
+      numericAttributes: initNumericAttrs,
     }
 
     currentPage.value = 1
@@ -1119,6 +1179,7 @@ useHead(() => {
             :piece-count-range="pieceCountRange"
             :available-materials="availableMaterials"
             :available-countries="availableCountries"
+            :numeric-attribute-ranges="numericAttributeRanges"
             :is-loading="isLoadingFilters"
           />
         </aside>
@@ -1457,6 +1518,7 @@ useHead(() => {
         :piece-count-range="pieceCountRange"
         :available-materials="availableMaterials"
         :available-countries="availableCountries"
+        :numeric-attribute-ranges="numericAttributeRanges"
         :is-loading="isLoadingFilters"
         @update:open="isMobileFiltersOpen = $event"
       />

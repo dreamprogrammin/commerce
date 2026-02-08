@@ -3,6 +3,11 @@ import type { PropType } from 'vue'
 import type { AttributeWithValue, BrandForFilter, ColorOptionMeta, Country, Material, ProductLine } from '@/types'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
+interface NumericAttributeRange {
+  min: number
+  max: number
+}
+
 // --- 1. PROPS & EMITS ---
 const props = defineProps({
   modelValue: {
@@ -15,6 +20,7 @@ const props = defineProps({
       materialIds: string[]
       countryIds: string[]
       attributes: Record<string, (string | number)[]>
+      numericAttributes: Record<number, [number, number]>
     }>,
     required: true,
   },
@@ -47,6 +53,10 @@ const props = defineProps({
     type: Array as PropType<AttributeWithValue[]>,
     default: () => [],
   },
+  numericAttributeRanges: {
+    type: Object as PropType<Record<number, NumericAttributeRange>>,
+    default: () => ({}),
+  },
   open: {
     type: Boolean,
     default: false,
@@ -62,13 +72,21 @@ const route = useRoute()
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? null)
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
-// Фильтруем атрибуты - number_range заменён на слайдер piece_count
+// Фильтруем атрибуты - number_range заменён на слайдер piece_count, numeric обрабатывается отдельно
 const displayableFilters = computed(() => {
-  return props.availableFilters.filter(f => f.display_type !== 'number_range')
+  return props.availableFilters.filter(f => f.display_type !== 'number_range' && f.display_type !== 'numeric')
+})
+
+// Числовые атрибуты для отображения слайдеров
+const numericFilters = computed(() => {
+  return props.availableFilters.filter(f => f.display_type === 'numeric')
 })
 
 const localPrice = ref<[number, number]>([...props.modelValue.price])
 const localPieceCount = ref<[number, number] | null>(props.modelValue.pieceCount ? [...props.modelValue.pieceCount] : null)
+const localNumericAttributes = ref<Record<number, [number, number]>>(
+  props.modelValue.numericAttributes ? { ...props.modelValue.numericAttributes } : {},
+)
 
 // Подсчет активных фильтров
 const activeFiltersCount = computed(() => {
@@ -106,6 +124,16 @@ const activeFiltersCount = computed(() => {
       || props.modelValue.pieceCount[1] !== props.pieceCountRange.max) {
       count += 1
     }
+  }
+
+  // Числовые атрибуты
+  if (props.modelValue.numericAttributes) {
+    Object.entries(props.modelValue.numericAttributes).forEach(([attrId, range]) => {
+      const attrRange = props.numericAttributeRanges[Number(attrId)]
+      if (attrRange && (range[0] !== attrRange.min || range[1] !== attrRange.max)) {
+        count += 1
+      }
+    })
   }
 
   return count
@@ -169,7 +197,25 @@ function commitPieceCountToFilters(newPieceCount: number[]) {
   }
 }
 
+function commitNumericAttributeToFilters(attributeId: number, newValue: number[]) {
+  if (Array.isArray(newValue) && newValue.length === 2) {
+    emit('update:modelValue', {
+      ...props.modelValue,
+      numericAttributes: {
+        ...props.modelValue.numericAttributes,
+        [attributeId]: newValue as [number, number],
+      },
+    })
+  }
+}
+
 function resetFilters() {
+  // Сбрасываем числовые атрибуты до их диапазонов
+  const resetNumericAttrs: Record<number, [number, number]> = {}
+  Object.entries(props.numericAttributeRanges).forEach(([attrId, range]) => {
+    resetNumericAttrs[Number(attrId)] = [range.min, range.max]
+  })
+
   emit('update:modelValue', {
     subCategoryIds: [],
     pieceCount: props.pieceCountRange ? [props.pieceCountRange.min, props.pieceCountRange.max] : null,
@@ -179,6 +225,7 @@ function resetFilters() {
     materialIds: [],
     countryIds: [],
     attributes: {},
+    numericAttributes: resetNumericAttrs,
   })
 }
 
@@ -208,6 +255,21 @@ watch(() => props.pieceCountRange, (newRange) => {
     localPieceCount.value = null
   }
 }, { deep: true })
+
+// Синхронизируем локальные числовые атрибуты с пропсами
+watch(() => props.modelValue.numericAttributes, (newVal) => {
+  localNumericAttributes.value = newVal ? { ...newVal } : {}
+}, { deep: true })
+
+// При изменении диапазонов инициализируем локальные значения
+watch(() => props.numericAttributeRanges, (newRanges) => {
+  Object.entries(newRanges).forEach(([attrId, range]) => {
+    const id = Number(attrId)
+    if (!localNumericAttributes.value[id]) {
+      localNumericAttributes.value[id] = [range.min, range.max]
+    }
+  })
+}, { deep: true, immediate: true })
 </script>
 
 <template>
@@ -500,6 +562,74 @@ watch(() => props.pieceCountRange, (newRange) => {
           </template>
 
         </div>
+
+        <!-- 5.5. ЧИСЛОВЫЕ АТРИБУТЫ (слайдеры) -->
+        <ClientOnly v-for="numericFilter in numericFilters" :key="`numeric-${numericFilter.id}`">
+          <div
+            v-if="numericAttributeRanges[numericFilter.id] && localNumericAttributes[numericFilter.id]"
+            class="space-y-4 pt-4 border-t"
+          >
+            <div class="flex items-center gap-2">
+              <Icon name="lucide:ruler" class="w-4 h-4 text-muted-foreground" />
+              <h4 class="font-semibold text-base">
+                {{ numericFilter.name }}
+              </h4>
+            </div>
+
+            <template v-if="isLoading">
+              <div class="space-y-4 pt-2">
+                <Skeleton class="h-4 w-full" />
+                <Skeleton class="h-4 w-1/2" />
+              </div>
+            </template>
+            <template v-else>
+              <div class="px-2 pt-2">
+                <Slider
+                  v-model="localNumericAttributes[numericFilter.id]"
+                  :min="numericAttributeRanges[numericFilter.id].min"
+                  :max="numericAttributeRanges[numericFilter.id].max"
+                  :step="1"
+                  @value-commit="(val: number[]) => commitNumericAttributeToFilters(numericFilter.id, val)"
+                />
+              </div>
+              <div class="flex justify-between items-center gap-2">
+                <div class="flex-1 p-3 rounded-lg bg-secondary/60 text-center">
+                  <div class="text-xs text-muted-foreground mb-1">
+                    От
+                  </div>
+                  <div class="font-semibold">
+                    {{ localNumericAttributes[numericFilter.id][0] }} {{ (numericFilter as any).unit || '' }}
+                  </div>
+                </div>
+                <Icon name="lucide:minus" class="w-4 h-4 text-muted-foreground" />
+                <div class="flex-1 p-3 rounded-lg bg-secondary/60 text-center">
+                  <div class="text-xs text-muted-foreground mb-1">
+                    До
+                  </div>
+                  <div class="font-semibold">
+                    {{ localNumericAttributes[numericFilter.id][1] }} {{ (numericFilter as any).unit || '' }}
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Fallback для SSR -->
+          <template #fallback>
+            <div class="space-y-4 pt-4 border-t">
+              <div class="flex items-center gap-2">
+                <Icon name="lucide:ruler" class="w-4 h-4 text-muted-foreground" />
+                <h4 class="font-semibold text-base">
+                  {{ numericFilter.name }}
+                </h4>
+              </div>
+              <div class="space-y-4 pt-2">
+                <Skeleton class="h-4 w-full" />
+                <Skeleton class="h-4 w-1/2" />
+              </div>
+            </div>
+          </template>
+        </ClientOnly>
 
         <!-- 6. ФИЛЬТР ПО ЦЕНЕ -->
         <ClientOnly>
