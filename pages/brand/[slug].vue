@@ -512,7 +512,7 @@ useRobotsRule({
       </main>
 
       <!-- Описание бренда (внизу страницы, разворачивается) -->
-      <div v-if="brand.description || brand.seo_description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
+      <div v-if="brand.description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
         <div class="space-y-3 md:space-y-4">
           <!-- Заголовок с кнопкой разворачивания -->
           <button
@@ -534,7 +534,7 @@ useRobotsRule({
             :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
           >
             <p class="text-gray-700 leading-relaxed text-sm md:text-base">
-              {{ brand.seo_description || brand.description }}
+              {{ brand.description }}
             </p>
 
             <!-- Ключевые слова как теги -->
@@ -552,7 +552,7 @@ useRobotsRule({
 
           <!-- Кнопка "Читать далее" / "Свернуть" -->
           <button
-            v-if="((brand.seo_description && brand.seo_description.length > 150) || (brand.description && brand.description.length > 150))"
+            v-if="brand.description && brand.description.length > 150"
             class="text-xs md:text-sm text-primary hover:underline"
             @click="isSeoExpanded = !isSeoExpanded"
           >
