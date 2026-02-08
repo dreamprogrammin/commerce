@@ -698,6 +698,16 @@ const pieceCountValue = computed({
   },
 })
 
+// Показываем поле "Количество деталей" только если у категории есть атрибут типа number_range
+const hasPieceCountAttribute = computed(() => {
+  return categoryAttributes.value.some(attr => attr.display_type === 'number_range')
+})
+
+// Атрибуты для отображения в секции "Характеристики" (без number_range - он заменён на piece_count)
+const displayableAttributes = computed(() => {
+  return categoryAttributes.value.filter(attr => attr.display_type !== 'number_range')
+})
+
 // --- 14. SEO ПОЛЯ ---
 
 const seoDescriptionValue = computed({
@@ -908,7 +918,7 @@ const seoKeywordsString = computed({
       </Card>
 
       <!-- 🏷️ Характеристики -->
-      <Card v-if="categoryAttributes.length > 0">
+      <Card v-if="displayableAttributes.length > 0">
         <CardHeader>
           <CardTitle>Характеристики</CardTitle>
           <CardDescription>
@@ -916,10 +926,10 @@ const seoKeywordsString = computed({
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
-          <div v-for="attribute in categoryAttributes" :key="attribute.id">
+          <div v-for="attribute in displayableAttributes" :key="attribute.id">
             <Label>{{ attribute.name }}</Label>
             <Select
-              v-if="attribute.display_type === 'select' || attribute.display_type === 'color' || attribute.display_type === 'number_range'"
+              v-if="attribute.display_type === 'select' || attribute.display_type === 'color'"
               v-model="productAttributeValues[attribute.id]"
             >
               <SelectTrigger>
@@ -934,11 +944,7 @@ const seoKeywordsString = computed({
                   :key="option.id"
                   :value="option.id"
                 >
-                  <span v-if="attribute.display_type === 'number_range'" class="flex items-center gap-1.5">
-                    <Icon name="lucide:hash" class="w-3.5 h-3.5 text-muted-foreground" />
-                    {{ option.value }}
-                  </span>
-                  <span v-else>{{ option.value }}</span>
+                  {{ option.value }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -1247,7 +1253,8 @@ const seoKeywordsString = computed({
             />
           </div>
 
-          <div>
+          <!-- Поле "Количество деталей" только для категорий с атрибутом number_range (конструкторы) -->
+          <div v-if="hasPieceCountAttribute">
             <Label for="piece_count" class="flex items-center gap-2">
               <Icon name="lucide:puzzle" class="w-4 h-4 text-muted-foreground" />
               Количество деталей

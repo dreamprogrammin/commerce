@@ -47,6 +47,11 @@ const availableProductLines = ref<ProductLine[]>([])
 const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
+
+// Фильтруем атрибуты - number_range заменён на слайдер piece_count
+const displayableFilters = computed(() => {
+  return availableFilters.value.filter(f => f.display_type !== 'number_range')
+})
 const accumulatedProducts = ref<ProductWithGallery[]>([])
 const isMobileFiltersOpen = ref(false)
 const isSubcategoriesDrawerOpen = ref(false)
@@ -1191,7 +1196,7 @@ useHead(() => {
             <div v-if="!isLoadingFilters && availableFilters.length > 0" class="h-6 w-px bg-border hidden lg:block" />
 
             <template v-if="!isLoadingFilters && availableFilters.length > 0">
-              <template v-for="filter in availableFilters" :key="filter.id">
+              <template v-for="filter in displayableFilters" :key="filter.id">
                 <!-- Select type -->
                 <Popover v-if="filter.display_type === 'select'">
                   <PopoverTrigger as-child>
@@ -1313,68 +1318,6 @@ useHead(() => {
                   </PopoverContent>
                 </Popover>
 
-                <!-- Number Range type -->
-                <Popover v-else-if="filter.display_type === 'number_range'">
-                  <PopoverTrigger as-child>
-                    <Button
-                      :variant="(activeFilters.attributes[filter.slug] || []).length > 0 ? 'default' : 'outline'"
-                      class="hidden lg:inline-flex h-11 gap-2 transition-colors" :class="[
-                        (activeFilters.attributes[filter.slug] || []).length > 0
-                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
-                          : '',
-                      ]"
-                    >
-                      <Icon name="lucide:hash" class="w-4 h-4" />
-                      {{ filter.name }}
-                      <Badge
-                        v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
-                        variant="secondary"
-                        class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
-                      >
-                        {{ (activeFilters.attributes[filter.slug] || []).length }}
-                      </Badge>
-                      <Icon name="lucide:chevron-down" class="w-3.5 h-3.5 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent class="w-64 p-3" align="start">
-                    <div class="space-y-2">
-                      <div class="flex items-center justify-between mb-2">
-                        <h4 class="font-semibold text-sm">
-                          {{ filter.name }}
-                        </h4>
-                        <Button
-                          v-if="(activeFilters.attributes[filter.slug] || []).length > 0"
-                          variant="ghost"
-                          size="sm"
-                          class="h-6 px-2 text-xs"
-                          @click="clearAttributeFilter(filter.slug)"
-                        >
-                          <Icon name="lucide:x" class="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                      <div class="max-h-64 overflow-y-auto space-y-2">
-                        <div
-                          v-for="option in filter.attribute_options"
-                          :key="option.id"
-                          class="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            :id="`attr-${filter.slug}-${option.id}`"
-                            :model-value="(activeFilters.attributes[filter.slug] || []).includes(option.id)"
-                            @update:model-value="(checked) => updateAttribute(!!checked, filter.slug, option.id)"
-                          />
-                          <Label
-                            :for="`attr-${filter.slug}-${option.id}`"
-                            class="font-normal cursor-pointer text-sm flex items-center gap-1.5"
-                          >
-                            <Icon name="lucide:hash" class="w-3.5 h-3.5 text-muted-foreground" />
-                            {{ option.value }}
-                          </Label>
-                        </div>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
               </template>
             </template>
 

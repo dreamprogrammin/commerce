@@ -1067,6 +1067,16 @@ useHead(() => ({
                 </dd>
               </div>
 
+              <!-- Количество деталей (для конструкторов) -->
+              <div v-if="product.piece_count" class="product-spec-row">
+                <dt class="product-spec-label">
+                  Количество деталей
+                </dt>
+                <dd class="product-spec-value">
+                  {{ product.piece_count }} шт
+                </dd>
+              </div>
+
               <!-- Артикул / Код товара -->
               <div v-if="product.sku" class="product-spec-row">
                 <dt class="product-spec-label">
