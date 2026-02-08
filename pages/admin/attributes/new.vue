@@ -12,6 +12,7 @@ const formData = ref<Partial<AttributeInsert>>({
   name: '',
   slug: '',
   display_type: 'select',
+  unit: null,
 })
 
 function autoFillSlug() {
@@ -61,11 +62,22 @@ async function handleSubmit() {
                 <SelectItem value="number_range">
                   Числовые диапазоны (например: 0-50, 50-100)
                 </SelectItem>
+                <SelectItem value="numeric">
+                  Числовое значение (с единицей измерения)
+                </SelectItem>
                 <SelectItem value="range">
                   Ползунок (для чисел) - в разработке
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <!-- Поле единицы измерения для числовых атрибутов -->
+          <div v-if="formData.display_type === 'numeric'">
+            <Label for="unit">Единица измерения</Label>
+            <Input id="unit" v-model="formData.unit" placeholder="шт, см, кг, мл..." />
+            <p class="text-xs text-muted-foreground mt-1">
+              Будет отображаться после значения (например: "100 шт")
+            </p>
           </div>
         </CardContent>
       </Card>

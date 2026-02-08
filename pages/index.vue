@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ProductWithImages } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
 import { useSlides } from '@/composables/slides/useSlides'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -78,7 +79,8 @@ const { data: popularSsrData } = await useAsyncData(
   { server: true, lazy: false },
 )
 
-const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFetchingPopular } = useQuery({
+// @ts-expect-error - Deep type instantiation with TanStack Query
+const popularQuery = useQuery<ProductWithImages[]>({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
   staleTime: 5 * 60 * 1000, // 5 минут (было 3)
@@ -87,6 +89,10 @@ const { data: popularProductsData, isLoading: isLoadingPopular, isFetching: isFe
   refetchOnMount: false, // ⚡ Не перезагружать при каждом монтировании
   refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
 })
+
+const popularProductsData = popularQuery.data
+const isLoadingPopular = popularQuery.isLoading
+const isFetchingPopular = popularQuery.isFetching
 
 const popularProducts = computed(() => popularProductsData.value || [])
 

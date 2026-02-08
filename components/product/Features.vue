@@ -99,13 +99,13 @@ const dynamicAttributes = computed(() => {
   for (const pav of props.product.product_attribute_values) {
     const attrName = pav.attributes?.name || 'Атрибут'
     const displayType = pav.attributes?.display_type
-    const unit = (pav.attributes as any)?.unit || ''
+    const unit = pav.attributes?.unit || ''
 
     let displayValue: string
 
     // Для числовых атрибутов используем numeric_value
-    if (displayType === 'numeric' && (pav as any).numeric_value !== null) {
-      displayValue = `${(pav as any).numeric_value}${unit ? ` ${unit}` : ''}`
+    if (displayType === 'numeric' && pav.numeric_value !== null) {
+      displayValue = `${pav.numeric_value}${unit ? ` ${unit}` : ''}`
     }
     else {
       // Для select/color используем option_value

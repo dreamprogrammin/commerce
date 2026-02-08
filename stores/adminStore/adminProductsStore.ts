@@ -594,12 +594,12 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
       // Фильтруем только значения с option_id ИЛИ numeric_value
       const valuesToInsert = values
-        .filter(v => v.option_id != null || (v as any).numeric_value != null)
+        .filter(v => v.option_id != null || v.numeric_value != null)
         .map(v => ({
           product_id: productId,
           attribute_id: v.attribute_id,
           option_id: v.option_id ?? null,
-          numeric_value: (v as any).numeric_value ?? null,
+          numeric_value: v.numeric_value ?? null,
         }))
 
       if (valuesToInsert.length > 0) {

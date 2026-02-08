@@ -177,7 +177,22 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
     }
   }
 
-  // (Здесь позже можно добавить update/delete для атрибутов и опций)
+  async function updateAttribute(attributeId: number, updates: Partial<AttributeInsert>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('attributes')
+        .update(updates)
+        .eq('id', attributeId)
+      if (error)
+        throw error
+
+      return true
+    }
+    catch (error: any) {
+      toast.error('Ошибка обновления атрибута', { description: error.message })
+      return false
+    }
+  }
 
   return {
     attributes,
@@ -185,6 +200,7 @@ export const useAdminAttributesStore = defineStore('adminAttributesStore', () =>
     fetchAttributes,
     fetchAttributeById,
     createAttribute,
+    updateAttribute,
     fetchOptionsForAttribute,
     addOptionToAttribute,
     categories,

@@ -1792,6 +1792,12 @@ export type Database = {
           id: string
         }[]
       }
+      get_category_and_children_ids_by_uuid: {
+        Args: { p_category_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
       get_category_piece_count_range: {
         Args: { p_category_slug: string }
         Returns: {

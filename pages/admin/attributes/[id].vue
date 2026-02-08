@@ -79,6 +79,17 @@ async function handleDeleteOption(optionId: number) {
   }
 }
 
+// <-- ФУНКЦИЯ для сохранения единицы измерения -->
+async function handleSaveUnit() {
+  if (!currentAttribute.value) return
+  const success = await attributesStore.updateAttribute(currentAttribute.value.id, {
+    unit: currentAttribute.value.unit,
+  })
+  if (success) {
+    toast.success('Единица измерения сохранена')
+  }
+}
+
 // <-- ФУНКЦИЯ для отмены выбора категорий -->
 function clearCategorySelection() {
   linkedCategoryIds.value = []
@@ -100,7 +111,7 @@ function clearCategorySelection() {
       </h1>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         <!-- Блок: Управление опциями -->
-        <Card v-if="currentAttribute.display_type !== 'range'">
+        <Card v-if="currentAttribute.display_type !== 'range' && currentAttribute.display_type !== 'numeric'">
           <CardHeader>
             <CardTitle>Опции для выбора</CardTitle>
             <CardDescription>
@@ -136,6 +147,28 @@ function clearCategorySelection() {
                 Добавить
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <!-- Блок для числовых атрибутов (numeric) -->
+        <Card v-else-if="currentAttribute.display_type === 'numeric'">
+          <CardHeader>
+            <CardTitle>Настройки числового атрибута</CardTitle>
+            <CardDescription>
+              Для числовых атрибутов опции не требуются. Значение вводится в форме товара.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div>
+              <Label for="unit">Единица измерения</Label>
+              <Input id="unit" v-model="currentAttribute.unit" placeholder="шт, см, кг, мл..." />
+              <p class="text-xs text-muted-foreground mt-1">
+                Будет отображаться после значения (например: "100 шт")
+              </p>
+            </div>
+            <Button type="button" @click="handleSaveUnit">
+              Сохранить единицу
+            </Button>
           </CardContent>
         </Card>
 

@@ -21,10 +21,11 @@ export const useCartStore = defineStore('cartStore', () => {
   const bonusesToSpend = ref(0)
   const isAddingItem = ref(false) // Флаг для предотвращения race condition
 
-  const totalItems = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
+  // @ts-expect-error - Deep type instantiation with computed ref
+  const totalItems = computed(() => items.value.reduce((sum: number, item) => sum + item.quantity, 0))
 
   const subtotal = computed(() =>
-    items.value.reduce((sum, item) => {
+    items.value.reduce((sum: number, item) => {
       // Используем финальную цену с учетом скидки
       const priceData = formatPriceWithDiscount(
         Number(item.product.price),

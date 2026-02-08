@@ -139,7 +139,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       is_accessory: product.is_accessory || false,
       sku: product.sku,
       brand_id: product.brand_id,
-      product_line_id: (product as any).product_line_id || null,
+      product_line_id: product.product_line_id || null,
       origin_country_id: product.origin_country_id,
       discount_percentage: product.discount_percentage || 0,
       material_id: product.material_id,
@@ -150,7 +150,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       seo_description: product.seo_description || null,
       seo_keywords: product.seo_keywords || null,
       // Количество деталей для конструкторов
-      piece_count: (product as any).piece_count || null,
+      piece_count: product.piece_count || null,
     }
     // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
     existingImages.value = [...(product.product_images || [])].sort((a, b) => a.display_order - b.display_order)
@@ -302,7 +302,7 @@ async function handleCategoryChange(categoryId: string | null) {
         newSelectValues[savedValue.attribute_id] = savedValue.option_id
       }
       if (savedValue.attribute_id in newNumericValues) {
-        newNumericValues[savedValue.attribute_id] = (savedValue as any).numeric_value
+        newNumericValues[savedValue.attribute_id] = savedValue.numeric_value
       }
     }
   }
@@ -545,7 +545,8 @@ function addAccessory(product: ProductSearchResult) {
 }
 
 function removeAccessory(productId: string) {
-  linkedAccessories.value = linkedAccessories.value.filter(p => p.id !== productId)
+  // @ts-expect-error - Deep type instantiation with union types in filter
+  linkedAccessories.value = linkedAccessories.value.filter((p: ProductWithImages | ProductSearchResult) => p.id !== productId)
 }
 
 // --- 9. ОТПРАВКА ФОРМЫ ---
@@ -997,17 +998,18 @@ const seoKeywordsString = computed({
           <div v-for="attribute in numericAttributes" :key="attribute.id">
             <Label :for="`numeric-attr-${attribute.id}`" class="flex items-center gap-2">
               {{ attribute.name }}
-              <span v-if="(attribute as any).unit" class="text-muted-foreground text-xs">
-                ({{ (attribute as any).unit }})
+              <span v-if="attribute.unit" class="text-muted-foreground text-xs">
+                ({{ attribute.unit }})
               </span>
             </Label>
             <Input
               :id="`numeric-attr-${attribute.id}`"
-              v-model.number="numericAttributeValues[attribute.id]"
+              :model-value="numericAttributeValues[attribute.id] ?? undefined"
               type="number"
-              :placeholder="`Например: 50${(attribute as any).unit ? ` ${(attribute as any).unit}` : ''}`"
+              :placeholder="`Например: 50${attribute.unit ? ` ${attribute.unit}` : ''}`"
               min="0"
               step="any"
+              @update:model-value="(val) => numericAttributeValues[attribute.id] = val ? Number(val) : null"
             />
           </div>
         </CardContent>
