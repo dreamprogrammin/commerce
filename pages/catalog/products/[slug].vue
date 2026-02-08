@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { IBreadcrumbItem, ProductImageRow, ProductWithImages } from '@/types'
+import type { AttributeWithValue, IBreadcrumbItem, ProductImageRow, ProductWithImages } from '@/types'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { toast } from 'vue-sonner'
 import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
@@ -393,10 +393,30 @@ const metaDescription = computed(() => {
 
 const categoryName = computed(() => product.value?.categories?.name)
 const categorySlug = computed(() => product.value?.categories?.slug)
+
+// Загружаем атрибуты категории чтобы проверить есть ли number_range
+const categoryAttributes = ref<AttributeWithValue[]>([])
+
+watch(() => categorySlug.value, async (newSlug) => {
+  if (newSlug) {
+    categoryAttributes.value = await productsStore.fetchAttributesForCategory(newSlug)
+  }
+}, { immediate: true })
+
+// Проверяем есть ли у категории товара атрибут "Количество деталей" (number_range)
+const hasPieceCountAttribute = computed(() => {
+  return categoryAttributes.value.some(attr => attr.display_type === 'number_range')
+})
+
+// Типизация для product_lines (расширяем базовый тип)
+interface ProductWithProductLine {
+  product_lines?: { name: string, slug: string } | null
+}
+
 const brandName = computed(() => product.value?.brands?.name)
 const brandSlug = computed(() => product.value?.brands?.slug)
-const productLineName = computed(() => (product.value as any)?.product_lines?.name)
-const productLineSlug = computed(() => (product.value as any)?.product_lines?.slug)
+const productLineName = computed(() => (product.value as ProductWithProductLine | null)?.product_lines?.name)
+const productLineSlug = computed(() => (product.value as ProductWithProductLine | null)?.product_lines?.slug)
 
 // Ссылка на страницу линейки (если будет создана)
 const productLineLink = computed(() => {
@@ -1067,8 +1087,8 @@ useHead(() => ({
                 </dd>
               </div>
 
-              <!-- Количество деталей (для конструкторов) -->
-              <div v-if="product.piece_count" class="product-spec-row">
+              <!-- Количество деталей (только для категорий с атрибутом number_range) -->
+              <div v-if="hasPieceCountAttribute && product.piece_count" class="product-spec-row">
                 <dt class="product-spec-label">
                   Количество деталей
                 </dt>

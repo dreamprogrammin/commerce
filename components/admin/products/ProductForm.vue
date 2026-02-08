@@ -700,7 +700,9 @@ const pieceCountValue = computed({
 
 // Показываем поле "Количество деталей" только если у категории есть атрибут типа number_range
 const hasPieceCountAttribute = computed(() => {
-  return categoryAttributes.value.some(attr => attr.display_type === 'number_range')
+  const hasAttr = categoryAttributes.value.some(attr => attr.display_type === 'number_range')
+  console.log('🔍 hasPieceCountAttribute:', hasAttr, 'categoryAttributes:', categoryAttributes.value.map(a => ({ name: a.name, type: a.display_type })))
+  return hasAttr
 })
 
 // Атрибуты для отображения в секции "Характеристики" (без number_range - он заменён на piece_count)
