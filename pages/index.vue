@@ -159,6 +159,46 @@ const { data: brandsData } = await useQuery({
 
 const brandsForSchema = computed(() => brandsData.value || [])
 
+// Загрузка популярных брендов для карусели (SSR prefetch)
+const { data: brandsSsrData } = await useAsyncData('home-top-brands-ssr', async () => {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('*')
+    .order('name')
+    .limit(15)
+
+  if (error) {
+    console.error('Error fetching brands:', error)
+    return []
+  }
+
+  return data
+}, { server: true, lazy: false })
+
+// Загрузка брендов с TanStack Query для кеширования
+const { data: topBrands } = useQuery({
+  queryKey: ['home-top-brands'],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('brands')
+      .select('*')
+      .order('name')
+      .limit(15)
+
+    if (error) {
+      console.error('Error fetching brands:', error)
+      return []
+    }
+
+    return data
+  },
+  staleTime: 5 * 60 * 1000, // 5 минут
+  gcTime: 15 * 60 * 1000, // 15 минут
+  initialData: brandsSsrData.value || undefined,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
+})
+
 // Загрузка товарных линеек для SEO schema
 const { data: productLinesData } = await useQuery({
   queryKey: ['home-product-lines-schema'],
@@ -575,6 +615,9 @@ useRobotsRule({ index: true, follow: true })
         </div>
       </template>
     </ClientOnly>
+
+    <!-- Карусель брендов (стиль Instagram Stories) -->
+    <HomeBrandsCarousel v-if="topBrands && topBrands.length > 0" :brands="topBrands" />
 
     <!-- Баннеры -->
     <div :class="alwaysContainedClass">
