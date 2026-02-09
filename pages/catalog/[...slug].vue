@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
-import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, NumericAttributeFilter, ProductLine, ProductWithGallery, SortByType } from '@/types'
+import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, NumericAttributeFilter, ProductLine, SortByType } from '@/types'
 import { watchDebounced } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -39,9 +39,43 @@ onUnmounted(() => {
 })
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
+// Локальные интерфейсы для избежания циклической зависимости типов
+interface FilterAttribute {
+  id: number
+  name: string
+  slug: string
+  display_type: string
+  unit: string | null
+  attribute_options: {
+    id: number
+    attribute_id: number
+    value: string
+    meta: any
+  }[]
+}
+
+interface CatalogProductImage {
+  id: string
+  image_url: string
+  display_order: number
+  alt_text: string | null
+}
+
+interface CatalogProduct {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  price: number
+  discount_percentage: number | null
+  stock_quantity: number
+  product_images: CatalogProductImage[]
+  brands: { id: string, name: string, slug: string } | null
+}
+
 const currentPage = ref(1)
 const PAGE_SIZE = 12
-const availableFilters = ref<AttributeWithValue[]>([])
+const availableFilters = ref<FilterAttribute[]>([])
 const availableBrands = ref<BrandForFilter[]>([])
 const availableProductLines = ref<ProductLine[]>([])
 const availableMaterials = ref<Material[]>([])
@@ -49,18 +83,18 @@ const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
 
 // Фильтруем атрибуты - number_range заменён на слайдер piece_count, numeric обрабатывается отдельно
-const displayableFilters = computed(() => {
+const displayableFilters = computed<FilterAttribute[]>(() => {
   return availableFilters.value.filter(f => f.display_type !== 'number_range' && f.display_type !== 'numeric')
 })
 
 // Числовые атрибуты
-const numericFilters = computed(() => {
+const numericFilters = computed<FilterAttribute[]>(() => {
   return availableFilters.value.filter(f => f.display_type === 'numeric')
 })
 
 // Диапазоны числовых атрибутов
 const numericAttributeRanges = ref<Record<number, { min: number, max: number }>>({})
-const accumulatedProducts = ref<ProductWithGallery[]>([])
+const accumulatedProducts = ref<CatalogProduct[]>([])
 const isMobileFiltersOpen = ref(false)
 const isSubcategoriesDrawerOpen = ref(false)
 
@@ -241,9 +275,9 @@ const {
   isFetching,
 } = useCatalogQuery(catalogFilters, currentPage, PAGE_SIZE)
 
-const displayedProducts = computed(() => {
+const displayedProducts = computed<CatalogProduct[]>(() => {
   if (currentPage.value === 1) {
-    return currentPageProducts.value
+    return currentPageProducts.value as CatalogProduct[]
   }
   return accumulatedProducts.value
 })
@@ -297,7 +331,7 @@ async function loadFilterData(slug: string) {
 
     availableBrands.value = brandsResult.status === 'fulfilled' ? brandsResult.value : []
     availableProductLines.value = productLinesResult.status === 'fulfilled' ? productLinesResult.value : []
-    availableFilters.value = attributesResult.status === 'fulfilled' ? attributesResult.value : []
+    availableFilters.value = (attributesResult.status === 'fulfilled' ? attributesResult.value : []) as FilterAttribute[]
     availableMaterials.value = materialsResult.status === 'fulfilled' ? materialsResult.value : []
     availableCountries.value = countriesResult.status === 'fulfilled' ? countriesResult.value : []
 
@@ -312,6 +346,8 @@ async function loadFilterData(slug: string) {
     // Диапазон количества деталей (может быть null если в категории нет товаров с piece_count)
     const pieceCountRangeData = pieceCountRangeResult.status === 'fulfilled' ? pieceCountRangeResult.value : null
     pieceCountRange.value = pieceCountRangeData
+      ? { min: pieceCountRangeData.min_count, max: pieceCountRangeData.max_count }
+      : null
 
     // Загружаем диапазоны для числовых атрибутов
     const numericAttrs = availableFilters.value.filter(f => f.display_type === 'numeric')
@@ -320,15 +356,21 @@ async function loadFilterData(slug: string) {
     )
 
     const newNumericRanges: Record<number, { min: number, max: number }> = {}
-    numericAttrs.forEach((attr, index) => {
-      const result = numericRangesResults[index]
-      if (result.status === 'fulfilled' && result.value) {
-        newNumericRanges[attr.id] = result.value
+    for (let i = 0; i < numericAttrs.length; i++) {
+      const attr = numericAttrs[i]
+      const result = numericRangesResults[i]
+      if (!attr || !result) continue
+
+      if (result.status === 'fulfilled') {
+        const value = result.value
+        if (value) {
+          newNumericRanges[attr.id] = value
+        }
       }
-    })
+    }
     numericAttributeRanges.value = newNumericRanges
 
-    const newAttributeFilters: Record<string, any[]> = {}
+    const newAttributeFilters: Record<string, (string | number)[]> = {}
     for (const attr of availableFilters.value) {
       const queryKey = `attr_${attr.slug}`
       const queryValue = route.query[queryKey]
@@ -339,8 +381,8 @@ async function loadFilterData(slug: string) {
     const priceMaxFromQuery = route.query.price_max ? Number(route.query.price_max) : priceMax
 
     // Диапазон деталей из query (если есть)
-    const pieceCountMinFromQuery = route.query.piece_count_min ? Number(route.query.piece_count_min) : pieceCountRangeData?.min
-    const pieceCountMaxFromQuery = route.query.piece_count_max ? Number(route.query.piece_count_max) : pieceCountRangeData?.max
+    const pieceCountMinFromQuery = route.query.piece_count_min ? Number(route.query.piece_count_min) : pieceCountRangeData?.min_count
+    const pieceCountMaxFromQuery = route.query.piece_count_max ? Number(route.query.piece_count_max) : pieceCountRangeData?.max_count
 
     // Инициализируем числовые атрибуты их диапазонами (или из query)
     const initNumericAttrs: Record<number, [number, number]> = {}
@@ -358,7 +400,7 @@ async function loadFilterData(slug: string) {
       sortBy: getSortByFromQuery(route.query.sort_by),
       subCategoryIds: getArrayFromQuery(route.query.subcategories),
       price: [priceMinFromQuery, priceMaxFromQuery],
-      pieceCount: pieceCountRangeData ? [pieceCountMinFromQuery ?? pieceCountRangeData.min, pieceCountMaxFromQuery ?? pieceCountRangeData.max] : null,
+      pieceCount: pieceCountRangeData ? [pieceCountMinFromQuery ?? pieceCountRangeData.min_count, pieceCountMaxFromQuery ?? pieceCountRangeData.max_count] : null,
       brandIds: getArrayFromQuery(route.query.brands),
       productLineIds: getArrayFromQuery(route.query.lines),
       materialIds: getArrayFromQuery(route.query.materials),
@@ -370,9 +412,9 @@ async function loadFilterData(slug: string) {
     currentPage.value = 1
     accumulatedProducts.value = []
   }
-  catch (error: any) {
+  catch (error: unknown) {
     // Игнорируем ошибки отмены
-    if (error.name !== 'AbortError') {
+    if (error instanceof Error && error.name !== 'AbortError') {
       console.error('Error loading filters:', error)
     }
   }
@@ -383,7 +425,7 @@ async function loadFilterData(slug: string) {
 
 function loadMoreProducts() {
   if (currentPage.value === 1) {
-    accumulatedProducts.value = [...currentPageProducts.value]
+    accumulatedProducts.value = [...currentPageProducts.value] as CatalogProduct[]
   }
   currentPage.value++
 }
@@ -391,7 +433,7 @@ function loadMoreProducts() {
 watch(currentPageProducts, (newProducts) => {
   if (currentPage.value > 1 && newProducts.length > 0) {
     const existingIds = new Set(accumulatedProducts.value.map(p => p.id))
-    const uniqueNewProducts = newProducts.filter(p => !existingIds.has(p.id))
+    const uniqueNewProducts = newProducts.filter(p => !existingIds.has(p.id)) as CatalogProduct[]
     accumulatedProducts.value = [...accumulatedProducts.value, ...uniqueNewProducts]
   }
 })
@@ -696,7 +738,12 @@ useHead(() => {
         '@context': 'https://schema.org',
         '@type': 'BreadcrumbList',
         'itemListElement': breadcrumbs.value.map((crumb, index) => {
-          const listItem: any = {
+          const listItem: {
+            '@type': 'ListItem'
+            'position': number
+            'name': string
+            'item'?: string
+          } = {
             '@type': 'ListItem',
             'position': index + 1,
             'name': crumb.name,
@@ -1066,7 +1113,7 @@ useHead(() => {
               :alt="currentCategory.name"
               object-fit="contain"
               placeholder-type="lqip"
-              :blur-data-url="currentCategory.blur_placeholder"
+              :blur-data-url="currentCategory.blur_placeholder || undefined"
               :eager="true"
               class="w-full h-full"
             />
@@ -1117,7 +1164,7 @@ useHead(() => {
               :alt="currentCategory.name"
               object-fit="contain"
               placeholder-type="lqip"
-              :blur-data-url="currentCategory.blur_placeholder"
+              :blur-data-url="currentCategory.blur_placeholder || undefined"
               :eager="true"
               class="w-full h-full"
             />
@@ -1172,7 +1219,7 @@ useHead(() => {
         <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
           <DynamicFilters
             v-model="activeFilters"
-            :available-filters="availableFilters"
+            :available-filters="availableFilters as unknown as AttributeWithValue[]"
             :available-brands="availableBrands"
             :available-product-lines="availableProductLines"
             :price-range="priceRange"
@@ -1363,7 +1410,7 @@ useHead(() => {
                           :key="option.id"
                           type="button"
                           :title="option.value"
-                          :style="{ backgroundColor: ((option.meta as unknown) as { hex: string })?.hex }"
+                          :style="{ backgroundColor: (option.meta as { hex?: string } | null)?.hex }"
                           class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95"
                           :class="{
                             'border-primary ring-2 ring-primary ring-offset-2': (activeFilters.attributes[filter.slug] || []).includes(option.id),
@@ -1511,7 +1558,7 @@ useHead(() => {
       <DynamicFiltersMobile
         v-model="activeFilters"
         :open="isMobileFiltersOpen"
-        :available-filters="availableFilters"
+        :available-filters="availableFilters as unknown as AttributeWithValue[]"
         :available-brands="availableBrands"
         :available-product-lines="availableProductLines"
         :price-range="priceRange"
