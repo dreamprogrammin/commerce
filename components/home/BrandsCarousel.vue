@@ -3,8 +3,10 @@ import type { Brand } from '@/types'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { carouselContainerVariants } from '@/lib/variants'
 
 const { getImageUrl } = useSupabaseStorage()
+const containerClass = carouselContainerVariants({ contained: 'desktop' })
 
 interface Props {
   brands: Brand[]
@@ -20,8 +22,8 @@ function getBrandLogoUrl(logoUrl: string | null) {
 </script>
 
 <template>
-  <section class="py-8 md:py-12 bg-gradient-to-b from-background to-muted/10">
-    <div class="container mx-auto px-4">
+  <section class="py-8 md:py-12 bg-linear-to-b from-background to-muted/10">
+    <div :class="`${containerClass} mx-auto px-4`">
       <!-- Заголовок с кнопкой -->
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl md:text-3xl font-bold">
@@ -39,8 +41,8 @@ function getBrandLogoUrl(logoUrl: string | null) {
       <!-- Карусель брендов (стиль Instagram Stories) -->
       <div class="relative">
         <!-- Градиенты для краёв -->
-        <div class="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-        <div class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+        <div class="absolute left-0 top-0 bottom-0 w-12 bg-linear-to-r from-background to-transparent z-10 pointer-events-none" />
+        <div class="absolute right-0 top-0 bottom-0 w-12 bg-linear-to-l from-background to-transparent z-10 pointer-events-none" />
 
         <!-- Скроллящийся контейнер -->
         <div class="overflow-x-auto scrollbar-hide -mx-2">
@@ -49,14 +51,14 @@ function getBrandLogoUrl(logoUrl: string | null) {
               v-for="brand in brands"
               :key="brand.id"
               :to="`/brand/${brand.slug}`"
-              class="flex flex-col items-center gap-2 min-w-[80px] md:min-w-[100px] group"
+              class="flex flex-col items-center gap-2 min-w-20 md:min-w-25 group"
             >
               <!-- Круглый аватар с градиентной рамкой (как в Instagram) -->
               <div class="relative">
                 <!-- Градиентная рамка -->
-                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-tr from-purple-600 via-pink-600 to-orange-500 p-[2px] group-hover:p-[3px] transition-all duration-300">
+                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-[2px] group-hover:p-[3px] transition-all duration-300">
                   <!-- Белый фон -->
-                  <div class="w-full h-full rounded-full bg-background p-[3px]">
+                  <div class="w-full h-full rounded-full bg-background p-0.75">
                     <!-- Логотип бренда -->
                     <div class="w-full h-full rounded-full bg-muted/50 flex items-center justify-center overflow-hidden">
                       <ProgressiveImage
@@ -82,7 +84,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
               </div>
 
               <!-- Название бренда -->
-              <span class="text-xs md:text-sm font-medium text-center line-clamp-1 max-w-[80px] md:max-w-[100px] group-hover:text-primary transition-colors">
+              <span class="text-xs md:text-sm font-medium text-center line-clamp-1 max-w-20 md:max-w-25 group-hover:text-primary transition-colors">
                 {{ brand.name }}
               </span>
             </NuxtLink>
