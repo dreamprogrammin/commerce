@@ -56,66 +56,79 @@ const { getImageUrl } = useSupabaseStorage()
   </div>
 </template>
 
-<style scoped>
-/* Базовые стили для описания категории */
-/* inline-стили из HTML будут иметь приоритет автоматически */
+<style>
+/* НЕ scoped стили для корректной работы с v-html */
 
-.category-description :deep(h1) {
+/* Базовые стили для элементов БЕЗ inline-стилей */
+.category-description h1:not([style]) {
   font-size: 2rem;
   font-weight: 700;
   line-height: 1.2;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 
-.category-description :deep(h2) {
+.category-description h2:not([style]) {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.3;
+  margin-top: 1.75rem;
+  margin-bottom: 1rem;
 }
 
-.category-description :deep(h3) {
+.category-description h3:not([style]) {
   font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.4;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
-.category-description :deep(h4) {
+.category-description h4:not([style]) {
   font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.4;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
 }
 
-.category-description :deep(p) {
+.category-description p:not([style]) {
   font-size: 1rem;
   line-height: 1.7;
+  margin-bottom: 1rem;
 }
 
-.category-description :deep(ul),
-.category-description :deep(ol) {
+.category-description ul:not([style]),
+.category-description ol:not([style]) {
   list-style-position: outside;
+  margin-bottom: 1.25rem;
+  padding-left: 1.25rem;
 }
 
-.category-description :deep(ul) {
+.category-description ul:not([style]) {
   list-style-type: disc;
 }
 
-.category-description :deep(ol) {
+.category-description ol:not([style]) {
   list-style-type: decimal;
 }
 
-.category-description :deep(li) {
+.category-description li:not([style]) {
   line-height: 1.7;
+  margin-bottom: 0.5rem;
 }
 
-.category-description :deep(strong) {
+/* Эти стили применяются всегда */
+.category-description strong {
   font-weight: 600;
 }
 
-.category-description :deep(a) {
+.category-description a {
   color: rgb(var(--color-primary));
   text-decoration: underline;
 }
 
-.category-description :deep(a:hover) {
+.category-description a:hover {
   opacity: 0.8;
 }
 </style>
