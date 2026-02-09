@@ -1016,22 +1016,11 @@ useHead(() => ({
             </h3>
 
             <!-- Краткое описание с возможностью раскрытия -->
-            <div v-if="product.description" class="mb-4">
-              <div
-                class="text-sm text-muted-foreground overflow-hidden transition-all duration-300" :class="[
-                  !isDescriptionExpanded && 'line-clamp-2',
-                ]"
-              >
-                {{ isDescriptionExpanded ? product.description.replace(/<[^>]*>/g, '') : product.description.replace(/<[^>]*>/g, '').substring(0, 200) + (product.description.length > 200 ? '...' : '') }}
-              </div>
-              <button
-                v-if="product.description.length > 200"
-                class="text-primary text-sm font-medium mt-1 hover:underline"
-                @click="isDescriptionExpanded = !isDescriptionExpanded"
-              >
-                {{ isDescriptionExpanded ? 'Скрыть' : 'Показать полностью' }}
-              </button>
-            </div>
+            <ProductDescription
+              :product="product"
+              :is-expanded="isDescriptionExpanded"
+              @toggle-expand="isDescriptionExpanded = !isDescriptionExpanded"
+            />
 
             <!-- Таблица характеристик с пунктирными линиями -->
             <dl class="space-y-0">

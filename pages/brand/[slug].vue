@@ -533,9 +533,7 @@ useRobotsRule({
             class="overflow-hidden transition-all duration-300 ease-in-out"
             :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
           >
-            <p class="text-gray-700 leading-relaxed text-sm md:text-base">
-              {{ brand.description }}
-            </p>
+            <BrandDescription :brand="brand" />
 
             <!-- Ключевые слова как теги -->
             <div v-if="brand.seo_keywords?.length" class="flex flex-wrap gap-1.5 md:gap-2 mt-3 md:mt-4">
