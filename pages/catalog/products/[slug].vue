@@ -6,7 +6,7 @@ import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -494,6 +494,23 @@ const productLineLogoUrl = computed(() => {
     return null
   return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, IMAGE_SIZES.PRODUCT_LINE_LOGO)
 })
+
+// URL изображения категории
+const categoryImageUrl = computed(() => {
+  const category = product.value?.categories as { image_url?: string | null } | undefined
+  const imageUrl = category?.image_url
+  if (!imageUrl)
+    return null
+  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_IMAGE)
+})
+
+// Helper для получения данных категории из breadcrumb
+function getCategoryFromBreadcrumb(crumb: IBreadcrumbItem) {
+  if (!crumb.href) return null
+  // Извлекаем slug из href (например, /catalog/toys -> toys)
+  const slug = crumb.href.replace('/catalog/', '')
+  return categoriesStore.allCategories.find(cat => cat.slug === slug)
+}
 
 // Ссылки для SEO блока "Ещё товары"
 const brandLink = computed(() => {
@@ -1197,8 +1214,19 @@ useHead(() => ({
                 :to="categoryLink"
                 class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
               >
-                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border shrink-0">
-                  <Icon name="lucide:box" class="w-6 h-6 text-muted-foreground" />
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
+                  <ProgressiveImage
+                    v-if="(product.categories as any)?.image_url"
+                    :src="categoryImageUrl"
+                    :alt="categoryName || 'Категория'"
+                    :bucket-name="BUCKET_NAME_CATEGORY"
+                    :file-path="(product.categories as any).image_url || undefined"
+                    aspect-ratio="square"
+                    object-fit="cover"
+                    placeholder-type="shimmer"
+                    class="w-full h-full"
+                  />
+                  <Icon v-else name="lucide:box" class="w-6 h-6 text-muted-foreground" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="font-semibold text-base leading-tight">
@@ -1218,8 +1246,19 @@ useHead(() => ({
                   :to="crumb.href"
                   class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
                 >
-                  <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border shrink-0">
-                    <Icon name="lucide:layers" class="w-6 h-6 text-muted-foreground" />
+                  <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
+                    <ProgressiveImage
+                      v-if="getCategoryFromBreadcrumb(crumb)?.image_url"
+                      :src="getImageUrl(BUCKET_NAME_CATEGORY, getCategoryFromBreadcrumb(crumb)!.image_url as string, IMAGE_SIZES.CATEGORY_IMAGE)"
+                      :alt="crumb.name"
+                      :bucket-name="BUCKET_NAME_CATEGORY"
+                      :file-path="getCategoryFromBreadcrumb(crumb)!.image_url || undefined"
+                      aspect-ratio="square"
+                      object-fit="cover"
+                      placeholder-type="shimmer"
+                      class="w-full h-full"
+                    />
+                    <Icon v-else name="lucide:layers" class="w-6 h-6 text-muted-foreground" />
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="font-semibold text-base leading-tight">
