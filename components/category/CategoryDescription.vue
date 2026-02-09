@@ -48,10 +48,74 @@ const { getImageUrl } = useSupabaseStorage()
       >
         <div
           v-if="category.description"
-          class="prose prose-sm lg:prose-base max-w-none text-foreground"
+          class="category-description text-foreground"
           v-html="category.description"
         />
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Базовые стили для описания категории */
+/* inline-стили из HTML будут иметь приоритет автоматически */
+
+.category-description :deep(h1) {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.category-description :deep(h2) {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.category-description :deep(h3) {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.category-description :deep(h4) {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.category-description :deep(p) {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.category-description :deep(ul),
+.category-description :deep(ol) {
+  list-style-position: outside;
+}
+
+.category-description :deep(ul) {
+  list-style-type: disc;
+}
+
+.category-description :deep(ol) {
+  list-style-type: decimal;
+}
+
+.category-description :deep(li) {
+  line-height: 1.7;
+}
+
+.category-description :deep(strong) {
+  font-weight: 600;
+}
+
+.category-description :deep(a) {
+  color: rgb(var(--color-primary));
+  text-decoration: underline;
+}
+
+.category-description :deep(a:hover) {
+  opacity: 0.8;
+}
+</style>
