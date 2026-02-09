@@ -1119,8 +1119,8 @@ useHead(() => {
             />
           </div>
 
-          <!-- Заголовок -->
-          <h1 class="text-xl font-bold capitalize flex-1 leading-tight">
+          <!-- Заголовок (только мобильная версия) -->
+          <h1 class="text-xl font-bold capitalize flex-1 leading-tight lg:hidden">
             {{ title }}
           </h1>
         </div>
@@ -1173,7 +1173,8 @@ useHead(() => {
 
         <!-- Текстовый блок справа -->
         <div :class="currentCategory.image_url ? 'col-span-9' : 'col-span-12'" class="space-y-4">
-          <h1 class="text-2xl md:text-3xl font-bold capitalize">
+          <!-- Заголовок (только десктопная версия) -->
+          <h1 class="hidden lg:block text-2xl md:text-3xl font-bold capitalize">
             {{ title }}
           </h1>
 
