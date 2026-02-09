@@ -41,7 +41,7 @@ export function useSafeHtml() {
         'br',
       ],
       // Разрешенные атрибуты
-      ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
+      ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'style'],
       // Автоматически добавлять rel="noopener noreferrer" к внешним ссылкам
       ADD_ATTR: ['target'],
       // Разрешить только безопасные URI схемы
