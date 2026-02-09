@@ -403,12 +403,10 @@ const fullCategory = computed(() => {
 
 // Получаем родительские категории с полными данными из store
 const parentCategories = computed(() => {
-  if (!categoriesStore.allCategories.length) {
-    console.log('parentCategories: allCategories is empty')
+  if (!categoriesStore.allCategories.length)
     return []
-  }
 
-  const result = breadcrumbs.value
+  return breadcrumbs.value
     .slice(0, -1) // Убираем последний элемент (товар)
     .filter(crumb => crumb.href && crumb.name !== categoryName.value) // Убираем текущую категорию
     .map(crumb => {
@@ -417,24 +415,12 @@ const parentCategories = computed(() => {
       const slug = crumb.href?.split('/').pop()
       const category = categoriesStore.allCategories.find(c => c.slug === slug)
 
-      console.log('parentCategories:', {
-        crumb: crumb.name,
-        href: crumb.href,
-        slug,
-        found: !!category,
-        hasImage: !!category?.image_url,
-        imageUrl: category?.image_url,
-      })
-
       return {
         crumb,
         category,
       }
     })
     .filter(item => item.category) // Оставляем только найденные категории
-
-  console.log('parentCategories result:', result.length, 'categories')
-  return result
 })
 
 // Загружаем атрибуты категории чтобы проверить есть ли number_range
