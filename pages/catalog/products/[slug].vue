@@ -412,11 +412,14 @@ const parentCategories = computed(() => {
     .slice(0, -1) // Убираем последний элемент (товар)
     .filter(crumb => crumb.href && crumb.name !== categoryName.value) // Убираем текущую категорию
     .map(crumb => {
-      const slug = crumb.href?.replace('/catalog/', '')
+      // Берем только последнюю часть пути (slug категории)
+      // Например: /catalog/boys/mashinki -> mashinki
+      const slug = crumb.href?.split('/').pop()
       const category = categoriesStore.allCategories.find(c => c.slug === slug)
 
       console.log('parentCategories:', {
         crumb: crumb.name,
+        href: crumb.href,
         slug,
         found: !!category,
         hasImage: !!category?.image_url,
