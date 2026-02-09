@@ -394,6 +394,21 @@ const metaDescription = computed(() => {
 const categoryName = computed(() => product.value?.categories?.name)
 const categorySlug = computed(() => product.value?.categories?.slug)
 
+// Получаем полные данные категории из store (как в catalog/[...slug].vue)
+const fullCategory = computed(() => {
+  if (!categorySlug.value || !categoriesStore.allCategories.length)
+    return null
+  return categoriesStore.allCategories.find(c => c.slug === categorySlug.value)
+})
+
+// Helper для получения категории по href из breadcrumb
+function getCategoryFromHref(href: string | undefined) {
+  if (!href || !categoriesStore.allCategories.length)
+    return null
+  const slug = href.replace('/catalog/', '')
+  return categoriesStore.allCategories.find(c => c.slug === slug)
+}
+
 // Загружаем атрибуты категории чтобы проверить есть ли number_range
 const categoryAttributes = ref<AttributeWithValue[]>([])
 
@@ -481,7 +496,7 @@ const metaKeywords = computed(() => {
 
 // URL логотипа бренда
 const brandLogoUrl = computed(() => {
-  const logoUrl = (product.value?.brands as any)?.logo_url
+  const logoUrl = product.value?.brands?.logo_url
   if (!logoUrl)
     return null
   return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
@@ -489,28 +504,11 @@ const brandLogoUrl = computed(() => {
 
 // URL логотипа линейки
 const productLineLogoUrl = computed(() => {
-  const logoUrl = (product.value as any)?.product_lines?.logo_url
+  const logoUrl = product.value?.product_lines?.logo_url
   if (!logoUrl)
     return null
   return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, IMAGE_SIZES.PRODUCT_LINE_LOGO)
 })
-
-// URL изображения категории
-const categoryImageUrl = computed(() => {
-  const category = product.value?.categories as { image_url?: string | null } | undefined
-  const imageUrl = category?.image_url
-  if (!imageUrl)
-    return null
-  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_IMAGE)
-})
-
-// Helper для получения данных категории из breadcrumb
-function getCategoryFromBreadcrumb(crumb: IBreadcrumbItem) {
-  if (!crumb.href) return null
-  // Извлекаем slug из href (например, /catalog/toys -> toys)
-  const slug = crumb.href.replace('/catalog/', '')
-  return categoriesStore.allCategories.find(cat => cat.slug === slug)
-}
 
 // Ссылки для SEO блока "Ещё товары"
 const brandLink = computed(() => {
@@ -829,7 +827,7 @@ useHead(() => ({
                         :src="brandLogoUrl"
                         :alt="brandName || 'Бренд'"
                         :bucket-name="BUCKET_NAME_BRANDS"
-                        :file-path="product.brands.logo_url"
+                        :file-path="product.brands.logo_url || undefined"
                         aspect-ratio="square"
                         object-fit="contain"
                         placeholder-type="shimmer"
@@ -851,11 +849,11 @@ useHead(() => ({
                   >
                     <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
-                        v-if="(product as any)?.product_lines?.logo_url"
+                        v-if="product.product_lines?.logo_url"
                         :src="productLineLogoUrl"
                         :alt="productLineName || 'Линейка'"
                         :bucket-name="BUCKET_NAME_PRODUCT_LINES"
-                        :file-path="(product as any).product_lines.logo_url"
+                        :file-path="product.product_lines!.logo_url || undefined"
                         aspect-ratio="square"
                         object-fit="contain"
                         placeholder-type="shimmer"
@@ -868,11 +866,11 @@ useHead(() => ({
                   <span v-else-if="productLineName" class="inline-flex items-center gap-1.5">
                     <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
-                        v-if="(product as any)?.product_lines?.logo_url"
+                        v-if="product.product_lines?.logo_url"
                         :src="productLineLogoUrl"
                         :alt="productLineName || 'Линейка'"
                         :bucket-name="BUCKET_NAME_PRODUCT_LINES"
-                        :file-path="(product as any).product_lines.logo_url"
+                        :file-path="product.product_lines!.logo_url || undefined"
                         aspect-ratio="square"
                         object-fit="contain"
                         placeholder-type="shimmer"
@@ -1158,7 +1156,7 @@ useHead(() => ({
                     :src="brandLogoUrl"
                     :alt="brandName || 'Бренд'"
                     :bucket-name="BUCKET_NAME_BRANDS"
-                    :file-path="product.brands.logo_url"
+                    :file-path="product.brands.logo_url || undefined"
                     aspect-ratio="square"
                     object-fit="contain"
                     placeholder-type="shimmer"
@@ -1185,11 +1183,11 @@ useHead(() => ({
               >
                 <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
                   <ProgressiveImage
-                    v-if="(product as any)?.product_lines?.logo_url"
+                    v-if="product.product_lines?.logo_url"
                     :src="productLineLogoUrl"
                     :alt="productLineName || 'Линейка'"
                     :bucket-name="BUCKET_NAME_PRODUCT_LINES"
-                    :file-path="(product as any).product_lines.logo_url"
+                    :file-path="product.product_lines!.logo_url || undefined"
                     aspect-ratio="square"
                     object-fit="contain"
                     placeholder-type="shimmer"
@@ -1216,15 +1214,15 @@ useHead(() => ({
               >
                 <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
                   <ProgressiveImage
-                    v-if="(product.categories as any)?.image_url"
-                    :src="categoryImageUrl"
+                    v-if="fullCategory?.image_url"
+                    :src="getImageUrl(BUCKET_NAME_CATEGORY, fullCategory.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
                     :alt="categoryName || 'Категория'"
                     :bucket-name="BUCKET_NAME_CATEGORY"
-                    :file-path="(product.categories as any).image_url || undefined"
+                    :file-path="fullCategory.image_url || undefined"
                     aspect-ratio="square"
-                    object-fit="cover"
+                    object-fit="contain"
                     placeholder-type="shimmer"
-                    class="w-full h-full"
+                    class="w-full h-full p-1.5"
                   />
                   <Icon v-else name="lucide:box" class="w-6 h-6 text-muted-foreground" />
                 </div>
@@ -1248,15 +1246,15 @@ useHead(() => ({
                 >
                   <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
                     <ProgressiveImage
-                      v-if="getCategoryFromBreadcrumb(crumb)?.image_url"
-                      :src="getImageUrl(BUCKET_NAME_CATEGORY, getCategoryFromBreadcrumb(crumb)!.image_url as string, IMAGE_SIZES.CATEGORY_IMAGE)"
+                      v-if="getCategoryFromHref(crumb.href)?.image_url"
+                      :src="getImageUrl(BUCKET_NAME_CATEGORY, getCategoryFromHref(crumb.href)!.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
                       :alt="crumb.name"
                       :bucket-name="BUCKET_NAME_CATEGORY"
-                      :file-path="getCategoryFromBreadcrumb(crumb)!.image_url || undefined"
+                      :file-path="getCategoryFromHref(crumb.href)!.image_url || undefined"
                       aspect-ratio="square"
-                      object-fit="cover"
+                      object-fit="contain"
                       placeholder-type="shimmer"
-                      class="w-full h-full"
+                      class="w-full h-full p-1.5"
                     />
                     <Icon v-else name="lucide:layers" class="w-6 h-6 text-muted-foreground" />
                   </div>
