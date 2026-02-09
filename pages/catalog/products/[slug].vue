@@ -401,13 +401,38 @@ const fullCategory = computed(() => {
   return categoriesStore.allCategories.find(c => c.slug === categorySlug.value)
 })
 
-// Helper для получения категории по href из breadcrumb
-function getCategoryFromHref(href: string | undefined) {
-  if (!href || !categoriesStore.allCategories.length)
-    return null
-  const slug = href.replace('/catalog/', '')
-  return categoriesStore.allCategories.find(c => c.slug === slug)
-}
+// Получаем родительские категории с полными данными из store
+const parentCategories = computed(() => {
+  if (!categoriesStore.allCategories.length) {
+    console.log('parentCategories: allCategories is empty')
+    return []
+  }
+
+  const result = breadcrumbs.value
+    .slice(0, -1) // Убираем последний элемент (товар)
+    .filter(crumb => crumb.href && crumb.name !== categoryName.value) // Убираем текущую категорию
+    .map(crumb => {
+      const slug = crumb.href?.replace('/catalog/', '')
+      const category = categoriesStore.allCategories.find(c => c.slug === slug)
+
+      console.log('parentCategories:', {
+        crumb: crumb.name,
+        slug,
+        found: !!category,
+        hasImage: !!category?.image_url,
+        imageUrl: category?.image_url,
+      })
+
+      return {
+        crumb,
+        category,
+      }
+    })
+    .filter(item => item.category) // Оставляем только найденные категории
+
+  console.log('parentCategories result:', result.length, 'categories')
+  return result
+})
 
 // Загружаем атрибуты категории чтобы проверить есть ли number_range
 const categoryAttributes = ref<AttributeWithValue[]>([])
@@ -1238,37 +1263,36 @@ useHead(() => ({
               </NuxtLink>
 
               <!-- Родительские категории из breadcrumbs -->
-              <template v-for="crumb in breadcrumbs.slice(0, -1)" :key="crumb.id">
-                <NuxtLink
-                  v-if="crumb.href && crumb.name !== categoryName"
-                  :to="crumb.href"
-                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-                >
-                  <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
-                    <ProgressiveImage
-                      v-if="getCategoryFromHref(crumb.href)?.image_url"
-                      :src="getImageUrl(BUCKET_NAME_CATEGORY, getCategoryFromHref(crumb.href)!.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
-                      :alt="crumb.name"
-                      :bucket-name="BUCKET_NAME_CATEGORY"
-                      :file-path="getCategoryFromHref(crumb.href)!.image_url || undefined"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full p-1.5"
-                    />
-                    <Icon v-else name="lucide:layers" class="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-base leading-tight">
-                      {{ crumb.name }}
-                    </p>
-                    <p class="text-sm text-muted-foreground mt-0.5">
-                      Категория
-                    </p>
-                  </div>
-                  <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary shrink-0" />
-                </NuxtLink>
-              </template>
+              <NuxtLink
+                v-for="item in parentCategories"
+                :key="item.crumb.id"
+                :to="item.crumb.href!"
+                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
+              >
+                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
+                  <ProgressiveImage
+                    v-if="item.category?.image_url"
+                    :src="getImageUrl(BUCKET_NAME_CATEGORY, item.category.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+                    :alt="item.crumb.name"
+                    :bucket-name="BUCKET_NAME_CATEGORY"
+                    :file-path="item.category.image_url || undefined"
+                    aspect-ratio="square"
+                    object-fit="contain"
+                    placeholder-type="shimmer"
+                    class="w-full h-full p-1.5"
+                  />
+                  <Icon v-else name="lucide:layers" class="w-6 h-6 text-muted-foreground" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-base leading-tight">
+                    {{ item.crumb.name }}
+                  </p>
+                  <p class="text-sm text-muted-foreground mt-0.5">
+                    Категория
+                  </p>
+                </div>
+                <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary shrink-0" />
+              </NuxtLink>
             </div>
           </div>
           <!-- Вопросы и ответы -->
