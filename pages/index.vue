@@ -690,7 +690,9 @@ useRobotsRule({ index: true, follow: true })
     </ClientOnly>
 
     <!-- Карусель брендов (стиль Instagram Stories) -->
-    <HomeBrandsCarousel v-if="topBrands && topBrands.length > 0" :brands="topBrands" />
+    <div :class="desktopContainedClass">
+      <HomeBrandsCarousel v-if="topBrands && topBrands.length > 0" :brands="topBrands" />
+    </div>
 
     <!-- Баннеры -->
     <div :class="alwaysContainedClass">

@@ -6,7 +6,6 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { carouselContainerVariants } from '@/lib/variants'
 
 const { getImageUrl } = useSupabaseStorage()
-const containerClass = carouselContainerVariants({ contained: 'desktop' })
 
 interface Props {
   brands: Brand[]
@@ -23,10 +22,10 @@ function getBrandLogoUrl(logoUrl: string | null) {
 
 <template>
   <section class="py-8 md:py-12 bg-linear-to-b from-background to-muted/10">
-    <div :class="`${containerClass} mx-auto px-4`">
+    <div class="mx-auto px-4">
       <!-- Заголовок с кнопкой -->
       <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl md:text-3xl font-bold">
+        <h2 class="text-xl md:text-3xl font-bold">
           Популярные бренды
         </h2>
         <NuxtLink
@@ -40,10 +39,6 @@ function getBrandLogoUrl(logoUrl: string | null) {
 
       <!-- Карусель брендов (стиль Instagram Stories) -->
       <div class="relative">
-        <!-- Градиенты для краёв -->
-        <div class="absolute left-0 top-0 bottom-0 w-12 bg-linear-to-r from-background to-transparent z-10 pointer-events-none" />
-        <div class="absolute right-0 top-0 bottom-0 w-12 bg-linear-to-l from-background to-transparent z-10 pointer-events-none" />
-
         <!-- Скроллящийся контейнер -->
         <div class="overflow-x-auto scrollbar-hide -mx-2">
           <div class="flex gap-4 md:gap-6 px-2 py-2">
@@ -56,7 +51,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
               <!-- Круглый аватар с градиентной рамкой (как в Instagram) -->
               <div class="relative">
                 <!-- Градиентная рамка -->
-                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-[2px] group-hover:p-[3px] transition-all duration-300">
+                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-0.5 group-hover:p-0.75 transition-all duration-300">
                   <!-- Белый фон -->
                   <div class="w-full h-full rounded-full bg-background p-0.75">
                     <!-- Логотип бренда -->

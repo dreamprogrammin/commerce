@@ -17,7 +17,7 @@ const containerClass = carouselContainerVariants({ contained: 'desktop' })
   <section class="py-4">
     <!-- 1. Если идет загрузка, показываем скелетон -->
     <div v-if="isLoading" :class="containerClass">
-      <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-8">
+      <h2 class="text2xl md:text-3xl font-bold tracking-tight mb-8">
         {{ props.title }}
       </h2>
       <ProductCarouselSkeleton />
@@ -27,7 +27,7 @@ const containerClass = carouselContainerVariants({ contained: 'desktop' })
     <ProductCarousel v-else-if="products && products.length > 0" :products="products">
       <template #header>
         <div class="flex justify-between items-center mb-8">
-          <h2 class="text-2xl md:text-3xl font-bold tracking-tight">
+          <h2 class="text-xl md:text-3xl font-bold tracking-tight">
             {{ props.title }}
           </h2>
           <Button v-if="products.length > 4" as-child variant="link">
