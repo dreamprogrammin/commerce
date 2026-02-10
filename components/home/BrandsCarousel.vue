@@ -40,7 +40,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
       <!-- Карусель брендов (стиль Instagram Stories) -->
       <div class="relative">
         <!-- Скроллящийся контейнер -->
-        <div class="overflow-x-auto scrollbar-hide -mx-2">
+        <div class="overflow-x-auto scrollbar-hide">
           <div class="flex gap-4 md:gap-6 pl-2 py-2">
             <NuxtLink
               v-for="brand in brands"
