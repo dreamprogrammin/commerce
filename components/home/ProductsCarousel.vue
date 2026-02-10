@@ -17,7 +17,7 @@ const containerClass = carouselContainerVariants({ contained: 'desktop' })
   <section class="py-4">
     <!-- 1. Если идет загрузка, показываем скелетон -->
     <div v-if="isLoading" :class="containerClass">
-      <h2 class="text2xl md:text-3xl font-bold tracking-tight mb-8">
+      <h2 class="text-xl md:text-3xl font-bold tracking-tight mb-8">
         {{ props.title }}
       </h2>
       <ProductCarouselSkeleton />
