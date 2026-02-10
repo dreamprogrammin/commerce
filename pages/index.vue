@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Brand, CategoryRow, ProductLine, ProductWithGallery, RecommendedProduct } from '@/types'
+import { toRaw } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useSlides } from '@/composables/slides/useSlides'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -60,7 +61,8 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
 
     if (isLoggedIn.value) {
       await wishlistStore.fetchWishlistProducts()
-      wishlist = wishlistStore.wishlistProducts as ProductWithGallery[]
+      // Создаем новый массив для правильного кеширования в TanStack Query
+      wishlist = [...toRaw(wishlistStore.wishlistProducts)]
     }
 
     return {

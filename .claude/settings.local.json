@@ -82,7 +82,8 @@
       "Bash(pnpm exec vue-tsc:*)",
       "Bash(pnpm exec nuxi typecheck:*)",
       "Bash(supabase db start:*)",
-      "Bash(supabase db psql:*)"
+      "Bash(supabase db psql:*)",
+      "Bash(pnpm run typecheck:*)"
     ]
   }
 }
