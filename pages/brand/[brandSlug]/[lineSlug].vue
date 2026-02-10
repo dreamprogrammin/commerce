@@ -175,34 +175,22 @@ const siteName = 'Ухтышка'
 
 const pageUrl = computed(() => `${siteUrl}/brand/${brandSlug}/${lineSlug}`)
 
-// Meta Title: приоритет meta_title > seo_title > автогенерация
+// Meta Title: автогенерация из названия линейки и бренда
 const metaTitle = computed(() => {
   if (!productLine.value || !brand.value) {
     return 'Линейка не найдена'
   }
 
-  // Приоритет: meta_title > seo_title > автогенерация
-  if (productLine.value.meta_title) {
-    return productLine.value.meta_title
-  }
-  if (productLine.value.seo_title) {
-    return productLine.value.seo_title
-  }
-
   return `${productLine.value.name} от ${brand.value.name} - Купить в Алматы | ${siteName}`
 })
 
-// SEO описание: приоритет meta_description > seo_description > description > автогенерация
+// SEO описание: приоритет seo_description > description > автогенерация
 const metaDescription = computed(() => {
   if (!productLine.value || !brand.value) {
     return `Товары линейки в ${siteName}`
   }
 
-  // Приоритет: meta_description > seo_description > description > автогенерация
-  if (productLine.value.meta_description) {
-    return productLine.value.meta_description
-  }
-
+  // Приоритет: seo_description > description > автогенерация
   if (productLine.value.seo_description) {
     return productLine.value.seo_description
   }
