@@ -29,6 +29,10 @@ definePageMeta({
   layout: 'home',
 })
 
+const nuxtApp = useNuxtApp()
+// Кеш useAsyncData: при клиентской навигации отдаёт данные мгновенно из payload
+const getCachedData = (key: string) => nuxtApp.payload.data[key] || nuxtApp.static.data[key]
+
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 const desktopContainedClass = carouselContainerVariants({ contained: 'desktop' })
 
@@ -48,7 +52,7 @@ const { data: recommendationsSsrData } = await useAsyncData(
       wishlist: [] as ProductWithGallery[], // Wishlist только на клиенте (требует auth)
     }
   },
-  { server: true, lazy: false },
+  { server: true, lazy: false, getCachedData },
 )
 
 // TanStack Query с SSR данными
@@ -89,7 +93,7 @@ const showRecommendationsSkeleton = computed(() =>
 const { data: popularSsrData } = await useAsyncData(
   'home-popular-ssr',
   () => productsStore.fetchPopularProducts(10),
-  { server: true, lazy: false },
+  { server: true, lazy: false, getCachedData },
 )
 
 const popularQuery = useQuery<ProductWithGallery[]>({
@@ -112,7 +116,7 @@ const popularProducts = computed<ProductWithGallery[]>(() => popularProductsData
 const { data: newestSsrData } = await useAsyncData(
   'home-newest-ssr',
   () => productsStore.fetchNewestProducts(10),
-  { server: true, lazy: false },
+  { server: true, lazy: false, getCachedData },
 )
 
 const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery<ProductWithGallery[]>({
@@ -144,7 +148,7 @@ const { data: categoriesSsrData } = await useAsyncData(
     await popularCategoriesStore.fetchPopularCategories()
     return popularCategoriesStore.popularCategories
   },
-  { server: true, lazy: false },
+  { server: true, lazy: false, getCachedData },
 )
 
 // Загрузка категорий для SEO schema с SSR данными
@@ -180,7 +184,7 @@ const { data: brandsSchemaSsrData } = await useAsyncData(
     }
     return data || []
   },
-  { server: true, lazy: false },
+  { server: true, lazy: false, getCachedData },
 )
 
 // Загрузка брендов для SEO schema с SSR данными
@@ -220,7 +224,7 @@ const { data: brandsSsrData } = await useAsyncData('home-top-brands-ssr', async 
   }
 
   return data
-}, { server: true, lazy: false })
+}, { server: true, lazy: false, getCachedData })
 
 // Загрузка брендов с TanStack Query для кеширования
 const { data: topBrands } = useQuery({
@@ -262,7 +266,7 @@ const { data: productLinesSsrData } = await useAsyncData(
     }
     return data || []
   },
-  { server: true, lazy: false },
+  { server: true, lazy: false, getCachedData },
 )
 
 // Загрузка товарных линеек для SEO schema с SSR данными
