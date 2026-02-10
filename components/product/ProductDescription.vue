@@ -12,24 +12,12 @@ const emit = defineEmits<{
   'toggle-expand': []
 }>()
 
-// ТЕСТ: Всегда показываем кнопку для отладки
+// Проверяем, нужна ли кнопка "Читать далее"
 const needsExpand = computed(() => {
-  console.log('✅ Component mounted! Description exists:', !!props.product.description)
-  return true // Всегда показываем кнопку для теста
-})
-
-function handleToggle() {
-  alert('🎉 Клик работает! isExpanded = ' + props.isExpanded)
-  console.log('🔵 Toggle clicked! Current state:', props.isExpanded)
-  emit('toggle-expand')
-}
-
-// Отладка при монтировании
-onMounted(() => {
-  console.log('🟢 ProductDescription mounted!', {
-    hasDescription: !!props.product.description,
-    isExpanded: props.isExpanded
-  })
+  if (!props.product.description) return false
+  // Убираем HTML теги для подсчета длины текста
+  const plainText = props.product.description.replace(/<[^>]*>/g, '').trim()
+  return plainText.length > 300
 })
 </script>
 
@@ -48,7 +36,7 @@ onMounted(() => {
       v-if="needsExpand"
       type="button"
       class="text-primary text-sm font-medium hover:underline inline-flex items-center gap-1"
-      @click="handleToggle"
+      @click="emit('toggle-expand')"
     >
       {{ isExpanded ? 'Свернуть' : 'Читать далее' }}
       <Icon :name="isExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'" class="w-4 h-4" />
