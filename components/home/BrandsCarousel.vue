@@ -24,7 +24,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
   <section class="py-8 md:py-12 bg-linear-to-b from-background to-muted/10">
     <div>
       <!-- Заголовок с кнопкой -->
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center justify-between mb-6 px-2">
         <h2 class="text-xl md:text-3xl font-bold">
           Популярные бренды
         </h2>
