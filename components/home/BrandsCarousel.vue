@@ -41,7 +41,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
       <div class="relative">
         <!-- Скроллящийся контейнер -->
         <div class="overflow-x-auto scrollbar-hide -mx-2">
-          <div class="flex gap-4 md:gap-6 px-2 py-2">
+          <div class="flex gap-4 md:gap-6 py-2">
             <NuxtLink
               v-for="brand in brands"
               :key="brand.id"
