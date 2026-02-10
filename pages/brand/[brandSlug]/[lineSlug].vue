@@ -403,7 +403,7 @@ useRobotsRule({
         </div>
 
         <!-- Hero skeleton -->
-        <div class="bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12">
+        <div class="bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12">
           <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
             <Skeleton class="w-20 h-20 md:w-32 md:h-32 rounded-xl md:rounded-2xl" />
             <div class="flex-1 space-y-3 md:space-y-4 text-center md:text-left w-full">
@@ -467,15 +467,15 @@ useRobotsRule({
       <Breadcrumbs :items="breadcrumbs" />
 
       <!-- Hero section с градиентом -->
-      <div class="relative overflow-hidden bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
+      <div class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
         <!-- Декоративные элементы -->
-        <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-0" />
-        <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -z-0" />
+        <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl z-0" />
+        <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl z-0" />
 
         <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
           <!-- Логотип линейки (или бренда если нет) -->
           <div
-            class="flex-shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
+            class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
           >
             <ProgressiveImage
               v-if="lineLogoUrl"
@@ -507,7 +507,7 @@ useRobotsRule({
 
           <!-- Информация о линейке -->
           <div class="flex-1 text-center md:text-left">
-            <h1 class="text-2xl md:text-5xl font-bold mb-2 md:mb-4 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+            <h1 class="text-2xl md:text-5xl font-bold mb-2 md:mb-4 bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
               {{ productLine.name }}
             </h1>
             <!-- Бренд -->
