@@ -6,6 +6,7 @@ import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import BrandDescription from '@/components/brand/BrandDescription.vue'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -357,7 +358,7 @@ useRobotsRule({
         </div>
 
         <!-- Hero skeleton -->
-        <div class="bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12">
+        <div class="bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12">
           <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
             <Skeleton class="w-20 h-20 md:w-32 md:h-32 rounded-xl md:rounded-2xl" />
             <div class="flex-1 space-y-3 md:space-y-4 text-center md:text-left w-full">
@@ -399,15 +400,15 @@ useRobotsRule({
       <Breadcrumbs :items="breadcrumbs" />
 
       <!-- Hero section с градиентом -->
-      <div class="relative overflow-hidden bg-gradient-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
+      <div class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
         <!-- Декоративные элементы (скрыты на мобилке для производительности) -->
-        <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-0" />
-        <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -z-0" />
+        <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl z-0" />
+        <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl z-0" />
 
         <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
           <!-- Логотип бренда -->
           <div
-            class="flex-shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
+            class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
           >
             <ProgressiveImage
               v-if="brand.logo_url"
@@ -430,7 +431,7 @@ useRobotsRule({
 
           <!-- Информация о бренде -->
           <div class="flex-1 text-center md:text-left">
-            <h1 class="text-2xl md:text-5xl font-bold mb-3 md:mb-6 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+            <h1 class="text-2xl md:text-5xl font-bold mb-3 md:mb-6 bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
               {{ brand.name }}
             </h1>
 
@@ -531,7 +532,7 @@ useRobotsRule({
           <!-- Контент (сворачивается/разворачивается) -->
           <div
             class="overflow-hidden transition-all duration-300 ease-in-out"
-            :class="isSeoExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
+            :class="isSeoExpanded ? 'max-h-250 opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
           >
             <BrandDescription :brand="brand" />
 
