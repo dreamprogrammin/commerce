@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductWithImages } from '@/types'
+import type { Brand, CategoryRow, ProductLine, ProductWithGallery, RecommendedProduct } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
 import { useSlides } from '@/composables/slides/useSlides'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -31,6 +31,12 @@ definePageMeta({
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 const desktopContainedClass = carouselContainerVariants({ contained: 'desktop' })
 
+// 🔧 Упрощенный тип для TanStack Query (избегаем глубокой инстанциации)
+type HomePersonalData = {
+  recommended: RecommendedProduct[]
+  wishlist: ProductWithGallery[]
+}
+
 // ✅ SSR prefetch для рекомендаций
 const { data: recommendationsSsrData } = await useAsyncData(
   'home-recommendations-ssr',
@@ -38,23 +44,28 @@ const { data: recommendationsSsrData } = await useAsyncData(
     const recommended = await recommendationsStore.fetchRecommendations()
     return {
       recommended: recommended || [],
-      wishlist: [], // Wishlist только на клиенте (требует auth)
+      wishlist: [] as ProductWithGallery[], // Wishlist только на клиенте (требует auth)
     }
   },
   { server: true, lazy: false },
 )
 
 // TanStack Query с SSR данными
-const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching: isFetchingRecommendations } = useQuery({
+// @ts-expect-error - Type instantiation depth issue with TanStack Query + Supabase complex types. Functionally correct.
+const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching: isFetchingRecommendations } = useQuery<HomePersonalData>({
   queryKey: ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value],
-  queryFn: async () => {
-    const [recommended, wishlist] = await Promise.all([
-      recommendationsStore.fetchRecommendations(),
-      isLoggedIn.value ? wishlistStore.fetchWishlistProducts() : [],
-    ])
+  queryFn: async (): Promise<HomePersonalData> => {
+    const recommended = await recommendationsStore.fetchRecommendations()
+    let wishlist: ProductWithGallery[] = []
+
+    if (isLoggedIn.value) {
+      await wishlistStore.fetchWishlistProducts()
+      wishlist = wishlistStore.wishlistProducts as ProductWithGallery[]
+    }
+
     return {
       recommended: recommended || [],
-      wishlist: Array.isArray(wishlist) ? wishlist : [],
+      wishlist: wishlist || [],
     }
   },
   staleTime: 5 * 60 * 1000, // 5 минут (было 3)
@@ -64,8 +75,8 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
   refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
 })
 
-const recommendedProducts = computed(() => mainPersonalData.value?.recommended || [])
-const wishlistProducts = computed(() => mainPersonalData.value?.wishlist || [])
+const recommendedProducts = computed<RecommendedProduct[]>(() => mainPersonalData.value?.recommended || [])
+const wishlistProducts = computed<ProductWithGallery[]>(() => mainPersonalData.value?.wishlist || [])
 
 const showRecommendationsSkeleton = computed(() =>
   (isLoadingRecommendations.value || isFetchingRecommendations.value)
@@ -79,8 +90,7 @@ const { data: popularSsrData } = await useAsyncData(
   { server: true, lazy: false },
 )
 
-// @ts-expect-error - Deep type instantiation with TanStack Query
-const popularQuery = useQuery<ProductWithImages[]>({
+const popularQuery = useQuery<ProductWithGallery[]>({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
   staleTime: 5 * 60 * 1000, // 5 минут (было 3)
@@ -94,7 +104,7 @@ const popularProductsData = popularQuery.data
 const isLoadingPopular = popularQuery.isLoading
 const isFetchingPopular = popularQuery.isFetching
 
-const popularProducts = computed(() => popularProductsData.value || [])
+const popularProducts = computed<ProductWithGallery[]>(() => popularProductsData.value || [])
 
 // ✅ SSR prefetch для новинок
 const { data: newestSsrData } = await useAsyncData(
@@ -103,7 +113,7 @@ const { data: newestSsrData } = await useAsyncData(
   { server: true, lazy: false },
 )
 
-const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery({
+const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery<ProductWithGallery[]>({
   queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
   staleTime: 5 * 60 * 1000, // 5 минут (было 3)
@@ -113,7 +123,7 @@ const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetc
   refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
 })
 
-const newestProducts = computed(() => newestProductsData.value || [])
+const newestProducts = computed<ProductWithGallery[]>(() => newestProductsData.value || [])
 
 const showPopularSkeleton = computed(() =>
   (isLoadingPopular.value || isFetchingPopular.value) && !popularProductsData.value,
@@ -125,8 +135,18 @@ const showNewestSkeleton = computed(() =>
 
 const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value || showPopularSkeleton.value)
 
-// Загрузка категорий для SEO schema
-const { data: categoriesData } = await useQuery({
+// ✅ SSR prefetch для категорий (SEO schema)
+const { data: categoriesSsrData } = await useAsyncData(
+  'home-categories-schema-ssr',
+  async () => {
+    await popularCategoriesStore.fetchPopularCategories()
+    return popularCategoriesStore.popularCategories
+  },
+  { server: true, lazy: false },
+)
+
+// Загрузка категорий для SEO schema с SSR данными
+const { data: categoriesData } = useQuery<CategoryRow[]>({
   queryKey: ['home-categories-schema'],
   queryFn: async () => {
     await popularCategoriesStore.fetchPopularCategories()
@@ -134,13 +154,35 @@ const { data: categoriesData } = await useQuery({
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
+  initialData: categoriesSsrData.value || undefined,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
 })
 
 const popularCategoriesForSchema = computed(() => categoriesData.value || [])
 
-// Загрузка брендов для SEO schema
+// ✅ SSR prefetch для брендов (SEO schema)
 const supabase = useSupabaseClient()
-const { data: brandsData } = await useQuery({
+const { data: brandsSchemaSsrData } = await useAsyncData(
+  'home-brands-schema-ssr',
+  async () => {
+    const { data, error } = await supabase
+      .from('brands')
+      .select('id, name, slug, logo_url, description, seo_description, seo_keywords')
+      .order('name', { ascending: true })
+      .limit(20)
+
+    if (error) {
+      console.error('Error fetching brands for schema:', error)
+      return []
+    }
+    return data || []
+  },
+  { server: true, lazy: false },
+)
+
+// Загрузка брендов для SEO schema с SSR данными
+const { data: brandsData } = useQuery<Brand[]>({
   queryKey: ['home-brands-schema'],
   queryFn: async () => {
     const { data, error } = await supabase
@@ -155,6 +197,9 @@ const { data: brandsData } = await useQuery({
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
+  initialData: brandsSchemaSsrData.value || undefined,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
 })
 
 const brandsForSchema = computed(() => brandsData.value || [])
@@ -199,8 +244,27 @@ const { data: topBrands } = useQuery({
   refetchOnWindowFocus: false,
 })
 
-// Загрузка товарных линеек для SEO schema
-const { data: productLinesData } = await useQuery({
+// ✅ SSR prefetch для товарных линеек (SEO schema)
+const { data: productLinesSsrData } = await useAsyncData(
+  'home-product-lines-schema-ssr',
+  async () => {
+    const { data, error } = await supabase
+      .from('product_lines')
+      .select('id, name, slug, logo_url, description, brand_id')
+      .order('name', { ascending: true })
+      .limit(30)
+
+    if (error) {
+      console.error('Error fetching product lines for schema:', error)
+      return []
+    }
+    return data || []
+  },
+  { server: true, lazy: false },
+)
+
+// Загрузка товарных линеек для SEO schema с SSR данными
+const { data: productLinesData } = useQuery<ProductLine[]>({
   queryKey: ['home-product-lines-schema'],
   queryFn: async () => {
     const { data, error } = await supabase
@@ -215,6 +279,9 @@ const { data: productLinesData } = await useQuery({
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
+  initialData: productLinesSsrData.value || undefined,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
 })
 
 const productLinesForSchema = computed(() => productLinesData.value || [])
