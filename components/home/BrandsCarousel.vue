@@ -22,7 +22,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
 
 <template>
   <section class="py-8 md:py-12 bg-linear-to-b from-background to-muted/10">
-    <div class="mx-auto px-4">
+    <div>
       <!-- Заголовок с кнопкой -->
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl md:text-3xl font-bold">
