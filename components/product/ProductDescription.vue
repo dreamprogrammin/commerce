@@ -12,25 +12,25 @@ const emit = defineEmits<{
   'toggle-expand': []
 }>()
 
-// Проверяем, нужна ли кнопка "Читать далее"
+// ТЕСТ: Всегда показываем кнопку для отладки
 const needsExpand = computed(() => {
-  if (!props.product.description) return false
-  // Убираем HTML теги для подсчета длины текста
-  const plainText = props.product.description.replace(/<[^>]*>/g, '').trim()
-  const shouldExpand = plainText.length > 100 // Уменьшил порог для тестирования
-  console.log('🔍 ProductDescription:', {
-    plainTextLength: plainText.length,
-    shouldExpand,
-    isExpanded: props.isExpanded,
-    rawDescription: props.product.description?.substring(0, 100) + '...'
-  })
-  return shouldExpand
+  console.log('✅ Component mounted! Description exists:', !!props.product.description)
+  return true // Всегда показываем кнопку для теста
 })
 
 function handleToggle() {
+  alert('🎉 Клик работает! isExpanded = ' + props.isExpanded)
   console.log('🔵 Toggle clicked! Current state:', props.isExpanded)
   emit('toggle-expand')
 }
+
+// Отладка при монтировании
+onMounted(() => {
+  console.log('🟢 ProductDescription mounted!', {
+    hasDescription: !!props.product.description,
+    isExpanded: props.isExpanded
+  })
+})
 </script>
 
 <template>

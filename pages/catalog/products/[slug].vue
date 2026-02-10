@@ -13,6 +13,7 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
+import ProductDescription from '@/components/product/ProductDescription.vue'
 
 const route = useRoute()
 const router = useRouter()
