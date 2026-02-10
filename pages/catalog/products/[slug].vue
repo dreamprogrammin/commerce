@@ -31,6 +31,12 @@ const selectedAccessoryIds = ref<string[]>([])
 
 const isDescriptionExpanded = ref(false)
 
+function toggleDescription() {
+  console.log('🟢 Toggle description! Before:', isDescriptionExpanded.value)
+  isDescriptionExpanded.value = !isDescriptionExpanded.value
+  console.log('🟢 After:', isDescriptionExpanded.value)
+}
+
 // 🔥 КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Загружаем категории и продукт на сервере
 if (import.meta.server) {
   // Загружаем категории сначала
@@ -1019,7 +1025,7 @@ useHead(() => ({
             <ProductDescription
               :product="product"
               :is-expanded="isDescriptionExpanded"
-              @toggle-expand="isDescriptionExpanded = !isDescriptionExpanded"
+              @toggle-expand="toggleDescription"
             />
 
             <!-- Таблица характеристик с пунктирными линиями -->
