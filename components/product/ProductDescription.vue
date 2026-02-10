@@ -16,41 +16,28 @@ const emit = defineEmits<{
 const needsExpand = computed(() => {
   if (!props.product.description) return false
   // Убираем HTML теги для подсчета длины текста
-  const plainText = props.product.description.replace(/<[^>]*>/g, '')
-  return plainText.length > 200
-})
-
-// Обрезанный текст для preview
-const truncatedHtml = computed(() => {
-  if (!props.product.description) return ''
-  if (props.isExpanded) return props.product.description
-
-  // Простое обрезание текста (можно улучшить для сохранения HTML структуры)
-  const plainText = props.product.description.replace(/<[^>]*>/g, '')
-  if (plainText.length <= 200) return props.product.description
-
-  return plainText.substring(0, 200) + '...'
+  const plainText = props.product.description.replace(/<[^>]*>/g, '').trim()
+  return plainText.length > 300
 })
 </script>
 
 <template>
-  <div v-if="product.description" class="space-y-2">
-    <div
-      class="product-description text-foreground overflow-hidden transition-all duration-300"
-      :class="{ 'line-clamp-3': !isExpanded && needsExpand }"
-    >
+  <div v-if="product.description" class="space-y-3">
+    <div class="product-description text-foreground">
       <div
-        class="text-sm text-muted-foreground"
-        v-html="isExpanded ? product.description : truncatedHtml"
+        class="text-sm text-muted-foreground transition-all duration-300"
+        :class="{ 'line-clamp-4': !isExpanded && needsExpand, 'line-clamp-none': isExpanded || !needsExpand }"
+        v-html="product.description"
       />
     </div>
 
     <button
       v-if="needsExpand"
-      class="text-primary text-sm font-medium hover:underline"
+      class="text-primary text-sm font-medium hover:underline inline-flex items-center gap-1"
       @click="emit('toggle-expand')"
     >
       {{ isExpanded ? 'Свернуть' : 'Читать далее' }}
+      <Icon :name="isExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'" class="w-4 h-4" />
     </button>
   </div>
 </template>
