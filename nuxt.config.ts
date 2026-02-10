@@ -85,6 +85,7 @@ export default defineNuxtConfig({
       '/cart',
       '/checkout',
       '/search',
+      '/notifications'
     ],
   },
 
