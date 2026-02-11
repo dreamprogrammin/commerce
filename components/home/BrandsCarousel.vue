@@ -41,7 +41,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
       <div class="relative">
         <!-- Скроллящийся контейнер -->
         <div class="overflow-x-auto scrollbar-hide">
-          <div class="flex gap-4 md:gap-6 pl-2 py-2">
+          <div class="flex gap-2 md:gap-6 pl-2 py-2">
             <NuxtLink
               v-for="brand in brands"
               :key="brand.id"
@@ -51,7 +51,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
               <!-- Круглый аватар с градиентной рамкой (как в Instagram) -->
               <div class="relative">
                 <!-- Градиентная рамка -->
-                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-0.5 group-hover:p-0.75 transition-all duration-300">
+                <div class="w-16 h-16 md:w-36 md:h-36 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-0.5 group-hover:p-0.75 transition-all duration-300">
                   <!-- Белый фон -->
                   <div class="w-full h-full rounded-full bg-background p-0.75">
                     <!-- Логотип бренда -->
