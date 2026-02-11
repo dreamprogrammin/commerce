@@ -15,16 +15,13 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
   try {
     // --- СТАТИЧЕСКИЕ СТРАНИЦЫ ---
     const staticPages = [
-      { loc: '/', priority: 1.0, changefreq: 'daily' as const },
-      { loc: '/catalog', priority: 0.9, changefreq: 'daily' as const },
-      { loc: '/brand/all', priority: 0.7, changefreq: 'weekly' as const },
+      { loc: '/', priority: 1.0, changefreq: 'daily' as const, lastmod: '2025-02-11' },
+      { loc: '/catalog', priority: 0.9, changefreq: 'daily' as const, lastmod: '2025-02-11' },
+      { loc: '/brand/all', priority: 0.7, changefreq: 'weekly' as const, lastmod: '2025-02-11' },
     ]
 
     staticPages.forEach((page) => {
-      sitemapRoutes.push({
-        ...page,
-        lastmod: new Date().toISOString(),
-      })
+      sitemapRoutes.push(page)
     })
 
     // --- ТОВАРЫ ---
