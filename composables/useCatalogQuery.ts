@@ -23,16 +23,16 @@ export function useCatalogQuery(
       f.countryIds?.join(',') || '',
       `${f.priceMin}-${f.priceMax}`,
       JSON.stringify(f.attributes || {}),
+      `${f.pieceCountMin}-${f.pieceCountMax}`,
+      JSON.stringify(f.numericAttributes || []),
     ]
   })
 
-  // ✅ Функция загрузки с AbortSignal
-  const queryFn = async ({ signal }: { signal: AbortSignal }) => {
+  const queryFn = async () => {
     const result = await productStore.fetchProducts(
       unref(filters),
       unref(currentPage),
       pageSize,
-      signal,
     )
     return result
   }
