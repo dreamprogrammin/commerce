@@ -804,7 +804,7 @@ useHead(() => ({
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-            <!-- Левая колонка: Галерея -->
+            <!-- Галерея -->
             <div class="lg:col-span-7">
               <div class="bg-white rounded-xl lg:p-4 lg:shadow-sm lg:border">
                 <ProductGallery
@@ -820,7 +820,7 @@ useHead(() => ({
             </div>
 
             <!-- Правая колонка: Информация о товаре -->
-            <div class="lg:col-span-5">
+            <div class="lg:col-span-5 lg:row-span-4 lg:row-start-1 lg:col-start-8">
               <div
                 class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border lg:sticky lg:top-4"
               >
@@ -828,7 +828,7 @@ useHead(() => ({
                   {{ product.name }}
                 </h1>
 
-                <!-- 🔥 Бренд и линейка товара -->
+                <!-- Бренд и линейка товара -->
                 <div v-if="brandName || productLineName" class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-4">
                   <!-- Бренд -->
                   <NuxtLink
@@ -1003,10 +1003,9 @@ useHead(() => ({
                 />
               </div>
             </div>
-          </div>
 
           <!-- О товаре (в стиле detmir.kz) -->
-          <div class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8">
+          <div class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border">
             <h2 class="text-xl font-bold mb-4">
               О товаре
             </h2>
@@ -1141,7 +1140,7 @@ useHead(() => ({
           <!-- Секция "Ещё товары" -->
           <div
             v-if="brandName || categoryName || breadcrumbs.length > 1"
-            class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8"
+            class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
           >
             <h3 class="font-bold text-xl mb-4">
               Ещё товары
@@ -1275,7 +1274,10 @@ useHead(() => ({
             </div>
           </div>
           <!-- Вопросы и ответы -->
-          <ProductQuestions v-if="product.id" :product-id="product.id" />
+          <div class="lg:col-span-7">
+            <ProductQuestions v-if="product.id" :product-id="product.id" />
+          </div>
+          </div>
         </div>
 
         <div v-else class="text-center py-20">
