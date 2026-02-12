@@ -34,8 +34,11 @@ const { data: popularCategories, isLoading, isFetching } = useQuery({
   initialData: ssrData.value || undefined, // Use SSR data as initial data
 })
 
+// ✅ Объединяем SSR и TanStack Query данные для предотвращения hydration mismatch
+const categories = computed(() => popularCategories.value ?? ssrData.value ?? null)
+
 // ✅ Показываем skeleton только когда данных нет И идёт загрузка
-const showSkeleton = computed(() => (isLoading.value || isFetching.value) && !popularCategories.value)
+const showSkeleton = computed(() => (isLoading.value || isFetching.value) && !categories.value)
 
 function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
@@ -113,7 +116,7 @@ onMounted(() => {
       </div>
 
       <!-- Content -->
-      <div v-else-if="popularCategories && popularCategories.length > 0">
+      <div v-else-if="categories && categories.length > 0">
         <!-- MOBILE: Горизонтальный скролл в 2 ряда -->
         <div
           ref="scrollContainer"
@@ -123,7 +126,7 @@ onMounted(() => {
           <div class="flex flex-col gap-3 px-4 pb-2 h-[192px]">
             <div class="flex gap-3 flex-1">
               <NuxtLink
-                v-for="category in popularCategories.filter((_, i) => i % 2 === 0)"
+                v-for="category in categories.filter((_, i) => i % 2 === 0)"
                 :key="category.id"
                 :to="category.href"
                 class="group flex-shrink-0"
@@ -157,7 +160,7 @@ onMounted(() => {
             </div>
             <div class="flex gap-3 flex-1">
               <NuxtLink
-                v-for="category in popularCategories.filter((_, i) => i % 2 === 1)"
+                v-for="category in categories.filter((_, i) => i % 2 === 1)"
                 :key="category.id"
                 :to="category.href"
                 class="group flex-shrink-0"
@@ -196,7 +199,7 @@ onMounted(() => {
         <div class="hidden md:block">
           <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <NuxtLink
-              v-for="category in popularCategories"
+              v-for="category in categories"
               :key="category.id"
               :to="category.href"
               class="group"
