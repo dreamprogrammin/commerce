@@ -14,7 +14,6 @@ interface Props {
 const props = defineProps<Props>()
 
 const headerContainerClass = carouselContainerVariants({ contained: 'always' })
-const carouselContainerClass = carouselContainerVariants({ contained: 'desktop' })
 
 // Получить URL логотипа бренда
 function getBrandLogoUrl(logoUrl: string | null) {
@@ -46,7 +45,6 @@ function getBrandLogoUrl(logoUrl: string | null) {
       <div class="pl-0 -mr-2 sm:-mr-6 lg:mx-auto">
         <Carousel
           class="w-full"
-          :class="carouselContainerClass"
           :opts="{
             align: 'start',
           }"
@@ -69,7 +67,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
                 <!-- Круглый аватар с градиентной рамкой (как в Instagram) -->
                 <div class="relative">
                   <!-- Градиентная рамка -->
-                  <div class="w-16 h-16 md:w-36 md:h-36 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-0.5 group-hover:p-0.75 transition-all duration-300">
+                  <div class="w-16 h-16 md:w-32 md:h-32 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-0.5 group-hover:p-0.75 transition-all duration-300">
                     <!-- Белый фон -->
                     <div class="w-full h-full rounded-full bg-background p-0.75">
                       <!-- Логотип бренда -->
