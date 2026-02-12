@@ -66,7 +66,7 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
     if (isLoggedIn.value) {
       await wishlistStore.fetchWishlistProducts()
       // Создаем новый массив для правильного кеширования в TanStack Query
-      wishlist = [...toRaw(wishlistStore.wishlistProducts)]
+      wishlist = JSON.parse(JSON.stringify(wishlistStore.wishlistProducts)) as ProductWithGallery[]
     }
 
     return {
