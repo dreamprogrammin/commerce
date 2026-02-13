@@ -75,12 +75,9 @@ export const useProfileStore = defineStore('profileStore', () => {
         if (data) {
           profile.value = data
 
-          // 🔍 DEBUG: Логируем обновление профиля для отладки бонусов
-          if (import.meta.client && force) {
-            console.log('[ProfileStore] Profile updated (force=true):', {
-              active_bonus: data.active_bonus_balance,
-              pending_bonus: data.pending_bonus_balance,
-            })
+          // Активируем pending бонусы если есть (замена pg_cron)
+          if (data.pending_bonus_balance > 0) {
+            activatePendingBonuses()
           }
 
           return true
@@ -175,6 +172,39 @@ export const useProfileStore = defineStore('profileStore', () => {
     }
     finally {
       isSaving.value = false
+    }
+  }
+
+  /**
+   * Активирует pending бонусы пользователя (замена pg_cron)
+   * Вызывается автоматически при загрузке профиля
+   */
+  async function activatePendingBonuses() {
+    if (!user.value) return
+
+    try {
+      const { data, error } = await supabase.rpc('activate_my_pending_bonuses')
+
+      if (error) {
+        console.error('[ProfileStore] Bonus activation error:', error)
+        return
+      }
+
+      // Если бонусы были активированы — перезагрузим профиль для обновления балансов
+      if (data?.activated > 0) {
+        const { data: updatedProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.value.id)
+          .single()
+
+        if (updatedProfile) {
+          profile.value = updatedProfile
+        }
+      }
+    }
+    catch (error) {
+      console.error('[ProfileStore] Bonus activation error:', error)
     }
   }
 

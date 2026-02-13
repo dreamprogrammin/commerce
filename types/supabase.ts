@@ -1684,6 +1684,7 @@ export type Database = {
       }
     }
     Functions: {
+      activate_my_pending_bonuses: { Args: Record<string, never>; Returns: Json }
       activate_pending_bonuses: { Args: never; Returns: string }
       cancel_order:
         | {
