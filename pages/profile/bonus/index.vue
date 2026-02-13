@@ -235,8 +235,52 @@ onMounted(() => {
           </p>
         </div>
 
-        <!-- Таблица транзакций -->
-        <div v-else class="rounded-md border">
+        <template v-else>
+          <!-- Мобильный список транзакций -->
+          <div class="space-y-3 md:hidden">
+            <div
+              v-for="transaction in transactions"
+              :key="transaction.id"
+              class="flex items-start gap-3 rounded-lg border p-3"
+            >
+              <component
+                :is="getTransactionIcon(transaction.transaction_type)"
+                class="mt-0.5 h-5 w-5 shrink-0" :class="[getTransactionColor(transaction.transaction_type)]"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-medium text-sm truncate">
+                    {{ getTransactionName(transaction.transaction_type) }}
+                  </span>
+                  <span
+                    class="shrink-0 font-semibold text-sm" :class="[
+                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600',
+                    ]"
+                  >
+                    {{ transaction.amount > 0 ? '+' : '' }}{{ transaction.amount.toLocaleString('ru-RU') }} ₸
+                  </span>
+                </div>
+                <div class="mt-1 flex items-center gap-2 flex-wrap">
+                  <span class="text-xs text-muted-foreground">{{ formatDate(transaction.created_at) }}</span>
+                  <Badge :variant="getStatusVariant(transaction.status)" class="text-[10px] px-1.5 py-0">
+                    {{ getStatusName(transaction.status) }}
+                  </Badge>
+                </div>
+                <div v-if="transaction.activation_date && transaction.status === 'pending'" class="mt-1 text-xs text-muted-foreground">
+                  Активация: {{ formatActivationDate(transaction.activation_date) }}
+                </div>
+                <div class="mt-1 text-xs text-muted-foreground">
+                  Баланс: {{ transaction.balance_after.toLocaleString('ru-RU') }} ₸
+                  <span v-if="transaction.pending_balance_after > 0">
+                    (+{{ transaction.pending_balance_after.toLocaleString('ru-RU') }} в ожидании)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Десктопная таблица транзакций -->
+          <div class="hidden md:block rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -253,12 +297,9 @@ onMounted(() => {
             </TableHeader>
             <TableBody>
               <TableRow v-for="transaction in transactions" :key="transaction.id">
-                <!-- Дата -->
                 <TableCell class="font-medium">
                   {{ formatDate(transaction.created_at) }}
                 </TableCell>
-
-                <!-- Операция -->
                 <TableCell>
                   <div class="flex items-center gap-2">
                     <component
@@ -278,8 +319,6 @@ onMounted(() => {
                     </div>
                   </div>
                 </TableCell>
-
-                <!-- Сумма -->
                 <TableCell class="text-right">
                   <span
                     class="font-semibold" :class="[
@@ -289,15 +328,11 @@ onMounted(() => {
                     {{ transaction.amount > 0 ? '+' : '' }}{{ transaction.amount.toLocaleString('ru-RU') }} ₸
                   </span>
                 </TableCell>
-
-                <!-- Статус -->
                 <TableCell>
                   <Badge :variant="getStatusVariant(transaction.status)">
                     {{ getStatusName(transaction.status) }}
                   </Badge>
                 </TableCell>
-
-                <!-- Баланс после -->
                 <TableCell class="text-right">
                   <div class="flex flex-col items-end">
                     <span class="font-medium">{{ transaction.balance_after.toLocaleString('ru-RU') }} ₸</span>
@@ -309,7 +344,8 @@ onMounted(() => {
               </TableRow>
             </TableBody>
           </Table>
-        </div>
+          </div>
+        </template>
       </CardContent>
     </Card>
   </div>
