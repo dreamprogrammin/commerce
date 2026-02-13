@@ -15,9 +15,9 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
   try {
     // --- СТАТИЧЕСКИЕ СТРАНИЦЫ ---
     const staticPages = [
-      { loc: '/', priority: 1.0, changefreq: 'daily' as const, lastmod: '2025-02-11' },
-      { loc: '/catalog', priority: 0.9, changefreq: 'daily' as const, lastmod: '2025-02-11' },
-      { loc: '/brand/all', priority: 0.7, changefreq: 'weekly' as const, lastmod: '2025-02-11' },
+      { loc: '/', priority: 1.0, changefreq: 'daily' as const, lastmod: new Date().toISOString() },
+      { loc: '/catalog', priority: 0.9, changefreq: 'daily' as const, lastmod: new Date().toISOString() },
+      { loc: '/brand/all', priority: 0.7, changefreq: 'weekly' as const, lastmod: new Date().toISOString() },
     ]
 
     staticPages.forEach((page) => {
@@ -101,13 +101,40 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
         sitemapRoutes.push({
           loc: `/brand/${brand.slug}`,
           lastmod: brand.updated_at ?? new Date().toISOString(),
-          changefreq: 'monthly',
-          priority: 0.6,
+          changefreq: 'weekly',
+          priority: 0.75,
         })
       })
     }
     else {
       console.warn('⚠️ Бренды не найдены в базе данных')
+    }
+
+    // --- ТОВАРНЫЕ ЛИНЕЙКИ ---
+    const { data: productLines, error: productLinesError } = await client
+      .from('product_lines')
+      .select('slug, updated_at, brand_id, brands!inner(slug)')
+      .not('slug', 'is', null)
+      .limit(1000)
+
+    if (productLinesError) {
+      console.error('❌ Ошибка загрузки товарных линеек для sitemap:', productLinesError)
+    }
+
+    console.log(`✅ Sitemap: Загружено ${productLines?.length || 0} товарных линеек`)
+
+    if (productLines && productLines.length > 0) {
+      productLines.forEach((line: any) => {
+        const brandSlug = line.brands?.slug
+        if (brandSlug) {
+          sitemapRoutes.push({
+            loc: `/brand/${brandSlug}/${line.slug}`,
+            lastmod: line.updated_at ?? new Date().toISOString(),
+            changefreq: 'weekly',
+            priority: 0.7,
+          })
+        }
+      })
     }
 
     // ✅ Итоговое логирование

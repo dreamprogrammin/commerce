@@ -990,7 +990,9 @@ useHead(() => {
             }),
             'offers': {
               '@type': 'Offer',
-              'price': product.price,
+              'price': product.discount_percentage
+                ? Math.round(product.price * (100 - product.discount_percentage) / 100)
+                : product.price,
               'priceCurrency': 'KZT',
               'availability': product.stock_quantity > 0
                 ? 'https://schema.org/InStock'
@@ -1000,6 +1002,42 @@ useHead(() => {
               'seller': {
                 '@type': 'Organization',
                 'name': 'Ухтышка',
+              },
+              'hasMerchantReturnPolicy': {
+                '@type': 'MerchantReturnPolicy',
+                'applicableCountry': 'KZ',
+                'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+                'merchantReturnDays': 14,
+                'returnMethod': 'https://schema.org/ReturnByMail',
+                'returnFees': 'https://schema.org/FreeReturn',
+              },
+              'shippingDetails': {
+                '@type': 'OfferShippingDetails',
+                'shippingDestination': {
+                  '@type': 'DefinedRegion',
+                  'addressCountry': 'KZ',
+                  'addressRegion': 'Алматы',
+                },
+                'shippingRate': {
+                  '@type': 'MonetaryAmount',
+                  'value': 0,
+                  'currency': 'KZT',
+                },
+                'deliveryTime': {
+                  '@type': 'ShippingDeliveryTime',
+                  'handlingTime': {
+                    '@type': 'QuantitativeValue',
+                    'minValue': 0,
+                    'maxValue': 1,
+                    'unitCode': 'DAY',
+                  },
+                  'transitTime': {
+                    '@type': 'QuantitativeValue',
+                    'minValue': 1,
+                    'maxValue': 3,
+                    'unitCode': 'DAY',
+                  },
+                },
               },
             },
           },

@@ -681,10 +681,7 @@ useHead(() => ({
         'description': metaDescription.value,
         'image': productImages.value,
         'sku': product.value?.sku || undefined,
-        // TODO: Добавить GTIN (штрих-код) когда появится в БД
-        // 'gtin13': product.value?.gtin || undefined,
-        // TODO: Добавить MPN (номер производителя) когда появится
-        // 'mpn': product.value?.mpn || undefined,
+        ...(product.value?.barcode && { 'gtin': product.value.barcode }),
         // 🔥 Если есть линейка - показываем её как бренд с parentOrganization
         // Это позволяет Google понять иерархию: Mattel → Barbie → Товар
         'brand': productLineName.value
@@ -712,18 +709,56 @@ useHead(() => ({
             },
         'offers': {
           '@type': 'Offer',
-          'price': String(Math.round(product.value?.price || 0)),
+          'price': product.value?.discount_percentage
+            ? Math.round(Number(product.value.price) * (100 - product.value.discount_percentage) / 100)
+            : Math.round(Number(product.value?.price || 0)),
           'priceCurrency': 'KZT',
           'availability': (product.value?.stock_quantity || 0) > 0
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
           'url': canonicalUrl.value,
-          'priceValidUntil': new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 дней
+          'priceValidUntil': new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           'itemCondition': 'https://schema.org/NewCondition',
           'seller': {
             '@type': 'Organization',
             'name': 'Ухтышка',
             'url': 'https://uhti.kz',
+          },
+          'hasMerchantReturnPolicy': {
+            '@type': 'MerchantReturnPolicy',
+            'applicableCountry': 'KZ',
+            'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+            'merchantReturnDays': 14,
+            'returnMethod': 'https://schema.org/ReturnByMail',
+            'returnFees': 'https://schema.org/FreeReturn',
+          },
+          'shippingDetails': {
+            '@type': 'OfferShippingDetails',
+            'shippingRate': {
+              '@type': 'MonetaryAmount',
+              'value': 0,
+              'currency': 'KZT',
+            },
+            'shippingDestination': {
+              '@type': 'DefinedRegion',
+              'addressCountry': 'KZ',
+              'addressRegion': 'Алматы',
+            },
+            'deliveryTime': {
+              '@type': 'ShippingDeliveryTime',
+              'handlingTime': {
+                '@type': 'QuantitativeValue',
+                'minValue': 0,
+                'maxValue': 1,
+                'unitCode': 'DAY',
+              },
+              'transitTime': {
+                '@type': 'QuantitativeValue',
+                'minValue': 1,
+                'maxValue': 3,
+                'unitCode': 'DAY',
+              },
+            },
           },
         },
         // Категория товара с URL

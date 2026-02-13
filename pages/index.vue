@@ -3,7 +3,9 @@ import type { Brand, CategoryRow, ProductLine, ProductWithGallery, RecommendedPr
 import { toRaw } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useSlides } from '@/composables/slides/useSlides'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { carouselContainerVariants } from '@/lib/variants'
+import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -21,6 +23,7 @@ const wishlistStore = useWishlistStore()
 const popularCategoriesStore = usePopularCategoriesStore()
 const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
 
+const { getPublicUrl } = useSupabaseStorage()
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
 const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
@@ -463,8 +466,7 @@ const categoriesListSchema = computed(() => ({
     '@type': 'ListItem',
     'position': index + 1,
     'item': {
-      '@type': 'Thing',
-      'additionalType': 'ProductCategory',
+      '@type': 'WebPage',
       '@id': `${siteUrl}${cat.href}`,
       'name': cat.name,
       'url': `${siteUrl}${cat.href}`,
@@ -496,21 +498,6 @@ const collectionPageSchema = computed(() => ({
     'name': 'Категории детских игрушек',
     'numberOfItems': popularCategoriesForSchema.value.length,
   },
-  'mainEntity': {
-    '@type': 'ItemList',
-    'numberOfItems': popularCategoriesForSchema.value.length,
-    'itemListElement': popularCategoriesForSchema.value.map((cat, index) => ({
-      '@type': 'ListItem',
-      'position': index + 1,
-      'item': {
-        '@type': 'Thing',
-        'additionalType': 'ProductCategory',
-        '@id': `${siteUrl}${cat.href}`,
-        'name': cat.name,
-        'url': `${siteUrl}${cat.href}`,
-      },
-    })),
-  },
 }))
 
 // ItemList schema для брендов
@@ -530,7 +517,7 @@ const brandsListSchema = computed(() => ({
       'url': `${siteUrl}/brand/${brand.slug}`,
       'description': brand.seo_description || brand.description || `Товары бренда ${brand.name} в интернет-магазине Ухтышка`,
       ...(brand.logo_url && {
-        logo: `${siteUrl}/storage/brand-logos/${brand.logo_url}`,
+        logo: getPublicUrl(BUCKET_NAME_BRANDS, brand.logo_url) || undefined,
       }),
     },
   })),
@@ -560,7 +547,7 @@ const productLinesListSchema = computed(() => {
         '@type': 'ListItem',
         'position': index + 1,
         'item': {
-          '@type': 'ProductCollection',
+          '@type': 'CollectionPage',
           '@id': `${siteUrl}/brand/${brand?.slug || 'unknown'}/${line.slug}#collection`,
           'name': line.name,
           'url': `${siteUrl}/brand/${brand?.slug || 'unknown'}/${line.slug}`,
@@ -606,10 +593,6 @@ useHead(() => ({
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify(brandsListSchema.value),
-    },
-    {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify(productLinesListSchema.value),
     },
     {
       type: 'application/ld+json',
