@@ -141,9 +141,9 @@ export const useProfileStore = defineStore('profileStore', () => {
   /**
    * Обновляет профиль пользователя
    */
-  async function updateProfile(updates: ProfileUpdate) {
+  async function updateProfile(updates: ProfileUpdate, { silent = false } = {}) {
     if (!user.value) {
-      toast.error('Для обновления профиля необходимо войти в систему.')
+      if (!silent) toast.error('Для обновления профиля необходимо войти в систему.')
       return false
     }
 
@@ -161,14 +161,16 @@ export const useProfileStore = defineStore('profileStore', () => {
         throw error
 
       profile.value = data
-      toast.success('Профиль успешно обновлен!')
+      if (!silent) toast.success('Профиль успешно обновлен!')
       return true
     }
     catch (error: any) {
       console.error('[ProfileStore] Profile update error:', error)
-      toast.error('Ошибка при обновлении профиля', {
-        description: error.message,
-      })
+      if (!silent) {
+        toast.error('Ошибка при обновлении профиля', {
+          description: error.message,
+        })
+      }
       return false
     }
     finally {

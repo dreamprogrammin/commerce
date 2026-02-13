@@ -227,6 +227,11 @@ async function placeOrder() {
   // Форматируем номер для отправки в бэк: +77771234567
   const formattedPhone = `+${phoneDigits.value}`
 
+  // Для залогиненных: сохраняем телефон в профиль, если он отсутствует или изменился
+  if (isLoggedIn.value && profileStore.profile?.phone !== formattedPhone) {
+    await profileStore.updateProfile({ phone: formattedPhone }, { silent: true })
+  }
+
   // Для гостей обязательны данные
   const guestInfo = !isLoggedIn.value
     ? {
