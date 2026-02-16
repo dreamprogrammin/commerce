@@ -1255,7 +1255,7 @@ useHead(() => {
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- Десктоп фильтры -->
       <ClientOnly>
-        <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
+        <aside class="hidden lg:block col-span-1">
           <DynamicFilters
             v-model="activeFilters"
             :available-filters="availableFilters as unknown as AttributeWithValue[]"
@@ -1271,8 +1271,8 @@ useHead(() => {
         </aside>
 
         <template #fallback>
-          <aside class="hidden lg:block col-span-1 lg:sticky top-24 self-start">
-            <div class="p-4 border rounded-lg bg-card space-y-6">
+          <aside class="hidden lg:block col-span-1">
+            <div class="p-4 border rounded-lg bg-card space-y-6 sticky top-24">
               <Skeleton class="h-6 w-24" />
               <div class="space-y-4 pt-4">
                 <Skeleton class="h-5 w-32" />

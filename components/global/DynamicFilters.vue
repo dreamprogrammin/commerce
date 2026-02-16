@@ -248,7 +248,7 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
 </script>
 
 <template>
-  <div class="bg-white border rounded-xl p-4 space-y-4 sticky top-4">
+  <div class="bg-white border rounded-xl p-4 space-y-4 sticky top-24">
     <!-- Заголовок -->
     <div class="flex items-center justify-between pb-3 border-b">
       <div class="flex items-center gap-2">
@@ -263,7 +263,7 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
     </div>
 
     <!-- Контент с прокруткой -->
-    <div class="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
+    <div class="space-y-3 max-h-[calc(100vh-12rem)] overflow-y-auto pr-2 scrollbar-thin">
       <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ -->
       <div v-if="subcategories.length > 0" class="space-y-2">
         <div class="flex items-center gap-2 mb-2">
