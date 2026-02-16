@@ -20,6 +20,15 @@ const products = ref<ProductWithGallery[]>([])
 const isLoading = ref(true)
 const sortBy = ref<'newest' | 'price_asc' | 'price_desc' | 'popularity'>('newest')
 const isSeoExpanded = ref(false)
+const seoContentRef = ref<HTMLElement | null>(null)
+const seoContentHeight = ref(0)
+
+function toggleSeoExpanded() {
+  if (!isSeoExpanded.value && seoContentRef.value) {
+    seoContentHeight.value = seoContentRef.value.scrollHeight
+  }
+  isSeoExpanded.value = !isSeoExpanded.value
+}
 
 // 1. Умная загрузка информации о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(
@@ -518,7 +527,7 @@ useRobotsRule({
           <!-- Заголовок с кнопкой разворачивания -->
           <button
             class="flex items-center gap-2 text-left w-full group"
-            @click="isSeoExpanded = !isSeoExpanded"
+            @click="toggleSeoExpanded"
           >
             <h3 class="text-base md:text-lg font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
               О бренде {{ brand.name }}
@@ -531,8 +540,10 @@ useRobotsRule({
 
           <!-- Контент (сворачивается/разворачивается) -->
           <div
+            ref="seoContentRef"
             class="overflow-hidden transition-all duration-300 ease-in-out"
-            :class="isSeoExpanded ? 'max-h-250 opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
+            :style="{ maxHeight: isSeoExpanded ? `${seoContentHeight}px` : undefined }"
+            :class="isSeoExpanded ? 'opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
           >
             <BrandDescription :brand="brand" />
 
@@ -553,7 +564,7 @@ useRobotsRule({
           <button
             v-if="brand.description && brand.description.length > 150"
             class="text-xs md:text-sm text-primary hover:underline"
-            @click="isSeoExpanded = !isSeoExpanded"
+            @click="toggleSeoExpanded"
           >
             {{ isSeoExpanded ? 'Свернуть' : 'Читать далее' }}
           </button>
