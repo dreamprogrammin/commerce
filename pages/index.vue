@@ -59,9 +59,12 @@ const { data: recommendationsSsrData } = await useAsyncData(
 )
 
 // TanStack Query с SSR данными
+// Используем computed queryKey для реактивного отслеживания изменений auth состояния
+const recommendationsQueryKey = computed(() => ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value])
+
 // @ts-expect-error - Type instantiation depth issue with TanStack Query + Supabase complex types. Functionally correct.
 const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching: isFetchingRecommendations } = useQuery<HomePersonalData>({
-  queryKey: ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value],
+  queryKey: recommendationsQueryKey,
   queryFn: async (): Promise<HomePersonalData> => {
     const recommended = await recommendationsStore.fetchRecommendations()
     let wishlist: ProductWithGallery[] = []
@@ -77,11 +80,12 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
       wishlist: wishlist || [],
     }
   },
-  staleTime: 5 * 60 * 1000, // 5 минут (было 3)
-  gcTime: 15 * 60 * 1000, // 15 минут (было 10)
-  initialData: recommendationsSsrData.value || undefined, // Используем SSR данные
-  refetchOnMount: false, // ⚡ Не перезагружать при каждом монтировании
-  refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
+  staleTime: 5 * 60 * 1000,
+  gcTime: 15 * 60 * 1000,
+  initialData: recommendationsSsrData.value || undefined,
+  initialDataUpdatedAt: recommendationsSsrData.value ? Date.now() : 0,
+  refetchOnMount: true, // Перезагрузить при монтировании если данные стейловые
+  refetchOnWindowFocus: false,
 })
 
 const recommendedProducts = computed<RecommendedProduct[]>(() => mainPersonalData.value?.recommended || [])
