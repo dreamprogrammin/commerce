@@ -71,12 +71,12 @@ function dismiss() {
             <Icon name="lucide:bell-ring" class="h-8 w-8 text-primary" />
           </div>
           <DrawerTitle class="text-center text-2xl">
-            Не пропустите бонусы!
+            Не пропустите важное!
           </DrawerTitle>
           <DrawerDescription class="text-center">
             {{ isIosSafari && !isStandalone
               ? 'Добавьте сайт на экран «Домой», чтобы получать уведомления'
-              : 'Включите уведомления, чтобы узнавать о начислении бонусов и акциях'
+              : 'Включите уведомления, чтобы узнавать о скидках, акциях и бонусах'
             }}
           </DrawerDescription>
         </DrawerHeader>
@@ -115,21 +115,21 @@ function dismiss() {
           <div class="space-y-2 py-2">
             <div class="flex items-center gap-3 text-sm">
               <div class="flex-shrink-0 w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-                <Icon name="lucide:gift" class="w-4 h-4 text-orange-600" />
+                <Icon name="lucide:percent" class="w-4 h-4 text-orange-600" />
               </div>
-              <span class="text-muted-foreground">Узнавайте когда бонусы стали доступны</span>
+              <span class="text-muted-foreground">Скидки и акции — узнавайте первыми</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
               <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <Icon name="lucide:message-circle" class="w-4 h-4 text-blue-600" />
+                <Icon name="lucide:gift" class="w-4 h-4 text-blue-600" />
               </div>
-              <span class="text-muted-foreground">Получайте ответы на вопросы о товарах</span>
+              <span class="text-muted-foreground">Бонусы и ответы на ваши вопросы</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
               <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                <Icon name="lucide:zap" class="w-4 h-4 text-green-600" />
+                <Icon name="lucide:smartphone" class="w-4 h-4 text-green-600" />
               </div>
-              <span class="text-muted-foreground">Мгновенные уведомления даже при закрытой вкладке</span>
+              <span class="text-muted-foreground">Уведомления даже при закрытой вкладке</span>
             </div>
           </div>
 
