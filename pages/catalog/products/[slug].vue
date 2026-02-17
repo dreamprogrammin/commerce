@@ -283,6 +283,27 @@ async function addToCart() {
 
 useFlipCounter(totalPrice, digitColumns)
 
+// Синхронизируем sticky-панель с видимостью навбара (тот же порог скролла)
+const isNavVisible = ref(true)
+let stickyLastScrollY = 0
+
+function handleStickyScroll() {
+  const y = window.scrollY
+  if (y < 60) {
+    isNavVisible.value = true
+  }
+  else if (y > stickyLastScrollY) {
+    isNavVisible.value = false
+  }
+  else {
+    isNavVisible.value = true
+  }
+  stickyLastScrollY = y
+}
+
+onMounted(() => window.addEventListener('scroll', handleStickyScroll, { passive: true }))
+onUnmounted(() => window.removeEventListener('scroll', handleStickyScroll))
+
 const quantity = ref(1)
 
 watch(() => product.value?.id, () => {
@@ -1333,18 +1354,17 @@ useHead(() => ({
       </ClientOnly>
     </div>
 
-    <!-- 🎯 Sticky панель для мобильных (компактная версия) -->
+    <!-- 🎯 Sticky панель для мобильных -->
     <ClientOnly>
       <div
         v-if="product"
-        class="lg:hidden fixed bottom-16 left-0 right-0 bg-white border-t shadow-[0_-2px_8px_rgba(0,0,0,0.1)] z-40"
+        class="lg:hidden fixed left-4 right-4 z-40 product-sticky-bar"
+        :class="isNavVisible ? 'sticky-above-nav' : 'sticky-at-bottom'"
       >
         <!-- Если товар НЕ в корзине - показываем цену + кнопку -->
-        <div v-if="!mainItemInCart" class="px-3 py-2">
+        <div v-if="!mainItemInCart" class="px-4 py-3">
           <div class="flex items-center justify-between gap-3">
-            <!-- Блок цены -->
             <div class="flex flex-col gap-0.5">
-              <!-- Старая цена + скидка (если есть) -->
               <div v-if="mainProductPrice.hasDiscount" class="flex items-center gap-1.5">
                 <span class="text-xs text-muted-foreground line-through">
                   {{ formatPrice(mainProductPrice.original) }} ₸
@@ -1353,8 +1373,6 @@ useHead(() => ({
                   -{{ product.discount_percentage }}%
                 </Badge>
               </div>
-
-              <!-- Текущая цена (компактно) -->
               <div class="flex items-baseline gap-0.5">
                 <span class="text-2xl font-bold leading-none">
                   {{ formatPrice(mainProductPrice.final) }}
@@ -1363,7 +1381,6 @@ useHead(() => ({
               </div>
             </div>
 
-            <!-- Кнопка в корзину -->
             <Button
               v-if="product.stock_quantity > 0"
               size="sm"
@@ -1374,19 +1391,14 @@ useHead(() => ({
               В корзину
             </Button>
 
-            <Button
-              v-else
-              size="sm"
-              class="h-9 text-sm px-4"
-              disabled
-            >
+            <Button v-else size="sm" class="h-9 text-sm px-4" disabled>
               Нет в наличии
             </Button>
           </div>
         </div>
 
         <!-- Если товар УЖЕ в корзине - показываем кнопку перехода + селектор количества -->
-        <div v-else class="px-3 py-2">
+        <div v-else class="px-4 py-3">
           <div class="flex items-center gap-3">
             <Button
               size="sm"
@@ -1396,7 +1408,6 @@ useHead(() => ({
               <Icon name="lucide:shopping-bag" class="w-4 h-4 mr-1.5" />
               В корзине ({{ quantityInCart }})
             </Button>
-
             <QuantitySelector
               :product="product"
               :quantity="quantityInCart"
@@ -1508,5 +1519,33 @@ useHead(() => ({
     height: 2.75rem;
     line-height: 2.75rem;
   }
+}
+
+/* Sticky panel: glass card */
+.product-sticky-bar {
+  /* Базовая позиция — у нижнего края (когда навбар скрыт) */
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  /* transform анимируется плавно (GPU) в отличие от bottom+env() */
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Навбар виден — поднимаем панель на высоту навбара (84px - 16px = 68px) */
+.sticky-above-nav {
+  transform: translateY(-68px);
+}
+
+/* Навбар скрылся — панель на базовой позиции */
+.sticky-at-bottom {
+  transform: translateY(0);
 }
 </style>

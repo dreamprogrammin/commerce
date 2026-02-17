@@ -85,7 +85,12 @@
       "Bash(supabase db psql:*)",
       "Bash(pnpm run typecheck:*)",
       "WebFetch(domain:sportmaster.kz)",
-      "Bash(npx web-push:*)"
+      "Bash(npx web-push:*)",
+      "WebFetch(domain:megamarket.ru)",
+      "WebFetch(domain:icon-sets.iconify.design)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm info:*)",
+      "Bash(python3:*)"
     ]
   }
 }

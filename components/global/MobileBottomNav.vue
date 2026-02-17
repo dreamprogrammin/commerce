@@ -5,55 +5,59 @@ import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
 const route = useRoute()
-const router = useRouter()
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const modalStore = useModalStore()
 
 const { isLoggedIn } = storeToRefs(authStore)
 
+// Scroll-aware visibility
+const isVisible = ref(true)
+let lastScrollY = 0
+
+function handleScroll() {
+  const currentScrollY = window.scrollY
+  if (currentScrollY < 60) {
+    isVisible.value = true
+  } else if (currentScrollY > lastScrollY) {
+    isVisible.value = false
+  } else {
+    isVisible.value = true
+  }
+  lastScrollY = currentScrollY
+}
+
+onMounted(() => window.addEventListener('scroll', handleScroll, { passive: true }))
+onUnmounted(() => window.removeEventListener('scroll', handleScroll))
+
 interface NavItem {
   path: string
-  label: string
   icon: string
 }
 
+// Корзина отдельно — только основная навигация
 const navItems: NavItem[] = [
-  {
-    path: '/',
-    label: 'Главная',
-    icon: 'lucide:home',
-  },
-  {
-    path: '/catalog',
-    label: 'Каталог',
-    icon: 'lucide:layout-grid',
-  },
-  {
-    path: '/cart',
-    label: 'Корзина',
-    icon: 'lucide:shopping-cart',
-  },
-  {
-    path: '/profile',
-    label: 'Профиль',
-    icon: 'lucide:user',
-  },
+  { path: '/', icon: 'streamline-plump:home-1' },
+  { path: '/catalog', icon: 'streamline-plump:layout-window-4' },
+  { path: '/profile', icon: 'streamline-plump:user-single-neutral-male' },
 ]
 
 function isActive(path: string) {
-  if (path === '/') {
-    return route.path === '/'
-  }
+  if (path === '/') return route.path === '/'
   return route.path.startsWith(path)
 }
 
-const cartItemsCount = computed(() => {
-  return cartStore.items.reduce((total, item) => total + item.quantity, 0)
-})
+const isCartActive = computed(() => route.path.startsWith('/cart'))
 
-function handleNavClick(path: string, event: Event) {
-  if (path === '/profile' && !isLoggedIn.value) {
+// Pill скользит только по 3 пунктам (0%, 33.33%, 66.66%)
+const activeIndex = computed(() => navItems.findIndex((item) => isActive(item.path)))
+
+const cartItemsCount = computed(() =>
+  cartStore.items.reduce((total, item) => total + item.quantity, 0),
+)
+
+function handleProfileClick(event: Event) {
+  if (!isLoggedIn.value) {
     event.preventDefault()
     modalStore.openLoginModal()
   }
@@ -61,52 +65,134 @@ function handleNavClick(path: string, event: Event) {
 </script>
 
 <template>
-  <nav
-    class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t safe-area-inset-bottom"
+  <div
+    class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-end justify-between nav-wrapper"
+    :class="isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
   >
-    <div class="grid grid-cols-4 h-16 items-end pb-1">
+    <!-- Основная навигация: Главная, Каталог, Профиль -->
+    <nav class="floating-bar">
+      <!-- Скользящий pill -->
+      <div
+        v-if="activeIndex >= 0"
+        class="sliding-pill"
+        :style="{ left: `${activeIndex * 33.333}%` }"
+      />
+
       <NuxtLink
         v-for="item in navItems"
         :key="item.path"
         :to="item.path"
-        class="flex flex-col items-center justify-end gap-0.5 transition-all relative"
-        @click="handleNavClick(item.path, $event)"
+        class="nav-item"
+        @click="item.path === '/profile' ? handleProfileClick($event) : undefined"
       >
-        <div
-          class="relative flex items-center justify-center rounded-full transition-all duration-300"
-          :class="isActive(item.path)
-            ? 'w-12 h-12 -mt-6 bg-blue-500 shadow-lg shadow-blue-500/25'
-            : 'w-10 h-10 bg-gray-100'"
-        >
-          <Icon
-            :name="item.icon"
-            class="transition-all duration-300"
-            :class="isActive(item.path) ? 'w-6 h-6 text-white' : 'w-5 h-5 text-muted-foreground'"
-          />
-
-          <ClientOnly>
-            <div
-              v-if="item.path === '/cart' && cartItemsCount > 0"
-              class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 ring-2 ring-white"
-            >
-              {{ cartItemsCount > 99 ? '99+' : cartItemsCount }}
-            </div>
-          </ClientOnly>
-        </div>
-
-        <span
-          class="text-[9px] font-medium transition-all pb-0.5"
-          :class="isActive(item.path) ? 'text-blue-500 font-semibold' : 'text-muted-foreground'"
-        >
-          {{ item.label }}
-        </span>
+        <Icon
+          :name="item.icon"
+          class="transition-all duration-300"
+          :class="isActive(item.path) ? 'w-7 h-7 text-blue-600' : 'w-6 h-6 text-gray-400'"
+          mode="svg"
+        />
       </NuxtLink>
-    </div>
-  </nav>
+    </nav>
+
+    <!-- Отдельная кнопка корзины справа -->
+    <NuxtLink to="/cart" class="cart-btn" :class="isCartActive ? 'cart-btn--active' : ''">
+      <div class="relative">
+        <Icon
+          name="streamline-plump:shopping-basket-1"
+          class="transition-all duration-300"
+          :class="isCartActive ? 'w-7 h-7 text-blue-600' : 'w-6 h-6 text-gray-400'"
+          mode="svg"
+        />
+        <ClientOnly>
+          <div
+            v-if="cartItemsCount > 0"
+            class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5"
+          >
+            {{ cartItemsCount > 99 ? '99+' : cartItemsCount }}
+          </div>
+        </ClientOnly>
+      </div>
+    </NuxtLink>
+  </div>
 </template>
 
 <style scoped>
-.safe-area-inset-bottom {
+.nav-wrapper {
   padding-bottom: env(safe-area-inset-bottom);
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  padding-top: 0.5rem;
+  gap: 0.625rem;
+  transition:
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.floating-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  flex: 1;
+  padding: 0.375rem;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  pointer-events: all;
+  margin-bottom: 0.5rem;
+}
+
+/* Скользящий pill по 3 пунктам */
+.sliding-pill {
+  position: absolute;
+  top: 0.375rem;
+  bottom: 0.375rem;
+  width: 33.333%;
+  border-radius: 18px;
+  background: rgba(59, 130, 246, 0.12);
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.nav-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-radius: 18px;
+}
+
+/* Отдельная кнопка корзины */
+.cart-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  pointer-events: all;
+  margin-bottom: 0.5rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cart-btn--active {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.2);
 }
 </style>
