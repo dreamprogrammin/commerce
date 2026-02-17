@@ -129,5 +129,10 @@ useSchemaOrg([
       <AuthLoginDrawer v-if="isMobile" />
       <AuthLoginModal v-else />
     </ClientOnly>
+
+    <!-- Push-уведомления: Drawer для подписки -->
+    <ClientOnly>
+      <CommonPushPermissionDrawer />
+    </ClientOnly>
   </div>
 </template>
