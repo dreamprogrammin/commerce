@@ -11,6 +11,18 @@ const store = useNotificationsStore()
 const authStore = useAuthStore()
 const router = useRouter()
 
+const notificationIcons: Record<string, string> = {
+  bonus_activated: 'lucide:gift',
+  question_answered: 'lucide:message-circle-reply',
+  promotion: 'lucide:percent',
+  discount: 'lucide:tag',
+  order_status: 'lucide:package',
+}
+
+function getNotificationIcon(type: string): string {
+  return notificationIcons[type] || 'lucide:bell'
+}
+
 onMounted(() => {
   store.fetchNotifications()
 })
@@ -110,7 +122,7 @@ async function handleMarkAllAsRead() {
             :class="n.is_read ? 'bg-gray-100 dark:bg-gray-800' : 'bg-primary/10'"
           >
             <Icon
-              :name="n.type === 'bonus_activated' ? 'lucide:gift' : 'lucide:message-circle-reply'"
+              :name="getNotificationIcon(n.type)"
               class="size-5"
               :class="n.is_read ? 'text-gray-500' : 'text-primary'"
             />

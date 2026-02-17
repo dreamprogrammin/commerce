@@ -87,39 +87,24 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
           notifications.value.unshift(newNotification)
           unreadCount.value++
 
-          // Показываем toast уведомление
-          if (newNotification.type === 'question_answered') {
-            toast.success(newNotification.title, {
-              description: newNotification.body,
-              duration: 5000,
-              action: newNotification.link
-                ? {
-                    label: 'Перейти',
-                    onClick: () => {
-                      if (newNotification.link) {
-                        window.location.href = newNotification.link
-                      }
-                    },
-                  }
-                : undefined,
-            })
-          }
-          else if (newNotification.type === 'bonus_activated') {
-            toast.success(newNotification.title, {
-              description: newNotification.body,
-              duration: 7000,
-              action: newNotification.link
-                ? {
-                    label: 'Посмотреть',
-                    onClick: () => {
-                      if (newNotification.link) {
-                        navigateTo(newNotification.link)
-                      }
-                    },
-                  }
-                : undefined,
-            })
-          }
+          // Показываем toast уведомление для всех типов
+          const actionLabel = newNotification.type === 'bonus_activated' ? 'Посмотреть' : 'Перейти'
+          const duration = newNotification.type === 'bonus_activated' ? 7000 : 5000
+
+          toast.success(newNotification.title, {
+            description: newNotification.body ?? undefined,
+            duration,
+            action: newNotification.link
+              ? {
+                  label: actionLabel,
+                  onClick: () => {
+                    if (newNotification.link) {
+                      navigateTo(newNotification.link)
+                    }
+                  },
+                }
+              : undefined,
+          })
         },
       )
       .subscribe()
