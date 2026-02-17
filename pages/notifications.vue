@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PushPermissionBanner from '@/components/common/PushPermissionBanner.vue'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 
@@ -14,7 +15,7 @@ onMounted(() => {
   store.fetchNotifications()
 })
 
-async function handleClick(notification: { id: string, link: string | null, is_read: boolean }) {
+async function handleClick(notification: { id: string, link: string | null, is_read: boolean | null }) {
   if (!notification.is_read) {
     await store.markAsRead(notification.id)
   }
@@ -23,7 +24,9 @@ async function handleClick(notification: { id: string, link: string | null, is_r
   }
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string | null) {
+  if (!dateStr)
+    return ''
   const date = new Date(dateStr)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
@@ -103,7 +106,7 @@ async function handleMarkAllAsRead() {
       >
         <div class="flex items-start gap-3">
           <div
-            class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+            class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
             :class="n.is_read ? 'bg-gray-100 dark:bg-gray-800' : 'bg-primary/10'"
           >
             <Icon
@@ -130,7 +133,7 @@ async function handleMarkAllAsRead() {
               {{ formatDate(n.created_at) }}
             </div>
           </div>
-          <Icon name="lucide:chevron-right" class="size-5 text-gray-400 flex-shrink-0 mt-1" />
+          <Icon name="lucide:chevron-right" class="size-5 text-gray-400 shrink-0 mt-1" />
         </div>
       </button>
     </div>
