@@ -104,6 +104,22 @@ export const useNotificationsStore = defineStore('notificationsStore', () => {
                 : undefined,
             })
           }
+          else if (newNotification.type === 'bonus_activated') {
+            toast.success(newNotification.title, {
+              description: newNotification.body,
+              duration: 7000,
+              action: newNotification.link
+                ? {
+                    label: 'Посмотреть',
+                    onClick: () => {
+                      if (newNotification.link) {
+                        navigateTo(newNotification.link)
+                      }
+                    },
+                  }
+                : undefined,
+            })
+          }
         },
       )
       .subscribe()

@@ -57,7 +57,7 @@ function getMainUrl(imagePath: string) {
         :opts="{ align: 'start', dragFree: true }"
         @init-api="onInitThumb"
       >
-        <CarouselContent class="mt-0 h-[600px]">
+        <CarouselContent class="mt-0 h-150">
           <CarouselItem
             v-for="(image, index) in images"
             :key="image.id"

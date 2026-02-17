@@ -1212,11 +1212,12 @@ export type Database = {
           answered_by: string | null
           created_at: string | null
           id: string
+          is_auto_generated: boolean | null
           is_published: boolean | null
           product_id: string
           question_text: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           answer_text?: string | null
@@ -1224,11 +1225,12 @@ export type Database = {
           answered_by?: string | null
           created_at?: string | null
           id?: string
+          is_auto_generated?: boolean | null
           is_published?: boolean | null
           product_id: string
           question_text: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           answer_text?: string | null
@@ -1236,11 +1238,12 @@ export type Database = {
           answered_by?: string | null
           created_at?: string | null
           id?: string
+          is_auto_generated?: boolean | null
           is_published?: boolean | null
           product_id?: string
           question_text?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1248,6 +1251,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_questions_profile_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1523,6 +1533,36 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string | null
+          endpoint: string
+          id: string
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           description: string | null
@@ -1684,7 +1724,7 @@ export type Database = {
       }
     }
     Functions: {
-      activate_my_pending_bonuses: { Args: Record<string, never>; Returns: Json }
+      activate_my_pending_bonuses: { Args: never; Returns: Json }
       activate_pending_bonuses: { Args: never; Returns: string }
       cancel_order:
         | {
@@ -1746,6 +1786,10 @@ export type Database = {
         Args: { p_category_id: string; p_skip_ai?: boolean }
         Returns: Json
       }
+      generate_product_questions: {
+        Args: { p_product_id: string; p_skip_ai?: boolean }
+        Returns: Json
+      }
       generate_questions_for_all_brands: {
         Args: never
         Returns: {
@@ -1759,6 +1803,14 @@ export type Database = {
         Returns: {
           category_id: string
           is_premium: boolean
+          questions_count: number
+        }[]
+      }
+      generate_questions_for_all_products: {
+        Args: never
+        Returns: {
+          is_premium: boolean
+          product_id: string
           questions_count: number
         }[]
       }

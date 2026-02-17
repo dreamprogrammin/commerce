@@ -73,6 +73,9 @@ async function handleMarkAllAsRead() {
       </button>
     </div>
 
+    <!-- Баннер Web Push -->
+    <PushPermissionBanner class="mb-4" />
+
     <!-- Список уведомлений -->
     <div v-if="store.isLoading" class="space-y-3">
       <div v-for="i in 5" :key="i" class="bg-white dark:bg-gray-900 rounded-xl p-4 border animate-pulse">
@@ -104,7 +107,7 @@ async function handleMarkAllAsRead() {
             :class="n.is_read ? 'bg-gray-100 dark:bg-gray-800' : 'bg-primary/10'"
           >
             <Icon
-              name="lucide:message-circle-reply"
+              :name="n.type === 'bonus_activated' ? 'lucide:gift' : 'lucide:message-circle-reply'"
               class="size-5"
               :class="n.is_read ? 'text-gray-500' : 'text-primary'"
             />

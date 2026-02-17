@@ -84,7 +84,8 @@
       "Bash(supabase db start:*)",
       "Bash(supabase db psql:*)",
       "Bash(pnpm run typecheck:*)",
-      "WebFetch(domain:sportmaster.kz)"
+      "WebFetch(domain:sportmaster.kz)",
+      "Bash(npx web-push:*)"
     ]
   }
 }
