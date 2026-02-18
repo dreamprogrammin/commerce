@@ -40,10 +40,10 @@ function openLoginModal() {
         to="/"
         class="flex items-center gap-2.5 md:gap-3 group transition-transform hover:scale-105 active:scale-95"
       >
-        <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow">
+        <div class="bg-linear-to-br from-blue-500 to-blue-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow">
           <Icon name="ic:round-toys" class="size-5 md:size-6 text-white" />
         </div>
-        <span class="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 md:from-white md:to-white/90 bg-clip-text text-transparent">
+        <span class="text-xl md:text-2xl font-bold bg-linear-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 md:from-white md:to-white/90 bg-clip-text text-transparent">
           Ухтышка
         </span>
       </NuxtLink>
@@ -70,7 +70,7 @@ function openLoginModal() {
             >
               <div
                 v-if="wishlistCount > 0"
-                class="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] md:text-[11px] font-bold rounded-full min-w-[18px] md:min-w-[20px] h-[18px] md:h-[20px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 md:border-blue-500 shadow-lg"
+                class="absolute -top-1 -right-1 bg-linear-to-r from-red-500 to-pink-500 text-white text-[10px] md:text-[11px] font-bold rounded-full min-w-4.5 md:min-w-5 h-4.5 md:h-5 flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 md:border-blue-500 shadow-lg"
               >
                 {{ wishlistCount > 9 ? '9+' : wishlistCount }}
               </div>
@@ -98,7 +98,7 @@ function openLoginModal() {
             >
               <div
                 v-if="cartCount > 0"
-                class="absolute -top-1 -right-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-[10px] md:text-[11px] font-bold rounded-full min-w-[18px] md:min-w-[20px] h-[18px] md:h-[20px] flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 md:border-blue-500 shadow-lg"
+                class="absolute -top-1 -right-1 bg-linear-to-r from-blue-500 to-blue-600 text-white text-[10px] md:text-[11px] font-bold rounded-full min-w-4.5 md:min-w-5 h-4.5 md:h-5 flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 md:border-blue-500 shadow-lg"
               >
                 {{ cartCount > 9 ? '9+' : cartCount }}
               </div>
@@ -115,7 +115,7 @@ function openLoginModal() {
         <ClientOnly>
           <NuxtLink
             v-if="isAuth"
-            to="/profile/bonus"
+            to="/profile/bonuses"
             class="hidden md:flex items-center gap-2.5 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg group"
           >
             <div class="relative">
@@ -138,12 +138,12 @@ function openLoginModal() {
             class="group"
           >
             <div
-              class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl shadow-lg md:shadow-lg transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20"
+              class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl shadow-lg md:shadow-lg transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20"
             >
               <div class="size-6 md:size-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center font-bold text-white text-sm border border-white/30">
                 {{ userInitial }}
               </div>
-              <span class="hidden md:block text-sm font-semibold text-white max-w-[120px] truncate">
+              <span class="hidden md:block text-sm font-semibold text-white max-w-30 truncate">
                 {{ fullName }}
               </span>
             </div>
@@ -156,7 +156,7 @@ function openLoginModal() {
             @click="openLoginModal"
           >
             <div
-              class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
+              class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
             >
               <Icon
                 name="lucide:user"
