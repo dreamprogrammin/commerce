@@ -128,10 +128,12 @@ async function onGoogleSignIn() {
 
         <!-- Дополнительная информация -->
         <p class="mt-4 text-center text-xs text-muted-foreground">
-          Нажимая "Войти через Google", вы соглашаетесь с
-          <a href="#" class="underline underline-offset-4 hover:text-primary">условиями</a>
-          и
-          <a href="#" class="underline underline-offset-4 hover:text-primary">политикой</a>
+          Нажимая «Войти через Google», вы даёте согласие на сбор и обработку
+          персональных данных в соответствии с
+          <NuxtLink to="/privacy-policy" class="underline underline-offset-4 hover:text-primary">
+            Политикой конфиденциальности
+          </NuxtLink>
+          и законодательством Республики Казахстан
         </p>
       </div>
     </DrawerContent>
