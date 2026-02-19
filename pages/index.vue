@@ -45,21 +45,47 @@ type HomePersonalData = {
   wishlist: ProductWithGallery[]
 }
 
-// ✅ SSR prefetch для рекомендаций
-const { data: recommendationsSsrData } = await useAsyncData(
-  'home-recommendations-ssr',
+// ✅ SSR prefetch — все запросы ПАРАЛЛЕЛЬНО через один useAsyncData
+const supabase = useSupabaseClient()
+
+const { data: ssrData } = await useAsyncData(
+  'home-ssr-all',
   async () => {
-    const recommended = await recommendationsStore.fetchRecommendations()
+    // Все запросы запускаются одновременно
+    const [recommended, popular, newest, _categories, brands, productLines] = await Promise.all([
+      recommendationsStore.fetchRecommendations().catch(() => []),
+      productsStore.fetchPopularProducts(10).catch(() => []),
+      productsStore.fetchNewestProducts(10).catch(() => []),
+      popularCategoriesStore.fetchPopularCategories().catch(() => null),
+      supabase
+        .from('brands')
+        .select('id, name, slug, logo_url, description, seo_description, seo_keywords')
+        .order('name', { ascending: true })
+        .limit(20)
+        .then(({ data }) => data || [])
+        .catch(() => []),
+      supabase
+        .from('product_lines')
+        .select('id, name, slug, logo_url, description, brand_id')
+        .order('name', { ascending: true })
+        .limit(30)
+        .then(({ data }) => data || [])
+        .catch(() => []),
+    ])
+
     return {
       recommended: recommended || [],
-      wishlist: [] as ProductWithGallery[], // Wishlist только на клиенте (требует auth)
+      popular: popular || [],
+      newest: newest || [],
+      categories: popularCategoriesStore.popularCategories || [],
+      brands: brands as Brand[],
+      productLines: productLines as ProductLine[],
     }
   },
   { server: true, lazy: false, getCachedData },
 )
 
-// TanStack Query с SSR данными
-// Используем computed queryKey для реактивного отслеживания изменений auth состояния
+// TanStack Query с SSR данными — рекомендации
 const recommendationsQueryKey = computed(() => ['home-recommendations', user.value?.id, personalizationTrigger.value, isLoggedIn.value])
 
 // @ts-expect-error - Type instantiation depth issue with TanStack Query + Supabase complex types. Functionally correct.
@@ -71,7 +97,6 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
 
     if (isLoggedIn.value) {
       await wishlistStore.fetchWishlistProducts()
-      // Создаем новый массив для правильного кеширования в TanStack Query
       wishlist = JSON.parse(JSON.stringify(wishlistStore.wishlistProducts)) as ProductWithGallery[]
     }
 
@@ -82,9 +107,9 @@ const { data: mainPersonalData, isLoading: isLoadingRecommendations, isFetching:
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 15 * 60 * 1000,
-  initialData: recommendationsSsrData.value || undefined,
-  initialDataUpdatedAt: recommendationsSsrData.value ? Date.now() : 0,
-  refetchOnMount: true, // Перезагрузить при монтировании если данные стейловые
+  initialData: ssrData.value ? { recommended: ssrData.value.recommended as RecommendedProduct[], wishlist: [] as ProductWithGallery[] } : undefined,
+  initialDataUpdatedAt: ssrData.value ? Date.now() : 0,
+  refetchOnMount: true,
   refetchOnWindowFocus: false,
 })
 
@@ -96,21 +121,15 @@ const showRecommendationsSkeleton = computed(() =>
   && (!mainPersonalData.value || (mainPersonalData.value.recommended.length === 0 && mainPersonalData.value.wishlist.length === 0)),
 )
 
-// ✅ SSR prefetch для популярных товаров
-const { data: popularSsrData } = await useAsyncData(
-  'home-popular-ssr',
-  () => productsStore.fetchPopularProducts(10),
-  { server: true, lazy: false, getCachedData },
-)
-
+// TanStack Query — популярные товары
 const popularQuery = useQuery<ProductWithGallery[]>({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
-  staleTime: 5 * 60 * 1000, // 5 минут (было 3)
-  gcTime: 15 * 60 * 1000, // 15 минут (было 10)
-  initialData: popularSsrData.value || undefined, // Используем SSR данные
-  refetchOnMount: false, // ⚡ Не перезагружать при каждом монтировании
-  refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
+  staleTime: 5 * 60 * 1000,
+  gcTime: 15 * 60 * 1000,
+  initialData: (ssrData.value?.popular as ProductWithGallery[]) || undefined,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
 })
 
 const popularProductsData = popularQuery.data
@@ -119,21 +138,15 @@ const isFetchingPopular = popularQuery.isFetching
 
 const popularProducts = computed<ProductWithGallery[]>(() => popularProductsData.value || [])
 
-// ✅ SSR prefetch для новинок
-const { data: newestSsrData } = await useAsyncData(
-  'home-newest-ssr',
-  () => productsStore.fetchNewestProducts(10),
-  { server: true, lazy: false, getCachedData },
-)
-
+// TanStack Query — новинки
 const { data: newestProductsData, isLoading: isLoadingNewest, isFetching: isFetchingNewest } = useQuery<ProductWithGallery[]>({
   queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
-  staleTime: 5 * 60 * 1000, // 5 минут (было 3)
-  gcTime: 15 * 60 * 1000, // 15 минут (было 10)
-  initialData: newestSsrData.value || undefined, // Используем SSR данные
-  refetchOnMount: false, // ⚡ Не перезагружать при каждом монтировании
-  refetchOnWindowFocus: false, // ⚡ Не перезагружать при фокусе
+  staleTime: 5 * 60 * 1000,
+  gcTime: 15 * 60 * 1000,
+  initialData: (ssrData.value?.newest as ProductWithGallery[]) || undefined,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
 })
 
 const newestProducts = computed<ProductWithGallery[]>(() => newestProductsData.value || [])
@@ -148,17 +161,7 @@ const showNewestSkeleton = computed(() =>
 
 const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value || showPopularSkeleton.value)
 
-// ✅ SSR prefetch для категорий (SEO schema)
-const { data: categoriesSsrData } = await useAsyncData(
-  'home-categories-schema-ssr',
-  async () => {
-    await popularCategoriesStore.fetchPopularCategories()
-    return popularCategoriesStore.popularCategories
-  },
-  { server: true, lazy: false, getCachedData },
-)
-
-// Загрузка категорий для SEO schema с SSR данными
+// TanStack Query — категории (SEO schema)
 const { data: categoriesData } = useQuery<CategoryRow[]>({
   queryKey: ['home-categories-schema'],
   queryFn: async () => {
@@ -167,34 +170,14 @@ const { data: categoriesData } = useQuery<CategoryRow[]>({
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  initialData: categoriesSsrData.value || undefined,
+  initialData: (ssrData.value?.categories as CategoryRow[]) || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 })
 
 const popularCategoriesForSchema = computed(() => categoriesData.value || [])
 
-// ✅ SSR prefetch для брендов (SEO schema)
-const supabase = useSupabaseClient()
-const { data: brandsSchemaSsrData } = await useAsyncData(
-  'home-brands-schema-ssr',
-  async () => {
-    const { data, error } = await supabase
-      .from('brands')
-      .select('id, name, slug, logo_url, description, seo_description, seo_keywords')
-      .order('name', { ascending: true })
-      .limit(20)
-
-    if (error) {
-      console.error('Error fetching brands for schema:', error)
-      return []
-    }
-    return data || []
-  },
-  { server: true, lazy: false, getCachedData },
-)
-
-// Загрузка брендов для SEO schema с SSR данными
+// TanStack Query — бренды (для SEO schema + карусель)
 const { data: brandsData } = useQuery<Brand[]>({
   queryKey: ['home-brands-schema'],
   queryFn: async () => {
@@ -210,73 +193,16 @@ const { data: brandsData } = useQuery<Brand[]>({
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  initialData: brandsSchemaSsrData.value || undefined,
+  initialData: ssrData.value?.brands || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 })
 
 const brandsForSchema = computed(() => brandsData.value || [])
+// Используем те же данные для карусели брендов (убран дубликат запроса)
+const topBrands = brandsForSchema
 
-// Загрузка популярных брендов для карусели (SSR prefetch)
-const { data: brandsSsrData } = await useAsyncData('home-top-brands-ssr', async () => {
-  const { data, error } = await supabase
-    .from('brands')
-    .select('*')
-    .order('name')
-    .limit(15)
-
-  if (error) {
-    console.error('Error fetching brands:', error)
-    return []
-  }
-
-  return data
-}, { server: true, lazy: false, getCachedData })
-
-// Загрузка брендов с TanStack Query для кеширования
-const { data: topBrands } = useQuery({
-  queryKey: ['home-top-brands'],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('brands')
-      .select('*')
-      .order('name')
-      .limit(15)
-
-    if (error) {
-      console.error('Error fetching brands:', error)
-      return []
-    }
-
-    return data
-  },
-  staleTime: 5 * 60 * 1000, // 5 минут
-  gcTime: 15 * 60 * 1000, // 15 минут
-  initialData: brandsSsrData.value || undefined,
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
-})
-
-// ✅ SSR prefetch для товарных линеек (SEO schema)
-const { data: productLinesSsrData } = await useAsyncData(
-  'home-product-lines-schema-ssr',
-  async () => {
-    const { data, error } = await supabase
-      .from('product_lines')
-      .select('id, name, slug, logo_url, description, brand_id')
-      .order('name', { ascending: true })
-      .limit(30)
-
-    if (error) {
-      console.error('Error fetching product lines for schema:', error)
-      return []
-    }
-    return data || []
-  },
-  { server: true, lazy: false, getCachedData },
-)
-
-// Загрузка товарных линеек для SEO schema с SSR данными
+// TanStack Query — товарные линейки (SEO schema)
 const { data: productLinesData } = useQuery<ProductLine[]>({
   queryKey: ['home-product-lines-schema'],
   queryFn: async () => {
@@ -292,7 +218,7 @@ const { data: productLinesData } = useQuery<ProductLine[]>({
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  initialData: productLinesSsrData.value || undefined,
+  initialData: ssrData.value?.productLines || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 })

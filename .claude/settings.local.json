@@ -90,7 +90,8 @@
       "WebFetch(domain:icon-sets.iconify.design)",
       "WebFetch(domain:www.npmjs.com)",
       "Bash(npm info:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "WebFetch(domain:uhti.kz)"
     ]
   }
 }
