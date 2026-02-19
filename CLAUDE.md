@@ -165,13 +165,13 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 1. Products have `bonus_points` field (earn on purchase)
 2. Users have `bonus_balance` in `profiles` table
 3. Orders track `bonus_spent` and `bonus_earned`
-4. New bonuses have 7-day activation period (`activated_at` column)
+4. New bonuses have 14-day activation period (`activated_at` column)
 5. Bonuses can be spent as discount during checkout (tracked in `bonuses` table)
 
 **Important Logic**:
 
 - Welcome bonus on signup (handled by database trigger)
-- Bonus activation after 7 days (check `activated_at` timestamp)
+- Bonus activation after 14 days (check `activated_at` timestamp)
 - Bonus refund on order cancellation
 - Guest orders don't earn bonuses (require profile linkage)
 
@@ -254,7 +254,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 2. **Order States**: `pending` → `confirmed` → `delivered` / `cancelled`
 3. **Bonus Handling**:
    - Spent bonuses are locked on order creation
-   - Earned bonuses have 7-day activation delay
+   - Earned bonuses have 14-day activation delay
    - Cancelled orders refund spent bonuses
 
 ### When Working with Authentication

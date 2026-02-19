@@ -65,7 +65,7 @@ function handleClose() {
 
             <div class="flex items-start gap-2 text-xs text-muted-foreground">
               <span class="font-bold text-primary">2.</span>
-              <span>Активация через 7 дней после подтверждения</span>
+              <span>Активация через 14 дней после подтверждения</span>
             </div>
 
             <div class="flex items-start gap-2 text-xs text-muted-foreground">

@@ -202,7 +202,7 @@ onMounted(() => {
             <span class="text-muted-foreground">₸</span>
           </div>
           <p class="mt-2 text-sm text-muted-foreground">
-            Станут доступны через 7 дней после начисления
+            Станут доступны через 14 дней после начисления
           </p>
         </CardContent>
       </Card>

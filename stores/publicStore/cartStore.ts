@@ -231,7 +231,7 @@ export const useCartStore = defineStore('cartStore', () => {
 
         toast.success('Заказ успешно создан!', {
           description: bonusesAwarded > 0
-            ? `Спасибо за покупку! ${bonusesAwarded} бонусов будут начислены на ваш счет и станут активны через 7 дней.`
+            ? `Спасибо за покупку! ${bonusesAwarded} бонусов будут начислены на ваш счет и станут активны через 14 дней.`
             : 'Спасибо за покупку!',
           duration: 10000,
         })
