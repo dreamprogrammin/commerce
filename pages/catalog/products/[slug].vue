@@ -32,16 +32,28 @@ const selectedAccessoryIds = ref<string[]>([])
 
 const isDescriptionExpanded = ref(false)
 
-// 🔥 КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Загружаем категории и продукт на сервере
+// 🔥 SSR: загружаем категории и продукт ПАРАЛЛЕЛЬНО
 if (import.meta.server) {
-  // Загружаем категории сначала
-  if (!categoriesStore.allCategories.length) {
-    await categoriesStore.fetchCategoryData()
+  let initialProduct = null
+  let ssrFetchFailed = false
+
+  try {
+    const [_categories, product] = await Promise.all([
+      !categoriesStore.allCategories.length
+        ? categoriesStore.fetchCategoryData().catch(() => null)
+        : Promise.resolve(null),
+      productsStore.fetchProductBySlug(slug.value),
+    ])
+    initialProduct = product
+  }
+  catch {
+    // Supabase недоступен (522, таймаут и т.д.) — не бросаем 404,
+    // клиент перезагрузит данные после гидратации
+    ssrFetchFailed = true
   }
 
-  // Загружаем продукт и добавляем в QueryClient для гидратации
-  const initialProduct = await productsStore.fetchProductBySlug(slug.value)
-  if (!initialProduct) {
+  // 404 только когда Supabase ответил нормально, но товар не найден
+  if (!initialProduct && !ssrFetchFailed) {
     throw createError({
       statusCode: 404,
       statusMessage: 'Товар не найден',
@@ -49,8 +61,9 @@ if (import.meta.server) {
     })
   }
 
-  // 🔥 Предзаполняем кеш для useQuery
-  queryClient.setQueryData(['product', slug.value], initialProduct)
+  if (initialProduct) {
+    queryClient.setQueryData(['product', slug.value], initialProduct)
+  }
 }
 
 // ✅ useQuery будет использовать данные из кеша на сервере
@@ -61,16 +74,17 @@ const {
 } = useQuery({
   queryKey: ['product', slug],
   queryFn: async () => {
+    // fetchProductBySlug бросает ошибку при проблемах сети — TanStack Query сделает retry
+    // Возвращает null если товар не найден (PGRST116)
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
     if (!fetchedProduct) {
       throw new Error('Товар не найден')
     }
     return fetchedProduct
   },
-  // ✅ Stale-While-Revalidate подход с принудительной проверкой при перезагрузке
-  staleTime: 2 * 60 * 1000, // 2 минуты - баланс между свежестью и производительностью
-  gcTime: 10 * 60 * 1000, // 10 минут в памяти
-  retry: 1,
+  staleTime: 2 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+  retry: 2, // 2 попытки при ошибке сети
   refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (даже если SSR кеш свежий)
   refetchOnWindowFocus: true, // Проверить при возврате на вкладку (если > staleTime)
   // 🔥 На сервере данные уже в кеше, не делаем повторный запрос

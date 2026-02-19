@@ -453,31 +453,31 @@ export const useProductsStore = defineStore('productsStore', () => {
   }
 
   async function fetchProductBySlug(slug: string): Promise<FullProduct | null> {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          categories(name, slug),
-          product_images(*),
-          brands(*),
-          product_lines(*),
-          countries(*),
-          materials(*),
-          product_attribute_values(*, attributes(*, attribute_options(*)))
-        `)
-        .eq('slug', slug)
-        .eq('is_active', true)
-        .single()
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        categories(name, slug),
+        product_images(*),
+        brands(*),
+        product_lines(*),
+        countries(*),
+        materials(*),
+        product_attribute_values(*, attributes(*, attribute_options(*)))
+      `)
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single()
 
-      if (error && error.code !== 'PGRST116')
-        throw error
-      return data as FullProduct | null
-    }
-    catch (error: any) {
-      toast.error('Ошибка загрузки товара', { description: error.message })
+    // Товар не найден — возвращаем null (вызывающий код покажет 404)
+    if (error && error.code === 'PGRST116')
       return null
-    }
+
+    // Ошибка сети/Supabase — пробрасываем наверх (НЕ глотаем)
+    if (error)
+      throw error
+
+    return data as FullProduct | null
   }
 
   async function fetchProductsByIds(ids: string[]): Promise<ProductWithImages[]> {
