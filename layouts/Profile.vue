@@ -16,7 +16,7 @@ const navItems = [
   { to: '/profile/children', icon: 'lucide:smile', label: 'Мои дети', shortLabel: 'Дети' },
   { to: '/profile/order', icon: 'lucide:shopping-bag', label: 'Мои заказы', shortLabel: 'Заказы' },
   { to: '/profile/wishlist', icon: 'lucide:heart', label: 'Избранное', shortLabel: 'Избранное' },
-  { to: '/profile/bonus', icon: 'lucide:star', label: 'Бонусы', shortLabel: 'Бонусы' },
+  { to: '/profile/bonuses', icon: 'lucide:star', label: 'Бонусы', shortLabel: 'Бонусы' },
   { to: '/profile/settings', icon: 'lucide:settings', label: 'Настройки', shortLabel: 'Настройки' },
 ]
 
