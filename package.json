@@ -73,6 +73,7 @@
     "@antfu/eslint-config": "^5.2.0",
     "@iconify-json/fluent-emoji-flat": "^1.2.5",
     "@iconify-json/lucide": "^1.2.73",
+    "@iconify-json/streamline-emojis": "^1.2.4",
     "@iconify-json/streamline-plump": "^1.2.0",
     "@nuxtjs/storybook": "^9.0.1",
     "@pinia/testing": "^1.0.3",

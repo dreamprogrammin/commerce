@@ -162,6 +162,9 @@ importers:
       '@iconify-json/lucide':
         specifier: ^1.2.73
         version: 1.2.85
+      '@iconify-json/streamline-emojis':
+        specifier: ^1.2.4
+        version: 1.2.4
       '@iconify-json/streamline-plump':
         specifier: ^1.2.0
         version: 1.2.0
@@ -906,6 +909,9 @@ packages:
 
   '@iconify-json/lucide@1.2.85':
     resolution: {integrity: sha512-VXUWT6KRDiVK4Ty/7Ypu+U0KnSbHzDAOOiSgLLPhU8u3ES5IusP1X7ahZb1iwiVKGWRG6gkKywaRUIZLgYWXyA==}
+
+  '@iconify-json/streamline-emojis@1.2.4':
+    resolution: {integrity: sha512-iNr9T9XuZVTyQPJO8ZlLxBzPkpi7qMl+z1l0C31vpEMqhPMelth3n7CeWQYtixdetDPdI81yeG4ROqjWpYJE6A==}
 
   '@iconify-json/streamline-plump@1.2.0':
     resolution: {integrity: sha512-cem8ppCqUuVfargMadkWq22gaFWLnCV98nQYv8ZaFCxzLINGHLjgioQyDAclxLwowREn2yjgymTXlUE6WW/VNg==}
@@ -7325,6 +7331,10 @@ snapshots:
       '@iconify/types': 2.0.0
 
   '@iconify-json/lucide@1.2.85':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/streamline-emojis@1.2.4':
     dependencies:
       '@iconify/types': 2.0.0
 

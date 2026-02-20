@@ -10,8 +10,8 @@ const selectedIds = defineModel<string[]>('selectedIds', { default: () => [] })
 
 // Category configuration with explicit Tailwind classes
 const categories = {
-  'batteries': { title: 'Батарейки', icon: 'mdi:battery', bg: 'bg-amber-50', text: 'text-amber-600' },
-  'gift-wrapping': { title: 'Упаковка', icon: 'mdi:gift', bg: 'bg-pink-50', text: 'text-pink-600' },
+  'batteries': { title: 'Батарейки', icon: 'streamline-emojis:battery', bg: 'bg-amber-50', text: 'text-amber-600' },
+  'gift-wrapping': { title: 'Упаковка', icon: 'streamline-emojis:wrapped-gift-1', bg: 'bg-pink-50', text: 'text-pink-600' },
   'other': { title: 'Аксессуары', icon: 'lucide:package', bg: 'bg-blue-50', text: 'text-blue-600' },
 } as const
 
