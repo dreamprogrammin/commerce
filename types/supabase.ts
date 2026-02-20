@@ -1309,6 +1309,7 @@ export type Database = {
           description: string | null
           discount_percentage: number
           featured_order: number | null
+          final_price: number | null
           gender: string | null
           id: string
           is_accessory: boolean
@@ -1360,6 +1361,7 @@ export type Database = {
           description?: string | null
           discount_percentage?: number
           featured_order?: number | null
+          final_price?: number | null
           gender?: string | null
           id?: string
           is_accessory?: boolean
@@ -1411,6 +1413,7 @@ export type Database = {
           description?: string | null
           discount_percentage?: number
           featured_order?: number | null
+          final_price?: number | null
           gender?: string | null
           id?: string
           is_accessory?: boolean
@@ -1982,6 +1985,7 @@ export type Database = {
         Args: { new_real_user_id: string; old_anon_user_id: string }
         Returns: string
       }
+      process_confirmed_order: { Args: { p_order_id: string }; Returns: string }
       recalculate_pending_balances: { Args: never; Returns: string }
     }
     Enums: {

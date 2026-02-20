@@ -286,6 +286,7 @@ export interface ProductFormData {
   slug: string
   description: string | null
   price: number
+  cost_price: number
   category_id: string | null
   bonus_points_award: number
   stock_quantity: number

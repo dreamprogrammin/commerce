@@ -128,6 +128,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       slug: product.slug,
       description: product.description,
       price: product.price,
+      cost_price: product.cost_price ?? 0,
       category_id: product.category_id,
       stock_quantity: product.stock_quantity,
       is_active: product.is_active,
@@ -170,6 +171,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       name: '',
       slug: '',
       price: 0,
+      cost_price: 0,
       is_active: true,
       stock_quantity: 0,
       description: null,
@@ -599,6 +601,10 @@ function handleSubmit() {
   }
 }
 
+function formatPrice(value: number) {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(value))
+}
+
 // --- 10. ИНИЦИАЛИЗАЦИЯ ---
 
 onMounted(() => {
@@ -701,6 +707,22 @@ const priceValue = computed({
       formData.value.price = typeof value === 'number' && value >= 0 ? value : 0
     }
   },
+})
+
+const costPriceValue = computed({
+  get() { return formData.value.cost_price ?? 0 },
+  set(value) {
+    if (formData.value) {
+      formData.value.cost_price = typeof value === 'number' && value >= 0 ? value : 0
+    }
+  },
+})
+
+const marginPercent = computed(() => {
+  const price = formData.value.price || 0
+  const cost = formData.value.cost_price || 0
+  if (!price || !cost) return null
+  return Math.round(((price - cost) / price) * 100)
 })
 
 const stockQuantityValue = computed({
@@ -902,6 +924,16 @@ const seoKeywordsString = computed({
             />
           </div>
           <div>
+            <Label for="cost_price">Закупочная цена (₸)</Label>
+            <Input
+              id="cost_price"
+              v-model.number="costPriceValue"
+              type="number"
+              placeholder="0"
+              min="0"
+            />
+          </div>
+          <div>
             <Label for="discount_percentage">Скидка (%)</Label>
             <Input
               id="discount_percentage"
@@ -911,6 +943,15 @@ const seoKeywordsString = computed({
               max="100"
               placeholder="0-100"
             />
+          </div>
+          <div v-if="marginPercent !== null" class="sm:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+            <div class="flex items-center gap-3 text-sm">
+              <span class="text-muted-foreground">Маржа:</span>
+              <span class="font-bold" :class="marginPercent >= 30 ? 'text-green-600 dark:text-green-400' : marginPercent >= 15 ? 'text-amber-600' : 'text-destructive'">
+                {{ marginPercent }}%
+              </span>
+              <span class="text-muted-foreground">({{ formatPrice(formData.price - formData.cost_price) }} ₸ с единицы)</span>
+            </div>
           </div>
           <div v-if="discountedPrice !== null" class="sm:col-span-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
             <div class="flex items-center gap-3">
