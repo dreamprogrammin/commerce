@@ -248,9 +248,9 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
 </script>
 
 <template>
-  <div class="bg-white border rounded-xl p-4 space-y-4 sticky top-24">
+  <div class="bg-white border rounded-xl p-4 flex flex-col sticky top-4 h-[calc(100vh-1rem)]">
     <!-- Заголовок -->
-    <div class="flex items-center justify-between pb-3 border-b">
+    <div class="flex items-center justify-between pb-3 border-b shrink-0">
       <div class="flex items-center gap-2">
         <Icon name="lucide:sliders-horizontal" class="w-5 h-5 text-muted-foreground" />
         <h3 class="font-bold text-lg">
@@ -263,7 +263,7 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
     </div>
 
     <!-- Контент с прокруткой -->
-    <div class="space-y-3 max-h-[calc(100vh-12rem)] overflow-y-auto pr-2 scrollbar-thin">
+    <div class="space-y-3 flex-1 overflow-y-auto pr-2 scrollbar-thin mt-4">
       <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ -->
       <div v-if="subcategories.length > 0" class="space-y-2">
         <div class="flex items-center gap-2 mb-2">
@@ -724,7 +724,7 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
     </div>
 
     <!-- Кнопка сброса -->
-    <div v-if="activeFiltersCount > 0" class="pt-3 border-t">
+    <div v-if="activeFiltersCount > 0" class="pt-3 border-t shrink-0">
       <Button
         variant="outline"
         size="sm"
