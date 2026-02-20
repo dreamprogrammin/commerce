@@ -14,10 +14,13 @@ onMounted(() => {
 })
 
 const visible = computed(() => {
+  // Проверяем и ref, и Notification.permission напрямую (страховка)
+  const browserPermission = ('Notification' in window) ? Notification.permission : 'default'
   return (
     user.value
     && isSupported.value
     && permission.value === 'default'
+    && browserPermission === 'default'
     && !dismissed.value
   )
 })

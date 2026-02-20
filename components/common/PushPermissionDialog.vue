@@ -17,11 +17,13 @@ onMounted(() => {
   if (wasDismissed || !user.value || !isSupported.value)
     return
 
-  if (permission.value !== 'default')
+  // Проверяем и реактивный ref, и напрямую браузерный API (страховка от race condition)
+  if (permission.value !== 'default' || Notification.permission !== 'default')
     return
 
   setTimeout(() => {
-    if (user.value) {
+    // Повторная проверка — за 5 секунд состояние могло измениться
+    if (user.value && Notification.permission === 'default') {
       isOpen.value = true
     }
   }, DELAY_MS)

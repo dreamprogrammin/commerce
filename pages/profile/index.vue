@@ -174,6 +174,11 @@ useHead({
       </div>
     </div>
 
+    <!-- Telegram баннер -->
+    <ClientOnly>
+      <TelegramBanner />
+    </ClientOnly>
+
     <!-- Быстрые карточки -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <!-- Бонусы -->

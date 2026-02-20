@@ -5,15 +5,45 @@ export function usePushSubscription() {
   const user = useSupabaseUser()
   const config = useRuntimeConfig()
 
-  const isSupported = ref(false)
-  const permission = ref<NotificationPermission>('default')
+  // Инициализируем синхронно — избегаем race condition с onMounted в Dialog/Drawer
+  const isSupported = ref(
+    import.meta.client && 'serviceWorker' in navigator && 'PushManager' in window,
+  )
+  const permission = ref<NotificationPermission>(
+    isSupported.value ? Notification.permission : 'default',
+  )
 
-  onMounted(() => {
-    isSupported.value = 'serviceWorker' in navigator && 'PushManager' in window
-    if (isSupported.value) {
-      permission.value = Notification.permission
-    }
-  })
+  // При повторном логине: если подписка уже есть в браузере, синхронизируем с БД
+  if (import.meta.client) {
+    watch(user, async (newUser) => {
+      if (!newUser || !isSupported.value)
+        return
+      if (Notification.permission !== 'granted')
+        return
+
+      try {
+        const registration = await navigator.serviceWorker.ready
+        const existingSub = await registration.pushManager.getSubscription()
+        if (!existingSub)
+          return
+
+        const subJson = existingSub.toJSON()
+        await supabase.from('push_subscriptions').upsert(
+          {
+            user_id: newUser.id,
+            endpoint: subJson.endpoint!,
+            p256dh: subJson.keys!.p256dh,
+            auth: subJson.keys!.auth,
+            user_agent: navigator.userAgent,
+          },
+          { onConflict: 'user_id,endpoint' },
+        )
+      }
+      catch {
+        // Не критично — подписка синхронизируется при следующем subscribe()
+      }
+    })
+  }
 
   function urlBase64ToUint8Array(base64String: string): Uint8Array {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)

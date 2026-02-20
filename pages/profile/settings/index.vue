@@ -5,11 +5,13 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, toRaw, watch } from 'vue'
 
 import { toast } from 'vue-sonner'
-// Импорт UI-компонентов
+
+import TelegramLinkButton from '@/components/profile/TelegramLinkButton.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useProfileStore } from '@/stores/core/profileStore'
 
@@ -164,6 +166,10 @@ async function handleUpdate() {
                 Отменить
               </Button>
             </div>
+
+            <Separator class="my-2" />
+
+            <TelegramLinkButton />
           </form>
 
           <!-- Состояние 3: Ошибка загрузки -->

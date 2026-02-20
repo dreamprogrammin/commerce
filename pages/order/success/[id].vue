@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { CheckCircle2, Package, ShoppingCart, Trash2, XCircle } from 'lucide-vue-next'
-import { usePersonalizationStore } from '@/stores/core/personalizationStore'
-import { useCartStore } from '@/stores/publicStore/cartStore'
+import { storeToRefs } from 'pinia'
+
+import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { usePersonalizationStore } from '@/stores/core/personalizationStore'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { useCartStore } from '@/stores/publicStore/cartStore'
 
 const route = useRoute()
 const router = useRouter()
 const user = useSupabaseUser()
 const supabase = useSupabaseClient()
 const cartStore = useCartStore()
+const profileStore = useProfileStore()
+const { profile } = storeToRefs(profileStore)
 
 // ✅ ИСПРАВЛЕНИЕ: Используем slice(-6) для консистентности с другими страницами
 const orderId = computed(() => (route.params.id as string).slice(-6)) // Последние 6 символов
@@ -193,6 +199,11 @@ onMounted(async () => {
         </Button>
       </CardContent>
     </Card>
+
+    <!-- Telegram баннер -->
+    <ClientOnly>
+      <TelegramBanner v-if="isAuthenticated && !profile?.telegram_chat_id" />
+    </ClientOnly>
 
     <!-- Кнопка на главную -->
     <div class="text-center">

@@ -1508,6 +1508,7 @@ export type Database = {
           pending_bonus_balance: number
           phone: string | null
           role: string
+          telegram_chat_id: number | null
           updated_at: string
         }
         Insert: {
@@ -1520,6 +1521,7 @@ export type Database = {
           pending_bonus_balance?: number
           phone?: string | null
           role?: string
+          telegram_chat_id?: number | null
           updated_at?: string
         }
         Update: {
@@ -1532,9 +1534,77 @@ export type Database = {
           pending_bonus_balance?: number
           phone?: string | null
           role?: string
+          telegram_chat_id?: number | null
           updated_at?: string
         }
         Relationships: []
+      }
+      telegram_link_codes: {
+        Row: {
+          id: string
+          user_id: string
+          code: string
+          created_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          code: string
+          created_at?: string
+          expires_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          code?: string
+          created_at?: string
+          expires_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_link_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_broadcasts: {
+        Row: {
+          id: string
+          admin_id: string
+          message: string
+          sent_count: number
+          failed_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          admin_id: string
+          message: string
+          sent_count?: number
+          failed_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          admin_id?: string
+          message?: string
+          sent_count?: number
+          failed_count?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_broadcasts_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_subscriptions: {
         Row: {
