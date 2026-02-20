@@ -85,7 +85,7 @@ function close() {
 <template>
   <div v-if="loading || accessories.length > 0" class="bg-white rounded-xl p-4 shadow-sm border mt-4">
     <h3 class="font-bold text-base mb-3 flex items-center gap-2">
-      <Icon name="lucide:plus-circle" class="w-4 h-4 text-primary" />
+      <Icon name="lucide:plus-circle" class="w-6 h-6 text-primary" mode="svg"/>
       С этим покупают
     </h3>
 
