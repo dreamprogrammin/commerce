@@ -26,6 +26,8 @@ interface SalesReport {
   offline_count: number
   user_orders_count: number
   guest_orders_count: number
+  returns_count: number
+  returns_amount: number
 }
 
 type Period = 'today' | 'week' | 'month' | 'custom'
@@ -78,7 +80,7 @@ function getPeriodDates(p: Period): { from: Date, to: Date } {
 
   // custom
   const from = customFrom.value ? new Date(customFrom.value) : startOfDay
-  const to = customTo.value ? new Date(customTo.value + 'T23:59:59') : new Date(almaty)
+  const to = customTo.value ? new Date(`${customTo.value}T23:59:59`) : new Date(almaty)
   return { from, to }
 }
 
@@ -104,7 +106,8 @@ async function loadReport() {
       p_acquiring_rate: acquiringRate.value,
     })
 
-    if (rpcError) throw rpcError
+    if (rpcError)
+      throw rpcError
     report.value = data as SalesReport
   }
   catch (err: unknown) {
@@ -126,17 +129,19 @@ watch([period, acquiringRate], () => {
 // Форматирование
 // ============================================================================
 function fmt(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—'
-  return new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₸'
+  if (value === null || value === undefined)
+    return '—'
+  return `${new Intl.NumberFormat('ru-RU').format(Math.round(value))} ₸`
 }
 
 function fmtNum(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined)
+    return '—'
   return new Intl.NumberFormat('ru-RU').format(value)
 }
 
 function fmtPct(value: number): string {
-  return value.toFixed(1) + '%'
+  return `${value.toFixed(1)}%`
 }
 
 const periodLabel = computed(() => {
@@ -150,12 +155,14 @@ const periodLabel = computed(() => {
 })
 
 const marginPct = computed(() => {
-  if (!report.value || !report.value.turnover) return null
+  if (!report.value || !report.value.turnover)
+    return null
   return ((report.value.gross_profit / report.value.turnover) * 100).toFixed(1)
 })
 
 const netMarginPct = computed(() => {
-  if (!report.value || !report.value.turnover) return null
+  if (!report.value || !report.value.turnover)
+    return null
   return ((report.value.net_profit / report.value.turnover) * 100).toFixed(1)
 })
 </script>
@@ -164,7 +171,9 @@ const netMarginPct = computed(() => {
   <div class="p-6 space-y-6 max-w-5xl mx-auto">
     <div class="flex items-center justify-between flex-wrap gap-4">
       <div>
-        <h1 class="text-2xl font-bold">Отчёт по продажам</h1>
+        <h1 class="text-2xl font-bold">
+          Отчёт по продажам
+        </h1>
         <p class="text-sm text-muted-foreground mt-0.5">
           Оборот, прибыль, налоги — {{ periodLabel }}
         </p>
@@ -265,16 +274,16 @@ const netMarginPct = computed(() => {
          Метрики
     ============================== -->
     <template v-if="report && !isLoading">
-
       <!-- Строка 1: Оборот + Себестоимость + Валовая прибыль -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
         <Card>
           <CardContent class="pt-5 pb-5">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Оборот (выручка)
             </p>
-            <p class="text-2xl font-bold mt-1">{{ fmt(report.turnover) }}</p>
+            <p class="text-2xl font-bold mt-1">
+              {{ fmt(report.turnover) }}
+            </p>
             <p class="text-xs text-muted-foreground mt-1">
               {{ fmtNum(report.total_orders) }} заказов
             </p>
@@ -286,7 +295,9 @@ const netMarginPct = computed(() => {
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Себестоимость
             </p>
-            <p class="text-2xl font-bold mt-1 text-orange-500">{{ fmt(report.cost_of_goods) }}</p>
+            <p class="text-2xl font-bold mt-1 text-orange-500">
+              {{ fmt(report.cost_of_goods) }}
+            </p>
             <p class="text-xs text-muted-foreground mt-1">
               Закупочная стоимость товаров
             </p>
@@ -305,7 +316,7 @@ const netMarginPct = computed(() => {
               {{ fmt(report.gross_profit) }}
             </p>
             <p class="text-xs text-muted-foreground mt-1">
-              Маржа: <span class="font-medium">{{ marginPct !== null ? marginPct + '%' : '—' }}</span>
+              Маржа: <span class="font-medium">{{ marginPct !== null ? `${marginPct}%` : '—' }}</span>
             </p>
           </CardContent>
         </Card>
@@ -313,7 +324,6 @@ const netMarginPct = computed(() => {
 
       <!-- Строка 2: Налог + Комиссия + Чистая прибыль -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
         <Card>
           <CardContent class="pt-5 pb-5">
             <div class="flex items-start justify-between">
@@ -321,7 +331,9 @@ const netMarginPct = computed(() => {
                 <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Налог ИПН
                 </p>
-                <p class="text-2xl font-bold mt-1 text-red-500">{{ fmt(report.tax_amount) }}</p>
+                <p class="text-2xl font-bold mt-1 text-red-500">
+                  {{ fmt(report.tax_amount) }}
+                </p>
               </div>
               <Badge variant="outline" class="text-xs mt-1">
                 4% от оборота
@@ -340,7 +352,9 @@ const netMarginPct = computed(() => {
                 <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Эквайринг
                 </p>
-                <p class="text-2xl font-bold mt-1 text-amber-500">{{ fmt(report.commission_amount) }}</p>
+                <p class="text-2xl font-bold mt-1 text-amber-500">
+                  {{ fmt(report.commission_amount) }}
+                </p>
               </div>
               <Badge variant="outline" class="text-xs mt-1">
                 {{ fmtPct(report.acquiring_rate) }}
@@ -364,7 +378,7 @@ const netMarginPct = computed(() => {
               {{ fmt(report.net_profit) }}
             </p>
             <p class="text-xs text-muted-foreground mt-1">
-              Маржа: <span class="font-medium">{{ netMarginPct !== null ? netMarginPct + '%' : '—' }}</span>
+              Маржа: <span class="font-medium">{{ netMarginPct !== null ? `${netMarginPct}%` : '—' }}</span>
             </p>
           </CardContent>
         </Card>
@@ -372,11 +386,12 @@ const netMarginPct = computed(() => {
 
       <!-- Строка 3: Детализация -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
         <!-- Разбивка онлайн / офлайн -->
         <Card>
           <CardHeader class="pb-3">
-            <CardTitle class="text-base">Каналы продаж</CardTitle>
+            <CardTitle class="text-base">
+              Каналы продаж
+            </CardTitle>
           </CardHeader>
           <CardContent class="space-y-3">
             <div class="flex items-center justify-between">
@@ -389,7 +404,7 @@ const netMarginPct = computed(() => {
             <div class="w-full bg-muted rounded-full h-2">
               <div
                 class="bg-blue-500 h-2 rounded-full transition-all"
-                :style="{ width: report.total_orders ? (report.online_count / report.total_orders * 100) + '%' : '0%' }"
+                :style="{ width: report.total_orders ? `${report.online_count / report.total_orders * 100}%` : '0%' }"
               />
             </div>
 
@@ -403,7 +418,7 @@ const netMarginPct = computed(() => {
             <div class="w-full bg-muted rounded-full h-2">
               <div
                 class="bg-purple-500 h-2 rounded-full transition-all"
-                :style="{ width: report.total_orders ? (report.offline_count / report.total_orders * 100) + '%' : '0%' }"
+                :style="{ width: report.total_orders ? `${report.offline_count / report.total_orders * 100}%` : '0%' }"
               />
             </div>
           </CardContent>
@@ -412,7 +427,9 @@ const netMarginPct = computed(() => {
         <!-- Расчёт по налогу -->
         <Card>
           <CardHeader class="pb-3">
-            <CardTitle class="text-base">Налоговый расчёт (СНР 2026)</CardTitle>
+            <CardTitle class="text-base">
+              Налоговый расчёт (СНР 2026)
+            </CardTitle>
           </CardHeader>
           <CardContent class="space-y-2 text-sm">
             <div class="flex justify-between py-1 border-b">
@@ -456,25 +473,64 @@ const netMarginPct = computed(() => {
         <CardContent class="pt-5 pb-5">
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div>
-              <p class="text-muted-foreground text-xs uppercase tracking-wide">Зарегистрированные</p>
-              <p class="font-semibold mt-1">{{ fmtNum(report.user_orders_count) }} заказов</p>
+              <p class="text-muted-foreground text-xs uppercase tracking-wide">
+                Зарегистрированные
+              </p>
+              <p class="font-semibold mt-1">
+                {{ fmtNum(report.user_orders_count) }} заказов
+              </p>
             </div>
             <div>
-              <p class="text-muted-foreground text-xs uppercase tracking-wide">Гостевые</p>
-              <p class="font-semibold mt-1">{{ fmtNum(report.guest_orders_count) }} заказов</p>
+              <p class="text-muted-foreground text-xs uppercase tracking-wide">
+                Гостевые
+              </p>
+              <p class="font-semibold mt-1">
+                {{ fmtNum(report.guest_orders_count) }} заказов
+              </p>
             </div>
             <div>
-              <p class="text-muted-foreground text-xs uppercase tracking-wide">Картой (сумма)</p>
-              <p class="font-semibold mt-1">{{ fmt(report.card_sum) }}</p>
+              <p class="text-muted-foreground text-xs uppercase tracking-wide">
+                Картой (сумма)
+              </p>
+              <p class="font-semibold mt-1">
+                {{ fmt(report.card_sum) }}
+              </p>
             </div>
             <div>
-              <p class="text-muted-foreground text-xs uppercase tracking-wide">Бонусов списано</p>
-              <p class="font-semibold mt-1 text-amber-500">{{ fmtNum(report.bonuses_spent) }}</p>
+              <p class="text-muted-foreground text-xs uppercase tracking-wide">
+                Бонусов списано
+              </p>
+              <p class="font-semibold mt-1 text-amber-500">
+                {{ fmtNum(report.bonuses_spent) }}
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      <!-- Возвраты -->
+      <Card v-if="report.returns_count > 0" class="border-orange-200 dark:border-orange-800">
+        <CardContent class="pt-5 pb-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Возвраты за период
+              </p>
+              <p class="text-2xl font-bold mt-1 text-orange-600 dark:text-orange-400">
+                {{ fmt(report.returns_amount) }}
+              </p>
+              <p class="text-xs text-muted-foreground mt-1">
+                {{ fmtNum(report.returns_count) }} возвратов
+              </p>
+            </div>
+            <NuxtLink to="/admin/returns">
+              <Button variant="outline" size="sm">
+                Возвраты
+              </Button>
+            </NuxtLink>
+          </div>
+        </CardContent>
+      </Card>
     </template>
 
     <!-- Пустое состояние -->
@@ -483,7 +539,9 @@ const netMarginPct = computed(() => {
       class="flex flex-col items-center justify-center py-16 text-muted-foreground"
     >
       <Icon name="lucide:bar-chart-2" class="w-12 h-12 mb-3 opacity-30" />
-      <p class="text-sm">Нет данных за выбранный период</p>
+      <p class="text-sm">
+        Нет данных за выбранный период
+      </p>
     </div>
   </div>
 </template>
