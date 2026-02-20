@@ -91,7 +91,9 @@
       "WebFetch(domain:www.npmjs.com)",
       "Bash(npm info:*)",
       "Bash(python3:*)",
-      "WebFetch(domain:uhti.kz)"
+      "WebFetch(domain:uhti.kz)",
+      "WebFetch(domain:mybuh.kz)",
+      "WebFetch(domain:alataucitybank.kz)"
     ]
   }
 }
