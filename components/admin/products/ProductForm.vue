@@ -725,6 +725,39 @@ const marginPercent = computed(() => {
   return Math.round(((price - cost) / price) * 100)
 })
 
+// --- КАЛЬКУЛЯЦИЯ РАСХОДОВ И ЧИСТОЙ ПРИБЫЛИ ---
+const acquiringRate = ref(1.5)
+const TAX_RATE = 0.04
+
+const priceBreakdown = computed(() => {
+  const price = formData.value.price || 0
+  if (!price) return null
+
+  const discount = formData.value.discount_percentage || 0
+  const sellingPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price
+  const discountAmount = price - sellingPrice
+  const costPrice = formData.value.cost_price || 0
+  const tax = Math.round(sellingPrice * TAX_RATE)
+  const acquiring = Math.round(sellingPrice * acquiringRate.value / 100)
+  const bonusPoints = formData.value.bonus_points_award || 0
+  const totalExpenses = costPrice + tax + acquiring
+  const netProfit = sellingPrice - totalExpenses
+  const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0
+
+  return {
+    price,
+    sellingPrice,
+    discountAmount,
+    costPrice,
+    tax,
+    acquiring,
+    bonusPoints,
+    totalExpenses,
+    netProfit,
+    netMargin,
+  }
+})
+
 const stockQuantityValue = computed({
   get() { return formData.value.stock_quantity ?? 0 },
   set(value) {
@@ -944,27 +977,70 @@ const seoKeywordsString = computed({
               placeholder="0-100"
             />
           </div>
-          <div v-if="marginPercent !== null" class="sm:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-            <div class="flex items-center gap-3 text-sm">
-              <span class="text-muted-foreground">Маржа:</span>
-              <span class="font-bold" :class="marginPercent >= 30 ? 'text-green-600 dark:text-green-400' : marginPercent >= 15 ? 'text-amber-600' : 'text-destructive'">
-                {{ marginPercent }}%
-              </span>
-              <span class="text-muted-foreground">({{ formatPrice(formData.price - formData.cost_price) }} ₸ с единицы)</span>
-            </div>
+          <div>
+            <Label for="acquiring_rate">Эквайринг (%)</Label>
+            <Input
+              id="acquiring_rate"
+              v-model.number="acquiringRate"
+              type="number"
+              min="0"
+              max="10"
+              step="0.1"
+              placeholder="1.5"
+            />
           </div>
-          <div v-if="discountedPrice !== null" class="sm:col-span-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-            <div class="flex items-center gap-3">
-              <div class="text-sm text-muted-foreground">
-                <span class="line-through">{{ formData.price }} ₸</span>
-                <span class="mx-1">→</span>
+          <!-- Калькуляция расходов -->
+          <div v-if="priceBreakdown" class="sm:col-span-2 p-4 bg-muted/50 border rounded-lg space-y-2 text-sm">
+            <p class="font-semibold text-base mb-3">
+              Калькуляция на единицу
+            </p>
+            <!-- Цена продажи -->
+            <div class="flex justify-between">
+              <span class="text-muted-foreground">Цена продажи:</span>
+              <span class="font-medium">{{ formatPrice(priceBreakdown.price) }} ₸</span>
+            </div>
+            <!-- Скидка -->
+            <div v-if="priceBreakdown.discountAmount > 0" class="flex justify-between text-destructive">
+              <span>Скидка ({{ formData.discount_percentage }}%):</span>
+              <span class="font-medium">-{{ formatPrice(priceBreakdown.discountAmount) }} ₸</span>
+            </div>
+            <!-- Цена после скидки -->
+            <div v-if="priceBreakdown.discountAmount > 0" class="flex justify-between font-semibold border-t pt-2">
+              <span>Цена со скидкой:</span>
+              <span>{{ formatPrice(priceBreakdown.sellingPrice) }} ₸</span>
+            </div>
+            <!-- Разделитель расходов -->
+            <div class="border-t pt-2 mt-1 space-y-2">
+              <div class="flex justify-between">
+                <span class="text-muted-foreground">Себестоимость:</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.costPrice) }} ₸</span>
               </div>
-              <span class="text-lg font-bold text-green-600 dark:text-green-400">
-                {{ discountedPrice }} ₸
-              </span>
-              <Badge variant="destructive" class="text-xs">
-                -{{ formData.discount_percentage }}%
-              </Badge>
+              <div class="flex justify-between">
+                <span class="text-muted-foreground">ИПН (4%):</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.tax) }} ₸</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-muted-foreground">Эквайринг ({{ acquiringRate }}%):</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.acquiring) }} ₸</span>
+              </div>
+            </div>
+            <!-- Итого расходы -->
+            <div class="flex justify-between border-t pt-2 text-muted-foreground">
+              <span>Итого расходы:</span>
+              <span class="font-medium">{{ formatPrice(priceBreakdown.totalExpenses) }} ₸</span>
+            </div>
+            <!-- Чистая прибыль -->
+            <div
+              class="flex justify-between border-t pt-2 font-bold text-base"
+              :class="priceBreakdown.netProfit > 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'"
+            >
+              <span>Чистая прибыль:</span>
+              <span>{{ formatPrice(priceBreakdown.netProfit) }} ₸ ({{ priceBreakdown.netMargin }}%)</span>
+            </div>
+            <!-- Бонусы (информативно) -->
+            <div v-if="priceBreakdown.bonusPoints > 0" class="flex justify-between pt-1 text-xs text-muted-foreground">
+              <span>Бонусы клиенту:</span>
+              <span>{{ priceBreakdown.bonusPoints }} бонусов</span>
             </div>
           </div>
           <div class="p-3 bg-muted/50 rounded-md sm:col-span-2">

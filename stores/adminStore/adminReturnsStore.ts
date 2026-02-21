@@ -24,6 +24,8 @@ export interface ReturnOrder {
   customer_phone: string | null
   days_since_order: number
   can_return: boolean
+  source_table: 'orders' | 'guest_checkouts'
+  source: 'online' | 'offline'
   items: ReturnOrderItem[]
 }
 

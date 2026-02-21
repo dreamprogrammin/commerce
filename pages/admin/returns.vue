@@ -160,7 +160,7 @@ onUnmounted(() => {
             <label class="text-sm font-medium mb-1.5 block">ID заказа</label>
             <Input
               v-model="orderIdQuery"
-              placeholder="Вставьте UUID заказа..."
+              placeholder="Вставьте UUID заказа или гостевого заказа..."
               @keydown.enter="searchOrder"
             />
           </div>
@@ -210,9 +210,15 @@ onUnmounted(() => {
             <CardTitle class="text-base">
               Заказ
             </CardTitle>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
               <Badge :variant="order.status === 'cancelled' ? 'destructive' : 'outline'">
                 {{ statusLabels[order.status] || order.status }}
+              </Badge>
+              <Badge variant="outline" :class="order.source === 'offline' ? 'text-violet-600 border-violet-300' : 'text-blue-600 border-blue-300'">
+                {{ order.source === 'offline' ? 'Офлайн' : 'Онлайн' }}
+              </Badge>
+              <Badge variant="outline" :class="order.source_table === 'guest_checkouts' ? 'text-orange-600 border-orange-300' : 'text-sky-600 border-sky-300'">
+                {{ order.source_table === 'guest_checkouts' ? 'Гостевой заказ' : 'Заказ пользователя' }}
               </Badge>
               <Badge v-if="order.can_return" variant="outline" class="text-green-600 border-green-300">
                 Возврат доступен
@@ -249,7 +255,7 @@ onUnmounted(() => {
                 {{ fmt(order.final_amount) }}
               </p>
             </div>
-            <div>
+            <div v-if="order.source_table !== 'guest_checkouts'">
               <span class="text-muted-foreground">Бонусы начислены:</span>
               <p class="font-medium">
                 {{ order.bonuses_awarded }}
@@ -356,7 +362,7 @@ onUnmounted(() => {
                   <span class="text-muted-foreground">Сумма возврата:</span>
                   <span class="font-semibold ml-1">{{ fmt(refundAmount) }}</span>
                 </p>
-                <p v-if="bonusesToCancel > 0">
+                <p v-if="bonusesToCancel > 0 && order.source_table !== 'guest_checkouts'">
                   <span class="text-muted-foreground">Бонусов к отмене:</span>
                   <span class="font-semibold ml-1 text-amber-600">{{ bonusesToCancel }}</span>
                 </p>
@@ -429,7 +435,7 @@ onUnmounted(() => {
             <span>Сумма возврата:</span>
             <span>{{ fmt(refundAmount) }}</span>
           </div>
-          <div v-if="bonusesToCancel > 0" class="flex justify-between text-amber-600">
+          <div v-if="bonusesToCancel > 0 && order?.source_table !== 'guest_checkouts'" class="flex justify-between text-amber-600">
             <span>Бонусов к отмене:</span>
             <span>{{ bonusesToCancel }}</span>
           </div>
