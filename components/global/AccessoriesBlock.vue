@@ -10,8 +10,8 @@ const selectedIds = defineModel<string[]>('selectedIds', { default: () => [] })
 
 // Category configuration with explicit Tailwind classes
 const categories = {
-  'batteries': { title: 'Батарейки', icon: 'streamline-emojis:battery', bg: 'bg-amber-50', text: 'text-amber-600' },
-  'gift-wrapping': { title: 'Упаковка', icon: 'streamline-emojis:wrapped-gift-1', bg: 'bg-pink-50', text: 'text-pink-600' },
+  'batteries': { title: 'Батарейки', icon: 'streamline-emojis:battery', bg: 'bg-amber-50', text: '' },
+  'gift-wrapping': { title: 'Упаковка', icon: 'streamline-emojis:wrapped-gift-1', bg: 'bg-pink-50', text: '' },
   'other': { title: 'Аксессуары', icon: 'lucide:package', bg: 'bg-blue-50', text: 'text-blue-600' },
 } as const
 
@@ -116,7 +116,7 @@ function close() {
           {{ selectedCount[key] }}
         </Badge>
         <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" :class="categories[key].bg">
-          <Icon :name="categories[key].icon" class="w-6 h-6" :class="categories[key].text" />
+          <Icon :name="categories[key].icon" class="w-8 h-8" :class="categories[key].text" mode="svg"/>
         </div>
         <div class="flex-1 text-left">
           <div class="text-sm font-semibold">
@@ -135,7 +135,7 @@ function close() {
       <DialogContent class="max-w-2xl">
         <DialogHeader>
           <DialogTitle v-if="currentConfig" class="flex items-center gap-2">
-            <Icon :name="currentConfig.icon" class="w-5 h-5" :class="currentConfig.text" />
+            <Icon :name="currentConfig.icon" class="w-7 h-7" :class="currentConfig.text" mode="svg" />
             {{ currentConfig.title }}
           </DialogTitle>
           <DialogDescription>Выберите товары для заказа</DialogDescription>
@@ -154,7 +154,7 @@ function close() {
       <DrawerContent class="max-h-[45vh]">
         <DrawerHeader class="text-left pb-2">
           <DrawerTitle v-if="currentConfig" class="flex items-center gap-2 text-base">
-            <Icon :name="currentConfig.icon" class="w-5 h-5" :class="currentConfig.text" />
+            <Icon :name="currentConfig.icon" class="w-7 h-7" :class="currentConfig.text" mode="svg"/>
             {{ currentConfig.title }}
           </DrawerTitle>
         </DrawerHeader>
