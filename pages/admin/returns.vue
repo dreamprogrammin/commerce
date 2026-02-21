@@ -7,13 +7,17 @@ definePageMeta({
 })
 
 const returnsStore = useAdminReturnsStore()
-const { order, isLoading, isProcessing, lastResult } = storeToRefs(returnsStore)
+const { order, isLoading, isProcessing, lastResult, searchResults, isSearching } = storeToRefs(returnsStore)
 
 // --- Состояние ---
 const orderIdQuery = ref('')
 const selectedItems = ref<Record<string, number>>({})
 const reason = ref('')
 const showConfirmDialog = ref(false)
+const hasSearched = ref(false)
+
+// UUID regex
+const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i
 
 // --- Поиск заказа ---
 async function searchOrder() {
@@ -23,7 +27,25 @@ async function searchOrder() {
   returnsStore.reset()
   selectedItems.value = {}
   reason.value = ''
-  await returnsStore.loadOrder(query)
+  hasSearched.value = false
+
+  if (UUID_RE.test(query)) {
+    // UUID — сразу загружаем заказ
+    await returnsStore.loadOrder(query)
+  }
+  else {
+    // Телефон или имя — ищем список
+    await returnsStore.searchOrders(query)
+    hasSearched.value = true
+  }
+}
+
+// --- Выбор заказа из результатов поиска ---
+async function selectOrder(orderId: string) {
+  searchResults.value = []
+  selectedItems.value = {}
+  reason.value = ''
+  await returnsStore.loadOrder(orderId)
 }
 
 function toggleItem(item: ReturnOrderItem) {
@@ -157,24 +179,84 @@ onUnmounted(() => {
       <CardContent class="pt-4 pb-4">
         <div class="flex gap-3 items-end">
           <div class="flex-1">
-            <label class="text-sm font-medium mb-1.5 block">ID заказа</label>
+            <label class="text-sm font-medium mb-1.5 block">Поиск заказа</label>
             <Input
               v-model="orderIdQuery"
-              placeholder="Вставьте UUID заказа или гостевого заказа..."
+              placeholder="Поиск по телефону, имени или UUID..."
               @keydown.enter="searchOrder"
             />
           </div>
-          <Button :disabled="!orderIdQuery.trim() || isLoading" @click="searchOrder">
+          <Button :disabled="!orderIdQuery.trim() || isLoading || isSearching" @click="searchOrder">
             <Icon
               name="lucide:search"
               class="w-4 h-4 mr-2"
-              :class="isLoading && 'animate-spin'"
+              :class="(isLoading || isSearching) && 'animate-spin'"
             />
             Найти
           </Button>
         </div>
       </CardContent>
     </Card>
+
+    <!-- Результаты поиска -->
+    <Card v-if="searchResults.length > 0 && !order">
+      <CardHeader class="pb-3">
+        <CardTitle class="text-base">
+          Найдено заказов: {{ searchResults.length }}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="space-y-2">
+          <div
+            v-for="result in searchResults"
+            :key="result.id"
+            class="flex items-center justify-between gap-3 p-3 rounded-lg border border-border hover:border-primary hover:bg-primary/5 cursor-pointer transition-colors"
+            @click="selectOrder(result.id)"
+          >
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium truncate">
+                {{ result.customer_name?.trim() || 'Без имени' }}
+              </p>
+              <p class="text-xs text-muted-foreground">
+                {{ result.customer_phone || '—' }}
+                &middot; {{ fmtDate(result.created_at) }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <Badge :variant="result.status === 'cancelled' ? 'destructive' : 'outline'" class="text-xs">
+                {{ statusLabels[result.status] || result.status }}
+              </Badge>
+              <Badge variant="outline" class="text-xs" :class="result.source === 'offline' ? 'text-violet-600 border-violet-300' : 'text-blue-600 border-blue-300'">
+                {{ result.source === 'offline' ? 'Офлайн' : 'Онлайн' }}
+              </Badge>
+              <Badge variant="outline" class="text-xs" :class="result.source_table === 'guest_checkouts' ? 'text-orange-600 border-orange-300' : 'text-sky-600 border-sky-300'">
+                {{ result.source_table === 'guest_checkouts' ? 'Гостевой' : 'Заказ' }}
+              </Badge>
+              <span class="text-sm font-medium ml-1">
+                {{ fmt(result.final_amount) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Пустой результат поиска -->
+    <div
+      v-if="hasSearched && !isSearching && searchResults.length === 0 && !order && !isLoading && !lastResult"
+      class="flex items-center gap-3 p-4 rounded-lg bg-muted text-sm"
+    >
+      <Icon name="lucide:search-x" class="w-5 h-5 text-muted-foreground shrink-0" />
+      <p class="text-muted-foreground">
+        Заказы не найдены. Попробуйте другой запрос.
+      </p>
+    </div>
+
+    <!-- Загрузка поиска -->
+    <div v-if="isSearching" class="space-y-3">
+      <div class="h-16 rounded-lg bg-muted animate-pulse" />
+      <div class="h-16 rounded-lg bg-muted animate-pulse" />
+    </div>
 
     <!-- Результат последнего возврата -->
     <div
@@ -394,12 +476,12 @@ onUnmounted(() => {
 
     <!-- Пустое состояние -->
     <div
-      v-if="!order && !isLoading && !lastResult"
+      v-if="!order && !isLoading && !isSearching && !lastResult && searchResults.length === 0 && !orderIdQuery.trim()"
       class="flex flex-col items-center justify-center py-16 text-muted-foreground"
     >
       <Icon name="lucide:undo-2" class="w-12 h-12 mb-3 opacity-30" />
       <p class="text-sm">
-        Введите ID заказа для поиска
+        Введите телефон, имя или UUID для поиска заказа
       </p>
     </div>
 

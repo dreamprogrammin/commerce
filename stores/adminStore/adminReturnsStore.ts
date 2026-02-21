@@ -1,6 +1,17 @@
 import type { Database } from '@/types'
 import { toast } from 'vue-sonner'
 
+export interface SearchResult {
+  id: string
+  customer_name: string
+  customer_phone: string | null
+  source_table: 'orders' | 'guest_checkouts'
+  source: 'online' | 'offline'
+  status: string
+  final_amount: number
+  created_at: string
+}
+
 export interface ReturnOrderItem {
   product_id: string
   product_name: string
@@ -45,6 +56,38 @@ export const useAdminReturnsStore = defineStore('adminReturnsStore', () => {
   const isLoading = ref(false)
   const isProcessing = ref(false)
   const lastResult = ref<ReturnResult | null>(null)
+  const searchResults = ref<SearchResult[]>([])
+  const isSearching = ref(false)
+
+  // --- Поиск заказов ---
+  async function searchOrders(query: string) {
+    const q = query.trim()
+    if (!q) {
+      searchResults.value = []
+      return
+    }
+
+    isSearching.value = true
+    searchResults.value = []
+
+    try {
+      const { data, error } = await (supabase.rpc as Function)('search_orders_for_return', {
+        p_query: q,
+      })
+
+      if (error)
+        throw error
+      searchResults.value = (data as SearchResult[]) || []
+    }
+    catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Неизвестная ошибка'
+      toast.error(`Ошибка поиска: ${message}`)
+      searchResults.value = []
+    }
+    finally {
+      isSearching.value = false
+    }
+  }
 
   // --- Загрузка заказа для возврата ---
   async function loadOrder(orderId: string) {
@@ -112,6 +155,7 @@ export const useAdminReturnsStore = defineStore('adminReturnsStore', () => {
   function reset() {
     order.value = null
     lastResult.value = null
+    searchResults.value = []
   }
 
   return {
@@ -119,7 +163,10 @@ export const useAdminReturnsStore = defineStore('adminReturnsStore', () => {
     isLoading,
     isProcessing,
     lastResult,
+    searchResults,
+    isSearching,
     loadOrder,
+    searchOrders,
     processReturn,
     reset,
   }
