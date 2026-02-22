@@ -89,6 +89,22 @@ useSchemaOrg([
       'https://www.instagram.com/uhtykz',
     ],
   },
+  {
+    '@type': 'WebSite',
+    '@id': `${siteUrl}/#website`,
+    'name': siteName,
+    'url': siteUrl,
+    'publisher': { '@id': `${siteUrl}/#organization` },
+    'inLanguage': 'ru-KZ',
+    'potentialAction': {
+      '@type': 'SearchAction',
+      'target': {
+        '@type': 'EntryPoint',
+        'urlTemplate': `${siteUrl}/search?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  },
 ])
 </script>
 

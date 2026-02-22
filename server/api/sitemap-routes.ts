@@ -1,12 +1,19 @@
 import type { Database } from '@/types'
 import { serverSupabaseClient } from '#supabase/server'
 
+interface SitemapImage {
+  loc: string
+}
+
 interface SitemapRoute {
   loc: string
   lastmod: string
   changefreq: 'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never'
   priority: number
+  images?: SitemapImage[]
 }
+
+const SUPABASE_STORAGE_URL = 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/product-images'
 
 export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
   const client = await serverSupabaseClient<Database>(event)
@@ -24,10 +31,10 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       sitemapRoutes.push(page)
     })
 
-    // --- ТОВАРЫ ---
+    // --- ТОВАРЫ (с изображениями для Google Images) ---
     const { data: products, error: productsError } = await client
       .from('products')
-      .select('slug, updated_at')
+      .select('slug, updated_at, product_images(image_url, display_order)')
       .eq('is_active', true)
       .not('slug', 'is', null)
       .order('created_at', { ascending: false })
@@ -41,12 +48,20 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     console.log(`✅ Sitemap: Загружено ${products?.length || 0} товаров`)
 
     if (products && products.length > 0) {
-      products.forEach((product) => {
+      products.forEach((product: any) => {
+        const images: SitemapImage[] = (product.product_images || [])
+          .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+          .slice(0, 3)
+          .map((img: any) => ({
+            loc: `${SUPABASE_STORAGE_URL}/${img.image_url}`,
+          }))
+
         sitemapRoutes.push({
           loc: `/catalog/products/${product.slug}`,
           lastmod: product.updated_at ?? new Date().toISOString(),
           changefreq: 'daily',
           priority: 0.8,
+          ...(images.length > 0 && { images }),
         })
       })
     }
@@ -57,22 +72,21 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // --- КАТЕГОРИИ ---
     const { data: categories, error: categoriesError } = await client
       .from('categories')
-      .select('slug, updated_at')
+      .select('slug, href, updated_at')
       .not('slug', 'is', null)
-      .limit(1000) // ✅ Явно указываем лимит
+      .limit(1000)
 
     if (categoriesError) {
       console.error('❌ Ошибка загрузки категорий для sitemap:', categoriesError)
     }
 
-    // ✅ Логирование количества категорий
     console.log(`✅ Sitemap: Загружено ${categories?.length || 0} категорий`)
 
     if (categories && categories.length > 0) {
       categories.forEach((category) => {
         sitemapRoutes.push({
-          loc: `/catalog/${category.slug}`,
-          lastmod: category.updated_at ?? new Date().toISOString(), // ✅ Используем реальную дату обновления
+          loc: category.href || `/catalog/${category.slug}`,
+          lastmod: category.updated_at ?? new Date().toISOString(),
           changefreq: 'weekly',
           priority: 0.75,
         })

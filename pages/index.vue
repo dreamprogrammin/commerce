@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import type { Brand, CategoryRow, ProductLine, ProductWithGallery, RecommendedProduct } from '@/types'
+import type { Brand, CategoryRow, ProductWithGallery, RecommendedProduct } from '@/types'
 import { toRaw } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useSlides } from '@/composables/slides/useSlides'
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { carouselContainerVariants } from '@/lib/variants'
-import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -23,7 +21,6 @@ const wishlistStore = useWishlistStore()
 const popularCategoriesStore = usePopularCategoriesStore()
 const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
 
-const { getPublicUrl } = useSupabaseStorage()
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
 const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
@@ -52,7 +49,7 @@ const { data: ssrData } = await useAsyncData(
   'home-ssr-all',
   async () => {
     // Все запросы запускаются одновременно
-    const [recommended, popular, newest, _categories, brands, productLines] = await Promise.all([
+    const [recommended, popular, newest, _categories, brands] = await Promise.all([
       recommendationsStore.fetchRecommendations().catch(() => []),
       productsStore.fetchPopularProducts(10).catch(() => []),
       productsStore.fetchNewestProducts(10).catch(() => []),
@@ -64,13 +61,6 @@ const { data: ssrData } = await useAsyncData(
         .limit(20)
         .then(({ data }) => data || [])
         .catch(() => []),
-      supabase
-        .from('product_lines')
-        .select('id, name, slug, logo_url, description, brand_id')
-        .order('name', { ascending: true })
-        .limit(30)
-        .then(({ data }) => data || [])
-        .catch(() => []),
     ])
 
     return {
@@ -79,7 +69,6 @@ const { data: ssrData } = await useAsyncData(
       newest: newest || [],
       categories: popularCategoriesStore.popularCategories || [],
       brands: brands as Brand[],
-      productLines: productLines as ProductLine[],
     }
   },
   { server: true, lazy: false, getCachedData },
@@ -202,29 +191,6 @@ const brandsForSchema = computed(() => brandsData.value || [])
 // Используем те же данные для карусели брендов (убран дубликат запроса)
 const topBrands = brandsForSchema
 
-// TanStack Query — товарные линейки (SEO schema)
-const { data: productLinesData } = useQuery<ProductLine[]>({
-  queryKey: ['home-product-lines-schema'],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('product_lines')
-      .select('id, name, slug, logo_url, description, brand_id')
-      .order('name', { ascending: true })
-      .limit(30)
-
-    if (error)
-      throw error
-    return data || []
-  },
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  initialData: ssrData.value?.productLines || undefined,
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
-})
-
-const productLinesForSchema = computed(() => productLinesData.value || [])
-
 // SEO
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
@@ -277,69 +243,6 @@ useSeoMeta({
   twitterImageAlt: `${siteName} - Детские игрушки`,
   robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
 })
-
-// Computed schema для динамических данных
-const organizationSchema = computed(() => ({
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  '@id': `${siteUrl}/#organization`,
-  'name': siteName,
-  'alternateName': 'Uhti.kz',
-  'url': siteUrl,
-  'logo': {
-    '@type': 'ImageObject',
-    'url': `${siteUrl}/logo.png`,
-    'width': 250,
-    'height': 60,
-  },
-  'image': ogImageUrl,
-  'description': metaDescription,
-  'telephone': '+7-702-537-94-73',
-  'email': 'info@uhti.kz',
-  'address': {
-    '@type': 'PostalAddress',
-    'addressCountry': 'KZ',
-    'addressLocality': 'Алматы',
-    'addressRegion': 'Алматы',
-  },
-  'geo': {
-    '@type': 'GeoCoordinates',
-    'latitude': 43.2220,
-    'longitude': 76.8512,
-  },
-  'areaServed': {
-    '@type': 'City',
-    'name': 'Алматы',
-    'containedInPlace': {
-      '@type': 'Country',
-      'name': 'Kazakhstan',
-    },
-  },
-  'sameAs': [
-    'https://www.instagram.com/uhtikz',
-    'https://twitter.com/uhtikz',
-  ],
-}))
-
-const webSiteSchema = computed(() => ({
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  '@id': `${siteUrl}/#website`,
-  'name': siteName,
-  'alternateName': 'Uhti.kz',
-  'url': siteUrl,
-  'description': metaDescription,
-  'inLanguage': 'ru-KZ',
-  'publisher': { '@id': `${siteUrl}/#organization` },
-  'potentialAction': {
-    '@type': 'SearchAction',
-    'target': {
-      '@type': 'EntryPoint',
-      'urlTemplate': `${siteUrl}/search?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
-}))
 
 const storeSchema = computed(() => ({
   '@context': 'https://schema.org',
@@ -430,71 +333,6 @@ const collectionPageSchema = computed(() => ({
   },
 }))
 
-// ItemList schema для брендов
-const brandsListSchema = computed(() => ({
-  '@context': 'https://schema.org',
-  '@type': 'ItemList',
-  'name': 'Бренды детских игрушек в магазине Ухтышка',
-  'description': 'Официальные бренды игрушек с гарантией качества и доставкой по Алматы',
-  'numberOfItems': brandsForSchema.value.length,
-  'itemListElement': brandsForSchema.value.map((brand, index) => ({
-    '@type': 'ListItem',
-    'position': index + 1,
-    'item': {
-      '@type': 'Brand',
-      '@id': `${siteUrl}/brand/${brand.slug}#brand`,
-      'name': brand.name,
-      'url': `${siteUrl}/brand/${brand.slug}`,
-      'description': brand.seo_description || brand.description || `Товары бренда ${brand.name} в интернет-магазине Ухтышка`,
-      ...(brand.logo_url && {
-        logo: getPublicUrl(BUCKET_NAME_BRANDS, brand.logo_url) || undefined,
-      }),
-    },
-  })),
-}))
-
-// ItemList schema для товарных линеек
-const productLinesListSchema = computed(() => {
-  // Группируем линейки по брендам для лучшей структуры
-  const linesByBrand = productLinesForSchema.value.reduce((acc, line) => {
-    const brandId = line.brand_id
-    if (!acc[brandId]) {
-      acc[brandId] = []
-    }
-    acc[brandId].push(line)
-    return acc
-  }, {} as Record<string, typeof productLinesForSchema.value>)
-
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    'name': 'Товарные линейки брендов',
-    'description': 'Коллекции и серии игрушек от ведущих производителей',
-    'numberOfItems': productLinesForSchema.value.length,
-    'itemListElement': productLinesForSchema.value.map((line, index) => {
-      const brand = brandsForSchema.value.find(b => b.id === line.brand_id)
-      return {
-        '@type': 'ListItem',
-        'position': index + 1,
-        'item': {
-          '@type': 'CollectionPage',
-          '@id': `${siteUrl}/brand/${brand?.slug || 'unknown'}/${line.slug}#collection`,
-          'name': line.name,
-          'url': `${siteUrl}/brand/${brand?.slug || 'unknown'}/${line.slug}`,
-          'description': line.description || `Коллекция ${line.name} от бренда ${brand?.name || 'Unknown'}`,
-          ...(brand && {
-            brand: {
-              '@type': 'Brand',
-              '@id': `${siteUrl}/brand/${brand.slug}#brand`,
-              'name': brand.name,
-            },
-          }),
-        },
-      }
-    }),
-  }
-})
-
 useHead(() => ({
   meta: [
     {
@@ -506,23 +344,11 @@ useHead(() => ({
   script: [
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify(organizationSchema.value),
-    },
-    {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify(webSiteSchema.value),
-    },
-    {
-      type: 'application/ld+json',
       innerHTML: JSON.stringify(storeSchema.value),
     },
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify(categoriesListSchema.value),
-    },
-    {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify(brandsListSchema.value),
     },
     {
       type: 'application/ld+json',

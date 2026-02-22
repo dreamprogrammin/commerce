@@ -58,6 +58,7 @@ interface OrderData {
   delivery_address: { city: string, line1: string } | null
   user_id: string | null
   status: string
+  source: 'online' | 'offline' | null
   bonuses_awarded: number
   bonuses_spent: number
   profile: OrderProfile | null
@@ -75,6 +76,7 @@ interface GuestCheckoutData {
   guest_phone: string | null
   guest_email: string | null
   status: string
+  source: 'online' | 'offline' | null
   guest_checkout_items: GuestCheckoutItem[]
 }
 
@@ -145,7 +147,7 @@ Deno.serve(async (req) => {
         .from('guest_checkouts')
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
-          delivery_address, guest_name, guest_phone, guest_email, status,
+          delivery_address, guest_name, guest_phone, guest_email, status, source,
           guest_checkout_items(
             quantity, 
             product_id,
@@ -181,6 +183,7 @@ Deno.serve(async (req) => {
           payment_method: guestData.payment_method,
           delivery_address: guestData.delivery_address,
           status: guestData.status,
+          source: guestData.source,
           user_id: null,
           bonuses_awarded: 0, // У гостей нет бонусов
           bonuses_spent: 0,   // У гостей нет бонусов
@@ -201,7 +204,7 @@ Deno.serve(async (req) => {
         .from('orders')
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
-          delivery_address, user_id, status, bonuses_awarded, bonuses_spent,
+          delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
           order_items(
             quantity,
             product_id,
@@ -360,6 +363,7 @@ Deno.serve(async (req) => {
     const customerPhone = typedOrderData.profile?.phone || guestPhone || 'Не указан'
     const customerEmail = escapeMarkdown(guestEmail || 'Не указан')
     const customerType = typedOrderData.user_id ? '👤 Зарегистрированный' : '👥 Гость'
+    const orderSource = typedOrderData.source === 'offline' ? '🏪 Оффлайн' : '🌐 Онлайн'
 
     const orderDate = new Date(typedOrderData.created_at).toLocaleString('ru-RU', {
       timeZone: 'Asia/Almaty'
@@ -410,6 +414,7 @@ Deno.serve(async (req) => {
     // Формируем основное текстовое сообщение
     let messageText = `🔔 *Новый заказ №${orderId.slice(-6)}*\n\n`
     messageText += `*Дата:* ${orderDate}\n`
+    messageText += `*Канал:* ${orderSource}\n`
     messageText += `*Тип:* ${customerType}\n`
     messageText += `*Клиент:* ${customerName}\n`
     messageText += `*Телефон:* ${customerPhone}\n`  // ✅ Убрали backticks вокруг номера

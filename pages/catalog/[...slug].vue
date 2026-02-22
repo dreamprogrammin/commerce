@@ -229,8 +229,14 @@ const activeFiltersCount = computed(() => {
 })
 const canonicalUrl = computed(() => {
   const baseUrl = 'https://uhti.kz'
-  const path = route.path
-  return `${baseUrl}${path}`
+  // Приоритет: canonical_url из БД > href категории > текущий path
+  if (currentCategory.value?.canonical_url) {
+    return `${baseUrl}${currentCategory.value.canonical_url}`
+  }
+  if (currentCategory.value?.href) {
+    return `${baseUrl}${currentCategory.value.href}`
+  }
+  return `${baseUrl}${route.path}`
 })
 
 const catalogFilters = computed<IProductFilters>(() => {
@@ -826,140 +832,7 @@ useHead(() => {
     })
   }
 
-  // 4. Brands Schema (Список брендов в категории)
-  if (availableBrands.value.length > 0) {
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'ItemList',
-        'name': `Бренды в категории ${categoryName.value}`,
-        'numberOfItems': availableBrands.value.length,
-        'itemListElement': availableBrands.value.slice(0, 10).map((brand, index) => ({
-          '@type': 'ListItem',
-          'position': index + 1,
-          'item': {
-            '@type': 'Brand',
-            'name': brand.name,
-            'url': `https://uhti.kz/brand/${brand.slug}`,
-          },
-        })),
-      }),
-    })
-  }
-
-  // 5. Product Lines Schema (Список линеек продуктов в категории)
-  if (availableProductLines.value.length > 0) {
-    // Создаем мапу брендов для быстрого доступа
-    const brandsMap = new Map(availableBrands.value.map(b => [b.id, b]))
-
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'ItemList',
-        'name': `Линейки продуктов в категории ${categoryName.value}`,
-        'numberOfItems': availableProductLines.value.length,
-        'itemListElement': availableProductLines.value.slice(0, 10).map((line, index) => {
-          const brand = brandsMap.get(line.brand_id)
-          const lineUrl = brand
-            ? `https://uhti.kz/brand/${brand.slug}/${line.slug}`
-            : `https://uhti.kz/brand/unknown/${line.slug}`
-
-          return {
-            '@type': 'ListItem',
-            'position': index + 1,
-            'item': {
-              '@type': 'ProductCollection',
-              'name': line.name,
-              'url': lineUrl,
-              'description': line.description || undefined,
-              // Добавляем информацию о бренде
-              ...(brand && {
-                brand: {
-                  '@type': 'Brand',
-                  'name': brand.name,
-                  'url': `https://uhti.kz/brand/${brand.slug}`,
-                },
-              }),
-            },
-          }
-        }),
-      }),
-    })
-  }
-
-  // 6. Materials Schema (Материалы доступные в категории)
-  if (availableMaterials.value.length > 0) {
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'ItemList',
-        'name': `Материалы товаров в категории ${categoryName.value}`,
-        'numberOfItems': availableMaterials.value.length,
-        'itemListElement': availableMaterials.value.map((material, index) => ({
-          '@type': 'ListItem',
-          'position': index + 1,
-          'item': {
-            '@type': 'Thing',
-            'name': material.name,
-            'additionalType': 'Material',
-          },
-        })),
-      }),
-    })
-  }
-
-  // 7. Countries Schema (Страны происхождения товаров)
-  if (availableCountries.value.length > 0) {
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'ItemList',
-        'name': `Страны производства товаров в категории ${categoryName.value}`,
-        'numberOfItems': availableCountries.value.length,
-        'itemListElement': availableCountries.value.map((country, index) => ({
-          '@type': 'ListItem',
-          'position': index + 1,
-          'item': {
-            '@type': 'Country',
-            'name': country.name,
-          },
-        })),
-      }),
-    })
-  }
-
-  // 8. Product Attributes Schema (Динамические атрибуты товаров)
-  if (availableFilters.value.length > 0) {
-    availableFilters.value.forEach((filter) => {
-      if (filter.attribute_options && filter.attribute_options.length > 0) {
-        schemas.push({
-          type: 'application/ld+json',
-          children: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'ItemList',
-            'name': `${filter.name} для категории ${categoryName.value}`,
-            'numberOfItems': filter.attribute_options.length,
-            'itemListElement': filter.attribute_options.map((option, index) => ({
-              '@type': 'ListItem',
-              'position': index + 1,
-              'item': {
-                '@type': 'PropertyValue',
-                'name': filter.name,
-                'value': option.value,
-                'propertyID': filter.slug,
-              },
-            })),
-          }),
-        })
-      }
-    })
-  }
-
-  // 9. ItemList Schema (Список товаров в категории с ценами)
+  // 4. ItemList Schema (Список товаров в категории с ценами)
   if (displayedProducts.value.length > 0) {
     schemas.push({
       type: 'application/ld+json',
@@ -1061,49 +934,6 @@ useHead(() => {
             'text': q.answer_text || 'Ответ скоро будет добавлен.',
           },
         })),
-      }),
-    })
-  }
-
-  // 11. 🆕 Article Schema для SEO описания
-  if (seoText.value && currentCategory.value) {
-    // Очищаем HTML теги для текстового контента
-    const plainText = seoText.value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        'headline': `${categoryName.value} - Полное руководство`,
-        'articleBody': plainText,
-        'description': plainText.substring(0, 200),
-        'author': {
-          '@type': 'Organization',
-          'name': 'Интернет-магазин Ухтышка',
-          'url': 'https://uhti.kz',
-        },
-        'publisher': {
-          '@type': 'Organization',
-          'name': 'Ухтышка',
-          'url': 'https://uhti.kz',
-        },
-        'mainEntityOfPage': {
-          '@type': 'WebPage',
-          '@id': canonicalUrl.value,
-        },
-        'inLanguage': 'ru-RU',
-        'about': {
-          '@type': 'Thing',
-          'name': categoryName.value,
-        },
-        ...(categoryOgImageUrl.value && {
-          image: {
-            '@type': 'ImageObject',
-            'url': categoryOgImageUrl.value,
-            'caption': categoryName.value,
-          },
-        }),
       }),
     })
   }

@@ -237,6 +237,7 @@ export default defineNuxtConfig({
         { name: 'format-detection', content: 'telephone=yes' },
         { name: 'theme-color', content: '#ffffff' },
         { name: 'msapplication-TileColor', content: '#ffffff' },
+        { name: 'robots', content: 'max-image-preview:large, max-snippet:-1, max-video-preview:-1' },
       ],
     },
   },

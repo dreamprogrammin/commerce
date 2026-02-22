@@ -14,7 +14,7 @@ const { profile } = storeToRefs(profileStore)
 
 const isLinking = ref(false)
 
-const BOT_USERNAME = 'uhti_kz_bot'
+const BOT_USERNAME = 'babyShopOfficialStoreKz_bot'
 
 const isLinked = computed(() => !!profile.value?.telegram_chat_id)
 
