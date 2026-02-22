@@ -93,7 +93,8 @@
       "Bash(python3:*)",
       "WebFetch(domain:uhti.kz)",
       "WebFetch(domain:mybuh.kz)",
-      "WebFetch(domain:alataucitybank.kz)"
+      "WebFetch(domain:alataucitybank.kz)",
+      "Bash(supabase functions list:*)"
     ]
   }
 }

@@ -398,3 +398,18 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/send-push-notification/deno.json"
 entrypoint = "./functions/send-push-notification/index.ts"
+
+[functions.telegram-webhook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/telegram-webhook/index.ts"
+
+[functions.send-user-telegram]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-user-telegram/index.ts"
+
+[functions.send-broadcast]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-broadcast/index.ts"
