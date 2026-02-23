@@ -29,26 +29,28 @@ nuxtApp.hook('vue:error', () => {
 // 🔔 Realtime подписка на изменения заказов
 const { subscribeAll, unsubscribe } = useOrderRealtime()
 
-onMounted(() => {
-  subscribeAll()
+// Показ модалки Telegram сразу после авторизации (если не привязан и не отклонял)
+watch(
+  () => profileStore.profile,
+  (profile) => {
+    if (!import.meta.client)
+      return
+    if (!profile || profile.telegram_chat_id)
+      return
 
-  // Автопоказ Telegram-подписки (только для авторизованных без привязки)
-  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
-  const dismissedAt = localStorage.getItem('tg_modal_dismissed_at')
-  if (dismissedAt && Date.now() - Number(dismissedAt) < SEVEN_DAYS)
-    return
-
-  setTimeout(() => {
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
     const dismissed = localStorage.getItem('tg_modal_dismissed_at')
     if (dismissed && Date.now() - Number(dismissed) < SEVEN_DAYS)
       return
-    if (!profileStore.profile)
-      return
-    if (profileStore.profile.telegram_chat_id)
-      return
 
-    modalStore.openTelegramModal()
-  }, 5000)
+    setTimeout(() => {
+      modalStore.openTelegramModal()
+    }, 2000)
+  },
+)
+
+onMounted(() => {
+  subscribeAll()
 })
 
 onUnmounted(() => {
