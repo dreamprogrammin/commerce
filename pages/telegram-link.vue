@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '@/types'
+import { toast } from 'vue-sonner'
 import { useProfileStore } from '@/stores/core/profileStore'
 
 definePageMeta({
@@ -11,15 +12,54 @@ const user = useSupabaseUser()
 const profileStore = useProfileStore()
 const route = useRoute()
 
-const status = ref<'loading' | 'success' | 'error' | 'login'>('loading')
+const status = ref<'loading' | 'success' | 'error' | 'login' | 'telegram-browser'>('loading')
 const errorMessage = ref('')
+const copied = ref(false)
 
 const code = computed(() => (route.query.code as string) || '')
+const linkUrl = computed(() => `https://uhti.kz/telegram-link?code=${code.value}`)
+
+const isTelegramBrowser = computed(() => {
+  if (!import.meta.client)
+    return false
+  return /Telegram/i.test(navigator.userAgent)
+})
+
+async function copyLink() {
+  try {
+    await navigator.clipboard.writeText(linkUrl.value)
+    copied.value = true
+    toast.success('Ссылка скопирована!')
+    setTimeout(() => {
+      copied.value = false
+    }, 3000)
+  }
+  catch {
+    // Fallback для старых браузеров
+    const input = document.createElement('input')
+    input.value = linkUrl.value
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+    copied.value = true
+    toast.success('Ссылка скопирована!')
+    setTimeout(() => {
+      copied.value = false
+    }, 3000)
+  }
+}
 
 async function linkAccount() {
   if (!code.value) {
     status.value = 'error'
     errorMessage.value = 'Код привязки не найден. Нажмите START в боте заново.'
+    return
+  }
+
+  // Если открыли в Telegram-браузере и не залогинены — показать экран копирования
+  if (isTelegramBrowser.value && !user.value) {
+    status.value = 'telegram-browser'
     return
   }
 
@@ -31,23 +71,26 @@ async function linkAccount() {
   status.value = 'loading'
 
   try {
+    // eslint-disable-next-line ts/no-unsafe-function-type
     const { data, error } = await (supabase.rpc as Function)('link_telegram_by_code', {
       p_code: code.value,
     })
 
-    if (error) throw error
+    if (error)
+      throw error
 
     const result = data as { success: boolean, error?: string }
 
     if (result.success) {
       status.value = 'success'
-      // Обновляем профиль в сторе
       await profileStore.fetchProfile()
-    } else {
+    }
+    else {
       status.value = 'error'
       errorMessage.value = result.error || 'Неизвестная ошибка'
     }
-  } catch (err: unknown) {
+  }
+  catch (err: unknown) {
     status.value = 'error'
     errorMessage.value = err instanceof Error ? err.message : 'Ошибка при привязке'
   }
@@ -55,9 +98,8 @@ async function linkAccount() {
 
 // Запускаем привязку при загрузке или после авторизации
 watch(user, (newUser) => {
-  if (newUser && status.value === 'login') {
+  if (newUser && (status.value === 'login' || status.value === 'telegram-browser'))
     linkAccount()
-  }
 }, { immediate: false })
 
 onMounted(() => {
@@ -102,7 +144,38 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Нужна авторизация -->
+      <!-- Telegram-браузер: скопировать ссылку -->
+      <div v-else-if="status === 'telegram-browser'" class="space-y-4">
+        <div class="text-4xl">
+          📋
+        </div>
+        <h1 class="text-xl font-bold">
+          Откройте в браузере
+        </h1>
+        <p class="text-muted-foreground text-sm">
+          Telegram не позволяет войти в аккаунт напрямую. Скопируйте ссылку и откройте в браузере телефона (Chrome, Safari).
+        </p>
+
+        <div class="bg-muted rounded-lg p-3 text-xs text-muted-foreground break-all select-all">
+          {{ linkUrl }}
+        </div>
+
+        <button
+          class="w-full inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-medium transition-colors"
+          :class="copied
+            ? 'bg-green-500 text-white'
+            : 'bg-primary text-primary-foreground hover:bg-primary/90'"
+          @click="copyLink"
+        >
+          {{ copied ? '✓ Скопировано!' : '📋 Скопировать ссылку' }}
+        </button>
+
+        <p class="text-muted-foreground text-xs">
+          После входа в аккаунт Telegram привяжется автоматически
+        </p>
+      </div>
+
+      <!-- Нужна авторизация (обычный браузер) -->
       <div v-else-if="status === 'login'" class="space-y-4">
         <div class="text-4xl">
           👤

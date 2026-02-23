@@ -46,20 +46,20 @@ if (import.meta.client) {
   }
 }
 
-// Автопривязка Telegram после логина (если есть сохранённый reverse code)
+// Привязка Telegram после логина: два сценария
 watch(
   () => [user.value, profileStore.profile] as const,
   async ([currentUser, currentProfile]) => {
     if (!import.meta.client)
       return
+    if (!currentUser || !currentProfile || currentProfile.telegram_chat_id)
+      return
+
+    // Сценарий Б: гость пришёл из Telegram (есть tg_code) → автопривязка
     const code = localStorage.getItem('tg_reverse_code')
-    if (
-      currentUser
-      && currentProfile
-      && !currentProfile.telegram_chat_id
-      && code
-    ) {
+    if (code) {
       localStorage.removeItem('tg_reverse_code')
+      localStorage.removeItem('tg_bot_visited')
       try {
         // eslint-disable-next-line ts/no-unsafe-function-type
         const { data, error } = await (supabase.rpc as Function)('link_telegram_by_code', {
@@ -78,6 +78,15 @@ watch(
       catch (err) {
         console.error('Auto-link Telegram failed:', err)
       }
+      return
+    }
+
+    // Сценарий А: гость подписался на бота с сайта (тот же браузер) → модалка привязки
+    if (localStorage.getItem('tg_bot_visited') === 'true') {
+      localStorage.removeItem('tg_bot_visited')
+      setTimeout(() => {
+        modalStore.openTelegramModal()
+      }, 2000)
     }
   },
 )

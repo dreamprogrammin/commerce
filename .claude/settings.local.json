@@ -97,7 +97,8 @@
       "Bash(supabase functions list:*)",
       "Bash(npx supabase functions deploy:*)",
       "WebFetch(domain:iconify.design)",
-      "WebFetch(domain:www.streamlinehq.com)"
+      "WebFetch(domain:www.streamlinehq.com)",
+      "Bash(supabase inspection db:*)"
     ]
   }
 }

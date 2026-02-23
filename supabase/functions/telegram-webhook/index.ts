@@ -417,11 +417,7 @@ async function sendWelcome(botToken: string, chatId: number, supabase?: any) {
     }
   }
 
-  // 3. Приветственное сообщение с кнопкой магазина (код в URL для автопривязки)
-  const shopUrl = reverseLinkCode
-    ? `https://uhti.kz?tg_code=${reverseLinkCode}`
-    : 'https://uhti.kz'
-
+  // 3. Приветственное сообщение с кнопками
   const welcomeText = [
     '👋 Привет!',
     '',
@@ -429,14 +425,17 @@ async function sendWelcome(botToken: string, chatId: number, supabase?: any) {
     '',
     'Мы — магазин детских игрушек в Алматы 🏙',
     '',
-    'Перейдите в магазин, зарегистрируйтесь — и Telegram привяжется автоматически!',
+    'Если у вас есть аккаунт на сайте — привяжите Telegram, чтобы получать уведомления о заказах и бонусах.',
   ].join('\n')
 
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: '🛍 Перейти в магазин', url: shopUrl }],
-    ],
+  const buttons: any[][] = [
+    [{ text: '🛍 Перейти в магазин', url: 'https://uhti.kz' }],
+  ]
+  if (reverseLinkCode) {
+    buttons.push([{ text: '🔗 Привязать аккаунт', url: `https://uhti.kz/telegram-link?code=${reverseLinkCode}` }])
   }
+
+  const keyboard = { inline_keyboard: buttons }
 
   await sendMessageWithKeyboard(botToken, chatId, welcomeText, keyboard)
   console.log('🏠 sendWelcome completed')
