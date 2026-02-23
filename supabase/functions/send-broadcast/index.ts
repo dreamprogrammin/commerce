@@ -106,11 +106,6 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               chat_id: sub.telegram_chat_id,
               text: message.trim(),
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: 'Перейти в магазин', url: 'https://uhti.kz' }],
-                ],
-              },
             }),
           }
         )
