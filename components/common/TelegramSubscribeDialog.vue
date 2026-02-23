@@ -82,7 +82,7 @@ async function subscribe() {
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
         <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-blue-500">
-          <Icon name="streamline-plump:telegram" class="h-8 w-8 text-white" />
+          <Icon name="simple-icons:telegram" class="h-8 w-8 text-white" />
         </div>
         <DialogTitle class="text-center text-2xl">
           Будьте в курсе!
@@ -95,25 +95,25 @@ async function subscribe() {
       <div class="space-y-2 py-2">
         <div class="flex items-center gap-3 text-sm">
           <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Icon name="streamline-plump:package-box" class="w-4 h-4 text-blue-600" />
+            <Icon name="lucide:package" class="w-4 h-4 text-blue-600" />
           </div>
           <span class="text-muted-foreground">Статусы заказов в реальном времени</span>
         </div>
         <div class="flex items-center gap-3 text-sm">
           <div class="flex-shrink-0 w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-            <Icon name="streamline-plump:gift" class="w-4 h-4 text-orange-600" />
+            <Icon name="lucide:gift" class="w-4 h-4 text-orange-600" />
           </div>
           <span class="text-muted-foreground">Бонусы и персональные скидки</span>
         </div>
         <div class="flex items-center gap-3 text-sm">
           <div class="flex-shrink-0 w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center">
-            <Icon name="streamline-plump:megaphone-1" class="w-4 h-4 text-pink-600" />
+            <Icon name="lucide:megaphone" class="w-4 h-4 text-pink-600" />
           </div>
           <span class="text-muted-foreground">Эксклюзивные акции и промокоды</span>
         </div>
         <div class="flex items-center gap-3 text-sm">
           <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-            <Icon name="streamline-plump:sparkles" class="w-4 h-4 text-green-600" />
+            <Icon name="lucide:sparkles" class="w-4 h-4 text-green-600" />
           </div>
           <span class="text-muted-foreground">Новинки каталога раньше всех</span>
         </div>
@@ -128,7 +128,7 @@ async function subscribe() {
         >
           <Icon
             v-if="!isLoading"
-            name="streamline-plump:telegram"
+            name="simple-icons:telegram"
             class="h-5 w-5"
           />
           <Icon

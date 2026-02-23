@@ -100,7 +100,7 @@ async function handleMarkAllAsRead() {
     >
       <div class="flex items-center gap-3">
         <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center">
-          <Icon name="streamline-plump:telegram" class="w-5 h-5 text-white" />
+          <Icon name="simple-icons:telegram" class="w-5 h-5 text-white" />
         </div>
         <div class="flex-1 min-w-0">
           <p class="font-semibold text-sm">
