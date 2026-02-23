@@ -27,6 +27,7 @@
 
 ## 🤖 Интеграции
 
+- [**TELEGRAM_SETUP.md**](./TELEGRAM_SETUP.md) — **Полная документация Telegram-бота** (настройка, команды, привязка, уведомления, troubleshooting).
 - [**telegram_troubleshooting.md**](./telegram_troubleshooting.md) — Устранение неполадок с Telegram ботом.
 - [**telegram_v3_update.md**](./telegram_v3_update.md) — Обновление интеграции с Telegram (v3).
 

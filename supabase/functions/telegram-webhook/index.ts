@@ -5,50 +5,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('Telegram webhook v4 initialized')
+console.log('Telegram webhook v5 initialized')
 
 // Стикер "машет привет". Чтобы заменить:
 // отправьте боту любой стикер → бот ответит file_id → вставьте сюда
 const WELCOME_STICKER = 'CAACAgIAAxkBAAEMk2tnuH-VAAHRdGfhZDqkrCvNHr5uqnMAAgEBAAJWnb0KIoz4oeejx_g2BA'
-
-// === Настройка бота при холодном старте ===
-const setupToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
-if (setupToken) {
-  const baseUrl = `https://api.telegram.org/bot${setupToken}`
-
-  // Команды меню
-  fetch(`${baseUrl}/setMyCommands`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      commands: [
-        { command: 'start', description: '🧸 Начать — привет от Ухтышки!' },
-        { command: 'unlink', description: '🔓 Отвязать Telegram от аккаунта' },
-      ],
-    }),
-  }).then(() => console.log('✅ Bot commands set'))
-    .catch(e => console.error('Bot commands setup error:', e))
-
-  // Описание бота (видно при первом открытии чата, над кнопкой START)
-  fetch(`${baseUrl}/setMyDescription`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      description: '🧸 Ухтышка — магазин детских игрушек в Алматы!\n\n🎁 Бонусная программа\n📦 Уведомления о заказах\n🔥 Акции и скидки\n\nНажмите START, чтобы начать!',
-    }),
-  }).then(() => console.log('✅ Bot description set'))
-    .catch(e => console.error('Bot description setup error:', e))
-
-  // Короткое описание (в поиске и профиле бота)
-  fetch(`${baseUrl}/setMyShortDescription`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      short_description: '🧸 Магазин детских игрушек — заказы, бонусы, акции | uhti.kz',
-    }),
-  }).then(() => console.log('✅ Bot short description set'))
-    .catch(e => console.error('Bot short description setup error:', e))
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -65,23 +26,97 @@ Deno.serve(async (req) => {
     })
 
     const update = await req.json()
-    console.log('Incoming Telegram update:', JSON.stringify(update))
+    console.log('📩 Incoming update:', JSON.stringify(update))
 
     const message = update.message
     if (!message) {
+      console.log('No message in update, skipping')
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     const chatId = message.chat.id
+    const messageId = message.message_id
+    console.log(`💬 chat_id=${chatId}, message_id=${messageId}, text="${message.text || ''}", sticker=${!!message.sticker}`)
+
+    // === /setup — одноразовая команда для настройки бота (webhook, описание, команды) ===
+    if (message.text?.trim() === '/setup') {
+      console.log('🔧 Running bot setup...')
+      const baseUrl = `https://api.telegram.org/bot${botToken}`
+      const webhookUrl = `${supabaseUrl}/functions/v1/telegram-webhook`
+
+      const results: string[] = []
+
+      // Webhook
+      try {
+        const r = await fetch(`${baseUrl}/setWebhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: webhookUrl }),
+        })
+        const res = await r.json()
+        results.push(`Webhook: ${res.ok ? '✅' : '❌'} ${res.description || ''}`)
+      } catch (e) { results.push(`Webhook: ❌ ${e}`) }
+
+      // Команды
+      try {
+        const r = await fetch(`${baseUrl}/setMyCommands`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            commands: [
+              { command: 'start', description: '🧸 Начать — привет от Ухтышки!' },
+              { command: 'unlink', description: '🔓 Отвязать Telegram от аккаунта' },
+            ],
+          }),
+        })
+        const res = await r.json()
+        results.push(`Commands: ${res.ok ? '✅' : '❌'}`)
+      } catch (e) { results.push(`Commands: ❌ ${e}`) }
+
+      // Описание
+      try {
+        const r = await fetch(`${baseUrl}/setMyDescription`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: '🧸 Ухтышка — магазин детских игрушек в Алматы!\n\n🎁 Бонусная программа\n📦 Уведомления о заказах\n🔥 Акции и скидки\n\nНажмите START, чтобы начать!',
+          }),
+        })
+        const res = await r.json()
+        results.push(`Description: ${res.ok ? '✅' : '❌'}`)
+      } catch (e) { results.push(`Description: ❌ ${e}`) }
+
+      // Короткое описание
+      try {
+        const r = await fetch(`${baseUrl}/setMyShortDescription`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            short_description: '🧸 Магазин детских игрушек — заказы, бонусы, акции | uhti.kz',
+          }),
+        })
+        const res = await r.json()
+        results.push(`Short desc: ${res.ok ? '✅' : '❌'}`)
+      } catch (e) { results.push(`Short desc: ❌ ${e}`) }
+
+      const report = `🔧 Setup complete:\n\n${results.join('\n')}`
+      console.log(report)
+      await sendPlainMessage(botToken, chatId, report)
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // Если пользователь прислал стикер — отвечаем его file_id (удобно для настройки)
     if (message.sticker) {
-      await sendMessage(
+      console.log(`🎭 Sticker received: ${message.sticker.file_id}`)
+      await sendPlainMessage(
         botToken,
         chatId,
-        `📎 file\\_id этого стикера:\n\n\`${message.sticker.file_id}\`\n\nСкопируйте и вставьте в WELCOME\\_STICKER`
+        `📎 file_id этого стикера:\n\n${message.sticker.file_id}\n\nСкопируйте и вставьте в WELCOME_STICKER`
       )
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -99,9 +134,10 @@ Deno.serve(async (req) => {
     // /start {code} — привязка аккаунта
     if (text.startsWith('/start ')) {
       const code = text.replace('/start ', '').trim()
+      console.log(`🔗 /start with code: ${code}`)
 
       if (!code) {
-        await sendMessage(botToken, chatId, 'Код привязки не указан. Попробуйте получить новую ссылку в личном кабинете на сайте uhti.kz')
+        await sendPlainMessage(botToken, chatId, 'Код привязки не указан. Попробуйте получить новую ссылку в личном кабинете на сайте uhti.kz')
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -116,8 +152,10 @@ Deno.serve(async (req) => {
         .single()
 
       if (codeError || !linkCode) {
-        console.log('Link code not found or expired:', code, codeError)
-        await sendMessage(botToken, chatId, 'Код привязки недействителен или истёк. Попробуйте получить новый код в личном кабинете на сайте uhti.kz')
+        console.log('Code not found or expired, showing welcome:', code, codeError?.message)
+        // Код невалидный — удаляем команду и показываем приветствие
+        await deleteMessage(botToken, chatId, messageId)
+        await sendWelcome(botToken, chatId, supabase)
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -132,28 +170,23 @@ Deno.serve(async (req) => {
       if (updateError) {
         console.error('Error updating profile:', updateError)
         if (updateError.code === '23505') {
-          await sendMessage(botToken, chatId, 'Этот Telegram аккаунт уже привязан к другому профилю. Сначала отвяжите его в настройках профиля.')
+          await sendPlainMessage(botToken, chatId, 'Этот Telegram аккаунт уже привязан к другому профилю. Сначала отвяжите его в настройках профиля.')
         } else {
-          await sendMessage(botToken, chatId, 'Произошла ошибка при привязке. Попробуйте позже.')
+          await sendPlainMessage(botToken, chatId, 'Произошла ошибка при привязке. Попробуйте позже.')
         }
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      // Удаляем использованный код
-      await supabase
-        .from('telegram_link_codes')
-        .delete()
-        .eq('id', linkCode.id)
+      // Удаляем использованный код и все другие коды
+      await supabase.from('telegram_link_codes').delete().eq('id', linkCode.id)
+      await supabase.from('telegram_link_codes').delete().eq('user_id', linkCode.user_id)
 
-      // Удаляем все другие коды этого пользователя
-      await supabase
-        .from('telegram_link_codes')
-        .delete()
-        .eq('user_id', linkCode.user_id)
+      // Удаляем /start из чата
+      await deleteMessage(botToken, chatId, messageId)
 
-      await sendMessage(
+      await sendPlainMessage(
         botToken,
         chatId,
         '✅ Telegram успешно привязан!\n\n🎉 Теперь вы будете получать:\n📦 Статус ваших заказов\n💰 Начисление бонусов\n🔥 Акции и новинки\n\n🛍 Приятных покупок на uhti.kz!'
@@ -166,32 +199,9 @@ Deno.serve(async (req) => {
 
     // /start без кода — приветствие со стикером + кнопками
     if (text === '/start') {
-      // 1. Отправляем стикер "машет привет"
-      await sendSticker(botToken, chatId, WELCOME_STICKER)
-
-      // 2. Красивое приветственное сообщение с кнопками
-      const welcomeText = [
-        '🧸 *Добро пожаловать в Ухтышка\\!*',
-        '',
-        'Мы — магазин детских игрушек в Алматы 🏙',
-        '',
-        '✨ Привяжите аккаунт и получайте:',
-        '📦 Статус ваших заказов',
-        '💰 Начисление бонусов',
-        '🔥 Акции и скидки',
-        '',
-        '👇 Нажмите кнопку ниже, чтобы начать\\!',
-      ].join('\n')
-
-      const keyboard = {
-        inline_keyboard: [
-          [{ text: '🛍 Перейти в магазин', url: 'https://uhti.kz' }],
-          [{ text: '👤 Привязать аккаунт', url: 'https://uhti.kz/profile/settings' }],
-        ],
-      }
-
-      await sendMessageWithKeyboard(botToken, chatId, welcomeText, keyboard)
-
+      console.log('👋 /start without code — showing welcome')
+      await deleteMessage(botToken, chatId, messageId)
+      await sendWelcome(botToken, chatId, supabase)
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -199,6 +209,7 @@ Deno.serve(async (req) => {
 
     // /unlink — отвязка аккаунта
     if (text === '/unlink') {
+      console.log('🔓 /unlink command')
       const { error } = await supabase
         .from('profiles')
         .update({ telegram_chat_id: null })
@@ -206,9 +217,9 @@ Deno.serve(async (req) => {
 
       if (error) {
         console.error('Error unlinking:', error)
-        await sendMessage(botToken, chatId, 'Произошла ошибка при отвязке. Попробуйте позже.')
+        await sendPlainMessage(botToken, chatId, 'Произошла ошибка при отвязке. Попробуйте позже.')
       } else {
-        await sendMessage(botToken, chatId, 'Telegram отвязан от аккаунта. Вы больше не будете получать уведомления.\n\nЧтобы привязать снова, используйте ссылку из личного кабинета на uhti.kz')
+        await sendPlainMessage(botToken, chatId, 'Telegram отвязан от аккаунта. Вы больше не будете получать уведомления.\n\nЧтобы привязать снова, используйте ссылку из личного кабинета на uhti.kz')
       }
 
       return new Response(JSON.stringify({ ok: true }), {
@@ -217,17 +228,17 @@ Deno.serve(async (req) => {
     }
 
     // Любое другое сообщение — справка
-    await sendMessage(
+    await sendPlainMessage(
       botToken,
       chatId,
-      '🧸 *Ухтышка* — магазин детских игрушек\n\n📋 Команды:\n/start — Привязать аккаунт\n/unlink — Отвязать аккаунт\n\n📱 Привязка: uhti.kz → Профиль → Настройки → Подключить Telegram'
+      '🧸 Ухтышка — магазин детских игрушек\n\n📋 Команды:\n/start — Привязать аккаунт\n/unlink — Отвязать аккаунт\n\n📱 Привязка: uhti.kz → Профиль → Настройки → Подключить Telegram'
     )
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    console.error('Telegram webhook error:', error)
+    console.error('❌ Telegram webhook error:', error)
     // Всегда возвращаем 200 для Telegram, чтобы не было повторных запросов
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -235,33 +246,62 @@ Deno.serve(async (req) => {
   }
 })
 
-async function sendMessage(botToken: string, chatId: number, text: string) {
+// === Вспомогательные функции ===
+
+async function sendPlainMessage(botToken: string, chatId: number, text: string) {
   try {
+    console.log(`📤 sendPlainMessage to ${chatId}: ${text.slice(0, 50)}...`)
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: 'Markdown',
-        }),
+        body: JSON.stringify({ chat_id: chatId, text }),
       }
     )
-
     const result = await response.json()
-    if (!response.ok) {
-      console.error('Failed to send message:', result)
+    if (!result.ok) {
+      console.error('❌ sendPlainMessage failed:', result)
+    } else {
+      console.log('✅ Message sent')
     }
     return result
   } catch (error) {
-    console.error('Error sending message:', error)
+    console.error('❌ sendPlainMessage error:', error)
+    return null
+  }
+}
+
+async function deleteMessage(botToken: string, chatId: number, messageId: number) {
+  try {
+    console.log(`🗑 deleteMessage: chat_id=${chatId}, message_id=${messageId}`)
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/deleteMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+        }),
+      }
+    )
+    const result = await response.json()
+    if (!result.ok) {
+      console.error('❌ deleteMessage failed:', result)
+    } else {
+      console.log('✅ Message deleted successfully')
+    }
+    return result
+  } catch (error) {
+    console.error('❌ deleteMessage error:', error)
+    return null
   }
 }
 
 async function sendSticker(botToken: string, chatId: number, stickerId: string) {
   try {
+    console.log(`🎭 sendSticker to ${chatId}`)
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendSticker`,
       {
@@ -275,17 +315,21 @@ async function sendSticker(botToken: string, chatId: number, stickerId: string) 
     )
 
     const result = await response.json()
-    if (!response.ok) {
-      console.error('Failed to send sticker:', result)
+    if (!result.ok) {
+      console.error('❌ sendSticker failed:', result)
+    } else {
+      console.log('✅ Sticker sent')
     }
     return result
   } catch (error) {
-    console.error('Error sending sticker:', error)
+    console.error('❌ sendSticker error:', error)
+    return null
   }
 }
 
 async function sendMessageWithKeyboard(botToken: string, chatId: number, text: string, replyMarkup: object) {
   try {
+    console.log(`📤 sendMessageWithKeyboard to ${chatId}`)
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
       {
@@ -294,18 +338,106 @@ async function sendMessageWithKeyboard(botToken: string, chatId: number, text: s
         body: JSON.stringify({
           chat_id: chatId,
           text,
-          parse_mode: 'MarkdownV2',
+          parse_mode: 'HTML',
           reply_markup: replyMarkup,
         }),
       }
     )
 
     const result = await response.json()
-    if (!response.ok) {
-      console.error('Failed to send message with keyboard:', result)
+    if (!result.ok) {
+      console.error('❌ sendMessageWithKeyboard HTML failed:', result)
+      // Fallback без HTML
+      console.log('🔄 Retrying without HTML parse_mode...')
+      const fallbackResponse = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: text.replace(/<[^>]+>/g, ''),
+            reply_markup: replyMarkup,
+          }),
+        }
+      )
+      const fallbackResult = await fallbackResponse.json()
+      if (!fallbackResult.ok) {
+        console.error('❌ sendMessageWithKeyboard fallback also failed:', fallbackResult)
+      } else {
+        console.log('✅ Message with keyboard sent (fallback)')
+      }
+      return fallbackResult
     }
+    console.log('✅ Message with keyboard sent')
     return result
   } catch (error) {
-    console.error('Error sending message with keyboard:', error)
+    console.error('❌ sendMessageWithKeyboard error:', error)
+    return null
   }
+}
+
+async function sendWelcome(botToken: string, chatId: number, supabase: ReturnType<typeof createClient>) {
+  console.log(`🏠 sendWelcome to ${chatId}`)
+
+  // 1. Пробуем отправить стикер, если не получится — отправим эмодзи
+  const stickerResult = await sendSticker(botToken, chatId, WELCOME_STICKER)
+  if (!stickerResult?.ok) {
+    console.log('Sticker failed, sending emoji fallback')
+    await sendPlainMessage(botToken, chatId, '👋')
+  }
+
+  // 2. Генерируем обратный код привязки
+  let linkUrl = 'https://uhti.kz/profile/settings'
+  try {
+    const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+
+    // Удаляем старые коды этого chat_id
+    const { error: delError } = await supabase
+      .from('telegram_reverse_links')
+      .delete()
+      .eq('chat_id', chatId)
+
+    if (delError) {
+      console.error('Error deleting old reverse links:', delError)
+    }
+
+    // Создаём новый код
+    const { error: insertError } = await supabase
+      .from('telegram_reverse_links')
+      .insert({ code, chat_id: chatId })
+
+    if (insertError) {
+      console.error('Error inserting reverse link:', insertError)
+    } else {
+      linkUrl = `https://uhti.kz/telegram-link?code=${code}`
+      console.log(`✅ Reverse link created: ${code}`)
+    }
+  } catch (e) {
+    console.error('Error creating reverse link:', e)
+  }
+
+  // 3. Приветственное сообщение с кнопками
+  const welcomeText = [
+    '🧸 <b>Добро пожаловать в Ухтышка!</b>',
+    '',
+    'Мы — магазин детских игрушек в Алматы 🏙',
+    '',
+    '✨ Привяжите аккаунт и получайте:',
+    '📦 Статус ваших заказов',
+    '💰 Начисление бонусов',
+    '🔥 Акции и скидки',
+    '',
+    '👇 Нажмите кнопку ниже!',
+  ].join('\n')
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🔗 Привязать аккаунт', url: linkUrl }],
+      [{ text: '🛍 Перейти в магазин', url: 'https://uhti.kz' }],
+    ],
+  }
+
+  await sendMessageWithKeyboard(botToken, chatId, welcomeText, keyboard)
+  console.log('🏠 sendWelcome completed')
 }
