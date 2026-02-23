@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import type { Database } from '@/types'
 import { useMediaQuery } from '@vueuse/core'
-import { Toaster } from 'vue-sonner'
+import { toast, Toaster } from 'vue-sonner'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
@@ -29,22 +30,54 @@ nuxtApp.hook('vue:error', () => {
 // 🔔 Realtime подписка на изменения заказов
 const { subscribeAll, unsubscribe } = useOrderRealtime()
 const user = useSupabaseUser()
+const supabase = useSupabaseClient<Database>()
+const route = useRoute()
+const router = useRouter()
 
-// Привязка Telegram после регистрации гостя, который уже заходил в бота
+// Перехват tg_code из URL (гость пришёл из бота) → сохраняем для автопривязки
+if (import.meta.client) {
+  const tgCode = route.query.tg_code as string
+  if (tgCode) {
+    localStorage.setItem('tg_reverse_code', tgCode)
+    // Убираем tg_code из URL чтобы не мешал
+    const query = { ...route.query }
+    delete query.tg_code
+    router.replace({ query })
+  }
+}
+
+// Автопривязка Telegram после логина (если есть сохранённый reverse code)
 watch(
   () => [user.value, profileStore.profile] as const,
-  ([currentUser, currentProfile]) => {
+  async ([currentUser, currentProfile]) => {
+    if (!import.meta.client)
+      return
+    const code = localStorage.getItem('tg_reverse_code')
     if (
       currentUser
       && currentProfile
       && !currentProfile.telegram_chat_id
-      && localStorage.getItem('tg_bot_visited') === 'true'
+      && code
     ) {
-      localStorage.removeItem('tg_bot_visited')
-      // Даём странице загрузиться, потом показываем модалку привязки
-      setTimeout(() => {
-        modalStore.openTelegramModal()
-      }, 2000)
+      localStorage.removeItem('tg_reverse_code')
+      try {
+        // eslint-disable-next-line ts/no-unsafe-function-type
+        const { data, error } = await (supabase.rpc as Function)('link_telegram_by_code', {
+          p_code: code,
+        })
+        if (error)
+          throw error
+        const result = data as { success: boolean, error?: string }
+        if (result.success) {
+          await profileStore.fetchProfile()
+          toast.success('Telegram привязан!', {
+            description: 'Вы будете получать уведомления о заказах и бонусах',
+          })
+        }
+      }
+      catch (err) {
+        console.error('Auto-link Telegram failed:', err)
+      }
     }
   },
 )
@@ -76,7 +109,6 @@ onUnmounted(() => {
 
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
-const route = useRoute()
 
 useHead({
   titleTemplate: (titleChunk) => {
