@@ -39,13 +39,8 @@ function dismiss() {
 }
 
 async function subscribe() {
-  if (!user.value) {
-    localStorage.setItem('tg_bot_visited', 'true')
-    window.open(`https://t.me/${BOT_USERNAME}`, '_blank')
-    localStorage.setItem('tg_modal_dismissed_at', Date.now().toString())
-    modalStore.closeTelegramModal()
+  if (!user.value)
     return
-  }
 
   isLoading.value = true
   try {

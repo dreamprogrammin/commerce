@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import type { Database } from '@/types'
 import { useMediaQuery } from '@vueuse/core'
-import { toast, Toaster } from 'vue-sonner'
+import { Toaster } from 'vue-sonner'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
@@ -29,83 +28,23 @@ nuxtApp.hook('vue:error', () => {
 
 // 🔔 Realtime подписка на изменения заказов
 const { subscribeAll, unsubscribe } = useOrderRealtime()
-const user = useSupabaseUser()
-const supabase = useSupabaseClient<Database>()
-const route = useRoute()
-const router = useRouter()
-
-// Перехват tg_code из URL (гость пришёл из бота) → сохраняем для автопривязки
-if (import.meta.client) {
-  const tgCode = route.query.tg_code as string
-  if (tgCode) {
-    localStorage.setItem('tg_reverse_code', tgCode)
-    // Убираем tg_code из URL чтобы не мешал
-    const query = { ...route.query }
-    delete query.tg_code
-    router.replace({ query })
-  }
-}
-
-// Привязка Telegram после логина: два сценария
-watch(
-  () => [user.value, profileStore.profile] as const,
-  async ([currentUser, currentProfile]) => {
-    if (!import.meta.client)
-      return
-    if (!currentUser || !currentProfile || currentProfile.telegram_chat_id)
-      return
-
-    // Сценарий Б: гость пришёл из Telegram (есть tg_code) → автопривязка
-    const code = localStorage.getItem('tg_reverse_code')
-    if (code) {
-      localStorage.removeItem('tg_reverse_code')
-      localStorage.removeItem('tg_bot_visited')
-      try {
-        // eslint-disable-next-line ts/no-unsafe-function-type
-        const { data, error } = await (supabase.rpc as Function)('link_telegram_by_code', {
-          p_code: code,
-        })
-        if (error)
-          throw error
-        const result = data as { success: boolean, error?: string }
-        if (result.success) {
-          await profileStore.fetchProfile()
-          toast.success('Telegram привязан!', {
-            description: 'Вы будете получать уведомления о заказах и бонусах',
-          })
-        }
-      }
-      catch (err) {
-        console.error('Auto-link Telegram failed:', err)
-      }
-      return
-    }
-
-    // Сценарий А: гость подписался на бота с сайта (тот же браузер) → модалка привязки
-    if (localStorage.getItem('tg_bot_visited') === 'true') {
-      localStorage.removeItem('tg_bot_visited')
-      setTimeout(() => {
-        modalStore.openTelegramModal()
-      }, 2000)
-    }
-  },
-)
 
 onMounted(() => {
   subscribeAll()
 
-  // Автопоказ Telegram-подписки
+  // Автопоказ Telegram-подписки (только для авторизованных без привязки)
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
   const dismissedAt = localStorage.getItem('tg_modal_dismissed_at')
   if (dismissedAt && Date.now() - Number(dismissedAt) < SEVEN_DAYS)
     return
 
   setTimeout(() => {
-    // Повторная проверка — профиль мог загрузиться за 5 сек
     const dismissed = localStorage.getItem('tg_modal_dismissed_at')
     if (dismissed && Date.now() - Number(dismissed) < SEVEN_DAYS)
       return
-    if (profileStore.profile?.telegram_chat_id)
+    if (!profileStore.profile)
+      return
+    if (profileStore.profile.telegram_chat_id)
       return
 
     modalStore.openTelegramModal()
@@ -192,6 +131,11 @@ useSchemaOrg([
 
 <template>
   <div>
+    <!-- Баннер для Telegram-браузера -->
+    <ClientOnly>
+      <CommonTelegramBrowserBanner />
+    </ClientOnly>
+
     <!-- 🆕 Глобальная полоска загрузки -->
     <LoadingBar
       :loading="isPageLoading"
