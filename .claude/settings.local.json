@@ -98,7 +98,10 @@
       "Bash(npx supabase functions deploy:*)",
       "WebFetch(domain:iconify.design)",
       "WebFetch(domain:www.streamlinehq.com)",
-      "Bash(supabase inspection db:*)"
+      "Bash(supabase inspection db:*)",
+      "Bash(git status:*)",
+      "Bash(gh auth status:*)",
+      "Bash(ssh -T:*)"
     ]
   }
 }
