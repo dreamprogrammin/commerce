@@ -56,8 +56,9 @@ export const useAuthStore = defineStore('authStore', () => {
       const { error } = await supabase.auth.signOut()
 
       if (error) {
-        console.error('[Auth Store] Sign out error:', error)
-        throw error
+        // "Auth session missing" — сессия уже невалидна (частая ситуация в Telegram-браузере)
+        // Не блокируем выход, просто логируем
+        console.warn('[Auth Store] Sign out warning:', error.message)
       }
 
       profileStore.clearProfile()
@@ -69,7 +70,9 @@ export const useAuthStore = defineStore('authStore', () => {
     }
     catch (e: any) {
       console.error('[Auth Store] Sign out failed:', e)
-      toast.error('Ошибка при выходе', { description: e.message })
+      // Даже при ошибке — очищаем локальное состояние
+      profileStore.clearProfile()
+      await router.push('/')
     }
   }
 
