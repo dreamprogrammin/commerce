@@ -2,11 +2,15 @@
 import { useMediaQuery } from '@vueuse/core'
 import { Toaster } from 'vue-sonner'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import 'vue-sonner/style.css'
 
 const nuxtApp = useNuxtApp()
 const isMobile = useMediaQuery('(max-width: 1023px)')
 const isPageLoading = ref(false)
+const modalStore = useModalStore()
+const profileStore = useProfileStore()
 
 nuxtApp.hook('page:start', () => {
   isPageLoading.value = true
@@ -27,6 +31,23 @@ const { subscribeAll, unsubscribe } = useOrderRealtime()
 
 onMounted(() => {
   subscribeAll()
+
+  // Автопоказ Telegram-подписки
+  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+  const dismissedAt = localStorage.getItem('tg_modal_dismissed_at')
+  if (dismissedAt && Date.now() - Number(dismissedAt) < SEVEN_DAYS)
+    return
+
+  setTimeout(() => {
+    // Повторная проверка — профиль мог загрузиться за 5 сек
+    const dismissed = localStorage.getItem('tg_modal_dismissed_at')
+    if (dismissed && Date.now() - Number(dismissed) < SEVEN_DAYS)
+      return
+    if (profileStore.profile?.telegram_chat_id)
+      return
+
+    modalStore.openTelegramModal()
+  }, 5000)
 })
 
 onUnmounted(() => {
@@ -146,5 +167,10 @@ useSchemaOrg([
       <AuthLoginModal v-else />
     </ClientOnly>
 
+    <!-- Telegram-подписка: Drawer на мобильных, Dialog на десктопе -->
+    <ClientOnly>
+      <CommonTelegramSubscribeDrawer v-if="isMobile" />
+      <CommonTelegramSubscribeDialog v-else />
+    </ClientOnly>
   </div>
 </template>

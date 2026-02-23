@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { useAuthStore } from '@/stores/core/useAuthStore'
+import { storeToRefs } from 'pinia'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 
 definePageMeta({
@@ -7,8 +9,12 @@ definePageMeta({
 })
 
 const store = useNotificationsStore()
-const authStore = useAuthStore()
+const profileStore = useProfileStore()
+const modalStore = useModalStore()
+const { profile } = storeToRefs(profileStore)
 const router = useRouter()
+
+const showTelegramBanner = computed(() => !profile.value?.telegram_chat_id)
 
 const notificationIcons: Record<string, string> = {
   bonus_activated: 'lucide:gift',
@@ -85,6 +91,32 @@ async function handleMarkAllAsRead() {
       >
         Прочитать все
       </button>
+    </div>
+
+    <!-- Telegram-баннер для неподписанных -->
+    <div
+      v-if="showTelegramBanner"
+      class="mb-6 rounded-xl bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/30 border border-sky-200 dark:border-sky-800 p-4"
+    >
+      <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center">
+          <Icon name="streamline-plump:telegram" class="w-5 h-5 text-white" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm">
+            Подключите Telegram
+          </p>
+          <p class="text-xs text-muted-foreground">
+            Получайте уведомления о заказах и акциях мгновенно
+          </p>
+        </div>
+        <button
+          class="flex-shrink-0 px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium rounded-lg transition-colors"
+          @click="modalStore.openTelegramModal()"
+        >
+          Подключить
+        </button>
+      </div>
     </div>
 
     <!-- Список уведомлений -->

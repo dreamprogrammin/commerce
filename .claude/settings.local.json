@@ -95,7 +95,9 @@
       "WebFetch(domain:mybuh.kz)",
       "WebFetch(domain:alataucitybank.kz)",
       "Bash(supabase functions list:*)",
-      "Bash(npx supabase functions deploy:*)"
+      "Bash(npx supabase functions deploy:*)",
+      "WebFetch(domain:iconify.design)",
+      "WebFetch(domain:www.streamlinehq.com)"
     ]
   }
 }
