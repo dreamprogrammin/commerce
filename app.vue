@@ -132,11 +132,6 @@ useSchemaOrg([
 
 <template>
   <div>
-    <!-- Баннер для Telegram-браузера -->
-    <ClientOnly>
-      <CommonTelegramBrowserBanner />
-    </ClientOnly>
-
     <!-- 🆕 Глобальная полоска загрузки -->
     <LoadingBar
       :loading="isPageLoading"
