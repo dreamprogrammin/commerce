@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
         console.log('Code not found or expired, showing welcome:', code, codeError?.message)
         // Код невалидный — удаляем команду и показываем приветствие
         await deleteMessage(botToken, chatId, messageId)
-        await sendWelcome(botToken, chatId)
+        await sendWelcome(botToken, chatId, supabase)
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -204,11 +204,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // /start без кода — приветствие со стикером + кнопками
+    // /start без кода — приветствие со стикером + кнопками + reverse link
     if (text === '/start') {
       console.log('👋 /start without code — showing welcome')
       await deleteMessage(botToken, chatId, messageId)
-      await sendWelcome(botToken, chatId)
+      await sendWelcome(botToken, chatId, supabase)
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -384,7 +384,7 @@ async function sendMessageWithKeyboard(botToken: string, chatId: number, text: s
   }
 }
 
-async function sendWelcome(botToken: string, chatId: number) {
+async function sendWelcome(botToken: string, chatId: number, supabase?: any) {
   console.log(`🏠 sendWelcome to ${chatId}`)
 
   // 1. Пробуем отправить стикер, если не получится — отправим эмодзи
@@ -394,7 +394,30 @@ async function sendWelcome(botToken: string, chatId: number) {
     await sendPlainMessage(botToken, chatId, '👋')
   }
 
-  // 2. Приветственное сообщение с кнопкой магазина
+  // 2. Создаём reverse link для привязки аккаунта с сайта
+  let reverseLinkCode: string | null = null
+  if (supabase) {
+    try {
+      const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+      // Удаляем старые коды этого chat_id
+      await supabase.from('telegram_reverse_links').delete().eq('chat_id', chatId)
+      const { error } = await supabase.from('telegram_reverse_links').insert({
+        code,
+        chat_id: chatId,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      if (!error) {
+        reverseLinkCode = code
+        console.log(`🔗 Reverse link created: ${code}`)
+      } else {
+        console.error('❌ Failed to create reverse link:', error)
+      }
+    } catch (e) {
+      console.error('❌ Reverse link error:', e)
+    }
+  }
+
+  // 3. Приветственное сообщение с кнопкой магазина
   const welcomeText = [
     '👋 Привет!',
     '',
@@ -402,7 +425,7 @@ async function sendWelcome(botToken: string, chatId: number) {
     '',
     'Мы — магазин детских игрушек в Алматы 🏙',
     '',
-    'Чтобы получать уведомления, подключите Telegram в личном кабинете на сайте uhti.kz',
+    'Чтобы получать уведомления о заказах и бонусах, зарегистрируйтесь на сайте uhti.kz',
   ].join('\n')
 
   const keyboard = {

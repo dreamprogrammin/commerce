@@ -28,6 +28,26 @@ nuxtApp.hook('vue:error', () => {
 
 // 🔔 Realtime подписка на изменения заказов
 const { subscribeAll, unsubscribe } = useOrderRealtime()
+const user = useSupabaseUser()
+
+// Привязка Telegram после регистрации гостя, который уже заходил в бота
+watch(
+  () => [user.value, profileStore.profile] as const,
+  ([currentUser, currentProfile]) => {
+    if (
+      currentUser
+      && currentProfile
+      && !currentProfile.telegram_chat_id
+      && localStorage.getItem('tg_bot_visited') === 'true'
+    ) {
+      localStorage.removeItem('tg_bot_visited')
+      // Даём странице загрузиться, потом показываем модалку привязки
+      setTimeout(() => {
+        modalStore.openTelegramModal()
+      }, 2000)
+    }
+  },
+)
 
 onMounted(() => {
   subscribeAll()
