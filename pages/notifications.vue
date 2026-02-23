@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PushPermissionBanner from '@/components/common/PushPermissionBanner.vue'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 
@@ -87,9 +86,6 @@ async function handleMarkAllAsRead() {
         Прочитать все
       </button>
     </div>
-
-    <!-- Баннер Web Push -->
-    <PushPermissionBanner class="mb-4" />
 
     <!-- Список уведомлений -->
     <div v-if="store.isLoading" class="space-y-3">

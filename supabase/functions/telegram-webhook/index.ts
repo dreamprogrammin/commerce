@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             commands: [
-              { command: 'start', description: '🧸 Начать — привет от Ухтышки!' },
+              { command: 'start', description: '🧸 Приветствие от Ухтышки' },
               { command: 'unlink', description: '🔓 Отвязать Telegram от аккаунта' },
             ],
           }),
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
         console.log('Code not found or expired, showing welcome:', code, codeError?.message)
         // Код невалидный — удаляем команду и показываем приветствие
         await deleteMessage(botToken, chatId, messageId)
-        await sendWelcome(botToken, chatId, supabase)
+        await sendWelcome(botToken, chatId)
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -186,10 +186,17 @@ Deno.serve(async (req) => {
       // Удаляем /start из чата
       await deleteMessage(botToken, chatId, messageId)
 
-      await sendPlainMessage(
+      // Стикер приветствия
+      const stickerResult = await sendSticker(botToken, chatId, WELCOME_STICKER)
+      if (!stickerResult?.ok) {
+        await sendPlainMessage(botToken, chatId, '👋')
+      }
+
+      await sendMessageWithKeyboard(
         botToken,
         chatId,
-        '✅ Telegram успешно привязан!\n\n🎉 Теперь вы будете получать:\n📦 Статус ваших заказов\n💰 Начисление бонусов\n🔥 Акции и новинки\n\n🛍 Приятных покупок на uhti.kz!'
+        '👋 Привет!\n\n✅ Telegram успешно привязан!\n\n🎉 Теперь вы будете получать:\n📦 Статус ваших заказов\n💰 Начисление бонусов\n🔥 Акции и новинки\n\n🛍 Приятных покупок на uhti.kz!',
+        { inline_keyboard: [[{ text: '🛍 Перейти в магазин', url: 'https://uhti.kz' }]] }
       )
 
       return new Response(JSON.stringify({ ok: true }), {
@@ -201,7 +208,7 @@ Deno.serve(async (req) => {
     if (text === '/start') {
       console.log('👋 /start without code — showing welcome')
       await deleteMessage(botToken, chatId, messageId)
-      await sendWelcome(botToken, chatId, supabase)
+      await sendWelcome(botToken, chatId)
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -231,7 +238,7 @@ Deno.serve(async (req) => {
     await sendPlainMessage(
       botToken,
       chatId,
-      '🧸 Ухтышка — магазин детских игрушек\n\n📋 Команды:\n/start — Привязать аккаунт\n/unlink — Отвязать аккаунт\n\n📱 Привязка: uhti.kz → Профиль → Настройки → Подключить Telegram'
+      '🧸 Ухтышка — магазин детских игрушек\n\n📋 Команды:\n/start — Приветствие\n/unlink — Отвязать аккаунт\n\n📱 Подключение: uhti.kz → Профиль → Настройки → Подключить Telegram'
     )
 
     return new Response(JSON.stringify({ ok: true }), {
@@ -377,7 +384,7 @@ async function sendMessageWithKeyboard(botToken: string, chatId: number, text: s
   }
 }
 
-async function sendWelcome(botToken: string, chatId: number, supabase: ReturnType<typeof createClient>) {
+async function sendWelcome(botToken: string, chatId: number) {
   console.log(`🏠 sendWelcome to ${chatId}`)
 
   // 1. Пробуем отправить стикер, если не получится — отправим эмодзи
@@ -387,53 +394,19 @@ async function sendWelcome(botToken: string, chatId: number, supabase: ReturnTyp
     await sendPlainMessage(botToken, chatId, '👋')
   }
 
-  // 2. Генерируем обратный код привязки
-  let linkUrl = 'https://uhti.kz/profile/settings'
-  try {
-    const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
-
-    // Удаляем старые коды этого chat_id
-    const { error: delError } = await supabase
-      .from('telegram_reverse_links')
-      .delete()
-      .eq('chat_id', chatId)
-
-    if (delError) {
-      console.error('Error deleting old reverse links:', delError)
-    }
-
-    // Создаём новый код
-    const { error: insertError } = await supabase
-      .from('telegram_reverse_links')
-      .insert({ code, chat_id: chatId })
-
-    if (insertError) {
-      console.error('Error inserting reverse link:', insertError)
-    } else {
-      linkUrl = `https://uhti.kz/telegram-link?code=${code}`
-      console.log(`✅ Reverse link created: ${code}`)
-    }
-  } catch (e) {
-    console.error('Error creating reverse link:', e)
-  }
-
-  // 3. Приветственное сообщение с кнопками
+  // 2. Приветственное сообщение с кнопкой магазина
   const welcomeText = [
-    '🧸 <b>Добро пожаловать в Ухтышка!</b>',
+    '👋 Привет!',
+    '',
+    '🧸 Добро пожаловать в Ухтышка!',
     '',
     'Мы — магазин детских игрушек в Алматы 🏙',
     '',
-    '✨ Привяжите аккаунт и получайте:',
-    '📦 Статус ваших заказов',
-    '💰 Начисление бонусов',
-    '🔥 Акции и скидки',
-    '',
-    '👇 Нажмите кнопку ниже!',
+    'Чтобы получать уведомления, подключите Telegram в личном кабинете на сайте uhti.kz',
   ].join('\n')
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: '🔗 Привязать аккаунт', url: linkUrl }],
       [{ text: '🛍 Перейти в магазин', url: 'https://uhti.kz' }],
     ],
   }

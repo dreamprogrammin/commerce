@@ -13,7 +13,6 @@ export default defineNuxtConfig({
     indexnowKey: process.env.INDEXNOW_KEY || '07d3f5086f59e65326ce9d66b1d1f57c',
     public: {
       siteUrl: 'https://uhti.kz',
-      vapidPublicKey: process.env.VAPID_PUBLIC_KEY || 'BFMIdGFMlpD9cpqqIWhDnGPXgJI9Pd31-f3dQtKiARuhmWWY4pviPnRDMW9qW4h34QUhngU8T_-I7l4jkvCbfFg',
     },
   },
 

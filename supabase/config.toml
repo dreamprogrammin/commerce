@@ -393,12 +393,6 @@ verify_jwt = false
 import_map = "./functions/notify-question-answered/deno.json"
 entrypoint = "./functions/notify-question-answered/index.ts"
 
-[functions.send-push-notification]
-enabled = true
-verify_jwt = false
-import_map = "./functions/send-push-notification/deno.json"
-entrypoint = "./functions/send-push-notification/index.ts"
-
 [functions.telegram-webhook]
 enabled = true
 verify_jwt = false

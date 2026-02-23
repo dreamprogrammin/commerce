@@ -146,10 +146,5 @@ useSchemaOrg([
       <AuthLoginModal v-else />
     </ClientOnly>
 
-    <!-- Push-уведомления: Drawer на мобильных, Dialog на десктопе -->
-    <ClientOnly>
-      <CommonPushPermissionDrawer v-if="isMobile" />
-      <CommonPushPermissionDialog v-else />
-    </ClientOnly>
   </div>
 </template>
