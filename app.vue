@@ -57,6 +57,7 @@ onUnmounted(() => {
 
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
+const route = useRoute()
 
 useHead({
   titleTemplate: (titleChunk) => {
