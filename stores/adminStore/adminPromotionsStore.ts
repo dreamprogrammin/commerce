@@ -165,16 +165,30 @@ export const useAdminPromotionsStore = defineStore('adminPromotionsStore', () =>
     }
   }
 
-  async function sendPromoNotification(message: string): Promise<boolean> {
+  async function sendPromoNotification(params: {
+    message: string
+    title?: string
+    link?: string
+  }): Promise<boolean> {
     try {
       const { data, error } = await supabase.functions.invoke('send-broadcast', {
-        body: { message },
+        body: {
+          message: params.message,
+          title: params.title,
+          link: params.link,
+        },
       })
 
       if (error)
         throw error
 
-      toast.success(`Уведомление отправлено: ${data.sent_count} получателей`, {
+      const parts: string[] = []
+      if (data.sent_count > 0)
+        parts.push(`Telegram: ${data.sent_count}`)
+      if (data.notified_count > 0)
+        parts.push(`In-app: ${data.notified_count}`)
+
+      toast.success(`Уведомление отправлено: ${parts.join(', ')}`, {
         description: data.failed_count > 0 ? `Не удалось: ${data.failed_count}` : undefined,
       })
       return true

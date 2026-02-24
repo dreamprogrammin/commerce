@@ -39,17 +39,23 @@ export const useAdminBroadcastStore = defineStore('adminBroadcastStore', () => {
     }
   }
 
-  async function sendBroadcast(message: string): Promise<boolean> {
+  async function sendBroadcast(message: string, options?: { title?: string, link?: string }): Promise<boolean> {
     isSending.value = true
     try {
       const { data, error } = await supabase.functions.invoke('send-broadcast', {
-        body: { message },
+        body: { message, title: options?.title, link: options?.link },
       })
 
       if (error)
         throw error
 
-      toast.success(`Рассылка отправлена: ${data.sent_count} получателей`, {
+      const parts: string[] = []
+      if (data.sent_count > 0)
+        parts.push(`Telegram: ${data.sent_count}`)
+      if (data.notified_count > 0)
+        parts.push(`In-app: ${data.notified_count}`)
+
+      toast.success(`Рассылка отправлена: ${parts.join(', ')}`, {
         description: data.failed_count > 0 ? `Не удалось: ${data.failed_count}` : undefined,
       })
 

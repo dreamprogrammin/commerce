@@ -60,6 +60,8 @@ const brands = ref<{ id: string, name: string }[]>([])
 // --- Notification dialog ---
 const showNotifyDialog = ref(false)
 const notifyMessage = ref('')
+const notifyTitle = ref('')
+const notifyLink = ref('')
 const isSendingNotification = ref(false)
 
 // --- Completed campaigns toggle ---
@@ -194,14 +196,22 @@ function getProductImageUrl(product: { product_images: { image_url: string | nul
 }
 
 async function handleCreate(notify = false) {
+  // Сохраняем значения до сброса формы
+  const savedTitle = title.value.trim()
+  const savedSlug = generatedSlug.value
+  const savedDescription = description.value.trim()
+  const savedDiscount = discountPercentage.value
+  const savedSourceType = sourceType.value
+  const savedSourceId = selectedSourceId.value
+
   const campaignId = await promotionsStore.createCampaign({
-    title: title.value.trim(),
-    slug: generatedSlug.value,
-    description: description.value.trim(),
-    sourceType: sourceType.value,
-    categoryId: sourceType.value === 'category' ? selectedSourceId.value : null,
-    brandId: sourceType.value === 'brand' ? selectedSourceId.value : null,
-    discountPercentage: discountPercentage.value,
+    title: savedTitle,
+    slug: savedSlug,
+    description: savedDescription,
+    sourceType: savedSourceType,
+    categoryId: savedSourceType === 'category' ? savedSourceId : null,
+    brandId: savedSourceType === 'brand' ? savedSourceId : null,
+    discountPercentage: savedDiscount,
     productIds: selectedProductIds.value,
   })
 
@@ -215,10 +225,12 @@ async function handleCreate(notify = false) {
     products.value = []
 
     if (notify) {
-      const sourceName = sourceType.value === 'category'
-        ? categories.value.find(c => c.id === selectedSourceId.value)?.name
-        : brands.value.find(b => b.id === selectedSourceId.value)?.name
-      notifyMessage.value = `🔥 Акция!\n\n${title.value || `Скидки до ${discountPercentage.value}%`}\n\n${description.value || `Скидки на ${sourceName || 'товары'}!`}\n\nСмотрите на uhti.kz`
+      const sourceName = savedSourceType === 'category'
+        ? categories.value.find(c => c.id === savedSourceId)?.name
+        : brands.value.find(b => b.id === savedSourceId)?.name
+      notifyMessage.value = `🔥 Акция!\n\n${savedTitle || `Скидки до ${savedDiscount}%`}\n\n${savedDescription || `Скидки на ${sourceName || 'товары'}!`}\n\nСмотрите на uhti.kz`
+      notifyTitle.value = savedTitle || `Скидки до ${savedDiscount}%`
+      notifyLink.value = `/promo/${savedSlug}`
       showNotifyDialog.value = true
     }
   }
@@ -226,10 +238,16 @@ async function handleCreate(notify = false) {
 
 async function handleSendNotification() {
   isSendingNotification.value = true
-  await promotionsStore.sendPromoNotification(notifyMessage.value)
+  await promotionsStore.sendPromoNotification({
+    message: notifyMessage.value,
+    title: notifyTitle.value,
+    link: notifyLink.value,
+  })
   isSendingNotification.value = false
   showNotifyDialog.value = false
   notifyMessage.value = ''
+  notifyTitle.value = ''
+  notifyLink.value = ''
 }
 
 async function handleDeactivate(campaignId: string) {
@@ -577,7 +595,7 @@ function formatDate(dateStr: string) {
         <AlertDialogHeader>
           <AlertDialogTitle>Отправить уведомление</AlertDialogTitle>
           <AlertDialogDescription>
-            Сообщение будет отправлено всем подписчикам Telegram.
+            Сообщение будет отправлено в Telegram и как in-app уведомление всем пользователям.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <Textarea v-model="notifyMessage" :rows="6" class="my-4" />

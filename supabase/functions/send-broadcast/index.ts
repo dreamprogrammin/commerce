@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { message } = await req.json()
+    const { message, title, link } = await req.json()
     if (!message || !message.trim()) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -85,7 +85,33 @@ Deno.serve(async (req) => {
     }
 
     if (!subscribers || subscribers.length === 0) {
-      return new Response(JSON.stringify({ sent_count: 0, failed_count: 0, message: 'No subscribers' }), {
+      // Нет Telegram-подписчиков, но всё равно отправляем in-app уведомления
+      let notifiedCount = 0
+      const { data: allUsers } = await supabase
+        .from('profiles')
+        .select('id')
+        .neq('role', 'admin')
+
+      if (allUsers?.length) {
+        const notificationRows = allUsers.map((u: { id: string }) => ({
+          user_id: u.id,
+          type: 'promotion',
+          title: title || 'Новая акция!',
+          body: message.trim(),
+          link: link || null,
+          is_read: false,
+        }))
+
+        const { error: notifError } = await supabase
+          .from('notifications')
+          .insert(notificationRows)
+
+        if (!notifError) {
+          notifiedCount = allUsers.length
+        }
+      }
+
+      return new Response(JSON.stringify({ sent_count: 0, failed_count: 0, notified_count: notifiedCount }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -144,10 +170,38 @@ Deno.serve(async (req) => {
       failed_count: failedCount,
     })
 
-    console.log(`Broadcast complete: sent=${sentCount}, failed=${failedCount}`)
+    // In-app уведомления для всех зарегистрированных пользователей
+    let notifiedCount = 0
+    const { data: allUsers } = await supabase
+      .from('profiles')
+      .select('id')
+      .neq('role', 'admin')
+
+    if (allUsers?.length) {
+      const notificationRows = allUsers.map((u: { id: string }) => ({
+        user_id: u.id,
+        type: 'promotion',
+        title: title || 'Новая акция!',
+        body: message.trim(),
+        link: link || null,
+        is_read: false,
+      }))
+
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert(notificationRows)
+
+      if (notifError) {
+        console.error('Error inserting notifications:', notifError)
+      } else {
+        notifiedCount = allUsers.length
+      }
+    }
+
+    console.log(`Broadcast complete: sent=${sentCount}, failed=${failedCount}, notified=${notifiedCount}`)
 
     return new Response(
-      JSON.stringify({ sent_count: sentCount, failed_count: failedCount }),
+      JSON.stringify({ sent_count: sentCount, failed_count: failedCount, notified_count: notifiedCount }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
