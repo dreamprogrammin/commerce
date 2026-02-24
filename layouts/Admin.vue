@@ -130,6 +130,14 @@ onMounted(() => {
         </NuxtLink>
 
         <NuxtLink
+          to="/admin/promotions"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          Акции
+        </NuxtLink>
+
+        <NuxtLink
           to="/admin/broadcast"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
           active-class="bg-muted text-primary"

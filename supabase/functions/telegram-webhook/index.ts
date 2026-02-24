@@ -5,11 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('Telegram webhook v5 initialized')
-
-// Стикер "машет привет". Чтобы заменить:
-// отправьте боту любой стикер → бот ответит file_id → вставьте сюда
-const WELCOME_STICKER = 'CAACAgIAAxkBAAEMk2tnuH-VAAHRdGfhZDqkrCvNHr5uqnMAAgEBAAJWnb0KIoz4oeejx_g2BA'
+console.log('Telegram webhook v6 initialized')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -38,7 +34,7 @@ Deno.serve(async (req) => {
 
     const chatId = message.chat.id
     const messageId = message.message_id
-    console.log(`💬 chat_id=${chatId}, message_id=${messageId}, text="${message.text || ''}", sticker=${!!message.sticker}`)
+    console.log(`💬 chat_id=${chatId}, message_id=${messageId}, text="${message.text || ''}"`)
 
     // === /setup — одноразовая команда для настройки бота (webhook, описание, команды) ===
     if (message.text?.trim() === '/setup') {
@@ -110,19 +106,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Если пользователь прислал стикер — отвечаем его file_id (удобно для настройки)
-    if (message.sticker) {
-      console.log(`🎭 Sticker received: ${message.sticker.file_id}`)
-      await sendPlainMessage(
-        botToken,
-        chatId,
-        `📎 file_id этого стикера:\n\n${message.sticker.file_id}\n\nСкопируйте и вставьте в WELCOME_STICKER`
-      )
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
+    // Если пользователь прислал стикер — игнорируем (бот только для уведомлений)
     if (!message.text) {
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -186,17 +170,10 @@ Deno.serve(async (req) => {
       // Удаляем /start из чата
       await deleteMessage(botToken, chatId, messageId)
 
-      // Стикер приветствия
-      const stickerResult = await sendSticker(botToken, chatId, WELCOME_STICKER)
-      if (!stickerResult?.ok) {
-        await sendPlainMessage(botToken, chatId, '👋')
-      }
-
-      await sendMessageWithKeyboard(
+      await sendPlainMessage(
         botToken,
         chatId,
-        '👋 Привет!\n\n✅ Telegram успешно привязан!\n\n🎉 Теперь вы будете получать:\n📦 Статус ваших заказов\n💰 Начисление бонусов\n🔥 Акции и новинки\n\n🛍 Приятных покупок на uhti.kz!',
-        { inline_keyboard: [[{ text: '🛍 Перейти в магазин', url: 'https://uhti.kz' }]] }
+        '👋 Привет!\n\n✅ Telegram успешно привязан!\n\n🎉 Теперь вы будете получать:\n📦 Статус ваших заказов\n💰 Начисление бонусов\n🔥 Акции и новинки\n\n🛍 Приятных покупок на uhti.kz!'
       )
 
       return new Response(JSON.stringify({ ok: true }), {
@@ -204,7 +181,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // /start без кода — приветствие со стикером + кнопками + reverse link
+    // /start без кода — приветствие
     if (text === '/start') {
       console.log('👋 /start without code — showing welcome')
       await deleteMessage(botToken, chatId, messageId)
@@ -306,100 +283,12 @@ async function deleteMessage(botToken: string, chatId: number, messageId: number
   }
 }
 
-async function sendSticker(botToken: string, chatId: number, stickerId: string) {
-  try {
-    console.log(`🎭 sendSticker to ${chatId}`)
-    const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendSticker`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          sticker: stickerId,
-        }),
-      }
-    )
-
-    const result = await response.json()
-    if (!result.ok) {
-      console.error('❌ sendSticker failed:', result)
-    } else {
-      console.log('✅ Sticker sent')
-    }
-    return result
-  } catch (error) {
-    console.error('❌ sendSticker error:', error)
-    return null
-  }
-}
-
-async function sendMessageWithKeyboard(botToken: string, chatId: number, text: string, replyMarkup: object) {
-  try {
-    console.log(`📤 sendMessageWithKeyboard to ${chatId}`)
-    const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: 'HTML',
-          reply_markup: replyMarkup,
-        }),
-      }
-    )
-
-    const result = await response.json()
-    if (!result.ok) {
-      console.error('❌ sendMessageWithKeyboard HTML failed:', result)
-      // Fallback без HTML
-      console.log('🔄 Retrying without HTML parse_mode...')
-      const fallbackResponse = await fetch(
-        `https://api.telegram.org/bot${botToken}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: text.replace(/<[^>]+>/g, ''),
-            reply_markup: replyMarkup,
-          }),
-        }
-      )
-      const fallbackResult = await fallbackResponse.json()
-      if (!fallbackResult.ok) {
-        console.error('❌ sendMessageWithKeyboard fallback also failed:', fallbackResult)
-      } else {
-        console.log('✅ Message with keyboard sent (fallback)')
-      }
-      return fallbackResult
-    }
-    console.log('✅ Message with keyboard sent')
-    return result
-  } catch (error) {
-    console.error('❌ sendMessageWithKeyboard error:', error)
-    return null
-  }
-}
-
 async function sendWelcome(botToken: string, chatId: number) {
   console.log(`🏠 sendWelcome to ${chatId}`)
 
-  // 1. Пробуем отправить стикер, если не получится — отправим эмодзи
-  const stickerResult = await sendSticker(botToken, chatId, WELCOME_STICKER)
-  if (!stickerResult?.ok) {
-    console.log('Sticker failed, sending emoji fallback')
-    await sendPlainMessage(botToken, chatId, '👋')
-  }
-
-  // 2. Приветственное сообщение (без ссылок — только уведомления)
   const welcomeText = [
     '👋 Привет!',
-    '',
     '🧸 Добро пожаловать в Ухтышка!',
-    '',
     'Мы — магазин детских игрушек в Алматы 🏙',
     '',
     'Здесь вы будете получать:',
@@ -407,7 +296,8 @@ async function sendWelcome(botToken: string, chatId: number) {
     '💰 Начисление бонусов',
     '🔥 Информацию об акциях и скидках',
     '',
-    'Чтобы подключить уведомления, привяжите Telegram в личном кабинете на сайте uhti.kz',
+    'Чтобы подключить уведомления, привяжите',
+    'Telegram в личном кабинете на uhti.kz',
   ].join('\n')
 
   await sendPlainMessage(botToken, chatId, welcomeText)

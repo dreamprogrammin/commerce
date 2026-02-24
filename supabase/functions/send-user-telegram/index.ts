@@ -3,7 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('send-user-telegram v1 initialized')
+console.log('send-user-telegram v2 initialized')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { chat_id, title, body, link } = await req.json()
+    const { chat_id, title, body } = await req.json()
 
     if (!chat_id || !title) {
       return new Response(JSON.stringify({ error: 'Missing chat_id or title' }), {
@@ -37,30 +37,15 @@ Deno.serve(async (req) => {
       text += `\n\n${body}`
     }
 
-    // Формируем inline keyboard с кнопкой-ссылкой
-    const replyMarkup = link
-      ? {
-          inline_keyboard: [
-            [{ text: 'Перейти на сайт', url: `https://uhti.kz${link}` }],
-          ],
-        }
-      : undefined
-
-    const telegramBody: Record<string, unknown> = {
-      chat_id,
-      text,
-    }
-
-    if (replyMarkup) {
-      telegramBody.reply_markup = replyMarkup
-    }
-
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(telegramBody),
+        body: JSON.stringify({
+          chat_id,
+          text,
+        }),
       }
     )
 
