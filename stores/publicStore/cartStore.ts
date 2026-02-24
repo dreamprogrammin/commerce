@@ -20,6 +20,7 @@ export const useCartStore = defineStore('cartStore', () => {
   const isProcessing = ref(false)
   const bonusesToSpend = ref(0)
   const isAddingItem = ref(false) // Флаг для предотвращения race condition
+  const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
   // @ts-expect-error - Deep type instantiation with computed ref
   const totalItems = computed(() => items.value.reduce((sum: number, item) => sum + item.quantity, 0))
@@ -144,6 +145,16 @@ export const useCartStore = defineStore('cartStore', () => {
   function clearCart() {
     items.value = []
     bonusesToSpend.value = 0
+    // Очищаем серверную корзину
+    if (user.value) {
+      supabase.from('server_carts')
+        .upsert({
+          user_id: user.value.id,
+          items: [] as any,
+          total_amount: 0,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+    }
   }
 
   function setBonusesToSpend(amount: number) {
@@ -162,6 +173,30 @@ export const useCartStore = defineStore('cartStore', () => {
     const maxPossible = Math.min(userBalance, maxBonusesForOrder)
     bonusesToSpend.value = amount > maxPossible ? maxPossible : Math.floor(amount)
   }
+
+  // Синхронизация корзины на сервер (debounced, только для авторизованных)
+  function syncToServer() {
+    if (!user.value) return
+
+    if (syncTimeout.value) clearTimeout(syncTimeout.value)
+    syncTimeout.value = setTimeout(async () => {
+      const cartItems = items.value.map(i => ({
+        product_id: i.product.id,
+        quantity: i.quantity,
+      }))
+
+      await supabase.from('server_carts').upsert({
+        user_id: user.value!.id,
+        items: cartItems as any,
+        total_amount: subtotal.value,
+        updated_at: new Date().toISOString(),
+        reminder_1h_sent: false,
+        reminder_24h_sent: false,
+      }, { onConflict: 'user_id' })
+    }, 2000)
+  }
+
+  watch([items, () => items.value.map(i => i.quantity)], syncToServer, { deep: true })
 
   /**
    * Оформление заказа

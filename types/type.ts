@@ -1,6 +1,6 @@
 import type { Database, Tables, TablesInsert, TablesUpdate } from './supabase'
 
-export interface Brand extends Tables<'brands'> {}
+export interface Brand extends Tables<'brands'> { }
 
 // Линейка продуктов (подбренд/франшиза, например: Mattel → Barbie, Hot Wheels)
 export interface ProductLine {
@@ -28,9 +28,9 @@ export interface ProductLineWithBrand extends ProductLine {
 // Упрощенный тип для отображения
 export type SimpleProductLine = Pick<ProductLine, 'id' | 'name' | 'slug'>
 
-export interface Country extends Tables<'countries'> {}
+export interface Country extends Tables<'countries'> { }
 
-export interface Material extends Tables<'materials'> {}
+export interface Material extends Tables<'materials'> { }
 
 export type AttributeValuePayload = Omit<ProductAttributeValueInsert, 'product_id'>
 
@@ -327,12 +327,12 @@ export type { Database, Tables, TablesInsert, TablesUpdate }
 export type BrandInsert = TablesInsert<'brands'>
 
 export type BrandUpdate = TablesUpdate<'brands'>
-export interface Attribute extends Tables<'attributes'> {}
-export interface AttributeInsert extends TablesInsert<'attributes'> {}
-export interface AttributeUpdate extends TablesUpdate<'attributes'> {}
+export interface Attribute extends Tables<'attributes'> { }
+export interface AttributeInsert extends TablesInsert<'attributes'> { }
+export interface AttributeUpdate extends TablesUpdate<'attributes'> { }
 
-export interface AttributeOption extends Tables<'attribute_options'> {}
-export interface AttributeOptionInsert extends TablesInsert<'attribute_options'> {}
+export interface AttributeOption extends Tables<'attribute_options'> { }
+export interface AttributeOptionInsert extends TablesInsert<'attribute_options'> { }
 
 export interface AttributeWithValue extends Tables<'attributes'> {
   attribute_options: Tables<'attribute_options'>[]
