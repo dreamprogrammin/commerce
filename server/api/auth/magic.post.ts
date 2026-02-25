@@ -8,6 +8,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig()                          // ← так читаем конфиг
+
+  console.log('[magic] config keys:', {
+    hasUrl: !!process.env.SUPABASE_URL,
+    hasServiceKey: !!config.supabaseServiceRoleKey,
+    serviceKeyLength: config.supabaseServiceRoleKey?.length ?? 0,
+  })
+
   const supabaseUrl = process.env.SUPABASE_URL || ''
   const supabaseServiceKey = config.supabaseServiceRoleKey  // ← не process.env напрямую
 
