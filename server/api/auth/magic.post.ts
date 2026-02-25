@@ -7,10 +7,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid token' })
   }
 
-  // eslint-disable-next-line node/prefer-global/process
+  const config = useRuntimeConfig()                          // ← так читаем конфиг
   const supabaseUrl = process.env.SUPABASE_URL || ''
-  // eslint-disable-next-line node/prefer-global/process
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  const supabaseServiceKey = config.supabaseServiceRoleKey  // ← не process.env напрямую
 
   if (!supabaseUrl || !supabaseServiceKey) {
     throw createError({ statusCode: 500, statusMessage: 'Server configuration error' })
