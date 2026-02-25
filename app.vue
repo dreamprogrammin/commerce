@@ -11,6 +11,8 @@ const isMobile = useMediaQuery('(max-width: 1023px)')
 const isPageLoading = ref(false)
 const modalStore = useModalStore()
 const profileStore = useProfileStore()
+const route = useRoute()
+const router = useRouter() // ← добавлено
 
 nuxtApp.hook('page:start', () => {
   isPageLoading.value = true
@@ -26,10 +28,8 @@ nuxtApp.hook('vue:error', () => {
   isPageLoading.value = false
 })
 
-// 🔔 Realtime подписка на изменения заказов
 const { subscribeAll, unsubscribe } = useOrderRealtime()
 
-// Показ модалки Telegram сразу после авторизации (если не привязан и не отклонял)
 watch(
   () => profileStore.profile,
   (profile) => {
@@ -49,8 +49,25 @@ watch(
   },
 )
 
-onMounted(() => {
+onMounted(async () => {
   subscribeAll()
+
+  // ← добавлено: обработка токена из Telegram magic link
+  if (route.hash && route.hash.includes('access_token=')) {
+    try {
+      const supabase = useSupabaseClient()
+      const { data, error } = await supabase.auth.getSession()
+
+      if (error) throw error
+
+      if (data.session) {
+        router.replace({ path: route.path, query: route.query, hash: '' })
+      }
+    }
+    catch (err) {
+      console.error('Ошибка при обработке токена из URL:', err)
+    }
+  }
 })
 
 onUnmounted(() => {
@@ -59,7 +76,6 @@ onUnmounted(() => {
 
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
-const route = useRoute()
 
 useHead({
   titleTemplate: (titleChunk) => {
