@@ -52,16 +52,29 @@ watch(
 onMounted(async () => {
   subscribeAll()
 
-  // ← добавлено: обработка токена из Telegram magic link
+  // Обработка токена из Telegram magic link
   if (route.hash && route.hash.includes('access_token=')) {
     try {
       const supabase = useSupabaseClient()
-      const { data, error } = await supabase.auth.getSession()
+      
+      // Парсим хэш вручную
+      const hashParams = new URLSearchParams(route.hash.substring(1))
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
 
-      if (error) throw error
+      if (accessToken && refreshToken) {
+        // Явно устанавливаем сессию через токены
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
 
-      if (data.session) {
-        router.replace({ path: route.path, query: route.query, hash: '' })
+        if (error) throw error
+
+        if (data.session) {
+          // Чистим URL
+          router.replace({ path: route.path, query: route.query, hash: '' })
+        }
       }
     }
     catch (err) {
