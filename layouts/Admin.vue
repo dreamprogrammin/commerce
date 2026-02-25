@@ -3,13 +3,16 @@ import Button from '@/components/ui/button/Button.vue'
 import { useAuth } from '@/composables/auth/useAuth'
 import { useCacheManager } from '@/composables/useCacheManager'
 import { useAdminQuestionsStore } from '@/stores/adminStore/adminQuestionsStore'
+import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
 
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
 const adminQuestionsStore = useAdminQuestionsStore()
+const adminReviewsStore = useAdminReviewsStore()
 
 onMounted(() => {
   adminQuestionsStore.fetchUnansweredCount()
+  adminReviewsStore.fetchUnpublishedCount()
 })
 </script>
 
@@ -94,6 +97,16 @@ onMounted(() => {
           <span>Вопросы</span>
           <Badge v-if="adminQuestionsStore.unansweredCount > 0" variant="destructive" class="text-xs">
             {{ adminQuestionsStore.unansweredCount }}
+          </Badge>
+        </NuxtLink>
+        <NuxtLink
+          to="/admin/reviews"
+          class="flex items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          <span>Отзывы</span>
+          <Badge v-if="adminReviewsStore.unpublishedCount > 0" variant="destructive" class="text-xs">
+            {{ adminReviewsStore.unpublishedCount }}
           </Badge>
         </NuxtLink>
 

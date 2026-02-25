@@ -12,6 +12,7 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
 import ProductDescription from '@/components/product/ProductDescription.vue'
 
@@ -21,6 +22,7 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
 const questionsStore = useProductQuestionsStore()
+const reviewsStore = useReviewsStore()
 const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl } = useSupabaseStorage()
@@ -140,6 +142,19 @@ const { data: productQuestions } = useQuery({
     if (!product.value?.id)
       return []
     return await questionsStore.fetchQuestions(product.value.id)
+  },
+  enabled: computed(() => !!product.value?.id),
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+})
+
+// ✅ 6. Отзывы
+const { data: productReviews } = useQuery({
+  queryKey: ['product-reviews', computed(() => product.value?.id)],
+  queryFn: async () => {
+    if (!product.value?.id)
+      return []
+    return await reviewsStore.fetchReviews(product.value.id)
   },
   enabled: computed(() => !!product.value?.id),
   staleTime: 5 * 60 * 1000,
@@ -832,28 +847,33 @@ useHead(() => ({
         ...(schemaAdditionalProperties.value.length > 0 && {
           additionalProperty: schemaAdditionalProperties.value,
         }),
-        // TODO: Добавить когда появится система отзывов
-        // 'aggregateRating': {
-        //   '@type': 'AggregateRating',
-        //   'ratingValue': '4.5',
-        //   'reviewCount': '24',
-        //   'bestRating': '5',
-        //   'worstRating': '1',
-        // },
-        // 'review': [
-        //   {
-        //     '@type': 'Review',
-        //     'author': { '@type': 'Person', 'name': 'Имя автора' },
-        //     'datePublished': '2026-01-15',
-        //     'reviewBody': 'Текст отзыва...',
-        //     'reviewRating': {
-        //       '@type': 'Rating',
-        //       'ratingValue': '5',
-        //       'bestRating': '5',
-        //       'worstRating': '1',
-        //     },
-        //   },
-        // ],
+        // Рейтинг и отзывы (SEO aggregateRating)
+        ...(product.value?.review_count && product.value.review_count > 0 && {
+          'aggregateRating': {
+            '@type': 'AggregateRating',
+            'ratingValue': String(product.value.avg_rating || 0),
+            'reviewCount': String(product.value.review_count),
+            'bestRating': '5',
+            'worstRating': '1',
+          },
+        }),
+        ...(productReviews.value?.length && {
+          'review': productReviews.value.slice(0, 5).map(r => ({
+            '@type': 'Review',
+            'author': {
+              '@type': 'Person',
+              'name': [r.profiles?.first_name, r.profiles?.last_name].filter(Boolean).join(' ') || 'Покупатель',
+            },
+            'datePublished': r.created_at.split('T')[0],
+            ...(r.text && { 'reviewBody': r.text }),
+            'reviewRating': {
+              '@type': 'Rating',
+              'ratingValue': String(r.rating),
+              'bestRating': '5',
+              'worstRating': '1',
+            },
+          })),
+        }),
       }),
     },
   ],
@@ -1054,9 +1074,10 @@ useHead(() => ({
                       </div>
                     </template>
 
-                    <Button v-else size="lg" class="w-full h-12" disabled>
-                      Нет в наличии
-                    </Button>
+                    <template v-else>
+                      <StockAlertButton :product-id="product.id" />
+                      <p class="text-sm text-muted-foreground text-center">Нет в наличии</p>
+                    </template>
 
                     <Button size="lg" variant="outline" class="w-full h-12 text-base">
                       <Icon name="mdi:heart-outline" class="w-5 h-5 mr-2" />
@@ -1342,6 +1363,15 @@ useHead(() => ({
                 <Icon name="lucide:chevron-right" class="w-5 h-5 text-primary shrink-0" />
               </NuxtLink>
             </div>
+          </div>
+          <!-- Отзывы -->
+          <div class="lg:col-span-7">
+            <ProductReviews
+              v-if="product.id"
+              :product-id="product.id"
+              :avg-rating="product.avg_rating ?? 0"
+              :review-count="product.review_count ?? 0"
+            />
           </div>
           <!-- Вопросы и ответы -->
           <div class="lg:col-span-7">

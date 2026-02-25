@@ -188,6 +188,7 @@ export default defineNuxtConfig({
       '/checkout': { ssr: false },
       '/cart': { ssr: false },
       '/order/**': { ssr: false },
+      '/auth/magic': { ssr: false },
     },
     compressPublicAssets: true,
     minify: true,

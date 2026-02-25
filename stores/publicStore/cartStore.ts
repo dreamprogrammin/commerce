@@ -231,6 +231,7 @@ export const useCartStore = defineStore('cartStore', () => {
           p_delivery_method: orderData.deliveryMethod,
           p_delivery_address: orderData.deliveryAddress,
           p_payment_method: orderData.paymentMethod,
+          p_promo_code: orderData.promoCode || null,
         })
 
         if (error)
@@ -250,6 +251,7 @@ export const useCartStore = defineStore('cartStore', () => {
           p_delivery_address: orderData.deliveryAddress,
           p_payment_method: orderData.paymentMethod,
           p_bonuses_to_spend: bonusesToSpend.value,
+          p_promo_code: orderData.promoCode || null,
         })
 
         if (error)

@@ -101,7 +101,8 @@
       "Bash(supabase inspection db:*)",
       "Bash(git status:*)",
       "Bash(gh auth status:*)",
-      "Bash(ssh -T:*)"
+      "Bash(ssh -T:*)",
+      "Bash(echo === New files ===:*)"
     ]
   }
 }

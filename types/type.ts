@@ -169,6 +169,7 @@ export interface ICheckoutData {
   paymentMethod: string
   deliveryAddress?: { line1: string, city: string, postalCode?: string }
   guestInfo?: { name: string, email: string, phone: string }
+  promoCode?: string
 }
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row'] & {
@@ -429,6 +430,27 @@ export type ProductImage = Database['public']['Tables']['product_images']['Row']
 export type Banner = Database['public']['Tables']['banners']['Row']
 export type BannerInsert = Database['public']['Tables']['banners']['Insert']
 export type BannerUpdate = Database['public']['Tables']['banners']['Update']
+
+// Product Reviews
+export interface ProductReviewRow {
+  id: string
+  user_id: string
+  product_id: string
+  order_id: string | null
+  rating: number
+  text: string | null
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ProductReviewWithAuthor extends ProductReviewRow {
+  profiles: {
+    first_name: string | null
+    last_name: string | null
+    avatar_url: string | null
+  } | null
+}
 
 export interface AdditionalMenuItem {
   id: string

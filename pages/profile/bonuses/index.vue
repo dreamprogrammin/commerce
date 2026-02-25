@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDownCircle, ArrowUpCircle, Clock, Gift, XCircle } from 'lucide-vue-next'
+import { ArrowDownCircle, ArrowUpCircle, Cake, Clock, Gift, Timer, XCircle } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
@@ -92,6 +92,10 @@ function getTransactionIcon(type: string) {
       return XCircle
     case 'activation':
       return Clock
+    case 'birthday':
+      return Cake
+    case 'expiration':
+      return Timer
     default:
       return Clock
   }
@@ -109,6 +113,10 @@ function getTransactionColor(type: string) {
       return 'text-red-600'
     case 'activation':
       return 'text-blue-600'
+    case 'birthday':
+      return 'text-green-600'
+    case 'expiration':
+      return 'text-red-600'
     default:
       return 'text-muted-foreground'
   }
@@ -123,6 +131,8 @@ function getTransactionName(type: string) {
     refund_spent: 'Возврат бонусов',
     refund_earned: 'Отмена начисления',
     activation: 'Активация бонусов',
+    birthday: 'Бонусы ко дню рождения',
+    expiration: 'Сгорело бонусов',
   }
   return names[type] || type
 }

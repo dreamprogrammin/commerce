@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { Star } from 'lucide-vue-next'
+import { Star, Tag } from 'lucide-vue-next'
 import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { usePromoCodeStore } from '@/stores/publicStore/promoCodeStore'
 
 const authStore = useAuthStore()
 const cartStore = useCartStore()
 const profileStore = useProfileStore()
+const promoCodeStore = usePromoCodeStore()
 
 const { user, isLoggedIn } = storeToRefs(authStore)
 const { bonusBalance } = storeToRefs(profileStore)
@@ -35,7 +37,19 @@ const orderForm = ref({
   },
 })
 const bonusesInput = ref(0)
+const promoCodeInput = ref('')
 const showGuestModal = ref(false)
+
+const { appliedCode: appliedPromoCode, discountAmount: promoDiscount, isValidating: isPromoValidating } = storeToRefs(promoCodeStore)
+
+async function applyPromoCode() {
+  await promoCodeStore.validateCode(promoCodeInput.value, subtotal.value)
+}
+
+function clearPromoCode() {
+  promoCodeStore.clearCode()
+  promoCodeInput.value = ''
+}
 
 // Маска для телефона (как в Kaspi)
 const phoneMaskOptions = reactive({
@@ -251,7 +265,11 @@ async function placeOrder() {
         }
       : undefined,
     guestInfo,
+    promoCode: appliedPromoCode.value || undefined,
   })
+
+  // Очищаем промокод после успешного заказа
+  promoCodeStore.clearCode()
 }
 </script>
 
@@ -455,6 +473,43 @@ async function placeOrder() {
           </CardContent>
         </Card>
 
+        <!-- Блок 4: Промокод -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <Tag class="w-5 h-5 text-primary" />
+              Промокод
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div v-if="appliedPromoCode" class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+              <div>
+                <span class="font-semibold text-green-700 dark:text-green-300">{{ appliedPromoCode }}</span>
+                <span class="text-sm text-muted-foreground ml-2">— скидка {{ promoDiscount }} ₸</span>
+              </div>
+              <Button type="button" variant="ghost" size="sm" @click="clearPromoCode">
+                Отменить
+              </Button>
+            </div>
+            <div v-else class="flex items-center gap-2">
+              <Input
+                v-model="promoCodeInput"
+                placeholder="Введите промокод"
+                class="flex-1 uppercase"
+                @keyup.enter="applyPromoCode"
+              />
+              <Button
+                type="button"
+                variant="default"
+                :disabled="isPromoValidating || !promoCodeInput.trim()"
+                @click="applyPromoCode"
+              >
+                {{ isPromoValidating ? 'Проверяем...' : 'Применить' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Кнопка оформления -->
         <Button
           type="button"
@@ -490,10 +545,16 @@ async function placeOrder() {
                 <span>{{ subtotal.toFixed(0) }} ₸</span>
               </div>
 
-              <!-- Скидка -->
+              <!-- Скидка бонусами -->
               <div v-if="discountAmount > 0" class="flex justify-between text-primary font-medium">
                 <span>Скидка бонусами:</span>
                 <span>-{{ discountAmount.toFixed(0) }} ₸</span>
+              </div>
+
+              <!-- Скидка промокодом -->
+              <div v-if="promoDiscount > 0" class="flex justify-between text-green-600 font-medium">
+                <span>Промокод {{ appliedPromoCode }}:</span>
+                <span>-{{ promoDiscount }} ₸</span>
               </div>
 
               <!-- Будущие бонусы (только для авторизованных) -->
