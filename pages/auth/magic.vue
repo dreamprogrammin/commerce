@@ -27,41 +27,9 @@ async function processToken() {
   }
   catch (err: unknown) {
     status.value = 'error'
-
-    // ✅ $fetch в Nuxt оборачивает ошибку в FetchError
-    // statusCode лежит в нескольких местах в зависимости от версии
-    const fetchError = err as {
-      statusCode?: number
-      status?: number
-      response?: { status?: number }
-      data?: { statusCode?: number; statusMessage?: string }
-      message?: string
-    }
-
-    const statusCode =
-      fetchError?.statusCode
-      ?? fetchError?.status
-      ?? fetchError?.response?.status
-      ?? fetchError?.data?.statusCode
-      ?? 0
-
-    const statusMessage =
-      fetchError?.data?.statusMessage
-      ?? fetchError?.message
-      ?? ''
-
-    console.error('[magic-link] error:', { statusCode, statusMessage, err })
-
-    if (statusCode === 410) {
-      if (statusMessage.toLowerCase().includes('already used')) {
-        errorMessage.value = 'Ссылка уже была использована. Запросите новую в боте.'
-      }
-      else {
-        errorMessage.value = 'Ссылка устарела. Запросите новую в боте.'
-      }
-    }
-    else if (statusCode === 404) {
-      errorMessage.value = 'Ссылка недействительна. Запросите новую в боте.'
+    const error = err as { statusCode?: number }
+    if (error.statusCode === 410) {
+      errorMessage.value = 'Ссылка уже использована или истекла'
     }
     else {
       errorMessage.value = 'Не удалось выполнить вход. Попробуйте войти через Google.'
