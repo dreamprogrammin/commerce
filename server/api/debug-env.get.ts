@@ -1,9 +1,17 @@
+// server/api/debug-env.get.ts
 export default defineEventHandler(() => {
+    const config = useRuntimeConfig()
     return {
-        hasUrl: !!process.env.SUPABASE_URL,
-        hasAnonKey: !!process.env.SUPABASE_KEY,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        // Первые 10 символов чтобы убедиться что это правильный ключ
-        serviceKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 10) || 'MISSING',
+        // Все способы чтения
+        viaProcessEnv: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        viaConfig: !!config.supabaseServiceRoleKey,
+        viaConfigRaw: !!config['supabaseServiceRoleKey'],
+
+        // Проверим все ключи runtimeConfig что есть
+        configKeys: Object.keys(config),
+
+        // Первые символы разными способами
+        prefixViaEnv: process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 5) || 'MISSING',
+        prefixViaConfig: config.supabaseServiceRoleKey?.substring(0, 5) || 'MISSING',
     }
 })
