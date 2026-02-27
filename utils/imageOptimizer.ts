@@ -1,4 +1,5 @@
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_QUALITY, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
+import imageCompression from 'browser-image-compression'
+import { IMAGE_OPTIMIZATION_ENABLED, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
 
 /**
  * 🎨 Результат генерации blur placeholder
@@ -10,62 +11,6 @@ export interface BlurPlaceholderResult {
 }
 
 /**
- * 🎨 Генерирует blur placeholder для LQIP (Low-Quality Image Placeholder)
- *
- * Создает крошечное изображение (20x20px) в base64 для мгновенного показа
- * пока грузится полное изображение (как на Medium.com)
- *
- * @param file - исходный файл изображения
- * @param maxSize - максимальный размер стороны (по умолчанию 20px)
- * @param quality - качество сжатия (по умолчанию 0.5)
- * @returns Promise с base64 data URL
- */
-/**
- * 🎨 Генерирует blur placeholder для LQIP (Low-Quality Image Placeholder)
- */
-export async function generateBlurPlaceholder(
-  file: File,
-  maxSize = 20,
-  quality = 0.5,
-): Promise<BlurPlaceholderResult> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      const img = new Image()
-
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const size = maxSize
-        canvas.width = size
-        canvas.height = size
-
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          reject(new Error('No context'))
-          return
-        }
-
-        ctx.drawImage(img, 0, 0, size, size)
-
-        try {
-          const dataUrl = canvas.toDataURL('image/jpeg', quality)
-          resolve({ dataUrl, width: size, height: size })
-        }
-        catch (err) {
-          reject(err)
-        }
-      }
-
-      img.onerror = reject
-      img.src = e.target?.result as string
-    }
-
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-/**
  * 🎨 Результат оптимизации изображения
  */
 export interface OptimizationResult {
@@ -73,7 +18,7 @@ export interface OptimizationResult {
   originalSize: number
   optimizedSize: number
   savings: number // процент экономии
-  blurPlaceholder?: string // 🆕 base64 blur preview
+  blurPlaceholder?: string // base64 blur preview
 }
 
 /**
@@ -88,13 +33,6 @@ export interface OptimizationInfo {
 
 /**
  * 🎯 Получить информацию о текущем режиме оптимизации
- *
- * @returns объект с информацией о режиме
- *
- * @example
- * const info = getOptimizationInfo()
- * console.log(info.name) // "Бесплатный тариф"
- * console.log(info.icon) // "💾"
  */
 export function getOptimizationInfo(): OptimizationInfo {
   if (IMAGE_OPTIMIZATION_ENABLED) {
@@ -109,20 +47,13 @@ export function getOptimizationInfo(): OptimizationInfo {
   return {
     name: 'Бесплатный тариф',
     icon: '💾',
-    description: 'Локальная оптимизация через Canvas API',
+    description: 'Локальная оптимизация через browser-image-compression',
     recommendation: 'Изображения оптимизируются локально перед загрузкой для экономии трафика',
   }
 }
 
 /**
  * 📏 Форматирует размер файла в читаемый вид
- *
- * @param bytes - размер в байтах
- * @returns строка типа "1.5 MB" или "350 KB"
- *
- * @example
- * formatFileSize(1500000) // "1.43 MB"
- * formatFileSize(50000)   // "48.8 KB"
  */
 export function formatFileSize(bytes: number): string {
   if (bytes === 0)
@@ -138,192 +69,85 @@ export function formatFileSize(bytes: number): string {
 /**
  * 🎯 Проверяет нужна ли оптимизация для файла
  *
- * Логика:
- * - Если платный тариф (IMAGE_OPTIMIZATION_ENABLED = true) → НЕ оптимизируем (загружаем оригиналы)
- * - Если бесплатный тариф → оптимизируем файлы > 500KB
- *
- * @param file - файл для проверки
- * @returns true если нужна локальная оптимизация
- *
- * @example
- * const file = new File([blob], 'image.jpg')
- * if (shouldOptimizeImage(file)) {
- *   await optimizeImageBeforeUpload(file)
- * }
+ * На бесплатном тарифе ВСЕГДА сжимаем — гарантируем WebP + 1200px + <150KB
  */
-export function shouldOptimizeImage(file: File): boolean {
-  // 🚀 Платный тариф - НЕ оптимизируем (Supabase сделает это сам)
-  if (IMAGE_OPTIMIZATION_ENABLED) {
+export function shouldOptimizeImage(_file: File): boolean {
+  // Платный тариф — Supabase оптимизирует сам
+  if (IMAGE_OPTIMIZATION_ENABLED)
     return false
-  }
 
-  // 🛡️ Бесплатный тариф - оптимизируем файлы > 500KB
-  const threshold = 500 * 1024 // 500KB
-  return file.size > threshold
+  // Бесплатный тариф — всегда сжимаем
+  return true
+}
+
+/**
+ * 🎨 Генерирует blur placeholder для LQIP (Low-Quality Image Placeholder)
+ *
+ * Создаёт крошечное изображение (20px) в base64 для мгновенного показа
+ * пока грузится полное изображение (как на Medium.com)
+ */
+export async function generateBlurPlaceholder(
+  file: File,
+  maxSize = 20,
+): Promise<BlurPlaceholderResult> {
+  const compressed = await imageCompression(file, {
+    maxSizeMB: 0.002,
+    maxWidthOrHeight: maxSize,
+    useWebWorker: true,
+  })
+  const dataUrl = await imageCompression.getDataUrlFromFile(compressed)
+  return { dataUrl, width: maxSize, height: maxSize }
 }
 
 /**
  * 🎨 Оптимизирует изображение перед загрузкой
  *
- * Использует Canvas API для:
- * - Изменения размера (если больше рекомендуемого)
- * - Конвертации в WebP (меньший размер)
- * - Сжатия с настраиваемым качеством
- * - 🆕 Генерации blur placeholder для LQIP
- *
- * @param file - исходный файл изображения
- * @param maxWidth - максимальная ширина (по умолчанию 2000px)
- * @param maxHeight - максимальная высота (по умолчанию 2000px)
- * @param quality - качество сжатия (0-1, по умолчанию 0.85)
- * @param generateBlur - генерировать ли blur placeholder (по умолчанию true)
- * @returns Promise с результатом оптимизации
- *
- * @example
- * const result = await optimizeImageBeforeUpload(file)
- * console.log(`Экономия: ${result.savings}%`)
- * console.log(`Blur: ${result.blurPlaceholder}`) // base64 string
+ * Использует browser-image-compression для:
+ * - Сжатия до ≤150KB / 1200px
+ * - Конвертации в WebP
+ * - Параллельной генерации LQIP blur placeholder
  */
 export async function optimizeImageBeforeUpload(
   file: File,
-  maxWidth = OPTIMIZATION_RECOMMENDATIONS.RECOMMENDED_UPLOAD_DIMENSIONS.width,
-  maxHeight = OPTIMIZATION_RECOMMENDATIONS.RECOMMENDED_UPLOAD_DIMENSIONS.height,
-  quality = IMAGE_QUALITY.HIGH / 100,
-  generateBlur = true,
 ): Promise<OptimizationResult> {
   const originalSize = file.size
 
-  // 🎨 Генерируем blur placeholder ПОСЛЕДОВАТЕЛЬНО (не параллельно)
-  let blurResult: BlurPlaceholderResult | null = null
+  const maxDim = OPTIMIZATION_RECOMMENDATIONS.RECOMMENDED_UPLOAD_DIMENSIONS.width
 
-  if (generateBlur) {
-    try {
-      blurResult = await generateBlurPlaceholder(file)
-      console.log('✅ Blur generated:', `${blurResult.dataUrl.slice(0, 50)}...`)
-    }
-    catch (error) {
-      console.warn('⚠️ Failed to generate blur:', error)
-      blurResult = null
-    }
+  // Параллельно: основное сжатие + LQIP
+  const [compressed, blurResult] = await Promise.all([
+    imageCompression(file, {
+      maxSizeMB: 0.15,
+      maxWidthOrHeight: maxDim,
+      useWebWorker: true,
+      fileType: 'image/webp',
+    }),
+    generateBlurPlaceholder(file).catch(() => null),
+  ])
+
+  // Переименовываем в .webp (library не всегда меняет имя)
+  const webpFile = new File(
+    [compressed],
+    file.name.replace(/\.[^.]+$/, '.webp'),
+    { type: 'image/webp' },
+  )
+
+  return {
+    file: webpFile,
+    originalSize,
+    optimizedSize: webpFile.size,
+    savings: Math.max(0, ((originalSize - webpFile.size) / originalSize) * 100),
+    blurPlaceholder: blurResult?.dataUrl,
   }
-
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      const result = e.target?.result
-      if (!result) {
-        reject(new Error('Failed to read file'))
-        return
-      }
-      img.src = result as string
-    }
-
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'))
-    }
-
-    img.onload = () => {
-      try {
-        // Вычисляем новые размеры
-        let { width, height } = img
-
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height)
-          width = Math.floor(width * ratio)
-          height = Math.floor(height * ratio)
-        }
-
-        // Создаем canvas
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-
-        const ctx = canvas.getContext('2d', {
-          alpha: true, // Для WebP нужен альфа-канал
-          willReadFrequently: false,
-        })
-
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'))
-          return
-        }
-
-        // Рисуем изображение
-        ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = 'high'
-        ctx.drawImage(img, 0, 0, width, height)
-
-        // Конвертируем в WebP
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Failed to create blob'))
-              return
-            }
-
-            const optimizedSize = blob.size
-            const savings = ((originalSize - optimizedSize) / originalSize) * 100
-
-            // Создаем новый файл
-            const optimizedFile = new File(
-              [blob],
-              file.name.replace(/\.[^.]+$/, '.webp'),
-              { type: 'image/webp' },
-            )
-
-            // 🔧 Очищаем canvas
-            canvas.width = 0
-            canvas.height = 0
-            img.src = ''
-
-            resolve({
-              file: optimizedFile,
-              originalSize,
-              optimizedSize,
-              savings: Math.max(0, savings),
-              blurPlaceholder: blurResult?.dataUrl, // 🆕 Добавляем blur
-            })
-          },
-          'image/webp',
-          quality,
-        )
-      }
-      catch (error) {
-        reject(error)
-      }
-    }
-
-    img.onerror = () => {
-      reject(new Error('Failed to load image'))
-    }
-
-    reader.readAsDataURL(file)
-  })
 }
 
 /**
  * 📊 Валидация файла изображения
- *
- * Проверяет:
- * - Является ли файл изображением
- * - Не превышает ли максимальный размер
- * - Поддерживается ли формат
- *
- * @param file - файл для проверки
- * @returns объект с результатом валидации
- *
- * @example
- * const validation = validateImageFile(file)
- * if (!validation.isValid) {
- *   toast.error(validation.error)
- * }
  */
 export function validateImageFile(file: File): {
   isValid: boolean
   error?: string
 } {
-  // Проверяем тип
   if (!file.type.startsWith('image/')) {
     return {
       isValid: false,
@@ -331,7 +155,6 @@ export function validateImageFile(file: File): {
     }
   }
 
-  // Проверяем поддерживаемые форматы
   const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
   if (!supportedFormats.includes(file.type)) {
     return {
@@ -340,7 +163,6 @@ export function validateImageFile(file: File): {
     }
   }
 
-  // Проверяем размер
   const maxSizeBytes = OPTIMIZATION_RECOMMENDATIONS.MAX_ORIGINAL_SIZE_MB * 1024 * 1024
   if (file.size > maxSizeBytes) {
     return {
@@ -354,15 +176,6 @@ export function validateImageFile(file: File): {
 
 /**
  * 🎯 Пакетная оптимизация изображений
- *
- * @param files - массив файлов для оптимизации
- * @param onProgress - callback для отслеживания прогресса
- * @returns Promise с массивом результатов
- *
- * @example
- * const results = await optimizeImagesBatch(files, (current, total) => {
- *   console.log(`Обработано ${current} из ${total}`)
- * })
  */
 export async function optimizeImagesBatch(
   files: File[],
@@ -373,30 +186,17 @@ export async function optimizeImagesBatch(
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
 
-    // Проверяем что файл существует
     if (!file) {
       console.warn(`File at index ${i} is undefined, skipping`)
       continue
     }
 
-    if (shouldOptimizeImage(file)) {
-      try {
-        const result = await optimizeImageBeforeUpload(file)
-        results.push(result)
-      }
-      catch (error) {
-        console.error(`Failed to optimize ${file.name}:`, error)
-        // Добавляем оригинал если не удалось оптимизировать
-        results.push({
-          file,
-          originalSize: file.size,
-          optimizedSize: file.size,
-          savings: 0,
-        })
-      }
+    try {
+      const result = await optimizeImageBeforeUpload(file)
+      results.push(result)
     }
-    else {
-      // Файл не требует оптимизации
+    catch (error) {
+      console.error(`Failed to optimize ${file.name}:`, error)
       results.push({
         file,
         originalSize: file.size,

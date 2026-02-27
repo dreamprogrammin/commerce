@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
+import { formatFileSize, optimizeImageBeforeUpload } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 
 const props = defineProps<{
@@ -31,6 +32,7 @@ const formData = ref<Partial<BrandInsert | BrandUpdate>>({
 const newLogoFile = ref<File | null>(null)
 const logoPreviewUrl = ref<string | null>(null)
 const isSlugManuallyEdited = ref(false)
+const isProcessingLogo = ref(false)
 
 // Автоматическая генерация slug при изменении названия
 watch(() => formData.value.name, (newName) => {
@@ -45,17 +47,32 @@ function onSlugInput() {
   isSlugManuallyEdited.value = true
 }
 
-function handleFileChange(event: Event) {
+async function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0] || null
-  newLogoFile.value = file
 
-  // Создаем превью для нового файла
-  if (file) {
+  if (!file) {
+    newLogoFile.value = null
+    logoPreviewUrl.value = null
+    return
+  }
+
+  isProcessingLogo.value = true
+  try {
+    const result = await optimizeImageBeforeUpload(file)
+    newLogoFile.value = result.file
+    logoPreviewUrl.value = URL.createObjectURL(result.file)
+    toast.success('Логотип оптимизирован', {
+      description: `${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%)`,
+    })
+  }
+  catch {
+    // fallback на оригинал
+    newLogoFile.value = file
     logoPreviewUrl.value = URL.createObjectURL(file)
   }
-  else {
-    logoPreviewUrl.value = null
+  finally {
+    isProcessingLogo.value = false
   }
 }
 
@@ -153,7 +170,12 @@ onBeforeUnmount(() => {
 
     <!-- 👇 Логотип с оптимизацией через getImageUrl -->
     <div class="space-y-2 pt-4">
-      <Label>Логотип</Label>
+      <Label>
+        Логотип
+        <span v-if="isProcessingLogo" class="text-xs text-muted-foreground ml-2">
+          💾 Обработка...
+        </span>
+      </Label>
       <div v-if="displayLogoUrl" class="flex items-center gap-3 mb-2">
         <img
           :src="displayLogoUrl"
@@ -165,7 +187,7 @@ onBeforeUnmount(() => {
           {{ newLogoFile ? 'Новый логотип (будет загружен)' : 'Текущий логотип' }}
         </p>
       </div>
-      <Input type="file" accept="image/*" @change="handleFileChange" />
+      <Input type="file" accept="image/*" :disabled="isProcessingLogo" @change="handleFileChange" />
     </div>
 
     <!-- 🔍 SEO секция -->

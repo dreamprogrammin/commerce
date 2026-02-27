@@ -46,9 +46,17 @@ const {
 
 Чтобы избежать медленной загрузки больших оригиналов, **оптимизируйте изображения перед загрузкой в Supabase**.
 
-#### Вариант 1: Автоматическая оптимизация (рекомендуется)
+#### Вариант 1: Автоматическая оптимизация (реализовано ✅)
 
-Создайте утилиту `utils/imageOptimizer.ts`:
+Утилита `utils/imageOptimizer.ts` использует `browser-image-compression`:
+- `maxSizeMB: 0.15` → файл ≤150KB
+- `maxWidthOrHeight: 1200` → изображение ≤1200px
+- `fileType: 'image/webp'` → конвертация в WebP
+- Параллельная генерация LQIP (20px blur placeholder)
+
+Пример реализации (устаревший Canvas API, заменён):
+
+
 
 \`\`\`typescript
 export async function optimizeImageBeforeUpload(

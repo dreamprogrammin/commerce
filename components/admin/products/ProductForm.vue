@@ -26,10 +26,8 @@ import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLines
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import {
   formatFileSize,
-  generateBlurPlaceholder,
   getOptimizationInfo,
   optimizeImageBeforeUpload,
-  shouldOptimizeImage,
 } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
@@ -412,49 +410,24 @@ async function processFiles(files: File[]) {
   try {
     const processedFiles = await Promise.all(
       files.map(async (file) => {
-        // Проверяем нужна ли оптимизация
-        if (shouldOptimizeImage(file)) {
-          try {
-            const result = await optimizeImageBeforeUpload(file)
-
-            console.log(
-              `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
-            )
-
-            return {
-              id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-              file: result.file,
-              previewUrl: URL.createObjectURL(result.file),
-              blurDataUrl: result.blurPlaceholder,
-            }
-          }
-          catch (error) {
-            console.error(`❌ Ошибка оптимизации ${file.name}:`, error)
-            toast.warning(`Ошибка обработки ${file.name}, используем оригинал`)
-
-            return {
-              id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-              file,
-              previewUrl: URL.createObjectURL(file),
-              blurDataUrl: undefined,
-            }
-          }
-        }
-
-        // Файл маленький - генерируем только blur
         try {
-          const blurResult = await generateBlurPlaceholder(file)
-          console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
+          const result = await optimizeImageBeforeUpload(file)
+
+          console.log(
+            `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
+          )
 
           return {
             id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-            file,
-            previewUrl: URL.createObjectURL(file),
-            blurDataUrl: blurResult.dataUrl,
+            file: result.file,
+            previewUrl: URL.createObjectURL(result.file),
+            blurDataUrl: result.blurPlaceholder,
           }
         }
         catch (error) {
-          console.warn(`⚠️ Не удалось сгенерировать blur для ${file.name}`)
+          console.error(`❌ Ошибка оптимизации ${file.name}:`, error)
+          toast.warning(`Ошибка обработки ${file.name}, используем оригинал`)
+
           return {
             id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             file,

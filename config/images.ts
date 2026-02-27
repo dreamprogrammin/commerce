@@ -293,8 +293,8 @@ export const OPTIMIZATION_RECOMMENDATIONS = {
 
   // Рекомендуемые размеры для загрузки
   RECOMMENDED_UPLOAD_DIMENSIONS: {
-    width: 2000,
-    height: 2000,
+    width: 1200,
+    height: 1200,
   },
 
   // Поддерживаемые форматы для загрузки

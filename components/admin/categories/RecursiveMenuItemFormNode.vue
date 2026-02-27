@@ -16,10 +16,8 @@ import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import {
   formatFileSize,
-  generateBlurPlaceholder,
   getOptimizationInfo,
   optimizeImageBeforeUpload,
-  shouldOptimizeImage,
 } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 
@@ -228,26 +226,14 @@ async function handleImageChange(event: Event) {
   )
 
   try {
-    let blurDataUrl: string | undefined
-    let processedFile = file
+    const result = await optimizeImageBeforeUpload(file)
 
-    // Проверяем нужна ли оптимизация
-    if (shouldOptimizeImage(file)) {
-      const result = await optimizeImageBeforeUpload(file)
+    console.log(
+      `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
+    )
 
-      console.log(
-        `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
-      )
-
-      processedFile = result.file
-      blurDataUrl = result.blurPlaceholder
-    }
-    else {
-      // Файл маленький - генерируем только blur
-      const blurResult = await generateBlurPlaceholder(file, 20, 0.5)
-      console.log(`📤 ${file.name}: ${formatFileSize(file.size)} + LQIP ✨`)
-      blurDataUrl = blurResult.dataUrl
-    }
+    const processedFile = result.file
+    const blurDataUrl: string | undefined = result.blurPlaceholder
 
     // Создаем preview URL для отображения
     const previewUrl = URL.createObjectURL(processedFile)
