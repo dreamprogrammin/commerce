@@ -14,6 +14,11 @@
 - [**MASONRY_GUIDE.md**](./MASONRY_GUIDE.md) — Гайд по использованию Masonry раскладки.
 - [**VARIANTS.md**](./VARIANTS.md) — Описание вариантов компонентов (Variants).
 
+## 🔐 Авторизация и профиль
+
+- [**GOOGLE_OAUTH_PROFILE_FIX.md**](./GOOGLE_OAUTH_PROFILE_FIX.md) — Фикс ошибки 500 при Google OAuth (пустое имя пользователя): триггер `handle_new_user`, RPC `ensure_profile_exists`, middleware wait.
+- [**MIGRATION_CLEAN_PROFILES.md**](./MIGRATION_CLEAN_PROFILES.md) — Миграция: очистка логики Profiles и Auth (2025-12-24).
+
 ## 🛠️ Технические настройки
 
 - [**VUE_QUERY_SETUP.md**](./VUE_QUERY_SETUP.md) — Настройка и использование Vue Query.

@@ -113,7 +113,37 @@ export const useProfileStore = defineStore('profileStore', () => {
           }
         }
 
-        // После всех попыток профиля нет
+        // После всех попыток профиля нет — пробуем создать через RPC (последний шанс)
+        console.warn('[ProfileStore] Profile not found after retries, calling ensure_profile_exists RPC...')
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error: ensureError } = await (supabase as any).rpc('ensure_profile_exists')
+
+          if (!ensureError) {
+            // Re-fetch profile after RPC creation
+            const { data: newProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.value!.id)
+              .maybeSingle()
+
+            if (newProfile) {
+              profile.value = newProfile
+              console.info('[ProfileStore] Profile created via ensure_profile_exists RPC')
+              return true
+            }
+          }
+          else {
+            console.error('[ProfileStore] ensure_profile_exists RPC error:', ensureError)
+          }
+        }
+        catch (rpcError) {
+          console.error('[ProfileStore] ensure_profile_exists RPC threw:', rpcError)
+        }
+
+        toast.error('Профиль не найден', {
+          description: 'Попробуйте выйти и войти снова.',
+        })
         profile.value = null
         return false
       }
