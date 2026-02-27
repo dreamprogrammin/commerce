@@ -61,6 +61,8 @@ interface OrderData {
   source: 'online' | 'offline' | null
   bonuses_awarded: number
   bonuses_spent: number
+  customer_name: string | null
+  customer_phone: string | null
   profile: OrderProfile | null
   order_items: OrderItem[]
 }
@@ -205,6 +207,7 @@ Deno.serve(async (req) => {
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
+          customer_name, customer_phone,
           order_items(
             quantity,
             product_id,
@@ -345,22 +348,24 @@ Deno.serve(async (req) => {
     // 📱 ФОРМИРОВАНИЕ И ОТПРАВКА СООБЩЕНИЯ
     // ========================================
     
-    // Определяем имя клиента в зависимости от типа заказа (с экранированием)
-    const customerNameRaw = typedOrderData.profile?.first_name
+    // Имя клиента: сначала из заказа (customer_name), затем профиль, затем гость
+    const profileFullName = typedOrderData.profile?.first_name
       ? `${typedOrderData.profile.first_name} ${typedOrderData.profile.last_name || ''}`.trim()
-      : guestName || 'Не указано'
+      : null
+    const customerNameRaw = typedOrderData.customer_name || profileFullName || guestName || 'Не указано'
     const customerName = escapeMarkdown(customerNameRaw)
 
-    console.log(`📱 Формирование контактов для сообщения:`)
-    console.log(`   typedOrderData.profile?.phone: ${typedOrderData.profile?.phone}`)
-    console.log(`   guestPhone (raw): "${guestPhone}"`)
-    console.log(`   guestPhone type: ${typeof guestPhone}`)
-    console.log(`   guestPhone length: ${guestPhone?.length || 0}`)
-    console.log(`   Будет использовано: "${typedOrderData.profile?.phone || guestPhone || 'Не указан'}"`)
+    // Телефон: сначала из заказа (customer_phone), затем профиль, затем гость
+    // НЕ используем escapeMarkdown — экранирование ломает отображение номера в Telegram
+    const customerPhone = typedOrderData.customer_phone || typedOrderData.profile?.phone || guestPhone || 'Не указан'
 
-    // ✅ Для номера телефона НЕ используем escapeMarkdown - оставляем как есть
-    // Экранирование может нарушить отображение номера в Telegram
-    const customerPhone = typedOrderData.profile?.phone || guestPhone || 'Не указан'
+    console.log(`📱 Формирование контактов для сообщения:`)
+    console.log(`   customer_name (заказ): ${typedOrderData.customer_name}`)
+    console.log(`   customer_phone (заказ): ${typedOrderData.customer_phone}`)
+    console.log(`   profile?.phone: ${typedOrderData.profile?.phone}`)
+    console.log(`   guestPhone: "${guestPhone}"`)
+    console.log(`   Итого имя: "${customerNameRaw}", телефон: "${customerPhone}"`)
+
     const customerEmail = escapeMarkdown(guestEmail || 'Не указан')
     const customerType = typedOrderData.user_id ? '👤 Зарегистрированный' : '👥 Гость'
     const orderSource = typedOrderData.source === 'offline' ? '🏪 Оффлайн' : '🌐 Онлайн'

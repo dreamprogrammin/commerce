@@ -266,6 +266,8 @@ async function placeOrder() {
       : undefined,
     guestInfo,
     promoCode: appliedPromoCode.value || undefined,
+    contactName: isLoggedIn.value ? orderForm.value.name.trim() || undefined : undefined,
+    contactPhone: isLoggedIn.value ? formattedPhone : undefined,
   })
 
   // Очищаем промокод после успешного заказа

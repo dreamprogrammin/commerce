@@ -252,6 +252,8 @@ export const useCartStore = defineStore('cartStore', () => {
           p_payment_method: orderData.paymentMethod,
           p_bonuses_to_spend: bonusesToSpend.value,
           p_promo_code: orderData.promoCode || null,
+          p_contact_name: orderData.contactName || null,
+          p_contact_phone: orderData.contactPhone || null,
         })
 
         if (error)

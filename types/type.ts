@@ -170,6 +170,8 @@ export interface ICheckoutData {
   deliveryAddress?: { line1: string, city: string, postalCode?: string }
   guestInfo?: { name: string, email: string, phone: string }
   promoCode?: string
+  contactName?: string
+  contactPhone?: string
 }
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row'] & {
