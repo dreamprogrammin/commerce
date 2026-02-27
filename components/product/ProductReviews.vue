@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
+import StarRating from './StarRating.vue'
+import ReviewCard from './ReviewCard.vue'
 
 const props = defineProps<{
   productId: string

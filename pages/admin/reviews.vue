@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
+import StarRating from '@/components/product/StarRating.vue'
 
 definePageMeta({
-  layout: 'Admin',
+  layout: 'admin',
 })
 
 const store = useAdminReviewsStore()

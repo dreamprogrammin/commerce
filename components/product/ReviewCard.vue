@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProductReview } from '@/stores/publicStore/reviewsStore'
+import StarRating from './StarRating.vue';
 
 defineProps<{
   review: ProductReview

@@ -15,6 +15,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
 import ProductDescription from '@/components/product/ProductDescription.vue'
+import StockAlertButton from '@/components/product/StockAlertButton.vue'
 
 const route = useRoute()
 const router = useRouter()

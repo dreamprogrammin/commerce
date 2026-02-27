@@ -8,6 +8,7 @@ import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 
 // --- Stores ---
 const authStore = useAuthStore()
