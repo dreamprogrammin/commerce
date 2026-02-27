@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -7,6 +8,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -396,7 +402,7 @@ export type Database = {
           is_featured: boolean
           is_root_category: boolean
           meta_description: string | null
-          meta_keywords: string | null
+          meta_keywords: string[] | null
           meta_title: string | null
           name: string
           og_description: string | null
@@ -429,7 +435,7 @@ export type Database = {
           is_featured?: boolean
           is_root_category?: boolean
           meta_description?: string | null
-          meta_keywords?: string | null
+          meta_keywords?: string[] | null
           meta_title?: string | null
           name: string
           og_description?: string | null
@@ -462,7 +468,7 @@ export type Database = {
           is_featured?: boolean
           is_root_category?: boolean
           meta_description?: string | null
-          meta_keywords?: string | null
+          meta_keywords?: string[] | null
           meta_title?: string | null
           name?: string
           og_description?: string | null
@@ -722,7 +728,6 @@ export type Database = {
           guest_phone: string
           id: string
           payment_method: string | null
-          processed_at: string | null
           source: string
           status: string
           telegram_message_id: string | null
@@ -744,7 +749,6 @@ export type Database = {
           guest_phone: string
           id?: string
           payment_method?: string | null
-          processed_at?: string | null
           source?: string
           status?: string
           telegram_message_id?: string | null
@@ -766,7 +770,6 @@ export type Database = {
           guest_phone?: string
           id?: string
           payment_method?: string | null
-          processed_at?: string | null
           source?: string
           status?: string
           telegram_message_id?: string | null
@@ -1053,6 +1056,8 @@ export type Database = {
           bonuses_spent: number
           cancelled_by: string | null
           created_at: string
+          customer_name: string | null
+          customer_phone: string | null
           delivery_address: Json | null
           delivery_method: string
           discount_amount: number
@@ -1068,7 +1073,7 @@ export type Database = {
           telegram_message_id: string | null
           total_amount: number
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           assigned_admin_name?: string | null
@@ -1079,6 +1084,8 @@ export type Database = {
           bonuses_spent?: number
           cancelled_by?: string | null
           created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
           delivery_address?: Json | null
           delivery_method: string
           discount_amount?: number
@@ -1094,7 +1101,7 @@ export type Database = {
           telegram_message_id?: string | null
           total_amount: number
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           assigned_admin_name?: string | null
@@ -1105,6 +1112,8 @@ export type Database = {
           bonuses_spent?: number
           cancelled_by?: string | null
           created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
           delivery_address?: Json | null
           delivery_method?: string
           discount_amount?: number
@@ -1120,17 +1129,9 @@ export type Database = {
           telegram_message_id?: string | null
           total_amount?: number
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "orders_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       product_accessories: {
         Row: {
@@ -1457,22 +1458,34 @@ export type Database = {
       }
       product_types: {
         Row: {
+          created_at: string
           custom_fields_schema: Json | null
-          id: number
+          description: string | null
+          display_order: number | null
+          id: string
           name: string
           slug: string
+          updated_at: string
         }
         Insert: {
+          created_at?: string
           custom_fields_schema?: Json | null
-          id?: number
+          description?: string | null
+          display_order?: number | null
+          id?: string
           name: string
           slug: string
+          updated_at?: string
         }
         Update: {
+          created_at?: string
           custom_fields_schema?: Json | null
-          id?: number
+          description?: string | null
+          display_order?: number | null
+          id?: string
           name?: string
           slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1677,6 +1690,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "product_lines"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_product_type_fkey"
+            columns: ["product_type"]
+            isOneToOne: false
+            referencedRelation: "product_types"
+            referencedColumns: ["slug"]
           },
         ]
       }
@@ -2145,23 +2165,16 @@ export type Database = {
       }
     }
     Views: {
-      all_orders_stats: {
-        Row: {
-          order_type: string | null
-          total_bonuses_awarded: number | null
-          total_bonuses_spent: number | null
-          total_orders: number | null
-          total_revenue: number | null
-        }
-        Relationships: []
-      }
       bonus_system_status: {
         Row: {
           bonuses_ready_for_activation: number | null
+          cron_is_configured: boolean | null
+          last_cron_run: string | null
+          last_cron_status: string | null
           orders_ready_for_activation: number | null
-          total_active_bonuses: number | null
-          total_pending_bonuses: number | null
+          skipped_last_7_days: number | null
           users_with_active_bonuses: number | null
+          users_with_negative_balance: number | null
           users_with_pending_bonuses: number | null
         }
         Relationships: []
@@ -2170,24 +2183,22 @@ export type Database = {
     Functions: {
       activate_my_pending_bonuses: { Args: never; Returns: Json }
       activate_pending_bonuses: { Args: never; Returns: string }
-      activate_pending_order_bonuses: { Args: never; Returns: number }
       cancel_order:
-      | {
-        Args: { p_order_id: string; p_table_name?: string }
-        Returns: string
-      }
-      | {
-        Args: {
-          p_cancelled_by?: string
-          p_order_id: string
-          p_table_name?: string
-        }
-        Returns: string
-      }
+        | {
+            Args: { p_order_id: string; p_table_name?: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_cancelled_by?: string
+              p_order_id: string
+              p_table_name?: string
+            }
+            Returns: string
+          }
       check_abandoned_carts: { Args: never; Returns: undefined }
       check_birthday_notifications: { Args: never; Returns: string }
       check_expiring_bonuses: { Args: never; Returns: string }
-      cleanup_expired_guest_checkouts: { Args: never; Returns: number }
       confirm_and_process_order: {
         Args: { p_order_id: string }
         Returns: string
@@ -2240,6 +2251,8 @@ export type Database = {
         Args: {
           p_bonuses_to_spend?: number
           p_cart_items: Json
+          p_contact_name?: string
+          p_contact_phone?: string
           p_delivery_address?: Json
           p_delivery_method: string
           p_payment_method?: string
@@ -2255,6 +2268,28 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: boolean
       }
+      ensure_profile_exists: {
+        Args: never
+        Returns: {
+          active_bonus_balance: number
+          created_at: string
+          first_name: string | null
+          has_received_welcome_bonus: boolean
+          id: string
+          last_name: string | null
+          pending_bonus_balance: number
+          phone: string | null
+          role: string
+          telegram_chat_id: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       expire_bonuses: { Args: never; Returns: string }
       generate_brand_questions: {
         Args: { p_brand_id: string; p_skip_ai?: boolean }
@@ -2264,21 +2299,9 @@ export type Database = {
         Args: { p_category_id: string; p_skip_ai?: boolean }
         Returns: Json
       }
-      generate_country_questions: {
-        Args: { p_country_id: number; p_skip_ai?: boolean }
-        Returns: Json
-      }
       generate_magic_link: {
         Args: { p_redirect_path?: string; p_user_id: string }
         Returns: string
-      }
-      generate_material_questions: {
-        Args: { p_material_id: number; p_skip_ai?: boolean }
-        Returns: Json
-      }
-      generate_product_line_questions: {
-        Args: { p_product_line_id: string; p_skip_ai?: boolean }
-        Returns: Json
       }
       generate_product_questions: {
         Args: { p_product_id: string; p_skip_ai?: boolean }
@@ -2297,30 +2320,6 @@ export type Database = {
         Returns: {
           category_id: string
           is_premium: boolean
-          questions_count: number
-        }[]
-      }
-      generate_questions_for_all_countries: {
-        Args: never
-        Returns: {
-          country_id: number
-          is_premium: boolean
-          questions_count: number
-        }[]
-      }
-      generate_questions_for_all_materials: {
-        Args: never
-        Returns: {
-          is_premium: boolean
-          material_id: number
-          questions_count: number
-        }[]
-      }
-      generate_questions_for_all_product_lines: {
-        Args: never
-        Returns: {
-          is_premium: boolean
-          product_line_id: string
           questions_count: number
         }[]
       }
@@ -2387,13 +2386,6 @@ export type Database = {
         Args: never
         Returns: {
           is_configured: boolean
-          last_run: string
-          last_status: string
-        }[]
-      }
-      get_cron_status_safe: {
-        Args: never
-        Returns: {
           last_run: string
           last_status: string
         }[]
@@ -2533,8 +2525,8 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       link_telegram_by_code: { Args: { p_code: string }; Returns: Json }
-      process_confirmed_guest_checkout: {
-        Args: { p_checkout_id: string }
+      merge_anon_user_into_real_user: {
+        Args: { new_real_user_id: string; old_anon_user_id: string }
         Returns: string
       }
       process_confirmed_order: { Args: { p_order_id: string }; Returns: string }
@@ -2589,116 +2581,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   graphql_public: {
@@ -2708,4 +2700,5 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.67.1)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
