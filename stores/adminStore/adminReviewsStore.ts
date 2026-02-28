@@ -1,6 +1,14 @@
 import type { Database } from '@/types'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
+import { BUCKET_NAME_REVIEWS } from '@/constants'
+
+export interface AdminReviewImage {
+  id: string
+  image_url: string
+  blur_placeholder: string | null
+  display_order: number | null
+}
 
 export interface AdminReview {
   id: string
@@ -12,6 +20,7 @@ export interface AdminReview {
   is_published: boolean
   created_at: string
   updated_at: string
+  review_images: AdminReviewImage[]
   profiles: {
     first_name: string | null
     last_name: string | null
@@ -30,7 +39,7 @@ export const useAdminReviewsStore = defineStore('adminReviewsStore', () => {
   const isLoading = ref(false)
   const unpublishedCount = ref(0)
 
-  const selectQuery = 'id, product_id, user_id, order_id, rating, text, is_published, created_at, updated_at, profiles!product_reviews_user_id_fkey(first_name, last_name, avatar_url), products!product_reviews_product_id_fkey(name, slug)'
+  const selectQuery = 'id, product_id, user_id, order_id, rating, text, is_published, created_at, updated_at, profiles!product_reviews_profile_id_fkey(first_name, last_name, avatar_url), products!product_reviews_product_id_fkey(name, slug), review_images(id, image_url, blur_placeholder, display_order)'
 
   async function fetchAllReviews(filter: 'all' | 'unpublished' = 'unpublished') {
     isLoading.value = true
@@ -92,6 +101,10 @@ export const useAdminReviewsStore = defineStore('adminReviewsStore', () => {
   }
 
   async function deleteReview(reviewId: string) {
+    // Получаем пути фото для удаления из storage
+    const review = reviews.value.find(r => r.id === reviewId)
+    const imagePaths = review?.review_images?.map(img => img.image_url) || []
+
     const { error } = await supabase
       .from('product_reviews')
       .delete()
@@ -100,6 +113,13 @@ export const useAdminReviewsStore = defineStore('adminReviewsStore', () => {
     if (error) {
       toast.error('Ошибка удаления', { description: error.message })
       return false
+    }
+
+    // Удаляем файлы из storage
+    if (imagePaths.length) {
+      await supabase.storage
+        .from(BUCKET_NAME_REVIEWS)
+        .remove(imagePaths)
     }
 
     reviews.value = reviews.value.filter(r => r.id !== reviewId)

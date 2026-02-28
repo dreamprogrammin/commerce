@@ -112,6 +112,18 @@ export const IMAGE_SIZES = {
     width: 200,
     height: 200,
   },
+
+  // Миниатюры фото отзывов
+  REVIEW_THUMB: {
+    width: 120,
+    height: 120,
+  },
+
+  // Полноразмерные фото отзывов
+  REVIEW_FULL: {
+    width: 800,
+    height: 800,
+  },
 } as const
 
 /**
@@ -278,6 +290,22 @@ export const IMAGE_PRESETS = {
   // Логотипы линеек продуктов (Barbie, Hot Wheels и т.д.)
   PRODUCT_LINE_LOGO: {
     ...IMAGE_SIZES.PRODUCT_LINE_LOGO,
+    quality: IMAGE_QUALITY.HIGH,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'contain' as const,
+  },
+
+  // Миниатюры фото отзывов
+  REVIEW_THUMB: {
+    ...IMAGE_SIZES.REVIEW_THUMB,
+    quality: IMAGE_QUALITY.MEDIUM,
+    format: IMAGE_FORMATS.MODERN,
+    resize: 'cover' as const,
+  },
+
+  // Полноразмерные фото отзывов
+  REVIEW_FULL: {
+    ...IMAGE_SIZES.REVIEW_FULL,
     quality: IMAGE_QUALITY.HIGH,
     format: IMAGE_FORMATS.MODERN,
     resize: 'contain' as const,

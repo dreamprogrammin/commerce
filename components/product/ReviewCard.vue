@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { ProductReview } from '@/stores/publicStore/reviewsStore'
-import StarRating from './StarRating.vue';
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_PRESETS } from '@/config/images'
+import { BUCKET_NAME_REVIEWS } from '@/constants'
+import StarRating from './StarRating.vue'
 
 defineProps<{
   review: ProductReview
@@ -10,6 +13,11 @@ defineProps<{
 const emit = defineEmits<{
   delete: [id: string]
 }>()
+
+const { getImageUrl } = useSupabaseStorage()
+
+const lightboxOpen = ref(false)
+const lightboxIndex = ref(0)
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('ru-RU', {
@@ -25,6 +33,26 @@ function getAuthorName(review: ProductReview): string {
     return 'Покупатель'
   const parts = [profile.first_name, profile.last_name].filter(Boolean)
   return parts.length ? parts.join(' ') : 'Покупатель'
+}
+
+function getThumbUrl(imageUrl: string) {
+  return getImageUrl(BUCKET_NAME_REVIEWS, imageUrl, IMAGE_PRESETS.REVIEW_THUMB)
+}
+
+function getFullUrl(imageUrl: string) {
+  return getImageUrl(BUCKET_NAME_REVIEWS, imageUrl, IMAGE_PRESETS.REVIEW_FULL)
+}
+
+function openLightbox(index: number) {
+  lightboxIndex.value = index
+  lightboxOpen.value = true
+}
+
+function navigateLightbox(direction: number, images: ProductReview['review_images']) {
+  const next = lightboxIndex.value + direction
+  if (next >= 0 && next < images.length) {
+    lightboxIndex.value = next
+  }
 }
 </script>
 
@@ -57,6 +85,23 @@ function getAuthorName(review: ProductReview): string {
           {{ review.text }}
         </p>
 
+        <!-- Фото отзыва -->
+        <div v-if="review.review_images?.length" class="flex flex-wrap gap-2 mt-3">
+          <button
+            v-for="(img, idx) in review.review_images.slice(0, 5)"
+            :key="img.id"
+            class="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg overflow-hidden border hover:border-primary transition-colors cursor-pointer"
+            @click="openLightbox(idx)"
+          >
+            <img
+              :src="getThumbUrl(img.image_url) || ''"
+              :alt="`Фото ${idx + 1}`"
+              class="w-full h-full object-cover"
+              loading="lazy"
+            >
+          </button>
+        </div>
+
         <!-- Удалить (свой отзыв) -->
         <button
           v-if="canDelete"
@@ -67,5 +112,46 @@ function getAuthorName(review: ProductReview): string {
         </button>
       </div>
     </div>
+
+    <!-- Lightbox -->
+    <Dialog v-model:open="lightboxOpen">
+      <DialogContent class="max-w-3xl p-0 bg-black/95 border-none">
+        <DialogTitle class="sr-only">
+          Фото отзыва
+        </DialogTitle>
+        <div class="relative flex items-center justify-center min-h-[300px] sm:min-h-[500px]">
+          <img
+            v-if="review.review_images?.[lightboxIndex]"
+            :src="getFullUrl(review.review_images[lightboxIndex].image_url) || ''"
+            :alt="`Фото ${lightboxIndex + 1}`"
+            class="max-h-[80vh] max-w-full object-contain"
+          >
+
+          <!-- Навигация -->
+          <button
+            v-if="lightboxIndex > 0"
+            class="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors"
+            @click="navigateLightbox(-1, review.review_images)"
+          >
+            <Icon name="lucide:chevron-left" class="w-6 h-6 text-white" />
+          </button>
+          <button
+            v-if="review.review_images && lightboxIndex < review.review_images.length - 1"
+            class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors"
+            @click="navigateLightbox(1, review.review_images)"
+          >
+            <Icon name="lucide:chevron-right" class="w-6 h-6 text-white" />
+          </button>
+
+          <!-- Счётчик -->
+          <div
+            v-if="review.review_images && review.review_images.length > 1"
+            class="absolute bottom-3 left-1/2 -translate-x-1/2 text-white/80 text-sm bg-black/50 px-3 py-1 rounded-full"
+          >
+            {{ lightboxIndex + 1 }} / {{ review.review_images.length }}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

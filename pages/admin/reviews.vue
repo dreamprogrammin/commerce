@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
 import StarRating from '@/components/product/StarRating.vue'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_PRESETS } from '@/config/images'
+import { BUCKET_NAME_REVIEWS } from '@/constants'
+import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
 
 definePageMeta({
   layout: 'admin',
 })
 
 const store = useAdminReviewsStore()
+const { getImageUrl } = useSupabaseStorage()
 const filter = ref<'all' | 'unpublished'>('unpublished')
 
 onMounted(() => {
@@ -25,6 +29,10 @@ function formatDate(dateStr: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function getThumbUrl(imageUrl: string) {
+  return getImageUrl(BUCKET_NAME_REVIEWS, imageUrl, IMAGE_PRESETS.REVIEW_THUMB)
 }
 </script>
 
@@ -99,6 +107,22 @@ function formatDate(dateStr: string) {
             <p v-else class="text-sm text-muted-foreground mt-2 italic">
               Без текста (только оценка)
             </p>
+
+            <!-- Фото отзыва -->
+            <div v-if="r.review_images?.length" class="flex flex-wrap gap-1.5 mt-2">
+              <div
+                v-for="img in r.review_images"
+                :key="img.id"
+                class="w-14 h-14 rounded overflow-hidden border"
+              >
+                <img
+                  :src="getThumbUrl(img.image_url) || ''"
+                  alt="Фото"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                >
+              </div>
+            </div>
 
             <p class="text-xs text-muted-foreground mt-2">
               {{ [r.profiles?.first_name, r.profiles?.last_name].filter(Boolean).join(' ') || 'Пользователь' }} · {{ formatDate(r.created_at) }}

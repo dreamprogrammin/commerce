@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { UserOrder } from '@/composables/orders/useUserOrders'
-import { Calendar, CreditCard, Gift, MapPin, Package, XCircle } from 'lucide-vue-next'
+import type { Database } from '@/types'
+import { Calendar, CreditCard, Gift, MapPin, MessageSquarePlus, Package, XCircle } from 'lucide-vue-next'
+import ReviewFormDialog from '@/components/product/ReviewFormDialog.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
@@ -8,7 +10,7 @@ import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const route = useRoute()
 const router = useRouter()
-const supabase = useSupabaseClient()
+const supabase = useSupabaseClient<Database>()
 const { getImageUrl } = useSupabaseStorage()
 
 const orderId = route.params.id as string
@@ -18,6 +20,12 @@ const { getStatusColor, getStatusLabel, subscribeToOrderUpdates, cancelOrder, ca
 // Состояние для отмены
 const isCancelling = ref(false)
 const showCancelDialog = ref(false)
+
+// Состояние для отзывов
+const reviewDialogOpen = ref(false)
+const reviewProductId = ref('')
+const reviewProductName = ref('')
+const reviewedProducts = ref<Set<string>>(new Set())
 
 // Загрузка заказа
 const order = ref<UserOrder | null>(null)
@@ -79,11 +87,44 @@ async function fetchOrder() {
   }
 }
 
+// Загрузить существующие отзывы пользователя по товарам заказа
+async function fetchUserReviews() {
+  if (!order.value)
+    return
+
+  const productIds = order.value.order_items
+    .map(item => item.product?.id)
+    .filter(Boolean) as string[]
+
+  if (!productIds.length)
+    return
+
+  const { data } = await supabase
+    .from('product_reviews')
+    .select('product_id')
+    .in('product_id', productIds)
+
+  if (data) {
+    reviewedProducts.value = new Set(data.map(r => r.product_id))
+  }
+}
+
+function openReviewDialog(productId: string, productName: string) {
+  reviewProductId.value = productId
+  reviewProductName.value = productName
+  reviewDialogOpen.value = true
+}
+
+function onReviewSubmitted() {
+  reviewedProducts.value.add(reviewProductId.value)
+}
+
 // ✅ Подписка на обновления конкретного заказа в realtime
 let channel: any = null
 
 onMounted(async () => {
   await fetchOrder()
+  await fetchUserReviews()
 
   // ✅ Подписываемся на изменения КОНКРЕТНОГО заказа
   channel = supabase
@@ -206,6 +247,11 @@ function getProductImageUrl(imageUrl: string | null): string | null {
     return null
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
 }
+
+// Проверка что заказ доставлен
+const isDelivered = computed(() => {
+  return order.value?.status === 'delivered' || order.value?.status === 'completed'
+})
 
 // Мета
 definePageMeta({
@@ -379,6 +425,28 @@ useHead({
                 <p class="text-sm text-muted-foreground">
                   {{ item.product.price.toLocaleString('ru-RU') }} ₸ × {{ item.quantity }}
                 </p>
+
+                <!-- Кнопка отзыва для доставленных заказов -->
+                <div v-if="isDelivered && item.product?.id" class="mt-2">
+                  <Badge
+                    v-if="reviewedProducts.has(item.product.id)"
+                    variant="secondary"
+                    class="text-green-700 bg-green-50"
+                  >
+                    <Icon name="lucide:check" class="w-3 h-3 mr-1" />
+                    Отзыв оставлен
+                  </Badge>
+                  <Button
+                    v-else
+                    variant="outline"
+                    size="sm"
+                    class="h-7 text-xs"
+                    @click="openReviewDialog(item.product.id, item.product.name)"
+                  >
+                    <MessageSquarePlus class="w-3.5 h-3.5 mr-1" />
+                    Оставить отзыв
+                  </Button>
+                </div>
               </div>
 
               <!-- Сумма -->
@@ -437,5 +505,14 @@ useHead({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- Диалог отзыва -->
+    <ReviewFormDialog
+      v-model:open="reviewDialogOpen"
+      :product-id="reviewProductId"
+      :product-name="reviewProductName"
+      :order-id="orderId"
+      @submitted="onReviewSubmitted"
+    />
   </div>
 </template>
