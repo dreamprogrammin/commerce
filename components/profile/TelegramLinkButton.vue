@@ -12,57 +12,58 @@ const user = useSupabaseUser()
 const profileStore = useProfileStore()
 const { profile } = storeToRefs(profileStore)
 
-const isLinking = ref(false)
+const telegramUrl = ref<string | null>(null)
+const isPreparing = ref(false)
 const isUnlinking = ref(false)
 
 const BOT_USERNAME = 'babyShopOfficialStoreKz_bot'
 
 const isLinked = computed(() => !!profile.value?.telegram_chat_id)
 
-async function linkTelegram() {
-  if (!user.value)
-    return
+async function prepareLink() {
+  if (!user.value) return
 
-  isLinking.value = true
+  isPreparing.value = true
+  telegramUrl.value = null
   try {
-    // Генерируем случайный код
     const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
 
-    // Удаляем старые коды этого пользователя
     await supabase
       .from('telegram_link_codes')
       .delete()
       .eq('user_id', user.value.id)
 
-    // Создаём новый код
     const { error } = await supabase
       .from('telegram_link_codes')
-      .insert({
-        user_id: user.value.id,
-        code,
-      })
+      .insert({ user_id: user.value.id, code })
 
     if (error)
       throw error
 
-    // Открываем deep link в Telegram
-    const deepLink = `https://t.me/${BOT_USERNAME}?start=${code}`
-    window.open(deepLink, '_blank')
-
-    toast.info('Перейдите в Telegram и нажмите "Начать"', {
-      description: 'После привязки обновите страницу',
-      duration: 10000,
-    })
+    telegramUrl.value = `https://t.me/${BOT_USERNAME}?start=${code}`
   }
   catch (error: any) {
-    console.error('Error creating link code:', error)
-    toast.error('Ошибка при создании ссылки', {
-      description: error.message,
-    })
+    console.error('Error preparing Telegram link:', error)
+    toast.error('Ошибка при создании ссылки', { description: error.message })
   }
   finally {
-    isLinking.value = false
+    isPreparing.value = false
   }
+}
+
+// Pre-generate link on mount so the button renders as a native <a href>
+// This avoids popup-blocker issues caused by calling window.open() after await
+onMounted(() => {
+  if (user.value && !isLinked.value) {
+    prepareLink()
+  }
+})
+
+function handleLinkClick() {
+  toast.info('Перейдите в Telegram и нажмите "Начать"', {
+    description: 'После привязки обновите страницу',
+    duration: 10000,
+  })
 }
 
 async function unlinkTelegram() {
@@ -120,14 +121,27 @@ async function unlinkTelegram() {
       {{ isUnlinking ? 'Отключение...' : 'Отключить' }}
     </Button>
 
+    <!-- Render as native <a> once the link is ready — avoids popup-blocker on mobile/in-app browsers -->
+    <Button
+      v-else-if="telegramUrl"
+      as="a"
+      :href="telegramUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+      size="sm"
+      @click="handleLinkClick"
+    >
+      <Icon name="simple-icons:telegram" class="mr-2 h-4 w-4" />
+      Подключить Telegram
+    </Button>
+
     <Button
       v-else
       size="sm"
-      :disabled="isLinking"
-      @click="linkTelegram"
+      disabled
     >
-      <Loader2 v-if="isLinking" class="mr-2 h-4 w-4 animate-spin" />
-      {{ isLinking ? 'Создание ссылки...' : 'Подключить Telegram' }}
+      <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+      Загрузка...
     </Button>
   </div>
 </template>

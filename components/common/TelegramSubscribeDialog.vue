@@ -13,7 +13,8 @@ const user = useSupabaseUser()
 const modalStore = useModalStore()
 const { showTelegramModal } = storeToRefs(modalStore)
 
-const isLoading = ref(false)
+const telegramUrl = ref<string | null>(null)
+const isPreparing = ref(false)
 
 const isOpen = computed({
   get: () => showTelegramModal.value,
@@ -27,16 +28,11 @@ const isOpen = computed({
   },
 })
 
-function dismiss() {
-  localStorage.setItem('tg_modal_dismissed_at', Date.now().toString())
-  modalStore.closeTelegramModal()
-}
+async function prepareLink() {
+  if (!user.value) return
 
-async function subscribe() {
-  if (!user.value)
-    return
-
-  isLoading.value = true
+  isPreparing.value = true
+  telegramUrl.value = null
   try {
     const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
 
@@ -52,21 +48,38 @@ async function subscribe() {
     if (error)
       throw error
 
-    window.open(`https://t.me/${BOT_USERNAME}?start=${code}`, '_blank')
-
-    toast.info('Перейдите в Telegram и нажмите "Начать"', {
-      description: 'После привязки обновите страницу',
-      duration: 10000,
-    })
+    telegramUrl.value = `https://t.me/${BOT_USERNAME}?start=${code}`
   }
   catch (error: any) {
-    console.error('Error creating link code:', error)
+    console.error('Error preparing Telegram link:', error)
     toast.error('Ошибка при создании ссылки', { description: error.message })
   }
   finally {
-    isLoading.value = false
+    isPreparing.value = false
   }
+}
 
+// Pre-generate link when modal opens so the button renders as a native <a href>
+// This avoids popup-blocker issues caused by calling window.open() after await
+watch(isOpen, (opened) => {
+  if (opened && user.value) {
+    prepareLink()
+  }
+  else if (!opened) {
+    telegramUrl.value = null
+  }
+})
+
+function dismiss() {
+  localStorage.setItem('tg_modal_dismissed_at', Date.now().toString())
+  modalStore.closeTelegramModal()
+}
+
+function handleSubscribeClick() {
+  toast.info('Перейдите в Telegram и нажмите "Начать"', {
+    description: 'После привязки обновите страницу',
+    duration: 10000,
+  })
   localStorage.setItem('tg_modal_dismissed_at', Date.now().toString())
   modalStore.closeTelegramModal()
 }
@@ -115,23 +128,29 @@ async function subscribe() {
       </div>
 
       <div class="space-y-3 pt-2">
+        <!-- Render as native <a> once the link is ready — avoids popup-blocker on mobile/in-app browsers -->
         <Button
+          v-if="telegramUrl"
+          as="a"
+          :href="telegramUrl"
+          target="_blank"
+          rel="noopener noreferrer"
           size="lg"
           class="w-full gap-2 bg-sky-500 hover:bg-sky-600 text-white"
-          :disabled="isLoading"
-          @click="subscribe"
+          @click="handleSubscribeClick"
         >
-          <Icon
-            v-if="!isLoading"
-            name="simple-icons:telegram"
-            class="h-5 w-5"
-          />
-          <Icon
-            v-else
-            name="line-md:loading-twotone-loop"
-            class="h-5 w-5"
-          />
-          {{ isLoading ? 'Загрузка...' : 'Подписаться в Telegram' }}
+          <Icon name="simple-icons:telegram" class="h-5 w-5" />
+          Подписаться в Telegram
+        </Button>
+
+        <Button
+          v-else
+          size="lg"
+          class="w-full gap-2 bg-sky-500 hover:bg-sky-600 text-white"
+          disabled
+        >
+          <Icon name="line-md:loading-twotone-loop" class="h-5 w-5" />
+          Загрузка...
         </Button>
 
         <Button
