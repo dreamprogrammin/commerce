@@ -223,7 +223,7 @@ export const useProfileStore = defineStore('profileStore', () => {
       }
 
       // Если бонусы были активированы — перезагрузим профиль для обновления балансов
-      if (data?.activated > 0) {
+      if (data && data.activated > 0) {
         const { data: updatedProfile } = await supabase
           .from('profiles')
           .select('*')

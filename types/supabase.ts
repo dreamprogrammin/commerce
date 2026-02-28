@@ -2181,7 +2181,7 @@ export type Database = {
       }
     }
     Functions: {
-      activate_my_pending_bonuses: { Args: never; Returns: Json }
+      activate_my_pending_bonuses: { Args: never; Returns: { activated: number } }
       activate_pending_bonuses: { Args: never; Returns: string }
       cancel_order:
         | {
