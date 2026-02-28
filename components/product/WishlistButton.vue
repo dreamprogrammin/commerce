@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Heart } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
 const props = defineProps<{
@@ -11,13 +11,14 @@ const props = defineProps<{
 
 const wishlistStore = useWishlistStore()
 const authStore = useAuthStore()
+const modalStore = useModalStore()
 
 // `isProductInWishlist` - это метод-геттер из стора, который проверяет наличие по ID
 const isWishlisted = computed(() => wishlistStore.isProductInWishlist(props.productId))
 
 async function handleToggle() {
   if (!authStore.isLoggedIn) {
-    toast.info('Пожалуйста, войдите, чтобы добавить товар в избранное.')
+    modalStore.openLoginModal()
     return
   }
   await wishlistStore.toggleWishlist(props.productId, props.productName)

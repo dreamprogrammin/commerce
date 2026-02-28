@@ -68,15 +68,22 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
   // --- ЗАПИСЬ (Toggle: Добавить/Удалить) ---
   async function toggleWishlist(productId: string, productName: string) {
     if (!authStore.isLoggedIn || !authStore.user?.id) {
-      toast.info('Пожалуйста, авторизуйтесь, чтобы добавлять в избранное.')
       return
     }
 
     const isCurrentlyInWishlist = wishlistProductIds.value.includes(productId)
-    const method = isCurrentlyInWishlist ? 'delete' : 'insert'
+
+    // OPTIMISTIC UPDATE: сразу меняем стейт, не дожидаясь сервера
+    if (isCurrentlyInWishlist) {
+      wishlistProductIds.value = wishlistProductIds.value.filter(id => id !== productId)
+      wishlistProducts.value = wishlistProducts.value.filter(p => p.id !== productId)
+    }
+    else {
+      wishlistProductIds.value = [...wishlistProductIds.value, productId]
+    }
 
     try {
-      if (method === 'delete') {
+      if (isCurrentlyInWishlist) {
         const { error } = await supabase.from('wishlist').delete().match({ user_id: authStore.user.id, product_id: productId })
         if (error)
           throw error
@@ -88,11 +95,16 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
           throw error
         toast.success(`Товар "${productName}" добавлен в избранное.`)
       }
-
-      // Обновляем состояние после изменения (чтобы UI сразу обновился)
-      await fetchWishlistProducts()
     }
     catch (error: any) {
+      // ROLLBACK: откатываем оптимистичное обновление при ошибке
+      if (isCurrentlyInWishlist) {
+        wishlistProductIds.value = [...wishlistProductIds.value, productId]
+      }
+      else {
+        wishlistProductIds.value = wishlistProductIds.value.filter(id => id !== productId)
+        wishlistProducts.value = wishlistProducts.value.filter(p => p.id !== productId)
+      }
       toast.error('Ошибка при обновлении избранного', {
         description: error?.message || 'Неизвестная ошибка',
       })
