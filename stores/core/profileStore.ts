@@ -34,8 +34,9 @@ export const useProfileStore = defineStore('profileStore', () => {
    * Загружает профиль текущего авторизованного пользователя
    * @param force Принудительная перезагрузка
    * @param waitForCreation Ждать создания профиля (используется только при первом входе после OAuth)
+   * @param silent Фоновый refetch — не устанавливает isLoading (не показывает скелетон)
    */
-  async function loadProfile(force: boolean = false, waitForCreation: boolean = false): Promise<boolean> {
+  async function loadProfile(force: boolean = false, waitForCreation: boolean = false, silent: boolean = false): Promise<boolean> {
     // ✅ Упрощённая логика без таймаутов
 
     // Если уже идет загрузка - возвращаем существующий промис
@@ -56,7 +57,8 @@ export const useProfileStore = defineStore('profileStore', () => {
 
     // ✅ Создаем промис для текущей загрузки
     loadingPromise = (async () => {
-      isLoading.value = true
+      // silent=true — фоновый refetch, не трогаем isLoading чтобы не мигал UI
+      if (!silent) isLoading.value = true
 
       try {
         // Пробуем загрузить профиль
@@ -157,7 +159,7 @@ export const useProfileStore = defineStore('profileStore', () => {
       }
       finally {
         // ✅ КРИТИЧНО: ВСЕГДА снимаем загрузку и очищаем промис
-        isLoading.value = false
+        if (!silent) isLoading.value = false
         loadingPromise = null
       }
     })()

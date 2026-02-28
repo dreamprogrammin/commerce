@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '@/types'
+import { useEventListener } from '@vueuse/core'
 import { Loader2 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
@@ -57,6 +58,16 @@ onMounted(() => {
     prepareLink()
   }
 })
+
+// When user returns from Telegram app back to the browser, silently refetch the profile
+// so the banner disappears immediately once Telegram is linked
+if (import.meta.client) {
+  useEventListener(document, 'visibilitychange', () => {
+    if (!document.hidden && user.value && !isLinked.value) {
+      profileStore.loadProfile(true, false, true)
+    }
+  })
+}
 
 function handleLinkClick() {
   toast.info('Перейдите в Telegram и нажмите "Начать"', {
