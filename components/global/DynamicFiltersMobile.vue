@@ -663,7 +663,7 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
                     От
                   </div>
                   <div class="font-semibold">
-                    {{ Math.round(localPrice[0]).toLocaleString() }} ₸
+                    {{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[0])) }} ₸
                   </div>
                 </div>
                 <Icon name="lucide:minus" class="w-4 h-4 text-muted-foreground" />
@@ -672,7 +672,7 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
                     До
                   </div>
                   <div class="font-semibold">
-                    {{ Math.round(localPrice[1]).toLocaleString() }} ₸
+                    {{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[1])) }} ₸
                   </div>
                 </div>
               </div>

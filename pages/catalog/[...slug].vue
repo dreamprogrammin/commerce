@@ -345,8 +345,8 @@ async function loadFilterData(slug: string) {
       ? priceRangeResult.value
       : { min_price: 0, max_price: 50000 }
 
-    const priceMin = priceRangeData.min_price
-    const priceMax = priceRangeData.max_price
+    const priceMin = Math.floor(Number(priceRangeData.min_price))
+    const priceMax = Math.ceil(Number(priceRangeData.max_price))
     priceRange.value = { min: priceMin, max: priceMax }
 
     // Диапазон количества деталей (может быть null если в категории нет товаров с piece_count)
