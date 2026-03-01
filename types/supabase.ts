@@ -1745,6 +1745,7 @@ export type Database = {
       profiles: {
         Row: {
           active_bonus_balance: number
+          avatar_url: string | null
           created_at: string
           first_name: string | null
           has_received_welcome_bonus: boolean
@@ -1758,6 +1759,7 @@ export type Database = {
         }
         Insert: {
           active_bonus_balance?: number
+          avatar_url?: string | null
           created_at?: string
           first_name?: string | null
           has_received_welcome_bonus?: boolean
@@ -1771,6 +1773,7 @@ export type Database = {
         }
         Update: {
           active_bonus_balance?: number
+          avatar_url?: string | null
           created_at?: string
           first_name?: string | null
           has_received_welcome_bonus?: boolean
