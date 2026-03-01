@@ -4,6 +4,7 @@ import { Toaster } from 'vue-sonner'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
+import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import 'vue-sonner/style.css'
 
 const nuxtApp = useNuxtApp()
@@ -11,8 +12,22 @@ const isMobile = useMediaQuery('(max-width: 1023px)')
 const isPageLoading = ref(false)
 const modalStore = useModalStore()
 const profileStore = useProfileStore()
+const wishlistStore = useWishlistStore()
 const route = useRoute()
 const router = useRouter() // ← добавлено
+
+// Глобальная инициализация ID избранного при авторизации
+const supabaseUser = useSupabaseUser()
+watch(supabaseUser, (newUser) => {
+  if (!import.meta.client)
+    return
+  if (newUser) {
+    wishlistStore.fetchWishlistIds()
+  }
+  else {
+    wishlistStore.wishlistProductIds = []
+  }
+}, { immediate: true })
 
 nuxtApp.hook('page:start', () => {
   isPageLoading.value = true

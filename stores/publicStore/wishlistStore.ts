@@ -65,6 +65,23 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
     }
   }
 
+  // --- ИНИЦИАЛИЗАЦИЯ (Только ID, без полных данных товаров) ---
+  async function fetchWishlistIds() {
+    if (!authStore.isLoggedIn || !authStore.user?.id) {
+      wishlistProductIds.value = []
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('wishlist')
+      .select('product_id')
+      .eq('user_id', authStore.user.id)
+
+    if (!error && data) {
+      wishlistProductIds.value = data.map(item => item.product_id)
+    }
+  }
+
   // --- ЗАПИСЬ (Toggle: Добавить/Удалить) ---
   async function toggleWishlist(productId: string, productName: string) {
     if (!authStore.isLoggedIn || !authStore.user?.id) {
@@ -91,7 +108,8 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
       }
       else {
         const { error } = await supabase.from('wishlist').insert({ user_id: authStore.user.id, product_id: productId })
-        if (error)
+        // Игнорируем 23505 — товар уже в базе (рассинхрон вкладок)
+        if (error && error.code !== '23505')
           throw error
         toast.success(`Товар "${productName}" добавлен в избранное.`)
       }
@@ -115,6 +133,7 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
     wishlistProducts,
     wishlistProductIds,
     isLoading,
+    fetchWishlistIds,
     fetchWishlistProducts,
     toggleWishlist,
     isProductInWishlist: computed(() => (id: string) => wishlistProductIds.value.includes(id)),
