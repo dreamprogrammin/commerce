@@ -1,5 +1,5 @@
 import imageCompression from 'browser-image-compression'
-import { IMAGE_OPTIMIZATION_ENABLED, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
 
 /**
  * 🎨 Результат генерации blur placeholder
@@ -29,6 +29,66 @@ export interface OptimizationInfo {
   icon: string
   description: string
   recommendation: string
+}
+
+/**
+ * 🎯 Результат генерации вариантов изображения (sm/md/lg)
+ */
+export interface VariantResult {
+  sm: File
+  md: File
+  lg: File
+  blurPlaceholder?: string
+  originalSize: number
+}
+
+/**
+ * 🎯 Генерирует 3 варианта изображения (sm/md/lg) + LQIP blur placeholder
+ *
+ * Используется при загрузке товаров для адаптивных изображений (srcset).
+ * Все варианты генерируются параллельно для скорости.
+ */
+export async function generateImageVariants(file: File): Promise<VariantResult> {
+  const originalSize = file.size
+
+  const [smCompressed, mdCompressed, lgCompressed, blurResult] = await Promise.all([
+    imageCompression(file, {
+      maxSizeMB: 0.05,
+      maxWidthOrHeight: IMAGE_VARIANTS.sm.maxWidthOrHeight,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: IMAGE_VARIANTS.sm.quality,
+    }),
+    imageCompression(file, {
+      maxSizeMB: 0.15,
+      maxWidthOrHeight: IMAGE_VARIANTS.md.maxWidthOrHeight,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: IMAGE_VARIANTS.md.quality,
+    }),
+    imageCompression(file, {
+      maxSizeMB: 0.8,
+      maxWidthOrHeight: IMAGE_VARIANTS.lg.maxWidthOrHeight,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: IMAGE_VARIANTS.lg.quality,
+    }),
+    generateBlurPlaceholder(file).catch(() => null),
+  ])
+
+  const baseName = file.name.replace(/\.[^.]+$/, '')
+
+  const sm = new File([smCompressed], `${baseName}_sm.webp`, { type: 'image/webp' })
+  const md = new File([mdCompressed], `${baseName}_md.webp`, { type: 'image/webp' })
+  const lg = new File([lgCompressed], `${baseName}_lg.webp`, { type: 'image/webp' })
+
+  return {
+    sm,
+    md,
+    lg,
+    blurPlaceholder: blurResult?.dataUrl,
+    originalSize,
+  }
 }
 
 /**

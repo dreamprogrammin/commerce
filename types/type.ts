@@ -97,6 +97,8 @@ export interface IUploadFileOptions {
   contentType?: string
   /** SEO-имя для файла (будет в формате: uhti-{seoName}-{uuid}.ext) */
   seoName?: string
+  /** Полное имя файла (без prefix) — пропускает генерацию SEO-имени */
+  customFileName?: string
 }
 
 export interface IItemToDelete {

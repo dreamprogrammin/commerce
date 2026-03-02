@@ -21,6 +21,22 @@
 export const IMAGE_OPTIMIZATION_ENABLED = false // 🎯 false = бесплатный (прямые ссылки), true = платный (render API)
 
 /**
+ * 📐 Варианты изображений для адаптивной загрузки (srcset)
+ *
+ * При загрузке товара генерируются 3 файла:
+ * - sm (400px) — для карточек на мобильных (~20-50KB)
+ * - md (800px) — для карточек на десктопе и галереи (~100-150KB)
+ * - lg (1440px) — для лайтбокса и зума (~300-800KB)
+ */
+export const IMAGE_VARIANTS = {
+  sm: { maxWidthOrHeight: 400, quality: 0.75, suffix: '_sm' },
+  md: { maxWidthOrHeight: 800, quality: 0.80, suffix: '_md' },
+  lg: { maxWidthOrHeight: 1440, quality: 0.90, suffix: '_lg' },
+} as const
+
+export type ImageVariant = keyof typeof IMAGE_VARIANTS
+
+/**
  * 📐 Размеры изображений для разных контекстов
  */
 export const IMAGE_SIZES = {

@@ -16,9 +16,9 @@ import type {
 } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
-import { formatFileSize, generateBlurPlaceholder, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
+import { formatFileSize, generateBlurPlaceholder, generateImageVariants, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
 
 // 🆕 Интерфейс для изображения с blur
 interface ImageWithBlur {
@@ -28,7 +28,7 @@ interface ImageWithBlur {
 
 export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
-  const { uploadFile, removeFile } = useSupabaseStorage()
+  const { uploadFile, removeFile, generateSeoFileName } = useSupabaseStorage()
 
   // --- SEO: Уведомление поисковиков о новых страницах ---
   async function notifySearchEngines(productSlug: string) {
@@ -365,7 +365,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
     try {
       if (productToDelete.product_images && productToDelete.product_images.length > 0) {
-        const pathsToRemove = productToDelete.product_images.map(img => img.image_url)
+        const pathsToRemove = productToDelete.product_images.flatMap(img => _getVariantPaths(img.image_url))
         const success = await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
         if (!success) {
           throw new Error('Не удалось удалить связанные изображения.')
@@ -395,21 +395,38 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   // --- Приватные хелперы ---
 
   /**
-   * 🎯 ОБНОВЛЕНО: Управление изображениями с поддержкой blur placeholder
+   * Проверяет, является ли image_url старым форматом (с расширением файла)
+   */
+  function _isLegacyImagePath(imageUrl: string): boolean {
+    return /\.\w{3,4}$/.test(imageUrl)
+  }
+
+  /**
+   * Возвращает пути всех вариантов для удаления из Storage
+   */
+  function _getVariantPaths(imageUrl: string): string[] {
+    if (_isLegacyImagePath(imageUrl)) {
+      return [imageUrl]
+    }
+    return Object.values(IMAGE_VARIANTS).map(v => `${imageUrl}${v.suffix}.webp`)
+  }
+
+  /**
+   * 🎯 Управление изображениями с поддержкой вариантов (sm/md/lg)
    *
-   * Обрабатывает файлы в зависимости от режима:
-   * - Бесплатный: локально оптимизирует + генерирует blur
-   * - Платный: загружает оригиналы + генерирует blur
+   * Генерирует 3 варианта каждого изображения для адаптивной загрузки.
+   * В БД сохраняется базовый путь без расширения.
+   * На платном тарифе загружает оригиналы + генерирует blur.
    */
   async function _manageProductImages(
     productId: string,
-    productName: string | undefined, // 🔍 SEO: Имя товара для названия файлов
-    imagesToUpload: ImageWithBlur[], // 🎯 Изменено: принимаем blur
+    productName: string | undefined,
+    imagesToUpload: ImageWithBlur[],
     imageIdsToDelete: string[],
     currentImageCount: number,
-    existingImages: ProductImageRow[] = [], // 🆕 Добавлен параметр для обновления порядка
+    existingImages: ProductImageRow[] = [],
   ) {
-    // 1️⃣ Удаляем отмеченные изображения
+    // 1️⃣ Удаляем отмеченные изображения (все варианты)
     if (imageIdsToDelete.length > 0) {
       const { data: deletedImages, error: dbError } = await supabase
         .from('product_images')
@@ -419,12 +436,14 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (dbError)
         throw dbError
 
-      const pathsToRemove = deletedImages?.map(img => img.image_url).filter((p): p is string => !!p) || []
+      const pathsToRemove = (deletedImages || [])
+        .filter((img): img is { image_url: string } => !!img.image_url)
+        .flatMap(img => _getVariantPaths(img.image_url))
       if (pathsToRemove.length > 0)
         await removeFile(BUCKET_NAME_PRODUCT, pathsToRemove)
     }
 
-    // 🆕 2️⃣ Обновляем display_order для существующих изображений
+    // 2️⃣ Обновляем display_order для существующих изображений
     if (existingImages.length > 0) {
       for (let i = 0; i < existingImages.length; i++) {
         const { error: updateError } = await supabase
@@ -440,67 +459,158 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
     // 3️⃣ Обрабатываем и загружаем новые изображения
     if (imagesToUpload.length > 0) {
+      const filePathPrefix = `products/${productId}`
+
       for (let i = 0; i < imagesToUpload.length; i++) {
         const { file, blurDataUrl } = imagesToUpload[i]
 
-        // 🎯 Оптимизация если нужно (бесплатный тариф)
-        let fileToUpload = file
-        let finalBlur = blurDataUrl
-
-        if (!IMAGE_OPTIMIZATION_ENABLED && shouldOptimizeImage(file)) {
-          try {
-            const result = await optimizeImageBeforeUpload(file)
-            fileToUpload = result.file
-            finalBlur = result.blurPlaceholder || blurDataUrl // Используем blur из оптимизации
-
-            console.log(
-              `✅ Оптимизирован: ${file.name} (${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)}) + ${finalBlur ? 'LQIP ✨' : 'no blur'}`,
-            )
+        if (IMAGE_OPTIMIZATION_ENABLED) {
+          // === ПЛАТНЫЙ ТАРИФ: загружаем оригинал, Supabase трансформирует на лету ===
+          let finalBlur = blurDataUrl
+          if (!finalBlur) {
+            try {
+              const blurResult = await generateBlurPlaceholder(file)
+              finalBlur = blurResult.dataUrl
+            }
+            catch (error) {
+              console.warn(`⚠️ Не удалось сгенерировать blur для ${file.name}:`, error)
+            }
           }
-          catch (error) {
-            console.warn(`⚠️ Ошибка оптимизации ${file.name}, загружаем оригинал:`, error)
-          }
-        }
 
-        // 🆕 Если blur нет, генерируем его
-        if (!finalBlur) {
-          try {
-            const blurResult = await generateBlurPlaceholder(file)
-            finalBlur = blurResult.dataUrl
-            console.log(`✨ Blur сгенерирован для ${file.name}`)
-          }
-          catch (error) {
-            console.warn(`⚠️ Не удалось сгенерировать blur для ${file.name}:`, error)
-          }
-        }
-
-        // 4️⃣ Загружаем файл в Storage (🔍 SEO: имя файла содержит название товара)
-        const filePath = await uploadFile(fileToUpload, {
-          bucketName: BUCKET_NAME_PRODUCT,
-          filePathPrefix: `products/${productId}`,
-          seoName: productName ? `product-${productName}` : undefined,
-        })
-
-        if (!filePath) {
-          console.error(`❌ Не удалось загрузить ${file.name}`)
-          continue
-        }
-
-        // 5️⃣ Сохраняем в БД С blur_placeholder
-        const { error: imageError } = await supabase
-          .from('product_images')
-          .insert({
-            product_id: productId,
-            image_url: filePath,
-            display_order: existingImages.length + i, // 🎯 ИСПРАВЛЕНО: используем existingImages.length
-            blur_placeholder: finalBlur || null, // 🎯 СОХРАНЯЕМ BLUR
+          const filePath = await uploadFile(file, {
+            bucketName: BUCKET_NAME_PRODUCT,
+            filePathPrefix,
+            seoName: productName ? `product-${productName}` : undefined,
           })
 
-        if (imageError) {
-          console.error(`❌ Ошибка сохранения метаданных изображения:`, imageError)
+          if (!filePath) {
+            console.error(`❌ Не удалось загрузить ${file.name}`)
+            continue
+          }
+
+          const { error: imageError } = await supabase
+            .from('product_images')
+            .insert({
+              product_id: productId,
+              image_url: filePath,
+              display_order: existingImages.length + i,
+              blur_placeholder: finalBlur || null,
+            })
+
+          if (imageError)
+            console.error(`❌ Ошибка сохранения метаданных изображения:`, imageError)
         }
         else {
-          console.log(`✅ Сохранено изображение с blur (${finalBlur ? finalBlur.length : 0} chars)`)
+          // === БЕСПЛАТНЫЙ ТАРИФ: генерируем 3 варианта (sm/md/lg) ===
+          try {
+            const variants = await generateImageVariants(file)
+            const finalBlur = variants.blurPlaceholder || blurDataUrl
+
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.log(
+                `✅ Варианты: ${file.name} (${formatFileSize(variants.originalSize)} → sm:${formatFileSize(variants.sm.size)}, md:${formatFileSize(variants.md.size)}, lg:${formatFileSize(variants.lg.size)}) + ${finalBlur ? 'LQIP ✨' : 'no blur'}`,
+              )
+            }
+
+            // Генерируем базовое SEO-имя без расширения
+            const seoName = productName ? `product-${productName}` : undefined
+            const baseSeoName = generateSeoFileName(file, seoName).replace(/\.[^.]+$/, '')
+
+            // Загружаем 3 файла параллельно
+            const uploadResults = await Promise.all(
+              (['sm', 'md', 'lg'] as const).map(variant =>
+                uploadFile(variants[variant], {
+                  bucketName: BUCKET_NAME_PRODUCT,
+                  filePathPrefix,
+                  customFileName: `${baseSeoName}${IMAGE_VARIANTS[variant].suffix}.webp`,
+                }),
+              ),
+            )
+
+            // Проверяем что хотя бы один загрузился
+            const anyFailed = uploadResults.some(r => !r)
+            if (anyFailed) {
+              console.warn(`⚠️ Некоторые варианты не загрузились для ${file.name}`)
+            }
+
+            // Все загружены — нет пути? пропускаем
+            if (!uploadResults[0]) {
+              console.error(`❌ Не удалось загрузить sm-вариант ${file.name}`)
+              continue
+            }
+
+            // В БД сохраняем базовый путь без суффикса и расширения
+            const basePath = `${filePathPrefix}/${baseSeoName}`
+
+            const { error: imageError } = await supabase
+              .from('product_images')
+              .insert({
+                product_id: productId,
+                image_url: basePath,
+                display_order: existingImages.length + i,
+                blur_placeholder: finalBlur || null,
+              })
+
+            if (imageError) {
+              console.error(`❌ Ошибка сохранения метаданных изображения:`, imageError)
+            }
+            else if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.log(`✅ Сохранено изображение (base: ${basePath}) с blur (${finalBlur ? finalBlur.length : 0} chars)`)
+            }
+          }
+          catch (error) {
+            console.warn(`⚠️ Ошибка генерации вариантов ${file.name}, загружаем как раньше:`, error)
+
+            // Fallback: загружаем как раньше (один файл)
+            let fileToUpload = file
+            let finalBlur = blurDataUrl
+
+            if (shouldOptimizeImage(file)) {
+              try {
+                const result = await optimizeImageBeforeUpload(file)
+                fileToUpload = result.file
+                finalBlur = result.blurPlaceholder || blurDataUrl
+              }
+              catch {
+                // используем оригинал
+              }
+            }
+
+            if (!finalBlur) {
+              try {
+                const blurResult = await generateBlurPlaceholder(file)
+                finalBlur = blurResult.dataUrl
+              }
+              catch {
+                // продолжаем без blur
+              }
+            }
+
+            const filePath = await uploadFile(fileToUpload, {
+              bucketName: BUCKET_NAME_PRODUCT,
+              filePathPrefix,
+              seoName: productName ? `product-${productName}` : undefined,
+            })
+
+            if (!filePath) {
+              console.error(`❌ Не удалось загрузить ${file.name}`)
+              continue
+            }
+
+            const { error: imageError } = await supabase
+              .from('product_images')
+              .insert({
+                product_id: productId,
+                image_url: filePath,
+                display_order: existingImages.length + i,
+                blur_placeholder: finalBlur || null,
+              })
+
+            if (imageError)
+              console.error(`❌ Ошибка сохранения метаданных изображения:`, imageError)
+          }
         }
       }
     }

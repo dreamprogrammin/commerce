@@ -9,7 +9,7 @@ const props = defineProps<{
   images: ProductImageRow[]
 }>()
 
-const { getImageUrl } = useSupabaseStorage()
+const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { images: imagesRef } = toRefs(props)
 
 const {
@@ -72,15 +72,18 @@ function onLightboxKeydown(e: KeyboardEvent) {
 }
 
 function getThumbUrl(imagePath: string) {
-  return getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.PRODUCT_GALLERY_THUMB)
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'sm')
+    || getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.PRODUCT_GALLERY_THUMB)
 }
 
 function getMainUrl(imagePath: string) {
-  return getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.PRODUCT_GALLERY_MAIN)
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'md')
+    || getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.PRODUCT_GALLERY_MAIN)
 }
 
 function getFullUrl(imagePath: string) {
-  return getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.LARGE)
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'lg')
+    || getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.LARGE)
 }
 </script>
 

@@ -15,6 +15,10 @@ interface Props {
   filePath?: string
   useTransform?: boolean
   eager?: boolean
+  srcSm?: string | null
+  srcMd?: string | null
+  srcLg?: string | null
+  sizes?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -78,6 +82,17 @@ const objectFitClass = computed(() => {
     case 'cover':
     default: return 'object-cover'
   }
+})
+
+const srcsetValue = computed(() => {
+  const parts: string[] = []
+  if (props.srcSm)
+    parts.push(`${props.srcSm} 400w`)
+  if (props.srcMd)
+    parts.push(`${props.srcMd} 800w`)
+  if (props.srcLg)
+    parts.push(`${props.srcLg} 1440w`)
+  return parts.length > 0 ? parts.join(', ') : undefined
 })
 
 const isDev = computed(() => import.meta.env.DEV)
@@ -174,6 +189,8 @@ const isDev = computed(() => import.meta.env.DEV)
     <img
       ref="imageRef"
       :src="optimizedImageUrl || undefined"
+      :srcset="srcsetValue || undefined"
+      :sizes="srcsetValue ? (sizes || undefined) : undefined"
       :alt="alt"
       class="w-full h-full transition-opacity duration-500"
       :class="[

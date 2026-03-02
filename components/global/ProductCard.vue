@@ -14,7 +14,7 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
-const { getImageUrl } = useSupabaseStorage()
+const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 
 // --- DEVICE DETECTION ---
 const isTouchDevice = ref(false)
@@ -65,6 +65,20 @@ function getImageUrlByIndex(index: number): string | null {
     return null
 
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
+}
+
+/**
+ * Получить URL вариантов изображения (sm/md/lg) для srcset
+ */
+function getVariantUrls(index: number) {
+  const imageUrl = props.product.product_images?.[index]?.image_url
+  if (!imageUrl)
+    return {}
+  return {
+    sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm'),
+    md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'md'),
+    lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'lg'),
+  }
 }
 
 /**
@@ -168,6 +182,10 @@ const priceDetails = computed(() => {
           <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full p-4">
             <ProgressiveImage
               :src="activeImageUrl"
+              :src-sm="getVariantUrls(activeImageIndex).sm"
+              :src-md="getVariantUrls(activeImageIndex).md"
+              :src-lg="getVariantUrls(activeImageIndex).lg"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               :alt="`${product.name}`"
               aspect-ratio="1/1"
               object-fit="contain"
@@ -200,6 +218,10 @@ const priceDetails = computed(() => {
                 >
                   <ProgressiveImage
                     :src="getImageUrlByIndex(index)"
+                    :src-sm="getVariantUrls(index).sm"
+                    :src-md="getVariantUrls(index).md"
+                    :src-lg="getVariantUrls(index).lg"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     :alt="`${product.name} - фото ${index + 1}`"
                     aspect-ratio="1/1"
                     object-fit="contain"

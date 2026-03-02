@@ -1,7 +1,8 @@
+import type { ImageVariant } from '@/config/images'
 import type { Database, IUploadFileOptions } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
-import { IMAGE_OPTIMIZATION_ENABLED } from '@/config/images'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 
 export interface ImageTransformOptions {
   width?: number
@@ -136,8 +137,8 @@ export function useSupabaseStorage() {
       return null
     }
 
-    // 🔍 SEO: Генерируем имя с префиксом сайта
-    const uniqueFileName = generateSeoFileName(file, options.seoName)
+    // 🔍 SEO: Генерируем имя с префиксом сайта (или используем customFileName)
+    const uniqueFileName = options.customFileName || generateSeoFileName(file, options.seoName)
     const filePath = options.filePathPrefix
       ? `${options.filePathPrefix.replace(/\/$/, '')}/${uniqueFileName}`
       : uniqueFileName
@@ -328,6 +329,45 @@ export function useSupabaseStorage() {
   }
 
   /**
+   * 🎯 Получить URL конкретного варианта изображения (sm/md/lg)
+   *
+   * Обратная совместимость: если image_url содержит расширение файла
+   * (старое фото), возвращает обычный публичный URL без суффикса.
+   *
+   * @example
+   * getVariantUrl('product-images', 'products/123/uhti-toy-abc', 'sm')
+   * // → публичный URL для products/123/uhti-toy-abc_sm.webp
+   */
+  function getVariantUrl(
+    bucketName: string,
+    filePath: string | null,
+    variant: ImageVariant,
+  ): string | null {
+    if (!filePath?.trim())
+      return null
+
+    // Обратная совместимость: старые фото с расширением → обычный URL
+    if (/\.\w{3,4}$/.test(filePath)) {
+      return getPublicUrl(bucketName, filePath)
+    }
+
+    // Платный тариф: Supabase трансформирует на лету, не нужны суффиксы
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      const variantConfig = IMAGE_VARIANTS[variant]
+      return getOptimizedUrl(bucketName, filePath, {
+        width: variantConfig.maxWidthOrHeight,
+        quality: Math.round(variantConfig.quality * 100),
+        format: 'webp',
+      })
+    }
+
+    // Бесплатный тариф: подставляем суффикс
+    const suffix = IMAGE_VARIANTS[variant].suffix
+    const variantPath = `${filePath}${suffix}.webp`
+    return getPublicUrl(bucketName, variantPath)
+  }
+
+  /**
    * 🧹 Очистить кеш
    */
   function clearImageCache(): void {
@@ -383,9 +423,11 @@ ${IMAGE_OPTIMIZATION_ENABLED
     getPublicUrl,
     getOptimizedUrl,
     getImageUrl, // 🎯 ОСНОВНОЙ - используй везде
+    getVariantUrl, // 🎯 Для адаптивных изображений (srcset)
 
     // Утилиты
     clearImageCache,
     getCacheInfo,
+    generateSeoFileName,
   }
 }

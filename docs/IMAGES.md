@@ -724,12 +724,15 @@ export default defineNuxtPlugin(() => {
 
 ## 🔗 Связанные файлы
 
-- `composables/menuItems/useSupabaseStorage.ts` - Основной композабл
+- `composables/menuItems/useSupabaseStorage.ts` - Основной композабл (`getImageUrl`, `getVariantUrl`)
 - `composables/useProductGallery.ts` - Логика синхронизации каруселей (main + thumb)
-- `config/images.ts` - Конфигурация и пресеты
+- `config/images.ts` - Конфигурация, пресеты, `IMAGE_VARIANTS`
+- `utils/imageOptimizer.ts` - Клиентская оптимизация, `generateImageVariants()`
 - `constants/index.ts` - Названия бакетов
+- `components/global/ProgressiveImage.vue` - Базовый компонент с srcset
 - `components/global/ProductGallery.vue` - Галерея товара с Lightbox
-- `components/global/ProductCard.vue` - Пример использования
+- `components/global/ProductCard.vue` - Карточка товара с адаптивными изображениями
+- `stores/adminStore/adminProductsStore.ts` - Загрузка вариантов при создании/обновлении товара
 - `components/home/PopularCategories.vue` - Пример с категориями
 
 ---
@@ -742,9 +745,142 @@ export default defineNuxtPlugin(() => {
 
 ---
 
+## 📐 Адаптивные изображения (srcset) — v4.0.0
+
+### Концепция
+
+При загрузке товара генерируются **3 варианта** каждого изображения:
+
+| Вариант | Размер | Качество | maxSizeMB | Суффикс | Использование |
+|---------|--------|----------|-----------|---------|---------------|
+| `sm` | 400px | 75% | 0.05 (50KB) | `_sm` | Карточки на мобильных |
+| `md` | 800px | 80% | 0.15 (150KB) | `_md` | Карточки на десктопе, галерея |
+| `lg` | 1440px | 90% | 0.8 (800KB) | `_lg` | Lightbox, зум |
+
+Браузер автоматически выбирает оптимальный размер через HTML `srcset`.
+
+### Хранение в БД
+
+**Новые изображения:** `product_images.image_url` хранит **базовый путь без расширения**:
+```
+products/abc-123/uhti-product-name-def456
+```
+
+В Supabase Storage лежат 3 файла:
+```
+products/abc-123/uhti-product-name-def456_sm.webp  (~20-50KB)
+products/abc-123/uhti-product-name-def456_md.webp  (~100-150KB)
+products/abc-123/uhti-product-name-def456_lg.webp  (~300-800KB)
+```
+
+**Старые изображения:** путь с расширением (`.webp`, `.jpg`) — работают как раньше (fallback).
+
+### Конфигурация
+
+```typescript
+// config/images.ts
+export const IMAGE_VARIANTS = {
+  sm: { maxWidthOrHeight: 400, quality: 0.75, suffix: '_sm' },
+  md: { maxWidthOrHeight: 800, quality: 0.80, suffix: '_md' },
+  lg: { maxWidthOrHeight: 1440, quality: 0.90, suffix: '_lg' },
+} as const
+
+export type ImageVariant = keyof typeof IMAGE_VARIANTS  // 'sm' | 'md' | 'lg'
+```
+
+### API
+
+#### `getVariantUrl(bucket, basePath, variant)`
+
+Возвращает URL конкретного варианта с обратной совместимостью:
+
+```typescript
+const { getVariantUrl } = useSupabaseStorage()
+
+// Новое фото (без расширения) → подставляет суффикс
+getVariantUrl('product-images', 'products/123/uhti-toy-abc', 'sm')
+// → .../products/123/uhti-toy-abc_sm.webp
+
+// Старое фото (с расширением) → возвращает как есть
+getVariantUrl('product-images', 'products/123/uhti-toy-abc.webp', 'sm')
+// → .../products/123/uhti-toy-abc.webp
+```
+
+#### `generateImageVariants(file)`
+
+Генерирует 3 варианта + LQIP параллельно (на клиенте, при загрузке):
+
+```typescript
+import { generateImageVariants } from '@/utils/imageOptimizer'
+
+const result = await generateImageVariants(file)
+// result.sm  → File (400px, ~50KB)
+// result.md  → File (800px, ~150KB)
+// result.lg  → File (1440px, ~800KB)
+// result.blurPlaceholder → base64 data URL
+```
+
+### Использование в компонентах
+
+#### ProgressiveImage (srcset)
+
+```vue
+<ProgressiveImage
+  :src="getVariantUrl(BUCKET, imageUrl, 'sm')"
+  :src-sm="getVariantUrl(BUCKET, imageUrl, 'sm')"
+  :src-md="getVariantUrl(BUCKET, imageUrl, 'md')"
+  :src-lg="getVariantUrl(BUCKET, imageUrl, 'lg')"
+  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+  :blur-data-url="image.blur_placeholder"
+  alt="Товар"
+/>
+```
+
+Если `srcSm`/`srcMd`/`srcLg` не переданы — поведение не меняется (обратная совместимость).
+
+#### ProductGallery (контекстные варианты)
+
+| Контекст | Вариант | Почему |
+|----------|---------|--------|
+| Миниатюры (120px) | `sm` (400px) | Достаточно для мелких превью |
+| Основное изображение | `md` (800px) | Оптимально для ~600px контейнера |
+| Lightbox (fullscreen) | `lg` (1440px) | HD-качество для зума |
+
+### Обратная совместимость
+
+Детекция старых/новых фото происходит автоматически:
+
+```typescript
+// Старое фото: image_url содержит расширение → /\.\w{3,4}$/.test(path)
+"products/123/uhti-toy-abc.webp"  → используем URL как есть
+
+// Новое фото: image_url без расширения
+"products/123/uhti-toy-abc"  → подставляем _sm.webp / _md.webp / _lg.webp
+```
+
+### Удаление изображений
+
+При удалении товара или отдельного изображения автоматически удаляются все 3 варианта из Storage.
+
+### Платный тариф
+
+При `IMAGE_OPTIMIZATION_ENABLED = true` варианты не используются — Supabase Transform API трансформирует на лету. `getVariantUrl()` в этом режиме вызывает `getOptimizedUrl()` с соответствующими размерами.
+
+---
+
 ## 📝 Changelog
 
-### v3.1.0 (Current)
+### v4.0.0 (Current)
+
+- Адаптивные изображения: 3 варианта (sm/md/lg) при загрузке товара
+- HTML `srcset` + `sizes` в `ProgressiveImage.vue` для автоматического выбора размера
+- `getVariantUrl()` хелпер с обратной совместимостью для старых изображений
+- `generateImageVariants()` — параллельная генерация 3 WebP + LQIP
+- `ProductCard.vue` и `ProductGallery.vue` используют варианты
+- Удаление товара удаляет все 3 файла из Storage
+- Fallback: при ошибке генерации вариантов загружается один файл как раньше
+
+### v3.1.0
 
 - ✅ Улучшено качество сжатия: `maxSizeMB` 0.15 → 0.8, `maxWidthOrHeight` 1200 → 1440, `initialQuality: 0.85`
 - ✅ `PRODUCT_GALLERY_MAIN` увеличен с 800×800 до 1200×1200 для четкости на десктопе
@@ -774,30 +910,40 @@ export default defineNuxtPlugin(() => {
 ---
 
 **Автор:** Development Team
-**Последнее обновление:** 2026
-**Версия:** 3.1.0
+**Последнее обновление:** 2026-03-02
+**Версия:** 4.0.0
 
 ---
 
-## 🔄 Клиентская оптимизация при загрузке (v3.0.0)
+## 🔄 Клиентская оптимизация при загрузке
 
 На бесплатном тарифе (`IMAGE_OPTIMIZATION_ENABLED = false`) Supabase Image Transformation API не используется.
 Вместо этого изображения сжимаются в браузере администратора перед загрузкой в Supabase Storage.
 
 ### Как работает `utils/imageOptimizer.ts`
 
+**v4.0.0 (товары):** При загрузке товара вызывается `generateImageVariants(file)`, который параллельно генерирует 3 WebP-файла + LQIP:
+
 ```typescript
-import imageCompression from 'browser-image-compression'
-
-// Всегда сжимаем на бесплатном тарифе
-shouldOptimizeImage(file) → true
-
-// optimizeImageBeforeUpload: параллельно
-// 1. Основное сжатие: maxSizeMB=0.8, maxWidthOrHeight=1440, initialQuality=0.85, fileType='image/webp'
-// 2. LQIP: maxSizeMB=0.002, maxWidthOrHeight=20
+// generateImageVariants: параллельно (Promise.all)
+// 1. sm: maxSizeMB=0.05, maxWidthOrHeight=400, quality=0.75, fileType='image/webp'
+// 2. md: maxSizeMB=0.15, maxWidthOrHeight=800, quality=0.80, fileType='image/webp'
+// 3. lg: maxSizeMB=0.8, maxWidthOrHeight=1440, quality=0.90, fileType='image/webp'
+// 4. LQIP: maxSizeMB=0.002, maxWidthOrHeight=20
 ```
 
-### Параметры сжатия
+**Для категорий, брендов, баннеров** по-прежнему используется `optimizeImageBeforeUpload()` (один файл).
+
+### Параметры сжатия (варианты товаров)
+
+| Вариант | maxSizeMB | maxWidthOrHeight | quality | Типичный размер |
+|---------|-----------|------------------|---------|----------------|
+| `sm` | 0.05 | 400px | 75% | 20-50 KB |
+| `md` | 0.15 | 800px | 80% | 80-150 KB |
+| `lg` | 0.8 | 1440px | 90% | 300-800 KB |
+| LQIP | 0.002 | 20px | — | ~0.5 KB |
+
+### Параметры сжатия (одиночное, legacy)
 
 | Параметр | Значение | Описание |
 |----------|----------|----------|
@@ -806,10 +952,6 @@ shouldOptimizeImage(file) → true
 | `initialQuality` | 0.85 | Начальное качество 85% |
 | `fileType` | `image/webp` | Всегда конвертируем в WebP |
 | LQIP `maxWidthOrHeight` | 20 | Blur placeholder 20px |
-
-> **Примечание (v3.1.0):** Параметры были увеличены с 150KB/1200px до 800KB/1440px с `initialQuality: 0.85`
-> для улучшения четкости фотографий товаров в галерее и полноэкранном Lightbox.
-> Старые изображения необходимо перезалить для применения новых настроек.
 
 ### Файлы задействованные в клиентской оптимизации
 
