@@ -13,11 +13,12 @@ config/images.ts                              # Конфигурация и пр
 
 Система позволяет:
 
-- ✅ **Автоматическая оптимизация** - WebP формат, сжатие до ≤150KB/1200px через browser-image-compression
+- ✅ **Автоматическая оптимизация** - WebP формат, сжатие до ≤500KB/1200px через browser-image-compression
 - ✅ **Один переключатель** - включение/отключение оптимизации глобально
 - ✅ **Предустановленные размеры** - консистентные размеры по всему проекту
 - ✅ **Экономия трафика** - до 80% меньше размер файлов
 - ✅ **Fallback на оригиналы** - при отключении оптимизации или ошибках
+- ✅ **Полноэкранная галерея (Lightbox)** - просмотр HD-фото в полноэкранном режиме по клику
 
 ---
 
@@ -684,11 +685,50 @@ export default defineNuxtPlugin(() => {
 
 ---
 
+## 🔍 Полноэкранная галерея (Lightbox)
+
+### Описание
+
+Компонент `ProductGallery.vue` поддерживает полноэкранный просмотр изображений по клику.
+Реализовано на базе `Dialog` (shadcn-ui) + `Carousel` (Embla) — без сторонних библиотек.
+
+### Функционал
+
+- **Триггер**: клик по основному изображению в слайдере (`cursor-zoom-in`)
+- **Темный overlay** (`bg-black/95`)
+- **Кнопка закрытия** (X, правый верхний угол)
+- **HD-изображения** — используется пресет `IMAGE_SIZES.LARGE` (1200x1200) для максимальной четкости
+- **Навигация**: стрелки ← → + свайпы (Embla) + клавиатура (ArrowLeft / ArrowRight)
+- **Синхронизация**: при открытии показывает тот слайд, на который кликнул пользователь
+- **Счетчик**: «2 / 5» в левом верхнем углу
+- **Доступность**: `sr-only` DialogTitle, aria-labels на кнопках
+
+### Архитектура
+
+```
+Клик по фото → isLightboxOpen = true
+                    ↓
+         Dialog (fullscreen, bg-black/95)
+                    ↓
+         Carousel (loop, startIndex = currentSlide)
+                    ↓
+         img src = getFullUrl() → IMAGE_SIZES.LARGE (1200×1200)
+```
+
+### Пример расширения
+
+Чтобы добавить зум внутри лайтбокса, можно обернуть `<img>` в pinch-to-zoom библиотеку
+или реализовать CSS `transform: scale()` по двойному клику.
+
+---
+
 ## 🔗 Связанные файлы
 
 - `composables/menuItems/useSupabaseStorage.ts` - Основной композабл
+- `composables/useProductGallery.ts` - Логика синхронизации каруселей (main + thumb)
 - `config/images.ts` - Конфигурация и пресеты
 - `constants/index.ts` - Названия бакетов
+- `components/global/ProductGallery.vue` - Галерея товара с Lightbox
 - `components/global/ProductCard.vue` - Пример использования
 - `components/home/PopularCategories.vue` - Пример с категориями
 
@@ -704,7 +744,20 @@ export default defineNuxtPlugin(() => {
 
 ## 📝 Changelog
 
-### v2.0.0 (Current)
+### v3.1.0 (Current)
+
+- ✅ Улучшено качество сжатия: `maxSizeMB` 0.15 → 0.5, добавлен `initialQuality: 0.80`
+- ✅ Полноэкранная галерея (Lightbox) на базе Dialog + Carousel (без сторонних библиотек)
+- ✅ HD-просмотр через `IMAGE_SIZES.LARGE` (1200×1200) в Lightbox
+- ✅ Навигация: стрелки, свайпы, клавиатура, синхронизация с основным слайдером
+
+### v3.0.0
+
+- ✅ Клиентская оптимизация при загрузке (browser-image-compression)
+- ✅ LQIP blur placeholder генерация
+- ✅ Пакетная оптимизация `optimizeImagesBatch()`
+
+### v2.0.0
 
 - ✅ Добавлена функция `getImageUrl()` с поддержкой глобального флага
 - ✅ Конфиг `IMAGE_OPTIMIZATION_ENABLED` для быстрого переключения
@@ -721,7 +774,7 @@ export default defineNuxtPlugin(() => {
 
 **Автор:** Development Team
 **Последнее обновление:** 2026
-**Версия:** 3.0.0
+**Версия:** 3.1.0
 
 ---
 
@@ -739,7 +792,7 @@ import imageCompression from 'browser-image-compression'
 shouldOptimizeImage(file) → true
 
 // optimizeImageBeforeUpload: параллельно
-// 1. Основное сжатие: maxSizeMB=0.15, maxWidthOrHeight=1200, fileType='image/webp'
+// 1. Основное сжатие: maxSizeMB=0.5, maxWidthOrHeight=1200, initialQuality=0.80, fileType='image/webp'
 // 2. LQIP: maxSizeMB=0.002, maxWidthOrHeight=20
 ```
 
@@ -747,10 +800,14 @@ shouldOptimizeImage(file) → true
 
 | Параметр | Значение | Описание |
 |----------|----------|----------|
-| `maxSizeMB` | 0.15 | Максимум 150KB |
+| `maxSizeMB` | 0.5 | Максимум 500KB (HD-качество) |
 | `maxWidthOrHeight` | 1200 | Максимум 1200px по длинной стороне |
+| `initialQuality` | 0.80 | Начальное качество 80% |
 | `fileType` | `image/webp` | Всегда конвертируем в WebP |
 | LQIP `maxWidthOrHeight` | 20 | Blur placeholder 20px |
+
+> **Примечание (v3.1.0):** Параметры были увеличены с 150KB до 500KB и добавлен `initialQuality: 0.80`
+> для улучшения четкости фотографий товаров, особенно при просмотре в полноэкранном Lightbox.
 
 ### Файлы задействованные в клиентской оптимизации
 
