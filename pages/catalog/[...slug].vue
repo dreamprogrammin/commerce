@@ -677,6 +677,35 @@ const { data: categoryQuestions } = await useAsyncData(
 
 const faqQuestions = computed(() => categoryQuestions.value || [])
 
+// 🆕 Агрегированный рейтинг категории для Schema.org aggregateRating
+const supabase = useSupabaseClient()
+const { data: categoryRatingData } = await useAsyncData(
+  `catalog-rating-${currentCategorySlug.value}`,
+  async () => {
+    const category = categoriesStore.allCategories.find(c => c.slug === currentCategorySlug.value)
+    if (!category?.id || currentCategorySlug.value === 'all')
+      return null
+
+    try {
+      const { data, error } = await supabase.rpc('get_category_aggregate_rating', {
+        p_category_id: category.id,
+      })
+      if (error) {
+        console.error('Error fetching category rating:', error)
+        return null
+      }
+      return data as { avg_rating: number, total_reviews: number } | null
+    }
+    catch {
+      return null
+    }
+  },
+  {
+    watch: [currentCategorySlug],
+    server: true,
+  },
+)
+
 // 🆕 Уменьшен debounce до 300ms
 watchDebounced(
   activeFilters,
@@ -810,6 +839,16 @@ useHead(() => {
           'highPrice': priceRange.value.max,
           'priceCurrency': 'KZT',
           'offerCount': displayedProducts.value.length,
+        },
+      }),
+      // Агрегированный рейтинг (только если есть реальные отзывы)
+      ...(categoryRatingData.value && categoryRatingData.value.total_reviews > 0 && {
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          'ratingValue': categoryRatingData.value.avg_rating,
+          'reviewCount': categoryRatingData.value.total_reviews,
+          'bestRating': 5,
+          'worstRating': 1,
         },
       }),
     }),
