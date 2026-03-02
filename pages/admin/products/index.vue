@@ -3,14 +3,13 @@ import type { ProductListAdmin } from '@/types'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 
 definePageMeta({ layout: 'admin' })
 
 const adminProductsStore = useAdminProductsStore()
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const router = useRouter()
 
 const { products, isLoading } = storeToRefs(adminProductsStore)
@@ -60,7 +59,7 @@ function getProductImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
 
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm')
 }
 </script>
 

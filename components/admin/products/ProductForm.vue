@@ -18,7 +18,6 @@ import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
@@ -71,7 +70,7 @@ const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
 const brandsStore = useAdminBrandsStore()
 const productLinesStore = useAdminProductLinesStore()
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
 
@@ -364,11 +363,11 @@ function removeExistingImage(image: ProductImageRow) {
 }
 
 /**
- * 🎯 Получить оптимизированный URL для существующего изображения
- * Автоматически использует правильный режим из конфига
+ * 🎯 Получить URL для превью существующего изображения
+ * Использует sm-вариант (400px) с обратной совместимостью для старых фото
  */
 function getExistingImageUrl(imageUrl: string) {
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL) || ''
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm') || ''
 }
 
 // --- DRAG & DROP ФУНКЦИИ ---
@@ -1572,10 +1571,11 @@ const seoKeywordsString = computed({
                   <!-- Изображение -->
                   <div class="aspect-square">
                     <img
-                      :src="getExistingImageUrl(image.image_url)"
+                      :src="getExistingImageUrl(image.image_url) || '/images/placeholder.svg'"
                       class="w-full h-full object-cover"
                       loading="lazy"
                       alt="Изображение товара"
+                      @error="(e: Event) => (e.target as HTMLImageElement).src = '/images/placeholder.svg'"
                     >
                   </div>
                   <!-- Бейдж главного изображения -->
