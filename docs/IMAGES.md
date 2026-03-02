@@ -13,7 +13,7 @@ config/images.ts                              # Конфигурация и пр
 
 Система позволяет:
 
-- ✅ **Автоматическая оптимизация** - WebP формат, сжатие до ≤500KB/1200px через browser-image-compression
+- ✅ **Автоматическая оптимизация** - WebP формат, сжатие до ≤800KB/1440px через browser-image-compression
 - ✅ **Один переключатель** - включение/отключение оптимизации глобально
 - ✅ **Предустановленные размеры** - консистентные размеры по всему проекту
 - ✅ **Экономия трафика** - до 80% меньше размер файлов
@@ -746,9 +746,10 @@ export default defineNuxtPlugin(() => {
 
 ### v3.1.0 (Current)
 
-- ✅ Улучшено качество сжатия: `maxSizeMB` 0.15 → 0.5, добавлен `initialQuality: 0.80`
+- ✅ Улучшено качество сжатия: `maxSizeMB` 0.15 → 0.8, `maxWidthOrHeight` 1200 → 1440, `initialQuality: 0.85`
+- ✅ `PRODUCT_GALLERY_MAIN` увеличен с 800×800 до 1200×1200 для четкости на десктопе
+- ✅ `IMAGE_SIZES.LARGE` увеличен до 1440×1440 с quality 95 для Lightbox
 - ✅ Полноэкранная галерея (Lightbox) на базе Dialog + Carousel (без сторонних библиотек)
-- ✅ HD-просмотр через `IMAGE_SIZES.LARGE` (1200×1200) в Lightbox
 - ✅ Навигация: стрелки, свайпы, клавиатура, синхронизация с основным слайдером
 
 ### v3.0.0
@@ -792,7 +793,7 @@ import imageCompression from 'browser-image-compression'
 shouldOptimizeImage(file) → true
 
 // optimizeImageBeforeUpload: параллельно
-// 1. Основное сжатие: maxSizeMB=0.5, maxWidthOrHeight=1200, initialQuality=0.80, fileType='image/webp'
+// 1. Основное сжатие: maxSizeMB=0.8, maxWidthOrHeight=1440, initialQuality=0.85, fileType='image/webp'
 // 2. LQIP: maxSizeMB=0.002, maxWidthOrHeight=20
 ```
 
@@ -800,14 +801,15 @@ shouldOptimizeImage(file) → true
 
 | Параметр | Значение | Описание |
 |----------|----------|----------|
-| `maxSizeMB` | 0.5 | Максимум 500KB (HD-качество) |
-| `maxWidthOrHeight` | 1200 | Максимум 1200px по длинной стороне |
-| `initialQuality` | 0.80 | Начальное качество 80% |
+| `maxSizeMB` | 0.8 | Максимум 800KB (HD-качество) |
+| `maxWidthOrHeight` | 1440 | Максимум 1440px по длинной стороне |
+| `initialQuality` | 0.85 | Начальное качество 85% |
 | `fileType` | `image/webp` | Всегда конвертируем в WebP |
 | LQIP `maxWidthOrHeight` | 20 | Blur placeholder 20px |
 
-> **Примечание (v3.1.0):** Параметры были увеличены с 150KB до 500KB и добавлен `initialQuality: 0.80`
-> для улучшения четкости фотографий товаров, особенно при просмотре в полноэкранном Lightbox.
+> **Примечание (v3.1.0):** Параметры были увеличены с 150KB/1200px до 800KB/1440px с `initialQuality: 0.85`
+> для улучшения четкости фотографий товаров в галерее и полноэкранном Lightbox.
+> Старые изображения необходимо перезалить для применения новых настроек.
 
 ### Файлы задействованные в клиентской оптимизации
 

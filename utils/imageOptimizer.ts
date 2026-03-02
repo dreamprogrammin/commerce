@@ -69,7 +69,7 @@ export function formatFileSize(bytes: number): string {
 /**
  * 🎯 Проверяет нужна ли оптимизация для файла
  *
- * На бесплатном тарифе ВСЕГДА сжимаем — гарантируем WebP + 1200px + <500KB
+ * На бесплатном тарифе ВСЕГДА сжимаем — гарантируем WebP + 1440px + <800KB
  */
 export function shouldOptimizeImage(_file: File): boolean {
   // Платный тариф — Supabase оптимизирует сам
@@ -103,7 +103,7 @@ export async function generateBlurPlaceholder(
  * 🎨 Оптимизирует изображение перед загрузкой
  *
  * Использует browser-image-compression для:
- * - Сжатия до ≤500KB / 1200px
+ * - Сжатия до ≤800KB / 1440px
  * - Конвертации в WebP
  * - Параллельной генерации LQIP blur placeholder
  */
@@ -117,11 +117,11 @@ export async function optimizeImageBeforeUpload(
   // Параллельно: основное сжатие + LQIP
   const [compressed, blurResult] = await Promise.all([
     imageCompression(file, {
-      maxSizeMB: 0.5,
+      maxSizeMB: 0.8,
       maxWidthOrHeight: maxDim,
       useWebWorker: true,
       fileType: 'image/webp',
-      initialQuality: 0.80,
+      initialQuality: 0.85,
     }),
     generateBlurPlaceholder(file).catch(() => null),
   ])

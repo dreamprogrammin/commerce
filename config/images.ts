@@ -42,10 +42,10 @@ export const IMAGE_SIZES = {
     height: 800,
   },
 
-  // 🆕 Large изображения (для OG Image, зума, высокого качества)
+  // 🆕 Large изображения (для Lightbox, OG Image, зума, высокого качества)
   LARGE: {
-    width: 1200,
-    height: 1200,
+    width: 1440,
+    height: 1440,
   },
 
   // Hero изображения
@@ -91,8 +91,8 @@ export const IMAGE_SIZES = {
 
   // Галерея товара - основное изображение
   PRODUCT_GALLERY_MAIN: {
-    width: 800,
-    height: 800,
+    width: 1200,
+    height: 1200,
   },
 
   // 🆕 OG Image (Open Graph для соцсетей)
@@ -208,10 +208,10 @@ export const IMAGE_PRESETS = {
     resize: 'cover' as const,
   },
 
-  // 🆕 Large изображения (для зума, OG Image)
+  // 🆕 Large изображения (для Lightbox, зума, OG Image)
   LARGE: {
     ...IMAGE_SIZES.LARGE,
-    quality: IMAGE_QUALITY.HIGH,
+    quality: IMAGE_QUALITY.ORIGINAL,
     format: IMAGE_FORMATS.MODERN,
     resize: 'contain' as const,
   },
@@ -321,8 +321,8 @@ export const OPTIMIZATION_RECOMMENDATIONS = {
 
   // Рекомендуемые размеры для загрузки
   RECOMMENDED_UPLOAD_DIMENSIONS: {
-    width: 1200,
-    height: 1200,
+    width: 1440,
+    height: 1440,
   },
 
   // Поддерживаемые форматы для загрузки
