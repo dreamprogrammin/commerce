@@ -168,7 +168,7 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                       </div>
 
                       <!-- Art Direction picture -->
-                      <picture>
+                      <picture class="block w-full h-full">
                         <!-- Mobile: < 768px -->
                         <source
                           v-if="slide.mobileSrcset"
