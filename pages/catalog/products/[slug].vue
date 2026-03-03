@@ -260,6 +260,27 @@ const priceChars = computed(() => {
   })
 })
 
+// Выбранные аксессуары (полные объекты)
+const selectedAccessoriesData = computed(() =>
+  (accessories.value || []).filter((acc: ProductWithImages) => selectedAccessoryIds.value.includes(acc.id)),
+)
+
+// Есть ли хоть один выбранный аксессуар
+const hasAccessoriesSelected = computed(() => selectedAccessoriesData.value.length > 0)
+
+// Синхронизация: при загрузке аксессуаров предвыбрать те, что уже в корзине
+watch(accessories, (newAccessories) => {
+  if (!newAccessories?.length)
+    return
+  const cartProductIds = new Set(cartStore.items.map(i => i.product.id))
+  const preSelected = newAccessories
+    .filter((acc: ProductWithImages) => cartProductIds.has(acc.id))
+    .map((acc: ProductWithImages) => acc.id)
+  if (preSelected.length > 0) {
+    selectedAccessoryIds.value = [...new Set([...selectedAccessoryIds.value, ...preSelected])]
+  }
+})
+
 const mainItemInCart = computed(() => {
   if (!product.value)
     return undefined
@@ -988,8 +1009,13 @@ useHead(() => ({
                 </div>
 
                 <div class="mb-6 lg:mb-8">
-                  <!-- Старая цена (зачеркнутая) если есть скидка -->
-                  <div v-if="mainProductPrice.hasDiscount" class="flex items-center gap-2 mb-1">
+                  <!-- Лейбл: Цена / Итого за комплект -->
+                  <p class="text-xs font-medium text-muted-foreground mb-1 transition-all">
+                    {{ hasAccessoriesSelected ? 'Итого за комплект' : 'Цена' }}
+                  </p>
+
+                  <!-- Старая цена (зачеркнутая) если есть скидка и нет аксессуаров -->
+                  <div v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected" class="flex items-center gap-2 mb-1">
                     <span class="text-lg text-muted-foreground line-through">
                       {{ formatPrice(mainProductPrice.original) }} ₸
                     </span>
@@ -1024,6 +1050,18 @@ useHead(() => ({
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium">
                     <Icon name="lucide:gift" class="w-4 h-4" />
                     <span>+{{ totalBonuses }} бонусов</span>
+                  </div>
+
+                  <!-- Плашка-расшифровка комплекта -->
+                  <div
+                    v-if="hasAccessoriesSelected"
+                    class="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm"
+                  >
+                    <span class="text-muted-foreground font-medium truncate max-w-[180px]">{{ product.name }}</span>
+                    <template v-for="acc in selectedAccessoriesData" :key="acc.id">
+                      <span class="text-muted-foreground">+</span>
+                      <span class="text-muted-foreground font-medium">{{ acc.name }}</span>
+                    </template>
                   </div>
                 </div>
 
@@ -1409,7 +1447,7 @@ useHead(() => ({
         <div v-if="!mainItemInCart" class="px-4 py-3">
           <div class="flex items-center justify-between gap-3">
             <div class="flex flex-col gap-0.5">
-              <div v-if="mainProductPrice.hasDiscount" class="flex items-center gap-1.5">
+              <div v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected" class="flex items-center gap-1.5">
                 <span class="text-xs text-muted-foreground line-through">
                   {{ formatPrice(mainProductPrice.original) }} ₸
                 </span>
@@ -1417,9 +1455,10 @@ useHead(() => ({
                   -{{ product.discount_percentage }}%
                 </Badge>
               </div>
+              <span v-if="hasAccessoriesSelected" class="text-[10px] text-muted-foreground leading-none">Итого за комплект</span>
               <div class="flex items-baseline gap-0.5">
                 <span class="text-2xl font-bold leading-none">
-                  {{ formatPrice(mainProductPrice.final) }}
+                  {{ formatPrice(totalPrice) }}
                 </span>
                 <span class="text-xl font-bold">₸</span>
               </div>
