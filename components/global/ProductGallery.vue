@@ -113,7 +113,7 @@ function getFullUrl(imagePath: string) {
             >
               <img
                 :src="getThumbUrl(image.image_url) || undefined"
-                alt="Миниатюра товара"
+                :alt="image.alt_text || `Изображение товара ${index + 1}`"
                 class="w-full h-full object-cover rounded-lg"
                 loading="lazy"
               >
@@ -142,7 +142,8 @@ function getFullUrl(imagePath: string) {
                 :src="getMainUrl(image.image_url) || undefined"
                 :alt="image.alt_text || `Изображение товара ${index + 1}`"
                 class="w-full h-full object-contain"
-                loading="lazy"
+                :loading="index === 0 ? 'eager' : 'lazy'"
+                :fetchpriority="index === 0 ? 'high' : 'auto'"
               >
             </div>
           </CarouselItem>

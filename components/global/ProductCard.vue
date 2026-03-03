@@ -186,12 +186,13 @@ const priceDetails = computed(() => {
               :src-md="getVariantUrls(activeImageIndex).md"
               :src-lg="getVariantUrls(activeImageIndex).lg"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              :alt="`${product.name}`"
+              :alt="`${product.name} - фото ${activeImageIndex + 1}`"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="lqip"
               :blur-data-url="product.product_images?.[activeImageIndex]?.blur_placeholder"
               eager
+              zoom-on-hover
             />
           </NuxtLink>
         </template>
@@ -228,6 +229,7 @@ const priceDetails = computed(() => {
                     placeholder-type="lqip"
                     :blur-data-url="image.blur_placeholder"
                     eager
+                    zoom-on-hover
                   />
                 </NuxtLink>
               </CarouselItem>
@@ -239,11 +241,12 @@ const priceDetails = computed(() => {
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
-              :alt="`${product.name}`"
+              :alt="`${product.name} - фото 1`"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"
               eager
+              zoom-on-hover
             />
             <div
               v-else
@@ -260,11 +263,12 @@ const priceDetails = computed(() => {
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
-              :alt="`${product.name}`"
+              :alt="`${product.name} - фото 1`"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"
               eager
+              zoom-on-hover
             />
             <div
               v-else

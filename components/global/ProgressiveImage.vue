@@ -19,6 +19,10 @@ interface Props {
   srcMd?: string | null
   srcLg?: string | null
   sizes?: string
+  width?: number
+  height?: number
+  fetchpriority?: 'high' | 'low' | 'auto'
+  zoomOnHover?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -28,6 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
   placeholderColor: 'from-muted via-muted/70 to-muted',
   blurDataUrl: null,
   useTransform: true,
+  zoomOnHover: false,
 })
 
 const { getImageUrl } = useSupabaseStorage()
@@ -93,6 +98,12 @@ const srcsetValue = computed(() => {
   if (props.srcLg)
     parts.push(`${props.srcLg} 1440w`)
   return parts.length > 0 ? parts.join(', ') : undefined
+})
+
+const resolvedFetchpriority = computed(() => {
+  if (props.fetchpriority)
+    return props.fetchpriority
+  return props.eager ? 'high' : 'auto'
 })
 
 const isDev = computed(() => import.meta.env.DEV)
@@ -186,23 +197,39 @@ const isDev = computed(() => import.meta.env.DEV)
     </div>
 
     <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ -->
-    <img
-      ref="imageRef"
-      :src="optimizedImageUrl || undefined"
-      :srcset="srcsetValue || undefined"
-      :sizes="srcsetValue ? (sizes || undefined) : undefined"
-      :alt="alt"
-      class="w-full h-full transition-opacity duration-500"
-      :class="[
-        isLoaded ? 'opacity-100' : 'opacity-0',
-        objectFitClass,
-      ]"
-      loading="lazy"
-      decoding="async"
-      :fetchpriority="eager ? 'high' : 'auto'"
-      @load="onLoad"
-      @error="onError"
-    >
+    <picture>
+      <!-- WebP srcset (варианты sm/md/lg) -->
+      <source
+        v-if="srcsetValue"
+        :srcset="srcsetValue"
+        :sizes="sizes || undefined"
+        type="image/webp"
+      >
+      <!-- Одиночный WebP URL -->
+      <source
+        v-else-if="optimizedImageUrl"
+        :srcset="optimizedImageUrl"
+        type="image/webp"
+      >
+      <img
+        ref="imageRef"
+        :src="optimizedImageUrl || undefined"
+        :alt="alt"
+        :width="width || undefined"
+        :height="height || undefined"
+        class="w-full h-full"
+        :class="[
+          isLoaded ? 'opacity-100' : 'opacity-0',
+          objectFitClass,
+          zoomOnHover ? 'hover:scale-105' : '',
+        ]"
+        :loading="eager ? 'eager' : 'lazy'"
+        decoding="async"
+        :fetchpriority="resolvedFetchpriority"
+        @load="onLoad"
+        @error="onError"
+      >
+    </picture>
 
     <!-- ❌ FALLBACK ПРИ ОШИБКЕ -->
     <div
@@ -231,7 +258,9 @@ const isDev = computed(() => import.meta.env.DEV)
 
 <style scoped>
 img {
-  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .animate-pulse {

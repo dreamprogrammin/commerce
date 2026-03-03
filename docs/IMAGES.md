@@ -824,7 +824,9 @@ const result = await generateImageVariants(file)
 
 ### Использование в компонентах
 
-#### ProgressiveImage (srcset)
+#### ProgressiveImage (srcset + picture)
+
+Компонент рендерит нативный `<picture>` с `<source type="image/webp">` для корректного указания формата:
 
 ```vue
 <ProgressiveImage
@@ -834,8 +836,52 @@ const result = await generateImageVariants(file)
   :src-lg="getVariantUrl(BUCKET, imageUrl, 'lg')"
   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
   :blur-data-url="image.blur_placeholder"
-  alt="Товар"
+  :alt="`${product.name} - фото 1`"
+  :width="400"
+  :height="400"
+  fetchpriority="high"
+  zoom-on-hover
 />
+```
+
+#### Пропсы ProgressiveImage
+
+| Проп | Тип | По умолчанию | Описание |
+|------|-----|--------------|----------|
+| `src` | `string\|null` | — | Основной URL изображения |
+| `alt` | `string` | — | **Обязателен.** Осмысленный текст (не "Миниатюра") |
+| `srcSm` / `srcMd` / `srcLg` | `string\|null` | — | Варианты для srcset |
+| `sizes` | `string` | — | HTML `sizes` атрибут |
+| `width` | `number` | — | Фиксированная ширина — предотвращает CLS |
+| `height` | `number` | — | Фиксированная высота — предотвращает CLS |
+| `fetchpriority` | `'high'\|'low'\|'auto'` | `'auto'` | Приоритет загрузки (LCP-оптимизация) |
+| `zoomOnHover` | `boolean` | `false` | Эффект увеличения при наведении (`hover:scale-105`) |
+| `eager` | `boolean` | `false` | Загружать немедленно (без IntersectionObserver) |
+| `blurDataUrl` | `string\|null` | — | LQIP base64 данные |
+| `aspectRatio` | `'square'\|'video'\|..` | `'square'` | Пропорции контейнера |
+| `objectFit` | `'cover'\|'contain'\|'fill'` | `'cover'` | CSS object-fit |
+| `placeholderType` | `'lqip'\|'shimmer'\|...` | `'lqip'` | Тип плейсхолдера |
+
+#### Правила для alt атрибута
+
+```vue
+<!-- ❌ НЕ используйте заглушки -->
+<ProgressiveImage alt="Миниатюра товара" />
+<ProgressiveImage alt="Изображение" />
+
+<!-- ✅ Используйте осмысленный текст -->
+<ProgressiveImage :alt="`${product.name} - фото ${index + 1}`" />
+<ProgressiveImage :alt="image.alt_text || `Изображение товара ${index + 1}`" />
+```
+
+#### fetchpriority для LCP
+
+```vue
+<!-- Первое изображение на странице товара (LCP-элемент) -->
+<img fetchpriority="high" ... />
+
+<!-- Карточки в каталоге, below-the-fold -->
+<ProgressiveImage :eager="false" fetchpriority="auto" ... />
 ```
 
 Если `srcSm`/`srcMd`/`srcLg` не переданы — поведение не меняется (обратная совместимость).
