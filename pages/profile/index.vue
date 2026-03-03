@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDownCircle, ArrowRight, ArrowUpCircle, Gift, Heart, Package, ShoppingBag, Star, User } from 'lucide-vue-next'
+import { ArrowDownCircle, ArrowRight, ArrowUpCircle, Cake, Clock, Gift, Heart, MessageSquare, Package, ShoppingBag, Star, Timer, User } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useQuery } from '@tanstack/vue-query'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -81,6 +81,14 @@ function getTransactionIcon(type: string) {
       return ArrowDownCircle
     case 'welcome':
       return Gift
+    case 'review':
+      return MessageSquare
+    case 'activation':
+      return Clock
+    case 'birthday':
+      return Cake
+    case 'expiration':
+      return Timer
     default:
       return Star
   }
@@ -91,9 +99,14 @@ function getTransactionColor(type: string) {
     case 'earned':
     case 'welcome':
     case 'refund_spent':
+    case 'review':
+    case 'birthday':
       return 'text-green-600'
+    case 'activation':
+      return 'text-blue-600'
     case 'spent':
     case 'refund_earned':
+    case 'expiration':
       return 'text-red-600'
     default:
       return 'text-muted-foreground'
@@ -418,7 +431,7 @@ useHead({
             Бонусные операции
           </CardTitle>
           <Button v-if="bonusData && bonusData.length > 0" variant="ghost" size="sm" as-child>
-            <NuxtLink to="/profile/bonus" class="flex items-center gap-1">
+            <NuxtLink to="/profile/bonuses" class="flex items-center gap-1">
               История
               <ArrowRight class="w-4 h-4" />
             </NuxtLink>
@@ -454,10 +467,16 @@ useHead({
               />
               <div>
                 <p class="text-sm font-medium">
-                  {{ tx.transaction_type === 'earned' ? 'Начисление'
-                    : tx.transaction_type === 'spent' ? 'Списание'
-                      : tx.transaction_type === 'welcome' ? 'Приветственный бонус'
-                        : tx.transaction_type === 'refund_spent' ? 'Возврат' : 'Операция' }}
+                  {{ tx.transaction_type === 'earned' ? 'Начислено за покупку'
+                    : tx.transaction_type === 'spent' ? 'Списание за заказ'
+                      : tx.transaction_type === 'welcome' ? 'Приветственные бонусы'
+                        : tx.transaction_type === 'review' ? 'Бонусы за отзыв'
+                          : tx.transaction_type === 'refund_spent' ? 'Возврат бонусов'
+                            : tx.transaction_type === 'activation' ? 'Активация бонусов'
+                              : tx.transaction_type === 'birthday' ? 'Бонусы ко дню рождения'
+                                : tx.transaction_type === 'expiration' ? 'Сгорело бонусов'
+                                  : tx.transaction_type === 'refund_earned' ? 'Отмена начисления'
+                                    : 'Операция' }}
                 </p>
                 <p class="text-xs text-muted-foreground">
                   {{ formatDate(tx.created_at) }}

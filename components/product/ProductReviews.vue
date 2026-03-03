@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
@@ -136,6 +137,10 @@ async function submitReview() {
       isFormOpen.value = false
       queryClient.invalidateQueries({ queryKey: ['product-reviews', props.productId] })
       queryClient.invalidateQueries({ queryKey: ['can-review', props.productId] })
+
+      // Обновляем профиль в фоне (бонусы за отзыв начислятся после модерации)
+      const profileStore = useProfileStore()
+      profileStore.loadProfile(true, false, true)
     }
   }
   catch (e: any) {

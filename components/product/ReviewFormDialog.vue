@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProfileStore } from '@/stores/core/profileStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
 import StarRating from './StarRating.vue'
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const reviewsStore = useReviewsStore()
+const profileStore = useProfileStore()
 
 const rating = ref(0)
 const text = ref('')
@@ -87,6 +89,9 @@ async function submit() {
       text.value = ''
       emit('update:open', false)
       emit('submitted')
+
+      // Обновляем профиль в фоне (бонусы за отзыв начислятся после модерации)
+      profileStore.loadProfile(true, false, true)
     }
   }
   catch (e: any) {

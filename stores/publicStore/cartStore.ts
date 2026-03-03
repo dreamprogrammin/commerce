@@ -262,8 +262,8 @@ export const useCartStore = defineStore('cartStore', () => {
 
         const bonusesAwarded = bonusesToAward.value
 
-        // 🔥 КРИТИЧНО: Перезагружаем профиль для обновления бонусов ДО показа toast
-        await profileStore.loadProfile(true)
+        // 🔥 КРИТИЧНО: Перезагружаем профиль для обновления бонусов (silent — без лоадера)
+        await profileStore.loadProfile(true, false, true)
 
         // ✅ Принудительно триггерим реактивность через nextTick
         await nextTick()

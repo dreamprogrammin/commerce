@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDownCircle, ArrowUpCircle, Cake, Clock, Gift, Timer, XCircle } from 'lucide-vue-next'
+import { ArrowDownCircle, ArrowUpCircle, Cake, Clock, Gift, MessageSquare, Timer, XCircle } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
@@ -86,6 +86,8 @@ function getTransactionIcon(type: string) {
       return ArrowDownCircle
     case 'welcome':
       return Gift
+    case 'review':
+      return MessageSquare
     case 'refund_spent':
       return ArrowUpCircle
     case 'refund_earned':
@@ -107,16 +109,15 @@ function getTransactionColor(type: string) {
     case 'earned':
     case 'welcome':
     case 'refund_spent':
+    case 'review':
+    case 'birthday':
       return 'text-green-600'
     case 'spent':
     case 'refund_earned':
+    case 'expiration':
       return 'text-red-600'
     case 'activation':
       return 'text-blue-600'
-    case 'birthday':
-      return 'text-green-600'
-    case 'expiration':
-      return 'text-red-600'
     default:
       return 'text-muted-foreground'
   }
@@ -126,8 +127,9 @@ function getTransactionColor(type: string) {
 function getTransactionName(type: string) {
   const names: Record<string, string> = {
     earned: 'Начислено за покупку',
-    spent: 'Потрачено на покупку',
-    welcome: 'Приветственный бонус',
+    spent: 'Списание за заказ',
+    welcome: 'Приветственные бонусы',
+    review: 'Бонусы за отзыв',
     refund_spent: 'Возврат бонусов',
     refund_earned: 'Отмена начисления',
     activation: 'Активация бонусов',
@@ -279,7 +281,7 @@ onMounted(() => {
                 <div v-if="transaction.activation_date && transaction.status === 'pending'" class="mt-1 text-xs text-muted-foreground">
                   Активация: {{ formatActivationDate(transaction.activation_date) }}
                 </div>
-                <div class="mt-1 text-xs text-muted-foreground">
+                <div v-if="transaction.balance_after > 0 || transaction.pending_balance_after > 0" class="mt-1 text-xs text-muted-foreground">
                   Баланс: {{ transaction.balance_after.toLocaleString('ru-RU') }} ₸
                   <span v-if="transaction.pending_balance_after > 0">
                     (+{{ transaction.pending_balance_after.toLocaleString('ru-RU') }} в ожидании)
@@ -344,12 +346,13 @@ onMounted(() => {
                   </Badge>
                 </TableCell>
                 <TableCell class="text-right">
-                  <div class="flex flex-col items-end">
+                  <div v-if="transaction.balance_after > 0 || transaction.pending_balance_after > 0" class="flex flex-col items-end">
                     <span class="font-medium">{{ transaction.balance_after.toLocaleString('ru-RU') }} ₸</span>
                     <span v-if="transaction.pending_balance_after > 0" class="text-sm text-muted-foreground">
                       (+{{ transaction.pending_balance_after.toLocaleString('ru-RU') }} в ожидании)
                     </span>
                   </div>
+                  <span v-else class="text-muted-foreground">—</span>
                 </TableCell>
               </TableRow>
             </TableBody>

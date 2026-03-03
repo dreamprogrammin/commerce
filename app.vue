@@ -18,6 +18,8 @@ const router = useRouter() // ← добавлено
 
 // Глобальная инициализация ID избранного при авторизации
 const supabaseUser = useSupabaseUser()
+const supabase = useSupabaseClient()
+
 watch(supabaseUser, (newUser) => {
   if (!import.meta.client)
     return
@@ -28,6 +30,18 @@ watch(supabaseUser, (newUser) => {
     wishlistStore.wishlistProductIds = []
   }
 }, { immediate: true })
+
+// Авто-синхронизация профиля при входе (Magic Link из Telegram, OAuth и т.д.)
+if (import.meta.client) {
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_IN') {
+      profileStore.loadProfile(true, true, true)
+    }
+    else if (event === 'SIGNED_OUT') {
+      profileStore.clearProfile()
+    }
+  })
+}
 
 nuxtApp.hook('page:start', () => {
   isPageLoading.value = true
