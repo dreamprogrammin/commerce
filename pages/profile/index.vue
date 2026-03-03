@@ -183,7 +183,7 @@ useHead({
     <!-- Быстрые карточки -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <!-- Бонусы -->
-      <NuxtLink to="/profile/bonus" class="group">
+      <NuxtLink to="/profile/bonuses" class="group">
         <Card class="h-full hover:shadow-md transition-shadow">
           <CardContent class="p-4">
             <div class="flex items-center gap-2 mb-2">
