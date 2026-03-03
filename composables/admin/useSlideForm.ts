@@ -283,6 +283,33 @@ export function useSlideForm(
     const toastId = toast.loading('Сохранение данных...')
 
     try {
+      let slideId: string
+
+      if (isEditMode.value) {
+        // EDIT: ID уже известен
+        slideId = initialData.value!.id
+      }
+      else {
+        // CREATE: сначала INSERT без изображений, чтобы получить UUID
+        const { data: inserted, error: insertError } = await supabase
+          .from('slides')
+          .insert({
+            title: formData.value.title,
+            description: formData.value.description,
+            cta_link: formData.value.cta_link,
+            cta_text: formData.value.cta_text,
+            is_active: formData.value.is_active,
+            display_order: formData.value.display_order,
+          } as SlideInsert)
+          .select('id')
+          .single()
+
+        if (insertError || !inserted)
+          throw insertError || new Error('Не удалось создать слайд')
+
+        slideId = inserted.id
+      }
+
       let finalImagePath = formData.value.image_url
       let finalBlurDataUrl = formData.value.blur_placeholder
       let finalImagePathMobile = formData.value.image_url_mobile
@@ -290,56 +317,51 @@ export function useSlideForm(
 
       // 📤 Загружаем новое ДЕСКТОПНОЕ изображение (3 широких варианта)
       if (newImageFile.value) {
-        const seoName = formData.value.title ? `slide-${formData.value.title}` : 'slide'
+        const seoName = `slide-${slideId}`
         const result = await _uploadWideVariants(newImageFile.value.file, seoName)
         if (!result)
           throw new Error('Не удалось загрузить десктопное изображение')
         finalImagePath = result.basePath
         finalBlurDataUrl = result.blurPlaceholder || newImageFile.value.blurDataUrl || null
-        if (isEditMode.value && imageToDelete.value) {
+        if (imageToDelete.value) {
           await removeFile(BUCKET_NAME, _getVariantPaths(imageToDelete.value))
         }
       }
 
       // 📤 Загружаем новое МОБИЛЬНОЕ изображение (3 широких варианта)
       if (newImageFileMobile.value) {
-        const seoName = formData.value.title ? `slide-mobile-${formData.value.title}` : 'slide-mobile'
+        const seoName = `slide-mobile-${slideId}`
         const result = await _uploadWideVariants(newImageFileMobile.value.file, seoName)
         if (!result)
           throw new Error('Не удалось загрузить мобильное изображение')
         finalImagePathMobile = result.basePath
         finalBlurDataUrlMobile = result.blurPlaceholder || newImageFileMobile.value.blurDataUrl || null
-        if (isEditMode.value && imageToDeleteMobile.value) {
+        if (imageToDeleteMobile.value) {
           await removeFile(BUCKET_NAME, _getVariantPaths(imageToDeleteMobile.value))
         }
       }
 
-      const dataToSave = {
+      const dataToUpdate = {
         ...formData.value,
         image_url: finalImagePath,
         blur_placeholder: finalBlurDataUrl,
-        image_url_mobile: finalImagePathMobile, // 🆕
-        blur_placeholder_mobile: finalBlurDataUrlMobile, // 🆕
+        image_url_mobile: finalImagePathMobile,
+        blur_placeholder_mobile: finalBlurDataUrlMobile,
       }
 
-      if (isEditMode.value) {
-        const { error } = await supabase
-          .from('slides')
-          .update(dataToSave)
-          .eq('id', initialData.value!.id)
+      // UPDATE слайд (и для EDIT, и для CREATE — обновляем запись с изображениями)
+      const { error: updateError } = await supabase
+        .from('slides')
+        .update(dataToUpdate)
+        .eq('id', slideId)
 
-        if (error)
-          throw error
-        toast.success('Слайд успешно обновлен!', { id: toastId })
-      }
-      else {
-        const { error } = await supabase
-          .from('slides')
-          .insert(dataToSave as SlideInsert)
-        if (error)
-          throw error
-        toast.success('Слайд успешно создан!', { id: toastId })
-      }
+      if (updateError)
+        throw updateError
+
+      toast.success(
+        isEditMode.value ? 'Слайд успешно обновлен!' : 'Слайд успешно создан!',
+        { id: toastId },
+      )
 
       options.onSuccess?.()
     }

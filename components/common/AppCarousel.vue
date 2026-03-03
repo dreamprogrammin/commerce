@@ -36,15 +36,41 @@ onMounted(async () => {
 
 const emblaApi = ref<CarouselApi>()
 
+function buildSrcset(imageUrl: string | null): string | undefined {
+  if (!imageUrl || imageUrl.startsWith('http'))
+    return undefined
+  const sm = getVariantUrlWide(BUCKET_NAME_SLIDES, imageUrl, 'sm')
+  const md = getVariantUrlWide(BUCKET_NAME_SLIDES, imageUrl, 'md')
+  const lg = getVariantUrlWide(BUCKET_NAME_SLIDES, imageUrl, 'lg')
+  const parts: string[] = []
+  if (sm)
+    parts.push(`${sm} 640w`)
+  if (md)
+    parts.push(`${md} 1280w`)
+  if (lg)
+    parts.push(`${lg} 1920w`)
+  return parts.length > 0 ? parts.join(', ') : undefined
+}
+
 const processedSlides = computed(() => {
   if (!props.slides || !Array.isArray(props.slides))
     return []
 
-  return props.slides.map(slide => ({
-    ...slide,
-    desktopUrl: getSlideUrl(slide.image_url),
-    mobileUrl: slide.image_url_mobile ? getSlideUrlMobile(slide.image_url_mobile) : null,
-  }))
+  return props.slides.map((slide) => {
+    const dUrl = getSlideUrl(slide.image_url)
+    const mUrl = slide.image_url_mobile
+      ? getSlideUrlMobile(slide.image_url_mobile)
+      : null
+
+    return {
+      ...slide,
+      desktopUrl: dUrl,
+      desktopSrcset: buildSrcset(slide.image_url),
+      mobileUrl: mUrl || dUrl,
+      mobileSrcset: buildSrcset(slide.image_url_mobile || slide.image_url),
+      _loaded: false,
+    }
+  })
 })
 
 const showSkeleton = computed(() => props.isLoading && processedSlides.value.length === 0)
@@ -122,17 +148,41 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                   class="block"
                 >
                   <CardContent class="relative flex items-center justify-center p-0 overflow-hidden aspect-3/2 md:aspect-19/6 lg:aspect-21/9">
-                    <ProgressiveImage
-                      v-if="slide.desktopUrl"
-                      :src="slide.mobileUrl || slide.desktopUrl"
-                      :blur-data-url="slide.blur_placeholder || undefined"
-                      :alt="slide.title || 'Слайд'"
-                      object-fit="cover"
-                      :placeholder-type="slide.blur_placeholder ? 'lqip' : 'shimmer'"
-                      aspect-ratio="21/9"
-                      class="w-full h-full"
-                      :eager="true"
-                    />
+                    <template v-if="slide.desktopUrl">
+                      <!-- LQIP placeholder overlay -->
+                      <div
+                        v-if="!slide._loaded && slide.blur_placeholder"
+                        class="absolute inset-0 z-10 overflow-hidden"
+                      >
+                        <img
+                          :src="slide.blur_placeholder"
+                          alt=""
+                          class="w-full h-full object-cover blur-2xl scale-110"
+                        >
+                      </div>
+
+                      <!-- Art Direction picture -->
+                      <picture>
+                        <!-- Mobile: < 768px -->
+                        <source
+                          v-if="slide.mobileSrcset"
+                          media="(max-width: 767px)"
+                          :srcset="slide.mobileSrcset"
+                          sizes="100vw"
+                        >
+                        <!-- Desktop (default) -->
+                        <img
+                          :src="slide.desktopUrl"
+                          :srcset="slide.desktopSrcset"
+                          sizes="(max-width: 1024px) 85vw, 80vw"
+                          :alt="slide.title || 'Слайд'"
+                          class="w-full h-full object-cover"
+                          fetchpriority="high"
+                          @load="slide._loaded = true"
+                          @error="slide._loaded = true"
+                        >
+                      </picture>
+                    </template>
                     <div
                       v-else
                       class="w-full h-full bg-linear-to-br from-primary to-secondary"

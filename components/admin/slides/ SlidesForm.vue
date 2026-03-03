@@ -90,7 +90,7 @@ const optimizedPreviewUrlMobile = computed(() => {
         </div>
 
         <div class="p-4 border rounded-md">
-          <Label for="image" class="font-semibold">Изображение для десктопа (21:9)</Label>
+          <Label for="image" class="font-semibold">Изображение для ПК (21:9)</Label>
           <div class="flex items-center gap-2 mt-1 mb-2">
             <span class="text-xs text-muted-foreground">
               {{ optimizationInfo.icon }} {{ optimizationInfo.name }}
@@ -114,12 +114,14 @@ const optimizedPreviewUrlMobile = computed(() => {
             v-if="optimizedPreviewUrl"
             class="mt-2 border p-2 rounded-md inline-block relative"
           >
-            <img
-              :src="optimizedPreviewUrl"
-              alt="Превью"
-              class="max-w-[200px] max-h-[100px] object-contain rounded"
-              loading="lazy"
-            >
+            <div class="w-[280px] aspect-21/9 overflow-hidden rounded">
+              <img
+                :src="optimizedPreviewUrl"
+                alt="Превью"
+                class="w-full h-full object-cover"
+                loading="lazy"
+              >
+            </div>
             <Button
               variant="destructive"
               size="icon"
@@ -133,7 +135,10 @@ const optimizedPreviewUrlMobile = computed(() => {
         </div>
 
         <div class="p-4 border rounded-md">
-          <Label for="image-mobile" class="font-semibold">Изображение для мобильных (3:2)</Label>
+          <Label for="image-mobile" class="font-semibold">Изображение для смартфонов (3:2)</Label>
+          <p class="text-xs text-muted-foreground mt-1 mb-2">
+            Если не загружена мобильная версия, будет использована десктопная
+          </p>
           <div class="flex items-center gap-2 mt-1 mb-2">
             <span class="text-xs text-muted-foreground">{{ optimizationInfo.icon }} {{ optimizationInfo.name }}</span>
           </div>
@@ -155,12 +160,14 @@ const optimizedPreviewUrlMobile = computed(() => {
             v-if="optimizedPreviewUrlMobile"
             class="mt-2 border p-2 rounded-md inline-block relative"
           >
-            <img
-              :src="optimizedPreviewUrlMobile"
-              alt="Превью мобильной версии"
-              class="max-w-[200px] max-h-[100px] object-contain rounded"
-              loading="lazy"
-            >
+            <div class="w-[180px] aspect-3/2 overflow-hidden rounded">
+              <img
+                :src="optimizedPreviewUrlMobile"
+                alt="Превью мобильной версии"
+                class="w-full h-full object-cover"
+                loading="lazy"
+              >
+            </div>
             <Button
               variant="destructive"
               size="icon"

@@ -909,38 +909,54 @@ const result = await generateImageVariants(file)
 └──────────────────────────────────────────────────────┘
 ```
 
+### Именование файлов (ID-based)
+
+Файлы слайдов именуются по UUID записи (не по заголовку):
+- Desktop: `slide-{slideId}` → `slide-{slideId}_sm.webp`, `_md.webp`, `_lg.webp`
+- Mobile: `slide-mobile-{slideId}` → `slide-mobile-{slideId}_sm.webp`, `_md.webp`, `_lg.webp`
+
+Для новых слайдов используется **insert-first flow**: сначала создаётся запись в БД (без изображений), получаем UUID, загружаем файлы с этим ID, затем UPDATE.
+
 ### Хранение в Supabase Storage (`slides-images`)
 
 ```
 slides-images/
-├── slide-promo-abc123_sm.webp      (desktop, 640px)
-├── slide-promo-abc123_md.webp      (desktop, 1280px)
-├── slide-promo-abc123_lg.webp      (desktop, 1920px)
-├── slide-mobile-promo-def456_sm.webp  (mobile, 640px)
-├── slide-mobile-promo-def456_md.webp  (mobile, 1280px)
-└── slide-mobile-promo-def456_lg.webp  (mobile, 1920px)
+├── slide-a1b2c3d4_sm.webp           (desktop, 640px)
+├── slide-a1b2c3d4_md.webp           (desktop, 1280px)
+├── slide-a1b2c3d4_lg.webp           (desktop, 1920px)
+├── slide-mobile-a1b2c3d4_sm.webp    (mobile, 640px)
+├── slide-mobile-a1b2c3d4_md.webp    (mobile, 1280px)
+└── slide-mobile-a1b2c3d4_lg.webp    (mobile, 1920px)
 ```
 
 ### Хранение в БД (`slides`)
 
 | Поле | Значение | Описание |
 |------|----------|----------|
-| `image_url` | `slide-promo-abc123` | Базовый путь desktop (без суффикса) |
+| `image_url` | `slide-a1b2c3d4` | Базовый путь desktop (без суффикса) |
 | `blur_placeholder` | `data:image/webp;base64,...` | LQIP для desktop |
-| `image_url_mobile` | `slide-mobile-promo-def456` | Базовый путь mobile (без суффикса) |
+| `image_url_mobile` | `slide-mobile-a1b2c3d4` | Базовый путь mobile (без суффикса), `null` если не загружено |
 | `blur_placeholder_mobile` | `data:image/webp;base64,...` | LQIP для mobile |
 
-### Отображение на фронтенде (`AppCarousel.vue`)
+### Art Direction (`AppCarousel.vue`)
 
-```typescript
-// Desktop → lg вариант (1920px)
-getVariantUrlWide(BUCKET_NAME_SLIDES, slide.image_url, 'lg')
+Компонент использует нативный `<picture>` с `<source media="...">` для автоматического переключения изображений:
 
-// Mobile → sm вариант (640px)
-getVariantUrlWide(BUCKET_NAME_SLIDES, slide.image_url_mobile, 'sm')
+```html
+<picture>
+  <!-- Mobile: < 768px -->
+  <source media="(max-width: 767px)" :srcset="slide.mobileSrcset" sizes="100vw" />
+  <!-- Desktop (default) -->
+  <img :src="slide.desktopUrl" :srcset="slide.desktopSrcset" sizes="(max-width: 1024px) 85vw, 80vw" />
+</picture>
 ```
 
-Компонент `AppCarousel` показывает desktop-версию на `md+` экранах и mobile-версию на `<md`.
+**Srcset для каждого изображения**: `640w` (sm), `1280w` (md), `1920w` (lg) — браузер выбирает оптимальный вариант.
+
+### Fallback логика
+
+- Если `image_url_mobile = null`, `<source>` для мобильных использует desktop srcset — браузер автоматически подберёт нужный размер
+- LQIP blur placeholder отображается поверх `<picture>` до загрузки изображения
 
 ### Удаление
 
