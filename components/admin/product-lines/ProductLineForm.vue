@@ -3,7 +3,6 @@ import type { ProductLine, ProductLineInsert } from '@/types'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_PRESETS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { slugify } from '@/utils/slugify'
 
@@ -17,7 +16,7 @@ const emit = defineEmits<{
   (e: 'submit', payload: { data: ProductLineInsert, file: File | null }): void
 }>()
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const formData = ref<Partial<ProductLineInsert>>({
   brand_id: props.brandId,
@@ -120,7 +119,7 @@ const displayLogoUrl = computed(() => {
 
   const logoUrl = formData.value.logo_url
   if (logoUrl && typeof logoUrl === 'string') {
-    return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, IMAGE_PRESETS.PRODUCT_LINE_LOGO)
+    return getVariantUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, 'sm')
   }
 
   return null
@@ -158,6 +157,7 @@ onBeforeUnmount(() => {
           alt="Логотип линейки"
           class="w-12 h-12 object-contain border rounded bg-muted"
           loading="lazy"
+          @error="($event.target as HTMLImageElement).src = '/images/placeholder.svg'"
         >
         <p class="text-sm text-muted-foreground">
           {{ newLogoFile ? 'Новый логотип' : 'Текущий логотип' }}

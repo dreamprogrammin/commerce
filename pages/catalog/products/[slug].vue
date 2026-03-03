@@ -5,7 +5,6 @@ import { toast } from 'vue-sonner'
 import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -26,7 +25,7 @@ const questionsStore = useProductQuestionsStore()
 const reviewsStore = useReviewsStore()
 const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const slug = computed(() => route.params.slug as string)
 
@@ -565,7 +564,7 @@ const brandLogoUrl = computed(() => {
   const logoUrl = product.value?.brands?.logo_url
   if (!logoUrl)
     return null
-  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 })
 
 // URL логотипа линейки
@@ -573,7 +572,7 @@ const productLineLogoUrl = computed(() => {
   const logoUrl = product.value?.product_lines?.logo_url
   if (!logoUrl)
     return null
-  return getImageUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, IMAGE_SIZES.PRODUCT_LINE_LOGO)
+  return getVariantUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, 'sm')
 })
 
 // Ссылки для SEO блока "Ещё товары"
@@ -1310,7 +1309,7 @@ useHead(() => ({
                 <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
                   <ProgressiveImage
                     v-if="fullCategory?.image_url"
-                    :src="getImageUrl(BUCKET_NAME_CATEGORY, fullCategory.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+                    :src="getVariantUrl(BUCKET_NAME_CATEGORY, fullCategory.image_url, 'sm')"
                     :alt="categoryName || 'Категория'"
                     :bucket-name="BUCKET_NAME_CATEGORY"
                     :file-path="fullCategory.image_url || undefined"
@@ -1342,7 +1341,7 @@ useHead(() => ({
                 <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
                   <ProgressiveImage
                     v-if="item.category?.image_url"
-                    :src="getImageUrl(BUCKET_NAME_CATEGORY, item.category.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+                    :src="getVariantUrl(BUCKET_NAME_CATEGORY, item.category.image_url, 'sm')"
                     :alt="item.crumb.name"
                     :bucket-name="BUCKET_NAME_CATEGORY"
                     :file-path="item.category.image_url || undefined"

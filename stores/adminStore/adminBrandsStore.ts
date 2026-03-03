@@ -3,11 +3,78 @@
 import type { Brand, BrandInsert, BrandUpdate, Database } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
+import { generateBlurPlaceholder, generateImageVariants } from '@/utils/imageOptimizer'
 
 export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
   const supabase = useSupabaseClient<Database>()
-  const { uploadFile, removeFile, getPublicUrl } = useSupabaseStorage()
+  const { uploadFile, removeFile, getPublicUrl, generateSeoFileName } = useSupabaseStorage()
+
+  /**
+   * Проверяет, является ли путь старым форматом (с расширением файла)
+   */
+  function _isLegacyPath(url: string): boolean {
+    return /\.\w{3,4}$/.test(url)
+  }
+
+  /**
+   * Возвращает пути всех вариантов для удаления из Storage
+   */
+  function _getVariantPaths(url: string): string[] {
+    if (_isLegacyPath(url)) {
+      return [url]
+    }
+    return Object.values(IMAGE_VARIANTS).map(v => `${url}${v.suffix}.webp`)
+  }
+
+  /**
+   * Загружает 3 варианта изображения (sm/md/lg) и возвращает базовый путь
+   */
+  async function _uploadVariants(
+    file: File,
+    seoName?: string,
+  ): Promise<{ basePath: string, blurPlaceholder?: string } | null> {
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      // Платный тариф: загружаем оригинал
+      let blurDataUrl: string | undefined
+      try {
+        const blurResult = await generateBlurPlaceholder(file)
+        blurDataUrl = blurResult.dataUrl
+      }
+      catch { /* ignore */ }
+
+      const filePath = await uploadFile(file, {
+        bucketName: BUCKET_NAME_BRANDS,
+        seoName,
+      })
+      if (!filePath) {
+        return null
+      }
+      return { basePath: filePath, blurPlaceholder: blurDataUrl }
+    }
+
+    // Бесплатный тариф: генерируем 3 варианта
+    const variants = await generateImageVariants(file)
+    const baseSeoName = generateSeoFileName(file, seoName).replace(/\.[^.]+$/, '')
+
+    const uploadResults = await Promise.all(
+      (['sm', 'md', 'lg'] as const).map(variant =>
+        uploadFile(variants[variant], {
+          bucketName: BUCKET_NAME_BRANDS,
+          customFileName: `${baseSeoName}${IMAGE_VARIANTS[variant].suffix}.webp`,
+        }),
+      ),
+    )
+
+    if (!uploadResults[0]) {
+      return null
+    }
+
+    // Базовый путь без суффикса и расширения
+    const basePath = baseSeoName
+    return { basePath, blurPlaceholder: variants.blurPlaceholder }
+  }
 
   const brands = ref<Brand[]>([])
   const currentBrand = ref<Brand | null>(null)
@@ -71,14 +138,10 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     isLoading.value = true
     try {
       if (logoFile) {
-        // 🔍 SEO: Имя файла будет содержать название бренда (uhti-{brand-name}-{uuid}.ext)
-        const uploadedPath = await uploadFile(logoFile, {
-          bucketName: BUCKET_NAME_BRANDS,
-          seoName: brandData.name ? `brand-${brandData.name}` : undefined,
-        })
-        if (!uploadedPath)
+        const result = await _uploadVariants(logoFile, brandData.name ? `brand-${brandData.name}` : undefined)
+        if (!result)
           throw new Error('Не удалось загрузить логотип.')
-        brandData.logo_url = uploadedPath
+        brandData.logo_url = result.basePath
       }
 
       const { data: newBrand, error } = await supabase
@@ -113,18 +176,14 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     isLoading.value = true
     try {
       if (newLogoFile) {
-        // Если есть старый логотип, удаляем его
+        // Удаляем старый логотип (все варианты)
         if (brandData.logo_url) {
-          await removeFile(BUCKET_NAME_BRANDS, [brandData.logo_url])
+          await removeFile(BUCKET_NAME_BRANDS, _getVariantPaths(brandData.logo_url))
         }
-        // 🔍 SEO: Имя файла будет содержать название бренда (uhti-{brand-name}-{uuid}.ext)
-        const uploadedPath = await uploadFile(newLogoFile, {
-          bucketName: BUCKET_NAME_BRANDS,
-          seoName: brandData.name ? `brand-${brandData.name}` : undefined,
-        })
-        if (!uploadedPath)
+        const result = await _uploadVariants(newLogoFile, brandData.name ? `brand-${brandData.name}` : undefined)
+        if (!result)
           throw new Error('Не удалось загрузить новый логотип.')
-        brandData.logo_url = uploadedPath
+        brandData.logo_url = result.basePath
       }
 
       const { error } = await supabase.from('brands').update(brandData).eq('id', id)
@@ -152,9 +211,9 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
 
   async function deleteBrand(brandToDelete: Brand) {
     try {
-      // Сначала удаляем логотип из хранилища
+      // Удаляем все варианты логотипа из хранилища
       if (brandToDelete.logo_url) {
-        await removeFile(BUCKET_NAME_BRANDS, [brandToDelete.logo_url])
+        await removeFile(BUCKET_NAME_BRANDS, _getVariantPaths(brandToDelete.logo_url))
       }
       // Затем удаляем запись из БД
       const { error } = await supabase.from('brands').delete().eq('id', brandToDelete.id)

@@ -1,5 +1,5 @@
 import imageCompression from 'browser-image-compression'
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, IMAGE_VARIANTS_WIDE, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
 
 /**
  * 🎨 Результат генерации blur placeholder
@@ -72,6 +72,54 @@ export async function generateImageVariants(file: File): Promise<VariantResult> 
       useWebWorker: true,
       fileType: 'image/webp',
       initialQuality: IMAGE_VARIANTS.lg.quality,
+    }),
+    generateBlurPlaceholder(file).catch(() => null),
+  ])
+
+  const baseName = file.name.replace(/\.[^.]+$/, '')
+
+  const sm = new File([smCompressed], `${baseName}_sm.webp`, { type: 'image/webp' })
+  const md = new File([mdCompressed], `${baseName}_md.webp`, { type: 'image/webp' })
+  const lg = new File([lgCompressed], `${baseName}_lg.webp`, { type: 'image/webp' })
+
+  return {
+    sm,
+    md,
+    lg,
+    blurPlaceholder: blurResult?.dataUrl,
+    originalSize,
+  }
+}
+
+/**
+ * 🎯 Генерирует 3 варианта широкого изображения (баннеры, слайды) + LQIP
+ *
+ * Использует IMAGE_VARIANTS_WIDE (640/1280/1920px) для сохранения пропорций.
+ */
+export async function generateImageVariantsWide(file: File): Promise<VariantResult> {
+  const originalSize = file.size
+
+  const [smCompressed, mdCompressed, lgCompressed, blurResult] = await Promise.all([
+    imageCompression(file, {
+      maxSizeMB: 0.1,
+      maxWidthOrHeight: IMAGE_VARIANTS_WIDE.sm.maxWidthOrHeight,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: IMAGE_VARIANTS_WIDE.sm.quality,
+    }),
+    imageCompression(file, {
+      maxSizeMB: 0.3,
+      maxWidthOrHeight: IMAGE_VARIANTS_WIDE.md.maxWidthOrHeight,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: IMAGE_VARIANTS_WIDE.md.quality,
+    }),
+    imageCompression(file, {
+      maxSizeMB: 1.0,
+      maxWidthOrHeight: IMAGE_VARIANTS_WIDE.lg.maxWidthOrHeight,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: IMAGE_VARIANTS_WIDE.lg.quality,
     }),
     generateBlurPlaceholder(file).catch(() => null),
   ])

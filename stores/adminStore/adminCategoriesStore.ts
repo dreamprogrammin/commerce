@@ -3,6 +3,8 @@ import type { Database } from '@/types/supabase'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
+import { generateImageVariants } from '@/utils/imageOptimizer'
 import { useCategoriesStore } from '../publicStore/categoriesStore'
 
 interface CategoryUpsertPayload {
@@ -103,7 +105,18 @@ function createUpdatePayload(item: EditableCategory, parentId: string | null, di
 
 export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () => {
   const supabase = useSupabaseClient<Database>()
-  const { uploadFile, removeFile } = useSupabaseStorage()
+  const { uploadFile, removeFile, generateSeoFileName } = useSupabaseStorage()
+
+  function _isLegacyPath(url: string): boolean {
+    return /\.\w{3,4}$/.test(url)
+  }
+
+  function _getVariantPaths(url: string): string[] {
+    if (_isLegacyPath(url)) {
+      return [url]
+    }
+    return Object.values(IMAGE_VARIANTS).map(v => `${url}${v.suffix}.webp`)
+  }
 
   const categoriesStore = useCategoriesStore()
 
@@ -215,38 +228,53 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         for (const [index, item] of items.entries()) {
           const originalItem = item.id ? originalItems.get(item.id) : null
 
-          // 🆕 ИСПРАВЛЕНИЕ: Обработка изображения с blur
+          // Обработка изображения с вариантами (sm/md/lg)
           if (item._imageFile) {
-            console.log(`📤 Загружаем файл для: ${item.name}`, {
-              hasBlur: !!item._blurPlaceholder,
-              blurLength: item._blurPlaceholder?.length,
-            })
-
-            // Удаляем старое изображение если оно было
+            // Удаляем все варианты старого изображения
             if (originalItem?.image_url) {
-              await removeFile('category-images', originalItem.image_url)
+              await removeFile('category-images', _getVariantPaths(originalItem.image_url))
             }
 
-            // Загружаем новое изображение (🔍 SEO: имя файла содержит название категории)
-            const newPath = await uploadFile(item._imageFile, {
-              bucketName: 'category-images',
-              filePathPrefix: `categories/${item.slug || 'new'}`,
-              seoName: item.name ? `category-${item.name}` : undefined,
-            })
+            const seoName = item.name ? `category-${item.name}` : undefined
+            const filePathPrefix = `categories/${item.slug || 'new'}`
 
-            // 🔥 КРИТИЧНО: Переносим _blurPlaceholder в blur_placeholder
-            item.image_url = newPath || null
-            item.blur_placeholder = item._blurPlaceholder || null
+            if (IMAGE_OPTIMIZATION_ENABLED) {
+              // Платный тариф: загружаем оригинал
+              const newPath = await uploadFile(item._imageFile, {
+                bucketName: 'category-images',
+                filePathPrefix,
+                seoName,
+              })
+              item.image_url = newPath || null
+              item.blur_placeholder = item._blurPlaceholder || null
+            }
+            else {
+              // Бесплатный тариф: генерируем 3 варианта
+              const variants = await generateImageVariants(item._imageFile)
+              const baseSeoName = generateSeoFileName(item._imageFile, seoName).replace(/\.[^.]+$/, '')
 
-            console.log(`✅ Файл загружен для: ${item.name}`, {
-              imagePath: item.image_url,
-              hasBlur: !!item.blur_placeholder,
-              blurLength: item.blur_placeholder?.length,
-            })
+              const uploadResults = await Promise.all(
+                (['sm', 'md', 'lg'] as const).map(variant =>
+                  uploadFile(variants[variant], {
+                    bucketName: 'category-images',
+                    filePathPrefix,
+                    customFileName: `${baseSeoName}${IMAGE_VARIANTS[variant].suffix}.webp`,
+                  }),
+                ),
+              )
+
+              if (uploadResults[0]) {
+                item.image_url = `${filePathPrefix}/${baseSeoName}`
+              }
+              else {
+                item.image_url = null
+              }
+              item.blur_placeholder = variants.blurPlaceholder || item._blurPlaceholder || null
+            }
           }
           else if (originalItem?.image_url && item.image_url === null) {
-            // Если изображение было удалено
-            await removeFile('category-images', originalItem.image_url)
+            // Удаляем все варианты при удалении изображения
+            await removeFile('category-images', _getVariantPaths(originalItem.image_url))
             item.blur_placeholder = null
           }
           else if (!item._imageFile && item._blurPlaceholder) {
@@ -294,7 +322,10 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         if (error)
           throw error
 
-        const filesToDelete = toDelete.map(d => d.imageUrl).filter((url): url is string => !!url)
+        const filesToDelete = toDelete
+          .map(d => d.imageUrl)
+          .filter((url): url is string => !!url)
+          .flatMap(url => _getVariantPaths(url))
         if (filesToDelete.length > 0) {
           await removeFile('category-images', filesToDelete)
         }

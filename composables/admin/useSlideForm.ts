@@ -1,9 +1,10 @@
 import type { Database, SlideInsert, SlideRow, SlideUpdate } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS_WIDE } from '@/config/images'
 import {
-  formatFileSize,
   generateBlurPlaceholder,
+  generateImageVariantsWide,
   getOptimizationInfo,
   optimizeImageBeforeUpload,
   shouldOptimizeImage,
@@ -26,7 +27,62 @@ export function useSlideForm(
   options: UseSlideFromOptions,
 ) {
   const supabase = useSupabaseClient<Database>()
-  const { uploadFile, removeFile } = useSupabaseStorage()
+  const { uploadFile, removeFile, generateSeoFileName } = useSupabaseStorage()
+
+  function _isLegacyPath(url: string): boolean {
+    return /\.\w{3,4}$/.test(url)
+  }
+
+  function _getVariantPaths(url: string): string[] {
+    if (_isLegacyPath(url)) {
+      return [url]
+    }
+    return Object.values(IMAGE_VARIANTS_WIDE).map(v => `${url}${v.suffix}.webp`)
+  }
+
+  /**
+   * Загружает 3 широких варианта (640/1280/1920px) и возвращает базовый путь
+   */
+  async function _uploadWideVariants(
+    file: File,
+    seoName?: string,
+  ): Promise<{ basePath: string, blurPlaceholder?: string } | null> {
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      let blurDataUrl: string | undefined
+      try {
+        const blurResult = await generateBlurPlaceholder(file)
+        blurDataUrl = blurResult.dataUrl
+      }
+      catch { /* ignore */ }
+
+      const filePath = await uploadFile(file, {
+        bucketName: BUCKET_NAME,
+        seoName,
+      })
+      if (!filePath) {
+        return null
+      }
+      return { basePath: filePath, blurPlaceholder: blurDataUrl }
+    }
+
+    const variants = await generateImageVariantsWide(file)
+    const baseSeoName = generateSeoFileName(file, seoName).replace(/\.[^.]+$/, '')
+
+    const uploadResults = await Promise.all(
+      (['sm', 'md', 'lg'] as const).map(variant =>
+        uploadFile(variants[variant], {
+          bucketName: BUCKET_NAME,
+          customFileName: `${baseSeoName}${IMAGE_VARIANTS_WIDE[variant].suffix}.webp`,
+        }),
+      ),
+    )
+
+    if (!uploadResults[0]) {
+      return null
+    }
+
+    return { basePath: baseSeoName, blurPlaceholder: variants.blurPlaceholder }
+  }
 
   const isSaving = ref(false)
   const isProcessingImage = ref(false)
@@ -232,33 +288,29 @@ export function useSlideForm(
       let finalImagePathMobile = formData.value.image_url_mobile
       let finalBlurDataUrlMobile = formData.value.blur_placeholder_mobile
 
-      // 📤 Загружаем новое ДЕСКТОПНОЕ изображение если есть (🔍 SEO: имя файла содержит название слайда)
+      // 📤 Загружаем новое ДЕСКТОПНОЕ изображение (3 широких варианта)
       if (newImageFile.value) {
-        const uploadedPath = await uploadFile(newImageFile.value.file, {
-          bucketName: BUCKET_NAME,
-          seoName: formData.value.title ? `slide-${formData.value.title}` : 'slide',
-        })
-        if (!uploadedPath)
+        const seoName = formData.value.title ? `slide-${formData.value.title}` : 'slide'
+        const result = await _uploadWideVariants(newImageFile.value.file, seoName)
+        if (!result)
           throw new Error('Не удалось загрузить десктопное изображение')
-        finalImagePath = uploadedPath
-        finalBlurDataUrl = newImageFile.value.blurDataUrl || null
+        finalImagePath = result.basePath
+        finalBlurDataUrl = result.blurPlaceholder || newImageFile.value.blurDataUrl || null
         if (isEditMode.value && imageToDelete.value) {
-          await removeFile(BUCKET_NAME, imageToDelete.value)
+          await removeFile(BUCKET_NAME, _getVariantPaths(imageToDelete.value))
         }
       }
 
-      // 🆕 📤 Загружаем новое МОБИЛЬНОЕ изображение если есть (🔍 SEO: имя файла содержит название слайда)
+      // 📤 Загружаем новое МОБИЛЬНОЕ изображение (3 широких варианта)
       if (newImageFileMobile.value) {
-        const uploadedPath = await uploadFile(newImageFileMobile.value.file, {
-          bucketName: BUCKET_NAME,
-          seoName: formData.value.title ? `slide-mobile-${formData.value.title}` : 'slide-mobile',
-        })
-        if (!uploadedPath)
+        const seoName = formData.value.title ? `slide-mobile-${formData.value.title}` : 'slide-mobile'
+        const result = await _uploadWideVariants(newImageFileMobile.value.file, seoName)
+        if (!result)
           throw new Error('Не удалось загрузить мобильное изображение')
-        finalImagePathMobile = uploadedPath
-        finalBlurDataUrlMobile = newImageFileMobile.value.blurDataUrl || null
+        finalImagePathMobile = result.basePath
+        finalBlurDataUrlMobile = result.blurPlaceholder || newImageFileMobile.value.blurDataUrl || null
         if (isEditMode.value && imageToDeleteMobile.value) {
-          await removeFile(BUCKET_NAME, imageToDeleteMobile.value)
+          await removeFile(BUCKET_NAME, _getVariantPaths(imageToDeleteMobile.value))
         }
       }
 

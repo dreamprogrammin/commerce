@@ -2,13 +2,12 @@
 import type { Brand, IBreadcrumbItem, ProductImageRow, ProductLine, ProductWithGallery, SimpleBrand } from '@/types'
 import { ArrowLeft, ChevronDown, Package, Sparkles, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
-const { getImageUrl } = useSupabaseStorage()
+const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
 const brandSlug = route.params.brandSlug as string
@@ -156,7 +155,7 @@ const brandLogoUrl = computed(() => {
   if (!brand.value?.logo_url) {
     return null
   }
-  return getImageUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, IMAGE_SIZES.BRAND_LOGO)
+  return getVariantUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, 'sm')
 })
 
 // URL логотипа линейки
@@ -164,7 +163,7 @@ const lineLogoUrl = computed(() => {
   if (!productLine.value?.logo_url) {
     return null
   }
-  return getImageUrl(BUCKET_NAME_PRODUCT_LINES, productLine.value.logo_url, IMAGE_SIZES.PRODUCT_LINE_LOGO)
+  return getVariantUrl(BUCKET_NAME_PRODUCT_LINES, productLine.value.logo_url, 'sm')
 })
 
 // ========================================

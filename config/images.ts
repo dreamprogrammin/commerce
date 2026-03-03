@@ -37,6 +37,20 @@ export const IMAGE_VARIANTS = {
 export type ImageVariant = keyof typeof IMAGE_VARIANTS
 
 /**
+ * 📐 Варианты для широких изображений (баннеры, слайды)
+ *
+ * Сохраняют пропорции, но ограничивают ширину:
+ * - sm (640px) — мобильные экраны
+ * - md (1280px) — планшеты и ноутбуки
+ * - lg (1920px) — десктоп Full HD
+ */
+export const IMAGE_VARIANTS_WIDE = {
+  sm: { maxWidthOrHeight: 640, quality: 0.75, suffix: '_sm' },
+  md: { maxWidthOrHeight: 1280, quality: 0.80, suffix: '_md' },
+  lg: { maxWidthOrHeight: 1920, quality: 0.90, suffix: '_lg' },
+} as const
+
+/**
  * 📐 Размеры изображений для разных контекстов
  */
 export const IMAGE_SIZES = {

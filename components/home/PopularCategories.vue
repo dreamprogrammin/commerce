@@ -2,12 +2,11 @@
 import { useQuery } from '@tanstack/vue-query'
 import { onMounted, ref } from 'vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
 const popularCategoriesStore = usePopularCategoriesStore()
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 // ✅ Prefetch data during SSR to prevent hydration mismatch
 const { data: ssrData } = await useAsyncData(
@@ -44,7 +43,7 @@ function getCategoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return '/images/placeholder.svg'
 
-  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_MENU)
+  return getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, 'sm')
     || '/images/placeholder.svg'
 }
 

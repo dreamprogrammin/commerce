@@ -5,7 +5,6 @@ import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBrandQuestions } from '@/composables/useBrandQuestions'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
@@ -15,7 +14,7 @@ definePageMeta({ layout: 'admin' })
 const brandsStore = useAdminBrandsStore()
 const productLinesStore = useAdminProductLinesStore()
 const { brands, isLoading } = storeToRefs(brandsStore)
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const { generateQuestionsForAllBrands } = useBrandQuestions()
 
 // Генерация FAQ
@@ -102,7 +101,7 @@ const BRAND_PLACEHOLDER = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/20
 function getBrandLogoUrl(logoUrl: string | null): string {
   if (!logoUrl)
     return BRAND_PLACEHOLDER
-  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.CATEGORY_MENU) || BRAND_PLACEHOLDER
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm') || BRAND_PLACEHOLDER
 }
 </script>
 

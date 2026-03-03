@@ -35,12 +35,12 @@ const { data: banners, pending } = useAsyncData(
 // ✅ Показываем skeleton только если идёт загрузка И данных нет
 const showSkeleton = computed(() => pending.value && (!banners.value || banners.value.length === 0))
 
-const { getPublicUrl } = useSupabaseStorage()
+const { getVariantUrlWide } = useSupabaseStorage()
 
 function getBannerImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
-  return getPublicUrl('banners', imageUrl)
+  return getVariantUrlWide('banners', imageUrl, 'md')
 }
 
 // 🔧 Безопасное получение blur placeholder

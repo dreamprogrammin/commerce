@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 
 const props = defineProps<{
@@ -14,7 +13,7 @@ const props = defineProps<{
 }>()
 
 // Используем композабл для работы с изображениями
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 </script>
 
 <template>
@@ -30,7 +29,7 @@ const { getImageUrl } = useSupabaseStorage()
       >
         <div class="w-full max-w-sm rounded-lg overflow-hidden shadow-md">
           <ProgressiveImage
-            :src="getImageUrl(BUCKET_NAME_CATEGORY, category.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+            :src="getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'md')"
             :alt="category.name"
             aspect-ratio="square"
             object-fit="cover"

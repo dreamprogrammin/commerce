@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSafeHtml } from '@/composables/useSafeHtml'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
@@ -42,8 +41,7 @@ const isChildrenVisible = ref(true)
 const isProcessingImage = ref(false)
 const isSlugManuallyEdited = ref(false)
 
-// 👇 Используем универсальную функцию getImageUrl
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
 const optimizationInfo = computed(() => getOptimizationInfo())
@@ -192,17 +190,13 @@ const isDeleted = computed({
   set: value => emit('update:item', { ...props.item, _isDeleted: value }),
 })
 
-// 👇 Computed для отображения оптимизированного изображения
 const displayImageUrl = computed(() => {
-  // Если есть превью нового файла (локальный blob URL)
   if (props.item._imagePreview) {
     return props.item._imagePreview
   }
 
-  // Если есть существующее изображение в БД - используем оптимизацию
   if (props.item.image_url) {
-    // Используем предустановку CATEGORY_IMAGE
-    return getImageUrl(BUCKET_NAME_CATEGORY, props.item.image_url, IMAGE_SIZES.CATEGORY_MENU)
+    return getVariantUrl(BUCKET_NAME_CATEGORY, props.item.image_url, 'sm')
   }
 
   return null

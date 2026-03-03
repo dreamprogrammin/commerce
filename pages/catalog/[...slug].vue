@@ -25,7 +25,7 @@ const router = useRouter()
 const categoriesStore = useCategoriesStore()
 const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
-const { getImageUrl } = useSupabaseStorage()
+const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
 // 🆕 Отмена запросов при размонтировании
@@ -146,7 +146,7 @@ const categoryOgImageUrl = computed(() => {
     return undefined
 
   // Используем пресет OG_IMAGE для Open Graph (1200x630)
-  return getImageUrl(BUCKET_NAME_CATEGORY, imageFilename, IMAGE_SIZES.OG_IMAGE)
+  return getVariantUrl(BUCKET_NAME_CATEGORY, imageFilename, 'lg')
 })
 
 // Название категории (для breadcrumbs и fallback)
@@ -1016,7 +1016,7 @@ useHead(() => {
             class="shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center"
           >
             <ProgressiveImage
-              :src="getImageUrl(BUCKET_NAME_CATEGORY, currentCategory.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+              :src="getVariantUrl(BUCKET_NAME_CATEGORY, currentCategory.image_url, 'md')"
               :alt="currentCategory.name"
               object-fit="contain"
               placeholder-type="lqip"
@@ -1067,7 +1067,7 @@ useHead(() => {
         >
           <div class="w-full max-w-[220px] h-[160px] rounded-lg overflow-hidden shadow-md bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
             <ProgressiveImage
-              :src="getImageUrl(BUCKET_NAME_CATEGORY, currentCategory.image_url, IMAGE_SIZES.CATEGORY_IMAGE)"
+              :src="getVariantUrl(BUCKET_NAME_CATEGORY, currentCategory.image_url, 'md')"
               :alt="currentCategory.name"
               object-fit="contain"
               placeholder-type="lqip"

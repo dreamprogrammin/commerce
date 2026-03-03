@@ -37,14 +37,14 @@ const {
   },
 })
 
-const { getPublicUrl } = useSupabaseStorage()
+const { getVariantUrlWide } = useSupabaseStorage()
 
 // Computed для отображения текущего изображения
 const currentImageUrl = computed(() => {
   if (imagePreviewUrl.value)
     return imagePreviewUrl.value
   if (formData.value.image_url) {
-    return getPublicUrl(BUCKET_NAME_BANNERS, formData.value.image_url)
+    return getVariantUrlWide(BUCKET_NAME_BANNERS, formData.value.image_url, 'sm')
   }
   return null
 })

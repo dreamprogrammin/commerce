@@ -49,13 +49,15 @@ export const IMAGE_OPTIMIZATION_ENABLED = false // ⚠️ Оптимизация
 
 #### Методы
 
-| Метод               | Описание                                        | Использование              |
-| ------------------- | ----------------------------------------------- | -------------------------- |
-| `getPublicUrl()`    | Возвращает оригинальный URL                     | Когда нужен оригинал       |
-| `getOptimizedUrl()` | Всегда оптимизирует (игнорирует флаг)           | Принудительная оптимизация |
-| `getImageUrl()`     | **Рекомендуется!** Умная функция с учетом флага | 99% случаев                |
-| `uploadFile()`      | Загрузка файла в бакет                          | Админ-панель, формы        |
-| `removeFile()`      | Удаление файла из бакета                        | Удаление изображений       |
+| Метод                 | Описание                                        | Использование                  |
+| --------------------- | ----------------------------------------------- | ------------------------------ |
+| `getPublicUrl()`      | Возвращает оригинальный URL                     | Когда нужен оригинал           |
+| `getOptimizedUrl()`   | Всегда оптимизирует (игнорирует флаг)           | Принудительная оптимизация     |
+| `getImageUrl()`       | Умная функция с учетом флага                    | Legacy — старые изображения    |
+| `getVariantUrl()`     | **Рекомендуется!** URL варианта (sm/md/lg)      | Товары, бренды, категории      |
+| `getVariantUrlWide()` | URL широкого варианта (sm/md/lg)                | Баннеры, слайды                |
+| `uploadFile()`        | Загрузка файла в бакет                          | Админ-панель, формы            |
+| `removeFile()`        | Удаление файла из бакета                        | Удаление изображений           |
 
 ---
 
@@ -868,9 +870,135 @@ const result = await generateImageVariants(file)
 
 ---
 
+## 🎠 Слайды — двойная загрузка изображений (Desktop + Mobile)
+
+### Концепция
+
+Каждый слайд на главной странице имеет **два изображения**:
+
+| Поле | Пропорции | Назначение |
+|------|-----------|------------|
+| `image_url` | 21:9 | Десктопная версия (широкий баннер) |
+| `image_url_mobile` | 3:2 | Мобильная версия (компактная) |
+
+Оба изображения генерируются в 3 широких варианта через `IMAGE_VARIANTS_WIDE` (640/1280/1920px).
+
+### Архитектура
+
+```
+┌──────────────────────────────────────────────────────┐
+│  SlidesForm.vue (UI)                                 │
+│  ├── input[file] для desktop → handleImageChange()   │
+│  └── input[file] для mobile  → handleImageChangeMobile()
+└──────────────────┬───────────────────────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────────────────────┐
+│  useSlideForm.ts (Composable)                        │
+│                                                      │
+│  Состояние:                                          │
+│  ├── newImageFile        / imageToDelete       (desktop)
+│  └── newImageFileMobile  / imageToDeleteMobile (mobile)
+│                                                      │
+│  handleSubmit():                                     │
+│  ├── _uploadWideVariants(desktopFile, "slide-{title}")
+│  │   └── generateImageVariantsWide() → 3 файла       │
+│  ├── _uploadWideVariants(mobileFile, "slide-mobile-{title}")
+│  │   └── generateImageVariantsWide() → 3 файла       │
+│  └── supabase.from('slides').insert/update(...)      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Хранение в Supabase Storage (`slides-images`)
+
+```
+slides-images/
+├── slide-promo-abc123_sm.webp      (desktop, 640px)
+├── slide-promo-abc123_md.webp      (desktop, 1280px)
+├── slide-promo-abc123_lg.webp      (desktop, 1920px)
+├── slide-mobile-promo-def456_sm.webp  (mobile, 640px)
+├── slide-mobile-promo-def456_md.webp  (mobile, 1280px)
+└── slide-mobile-promo-def456_lg.webp  (mobile, 1920px)
+```
+
+### Хранение в БД (`slides`)
+
+| Поле | Значение | Описание |
+|------|----------|----------|
+| `image_url` | `slide-promo-abc123` | Базовый путь desktop (без суффикса) |
+| `blur_placeholder` | `data:image/webp;base64,...` | LQIP для desktop |
+| `image_url_mobile` | `slide-mobile-promo-def456` | Базовый путь mobile (без суффикса) |
+| `blur_placeholder_mobile` | `data:image/webp;base64,...` | LQIP для mobile |
+
+### Отображение на фронтенде (`AppCarousel.vue`)
+
+```typescript
+// Desktop → lg вариант (1920px)
+getVariantUrlWide(BUCKET_NAME_SLIDES, slide.image_url, 'lg')
+
+// Mobile → sm вариант (640px)
+getVariantUrlWide(BUCKET_NAME_SLIDES, slide.image_url_mobile, 'sm')
+```
+
+Компонент `AppCarousel` показывает desktop-версию на `md+` экранах и mobile-версию на `<md`.
+
+### Удаление
+
+При удалении слайда (`useAdminSlides.handleDelete()`) автоматически удаляются **все 6 файлов** (3 desktop + 3 mobile) через `_getVariantPaths()`.
+
+### Файлы
+
+| Файл | Роль |
+|------|------|
+| `components/admin/slides/ SlidesForm.vue` | UI формы с двумя input[file] |
+| `composables/admin/useSlideForm.ts` | Логика загрузки, валидации, сохранения |
+| `composables/admin/useAdminSlides.ts` | Список слайдов + удаление с очисткой Storage |
+| `components/common/AppCarousel.vue` | Карусель на главной (desktop/mobile switching) |
+
+---
+
 ## 📝 Changelog
 
-### v4.0.0 (Current)
+### v4.1.0 (Current) — Глобальная стандартизация
+
+Система адаптивных изображений распространена на **все сущности** проекта.
+
+**Новые конфигурации:**
+- `IMAGE_VARIANTS_WIDE` — широкие варианты (640/1280/1920px) для баннеров и слайдов
+- `generateImageVariantsWide()` — генерация широких вариантов
+- `getVariantUrlWide()` — URL-хелпер для широких вариантов
+
+**Stores — загрузка 3 вариантов при создании/обновлении:**
+
+| Store | Бакет | Тип вариантов |
+|-------|-------|---------------|
+| `adminProductsStore` | product-images | Standard (400/800/1440px) |
+| `adminBrandsStore` | brand-logos | Standard |
+| `adminProductLinesStore` | product-line-logos | Standard |
+| `adminCategoriesStore` | category-images | Standard |
+| `useSlideForm` | slides-images | Wide (640/1280/1920px) |
+| `useBannerForm` | banners | Wide |
+
+**Удаление всех вариантов при удалении сущности:**
+- `adminBrandsStore.deleteBrand()` — удаляет 3 файла логотипа
+- `adminProductLinesStore.deleteProductLine()` — удаляет 3 файла
+- `adminCategoriesStore.saveChanges()` — удаляет варианты при удалении/замене
+- `useAdminSlides.handleDelete()` — удаляет варианты desktop + mobile
+- `useAdminBanners.handleDelete()` — **исправлен баг**: ранее файлы не удалялись из Storage
+
+**Фронтенд — все компоненты используют `getVariantUrl`/`getVariantUrlWide`:**
+- Категории: `PopularCategories`, `AppTabBar`, `CategoryDescription`, каталог
+- Бренды: `BrandsCarousel`, `ProductCard` (лого), `/brands`, `/brand/[slug]`
+- Линейки: `CategoryProductLines`, `/brand/[brandSlug]/[lineSlug]`
+- Слайды: `AppCarousel` → `getVariantUrlWide('lg'/'sm')`
+- Баннеры: `Banners.vue` → `getVariantUrlWide('md')`
+
+**Админ-панель — превью через варианты:**
+- `BrandForm`, `ProductLineForm`, `RecursiveMenuItemFormNode` → `getVariantUrl('sm')`
+- `SlidesForm`, `BannerForm` → `getVariantUrlWide('sm'/'lg')`
+- Все формы имеют `@error` fallback на placeholder.svg
+
+### v4.0.0
 
 - Адаптивные изображения: 3 варианта (sm/md/lg) при загрузке товара
 - HTML `srcset` + `sizes` в `ProgressiveImage.vue` для автоматического выбора размера
@@ -910,8 +1038,8 @@ const result = await generateImageVariants(file)
 ---
 
 **Автор:** Development Team
-**Последнее обновление:** 2026-03-02
-**Версия:** 4.0.0
+**Последнее обновление:** 2026-03-03
+**Версия:** 4.1.0
 
 ---
 
@@ -932,9 +1060,11 @@ const result = await generateImageVariants(file)
 // 4. LQIP: maxSizeMB=0.002, maxWidthOrHeight=20
 ```
 
-**Для категорий, брендов, баннеров** по-прежнему используется `optimizeImageBeforeUpload()` (один файл).
+**v4.1.0 (все сущности):** Все сущности используют варианты:
+- Бренды, линейки, категории → `generateImageVariants()` (Standard: 400/800/1440px)
+- Слайды, баннеры → `generateImageVariantsWide()` (Wide: 640/1280/1920px)
 
-### Параметры сжатия (варианты товаров)
+### Параметры сжатия (стандартные варианты)
 
 | Вариант | maxSizeMB | maxWidthOrHeight | quality | Типичный размер |
 |---------|-----------|------------------|---------|----------------|
@@ -942,6 +1072,14 @@ const result = await generateImageVariants(file)
 | `md` | 0.15 | 800px | 80% | 80-150 KB |
 | `lg` | 0.8 | 1440px | 90% | 300-800 KB |
 | LQIP | 0.002 | 20px | — | ~0.5 KB |
+
+### Параметры сжатия (широкие варианты — баннеры/слайды)
+
+| Вариант | maxSizeMB | maxWidthOrHeight | quality | Типичный размер |
+|---------|-----------|------------------|---------|----------------|
+| `sm` | 0.1 | 640px | 75% | 50-100 KB |
+| `md` | 0.3 | 1280px | 80% | 150-300 KB |
+| `lg` | 1.0 | 1920px | 90% | 400-1000 KB |
 
 ### Параметры сжатия (одиночное, legacy)
 
@@ -955,7 +1093,10 @@ const result = await generateImageVariants(file)
 
 ### Файлы задействованные в клиентской оптимизации
 
-- `utils/imageOptimizer.ts` - логика сжатия через browser-image-compression
-- `components/admin/products/ProductForm.vue` - `processFiles()`
-- `components/admin/categories/RecursiveMenuItemFormNode.vue` - `handleImageChange()`
-- `components/admin/brands/BrandForm.vue` - `handleFileChange()`
+- `utils/imageOptimizer.ts` — `generateImageVariants()`, `generateImageVariantsWide()`, `optimizeImageBeforeUpload()`
+- `stores/adminStore/adminProductsStore.ts` — варианты товарных изображений (Standard)
+- `stores/adminStore/adminBrandsStore.ts` — варианты логотипов брендов (Standard)
+- `stores/adminStore/adminProductLinesStore.ts` — варианты логотипов линеек (Standard)
+- `stores/adminStore/adminCategoriesStore.ts` — варианты изображений категорий (Standard)
+- `composables/admin/useSlideForm.ts` — варианты слайдов (Wide)
+- `composables/admin/useBannerForm.ts` — варианты баннеров (Wide)

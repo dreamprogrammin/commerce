@@ -1,8 +1,10 @@
 // composables/admin/useBannerForm.ts
 import type { Banner } from '@/types'
 import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS_WIDE } from '@/config/images'
 import { BUCKET_NAME_BANNERS } from '@/constants'
-import { generateBlurPlaceholder, validateImageFile } from '@/utils/imageOptimizer'
+import { generateBlurPlaceholder, generateImageVariantsWide, validateImageFile } from '@/utils/imageOptimizer'
 
 interface UseBannerFormOptions {
   onSuccess?: () => void
@@ -13,8 +15,61 @@ export function useBannerForm(
   options: UseBannerFormOptions = {},
 ) {
   const supabase = useSupabaseClient()
+  const { uploadFile, removeFile, generateSeoFileName } = useSupabaseStorage()
   const isSaving = ref(false)
   const isGeneratingBlur = ref(false)
+
+  function _isLegacyPath(url: string): boolean {
+    return /\.\w{3,4}$/.test(url)
+  }
+
+  function _getVariantPaths(url: string): string[] {
+    if (_isLegacyPath(url)) {
+      return [url]
+    }
+    return Object.values(IMAGE_VARIANTS_WIDE).map(v => `${url}${v.suffix}.webp`)
+  }
+
+  async function _uploadWideVariants(
+    file: File,
+    seoName?: string,
+  ): Promise<{ basePath: string, blurPlaceholder?: string } | null> {
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      let blurDataUrl: string | undefined
+      try {
+        const blurResult = await generateBlurPlaceholder(file)
+        blurDataUrl = blurResult.dataUrl
+      }
+      catch { /* ignore */ }
+
+      const filePath = await uploadFile(file, {
+        bucketName: BUCKET_NAME_BANNERS,
+        seoName,
+      })
+      if (!filePath) {
+        return null
+      }
+      return { basePath: filePath, blurPlaceholder: blurDataUrl }
+    }
+
+    const variants = await generateImageVariantsWide(file)
+    const baseSeoName = generateSeoFileName(file, seoName).replace(/\.[^.]+$/, '')
+
+    const uploadResults = await Promise.all(
+      (['sm', 'md', 'lg'] as const).map(variant =>
+        uploadFile(variants[variant], {
+          bucketName: BUCKET_NAME_BANNERS,
+          customFileName: `${baseSeoName}${IMAGE_VARIANTS_WIDE[variant].suffix}.webp`,
+        }),
+      ),
+    )
+
+    if (!uploadResults[0]) {
+      return null
+    }
+
+    return { basePath: baseSeoName, blurPlaceholder: variants.blurPlaceholder }
+  }
   const selectedImage = ref<File | null>(null)
   const imagePreviewUrl = ref<string | null>(null)
 
@@ -166,24 +221,21 @@ export function useBannerForm(
       let imageUrl = formData.value.image_url
       const blurDataUrl = formData.value.blur_data_url
 
-      // Загружаем новое изображение если выбрано
+      // Загружаем новое изображение (3 широких варианта)
       if (selectedImage.value) {
-        const fileName = `${Date.now()}-${selectedImage.value.name}`
+        const seoName = formData.value.title ? `banner-${formData.value.title}` : 'banner'
+        const result = await _uploadWideVariants(selectedImage.value, seoName)
+        if (!result)
+          throw new Error('Не удалось загрузить изображение баннера')
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from(BUCKET_NAME_BANNERS)
-          .upload(fileName, selectedImage.value)
+        imageUrl = result.basePath
+        if (result.blurPlaceholder) {
+          formData.value.blur_data_url = result.blurPlaceholder
+        }
 
-        if (uploadError)
-          throw uploadError
-
-        imageUrl = uploadData.path
-
-        // Если удалили старое изображение в режиме редактирования
+        // Удаляем все варианты старого изображения
         if (isEditMode.value && banner.value?.image_url) {
-          await supabase.storage
-            .from(BUCKET_NAME_BANNERS)
-            .remove([banner.value.image_url])
+          await removeFile(BUCKET_NAME_BANNERS, _getVariantPaths(banner.value.image_url))
         }
       }
 

@@ -1,20 +1,19 @@
 <script setup lang="ts">
 import type { BrandForFilter } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 
 const props = defineProps<{
   brands: BrandForFilter[]
 }>()
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 // Получить URL логотипа бренда с оптимизацией
 function getBrandLogoUrl(logoUrl: string | null): string | null {
   if (!logoUrl)
     return null
-  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 }
 </script>
 

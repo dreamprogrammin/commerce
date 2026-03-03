@@ -2,7 +2,7 @@ import type { ImageVariant } from '@/config/images'
 import type { Database, IUploadFileOptions } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, IMAGE_VARIANTS_WIDE } from '@/config/images'
 
 export interface ImageTransformOptions {
   width?: number
@@ -368,6 +368,35 @@ export function useSupabaseStorage() {
   }
 
   /**
+   * 🎯 Получить URL варианта для широких изображений (баннеры, слайды)
+   * Использует IMAGE_VARIANTS_WIDE (640/1280/1920px)
+   */
+  function getVariantUrlWide(
+    bucketName: string,
+    filePath: string | null,
+    variant: ImageVariant,
+  ): string | null {
+    if (!filePath?.trim())
+      return null
+
+    if (/\.\w{3,4}$/.test(filePath))
+      return getPublicUrl(bucketName, filePath)
+
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      const variantConfig = IMAGE_VARIANTS_WIDE[variant]
+      return getOptimizedUrl(bucketName, filePath, {
+        width: variantConfig.maxWidthOrHeight,
+        quality: Math.round(variantConfig.quality * 100),
+        format: 'webp',
+      })
+    }
+
+    const suffix = IMAGE_VARIANTS_WIDE[variant].suffix
+    const variantPath = `${filePath}${suffix}.webp`
+    return getPublicUrl(bucketName, variantPath)
+  }
+
+  /**
    * 🧹 Очистить кеш
    */
   function clearImageCache(): void {
@@ -424,6 +453,7 @@ ${IMAGE_OPTIMIZATION_ENABLED
     getOptimizedUrl,
     getImageUrl, // 🎯 ОСНОВНОЙ - используй везде
     getVariantUrl, // 🎯 Для адаптивных изображений (srcset)
+    getVariantUrlWide, // 🎯 Для широких изображений (баннеры, слайды)
 
     // Утилиты
     clearImageCache,

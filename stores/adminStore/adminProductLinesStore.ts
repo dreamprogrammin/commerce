@@ -4,11 +4,65 @@
 import type { Database, ProductLine, ProductLineInsert, ProductLineUpdate } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import { generateBlurPlaceholder, generateImageVariants } from '@/utils/imageOptimizer'
 
 export const useAdminProductLinesStore = defineStore('adminProductLinesStore', () => {
   const supabase = useSupabaseClient<Database>()
-  const { uploadFile, removeFile, getPublicUrl } = useSupabaseStorage()
+  const { uploadFile, removeFile, getPublicUrl, generateSeoFileName } = useSupabaseStorage()
+
+  function _isLegacyPath(url: string): boolean {
+    return /\.\w{3,4}$/.test(url)
+  }
+
+  function _getVariantPaths(url: string): string[] {
+    if (_isLegacyPath(url)) {
+      return [url]
+    }
+    return Object.values(IMAGE_VARIANTS).map(v => `${url}${v.suffix}.webp`)
+  }
+
+  async function _uploadVariants(
+    file: File,
+    seoName?: string,
+  ): Promise<{ basePath: string, blurPlaceholder?: string } | null> {
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      let blurDataUrl: string | undefined
+      try {
+        const blurResult = await generateBlurPlaceholder(file)
+        blurDataUrl = blurResult.dataUrl
+      }
+      catch { /* ignore */ }
+
+      const filePath = await uploadFile(file, {
+        bucketName: BUCKET_NAME_PRODUCT_LINES,
+        seoName,
+      })
+      if (!filePath) {
+        return null
+      }
+      return { basePath: filePath, blurPlaceholder: blurDataUrl }
+    }
+
+    const variants = await generateImageVariants(file)
+    const baseSeoName = generateSeoFileName(file, seoName).replace(/\.[^.]+$/, '')
+
+    const uploadResults = await Promise.all(
+      (['sm', 'md', 'lg'] as const).map(variant =>
+        uploadFile(variants[variant], {
+          bucketName: BUCKET_NAME_PRODUCT_LINES,
+          customFileName: `${baseSeoName}${IMAGE_VARIANTS[variant].suffix}.webp`,
+        }),
+      ),
+    )
+
+    if (!uploadResults[0]) {
+      return null
+    }
+
+    return { basePath: baseSeoName, blurPlaceholder: variants.blurPlaceholder }
+  }
 
   const productLines = ref<ProductLine[]>([])
   const currentProductLine = ref<ProductLine | null>(null)
@@ -109,13 +163,10 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
       let logoUrl: string | null = null
 
       if (logoFile) {
-        const uploadedPath = await uploadFile(logoFile, {
-          bucketName: BUCKET_NAME_PRODUCT_LINES,
-          seoName: lineData.name ? `line-${lineData.name}` : undefined,
-        })
-        if (!uploadedPath)
+        const result = await _uploadVariants(logoFile, lineData.name ? `line-${lineData.name}` : undefined)
+        if (!result)
           throw new Error('Не удалось загрузить логотип.')
-        logoUrl = uploadedPath
+        logoUrl = result.basePath
       }
 
       const { data: newLine, error } = await supabase
@@ -161,18 +212,15 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
       let logoUrl = lineData.logo_url
 
       if (newLogoFile) {
-        // Удаляем старый логотип
+        // Удаляем все варианты старого логотипа
         if (oldLogoUrl) {
-          await removeFile(BUCKET_NAME_PRODUCT_LINES, [oldLogoUrl])
+          await removeFile(BUCKET_NAME_PRODUCT_LINES, _getVariantPaths(oldLogoUrl))
         }
 
-        const uploadedPath = await uploadFile(newLogoFile, {
-          bucketName: BUCKET_NAME_PRODUCT_LINES,
-          seoName: lineData.name ? `line-${lineData.name}` : undefined,
-        })
-        if (!uploadedPath)
+        const result = await _uploadVariants(newLogoFile, lineData.name ? `line-${lineData.name}` : undefined)
+        if (!result)
           throw new Error('Не удалось загрузить новый логотип.')
-        logoUrl = uploadedPath
+        logoUrl = result.basePath
       }
 
       const { error } = await supabase
@@ -208,9 +256,9 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
 
   async function deleteProductLine(line: ProductLine): Promise<boolean> {
     try {
-      // Удаляем логотип из хранилища
+      // Удаляем все варианты логотипа из хранилища
       if (line.logo_url) {
-        await removeFile(BUCKET_NAME_PRODUCT_LINES, [line.logo_url])
+        await removeFile(BUCKET_NAME_PRODUCT_LINES, _getVariantPaths(line.logo_url))
       }
 
       const { error } = await supabase

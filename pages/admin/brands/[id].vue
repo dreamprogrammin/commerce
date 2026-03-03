@@ -4,6 +4,7 @@ import { ArrowLeft, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-vue-n
 import { storeToRefs } from 'pinia'
 import BrandForm from '@/components/admin/brands/BrandForm.vue'
 import ProductLineForm from '@/components/admin/product-lines/ProductLineForm.vue'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
 
@@ -11,6 +12,7 @@ definePageMeta({ layout: 'admin' })
 
 const brandsStore = useAdminBrandsStore()
 const productLinesStore = useAdminProductLinesStore()
+const { getVariantUrl } = useSupabaseStorage()
 const { currentBrand, isLoading } = storeToRefs(brandsStore)
 
 const route = useRoute()
@@ -243,7 +245,7 @@ async function handleDeleteLine() {
                   <div class="w-12 h-12 rounded-lg bg-muted border overflow-hidden flex-shrink-0 flex items-center justify-center">
                     <img
                       v-if="line.logo_url"
-                      :src="productLinesStore.getPublicUrl('product-line-logos', line.logo_url)"
+                      :src="getVariantUrl('product-line-logos', line.logo_url, 'sm')"
                       :alt="line.name"
                       class="w-full h-full object-contain p-1"
                     >

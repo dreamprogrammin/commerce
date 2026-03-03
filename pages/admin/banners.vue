@@ -20,12 +20,12 @@ const {
   handleFormSaved,
 } = useAdminBanners()
 
-const { getPublicUrl } = useSupabaseStorage()
+const { getVariantUrlWide } = useSupabaseStorage()
 
 function getBannerImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
-  return getPublicUrl(BUCKET_NAME_BANNERS, imageUrl)
+  return getVariantUrlWide(BUCKET_NAME_BANNERS, imageUrl, 'sm')
 }
 </script>
 

@@ -2,7 +2,6 @@
 import type { CarouselApi } from '../ui/carousel'
 import type { SlideRow } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
@@ -14,7 +13,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrlWide } = useSupabaseStorage()
 
 const carouselContainerClass = carouselContainerVariants({ contained: 'desktop' })
 const containerClass = carouselContainerVariants({ contained: 'always' })
@@ -65,13 +64,13 @@ function playAutoplay() {
 function getSlideUrl(imageUrl: string | null): string | null {
   if (!imageUrl || imageUrl.startsWith('http'))
     return imageUrl
-  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.SLIDER_BANNER)
+  return getVariantUrlWide(BUCKET_NAME_SLIDES, imageUrl, 'lg')
 }
 
 function getSlideUrlMobile(imageUrl: string | null): string | null {
   if (!imageUrl || imageUrl.startsWith('http'))
     return imageUrl
-  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.MOBILE)
+  return getVariantUrlWide(BUCKET_NAME_SLIDES, imageUrl, 'sm')
 }
 </script>
 

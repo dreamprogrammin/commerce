@@ -2,7 +2,6 @@
 import SlidesForm from '@/components/admin/slides/ SlidesForm.vue'
 import { useAdminSlides } from '@/composables/admin/useAdminSlides'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_SLIDES } from '@/constants'
 
 definePageMeta({
@@ -21,18 +20,18 @@ const {
   handleFormSaved,
 } = useAdminSlides()
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrlWide } = useSupabaseStorage()
 
 function getSlideImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
 
-  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.SLIDER_BANNER)
+  return getVariantUrlWide(BUCKET_NAME_SLIDES, imageUrl, 'lg')
 }
 function getSlideImageUrlMobile(imageUrl: string | null) {
   if (!imageUrl)
     return null
-  return getImageUrl(BUCKET_NAME_SLIDES, imageUrl, IMAGE_SIZES.THUMBNAIL) // Самый маленький размер
+  return getVariantUrlWide(BUCKET_NAME_SLIDES, imageUrl, 'sm')
 }
 </script>
 

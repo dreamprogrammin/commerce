@@ -38,7 +38,7 @@ const {
   clearSearchHistory,
 } = useProductSearch()
 
-const { getImageUrl: getSupabaseImageUrl } = useSupabaseStorage()
+const { getImageUrl: getSupabaseImageUrl, getVariantUrl } = useSupabaseStorage()
 
 // Живой поиск при вводе
 watch(searchQuery, (newQuery) => {
@@ -99,7 +99,6 @@ function formatPrice(price: number, discount?: number): { original: string, fina
 }
 
 const categoriesStore = useCategoriesStore()
-const { getImageUrl } = useSupabaseStorage()
 
 const menuTree = computed(() => categoriesStore.menuTree)
 const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems)
@@ -145,7 +144,7 @@ function closeAllPopups() {
 function getCategoryImageUrl(imageUrl: string | null): string | null {
   if (!imageUrl)
     return null
-  return getImageUrl(BUCKET_NAME_CATEGORY, imageUrl, IMAGE_SIZES.CATEGORY_MENU)
+  return getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, 'sm')
 }
 
 // Функция для закрытия меню после клика по ссылке

@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import type { Brand } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
-import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_BRANDS } from '@/constants'
 
 definePageMeta({
   layout: 'default',
 })
 
 const supabase = useSupabaseClient()
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 // SSR prefetch всех брендов
 const { data: brandsSsrData } = await useAsyncData('all-brands-ssr', async () => {
@@ -75,7 +74,7 @@ useSchemaOrg([
 // Получить URL логотипа бренда
 function getBrandLogoUrl(logoUrl: string | null) {
   if (!logoUrl) return null
-  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 }
 
 // Группировка брендов по первой букве

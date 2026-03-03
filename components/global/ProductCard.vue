@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_PRODUCT, BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
 
@@ -89,7 +89,7 @@ function getBrandLogoUrl(): string | null {
   if (!logoUrl)
     return null
 
-  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 }
 
 /**

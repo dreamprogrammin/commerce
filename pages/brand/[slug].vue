@@ -2,7 +2,6 @@
 import type { IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import { ArrowLeft, ChevronDown, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -11,7 +10,7 @@ import BrandDescription from '@/components/brand/BrandDescription.vue'
 const route = useRoute()
 const supabase = useSupabaseClient()
 const productsStore = useProductsStore()
-const { getImageUrl } = useSupabaseStorage()
+const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
@@ -116,7 +115,7 @@ const brandLogoUrl = computed(() => {
   if (!brand.value?.logo_url)
     return null
 
-  return getImageUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, IMAGE_SIZES.BRAND_LOGO)
+  return getVariantUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, 'sm')
 })
 
 // ========================================
@@ -270,7 +269,7 @@ useHead({
                 'name': line.name,
                 'url': `${siteUrl}/brand/${brand.value!.slug}/${line.slug}`,
                 ...(line.logo_url && {
-                  logo: getImageUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, IMAGE_SIZES.PRODUCT_LINE_LOGO),
+                  logo: getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm'),
                 }),
                 ...(line.description && { description: line.description }),
               })),

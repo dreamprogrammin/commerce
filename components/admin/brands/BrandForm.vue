@@ -16,8 +16,7 @@ const emit = defineEmits<{
   (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null }): void
 }>()
 
-// 👇 Используем универсальную функцию getImageUrl
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const formData = ref<Partial<BrandInsert | BrandUpdate>>({
   name: props.initialName || props.initialData?.name || '',
@@ -115,29 +114,14 @@ const seoKeywordsString = computed({
   },
 })
 
-// 👇 Computed для отображения логотипа с использованием getImageUrl
 const displayLogoUrl = computed(() => {
-  // Если выбран новый файл, показываем его превью (локальный blob URL)
   if (logoPreviewUrl.value) {
     return logoPreviewUrl.value
   }
 
-  // Если есть существующий логотип в БД - используем оптимизацию
   const logoUrl = formData.value.logo_url
   if (logoUrl && typeof logoUrl === 'string') {
-    // Можно использовать предустановку или кастомные параметры
-    // Вариант 1: Кастомные параметры (для логотипов лучше contain)
-    return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, {
-      width: 200,
-      height: 200,
-      quality: 85,
-      format: 'webp',
-      resize: 'contain',
-    })
-
-    // Вариант 2: Можно добавить в config/images.ts:
-    // BRAND_LOGO: { width: 200, height: 200, quality: 85, format: 'webp', resize: 'contain' }
-    // И использовать: IMAGE_SIZES.BRAND_LOGO
+    return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
   }
 
   return null
@@ -182,6 +166,7 @@ onBeforeUnmount(() => {
           alt="Логотип бренда"
           class="w-12 h-12 object-contain border rounded bg-muted"
           loading="lazy"
+          @error="($event.target as HTMLImageElement).src = '/images/placeholder.svg'"
         >
         <p class="text-sm text-muted-foreground">
           {{ newLogoFile ? 'Новый логотип (будет загружен)' : 'Текущий логотип' }}

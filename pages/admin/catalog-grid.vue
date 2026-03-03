@@ -6,13 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 
 definePageMeta({ layout: 'admin' })
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const adminCategoriesStore = useAdminCategoriesStore()
 const isSaving = ref(false)
@@ -412,7 +411,7 @@ const activeTab = ref('preview')
                     <!-- Изображение категории -->
                     <div v-if="category.image_url" class="absolute inset-0">
                       <img
-                        :src="getImageUrl(BUCKET_NAME_CATEGORY, category.image_url, IMAGE_SIZES.CATEGORY_MENU) || ''"
+                        :src="getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'sm') || ''"
                         :alt="category.name"
                         class="w-full h-full object-cover transition-transform group-hover:scale-105"
                         loading="lazy"

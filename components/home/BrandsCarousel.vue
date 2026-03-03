@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { Brand } from '@/types'
-import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS } from '@/constants'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_BRANDS } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 interface Props {
   brands: Brand[]
@@ -18,7 +17,7 @@ const headerContainerClass = carouselContainerVariants({ contained: 'always' })
 // Получить URL логотипа бренда
 function getBrandLogoUrl(logoUrl: string | null) {
   if (!logoUrl) return null
-  return getImageUrl(BUCKET_NAME_BRANDS, logoUrl, IMAGE_SIZES.BRAND_LOGO)
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 }
 </script>
 
