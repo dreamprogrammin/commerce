@@ -9,6 +9,7 @@ import {
   optimizeImageBeforeUpload,
   shouldOptimizeImage,
 } from '@/utils/imageOptimizer'
+import { getVariantPathsWide } from '@/utils/storageVariants'
 
 const BUCKET_NAME = 'slides-images'
 
@@ -29,16 +30,7 @@ export function useSlideForm(
   const supabase = useSupabaseClient<Database>()
   const { uploadFile, removeFile, generateSeoFileName } = useSupabaseStorage()
 
-  function _isLegacyPath(url: string): boolean {
-    return /\.\w{3,4}$/.test(url)
-  }
-
-  function _getVariantPaths(url: string): string[] {
-    if (_isLegacyPath(url)) {
-      return [url]
-    }
-    return Object.values(IMAGE_VARIANTS_WIDE).map(v => `${url}${v.suffix}.webp`)
-  }
+  // Используем shared utility getVariantPathsWide из utils/storageVariants.ts
 
   /**
    * Загружает 3 широких варианта (640/1280/1920px) и возвращает базовый путь
@@ -323,9 +315,16 @@ export function useSlideForm(
           throw new Error('Не удалось загрузить десктопное изображение')
         finalImagePath = result.basePath
         finalBlurDataUrl = result.blurPlaceholder || newImageFile.value.blurDataUrl || null
-        if (imageToDelete.value) {
-          await removeFile(BUCKET_NAME, _getVariantPaths(imageToDelete.value))
+        // Удаляем старые варианты из Storage
+        if (imageToDelete.value && imageToDelete.value !== finalImagePath) {
+          await removeFile(BUCKET_NAME, getVariantPathsWide(imageToDelete.value))
         }
+      }
+      else if (!formData.value.image_url && imageToDelete.value) {
+        // Изображение удалено без замены — чистим Storage
+        await removeFile(BUCKET_NAME, getVariantPathsWide(imageToDelete.value))
+        finalImagePath = null
+        finalBlurDataUrl = null
       }
 
       // 📤 Загружаем новое МОБИЛЬНОЕ изображение (3 широких варианта)
@@ -336,9 +335,16 @@ export function useSlideForm(
           throw new Error('Не удалось загрузить мобильное изображение')
         finalImagePathMobile = result.basePath
         finalBlurDataUrlMobile = result.blurPlaceholder || newImageFileMobile.value.blurDataUrl || null
-        if (imageToDeleteMobile.value) {
-          await removeFile(BUCKET_NAME, _getVariantPaths(imageToDeleteMobile.value))
+        // Удаляем старые варианты из Storage
+        if (imageToDeleteMobile.value && imageToDeleteMobile.value !== finalImagePathMobile) {
+          await removeFile(BUCKET_NAME, getVariantPathsWide(imageToDeleteMobile.value))
         }
+      }
+      else if (!formData.value.image_url_mobile && imageToDeleteMobile.value) {
+        // Мобильное изображение удалено без замены — чистим Storage
+        await removeFile(BUCKET_NAME, getVariantPathsWide(imageToDeleteMobile.value))
+        finalImagePathMobile = null
+        finalBlurDataUrlMobile = null
       }
 
       const dataToUpdate = {

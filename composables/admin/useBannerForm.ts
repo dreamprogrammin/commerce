@@ -5,6 +5,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS_WIDE } from '@/config/images'
 import { BUCKET_NAME_BANNERS } from '@/constants'
 import { generateBlurPlaceholder, generateImageVariantsWide, validateImageFile } from '@/utils/imageOptimizer'
+import { getVariantPathsWide } from '@/utils/storageVariants'
 
 interface UseBannerFormOptions {
   onSuccess?: () => void
@@ -19,16 +20,7 @@ export function useBannerForm(
   const isSaving = ref(false)
   const isGeneratingBlur = ref(false)
 
-  function _isLegacyPath(url: string): boolean {
-    return /\.\w{3,4}$/.test(url)
-  }
-
-  function _getVariantPaths(url: string): string[] {
-    if (_isLegacyPath(url)) {
-      return [url]
-    }
-    return Object.values(IMAGE_VARIANTS_WIDE).map(v => `${url}${v.suffix}.webp`)
-  }
+  // Используем shared utility getVariantPathsWide из utils/storageVariants.ts
 
   async function _uploadWideVariants(
     file: File,
@@ -219,7 +211,7 @@ export function useBannerForm(
 
     try {
       let imageUrl = formData.value.image_url
-      const blurDataUrl = formData.value.blur_data_url
+      let blurDataUrl = formData.value.blur_data_url
 
       // Загружаем новое изображение (3 широких варианта)
       if (selectedImage.value) {
@@ -230,13 +222,19 @@ export function useBannerForm(
 
         imageUrl = result.basePath
         if (result.blurPlaceholder) {
-          formData.value.blur_data_url = result.blurPlaceholder
+          blurDataUrl = result.blurPlaceholder
         }
 
         // Удаляем все варианты старого изображения
-        if (isEditMode.value && banner.value?.image_url) {
-          await removeFile(BUCKET_NAME_BANNERS, _getVariantPaths(banner.value.image_url))
+        if (isEditMode.value && banner.value?.image_url && banner.value.image_url !== imageUrl) {
+          await removeFile(BUCKET_NAME_BANNERS, getVariantPathsWide(banner.value.image_url))
         }
+      }
+      else if (!formData.value.image_url && isEditMode.value && banner.value?.image_url) {
+        // Изображение удалено без замены — чистим Storage
+        await removeFile(BUCKET_NAME_BANNERS, getVariantPathsWide(banner.value.image_url))
+        imageUrl = ''
+        blurDataUrl = ''
       }
 
       // Подготавливаем данные для сохранения
@@ -244,7 +242,7 @@ export function useBannerForm(
         title: formData.value.title,
         description: formData.value.description || null,
         image_url: imageUrl || null,
-        blur_data_url: blurDataUrl || null, // 👈 Сохраняем blur
+        blur_data_url: blurDataUrl || null,
         cta_link: formData.value.cta_link || null,
         is_active: formData.value.is_active,
         display_order: formData.value.display_order,

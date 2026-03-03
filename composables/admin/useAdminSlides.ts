@@ -1,20 +1,13 @@
 import type { Database, SlideRow } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_VARIANTS_WIDE } from '@/config/images'
+import { getVariantPathsWide } from '@/utils/storageVariants'
 
 const BUCKET_NAME = 'slides-images'
 
 export function useAdminSlides() {
   const supabase = useSupabaseClient<Database>()
   const { removeFile } = useSupabaseStorage()
-
-  function _getVariantPaths(url: string): string[] {
-    if (/\.\w{3,4}$/.test(url)) {
-      return [url]
-    }
-    return Object.values(IMAGE_VARIANTS_WIDE).map(v => `${url}${v.suffix}.webp`)
-  }
 
   const asyncData = useAsyncData(
     'admin-all-slides',
@@ -65,11 +58,11 @@ export function useAdminSlides() {
       const pathsToDelete: string[] = []
       // Удаляем все варианты изображений
       if (slide.image_url) {
-        pathsToDelete.push(..._getVariantPaths(slide.image_url))
+        pathsToDelete.push(...getVariantPathsWide(slide.image_url))
       }
 
       if (slide.image_url_mobile) {
-        pathsToDelete.push(..._getVariantPaths(slide.image_url_mobile))
+        pathsToDelete.push(...getVariantPathsWide(slide.image_url_mobile))
       }
 
       if (pathsToDelete.length > 0) {

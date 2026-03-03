@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Banner } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_BANNERS } from '@/constants'
 
 // 🔥 Используем getCachedData для предотвращения повторных загрузок
 const { data: banners, pending } = useAsyncData(
@@ -35,12 +36,14 @@ const { data: banners, pending } = useAsyncData(
 // ✅ Показываем skeleton только если идёт загрузка И данных нет
 const showSkeleton = computed(() => pending.value && (!banners.value || banners.value.length === 0))
 
-const { getVariantUrlWide } = useSupabaseStorage()
+const { getVariantUrlWide, getPublicUrl } = useSupabaseStorage()
 
 function getBannerImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
-  return getVariantUrlWide('banners', imageUrl, 'md')
+  // Сначала пробуем вариант _md, с fallback на обычный public URL
+  return getVariantUrlWide(BUCKET_NAME_BANNERS, imageUrl, 'md')
+    || getPublicUrl(BUCKET_NAME_BANNERS, imageUrl)
 }
 
 // 🔧 Безопасное получение blur placeholder

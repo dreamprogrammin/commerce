@@ -36,6 +36,13 @@ onMounted(async () => {
 
 const emblaApi = ref<CarouselApi>()
 
+// Reactive Set для отслеживания загруженных слайдов (вместо мутации computed-объектов)
+const loadedSlideIds = reactive(new Set<string>())
+
+function onSlideImageLoaded(slideId: string) {
+  loadedSlideIds.add(slideId)
+}
+
 function buildSrcset(imageUrl: string | null): string | undefined {
   if (!imageUrl || imageUrl.startsWith('http'))
     return undefined
@@ -68,7 +75,6 @@ const processedSlides = computed(() => {
       desktopSrcset: buildSrcset(slide.image_url),
       mobileUrl: mUrl || dUrl,
       mobileSrcset: buildSrcset(slide.image_url_mobile || slide.image_url),
-      _loaded: false,
     }
   })
 })
@@ -151,8 +157,8 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                     <template v-if="slide.desktopUrl">
                       <!-- LQIP placeholder overlay -->
                       <div
-                        v-if="!slide._loaded && slide.blur_placeholder"
-                        class="absolute inset-0 z-10 overflow-hidden"
+                        v-if="!loadedSlideIds.has(slide.id) && slide.blur_placeholder"
+                        class="absolute inset-0 z-10 overflow-hidden transition-opacity duration-500"
                       >
                         <img
                           :src="slide.blur_placeholder"
@@ -178,8 +184,8 @@ function getSlideUrlMobile(imageUrl: string | null): string | null {
                           :alt="slide.title || 'Слайд'"
                           class="w-full h-full object-cover"
                           fetchpriority="high"
-                          @load="slide._loaded = true"
-                          @error="slide._loaded = true"
+                          @load="onSlideImageLoaded(slide.id)"
+                          @error="onSlideImageLoaded(slide.id)"
                         >
                       </picture>
                     </template>
