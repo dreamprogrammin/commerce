@@ -65,45 +65,52 @@ export const useReviewsStore = defineStore('reviewsStore', () => {
       return null
     }
 
-    // 1. Создаём отзыв
-    const { data, error } = await supabase
-      .from('product_reviews')
-      .insert({
-        product_id: productId,
-        user_id: authStore.user.id,
-        rating,
-        text: text.trim() || null,
-        ...(orderId && { order_id: orderId }),
-      })
-      .select(REVIEW_SELECT)
-      .single()
+    try {
+      // 1. Создаём отзыв
+      const { data, error } = await supabase
+        .from('product_reviews')
+        .insert({
+          product_id: productId,
+          user_id: authStore.user.id,
+          rating,
+          text: text.trim() || null,
+          ...(orderId && { order_id: orderId }),
+        })
+        .select(REVIEW_SELECT)
+        .single()
 
-    if (error) {
-      if (error.code === '23505') {
-        toast.error('Вы уже оставляли отзыв на этот товар')
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('Вы уже оставляли отзыв на этот товар')
+        }
+        else {
+          toast.error('Ошибка при отправке отзыва', { description: error.message })
+        }
+        return null
       }
-      else {
-        toast.error('Ошибка при отправке отзыва', { description: error.message })
+
+      const review = data as unknown as ProductReview
+
+      // 2. Загружаем фото (если есть)
+      if (imageFiles?.length) {
+        try {
+          await uploadReviewImages(review.id, imageFiles)
+        }
+        catch (imgError: any) {
+          console.error('Ошибка загрузки фото отзыва:', imgError)
+          // Отзыв уже создан, просто предупреждаем
+          toast.warning('Отзыв отправлен, но некоторые фото не удалось загрузить')
+        }
       }
+
+      toast.success('Ваш отзыв отправлен на модерацию!')
+      return review
+    }
+    catch (e: any) {
+      console.error('submitReview — необработанная ошибка:', e)
+      toast.error('Не удалось отправить отзыв. Попробуйте ещё раз.')
       return null
     }
-
-    const review = data as unknown as ProductReview
-
-    // 2. Загружаем фото (если есть)
-    if (imageFiles?.length) {
-      try {
-        await uploadReviewImages(review.id, imageFiles)
-      }
-      catch (imgError: any) {
-        console.error('Ошибка загрузки фото отзыва:', imgError)
-        // Отзыв уже создан, просто предупреждаем
-        toast.warning('Отзыв отправлен, но некоторые фото не удалось загрузить')
-      }
-    }
-
-    toast.success('Ваш отзыв отправлен на модерацию!')
-    return review
   }
 
   async function uploadReviewImages(

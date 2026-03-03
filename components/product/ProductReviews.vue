@@ -114,28 +114,35 @@ async function submitReview() {
 
   isSubmitting.value = true
 
-  const images = imageFiles.value.length
-    ? imageFiles.value.map(img => ({ file: img.file, blurPlaceholder: img.blurPlaceholder }))
-    : undefined
+  try {
+    const images = imageFiles.value.length
+      ? imageFiles.value.map(img => ({ file: img.file, blurPlaceholder: img.blurPlaceholder }))
+      : undefined
 
-  const result = await reviewsStore.submitReview(
-    props.productId,
-    reviewRating.value,
-    reviewText.value,
-    undefined,
-    images,
-  )
-  isSubmitting.value = false
+    const result = await reviewsStore.submitReview(
+      props.productId,
+      reviewRating.value,
+      reviewText.value,
+      undefined,
+      images,
+    )
 
-  if (result) {
-    // Cleanup
-    imageFiles.value.forEach(img => URL.revokeObjectURL(img.preview))
-    imageFiles.value = []
-    reviewText.value = ''
-    reviewRating.value = 0
-    isFormOpen.value = false
-    queryClient.invalidateQueries({ queryKey: ['product-reviews', props.productId] })
-    queryClient.invalidateQueries({ queryKey: ['can-review', props.productId] })
+    if (result) {
+      // Cleanup
+      imageFiles.value.forEach(img => URL.revokeObjectURL(img.preview))
+      imageFiles.value = []
+      reviewText.value = ''
+      reviewRating.value = 0
+      isFormOpen.value = false
+      queryClient.invalidateQueries({ queryKey: ['product-reviews', props.productId] })
+      queryClient.invalidateQueries({ queryKey: ['can-review', props.productId] })
+    }
+  }
+  catch (e: any) {
+    console.error('ProductReviews submitReview error:', e)
+  }
+  finally {
+    isSubmitting.value = false
   }
 }
 

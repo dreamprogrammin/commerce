@@ -66,28 +66,34 @@ async function submit() {
 
   isSubmitting.value = true
 
-  const images = imageFiles.value.length
-    ? imageFiles.value.map(img => ({ file: img.file, blurPlaceholder: img.blurPlaceholder }))
-    : undefined
+  try {
+    const images = imageFiles.value.length
+      ? imageFiles.value.map(img => ({ file: img.file, blurPlaceholder: img.blurPlaceholder }))
+      : undefined
 
-  const result = await reviewsStore.submitReview(
-    props.productId,
-    rating.value,
-    text.value,
-    props.orderId,
-    images,
-  )
+    const result = await reviewsStore.submitReview(
+      props.productId,
+      rating.value,
+      text.value,
+      props.orderId,
+      images,
+    )
 
-  isSubmitting.value = false
-
-  if (result) {
-    // Cleanup
-    imageFiles.value.forEach(img => URL.revokeObjectURL(img.preview))
-    imageFiles.value = []
-    rating.value = 0
-    text.value = ''
-    emit('update:open', false)
-    emit('submitted')
+    if (result) {
+      // Cleanup
+      imageFiles.value.forEach(img => URL.revokeObjectURL(img.preview))
+      imageFiles.value = []
+      rating.value = 0
+      text.value = ''
+      emit('update:open', false)
+      emit('submitted')
+    }
+  }
+  catch (e: any) {
+    console.error('ReviewFormDialog submit error:', e)
+  }
+  finally {
+    isSubmitting.value = false
   }
 }
 

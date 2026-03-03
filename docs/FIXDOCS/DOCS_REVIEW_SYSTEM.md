@@ -52,6 +52,40 @@ supabase gen types typescript --local > types/supabase.ts
 4. INSERT в `review_images` с путём и blur placeholder
 5. При удалении отзыва → каскадное удаление записей + удаление файлов из storage
 
+## Bugfix: Global Hang / Unhandled Promise (2026-03-03)
+
+### Проблема
+При отправке отзыва, если запрос к Supabase падал с необработанной ошибкой (таймаут сети, недоступность сервера и т.д.), `isSubmitting` оставался `true` навсегда → вечная загрузка. При перезагрузке страницы unhandled promise rejection на SSR вешал весь Nuxt-процесс на несколько минут.
+
+### Причина
+В трёх местах `await reviewsStore.submitReview(...)` вызывался без `try/catch/finally`:
+- `ProductReviews.vue:submitReview()` — inline-форма на странице товара
+- `ReviewFormDialog.vue:submit()` — диалог из страницы заказа
+- `reviewsStore.ts:submitReview()` — сам store не ловил общие ошибки (сеть, таймауты)
+
+`isSubmitting.value = false` стоял **после** `await` вне `finally` — при исключении никогда не выполнялся.
+
+### Исправление
+
+1. **`reviewsStore.ts`** — вся логика `submitReview` обёрнута в `try/catch`. `catch` показывает `toast.error` и логирует `console.error`. Всегда возвращает `null` при ошибке (вместо выброса исключения наверх).
+
+2. **`ReviewFormDialog.vue`** и **`ProductReviews.vue`** — `submit`/`submitReview` обёрнуты в `try/catch/finally`. `isSubmitting = false` теперь в `finally` — гарантированный сброс в любом случае.
+
+### Ключевой паттерн
+```typescript
+async function submit() {
+  isSubmitting.value = true
+  try {
+    const result = await store.submitReview(...)
+    if (result) { /* cleanup & emit */ }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    isSubmitting.value = false  // ВСЕГДА сбрасываем
+  }
+}
+```
+
 ## Верификация
 
 1. Страница товара — отзывы загружаются без PGRST200
