@@ -143,14 +143,14 @@ onMounted(() => {
                   "
                 >
                   <div class="absolute inset-0 bg-gradient-to-r from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-primary/10 transition-all duration-300" />
-                  <div class="relative w-14 h-14 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-xl">
-                    <img
-                      :src="getCategoryImageUrl(category.image_url || null)"
-                      :alt="category.name"
-                      class="w-full h-full object-contain p-1"
-                      loading="lazy"
-                    >
-                  </div>
+                  <ProgressiveImage
+                    :src="getCategoryImageUrl(category.image_url || null)"
+                    :blur-data-url="category.blur_placeholder || null"
+                    :alt="category.name"
+                    object-fit="contain"
+                    :placeholder-type="category.blur_placeholder ? 'lqip' : 'shimmer'"
+                    class="w-14 h-14 flex-shrink-0 rounded-xl"
+                  />
                   <span class="font-semibold text-sm text-gray-900 relative z-10 group-hover:text-gray-900 transition-colors leading-snug flex-1 break-words">
                     {{ category.name }}
                   </span>
@@ -177,14 +177,14 @@ onMounted(() => {
                   "
                 >
                   <div class="absolute inset-0 bg-gradient-to-r from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-primary/10 transition-all duration-300" />
-                  <div class="relative w-14 h-14 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-xl">
-                    <img
-                      :src="getCategoryImageUrl(category.image_url || null)"
-                      :alt="category.name"
-                      class="w-full h-full object-contain p-1"
-                      loading="lazy"
-                    >
-                  </div>
+                  <ProgressiveImage
+                    :src="getCategoryImageUrl(category.image_url || null)"
+                    :blur-data-url="category.blur_placeholder || null"
+                    :alt="category.name"
+                    object-fit="contain"
+                    :placeholder-type="category.blur_placeholder ? 'lqip' : 'shimmer'"
+                    class="w-14 h-14 flex-shrink-0 rounded-xl"
+                  />
                   <span class="font-semibold text-sm text-gray-900 relative z-10 group-hover:text-gray-900 transition-colors leading-snug flex-1 break-words">
                     {{ category.name }}
                   </span>
@@ -238,14 +238,14 @@ onMounted(() => {
                     </div>
 
                     <!-- Product image - абсолютное позиционирование -->
-                    <div class="absolute bottom-0 right-0 w-36 h-36 flex items-center justify-center p-3">
-                      <img
-                        :src="getCategoryImageUrl(category.image_url || null)"
-                        :alt="category.name"
-                        class="w-full h-full object-contain drop-shadow-lg"
-                        loading="lazy"
-                      >
-                    </div>
+                    <ProgressiveImage
+                      :src="getCategoryImageUrl(category.image_url || null)"
+                      :blur-data-url="category.blur_placeholder || null"
+                      :alt="category.name"
+                      object-fit="contain"
+                      :placeholder-type="category.blur_placeholder ? 'lqip' : 'shimmer'"
+                      class="absolute bottom-0 right-0 w-36 h-36"
+                    />
                   </div>
                 </div>
               </div>

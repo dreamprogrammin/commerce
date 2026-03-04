@@ -85,6 +85,14 @@ function getFullUrl(imagePath: string) {
   return getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'lg')
     || getImageUrl(BUCKET_NAME_PRODUCT, imagePath, IMAGE_SIZES.LARGE)
 }
+
+function getImageVariants(imagePath: string) {
+  return {
+    sm: getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'sm'),
+    md: getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'md'),
+    lg: getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'lg'),
+  }
+}
 </script>
 
 <template>
@@ -111,12 +119,13 @@ function getFullUrl(imagePath: string) {
                 'border-transparent opacity-60': index !== selectedIndex,
               }"
             >
-              <img
-                :src="getThumbUrl(image.image_url) || undefined"
+              <ProgressiveImage
+                :src="getThumbUrl(image.image_url)"
+                :blur-data-url="image.blur_placeholder"
                 :alt="image.alt_text || `Изображение товара ${index + 1}`"
-                class="w-full h-full object-cover rounded-lg"
-                loading="lazy"
-              >
+                object-fit="cover"
+                :placeholder-type="image.blur_placeholder ? 'lqip' : 'shimmer'"
+              />
             </div>
           </CarouselItem>
         </CarouselContent>
@@ -135,16 +144,23 @@ function getFullUrl(imagePath: string) {
         <CarouselContent class="h-[400px] lg:h-[600px]">
           <CarouselItem v-for="(image, index) in images" :key="image.id" class="h-full">
             <div
-              class="bg-muted rounded-lg overflow-hidden w-full flex items-center justify-center h-full cursor-zoom-in"
+              class="bg-muted rounded-lg overflow-hidden w-full h-full cursor-zoom-in relative"
               @click="openLightbox"
             >
-              <img
-                :src="getMainUrl(image.image_url) || undefined"
+              <ProgressiveImage
+                :src="getMainUrl(image.image_url)"
+                :src-sm="getImageVariants(image.image_url).sm"
+                :src-md="getImageVariants(image.image_url).md"
+                :src-lg="getImageVariants(image.image_url).lg"
+                sizes="(max-width: 1024px) 100vw, 80vw"
+                :blur-data-url="image.blur_placeholder"
                 :alt="image.alt_text || `Изображение товара ${index + 1}`"
-                class="w-full h-full object-contain"
-                :loading="index === 0 ? 'eager' : 'lazy'"
+                object-fit="contain"
+                :placeholder-type="image.blur_placeholder ? 'lqip' : 'shimmer'"
+                :eager="index === 0"
                 :fetchpriority="index === 0 ? 'high' : 'auto'"
-              >
+                class="absolute inset-0"
+              />
             </div>
           </CarouselItem>
         </CarouselContent>

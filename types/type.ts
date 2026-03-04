@@ -353,6 +353,7 @@ export interface BrandForFilter {
   name: string
   slug: string
   logo_url?: string | null
+  blur_placeholder?: string | null
   products_count?: number
 }
 

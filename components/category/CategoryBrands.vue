@@ -41,9 +41,10 @@ function getBrandLogoUrl(logoUrl: string | null): string | null {
           <ProgressiveImage
             v-if="brand.logo_url"
             :src="getBrandLogoUrl(brand.logo_url)"
+            :blur-data-url="brand.blur_placeholder"
             :alt="brand.name"
             object-fit="contain"
-            placeholder-type="shimmer"
+            :placeholder-type="brand.blur_placeholder ? 'lqip' : 'shimmer'"
             class="w-full h-full p-1"
           />
           <div

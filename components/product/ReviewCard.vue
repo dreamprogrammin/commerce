@@ -61,12 +61,14 @@ function navigateLightbox(direction: number, images: ProductReview['review_image
     <div class="flex items-start gap-3">
       <!-- Аватар -->
       <div class="shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-        <img
+        <ProgressiveImage
           v-if="review.profiles?.avatar_url"
           :src="review.profiles.avatar_url"
           :alt="getAuthorName(review)"
-          class="w-full h-full object-cover"
-        >
+          object-fit="cover"
+          placeholder-type="shimmer"
+          class="w-full h-full"
+        />
         <Icon v-else name="lucide:user" class="w-5 h-5 text-muted-foreground" />
       </div>
 
@@ -90,15 +92,17 @@ function navigateLightbox(direction: number, images: ProductReview['review_image
           <button
             v-for="(img, idx) in review.review_images.slice(0, 5)"
             :key="img.id"
-            class="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg overflow-hidden border hover:border-primary transition-colors cursor-pointer"
+            class="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg overflow-hidden border hover:border-primary transition-colors cursor-pointer relative"
             @click="openLightbox(idx)"
           >
-            <img
-              :src="getThumbUrl(img.image_url) || ''"
+            <ProgressiveImage
+              :src="getThumbUrl(img.image_url)"
+              :blur-data-url="img.blur_placeholder"
               :alt="`Фото ${idx + 1}`"
-              class="w-full h-full object-cover"
-              loading="lazy"
-            >
+              object-fit="cover"
+              :placeholder-type="img.blur_placeholder ? 'lqip' : 'shimmer'"
+              class="absolute inset-0"
+            />
           </button>
         </div>
 

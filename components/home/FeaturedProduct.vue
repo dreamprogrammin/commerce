@@ -4,7 +4,7 @@ import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 const productStore = useProductsStore()
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const { data: products, pending: isLoading } = useAsyncData(
   'featured-products',
@@ -41,24 +41,14 @@ const productsList = computed(() => {
   return Array.isArray(products.value) ? products.value : [products.value]
 })
 
-function getProductImageUrl(imageUrl: string) {
-  if (!imageUrl)
-    return null
-
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-    width: 400,
-    height: 400,
-    quality: 90,
-    format: 'webp',
-    resize: 'contain',
-  })
+function getMainImage(product: any) {
+  return product?.product_images?.[0] ?? null
 }
 
-function getMainImageUrl(product: any) {
-  if (product?.product_images?.length > 0) {
-    return getProductImageUrl(product.product_images[0]?.image_url)
-  }
-  return null
+function getMainImageVariant(product: any, variant: 'sm' | 'md' | 'lg') {
+  const img = getMainImage(product)
+  if (!img?.image_url) return null
+  return getVariantUrl(BUCKET_NAME_PRODUCT, img.image_url, variant)
 }
 
 function formatPrice(price: number) {
@@ -152,16 +142,17 @@ function calculateDiscount(price: number, discount: number) {
                       </div>
                     </div>
 
-                    <img
-                      v-if="getMainImageUrl(product)"
-                      :src="getMainImageUrl(product) || undefined"
+                    <ProgressiveImage
+                      :src="getMainImageVariant(product, 'md')"
+                      :src-sm="getMainImageVariant(product, 'sm')"
+                      :src-md="getMainImageVariant(product, 'md')"
+                      :blur-data-url="getMainImage(product)?.blur_placeholder"
                       :alt="product.name"
-                      class="w-full h-full object-contain p-3 sm:p-4 group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                    >
-                    <div v-else class="w-full h-full flex items-center justify-center">
-                      <Icon name="lucide:image-off" class="w-8 h-8 text-gray-400" />
-                    </div>
+                      object-fit="contain"
+                      :placeholder-type="getMainImage(product)?.blur_placeholder ? 'lqip' : 'shimmer'"
+                      :zoom-on-hover="true"
+                      class="absolute inset-0"
+                    />
                   </div>
                 </NuxtLink>
 

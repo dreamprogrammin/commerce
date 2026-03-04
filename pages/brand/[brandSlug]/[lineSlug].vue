@@ -514,12 +514,14 @@ useRobotsRule({
               :to="`/brand/${brand.slug}`"
               class="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-3 md:mb-6"
             >
-              <img
+              <ProgressiveImage
                 v-if="brandLogoUrl"
                 :src="brandLogoUrl"
                 :alt="brand.name"
-                class="w-5 h-5 object-contain"
-              >
+                object-fit="contain"
+                placeholder-type="shimmer"
+                class="w-5 h-5 flex-shrink-0"
+              />
               <span class="text-sm md:text-base">{{ brand.name }}</span>
             </NuxtLink>
 
