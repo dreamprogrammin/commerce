@@ -70,16 +70,15 @@ function getBrandLogoUrl(logoUrl: string | null) {
                     <!-- Белый фон -->
                     <div class="w-full h-full rounded-full bg-background p-0.75">
                       <!-- Логотип бренда -->
-                      <div class="w-full h-full rounded-full bg-muted/50 flex items-center justify-center overflow-hidden">
+                      <div class="relative w-full h-full rounded-full bg-muted/50 overflow-hidden flex items-center justify-center">
                         <ProgressiveImage
                           v-if="brand.logo_url"
                           :src="getBrandLogoUrl(brand.logo_url) || ''"
                           :blur-data-url="brand.blur_placeholder"
                           :alt="brand.name"
-                          aspect-ratio="square"
                           object-fit="contain"
                           :placeholder-type="brand.blur_placeholder ? 'lqip' : 'shimmer'"
-                          class="w-full h-full p-2"
+                          class="absolute inset-0 p-2"
                         />
                         <Icon
                           v-else

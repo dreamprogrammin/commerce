@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Star, StarHalf } from 'lucide-vue-next'
+
 const props = withDefaults(defineProps<{
   modelValue?: number
   readonly?: boolean
@@ -59,12 +61,15 @@ function getStarState(index: number): 'full' | 'half' | 'empty' {
       @mouseenter="setHover(i)"
       @mouseleave="setHover(0)"
     >
-      <Icon
-        :name="getStarState(i) === 'full' ? 'lucide:star' : getStarState(i) === 'half' ? 'lucide:star-half' : 'lucide:star'"
+      <component
+        :is="getStarState(i) === 'half' ? StarHalf : Star"
         :class="[
           sizeClass,
-          getStarState(i) !== 'empty' ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300',
+          getStarState(i) !== 'empty'
+            ? 'fill-yellow-400 text-yellow-400'
+            : 'fill-gray-100 text-gray-300',
         ]"
+        :stroke-width="1.5"
       />
     </button>
   </div>
