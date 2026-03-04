@@ -36,10 +36,11 @@ watch(supabaseUser, (newUser) => {
 }, { immediate: true })
 
 // Авто-синхронизация профиля при входе (Magic Link из Telegram, OAuth и т.д.)
+// force=true, silent=true — всегда берём свежие данные из БД без мигания UI
 if (import.meta.client) {
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_IN') {
-      profileStore.loadProfile(true, true, true)
+  supabase.auth.onAuthStateChange((event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+      profileStore.loadProfile(true, false, true)
     }
     else if (event === 'SIGNED_OUT') {
       profileStore.clearProfile()
