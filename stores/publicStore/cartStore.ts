@@ -3,7 +3,7 @@ import { toast } from 'vue-sonner'
 import { formatPriceWithDiscount } from '@/utils/formatPrice'
 import { useProfileStore } from '../core/profileStore'
 
-const CART_STORAGE_KEY = 'krakenshop-cart-v1'
+const CART_STORAGE_KEY = 'uhti-cart-v1'
 
 export interface ICartItem {
   product: ProductWithImages
@@ -179,21 +179,107 @@ export const useCartStore = defineStore('cartStore', () => {
     if (!user.value) return
 
     if (syncTimeout.value) clearTimeout(syncTimeout.value)
-    syncTimeout.value = setTimeout(async () => {
-      const cartItems = items.value.map(i => ({
-        product_id: i.product.id,
-        quantity: i.quantity,
-      }))
+    syncTimeout.value = setTimeout(() => forceSyncToServer(), 500)
+  }
 
-      await supabase.from('server_carts').upsert({
-        user_id: user.value!.id,
-        items: cartItems as any,
-        total_amount: subtotal.value,
-        updated_at: new Date().toISOString(),
-        reminder_1h_sent: false,
-        reminder_24h_sent: false,
-      }, { onConflict: 'user_id' })
-    }, 2000)
+  // Немедленная синхронизация без debounce
+  async function forceSyncToServer() {
+    if (!user.value) return
+
+    if (syncTimeout.value) {
+      clearTimeout(syncTimeout.value)
+      syncTimeout.value = null
+    }
+
+    const cartItems = items.value.map(i => ({
+      product_id: i.product.id,
+      quantity: i.quantity,
+    }))
+
+    await supabase.from('server_carts').upsert({
+      user_id: user.value!.id,
+      items: cartItems as any,
+      total_amount: subtotal.value,
+      updated_at: new Date().toISOString(),
+      reminder_1h_sent: false,
+      reminder_24h_sent: false,
+    }, { onConflict: 'user_id' })
+  }
+
+  // Загрузка серверной корзины
+  async function loadServerCart(): Promise<ICartItem[]> {
+    if (!user.value) return []
+
+    const { data: serverCart } = await supabase
+      .from('server_carts')
+      .select('items')
+      .eq('user_id', user.value.id)
+      .single()
+
+    if (!serverCart?.items || !Array.isArray(serverCart.items) || serverCart.items.length === 0) {
+      return []
+    }
+
+    const productIds = (serverCart.items as Array<{ product_id: string, quantity: number }>)
+      .map(i => i.product_id)
+
+    const { data: products, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images (
+          id,
+          image_url,
+          blur_placeholder,
+          alt_text,
+          display_order
+        )
+      `)
+      .in('id', productIds)
+      .order('display_order', {
+        referencedTable: 'product_images',
+        ascending: true,
+      })
+
+    if (error || !products) return []
+
+    const serverItems: ICartItem[] = []
+    for (const serverItem of serverCart.items as Array<{ product_id: string, quantity: number }>) {
+      const product = products.find(p => p.id === serverItem.product_id)
+      if (product) {
+        serverItems.push({
+          product: product as ProductWithImages,
+          quantity: serverItem.quantity,
+        })
+      }
+    }
+
+    return serverItems
+  }
+
+  // Merge при логине: локальная корзина приоритетнее
+  async function mergeOnLogin() {
+    if (!user.value) return
+
+    if (items.value.length > 0) {
+      // Локальная корзина не пустая → синхронизируем на сервер
+      await forceSyncToServer()
+    }
+    else {
+      // Локальная корзина пустая → загружаем серверную
+      const serverItems = await loadServerCart()
+      if (serverItems.length > 0) {
+        items.value = serverItems
+      }
+    }
+  }
+
+  // Отмена pending sync (для logout)
+  function cancelPendingSync() {
+    if (syncTimeout.value) {
+      clearTimeout(syncTimeout.value)
+      syncTimeout.value = null
+    }
   }
 
   watch([items, () => items.value.map(i => i.quantity)], syncToServer, { deep: true })
@@ -316,6 +402,8 @@ export const useCartStore = defineStore('cartStore', () => {
     clearCart,
     checkout,
     setBonusesToSpend,
+    mergeOnLogin,
+    cancelPendingSync,
   }
 }, {
   persist: {

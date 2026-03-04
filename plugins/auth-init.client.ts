@@ -1,5 +1,6 @@
 import { toast } from 'vue-sonner'
 import { useProfileStore } from '@/stores/core/profileStore'
+import { useCartStore } from '@/stores/publicStore/cartStore'
 
 /**
  * Client-only plugin для инициализации auth state
@@ -8,6 +9,7 @@ import { useProfileStore } from '@/stores/core/profileStore'
 export default defineNuxtPlugin(async () => {
   const supabase = useSupabaseClient()
   const profileStore = useProfileStore()
+  const cartStore = useCartStore()
   const user = useSupabaseUser()
 
   // ✅ Проверяем текущую сессию при инициализации
@@ -57,6 +59,11 @@ export default defineNuxtPlugin(async () => {
       // force=false - возьмёт из localStorage если есть
       const hasProfile = await profileStore.loadProfile(false, true)
 
+      // Синхронизация корзины при логине
+      cartStore.mergeOnLogin().catch((error) => {
+        console.error('[Auth Plugin] Cart merge failed:', error)
+      })
+
       if (hasProfile) {
         toast.success('С возвращением!', {
           description: `Добро пожаловать, ${profileStore.fullName}!`,
@@ -80,6 +87,7 @@ export default defineNuxtPlugin(async () => {
     }
     else if (event === 'SIGNED_OUT') {
       profileStore.clearProfile()
+      cartStore.cancelPendingSync()
       // Очищаем историю обработанных событий
       processedEvents.clear()
     }

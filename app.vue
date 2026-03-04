@@ -4,6 +4,7 @@ import { Toaster } from 'vue-sonner'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
+import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import 'vue-sonner/style.css'
 
@@ -12,11 +13,12 @@ const isMobile = useMediaQuery('(max-width: 1023px)')
 const isPageLoading = ref(false)
 const modalStore = useModalStore()
 const profileStore = useProfileStore()
+const cartStore = useCartStore()
 const wishlistStore = useWishlistStore()
 const route = useRoute()
 const router = useRouter() // ← добавлено
 
-// Глобальная инициализация ID избранного при авторизации
+// Глобальная инициализация при авторизации
 const supabaseUser = useSupabaseUser()
 const supabase = useSupabaseClient()
 
@@ -25,9 +27,11 @@ watch(supabaseUser, (newUser) => {
     return
   if (newUser) {
     wishlistStore.fetchWishlistIds()
+    cartStore.mergeOnLogin()
   }
   else {
     wishlistStore.wishlistProductIds = []
+    cartStore.cancelPendingSync()
   }
 }, { immediate: true })
 
