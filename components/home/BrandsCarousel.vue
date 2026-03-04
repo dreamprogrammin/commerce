@@ -41,7 +41,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
 
     <!-- Карусель брендов (стиль Instagram Stories) -->
     <div class="overflow-hidden">
-      <div class="pl-0 -mr-2 sm:-mr-6 lg:mx-auto">
+      <div class="pl-2 -mr-2 sm:pl-6 sm:-mr-6 lg:pl-0 lg:mr-0 lg:mx-auto">
         <Carousel
           class="w-full"
           :opts="{
@@ -71,15 +71,16 @@ function getBrandLogoUrl(logoUrl: string | null) {
                     <div class="w-full h-full rounded-full bg-background p-0.75">
                       <!-- Логотип бренда -->
                       <div class="relative w-full h-full rounded-full bg-muted/50 overflow-hidden flex items-center justify-center">
-                        <ProgressiveImage
-                          v-if="brand.logo_url"
-                          :src="getBrandLogoUrl(brand.logo_url) || ''"
-                          :blur-data-url="brand.blur_placeholder"
-                          :alt="brand.name"
-                          object-fit="contain"
-                          :placeholder-type="brand.blur_placeholder ? 'lqip' : 'shimmer'"
-                          class="absolute inset-0 p-2"
-                        />
+                        <div v-if="brand.logo_url" class="absolute inset-0 p-2 flex items-center justify-center">
+                          <ProgressiveImage
+                            :src="getBrandLogoUrl(brand.logo_url) || ''"
+                            :blur-data-url="brand.blur_placeholder"
+                            :alt="brand.name"
+                            object-fit="contain"
+                            :placeholder-type="brand.blur_placeholder ? 'lqip' : 'shimmer'"
+                            class="w-full h-full"
+                          />
+                        </div>
                         <Icon
                           v-else
                           name="lucide:package"
