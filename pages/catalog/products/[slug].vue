@@ -947,7 +947,7 @@ useHead(() => ({
                     :to="brandLink"
                     class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
                   >
-                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
+                    <div class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
                         v-if="product.brands?.logo_url"
                         :src="brandLogoUrl"
@@ -957,7 +957,7 @@ useHead(() => ({
                         placeholder-type="shimmer"
                         class="w-full h-full"
                       />
-                      <Icon v-else name="lucide:building-2" class="w-3 h-3" />
+                      <Icon v-else name="lucide:building-2" class="w-4 h-4" />
                     </div>
                     <span class="group-hover:underline">{{ brandName }}</span>
                   </NuxtLink>
@@ -971,7 +971,7 @@ useHead(() => ({
                     :to="productLineLink"
                     class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
                   >
-                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
+                    <div class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
                         v-if="product.product_lines?.logo_url"
                         :src="productLineLogoUrl"
@@ -981,12 +981,12 @@ useHead(() => ({
                         placeholder-type="shimmer"
                         class="w-full h-full"
                       />
-                      <Icon v-else name="lucide:sparkles" class="w-3 h-3 text-primary/70" />
+                      <Icon v-else name="lucide:sparkles" class="w-4 h-4 text-primary/70" />
                     </div>
                     <span class="group-hover:underline font-medium">{{ productLineName }}</span>
                   </NuxtLink>
                   <span v-else-if="productLineName" class="inline-flex items-center gap-1.5">
-                    <div class="w-5 h-5 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
+                    <div class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0">
                       <ProgressiveImage
                         v-if="product.product_lines?.logo_url"
                         :src="productLineLogoUrl"
@@ -996,7 +996,7 @@ useHead(() => ({
                         placeholder-type="shimmer"
                         class="w-full h-full"
                       />
-                      <Icon v-else name="lucide:sparkles" class="w-3 h-3 text-primary/70" />
+                      <Icon v-else name="lucide:sparkles" class="w-4 h-4 text-primary/70" />
                     </div>
                     <span class="font-medium">{{ productLineName }}</span>
                   </span>

@@ -53,11 +53,11 @@ function getBrandLogoUrl(logoUrl: string | null) {
               v-for="brand in brands"
               :key="brand.id"
               class="pl-2 md:pl-0
-                basis-[22%]
-                sm:basis-[18%]
-                md:basis-[15%]
-                lg:basis-[12%]
-                xl:basis-[10%]"
+                basis-[28%]
+                sm:basis-[22%]
+                md:basis-[18%]
+                lg:basis-[14%]
+                xl:basis-[12%]"
             >
               <NuxtLink
                 :to="`/brand/${brand.slug}`"
@@ -66,12 +66,12 @@ function getBrandLogoUrl(logoUrl: string | null) {
                 <!-- Круглый аватар с градиентной рамкой (как в Instagram) -->
                 <div class="relative">
                   <!-- Градиентная рамка -->
-                  <div class="w-16 h-16 md:w-32 md:h-32 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-0.5 group-hover:p-0.75 transition-all duration-300">
+                  <div class="w-20 h-20 md:w-28 md:h-28 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 p-0.5 group-hover:p-0.75 transition-all duration-300">
                     <!-- Белый фон -->
-                    <div class="w-full h-full rounded-full bg-background p-0.75">
+                    <div class="w-full h-full rounded-full bg-background p-0.5">
                       <!-- Логотип бренда -->
                       <div class="relative w-full h-full rounded-full bg-muted/50 overflow-hidden flex items-center justify-center">
-                        <div v-if="brand.logo_url" class="absolute inset-0 p-2 flex items-center justify-center">
+                        <div v-if="brand.logo_url" class="absolute inset-0 p-1 flex items-center justify-center">
                           <ProgressiveImage
                             :src="getBrandLogoUrl(brand.logo_url) || ''"
                             :blur-data-url="brand.blur_placeholder"
@@ -84,7 +84,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
                         <Icon
                           v-else
                           name="lucide:package"
-                          class="w-8 h-8 md:w-10 md:h-10 text-muted-foreground"
+                          class="w-9 h-9 md:w-11 md:h-11 text-muted-foreground"
                         />
                       </div>
                     </div>
@@ -95,7 +95,7 @@ function getBrandLogoUrl(logoUrl: string | null) {
                 </div>
 
                 <!-- Название бренда -->
-                <span class="text-xs md:text-sm font-medium text-center line-clamp-1 max-w-20 md:max-w-25 group-hover:text-primary transition-colors">
+                <span class="text-xs md:text-sm font-medium text-center line-clamp-1 max-w-24 md:max-w-28 group-hover:text-primary transition-colors">
                   {{ brand.name }}
                 </span>
               </NuxtLink>
