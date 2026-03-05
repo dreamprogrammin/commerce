@@ -242,14 +242,9 @@ async function handleDeleteLine() {
                   class="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                 >
                   <!-- Логотип -->
-                  <div class="w-12 h-12 rounded-lg bg-muted border overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    <img
-                      v-if="line.logo_url"
-                      :src="getVariantUrl('product-line-logos', line.logo_url, 'sm')"
-                      :alt="line.name"
-                      class="w-full h-full object-contain p-1"
-                    >
-                    <Sparkles v-else class="w-6 h-6 text-muted-foreground" />
+                  <!-- TODO: Убрать скрытие после 10 марта (Экономия Egress) -->
+                  <div class="w-12 h-12 rounded-lg bg-muted border flex-shrink-0 flex items-center justify-center">
+                    <span class="text-xs text-muted-foreground">IMG</span>
                   </div>
 
                   <!-- Информация -->

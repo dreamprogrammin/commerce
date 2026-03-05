@@ -208,13 +208,10 @@ function getBrandLogoUrl(logoUrl: string | null): string {
             <!-- Строки брендов -->
             <TableRow v-for="brand in filteredBrands" :key="brand.id" class="group">
               <!-- Логотип -->
+              <!-- TODO: Убрать скрытие после 10 марта (Экономия Egress) -->
               <TableCell>
-                <div class="w-12 h-12 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden border">
-                  <img
-                    :src="getBrandLogoUrl(brand.logo_url)"
-                    :alt="brand.name"
-                    class="w-full h-full object-contain p-1"
-                  >
+                <div class="w-12 h-12 rounded-md bg-muted flex items-center justify-center border">
+                  <span class="text-xs text-muted-foreground">IMG</span>
                 </div>
               </TableCell>
 

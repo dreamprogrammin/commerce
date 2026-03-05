@@ -661,20 +661,16 @@ function removeImage() {
           Blur placeholder готов
         </p>
 
+        <!-- TODO: Убрать скрытие после 10 марта (Экономия Egress) -->
         <div
           v-if="displayImageUrl"
-          class="mt-2 border p-2 rounded-md inline-block relative bg-background"
+          class="mt-2 border p-2 rounded-md inline-flex items-center gap-2 bg-muted"
         >
-          <img
-            :src="displayImageUrl"
-            :alt="`Изображение для ${props.item.name}`"
-            class="max-w-[150px] max-h-[80px] object-contain rounded"
-            loading="lazy"
-          >
+          <span class="text-xs text-muted-foreground">IMG скрыто</span>
           <Button
             variant="destructive"
             size="icon"
-            class="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+            class="h-6 w-6 rounded-full"
             type="button"
             aria-label="Удалить изображение"
             :disabled="isDeleted"
@@ -684,15 +680,6 @@ function removeImage() {
               <path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z" />
             </svg>
           </Button>
-
-          <!-- 👀 Индикатор blur на превью -->
-          <div
-            v-if="props.item._blurPlaceholder"
-            class="absolute bottom-1 left-1 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1"
-          >
-            <Icon name="lucide:sparkles" class="w-2.5 h-2.5" />
-            <span>LQIP</span>
-          </div>
         </div>
       </div>
 
