@@ -219,8 +219,8 @@ onMounted(() => {
                 <!-- Content -->
                 <div class="absolute inset-0 flex flex-col p-4">
                   <!-- Category name - занимает верхнюю часть -->
-                  <div class="flex-shrink-0 pr-20">
-                    <h3 class="text-lg font-bold text-gray-900 leading-tight break-words">
+                  <div class="flex-shrink-0 pr-16">
+                    <h3 class="text-base font-bold text-gray-900 leading-tight break-words">
                       {{ category.name }}
                     </h3>
                   </div>
@@ -244,7 +244,7 @@ onMounted(() => {
                       :alt="category.name"
                       object-fit="contain"
                       :placeholder-type="category.blur_placeholder ? 'lqip' : 'shimmer'"
-                      class="absolute bottom-0 right-0 w-36 h-36"
+                      class="absolute bottom-0 right-0 w-24 h-24"
                     />
                   </div>
                 </div>
