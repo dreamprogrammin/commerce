@@ -118,20 +118,9 @@ function getProductImageUrl(imageUrl: string | null) {
 
           <TableRow v-for="product in products" :key="product.id">
             <TableCell>
-              <div class="w-16 h-16 bg-muted rounded-md overflow-hidden relative">
-                <img
-                  v-if="product.product_images && product.product_images.length > 0"
-                  :src="getProductImageUrl(product.product_images[0]?.image_url || null) || '/images/placeholder.svg'"
-                  :alt="product.name"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
-                >
-                <div
-                  v-if="product.product_images && product.product_images.length > 1"
-                  class="absolute bottom-0 right-0 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-tl-md"
-                >
-                  +{{ product.product_images.length - 1 }}
-                </div>
+              <!-- TODO: Убрать скрытие после 10 марта (Экономия Egress) -->
+              <div class="w-16 h-16 bg-muted rounded-md overflow-hidden relative flex items-center justify-center">
+                <span class="text-xs text-muted-foreground">IMG</span>
               </div>
             </TableCell>
             <TableCell class="font-medium">
