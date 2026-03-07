@@ -344,6 +344,11 @@ const priceDetails = computed(() => {
         </NuxtLink>
       </div>
 
+      <!-- 📦 Серия -->
+      <span v-if="product.product_line_name" class="text-[11px] text-pink-600 font-medium">
+        {{ product.product_line_name }}
+      </span>
+
       <!-- 📝 Название товара -->
       <NuxtLink :to="`/catalog/products/${product.slug}`" class="block">
         <h3 class="font-semibold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">

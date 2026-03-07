@@ -386,6 +386,8 @@ export interface BaseProduct {
   bonus_points_award?: number | null
   stock_quantity?: number | null
   brands?: SimpleBrand | null
+  product_line_id?: string | null
+  product_line_name?: string | null
 }
 
 export interface SimpleAttributeOption {

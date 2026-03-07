@@ -19,6 +19,7 @@ export function useCatalogQuery(
       unref(currentPage),
       f.subCategoryIds?.join(',') || '',
       f.brandIds?.join(',') || '',
+      f.productLineIds?.join(',') || '',
       f.materialIds?.join(',') || '',
       f.countryIds?.join(',') || '',
       `${f.priceMin}-${f.priceMax}`,

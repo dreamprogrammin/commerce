@@ -124,6 +124,14 @@ const activeFilters = ref<ActiveFilters>({
   numericAttributes: {},
 })
 
+// Smart UI: фильтруем линейки по выбранному бренду
+const filteredProductLines = computed(() => {
+  const selectedBrands = activeFilters.value.brandIds
+  if (selectedBrands.length === 0)
+    return availableProductLines.value
+  return availableProductLines.value.filter(line => selectedBrands.includes(line.brand_id))
+})
+
 // --- 3. Вычисляемые свойства ---
 const currentCategorySlug = computed(() => (route.params.slug as string[]).slice(-1)[0] ?? 'all')
 
@@ -436,6 +444,19 @@ function loadMoreProducts() {
   currentPage.value++
 }
 
+// При смене бренда — очищаем выбранные линейки, которые не принадлежат выбранным брендам
+watch(() => activeFilters.value.brandIds, (newBrandIds) => {
+  if (newBrandIds.length === 0)
+    return
+  const validLineIds = activeFilters.value.productLineIds.filter((lineId) => {
+    const line = availableProductLines.value.find(l => l.id === lineId)
+    return line && newBrandIds.includes(line.brand_id)
+  })
+  if (validLineIds.length !== activeFilters.value.productLineIds.length) {
+    activeFilters.value = { ...activeFilters.value, productLineIds: validLineIds }
+  }
+})
+
 watch(currentPageProducts, (newProducts) => {
   if (currentPage.value > 1 && newProducts.length > 0) {
     const existingIds = new Set(accumulatedProducts.value.map(p => p.id))
@@ -544,7 +565,28 @@ function formatPriceForSeo(price: number): string {
   return new Intl.NumberFormat('ru-RU').format(Math.round(price))
 }
 
+// SEO: выбрана ровно одна линейка / один бренд
+const selectedSingleLine = computed(() => {
+  if (activeFilters.value.productLineIds.length !== 1)
+    return null
+  return availableProductLines.value.find(l => l.id === activeFilters.value.productLineIds[0]) || null
+})
+
+const selectedSingleBrand = computed(() => {
+  if (activeFilters.value.brandIds.length !== 1)
+    return null
+  return availableBrands.value.find(b => b.id === activeFilters.value.brandIds[0]) || null
+})
+
 const metaDescription = computed(() => {
+  // SEO: если выбрана одна линейка — специальное описание
+  if (selectedSingleLine.value) {
+    const brandName = selectedSingleBrand.value?.name || ''
+    const lineName = selectedSingleLine.value.name
+    const prefix = brandName ? `${brandName} ${lineName}` : lineName
+    return `${prefix} — широкий ассортимент в интернет-магазине Ухтышка. Быстрая доставка в Алматы и по Казахстану.`
+  }
+
   // Если есть фильтры - показываем общее описание
   if (hasActiveFilters.value) {
     return `Результаты фильтрации для категории "${categoryName.value}". Широкий выбор товаров.`
@@ -585,6 +627,14 @@ const metaDescription = computed(() => {
 })
 
 const metaTitle = computed(() => {
+  // SEO: если выбрана одна линейка — специальный title
+  if (selectedSingleLine.value) {
+    const brandName = selectedSingleBrand.value?.name || ''
+    const lineName = selectedSingleLine.value.name
+    const prefix = brandName ? `${brandName} ${lineName}` : lineName
+    return `Купить ${prefix} в Алматы | Ухтышка`
+  }
+
   if (hasActiveFilters.value) {
     return `${categoryName.value} - Фильтр | Ухтышка`
   }
@@ -1129,7 +1179,7 @@ useHead(() => {
             v-model="activeFilters"
             :available-filters="availableFilters as unknown as AttributeWithValue[]"
             :available-brands="availableBrands"
-            :available-product-lines="availableProductLines"
+            :available-product-lines="filteredProductLines"
             :price-range="priceRange"
             :piece-count-range="pieceCountRange"
             :available-materials="availableMaterials"
@@ -1468,7 +1518,7 @@ useHead(() => {
         :open="isMobileFiltersOpen"
         :available-filters="availableFilters as unknown as AttributeWithValue[]"
         :available-brands="availableBrands"
-        :available-product-lines="availableProductLines"
+        :available-product-lines="filteredProductLines"
         :price-range="priceRange"
         :piece-count-range="pieceCountRange"
         :available-materials="availableMaterials"
