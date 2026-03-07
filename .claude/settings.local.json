@@ -103,7 +103,8 @@
       "Bash(gh auth status:*)",
       "Bash(ssh -T:*)",
       "Bash(echo === New files ===:*)",
-      "Bash(pnpm exec:*)"
+      "Bash(pnpm exec:*)",
+      "Bash(git pull:*)"
     ]
   }
 }
