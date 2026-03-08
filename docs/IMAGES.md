@@ -1036,6 +1036,7 @@ slides-images/
 |-------|-------|---------------|
 | `adminProductsStore` | product-images | Standard (400/800/1440px) |
 | `adminBrandsStore` | brand-logos | Standard |
+| `adminBrandsStore` (hero banner) | banners | Wide (640/1280/1920px) |
 | `adminProductLinesStore` | product-line-logos | Standard |
 | `adminCategoriesStore` | category-images | Standard |
 | `useSlideForm` | slides-images | Wide (640/1280/1920px) |
@@ -1043,6 +1044,7 @@ slides-images/
 
 **Удаление всех вариантов при удалении сущности:**
 - `adminBrandsStore.deleteBrand()` — удаляет 3 файла логотипа
+- `adminBrandsStore.updateBrand()` — удаляет старый hero-баннер (Wide) при замене
 - `adminProductLinesStore.deleteProductLine()` — удаляет 3 файла
 - `adminCategoriesStore.saveChanges()` — удаляет варианты при удалении/замене
 - `useAdminSlides.handleDelete()` — удаляет варианты desktop + mobile
@@ -1054,9 +1056,11 @@ slides-images/
 - Линейки: `CategoryProductLines`, `/brand/[brandSlug]/[lineSlug]`
 - Слайды: `AppCarousel` → `getVariantUrlWide('lg'/'sm')`
 - Баннеры: `Banners.vue` → `getVariantUrlWide('md')`
+- Кастомные страницы брендов: `BrandCustomTemplate.vue` → `getVariantUrlWide('sm'/'md'/'lg')`
 
 **Админ-панель — превью через варианты:**
 - `BrandForm`, `ProductLineForm`, `RecursiveMenuItemFormNode` → `getVariantUrl('sm')`
+- `BrandForm` (hero banner preview) → `getVariantUrlWide('sm')`
 - `SlidesForm`, `BannerForm` → `getVariantUrlWide('sm'/'lg')`
 - Все формы имеют `@error` fallback на placeholder.svg
 
@@ -1157,8 +1161,9 @@ slides-images/
 
 - `utils/imageOptimizer.ts` — `generateImageVariants()`, `generateImageVariantsWide()`, `optimizeImageBeforeUpload()`
 - `stores/adminStore/adminProductsStore.ts` — варианты товарных изображений (Standard)
-- `stores/adminStore/adminBrandsStore.ts` — варианты логотипов брендов (Standard)
+- `stores/adminStore/adminBrandsStore.ts` — варианты логотипов брендов (Standard) + hero-баннера (Wide, bucket: banners)
 - `stores/adminStore/adminProductLinesStore.ts` — варианты логотипов линеек (Standard)
 - `stores/adminStore/adminCategoriesStore.ts` — варианты изображений категорий (Standard)
 - `composables/admin/useSlideForm.ts` — варианты слайдов (Wide)
 - `composables/admin/useBannerForm.ts` — варианты баннеров (Wide)
+- `components/brand/BrandCustomTemplate.vue` — отображение hero-баннера бренда через `getVariantUrlWide()`

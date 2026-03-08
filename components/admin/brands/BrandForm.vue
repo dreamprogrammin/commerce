@@ -16,7 +16,7 @@ const emit = defineEmits<{
   (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null }): void
 }>()
 
-const { getVariantUrl } = useSupabaseStorage()
+const { getVariantUrl, getVariantUrlWide } = useSupabaseStorage()
 const supabase = useSupabaseClient<Database>()
 
 // Парсим page_layout из initialData
@@ -42,7 +42,6 @@ const isProcessingLogo = ref(false)
 // --- Custom Landing Page ---
 const newBannerFile = ref<File | null>(null)
 const bannerPreviewUrl = ref<string | null>(null)
-const isProcessingBanner = ref(false)
 const brandProductLines = ref<ProductLine[]>([])
 const selectedLineIds = ref<string[]>(initialLayout?.featuredLineIds || [])
 
@@ -64,7 +63,7 @@ async function loadBrandProductLines(brandId: string) {
   }
 }
 
-async function handleBannerFileChange(event: Event) {
+function handleBannerFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0] || null
 
@@ -74,22 +73,10 @@ async function handleBannerFileChange(event: Event) {
     return
   }
 
-  isProcessingBanner.value = true
-  try {
-    const result = await optimizeImageBeforeUpload(file)
-    newBannerFile.value = result.file
-    bannerPreviewUrl.value = URL.createObjectURL(result.file)
-    toast.success('Баннер оптимизирован', {
-      description: `${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%)`,
-    })
-  }
-  catch {
-    newBannerFile.value = file
-    bannerPreviewUrl.value = URL.createObjectURL(file)
-  }
-  finally {
-    isProcessingBanner.value = false
-  }
+  // Сохраняем оригинальный файл без предварительной обработки.
+  // Сжатие (generateImageVariantsWide) выполняется в _uploadBannerVariants стора.
+  newBannerFile.value = file
+  bannerPreviewUrl.value = URL.createObjectURL(file)
 }
 
 function toggleLineSelection(lineId: string) {
@@ -107,7 +94,7 @@ const displayBannerUrl = computed(() => {
     return bannerPreviewUrl.value
   }
   if (initialLayout?.heroBanner) {
-    return getVariantUrl(BUCKET_NAME_BANNERS, initialLayout.heroBanner, 'sm')
+    return getVariantUrlWide(BUCKET_NAME_BANNERS, initialLayout.heroBanner, 'sm')
   }
   return null
 })
@@ -342,12 +329,7 @@ onBeforeUnmount(() => {
       <template v-if="formData.is_custom_page">
         <!-- Hero баннер -->
         <div class="space-y-2">
-          <Label>
-            Hero баннер (1920x600 рекомендуется)
-            <span v-if="isProcessingBanner" class="text-xs text-muted-foreground ml-2">
-              Обработка...
-            </span>
-          </Label>
+          <Label>Hero баннер (1920x600 рекомендуется)</Label>
           <div v-if="displayBannerUrl" class="mb-2">
             <img
               :src="displayBannerUrl"
@@ -359,7 +341,7 @@ onBeforeUnmount(() => {
               {{ newBannerFile ? 'Новый баннер (будет загружен)' : 'Текущий баннер' }}
             </p>
           </div>
-          <Input type="file" accept="image/*" :disabled="isProcessingBanner" @change="handleBannerFileChange" />
+          <Input type="file" accept="image/*" @change="handleBannerFileChange" />
         </div>
 
         <!-- Выбор избранных линеек -->

@@ -18,7 +18,7 @@ const emit = defineEmits<{
   (e: 'update:sortBy', value: 'newest' | 'price_asc' | 'price_desc' | 'popularity'): void
 }>()
 
-const { getVariantUrl } = useSupabaseStorage()
+const { getVariantUrl, getVariantUrlWide } = useSupabaseStorage()
 
 const pageLayout = computed(() => props.brand.page_layout as BrandPageLayout | null)
 
@@ -33,22 +33,23 @@ const brandLogoUrl = computed(() => {
   return getVariantUrl(BUCKET_NAME_BRANDS, props.brand.logo_url, 'sm')
 })
 
+// Баннеры — широкий формат (640/1280/1920px), используем getVariantUrlWide
 const heroBannerSm = computed(() => {
   if (!pageLayout.value?.heroBanner)
     return null
-  return getVariantUrl(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'sm')
+  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'sm')
 })
 
 const heroBannerMd = computed(() => {
   if (!pageLayout.value?.heroBanner)
     return null
-  return getVariantUrl(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'md')
+  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'md')
 })
 
 const heroBannerLg = computed(() => {
   if (!pageLayout.value?.heroBanner)
     return null
-  return getVariantUrl(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'lg')
+  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'lg')
 })
 
 const displayH1 = computed(() => {
