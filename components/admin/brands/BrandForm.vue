@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { BrandInsert, BrandUpdate } from '@/types'
+import type { BrandInsert, BrandPageLayout, BrandUpdate, Database, ProductLine } from '@/types'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BANNERS, BUCKET_NAME_BRANDS } from '@/constants'
 import { formatFileSize, optimizeImageBeforeUpload } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 
@@ -13,16 +13,22 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null }): void
+  (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null }): void
 }>()
 
 const { getVariantUrl } = useSupabaseStorage()
+const supabase = useSupabaseClient<Database>()
+
+// Парсим page_layout из initialData
+const initialLayout = (props.initialData as any)?.page_layout as BrandPageLayout | null
 
 const formData = ref<Partial<BrandInsert | BrandUpdate>>({
   name: props.initialName || props.initialData?.name || '',
   slug: props.initialData?.slug || '',
   description: props.initialData?.description || null,
   logo_url: props.initialData?.logo_url || null,
+  is_custom_page: (props.initialData as any)?.is_custom_page || false,
+  page_layout: props.initialData ? (props.initialData as any).page_layout : null,
   // SEO поля
   seo_description: props.initialData?.seo_description || null,
   seo_keywords: props.initialData?.seo_keywords || null,
@@ -32,6 +38,79 @@ const newLogoFile = ref<File | null>(null)
 const logoPreviewUrl = ref<string | null>(null)
 const isSlugManuallyEdited = ref(false)
 const isProcessingLogo = ref(false)
+
+// --- Custom Landing Page ---
+const newBannerFile = ref<File | null>(null)
+const bannerPreviewUrl = ref<string | null>(null)
+const isProcessingBanner = ref(false)
+const brandProductLines = ref<ProductLine[]>([])
+const selectedLineIds = ref<string[]>(initialLayout?.featuredLineIds || [])
+
+// Загружаем линейки бренда при включении кастомной страницы
+watch(() => formData.value.is_custom_page, async (isCustom) => {
+  if (isCustom && props.initialData && 'id' in props.initialData && props.initialData.id) {
+    await loadBrandProductLines((props.initialData as any).id)
+  }
+}, { immediate: true })
+
+async function loadBrandProductLines(brandId: string) {
+  const { data } = await supabase
+    .from('product_lines')
+    .select('*')
+    .eq('brand_id', brandId)
+    .order('name', { ascending: true })
+  if (data) {
+    brandProductLines.value = data as ProductLine[]
+  }
+}
+
+async function handleBannerFileChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0] || null
+
+  if (!file) {
+    newBannerFile.value = null
+    bannerPreviewUrl.value = null
+    return
+  }
+
+  isProcessingBanner.value = true
+  try {
+    const result = await optimizeImageBeforeUpload(file)
+    newBannerFile.value = result.file
+    bannerPreviewUrl.value = URL.createObjectURL(result.file)
+    toast.success('Баннер оптимизирован', {
+      description: `${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%)`,
+    })
+  }
+  catch {
+    newBannerFile.value = file
+    bannerPreviewUrl.value = URL.createObjectURL(file)
+  }
+  finally {
+    isProcessingBanner.value = false
+  }
+}
+
+function toggleLineSelection(lineId: string) {
+  const idx = selectedLineIds.value.indexOf(lineId)
+  if (idx >= 0) {
+    selectedLineIds.value.splice(idx, 1)
+  }
+  else {
+    selectedLineIds.value.push(lineId)
+  }
+}
+
+const displayBannerUrl = computed(() => {
+  if (bannerPreviewUrl.value) {
+    return bannerPreviewUrl.value
+  }
+  if (initialLayout?.heroBanner) {
+    return getVariantUrl(BUCKET_NAME_BANNERS, initialLayout.heroBanner, 'sm')
+  }
+  return null
+})
 
 // Автоматическая генерация slug при изменении названия
 watch(() => formData.value.name, (newName) => {
@@ -81,9 +160,17 @@ function handleSubmit() {
     return
   }
 
+  // Обновляем page_layout с выбранными линейками
+  if (formData.value.is_custom_page) {
+    const currentLayout = (formData.value.page_layout as BrandPageLayout | null) || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
+    currentLayout.featuredLineIds = selectedLineIds.value
+    formData.value.page_layout = currentLayout as any
+  }
+
   emit('submit', {
     data: formData.value as BrandInsert | BrandUpdate,
     file: newLogoFile.value,
+    bannerFile: newBannerFile.value,
   })
 }
 
@@ -131,6 +218,9 @@ const displayLogoUrl = computed(() => {
 onBeforeUnmount(() => {
   if (logoPreviewUrl.value) {
     URL.revokeObjectURL(logoPreviewUrl.value)
+  }
+  if (bannerPreviewUrl.value) {
+    URL.revokeObjectURL(bannerPreviewUrl.value)
   }
 })
 </script>
@@ -230,6 +320,108 @@ onBeforeUnmount(() => {
           {{ seoDescriptionValue || descriptionValue || 'Описание бренда будет показано здесь...' }}
         </p>
       </div>
+    </div>
+
+    <!-- Кастомная Landing Page -->
+    <div class="space-y-4 pt-6 border-t">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold">
+            Кастомная Landing Page
+          </h3>
+          <p class="text-xs text-muted-foreground">
+            Включите для использования расширенного шаблона с hero-баннером
+          </p>
+        </div>
+        <Switch
+          :checked="!!formData.is_custom_page"
+          @update:checked="formData.is_custom_page = $event"
+        />
+      </div>
+
+      <template v-if="formData.is_custom_page">
+        <!-- Hero баннер -->
+        <div class="space-y-2">
+          <Label>
+            Hero баннер (1920x600 рекомендуется)
+            <span v-if="isProcessingBanner" class="text-xs text-muted-foreground ml-2">
+              Обработка...
+            </span>
+          </Label>
+          <div v-if="displayBannerUrl" class="mb-2">
+            <img
+              :src="displayBannerUrl"
+              alt="Hero баннер"
+              class="w-full h-32 object-cover border rounded-lg bg-muted"
+              loading="lazy"
+            >
+            <p class="text-xs text-muted-foreground mt-1">
+              {{ newBannerFile ? 'Новый баннер (будет загружен)' : 'Текущий баннер' }}
+            </p>
+          </div>
+          <Input type="file" accept="image/*" :disabled="isProcessingBanner" @change="handleBannerFileChange" />
+        </div>
+
+        <!-- Выбор избранных линеек -->
+        <div v-if="brandProductLines.length > 0" class="space-y-2">
+          <Label>Избранные линейки (отображаются крупно)</Label>
+          <div class="grid grid-cols-1 gap-2">
+            <label
+              v-for="line in brandProductLines"
+              :key="line.id"
+              class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+              :class="selectedLineIds.includes(line.id) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'"
+            >
+              <Checkbox
+                :checked="selectedLineIds.includes(line.id)"
+                @update:checked="toggleLineSelection(line.id)"
+              />
+              <span class="text-sm font-medium">{{ line.name }}</span>
+            </label>
+          </div>
+          <p class="text-xs text-muted-foreground">
+            Выбранные линейки будут отображаться крупными карточками в верхней части страницы
+          </p>
+        </div>
+        <div v-else class="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
+          Нет линеек для этого бренда. Добавьте линейки во вкладке "Линейки".
+        </div>
+
+        <!-- SEO поля для кастомной страницы -->
+        <div>
+          <Label for="seo-title">SEO Title (H1)</Label>
+          <Input
+            id="seo-title"
+            :model-value="(formData as any).seo_title ?? ''"
+            placeholder="Купить LEGO в Алматы - Оригинальные конструкторы"
+            @update:model-value="(formData as any).seo_title = $event === '' ? null : $event"
+          />
+        </div>
+
+        <div>
+          <Label for="seo-h1">Заголовок H1</Label>
+          <Input
+            id="seo-h1"
+            :model-value="(formData as any).seo_h1 ?? ''"
+            placeholder="Конструкторы LEGO"
+            @update:model-value="(formData as any).seo_h1 = $event === '' ? null : $event"
+          />
+        </div>
+
+        <div>
+          <Label for="seo-text">SEO текст (HTML)</Label>
+          <Textarea
+            id="seo-text"
+            :model-value="(formData as any).seo_text ?? ''"
+            rows="6"
+            placeholder="<p>Описание бренда для SEO...</p>"
+            @update:model-value="(formData as any).seo_text = $event === '' ? null : $event"
+          />
+          <p class="text-xs text-muted-foreground mt-1">
+            Поддерживает HTML-разметку. Отображается внизу кастомной страницы.
+          </p>
+        </div>
+      </template>
     </div>
 
     <Button type="submit" class="w-full">

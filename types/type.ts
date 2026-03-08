@@ -2,6 +2,12 @@ import type { Database, Tables, TablesInsert, TablesUpdate } from './supabase'
 
 export interface Brand extends Tables<'brands'> { }
 
+export interface BrandPageLayout {
+  heroBanner: string | null
+  heroBannerBlur: string | null
+  featuredLineIds: string[]
+}
+
 // Линейка продуктов (подбренд/франшиза, например: Mattel → Barbie, Hot Wheels)
 export interface ProductLine {
   id: string

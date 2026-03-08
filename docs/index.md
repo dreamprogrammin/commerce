@@ -19,6 +19,10 @@
 - [**GOOGLE_OAUTH_PROFILE_FIX.md**](./GOOGLE_OAUTH_PROFILE_FIX.md) — Фикс ошибки 500 при Google OAuth (пустое имя пользователя): триггер `handle_new_user`, RPC `ensure_profile_exists`, middleware wait.
 - [**MIGRATION_CLEAN_PROFILES.md**](./MIGRATION_CLEAN_PROFILES.md) — Миграция: очистка логики Profiles и Auth (2025-12-24).
 
+## 🏷️ Товарные линейки
+
+- [**PRODUCT_LINES.md**](./PRODUCT_LINES.md) — **Полная документация Product Lines** (БД, админка, каталог, фильтрация, страницы бренда/линейки, SEO, кеширование, FAQ).
+
 ## 🛒 Оформление заказа
 
 - [**CHECKOUT_CONTACT_INFO.md**](./CHECKOUT_CONTACT_INFO.md) — Автосохранение имени/телефона из формы чекаута в заказ и профиль; race-free контакты в Telegram-уведомлениях.

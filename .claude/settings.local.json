@@ -104,7 +104,9 @@
       "Bash(ssh -T:*)",
       "Bash(echo === New files ===:*)",
       "Bash(pnpm exec:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(head:*)",
+      "Bash(sed:*)"
     ]
   }
 }

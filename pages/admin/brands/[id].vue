@@ -4,7 +4,6 @@ import { ArrowLeft, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-vue-n
 import { storeToRefs } from 'pinia'
 import BrandForm from '@/components/admin/brands/BrandForm.vue'
 import ProductLineForm from '@/components/admin/product-lines/ProductLineForm.vue'
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
 
@@ -12,7 +11,6 @@ definePageMeta({ layout: 'admin' })
 
 const brandsStore = useAdminBrandsStore()
 const productLinesStore = useAdminProductLinesStore()
-const { getVariantUrl } = useSupabaseStorage()
 const { currentBrand, isLoading } = storeToRefs(brandsStore)
 
 const route = useRoute()
@@ -45,8 +43,8 @@ async function loadProductLines() {
   }
 }
 
-async function handleUpdate(payload: { data: BrandInsert | BrandUpdate, file: File | null }) {
-  const success = await brandsStore.updateBrand(brandId, payload.data as BrandUpdate, payload.file)
+async function handleUpdate(payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null }) {
+  const success = await brandsStore.updateBrand(brandId, payload.data as BrandUpdate, payload.file, payload.bannerFile)
   if (success)
     router.push('/admin/brands')
 }

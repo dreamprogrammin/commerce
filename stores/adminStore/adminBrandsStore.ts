@@ -1,11 +1,12 @@
 // stores/adminStore/useAdminBrandsStore.ts
 
-import type { Brand, BrandInsert, BrandUpdate, Database } from '@/types'
+import type { Brand, BrandInsert, BrandPageLayout, BrandUpdate, Database } from '@/types'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
-import { BUCKET_NAME_BRANDS } from '@/constants'
-import { generateBlurPlaceholder, generateImageVariants } from '@/utils/imageOptimizer'
+import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, IMAGE_VARIANTS_WIDE } from '@/config/images'
+import { BUCKET_NAME_BANNERS, BUCKET_NAME_BRANDS } from '@/constants'
+import { generateBlurPlaceholder, generateImageVariants, generateImageVariantsWide } from '@/utils/imageOptimizer'
+import { getVariantPathsWide } from '@/utils/storageVariants'
 
 export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
   const supabase = useSupabaseClient<Database>()
@@ -76,6 +77,50 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     return { basePath, blurPlaceholder: variants.blurPlaceholder }
   }
 
+  /**
+   * Загружает 3 варианта wide-изображения (sm/md/lg) для баннера бренда
+   */
+  async function _uploadBannerVariants(
+    file: File,
+    seoName?: string,
+  ): Promise<{ basePath: string, blurPlaceholder?: string } | null> {
+    if (IMAGE_OPTIMIZATION_ENABLED) {
+      let blurDataUrl: string | undefined
+      try {
+        const blurResult = await generateBlurPlaceholder(file)
+        blurDataUrl = blurResult.dataUrl
+      }
+      catch { /* ignore */ }
+
+      const filePath = await uploadFile(file, {
+        bucketName: BUCKET_NAME_BANNERS,
+        seoName,
+      })
+      if (!filePath) {
+        return null
+      }
+      return { basePath: filePath, blurPlaceholder: blurDataUrl }
+    }
+
+    const variants = await generateImageVariantsWide(file)
+    const baseSeoName = generateSeoFileName(file, seoName).replace(/\.[^.]+$/, '')
+
+    const uploadResults = await Promise.all(
+      (['sm', 'md', 'lg'] as const).map(variant =>
+        uploadFile(variants[variant], {
+          bucketName: BUCKET_NAME_BANNERS,
+          customFileName: `${baseSeoName}${IMAGE_VARIANTS_WIDE[variant].suffix}.webp`,
+        }),
+      ),
+    )
+
+    if (!uploadResults[0]) {
+      return null
+    }
+
+    return { basePath: baseSeoName, blurPlaceholder: variants.blurPlaceholder }
+  }
+
   const brands = ref<Brand[]>([])
   const currentBrand = ref<Brand | null>(null)
   const isLoading = ref(false)
@@ -134,7 +179,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     }
   }
 
-  async function createBrand(brandData: BrandInsert, logoFile: File | null): Promise<Brand | null> {
+  async function createBrand(brandData: BrandInsert, logoFile: File | null, bannerFile?: File | null): Promise<Brand | null> {
     isLoading.value = true
     try {
       if (logoFile) {
@@ -142,6 +187,17 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         if (!result)
           throw new Error('Не удалось загрузить логотип.')
         brandData.logo_url = result.basePath
+      }
+
+      // Загрузка баннера для кастомной страницы
+      if (bannerFile && brandData.is_custom_page) {
+        const bannerResult = await _uploadBannerVariants(bannerFile, brandData.name ? `brand-banner-${brandData.name}` : undefined)
+        if (!bannerResult)
+          throw new Error('Не удалось загрузить баннер.')
+        const currentLayout = (brandData.page_layout as BrandPageLayout | null) || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
+        currentLayout.heroBanner = bannerResult.basePath
+        currentLayout.heroBannerBlur = bannerResult.blurPlaceholder || null
+        brandData.page_layout = currentLayout as unknown as BrandInsert['page_layout']
       }
 
       const { data: newBrand, error } = await supabase
@@ -172,7 +228,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     }
   }
 
-  async function updateBrand(id: string, brandData: BrandUpdate, newLogoFile: File | null) {
+  async function updateBrand(id: string, brandData: BrandUpdate, newLogoFile: File | null, bannerFile?: File | null) {
     isLoading.value = true
     try {
       if (newLogoFile) {
@@ -184,6 +240,22 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         if (!result)
           throw new Error('Не удалось загрузить новый логотип.')
         brandData.logo_url = result.basePath
+      }
+
+      // Загрузка/обновление баннера для кастомной страницы
+      if (bannerFile && brandData.is_custom_page) {
+        // Удаляем старый баннер если есть
+        const oldLayout = brandData.page_layout as BrandPageLayout | null
+        if (oldLayout?.heroBanner) {
+          await removeFile(BUCKET_NAME_BANNERS, getVariantPathsWide(oldLayout.heroBanner))
+        }
+        const bannerResult = await _uploadBannerVariants(bannerFile, brandData.name ? `brand-banner-${brandData.name}` : undefined)
+        if (!bannerResult)
+          throw new Error('Не удалось загрузить баннер.')
+        const currentLayout = oldLayout || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
+        currentLayout.heroBanner = bannerResult.basePath
+        currentLayout.heroBannerBlur = bannerResult.blurPlaceholder || null
+        brandData.page_layout = currentLayout as unknown as BrandUpdate['page_layout']
       }
 
       const { error } = await supabase.from('brands').update(brandData).eq('id', id)
