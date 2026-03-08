@@ -334,8 +334,8 @@ onBeforeUnmount(() => {
           </p>
         </div>
         <Switch
-          :checked="!!formData.is_custom_page"
-          @update:checked="formData.is_custom_page = $event"
+          :model-value="!!formData.is_custom_page"
+          @update:model-value="formData.is_custom_page = $event"
         />
       </div>
 
