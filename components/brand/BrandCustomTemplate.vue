@@ -3,6 +3,7 @@ import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/
 import { ArrowLeft, ChevronRight, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import BrandLinesDrawer from './BrandLinesDrawer.vue';
 
 const props = defineProps<{
   brand: Brand
