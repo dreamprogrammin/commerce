@@ -112,12 +112,12 @@ const otherProductLines = computed(() => {
       <h2 class="text-xl md:text-3xl font-bold mb-4 md:mb-6">
         Популярные коллекции
       </h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
         <NuxtLink
           v-for="line in featuredProductLines"
           :key="line.id"
           :to="`/catalog/all?brands=${brand.id}&lines=${line.id}`"
-          class="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-xl transition-all duration-300"
+          class="group relative aspect-[4/3] rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200"
         >
           <template v-if="line.logo_url">
             <ProgressiveImage

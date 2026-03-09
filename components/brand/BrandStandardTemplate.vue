@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
+import type { Brand, IBreadcrumbItem, ProductWithGallery } from '@/types'
 import { ArrowLeft, ChevronDown, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
@@ -7,7 +7,6 @@ import { BUCKET_NAME_BRANDS } from '@/constants'
 const props = defineProps<{
   brand: Brand
   products: ProductWithGallery[]
-  productLines: ProductLine[]
   isLoading: boolean
   sortBy: 'newest' | 'price_asc' | 'price_desc' | 'popularity'
   breadcrumbs: IBreadcrumbItem[]
@@ -101,13 +100,6 @@ const localSortBy = computed({
         </div>
       </div>
     </div>
-
-    <!-- Линейки бренда -->
-    <BrandProductLinesGrid
-      v-if="productLines.length > 0"
-      :product-lines="productLines"
-      :brand-id="brand.id"
-    />
 
     <!-- Фильтры и сортировка -->
     <div class="flex flex-row justify-between items-center gap-2">

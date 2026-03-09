@@ -27,12 +27,12 @@ function getCatalogLink(lineId: string): string {
       Коллекции
     </h2>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
       <NuxtLink
         v-for="line in productLines"
         :key="line.id"
         :to="getCatalogLink(line.id)"
-        class="group relative aspect-square rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200"
+        class="group relative aspect-[4/3] rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200"
       >
         <!-- С картинкой -->
         <template v-if="line.logo_url">

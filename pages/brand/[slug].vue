@@ -436,7 +436,6 @@ useRobotsRule({
       <BrandStandardTemplate
         :brand="brand"
         :products="products"
-        :product-lines="brandProductLines"
         :is-loading="isLoading"
         :sort-by="sortBy"
         :breadcrumbs="breadcrumbs"
