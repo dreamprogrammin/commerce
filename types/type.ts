@@ -1,11 +1,16 @@
 import type { Database, Tables, TablesInsert, TablesUpdate } from './supabase'
 
-export interface Brand extends Tables<'brands'> { }
-
 export interface BrandPageLayout {
   heroBanner: string | null
   heroBannerBlur: string | null
   featuredLineIds: string[]
+}
+
+export interface Brand extends Tables<'brands'> {
+  is_custom_page?: boolean
+  page_layout?: BrandPageLayout | null
+  seo_h1?: string | null
+  seo_text?: string | null
 }
 
 // Линейка продуктов (подбренд/франшиза, например: Mattel → Barbie, Hot Wheels)

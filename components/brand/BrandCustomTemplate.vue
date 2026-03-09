@@ -53,7 +53,7 @@ const heroBannerLg = computed(() => {
 })
 
 const displayH1 = computed(() => {
-  return (props.brand as any).seo_h1 || props.brand.name
+  return props.brand.seo_h1 || props.brand.name
 })
 
 // Линейки, не входящие в featured
@@ -227,13 +227,11 @@ const otherProductLines = computed(() => {
     </main>
 
     <!-- SEO текст -->
-    <div v-if="(brand as any).seo_text" class="mt-6 md:mt-12 border-t pt-6 md:pt-10">
-      <div
-        class="brand-description text-foreground"
-      >
+    <div v-if="brand.seo_text" class="mt-6 md:mt-12 border-t pt-6 md:pt-10">
+      <div class="brand-description text-foreground">
         <div
           class="text-sm md:text-base leading-relaxed"
-          v-html="(brand as any).seo_text"
+          v-html="brand.seo_text"
         />
       </div>
     </div>
