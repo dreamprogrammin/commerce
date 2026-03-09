@@ -54,9 +54,8 @@ const localSortBy = computed({
 
       <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
         <!-- Логотип бренда -->
-        <div class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden">
+        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden p-2">
           <ProgressiveImage
-            v-if="brand.logo_url"
             :src="brandLogoUrl"
             :alt="brand.name"
             :bucket-name="BUCKET_NAME_BRANDS"
@@ -66,11 +65,6 @@ const localSortBy = computed({
             placeholder-type="shimmer"
             eager
           />
-          <div v-else class="w-full h-full flex items-center justify-center">
-            <span class="text-2xl md:text-4xl font-bold text-primary/60">
-              {{ brand.name.charAt(0).toUpperCase() }}
-            </span>
-          </div>
         </div>
 
         <!-- Информация о бренде -->

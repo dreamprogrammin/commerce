@@ -69,44 +69,56 @@ const otherProductLines = computed(() => {
     <Breadcrumbs :items="breadcrumbs" />
 
     <!-- Full-width Hero Banner -->
-    <div v-if="pageLayout?.heroBanner" class="relative overflow-hidden rounded-2xl md:rounded-3xl">
-      <picture>
-        <source :srcset="heroBannerLg!" media="(min-width: 1024px)">
-        <source :srcset="heroBannerMd!" media="(min-width: 640px)">
-        <img
-          :src="heroBannerSm!"
-          :alt="brand.name"
-          class="w-full h-48 sm:h-64 md:h-80 lg:h-[400px] object-cover"
-          :style="pageLayout.heroBannerBlur ? { backgroundImage: `url(${pageLayout.heroBannerBlur})`, backgroundSize: 'cover' } : undefined"
-        >
-      </picture>
-
-      <!-- Overlay с логотипом и H1 -->
-      <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end">
-        <div class="p-4 md:p-8 lg:p-12 flex items-center gap-4 md:gap-6">
-          <div v-if="brand.logo_url" class="shrink-0 w-16 h-16 md:w-24 md:h-24 bg-white rounded-xl shadow-lg overflow-hidden">
-            <ProgressiveImage
-              :src="brandLogoUrl"
+    <div v-if="pageLayout?.heroBanner">
+      <!-- Баннер + логотип, вылезающий снизу -->
+      <div class="relative pb-10 md:pb-14">
+        <!-- Баннер (overflow-hidden только на нём) -->
+        <div class="overflow-hidden rounded-2xl md:rounded-3xl">
+          <picture>
+            <source :srcset="heroBannerLg!" media="(min-width: 1024px)">
+            <source :srcset="heroBannerMd!" media="(min-width: 640px)">
+            <img
+              :src="heroBannerSm!"
               :alt="brand.name"
-              :bucket-name="BUCKET_NAME_BRANDS"
-              :file-path="brand.logo_url"
-              aspect-ratio="square"
-              object-fit="contain"
-              placeholder-type="shimmer"
-              eager
-            />
-          </div>
-          <h1 class="text-2xl md:text-4xl lg:text-5xl font-bold text-white drop-shadow-lg">
-            {{ displayH1 }}
-          </h1>
+              class="w-full h-48 sm:h-64 md:h-80 lg:h-[400px] object-cover"
+              :style="pageLayout.heroBannerBlur ? { backgroundImage: `url(${pageLayout.heroBannerBlur})`, backgroundSize: 'cover' } : undefined"
+            >
+          </picture>
+          <!-- Тёмный градиент снизу -->
+          <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/50 to-transparent rounded-b-2xl md:rounded-b-3xl" />
+        </div>
+
+        <!-- Логотип — вылезает снизу баннера -->
+        <div
+          v-if="brand.logo_url"
+          class="absolute bottom-0 left-4 md:left-8 w-20 h-20 md:w-28 md:h-28 bg-white rounded-2xl shadow-xl border border-border p-2 flex items-center justify-center"
+        >
+          <ProgressiveImage
+            :src="brandLogoUrl"
+            :alt="brand.name"
+            :bucket-name="BUCKET_NAME_BRANDS"
+            :file-path="brand.logo_url"
+            aspect-ratio="square"
+            object-fit="contain"
+            placeholder-type="shimmer"
+            eager
+          />
         </div>
       </div>
+
+      <!-- H1 — с отступом, чтобы не налезать на логотип -->
+      <h1
+        class="text-2xl md:text-4xl lg:text-5xl font-bold"
+        :class="brand.logo_url ? 'pl-28 md:pl-44' : ''"
+      >
+        {{ displayH1 }}
+      </h1>
     </div>
 
     <!-- Fallback hero без баннера -->
     <div v-else class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
       <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
-        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden">
+        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden p-2">
           <ProgressiveImage
             :src="brandLogoUrl"
             :alt="brand.name"
