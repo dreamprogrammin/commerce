@@ -73,17 +73,23 @@ const otherProductLines = computed(() => {
       <!-- Баннер + логотип, вылезающий снизу -->
       <div class="relative pb-10 md:pb-14">
         <!-- Баннер (overflow-hidden только на нём) -->
-        <div class="overflow-hidden rounded-2xl md:rounded-3xl">
-          <picture>
-            <source :srcset="heroBannerLg!" media="(min-width: 1024px)">
-            <source :srcset="heroBannerMd!" media="(min-width: 640px)">
-            <img
-              :src="heroBannerSm!"
-              :alt="brand.name"
-              class="w-full h-48 sm:h-64 md:h-80 lg:h-[400px] object-cover"
-              :style="pageLayout.heroBannerBlur ? { backgroundImage: `url(${pageLayout.heroBannerBlur})`, backgroundSize: 'cover' } : undefined"
-            >
-          </picture>
+        <div class="relative overflow-hidden rounded-2xl md:rounded-3xl">
+          <ProgressiveImage
+            :src="heroBannerSm"
+            :src-sm="heroBannerSm"
+            :src-md="heroBannerMd"
+            :src-lg="heroBannerLg"
+            sizes="100vw"
+            :blur-data-url="pageLayout.heroBannerBlur"
+            :alt="brand.name"
+            object-fit="cover"
+            placeholder-type="lqip"
+            fetchpriority="high"
+            eager
+            class="w-full h-48 sm:h-64 md:h-80 lg:h-[400px]"
+          />
+          <!-- Тёмный градиент снизу -->
+          <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/50 to-transparent" />
         </div>
 
         <!-- Логотип — вылезает снизу баннера -->
