@@ -88,8 +88,6 @@ const otherProductLines = computed(() => {
             eager
             class="w-full h-48 sm:h-64 md:h-80 lg:h-[400px]"
           />
-          <!-- Тёмный градиент снизу -->
-          <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/50 to-transparent" />
         </div>
 
         <!-- Логотип — вылезает снизу баннера -->
