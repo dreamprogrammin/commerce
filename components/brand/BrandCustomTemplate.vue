@@ -93,14 +93,18 @@ const otherProductLines = computed(() => {
         <!-- Логотип — вылезает снизу баннера -->
         <div
           v-if="brand.logo_url"
-          class="absolute bottom-0 left-4 md:left-8 w-20 h-20 md:w-28 md:h-28 bg-white rounded-2xl shadow-xl border border-border p-2 flex items-center justify-center"
+          class="absolute bottom-0 left-4 md:left-8 w-20 h-20 md:w-28 md:h-28 bg-white rounded-2xl shadow-xl border border-border overflow-hidden"
         >
-          <img
-            :src="brandLogoUrl ?? undefined"
+          <ProgressiveImage
+            :src="brandLogoUrl"
             :alt="brand.name"
-            class="w-full h-full object-contain"
-            loading="eager"
-          >
+            :bucket-name="BUCKET_NAME_BRANDS"
+            :file-path="brand.logo_url"
+            object-fit="contain"
+            placeholder-type="shimmer"
+            eager
+            class="w-full h-full"
+          />
         </div>
       </div>
 
@@ -116,13 +120,17 @@ const otherProductLines = computed(() => {
     <!-- Fallback hero без баннера -->
     <div v-else class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
       <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
-        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg border border-border p-2 flex items-center justify-center">
-          <img
-            :src="brandLogoUrl ?? undefined"
+        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg border border-border overflow-hidden">
+          <ProgressiveImage
+            :src="brandLogoUrl"
             :alt="brand.name"
-            class="w-full h-full object-contain"
-            loading="eager"
-          >
+            :bucket-name="BUCKET_NAME_BRANDS"
+            :file-path="brand.logo_url"
+            object-fit="contain"
+            placeholder-type="shimmer"
+            eager
+            class="w-full h-full"
+          />
         </div>
         <h1 class="text-2xl md:text-5xl font-bold bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
           {{ displayH1 }}
