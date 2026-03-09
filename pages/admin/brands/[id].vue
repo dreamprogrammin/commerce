@@ -43,8 +43,8 @@ async function loadProductLines() {
   }
 }
 
-async function handleUpdate(payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null }) {
-  const success = await brandsStore.updateBrand(brandId, payload.data as BrandUpdate, payload.file, payload.bannerFile)
+async function handleUpdate(payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null, mobileBannerFile: File | null }) {
+  const success = await brandsStore.updateBrand(brandId, payload.data as BrandUpdate, payload.file, payload.bannerFile, payload.mobileBannerFile)
   if (success)
     router.push('/admin/brands')
 }

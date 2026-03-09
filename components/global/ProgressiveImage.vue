@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useMediaQuery } from '@vueuse/core'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useImageState } from '@/composables/useImageState'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_SIZES } from '@/config/images'
@@ -23,6 +24,12 @@ interface Props {
   height?: number
   fetchpriority?: 'high' | 'low' | 'auto'
   zoomOnHover?: boolean
+  // Art Direction — мобильные варианты
+  srcMobile?: string | null
+  srcMobileSm?: string | null
+  srcMobileMd?: string | null
+  mobileBreakpoint?: string
+  blurDataUrlMobile?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +40,8 @@ const props = withDefaults(defineProps<Props>(), {
   blurDataUrl: null,
   useTransform: true,
   zoomOnHover: false,
+  mobileBreakpoint: '(max-width: 767px)',
+  blurDataUrlMobile: null,
 })
 
 const { getImageUrl } = useSupabaseStorage()
@@ -100,6 +109,26 @@ const srcsetValue = computed(() => {
   return parts.length > 0 ? parts.join(', ') : undefined
 })
 
+// Art Direction — мобильный srcset (640w / 1280w, соответствует IMAGE_VARIANTS_WIDE)
+const mobileSrcsetValue = computed(() => {
+  const parts: string[] = []
+  if (props.srcMobileSm)
+    parts.push(`${props.srcMobileSm} 640w`)
+  if (props.srcMobileMd)
+    parts.push(`${props.srcMobileMd} 1280w`)
+  if (!parts.length && props.srcMobile)
+    return props.srcMobile
+  return parts.length > 0 ? parts.join(', ') : undefined
+})
+
+// LQIP — используем мобильный блюр на узких экранах, если он передан
+const isMobileScreen = useMediaQuery('(max-width: 767px)')
+const currentBlurUrl = computed(() => {
+  if (isMobileScreen.value && props.blurDataUrlMobile)
+    return props.blurDataUrlMobile
+  return props.blurDataUrl ?? null
+})
+
 const resolvedFetchpriority = computed(() => {
   if (props.fetchpriority)
     return props.fetchpriority
@@ -126,12 +155,12 @@ const isDev = computed(() => import.meta.env.DEV)
     >
       <!-- 🎨 LQIP - Blur Preview (как на Medium.com) -->
       <div
-        v-if="placeholderType === 'lqip' && blurDataUrl"
+        v-if="placeholderType === 'lqip' && currentBlurUrl"
         class="absolute inset-0"
       >
         <!-- Крошечное blur изображение -->
         <img
-          :src="blurDataUrl"
+          :src="currentBlurUrl"
           :alt="alt"
           class="w-full h-full object-cover blur-2xl scale-110 opacity-60"
           aria-hidden="true"
@@ -198,6 +227,14 @@ const isDev = computed(() => import.meta.env.DEV)
 
     <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ -->
     <picture>
+      <!-- 📱 Art Direction: мобильный вариант (показывается при media-запросе) -->
+      <source
+        v-if="mobileSrcsetValue"
+        :media="mobileBreakpoint"
+        :srcset="mobileSrcsetValue"
+        sizes="100vw"
+        type="image/webp"
+      >
       <!-- WebP srcset (варианты sm/md/lg) -->
       <source
         v-if="srcsetValue"

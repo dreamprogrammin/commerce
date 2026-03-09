@@ -46,6 +46,19 @@ const heroBannerLg = computed(() => {
   return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'lg')
 })
 
+// Мобильный баннер (Portrait) — показывается на экранах до 767px
+const heroBannerMobileSm = computed(() => {
+  if (!pageLayout.value?.heroBannerMobile)
+    return null
+  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBannerMobile, 'sm')
+})
+
+const heroBannerMobileMd = computed(() => {
+  if (!pageLayout.value?.heroBannerMobile)
+    return null
+  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBannerMobile, 'md')
+})
+
 const displayH1 = computed(() => {
   return props.brand.seo_h1 || props.brand.name
 })
@@ -66,21 +79,27 @@ const otherProductLines = computed(() => {
     <div v-if="pageLayout?.heroBanner">
       <!-- Баннер + логотип, вылезающий снизу -->
       <div class="relative pb-10 md:pb-14">
-        <!-- Баннер -->
-        <div class="overflow-hidden rounded-2xl md:rounded-3xl">
+        <!-- Баннер с Art Direction (Desktop + Mobile) -->
+        <div
+          class="overflow-hidden rounded-2xl md:rounded-3xl md:h-80 lg:h-[400px]"
+          :class="pageLayout?.heroBannerMobile ? 'aspect-[3/4] md:aspect-auto' : 'h-48 sm:h-64'"
+        >
           <ProgressiveImage
-            :src="heroBannerSm"
+            :src="heroBannerLg"
             :src-sm="heroBannerSm"
             :src-md="heroBannerMd"
             :src-lg="heroBannerLg"
             sizes="100vw"
-            :blur-data-url="pageLayout.heroBannerBlur"
-            :alt="brand.name"
+            :blur-data-url="pageLayout?.heroBannerBlur ?? null"
+            :src-mobile-sm="heroBannerMobileSm"
+            :src-mobile-md="heroBannerMobileMd"
+            :blur-data-url-mobile="pageLayout?.heroBannerMobileBlur ?? null"
+            :alt="`Баннер ${brand.name}`"
             object-fit="cover"
             placeholder-type="lqip"
             fetchpriority="high"
             eager
-            class="w-full h-48 sm:h-64 md:h-80 lg:h-[400px]"
+            class="w-full h-full"
           />
         </div>
 

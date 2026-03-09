@@ -13,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null }): void
+  (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null, mobileBannerFile: File | null }): void
 }>()
 
 const { getVariantUrl, getVariantUrlWide } = useSupabaseStorage()
@@ -42,6 +42,8 @@ const isProcessingLogo = ref(false)
 // --- Custom Landing Page ---
 const newBannerFile = ref<File | null>(null)
 const bannerPreviewUrl = ref<string | null>(null)
+const newMobileBannerFile = ref<File | null>(null)
+const mobileBannerPreviewUrl = ref<string | null>(null)
 const brandProductLines = ref<ProductLine[]>([])
 const selectedLineIds = ref<string[]>(initialLayout?.featuredLineIds || [])
 
@@ -79,6 +81,20 @@ function handleBannerFileChange(event: Event) {
   bannerPreviewUrl.value = URL.createObjectURL(file)
 }
 
+function handleMobileBannerFileChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0] || null
+
+  if (!file) {
+    newMobileBannerFile.value = null
+    mobileBannerPreviewUrl.value = null
+    return
+  }
+
+  newMobileBannerFile.value = file
+  mobileBannerPreviewUrl.value = URL.createObjectURL(file)
+}
+
 function toggleLineSelection(lineId: string) {
   const idx = selectedLineIds.value.indexOf(lineId)
   if (idx >= 0) {
@@ -95,6 +111,16 @@ const displayBannerUrl = computed(() => {
   }
   if (initialLayout?.heroBanner) {
     return getVariantUrlWide(BUCKET_NAME_BANNERS, initialLayout.heroBanner, 'sm')
+  }
+  return null
+})
+
+const displayMobileBannerUrl = computed(() => {
+  if (mobileBannerPreviewUrl.value) {
+    return mobileBannerPreviewUrl.value
+  }
+  if (initialLayout?.heroBannerMobile) {
+    return getVariantUrlWide(BUCKET_NAME_BANNERS, initialLayout.heroBannerMobile, 'sm')
   }
   return null
 })
@@ -158,6 +184,7 @@ function handleSubmit() {
     data: formData.value as BrandInsert | BrandUpdate,
     file: newLogoFile.value,
     bannerFile: newBannerFile.value,
+    mobileBannerFile: newMobileBannerFile.value,
   })
 }
 
@@ -208,6 +235,9 @@ onBeforeUnmount(() => {
   }
   if (bannerPreviewUrl.value) {
     URL.revokeObjectURL(bannerPreviewUrl.value)
+  }
+  if (mobileBannerPreviewUrl.value) {
+    URL.revokeObjectURL(mobileBannerPreviewUrl.value)
   }
 })
 </script>
@@ -327,13 +357,13 @@ onBeforeUnmount(() => {
       </div>
 
       <template v-if="formData.is_custom_page">
-        <!-- Hero баннер -->
+        <!-- Hero баннер ПК -->
         <div class="space-y-2">
-          <Label>Hero баннер (1920x600 рекомендуется)</Label>
+          <Label>Баннер для ПК — 21:9 (рекомендуется 1920×600px)</Label>
           <div v-if="displayBannerUrl" class="mb-2">
             <img
               :src="displayBannerUrl"
-              alt="Hero баннер"
+              alt="Hero баннер ПК"
               class="w-full h-32 object-cover border rounded-lg bg-muted"
               loading="lazy"
             >
@@ -342,6 +372,26 @@ onBeforeUnmount(() => {
             </p>
           </div>
           <Input type="file" accept="image/*" @change="handleBannerFileChange" />
+        </div>
+
+        <!-- Hero баннер Мобильный -->
+        <div class="space-y-2">
+          <Label>Баннер для мобильных — 3:4 или 3:2 (рекомендуется 640×960px)</Label>
+          <p class="text-xs text-muted-foreground">
+            Показывается на экранах до 767px вместо ПК-баннера. Необязательно.
+          </p>
+          <div v-if="displayMobileBannerUrl" class="mb-2">
+            <img
+              :src="displayMobileBannerUrl"
+              alt="Hero баннер мобильный"
+              class="h-40 w-auto object-cover border rounded-lg bg-muted"
+              loading="lazy"
+            >
+            <p class="text-xs text-muted-foreground mt-1">
+              {{ newMobileBannerFile ? 'Новый мобильный баннер (будет загружен)' : 'Текущий мобильный баннер' }}
+            </p>
+          </div>
+          <Input type="file" accept="image/*" @change="handleMobileBannerFileChange" />
         </div>
 
         <!-- Выбор избранных линеек -->

@@ -179,7 +179,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     }
   }
 
-  async function createBrand(brandData: BrandInsert, logoFile: File | null, bannerFile?: File | null): Promise<Brand | null> {
+  async function createBrand(brandData: BrandInsert, logoFile: File | null, bannerFile?: File | null, mobileBannerFile?: File | null): Promise<Brand | null> {
     isLoading.value = true
     try {
       if (logoFile) {
@@ -197,6 +197,17 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         const currentLayout = (brandData.page_layout as BrandPageLayout | null) || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
         currentLayout.heroBanner = bannerResult.basePath
         currentLayout.heroBannerBlur = bannerResult.blurPlaceholder || null
+        brandData.page_layout = currentLayout as unknown as BrandInsert['page_layout']
+      }
+
+      // Загрузка мобильного баннера
+      if (mobileBannerFile && brandData.is_custom_page) {
+        const mobileResult = await _uploadBannerVariants(mobileBannerFile, brandData.name ? `brand-banner-mobile-${brandData.name}` : undefined)
+        if (!mobileResult)
+          throw new Error('Не удалось загрузить мобильный баннер.')
+        const currentLayout = (brandData.page_layout as BrandPageLayout | null) || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
+        currentLayout.heroBannerMobile = mobileResult.basePath
+        currentLayout.heroBannerMobileBlur = mobileResult.blurPlaceholder || null
         brandData.page_layout = currentLayout as unknown as BrandInsert['page_layout']
       }
 
@@ -228,7 +239,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     }
   }
 
-  async function updateBrand(id: string, brandData: BrandUpdate, newLogoFile: File | null, bannerFile?: File | null) {
+  async function updateBrand(id: string, brandData: BrandUpdate, newLogoFile: File | null, bannerFile?: File | null, mobileBannerFile?: File | null) {
     isLoading.value = true
     try {
       if (newLogoFile) {
@@ -255,6 +266,21 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         const currentLayout = oldLayout || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
         currentLayout.heroBanner = bannerResult.basePath
         currentLayout.heroBannerBlur = bannerResult.blurPlaceholder || null
+        brandData.page_layout = currentLayout as unknown as BrandUpdate['page_layout']
+      }
+
+      // Загрузка/обновление мобильного баннера
+      if (mobileBannerFile && brandData.is_custom_page) {
+        const oldLayout = brandData.page_layout as BrandPageLayout | null
+        if (oldLayout?.heroBannerMobile) {
+          await removeFile(BUCKET_NAME_BANNERS, getVariantPathsWide(oldLayout.heroBannerMobile))
+        }
+        const mobileResult = await _uploadBannerVariants(mobileBannerFile, brandData.name ? `brand-banner-mobile-${brandData.name}` : undefined)
+        if (!mobileResult)
+          throw new Error('Не удалось загрузить мобильный баннер.')
+        const currentLayout = (brandData.page_layout as BrandPageLayout | null) || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
+        currentLayout.heroBannerMobile = mobileResult.basePath
+        currentLayout.heroBannerMobileBlur = mobileResult.blurPlaceholder || null
         brandData.page_layout = currentLayout as unknown as BrandUpdate['page_layout']
       }
 

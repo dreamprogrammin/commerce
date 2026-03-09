@@ -9,8 +9,8 @@ definePageMeta({ layout: 'admin' })
 const brandsStore = useAdminBrandsStore()
 const router = useRouter()
 
-async function handleCreate(payload: { data: BrandInsert, file: File | null, bannerFile: File | null }) {
-  const success = await brandsStore.createBrand(payload.data, payload.file, payload.bannerFile)
+async function handleCreate(payload: { data: BrandInsert, file: File | null, bannerFile: File | null, mobileBannerFile: File | null }) {
+  const success = await brandsStore.createBrand(payload.data, payload.file, payload.bannerFile, payload.mobileBannerFile)
   if (success)
     router.push('/admin/brands')
 }

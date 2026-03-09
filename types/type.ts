@@ -3,6 +3,8 @@ import type { Database, Tables, TablesInsert, TablesUpdate } from './supabase'
 export interface BrandPageLayout {
   heroBanner: string | null
   heroBannerBlur: string | null
+  heroBannerMobile?: string | null
+  heroBannerMobileBlur?: string | null
   featuredLineIds: string[]
 }
 
