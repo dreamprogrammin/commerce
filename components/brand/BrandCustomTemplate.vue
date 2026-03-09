@@ -59,9 +59,7 @@ const heroBannerMobileMd = computed(() => {
   return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBannerMobile, 'md')
 })
 
-const displayH1 = computed(() => {
-  return props.brand.seo_h1 || props.brand.name
-})
+const displayH1 = computed(() => props.brand.seo_h1 || props.brand.name)
 
 // Линейки, не входящие в featured
 const otherProductLines = computed(() => {
@@ -72,6 +70,11 @@ const otherProductLines = computed(() => {
 
 <template>
   <div class="space-y-6 md:space-y-10">
+    <!-- H1 скрыт визуально, но виден поисковикам -->
+    <h1 class="sr-only">
+      {{ displayH1 }}
+    </h1>
+
     <!-- Breadcrumbs -->
     <Breadcrumbs :items="breadcrumbs" />
 
@@ -119,13 +122,6 @@ const otherProductLines = computed(() => {
         </div>
       </div>
 
-      <!-- H1 — с отступом, чтобы не налезать на логотип -->
-      <h1
-        class="text-2xl md:text-4xl lg:text-5xl font-bold"
-        :class="brand.logo_url ? 'pl-28 md:pl-44' : ''"
-      >
-        {{ displayH1 }}
-      </h1>
     </div>
 
     <!-- Fallback hero без баннера -->
@@ -141,9 +137,6 @@ const otherProductLines = computed(() => {
             class="w-full h-full"
           />
         </div>
-        <h1 class="text-2xl md:text-5xl font-bold bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-          {{ displayH1 }}
-        </h1>
       </div>
     </div>
 
