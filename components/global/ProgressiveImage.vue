@@ -24,6 +24,7 @@ interface Props {
   height?: number
   fetchpriority?: 'high' | 'low' | 'auto'
   zoomOnHover?: boolean
+  objectPosition?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'left-top' | 'right-top'
   // Art Direction — мобильные варианты
   srcMobile?: string | null
   srcMobileSm?: string | null
@@ -95,6 +96,19 @@ const objectFitClass = computed(() => {
     case 'fill': return 'object-fill'
     case 'cover':
     default: return 'object-cover'
+  }
+})
+
+const objectPositionClass = computed(() => {
+  switch (props.objectPosition) {
+    case 'top': return 'object-top'
+    case 'bottom': return 'object-bottom'
+    case 'left': return 'object-left'
+    case 'right': return 'object-right'
+    case 'left-top': return 'object-left-top'
+    case 'right-top': return 'object-right-top'
+    case 'center':
+    default: return 'object-center'
   }
 })
 
@@ -258,6 +272,7 @@ const isDev = computed(() => import.meta.env.DEV)
         :class="[
           isLoaded ? 'opacity-100' : 'opacity-0',
           objectFitClass,
+          objectPositionClass,
           zoomOnHover ? 'hover:scale-105' : '',
         ]"
         :loading="eager ? 'eager' : 'lazy'"
