@@ -405,8 +405,8 @@ onBeforeUnmount(() => {
               :class="selectedLineIds.includes(line.id) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'"
             >
               <Checkbox
-                :checked="selectedLineIds.includes(line.id)"
-                @update:checked="toggleLineSelection(line.id)"
+                :model-value="selectedLineIds.includes(line.id)"
+                @update:model-value="toggleLineSelection(line.id)"
               />
               <span class="text-sm font-medium">{{ line.name }}</span>
             </label>
