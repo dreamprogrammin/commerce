@@ -83,10 +83,7 @@ const otherProductLines = computed(() => {
       <!-- Баннер + логотип, вылезающий снизу -->
       <div class="relative pb-10 md:pb-14">
         <!-- Баннер с Art Direction (Desktop + Mobile) -->
-        <div
-          class="overflow-hidden rounded-2xl md:rounded-3xl md:h-80 lg:h-[400px]"
-          :class="pageLayout?.heroBannerMobile ? 'aspect-[3/4] md:aspect-auto' : 'h-48 sm:h-64'"
-        >
+        <div class="overflow-hidden rounded-2xl md:rounded-3xl aspect-[3/4] md:aspect-[21/9]">
           <ProgressiveImage
             :src="heroBannerLg"
             :src-sm="heroBannerSm"
