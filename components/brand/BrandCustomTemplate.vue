@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { Brand, BrandPageLayout, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
-import { ArrowLeft, Package, TrendingUp } from 'lucide-vue-next'
+import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
+import { ArrowLeft, ChevronRight, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 
 const props = defineProps<{
   brand: Brand
@@ -20,7 +20,8 @@ const emit = defineEmits<{
 
 const { getVariantUrl } = useSupabaseStorage()
 
-const pageLayout = computed(() => props.brand.page_layout as BrandPageLayout | null)
+const isDrawerOpen = ref(false)
+const LINES_VISIBLE_LIMIT = 3
 
 const localSortBy = computed({
   get: () => props.sortBy,
@@ -34,6 +35,10 @@ const otherProductLines = computed(() => {
   const featuredIds = new Set(props.featuredProductLines.map(line => line.id))
   return props.productLines.filter(line => !featuredIds.has(line.id))
 })
+
+// На главной странице показываем только первые N линеек
+const visibleOtherLines = computed(() => otherProductLines.value.slice(0, LINES_VISIBLE_LIMIT))
+const hasMoreLines = computed(() => otherProductLines.value.length > LINES_VISIBLE_LIMIT)
 </script>
 
 <template>
@@ -153,9 +158,56 @@ const otherProductLines = computed(() => {
     </div>
 
     <!-- Остальные линейки -->
-    <BrandProductLinesGrid
-      v-if="otherProductLines.length > 0"
-      :product-lines="otherProductLines"
+    <div v-if="otherProductLines.length > 0">
+      <div class="flex items-center justify-between mb-3 md:mb-4">
+        <h2 class="text-xl md:text-2xl font-bold">
+          Коллекции
+        </h2>
+        <Button
+          v-if="hasMoreLines"
+          variant="ghost"
+          size="sm"
+          class="text-primary gap-1"
+          @click="isDrawerOpen = true"
+        >
+          Показать все
+          <ChevronRight class="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+        <NuxtLink
+          v-for="line in visibleOtherLines"
+          :key="line.id"
+          :to="`/catalog/all?brands=${brand.id}&lines=${line.id}`"
+          class="group relative aspect-[4/3] rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200"
+        >
+          <template v-if="line.logo_url">
+            <ProgressiveImage
+              :src="getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm')"
+              :alt="line.name"
+              object-fit="cover"
+              placeholder-type="shimmer"
+              class="w-full h-full group-hover:scale-105 transition-transform duration-300"
+            />
+            <div class="absolute inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm px-2 py-1.5 md:px-3 md:py-2">
+              <span class="text-white text-xs md:text-sm font-semibold line-clamp-1">{{ line.name }}</span>
+            </div>
+          </template>
+          <div
+            v-else
+            class="w-full h-full bg-gradient-to-br from-primary/80 to-secondary/80 flex items-center justify-center p-3"
+          >
+            <span class="text-white text-sm md:text-base font-bold text-center line-clamp-3">{{ line.name }}</span>
+          </div>
+        </NuxtLink>
+      </div>
+    </div>
+
+    <!-- Drawer со всеми коллекциями -->
+    <BrandLinesDrawer
+      v-model="isDrawerOpen"
+      :lines="productLines"
       :brand-id="brand.id"
     />
 
