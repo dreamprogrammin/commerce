@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Brand, BrandPageLayout, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
-import { ArrowLeft, Package } from 'lucide-vue-next'
+import { ArrowLeft, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BANNERS, BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BRANDS } from '@/constants'
 
 const props = defineProps<{
   brand: Brand
@@ -18,45 +18,13 @@ const emit = defineEmits<{
   (e: 'update:sortBy', value: 'newest' | 'price_asc' | 'price_desc' | 'popularity'): void
 }>()
 
-const { getVariantUrl, getVariantUrlWide } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const pageLayout = computed(() => props.brand.page_layout as BrandPageLayout | null)
 
 const localSortBy = computed({
   get: () => props.sortBy,
   set: val => emit('update:sortBy', val),
-})
-
-// Баннеры — широкий формат (640/1280/1920px), используем getVariantUrlWide
-const heroBannerSm = computed(() => {
-  if (!pageLayout.value?.heroBanner)
-    return null
-  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'sm')
-})
-
-const heroBannerMd = computed(() => {
-  if (!pageLayout.value?.heroBanner)
-    return null
-  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'md')
-})
-
-const heroBannerLg = computed(() => {
-  if (!pageLayout.value?.heroBanner)
-    return null
-  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBanner, 'lg')
-})
-
-// Мобильный баннер (Portrait) — показывается на экранах до 767px
-const heroBannerMobileSm = computed(() => {
-  if (!pageLayout.value?.heroBannerMobile)
-    return null
-  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBannerMobile, 'sm')
-})
-
-const heroBannerMobileMd = computed(() => {
-  if (!pageLayout.value?.heroBannerMobile)
-    return null
-  return getVariantUrlWide(BUCKET_NAME_BANNERS, pageLayout.value.heroBannerMobile, 'md')
 })
 
 const displayH1 = computed(() => props.brand.seo_h1 || props.brand.name)
@@ -78,53 +46,13 @@ const otherProductLines = computed(() => {
     <!-- Breadcrumbs -->
     <Breadcrumbs :items="breadcrumbs" />
 
-    <!-- Full-width Hero Banner -->
-    <div v-if="pageLayout?.heroBanner">
-      <!-- Баннер + логотип, вылезающий снизу -->
-      <div class="relative pb-10 md:pb-14">
-        <!-- Баннер с Art Direction (Desktop + Mobile) -->
-        <div class="overflow-hidden rounded-2xl md:rounded-3xl h-[300px] md:h-[400px]">
-          <ProgressiveImage
-            :src="heroBannerLg"
-            :src-sm="heroBannerSm"
-            :src-md="heroBannerMd"
-            :src-lg="heroBannerLg"
-            sizes="100vw"
-            :blur-data-url="pageLayout?.heroBannerBlur ?? null"
-            :src-mobile-sm="heroBannerMobileSm"
-            :src-mobile-md="heroBannerMobileMd"
-            :blur-data-url-mobile="pageLayout?.heroBannerMobileBlur ?? null"
-            :alt="`Баннер ${brand.name}`"
-            object-fit="cover"
-            object-position="top"
-            placeholder-type="lqip"
-            fetchpriority="high"
-            eager
-            class="w-full h-full"
-          />
-        </div>
+    <!-- Hero section -->
+    <div class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
+      <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl z-0" />
+      <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl z-0" />
 
-        <!-- Логотип — вылезает снизу баннера -->
-        <div
-          v-if="brand.logo_url"
-          class="absolute bottom-0 left-4 md:left-8 w-20 h-20 md:w-28 md:h-28 bg-white rounded-2xl shadow-xl border border-border overflow-hidden"
-        >
-          <ProgressiveImage
-            :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
-            :alt="`Логотип ${brand.name}`"
-            object-fit="contain"
-            placeholder-type="shimmer"
-            eager
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Fallback hero без баннера -->
-    <div v-else class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
-      <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
+      <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
+        <!-- Логотип бренда -->
         <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg border border-border overflow-hidden">
           <ProgressiveImage
             :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
@@ -134,6 +62,47 @@ const otherProductLines = computed(() => {
             eager
             class="w-full h-full"
           />
+        </div>
+
+        <!-- Информация о бренде -->
+        <div class="flex-1 text-center md:text-left">
+          <p class="text-2xl md:text-5xl font-bold mb-3 md:mb-6 bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+            {{ brand.name }}
+          </p>
+
+          <div class="flex flex-wrap gap-2 md:gap-4 justify-center md:justify-start">
+            <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
+              <div class="flex items-center gap-2 md:gap-3">
+                <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Package class="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                </div>
+                <div class="text-left">
+                  <div class="text-lg md:text-2xl font-bold text-gray-900">
+                    {{ products.length }}
+                  </div>
+                  <div class="text-[10px] md:text-xs text-muted-foreground">
+                    {{ products.length === 1 ? 'Товар' : products.length < 5 ? 'Товара' : 'Товаров' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
+              <div class="flex items-center gap-2 md:gap-3">
+                <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <TrendingUp class="w-4 h-4 md:w-5 md:h-5 text-green-600" />
+                </div>
+                <div class="text-left">
+                  <div class="text-xs md:text-sm font-semibold text-gray-900">
+                    Оригинал
+                  </div>
+                  <div class="text-[10px] md:text-xs text-muted-foreground">
+                    Гарантия
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

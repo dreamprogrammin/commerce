@@ -3,7 +3,7 @@ import type { BrandInsert, BrandPageLayout, BrandUpdate, Database, ProductLine }
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BANNERS, BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BRANDS } from '@/constants'
 import { formatFileSize, optimizeImageBeforeUpload } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 
@@ -13,10 +13,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null, bannerFile: File | null, mobileBannerFile: File | null }): void
+  (e: 'submit', payload: { data: BrandInsert | BrandUpdate, file: File | null }): void
 }>()
 
-const { getVariantUrl, getVariantUrlWide } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const supabase = useSupabaseClient<Database>()
 
 // Парсим page_layout из initialData
@@ -40,10 +40,6 @@ const isSlugManuallyEdited = ref(false)
 const isProcessingLogo = ref(false)
 
 // --- Custom Landing Page ---
-const newBannerFile = ref<File | null>(null)
-const bannerPreviewUrl = ref<string | null>(null)
-const newMobileBannerFile = ref<File | null>(null)
-const mobileBannerPreviewUrl = ref<string | null>(null)
 const brandProductLines = ref<ProductLine[]>([])
 const selectedLineIds = ref<string[]>(initialLayout?.featuredLineIds || [])
 
@@ -65,36 +61,6 @@ async function loadBrandProductLines(brandId: string) {
   }
 }
 
-function handleBannerFileChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0] || null
-
-  if (!file) {
-    newBannerFile.value = null
-    bannerPreviewUrl.value = null
-    return
-  }
-
-  // Сохраняем оригинальный файл без предварительной обработки.
-  // Сжатие (generateImageVariantsWide) выполняется в _uploadBannerVariants стора.
-  newBannerFile.value = file
-  bannerPreviewUrl.value = URL.createObjectURL(file)
-}
-
-function handleMobileBannerFileChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0] || null
-
-  if (!file) {
-    newMobileBannerFile.value = null
-    mobileBannerPreviewUrl.value = null
-    return
-  }
-
-  newMobileBannerFile.value = file
-  mobileBannerPreviewUrl.value = URL.createObjectURL(file)
-}
-
 function toggleLineSelection(lineId: string) {
   const idx = selectedLineIds.value.indexOf(lineId)
   if (idx >= 0) {
@@ -104,26 +70,6 @@ function toggleLineSelection(lineId: string) {
     selectedLineIds.value.push(lineId)
   }
 }
-
-const displayBannerUrl = computed(() => {
-  if (bannerPreviewUrl.value) {
-    return bannerPreviewUrl.value
-  }
-  if (initialLayout?.heroBanner) {
-    return getVariantUrlWide(BUCKET_NAME_BANNERS, initialLayout.heroBanner, 'sm')
-  }
-  return null
-})
-
-const displayMobileBannerUrl = computed(() => {
-  if (mobileBannerPreviewUrl.value) {
-    return mobileBannerPreviewUrl.value
-  }
-  if (initialLayout?.heroBannerMobile) {
-    return getVariantUrlWide(BUCKET_NAME_BANNERS, initialLayout.heroBannerMobile, 'sm')
-  }
-  return null
-})
 
 // Автоматическая генерация slug при изменении названия
 watch(() => formData.value.name, (newName) => {
@@ -175,16 +121,13 @@ function handleSubmit() {
 
   // Обновляем page_layout с выбранными линейками
   if (formData.value.is_custom_page) {
-    const currentLayout = (formData.value.page_layout as BrandPageLayout | null) || { heroBanner: null, heroBannerBlur: null, featuredLineIds: [] }
-    currentLayout.featuredLineIds = selectedLineIds.value
+    const currentLayout: BrandPageLayout = { featuredLineIds: selectedLineIds.value }
     formData.value.page_layout = currentLayout as any
   }
 
   emit('submit', {
     data: formData.value as BrandInsert | BrandUpdate,
     file: newLogoFile.value,
-    bannerFile: newBannerFile.value,
-    mobileBannerFile: newMobileBannerFile.value,
   })
 }
 
@@ -232,12 +175,6 @@ const displayLogoUrl = computed(() => {
 onBeforeUnmount(() => {
   if (logoPreviewUrl.value) {
     URL.revokeObjectURL(logoPreviewUrl.value)
-  }
-  if (bannerPreviewUrl.value) {
-    URL.revokeObjectURL(bannerPreviewUrl.value)
-  }
-  if (mobileBannerPreviewUrl.value) {
-    URL.revokeObjectURL(mobileBannerPreviewUrl.value)
   }
 })
 </script>
@@ -347,7 +284,7 @@ onBeforeUnmount(() => {
             Кастомная Landing Page
           </h3>
           <p class="text-xs text-muted-foreground">
-            Включите для использования расширенного шаблона с hero-баннером
+            Включите для отображения избранных коллекций крупными карточками
           </p>
         </div>
         <Switch
@@ -357,43 +294,6 @@ onBeforeUnmount(() => {
       </div>
 
       <template v-if="formData.is_custom_page">
-        <!-- Hero баннер ПК -->
-        <div class="space-y-2">
-          <Label>Баннер для ПК — 21:9 (рекомендуется 1920×600px)</Label>
-          <div v-if="displayBannerUrl" class="mb-2">
-            <img
-              :src="displayBannerUrl"
-              alt="Hero баннер ПК"
-              class="w-full h-32 object-cover border rounded-lg bg-muted"
-              loading="lazy"
-            >
-            <p class="text-xs text-muted-foreground mt-1">
-              {{ newBannerFile ? 'Новый баннер (будет загружен)' : 'Текущий баннер' }}
-            </p>
-          </div>
-          <Input type="file" accept="image/*" @change="handleBannerFileChange" />
-        </div>
-
-        <!-- Hero баннер Мобильный -->
-        <div class="space-y-2">
-          <Label>Баннер для мобильных — 3:4 или 3:2 (рекомендуется 640×960px)</Label>
-          <p class="text-xs text-muted-foreground">
-            Показывается на экранах до 767px вместо ПК-баннера. Необязательно.
-          </p>
-          <div v-if="displayMobileBannerUrl" class="mb-2">
-            <img
-              :src="displayMobileBannerUrl"
-              alt="Hero баннер мобильный"
-              class="h-40 w-auto object-cover border rounded-lg bg-muted"
-              loading="lazy"
-            >
-            <p class="text-xs text-muted-foreground mt-1">
-              {{ newMobileBannerFile ? 'Новый мобильный баннер (будет загружен)' : 'Текущий мобильный баннер' }}
-            </p>
-          </div>
-          <Input type="file" accept="image/*" @change="handleMobileBannerFileChange" />
-        </div>
-
         <!-- Выбор избранных линеек -->
         <div v-if="brandProductLines.length > 0" class="space-y-2">
           <Label>Избранные линейки (отображаются крупно)</Label>
@@ -417,41 +317,6 @@ onBeforeUnmount(() => {
         </div>
         <div v-else class="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
           Нет линеек для этого бренда. Добавьте линейки во вкладке "Линейки".
-        </div>
-
-        <!-- SEO поля для кастомной страницы -->
-        <div>
-          <Label for="seo-title">SEO Title (H1)</Label>
-          <Input
-            id="seo-title"
-            :model-value="(formData as any).seo_title ?? ''"
-            placeholder="Купить LEGO в Алматы - Оригинальные конструкторы"
-            @update:model-value="(formData as any).seo_title = $event === '' ? null : $event"
-          />
-        </div>
-
-        <div>
-          <Label for="seo-h1">Заголовок H1</Label>
-          <Input
-            id="seo-h1"
-            :model-value="(formData as any).seo_h1 ?? ''"
-            placeholder="Конструкторы LEGO"
-            @update:model-value="(formData as any).seo_h1 = $event === '' ? null : $event"
-          />
-        </div>
-
-        <div>
-          <Label for="seo-text">SEO текст (HTML)</Label>
-          <Textarea
-            id="seo-text"
-            :model-value="(formData as any).seo_text ?? ''"
-            rows="6"
-            placeholder="<p>Описание бренда для SEO...</p>"
-            @update:model-value="(formData as any).seo_text = $event === '' ? null : $event"
-          />
-          <p class="text-xs text-muted-foreground mt-1">
-            Поддерживает HTML-разметку. Отображается внизу кастомной страницы.
-          </p>
         </div>
       </template>
     </div>
