@@ -54,17 +54,13 @@ const localSortBy = computed({
 
       <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
         <!-- Логотип бренда -->
-        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden p-2">
-          <ProgressiveImage
-            :src="brandLogoUrl"
+        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg border border-border p-2 flex items-center justify-center">
+          <img
+            :src="brandLogoUrl ?? undefined"
             :alt="brand.name"
-            :bucket-name="BUCKET_NAME_BRANDS"
-            :file-path="brand.logo_url"
-            aspect-ratio="square"
-            object-fit="contain"
-            placeholder-type="shimmer"
-            eager
-          />
+            class="w-full h-full object-contain"
+            loading="eager"
+          >
         </div>
 
         <!-- Информация о бренде -->
