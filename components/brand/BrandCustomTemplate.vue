@@ -27,12 +27,6 @@ const localSortBy = computed({
   set: val => emit('update:sortBy', val),
 })
 
-const brandLogoUrl = computed(() => {
-  if (!props.brand.logo_url)
-    return null
-  return getVariantUrl(BUCKET_NAME_BRANDS, props.brand.logo_url, 'sm')
-})
-
 // Баннеры — широкий формат (640/1280/1920px), используем getVariantUrlWide
 const heroBannerSm = computed(() => {
   if (!pageLayout.value?.heroBanner)
@@ -96,10 +90,8 @@ const otherProductLines = computed(() => {
           class="absolute bottom-0 left-4 md:left-8 w-20 h-20 md:w-28 md:h-28 bg-white rounded-2xl shadow-xl border border-border overflow-hidden"
         >
           <ProgressiveImage
-            :src="brandLogoUrl"
-            :alt="brand.name"
-            :bucket-name="BUCKET_NAME_BRANDS"
-            :file-path="brand.logo_url"
+            :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
+            :alt="`Логотип ${brand.name}`"
             object-fit="contain"
             placeholder-type="shimmer"
             eager
@@ -122,10 +114,8 @@ const otherProductLines = computed(() => {
       <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
         <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg border border-border overflow-hidden">
           <ProgressiveImage
-            :src="brandLogoUrl"
-            :alt="brand.name"
-            :bucket-name="BUCKET_NAME_BRANDS"
-            :file-path="brand.logo_url"
+            :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
+            :alt="`Логотип ${brand.name}`"
             object-fit="contain"
             placeholder-type="shimmer"
             eager

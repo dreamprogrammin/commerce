@@ -30,12 +30,6 @@ function toggleSeoExpanded() {
   isSeoExpanded.value = !isSeoExpanded.value
 }
 
-const brandLogoUrl = computed(() => {
-  if (!props.brand.logo_url)
-    return null
-  return getVariantUrl(BUCKET_NAME_BRANDS, props.brand.logo_url, 'sm')
-})
-
 const localSortBy = computed({
   get: () => props.sortBy,
   set: val => emit('update:sortBy', val),
@@ -56,10 +50,8 @@ const localSortBy = computed({
         <!-- Логотип бренда -->
         <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg border border-border overflow-hidden">
           <ProgressiveImage
-            :src="brandLogoUrl"
-            :alt="brand.name"
-            :bucket-name="BUCKET_NAME_BRANDS"
-            :file-path="brand.logo_url"
+            :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
+            :alt="`Логотип ${brand.name}`"
             object-fit="contain"
             placeholder-type="shimmer"
             eager
