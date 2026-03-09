@@ -84,8 +84,6 @@ const otherProductLines = computed(() => {
               :style="pageLayout.heroBannerBlur ? { backgroundImage: `url(${pageLayout.heroBannerBlur})`, backgroundSize: 'cover' } : undefined"
             >
           </picture>
-          <!-- Тёмный градиент снизу -->
-          <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/50 to-transparent rounded-b-2xl md:rounded-b-3xl" />
         </div>
 
         <!-- Логотип — вылезает снизу баннера -->
