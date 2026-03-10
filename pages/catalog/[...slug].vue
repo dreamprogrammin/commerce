@@ -540,6 +540,48 @@ watch(() => activeFilters.value.brandIds, (newBrandIds) => {
   }
 })
 
+// 🔥 BUGFIX: Синхронизация ?brand= параметра с фильтрами при навигации
+// в рамках той же категории (loadFilterData не перезапускается если slug категории не менялся)
+watch(activeBrandSlug, async (newSlug) => {
+  if (newSlug && availableBrands.value.length > 0) {
+    const brand = availableBrands.value.find(b => b.slug === newSlug)
+    if (brand) {
+      const alreadySet = activeFilters.value.brandIds.length === 1 && activeFilters.value.brandIds[0] === brand.id
+      if (!alreadySet) {
+        activeFilters.value = {
+          ...activeFilters.value,
+          brandIds: [brand.id],
+          productLineIds: [],
+        }
+        currentPage.value = 1
+        accumulatedProducts.value = []
+      }
+    }
+    // Перезагружаем SEO данные для новой связки бренд+категория
+    try {
+      const { data: seoData } = await supabase.rpc('get_category_brand_seo', {
+        p_category_slug: currentCategorySlug.value,
+        p_brand_slug: newSlug,
+      })
+      categoryBrandSeo.value = seoData && seoData.length > 0 ? seoData[0] : null
+    }
+    catch {
+      categoryBrandSeo.value = null
+    }
+  }
+  else if (!newSlug) {
+    if (activeFilters.value.brandIds.length > 0) {
+      activeFilters.value = {
+        ...activeFilters.value,
+        brandIds: getArrayFromQuery(route.query.brands),
+      }
+      currentPage.value = 1
+      accumulatedProducts.value = []
+    }
+    categoryBrandSeo.value = null
+  }
+})
+
 watch(currentPageProducts, (newProducts) => {
   if (currentPage.value > 1 && newProducts.length > 0) {
     const existingIds = new Set(accumulatedProducts.value.map(p => p.id))
