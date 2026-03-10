@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProductLine } from '@/types'
-import { ChevronDown, ChevronRight, Search } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 
@@ -115,12 +115,11 @@ function getCatalogLink(lineId: string): string {
       <h2 class="text-xl md:text-2xl font-bold shrink-0">
         Коллекции
       </h2>
-      <div class="relative sm:max-w-xs w-full">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <Input
+      <div class="sm:max-w-xs w-full">
+        <BrandSearchInput
           v-model="searchQuery"
           placeholder="Поиск коллекции..."
-          class="pl-9"
+          aria-label="Поиск по коллекциям бренда"
         />
       </div>
     </div>

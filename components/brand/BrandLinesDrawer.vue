@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ProductLine } from '@/types'
-import { Search } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 
@@ -57,14 +56,11 @@ watch(isOpen, (opened) => {
 
         <!-- Поиск -->
         <div class="px-4 pb-3 shrink-0">
-          <div class="relative">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              v-model="searchQuery"
-              placeholder="Поиск коллекции..."
-              class="pl-9"
-            />
-          </div>
+          <BrandSearchInput
+            v-model="searchQuery"
+            placeholder="Поиск коллекции..."
+            aria-label="Поиск по коллекциям бренда"
+          />
         </div>
 
         <!-- Сетка коллекций -->
