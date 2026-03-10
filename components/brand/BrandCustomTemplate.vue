@@ -127,8 +127,6 @@ const otherProductLines = computed(() => {
               placeholder-type="shimmer"
               class="w-full h-full group-hover:scale-[1.06] transition-transform duration-500 ease-out"
             />
-            <!-- Glass overlay -->
-            <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/8 to-transparent" />
             <!-- Name pill -->
             <div class="absolute inset-x-0 bottom-0 px-2.5 py-2">
               <span
@@ -142,7 +140,7 @@ const otherProductLines = computed(() => {
 
           <div
             v-else
-            class="w-full h-full bg-gradient-to-br from-primary/55 via-primary/35 to-secondary/55
+            class="w-full h-full bg-linear-to-br from-primary/55 via-primary/35 to-secondary/55
                    flex items-end p-2.5"
           >
             <span class="text-white text-xs md:text-sm font-semibold line-clamp-2 drop-shadow-sm">
@@ -151,7 +149,7 @@ const otherProductLines = computed(() => {
           </div>
 
           <!-- Top highlight on hover -->
-          <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </NuxtLink>
       </div>
     </div>
