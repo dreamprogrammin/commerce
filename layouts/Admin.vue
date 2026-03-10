@@ -76,6 +76,13 @@ onMounted(() => {
           Добавление бренда
         </NuxtLink>
         <NuxtLink
+          to="/admin/brand-seo"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          SEO: Бренд + Категория
+        </NuxtLink>
+        <NuxtLink
           to="/admin/attributes"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
           active-class="bg-muted text-primary"

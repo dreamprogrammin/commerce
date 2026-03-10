@@ -38,6 +38,22 @@ onUnmounted(() => {
   }
 })
 
+// --- 1.5. Brand Landing (3-й уровень навигации) ---
+const activeBrandSlug = computed(() => {
+  const brandParam = route.query.brand
+  if (!brandParam || Array.isArray(brandParam))
+    return null
+  return brandParam as string
+})
+
+// SEO данные для связки бренд+категория (из БД)
+const categoryBrandSeo = ref<{
+  seo_h1: string | null
+  seo_title: string | null
+  seo_description: string | null
+  seo_text: string | null
+} | null>(null)
+
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
 // Локальные интерфейсы для избежания циклической зависимости типов
 interface FilterAttribute {
@@ -139,7 +155,21 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (currentCategorySlug.value === 'all') {
     return [{ id: 'all', name: 'Все товары', href: '/catalog/all' }]
   }
-  return categoriesStore.getBreadcrumbs(currentCategorySlug.value)
+  const crumbs = categoriesStore.getBreadcrumbs(currentCategorySlug.value)
+
+  // Brand Landing: добавляем бренд как последний элемент хлебных крошек
+  if (activeBrand.value && crumbs.length > 0) {
+    return [
+      ...crumbs,
+      {
+        id: `brand-${activeBrand.value.id}`,
+        name: activeBrand.value.name,
+        // Без href — текущая страница, не ссылка
+      },
+    ]
+  }
+
+  return crumbs
 })
 const currentCategory = computed(() => {
   if (!categoriesStore.allCategories.length)
@@ -168,11 +198,27 @@ const categoryName = computed(() => {
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 
-// H1 заголовок (приоритет: seo_h1 > name)
+// Активный бренд (объект) для SEO
+const activeBrand = computed(() => {
+  if (!activeBrandSlug.value || availableBrands.value.length === 0)
+    return null
+  return availableBrands.value.find(b => b.slug === activeBrandSlug.value) || null
+})
+
+// H1 заголовок (приоритет: brand_seo_h1 > автогенерация с брендом > seo_h1 > name)
 const title = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
   }
+
+  // Brand Landing: кастомный H1 из БД или автогенерация
+  if (activeBrand.value) {
+    if (categoryBrandSeo.value?.seo_h1) {
+      return categoryBrandSeo.value.seo_h1
+    }
+    return `${categoryName.value} ${activeBrand.value.name} в Алматы`
+  }
+
   return currentCategory.value?.seo_h1 || categoryName.value
 })
 
@@ -237,14 +283,24 @@ const activeFiltersCount = computed(() => {
 })
 const canonicalUrl = computed(() => {
   const baseUrl = 'https://uhti.kz'
-  // Приоритет: canonical_url из БД > href категории > текущий path
+  let basePath: string
+
   if (currentCategory.value?.canonical_url) {
-    return `${baseUrl}${currentCategory.value.canonical_url}`
+    basePath = currentCategory.value.canonical_url
   }
-  if (currentCategory.value?.href) {
-    return `${baseUrl}${currentCategory.value.href}`
+  else if (currentCategory.value?.href) {
+    basePath = currentCategory.value.href
   }
-  return `${baseUrl}${route.path}`
+  else {
+    basePath = route.path
+  }
+
+  // Brand Landing: canonical включает ?brand=slug
+  if (activeBrandSlug.value) {
+    return `${baseUrl}${basePath}?brand=${activeBrandSlug.value}`
+  }
+
+  return `${baseUrl}${basePath}`
 })
 
 const catalogFilters = computed<IProductFilters>(() => {
@@ -410,12 +466,39 @@ async function loadFilterData(slug: string) {
       ]
     })
 
+    // Brand Landing: если есть ?brand=slug, резолвим в UUID
+    let resolvedBrandIds = getArrayFromQuery(route.query.brands)
+    const brandSlugParam = route.query.brand
+    if (brandSlugParam && !Array.isArray(brandSlugParam) && availableBrands.value.length > 0) {
+      const brandBySlug = availableBrands.value.find(b => b.slug === brandSlugParam)
+      if (brandBySlug) {
+        resolvedBrandIds = [brandBySlug.id]
+      }
+    }
+
+    // Загружаем SEO-текст для связки бренд+категория (если есть ?brand)
+    if (brandSlugParam && !Array.isArray(brandSlugParam)) {
+      try {
+        const { data: seoData } = await supabase.rpc('get_category_brand_seo', {
+          p_category_slug: slug,
+          p_brand_slug: brandSlugParam,
+        })
+        categoryBrandSeo.value = seoData && seoData.length > 0 ? seoData[0] : null
+      }
+      catch {
+        categoryBrandSeo.value = null
+      }
+    }
+    else {
+      categoryBrandSeo.value = null
+    }
+
     activeFilters.value = {
       sortBy: getSortByFromQuery(route.query.sort_by),
       subCategoryIds: getArrayFromQuery(route.query.subcategories),
       price: [priceMinFromQuery, priceMaxFromQuery],
       pieceCount: pieceCountRangeData ? [pieceCountMinFromQuery ?? pieceCountRangeData.min_count, pieceCountMaxFromQuery ?? pieceCountRangeData.max_count] : null,
-      brandIds: getArrayFromQuery(route.query.brands),
+      brandIds: resolvedBrandIds,
       productLineIds: getArrayFromQuery(route.query.lines),
       materialIds: getArrayFromQuery(route.query.materials),
       countryIds: getArrayFromQuery(route.query.countries),
@@ -520,7 +603,17 @@ function updateQueryParams() {
     query.subcategories = activeFilters.value.subCategoryIds
   }
 
-  if (activeFilters.value.brandIds.length > 0) {
+  // Brand Landing: если бренд выбран через ?brand=slug, сохраняем slug-формат
+  if (activeBrandSlug.value && activeFilters.value.brandIds.length === 1) {
+    const matchedBrand = availableBrands.value.find(b => b.id === activeFilters.value.brandIds[0])
+    if (matchedBrand && matchedBrand.slug === activeBrandSlug.value) {
+      query.brand = activeBrandSlug.value
+    }
+    else {
+      query.brands = activeFilters.value.brandIds
+    }
+  }
+  else if (activeFilters.value.brandIds.length > 0) {
     query.brands = activeFilters.value.brandIds
   }
 
@@ -579,6 +672,14 @@ const selectedSingleBrand = computed(() => {
 })
 
 const metaDescription = computed(() => {
+  // Brand Landing: кастомное описание
+  if (activeBrand.value) {
+    if (categoryBrandSeo.value?.seo_description) {
+      return categoryBrandSeo.value.seo_description
+    }
+    return `В каталоге Ухтышка вы можете купить ${(categoryName.value || '').toLowerCase()} ${activeBrand.value.name}. Большой выбор, гарантия оригинала, доставка по Алматы.`
+  }
+
   // SEO: если выбрана одна линейка — специальное описание
   if (selectedSingleLine.value) {
     const brandName = selectedSingleBrand.value?.name || ''
@@ -627,6 +728,14 @@ const metaDescription = computed(() => {
 })
 
 const metaTitle = computed(() => {
+  // Brand Landing: кастомный title
+  if (activeBrand.value) {
+    if (categoryBrandSeo.value?.seo_title) {
+      return categoryBrandSeo.value.seo_title
+    }
+    return `Купить ${categoryName.value} ${activeBrand.value.name} в Алматы | Ухтышка`
+  }
+
   // SEO: если выбрана одна линейка — специальный title
   if (selectedSingleLine.value) {
     const brandName = selectedSingleBrand.value?.name || ''
@@ -638,7 +747,7 @@ const metaTitle = computed(() => {
   if (hasActiveFilters.value) {
     return `${categoryName.value} - Фильтр | Ухтышка`
   }
-  // 🆕 Приоритет: meta_title > seo_title > автогенерация
+  // Приоритет: meta_title > seo_title > автогенерация
   if (currentCategory.value?.meta_title) {
     return currentCategory.value.meta_title
   }
@@ -646,7 +755,6 @@ const metaTitle = computed(() => {
   if (seoTitle) {
     return seoTitle
   }
-  // 🔥 Формат как у detmir.kz: "Лего Майнкрафт купить в интернет-магазине Ухтышка"
   return `${categoryName.value} купить в интернет-магазине Ухтышка Казахстан`
 })
 
@@ -667,16 +775,34 @@ const metaKeywords = computed(() => {
 
 // SEO текст для отображения внизу страницы (с санитизацией)
 const seoText = computed(() => {
+  // Brand Landing: кастомный SEO-текст из БД или автогенерация
+  if (activeBrand.value) {
+    if (categoryBrandSeo.value?.seo_text) {
+      return sanitizeHtml(categoryBrandSeo.value.seo_text)
+    }
+    // Автогенерация SEO-текста для связки бренд+категория
+    const catName = (categoryName.value || '').toLowerCase()
+    const brandName = activeBrand.value.name
+    return `<h2>${categoryName.value} ${brandName}</h2><p>В каталоге Ухтышка вы можете купить ${catName} ${brandName}. Большой выбор, гарантия оригинала, доставка по Алматы. Все товары сертифицированы и проверены на качество.</p>`
+  }
+
   const text = currentCategory.value?.seo_text
   return text ? sanitizeHtml(text) : null
 })
 
 const robotsRule = computed(() => {
+  // Brand Landing: страницы бренд+категория разрешаем индексировать
+  if (activeBrandSlug.value && activeFilters.value.brandIds.length === 1) {
+    return {
+      index: true,
+      follow: true,
+    }
+  }
   // Если есть фильтры ИЛИ сортировка не по умолчанию
   if (activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity') {
     return {
       noindex: true,
-      follow: true, // Ссылки внутри сканируем, но страницу не сохраняем
+      follow: true,
     }
   }
   return {
@@ -1497,10 +1623,13 @@ useHead(() => {
       />
     </ClientOnly>
 
-    <!-- Бренды в категории -->
+    <!-- Бренды в категории (3-й уровень навигации) -->
     <CategoryBrands
       v-if="availableBrands.length > 0"
       :brands="availableBrands"
+      :category-slug="currentCategorySlug"
+      :category-name="categoryName || undefined"
+      :active-brand-slug="activeBrandSlug"
     />
 
     <!-- Линейки продуктов в категории -->
