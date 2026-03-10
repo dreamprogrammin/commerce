@@ -107,109 +107,118 @@ function getCatalogLink(lineId: string): string {
   </button>
 
   <!-- ────────────────────────────────────────────────────
-       Desktop: сетка с поиском + плавное раскрытие
+       Desktop: glass-панель с поиском + раскрывающаяся сетка
   ──────────────────────────────────────────────────────── -->
-  <div class="hidden md:block">
-    <!-- Заголовок + поиск -->
-    <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-      <h2 class="text-xl md:text-2xl font-bold shrink-0">
-        Коллекции
-      </h2>
-      <div class="sm:max-w-xs w-full">
+  <div
+    class="hidden md:block rounded-2xl border border-white/40 bg-white/50 backdrop-blur-md shadow-sm shadow-black/5 overflow-hidden"
+  >
+    <!-- Glass-шапка: заголовок + счётчик + поиск -->
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-black/5 bg-white/20">
+      <div class="flex items-center gap-2 shrink-0">
+        <span class="text-sm font-semibold">Коллекции</span>
+        <span class="text-[11px] text-muted-foreground bg-black/6 rounded-full px-2 py-0.5 tabular-nums">
+          {{ filteredLines.length }}
+        </span>
+      </div>
+      <div class="flex-1 max-w-xs">
         <BrandSearchInput
           v-model="searchQuery"
-          placeholder="Поиск коллекции..."
+          placeholder="Поиск..."
           aria-label="Поиск по коллекциям бренда"
         />
       </div>
     </div>
 
-    <!-- Первые N карточек -->
-    <div class="grid grid-cols-4 gap-4">
-      <NuxtLink
-        v-for="line in visibleLines"
-        :key="line.id"
-        :to="getCatalogLink(line.id)"
-        class="group relative aspect-[4/3] rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200"
-      >
-        <template v-if="line.logo_url">
-          <ProgressiveImage
-            :src="getLogoUrl(line.logo_url)"
-            :alt="line.name"
-            object-fit="cover"
-            placeholder-type="shimmer"
-            class="w-full h-full group-hover:scale-105 transition-transform duration-300"
-          />
-          <div class="absolute inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm px-3 py-2">
-            <span class="text-white text-sm font-semibold line-clamp-1">{{ line.name }}</span>
-          </div>
-        </template>
-
-        <div
-          v-else
-          class="w-full h-full bg-gradient-to-br from-primary/80 to-secondary/80 flex items-center justify-center p-3 group-hover:scale-105 transition-transform duration-300"
+    <!-- Тело: карточки -->
+    <div class="p-3">
+      <!-- Первые N -->
+      <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+        <NuxtLink
+          v-for="line in visibleLines"
+          :key="line.id"
+          :to="getCatalogLink(line.id)"
+          class="group relative aspect-[3/2] rounded-xl overflow-hidden border border-white/30 hover:border-primary/40 hover:shadow-md transition-all duration-200"
         >
-          <span class="text-white text-base font-bold text-center line-clamp-3">{{ line.name }}</span>
-        </div>
-      </NuxtLink>
+          <template v-if="line.logo_url">
+            <ProgressiveImage
+              :src="getLogoUrl(line.logo_url)"
+              :alt="line.name"
+              object-fit="cover"
+              placeholder-type="shimmer"
+              class="w-full h-full group-hover:scale-105 transition-transform duration-300"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
+            <div class="absolute inset-x-0 bottom-0 px-2 py-1.5">
+              <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-1 drop-shadow">{{ line.name }}</span>
+            </div>
+          </template>
+          <div
+            v-else
+            class="w-full h-full bg-gradient-to-br from-primary/70 to-secondary/70 flex items-end p-2"
+          >
+            <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-2">{{ line.name }}</span>
+          </div>
+        </NuxtLink>
+      </div>
+
+      <!-- Раскрывающийся блок -->
+      <div
+        class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out"
+        :style="{
+          maxHeight: isExpanded ? `${Math.ceil(extraLines.length / 6) * 180}px` : '0px',
+          opacity: isExpanded ? 1 : 0,
+          marginTop: isExpanded && extraLines.length ? '0.5rem' : '0',
+        }"
+      >
+        <NuxtLink
+          v-for="line in extraLines"
+          :key="line.id"
+          :to="getCatalogLink(line.id)"
+          class="group relative aspect-[3/2] rounded-xl overflow-hidden border border-white/30 hover:border-primary/40 hover:shadow-md transition-all duration-200"
+        >
+          <template v-if="line.logo_url">
+            <ProgressiveImage
+              :src="getLogoUrl(line.logo_url)"
+              :alt="line.name"
+              object-fit="cover"
+              placeholder-type="shimmer"
+              class="w-full h-full group-hover:scale-105 transition-transform duration-300"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
+            <div class="absolute inset-x-0 bottom-0 px-2 py-1.5">
+              <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-1 drop-shadow">{{ line.name }}</span>
+            </div>
+          </template>
+          <div
+            v-else
+            class="w-full h-full bg-gradient-to-br from-primary/70 to-secondary/70 flex items-end p-2"
+          >
+            <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-2">{{ line.name }}</span>
+          </div>
+        </NuxtLink>
+      </div>
+
+      <!-- Пустой поиск -->
+      <div v-if="filteredLines.length === 0 && searchQuery" class="py-8 text-center text-muted-foreground text-sm">
+        Ничего не найдено
+      </div>
     </div>
 
-    <!-- Раскрывающийся блок с остальными карточками -->
+    <!-- Glass-футер: кнопка раскрытия -->
     <div
-      class="grid grid-cols-4 gap-4 overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out"
-      :style="{
-        maxHeight: isExpanded ? `${extraLines.length * 400}px` : '0px',
-        opacity: isExpanded ? 1 : 0,
-        marginTop: isExpanded && extraLines.length ? '1rem' : '0',
-      }"
+      v-if="hasMore"
+      class="border-t border-black/5 bg-white/10 flex justify-center py-2"
     >
-      <NuxtLink
-        v-for="line in extraLines"
-        :key="line.id"
-        :to="getCatalogLink(line.id)"
-        class="group relative aspect-[4/3] rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200"
-      >
-        <template v-if="line.logo_url">
-          <ProgressiveImage
-            :src="getLogoUrl(line.logo_url)"
-            :alt="line.name"
-            object-fit="cover"
-            placeholder-type="shimmer"
-            class="w-full h-full group-hover:scale-105 transition-transform duration-300"
-          />
-          <div class="absolute inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm px-3 py-2">
-            <span class="text-white text-sm font-semibold line-clamp-1">{{ line.name }}</span>
-          </div>
-        </template>
-
-        <div
-          v-else
-          class="w-full h-full bg-gradient-to-br from-primary/80 to-secondary/80 flex items-center justify-center p-3 group-hover:scale-105 transition-transform duration-300"
-        >
-          <span class="text-white text-base font-bold text-center line-clamp-3">{{ line.name }}</span>
-        </div>
-      </NuxtLink>
-    </div>
-
-    <!-- Кнопка раскрытия / схлопывания -->
-    <div v-if="hasMore" class="flex justify-center mt-4">
-      <Button
-        variant="outline"
-        size="sm"
-        class="gap-2"
+      <button
+        class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded-lg hover:bg-black/5"
         @click="isExpanded = !isExpanded"
       >
         <ChevronDown
-          class="w-4 h-4 transition-transform duration-300"
+          class="w-3.5 h-3.5 transition-transform duration-300"
           :class="isExpanded ? 'rotate-180' : ''"
         />
-        {{ isExpanded ? 'Свернуть' : `Показать ещё коллекции (${extraLines.length})` }}
-      </Button>
-    </div>
-
-    <!-- Пустой поиск -->
-    <div v-if="filteredLines.length === 0 && searchQuery" class="py-10 text-center text-muted-foreground text-sm">
-      Коллекции не найдены
+        {{ isExpanded ? 'Свернуть' : `Ещё ${extraLines.length} коллекций` }}
+      </button>
     </div>
   </div>
 

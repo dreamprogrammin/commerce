@@ -107,17 +107,17 @@ const otherProductLines = computed(() => {
       </div>
     </div>
 
-    <!-- Featured Product Lines (крупные карточки) -->
+    <!-- Featured Product Lines -->
     <div v-if="featuredProductLines.length > 0">
-      <h2 class="text-xl md:text-3xl font-bold mb-4 md:mb-6">
+      <h2 class="text-base md:text-lg font-semibold text-muted-foreground mb-3">
         Популярные коллекции
       </h2>
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3">
         <NuxtLink
           v-for="line in featuredProductLines"
           :key="line.id"
           :to="`/catalog/all?brands=${brand.id}&lines=${line.id}`"
-          class="group relative aspect-[4/3] rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200"
+          class="group relative aspect-[3/2] rounded-xl overflow-hidden border border-border/60 hover:border-primary/40 hover:shadow-md transition-all duration-200"
         >
           <template v-if="line.logo_url">
             <ProgressiveImage
@@ -127,26 +127,21 @@ const otherProductLines = computed(() => {
               placeholder-type="shimmer"
               class="w-full h-full group-hover:scale-105 transition-transform duration-500"
             />
-            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-4 md:px-6 md:py-5">
-              <span class="text-white text-base md:text-xl font-bold">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+            <div class="absolute inset-x-0 bottom-0 px-2.5 py-2 md:px-3 md:py-2.5">
+              <span class="text-white text-xs md:text-sm font-semibold line-clamp-1 drop-shadow-sm">
                 {{ line.name }}
               </span>
-              <p v-if="line.description" class="text-white/70 text-xs md:text-sm mt-1 line-clamp-2">
-                {{ line.description }}
-              </p>
             </div>
           </template>
 
           <div
             v-else
-            class="w-full h-full bg-gradient-to-br from-primary/80 to-secondary/80 flex flex-col items-center justify-center p-6 group-hover:scale-105 transition-transform duration-500"
+            class="w-full h-full bg-gradient-to-br from-primary/70 to-secondary/70 flex items-end p-2.5 md:p-3"
           >
-            <span class="text-white text-lg md:text-2xl font-bold text-center">
+            <span class="text-white text-xs md:text-sm font-semibold line-clamp-2">
               {{ line.name }}
             </span>
-            <p v-if="line.description" class="text-white/70 text-sm mt-2 text-center line-clamp-2">
-              {{ line.description }}
-            </p>
           </div>
         </NuxtLink>
       </div>

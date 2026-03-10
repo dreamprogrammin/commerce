@@ -67,14 +67,14 @@ watch(isOpen, (opened) => {
         <div class="overflow-y-auto overscroll-y-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <div
             v-if="filteredLines.length > 0"
-            class="grid grid-cols-2 gap-3"
+            class="grid grid-cols-2 gap-2"
           >
             <NuxtLink
               v-for="line in filteredLines"
               :key="line.id"
               v-memo="[line.id, line.name, line.logo_url]"
               :to="`/catalog/all?brands=${brandId}&lines=${line.id}`"
-              class="group relative aspect-[4/3] rounded-xl overflow-hidden border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200"
+              class="group relative aspect-[3/2] rounded-lg overflow-hidden border border-border/60 hover:border-primary/40 hover:shadow-md transition-all duration-200"
               @click="handleLineClick"
             >
               <template v-if="line.logo_url">
@@ -85,22 +85,23 @@ watch(isOpen, (opened) => {
                   placeholder-type="shimmer"
                   class="w-full h-full group-hover:scale-105 transition-transform duration-300"
                 />
-                <div class="absolute inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm px-2 py-1.5">
-                  <span class="text-white text-xs font-semibold line-clamp-1">{{ line.name }}</span>
+                <div class="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+                <div class="absolute inset-x-0 bottom-0 px-2 py-1.5">
+                  <span class="text-white text-xs font-semibold line-clamp-1 drop-shadow-sm">{{ line.name }}</span>
                 </div>
               </template>
 
               <div
                 v-else
-                class="w-full h-full bg-gradient-to-br from-primary/80 to-secondary/80 flex items-center justify-center p-3"
+                class="w-full h-full bg-gradient-to-br from-primary/70 to-secondary/70 flex items-end p-2"
               >
-                <span class="text-white text-sm font-bold text-center line-clamp-2">{{ line.name }}</span>
+                <span class="text-white text-xs font-semibold line-clamp-2">{{ line.name }}</span>
               </div>
             </NuxtLink>
           </div>
 
           <div v-else class="py-12 text-center text-muted-foreground text-sm">
-            Коллекции не найдены
+            Ничего не найдено
           </div>
         </div>
       </div>
