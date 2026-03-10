@@ -820,17 +820,13 @@ const metaKeywords = computed(() => {
   return null
 })
 
-// SEO текст для отображения внизу страницы (с санитизацией)
+// SEO текст (только из БД, без автогенерации)
 const seoText = computed(() => {
-  // Brand Landing: кастомный SEO-текст из БД или автогенерация
   if (activeBrand.value) {
-    if (categoryBrandSeo.value?.seo_text) {
-      return sanitizeHtml(categoryBrandSeo.value.seo_text)
-    }
-    // Автогенерация SEO-текста для связки бренд+категория
-    const catName = (categoryName.value || '').toLowerCase()
-    const brandName = activeBrand.value.name
-    return `<h2>${categoryName.value} ${brandName}</h2><p>В каталоге Ухтышка вы можете купить ${catName} ${brandName}. Большой выбор, гарантия оригинала, доставка по Алматы. Все товары сертифицированы и проверены на качество.</p>`
+    // Brand Landing: только если есть кастомный текст в БД
+    return categoryBrandSeo.value?.seo_text
+      ? sanitizeHtml(categoryBrandSeo.value.seo_text)
+      : null
   }
 
   const text = currentCategory.value?.seo_text
