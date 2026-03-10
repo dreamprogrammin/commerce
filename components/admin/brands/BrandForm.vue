@@ -278,13 +278,16 @@ onBeforeUnmount(() => {
 
     <!-- Кастомная Landing Page -->
     <div class="space-y-4 pt-6 border-t">
-      <div class="flex items-center justify-between">
+      <div
+        class="flex items-center justify-between p-3 rounded-lg transition-colors"
+        :class="formData.is_custom_page ? 'bg-primary/5 border border-primary/20' : 'bg-muted/30'"
+      >
         <div>
-          <h3 class="font-semibold">
+          <h3 class="font-semibold text-sm">
             Кастомная Landing Page
           </h3>
-          <p class="text-xs text-muted-foreground">
-            Включите для отображения избранных коллекций крупными карточками
+          <p class="text-xs text-muted-foreground mt-0.5">
+            {{ formData.is_custom_page ? 'Включена — страница с коллекциями и поиском' : 'Выключена — стандартный каталог товаров' }}
           </p>
         </div>
         <Switch
@@ -293,10 +296,10 @@ onBeforeUnmount(() => {
         />
       </div>
 
+      <!-- Настройки конструктора (только при is_custom_page = true) -->
       <template v-if="formData.is_custom_page">
-        <!-- Выбор избранных линеек -->
         <div v-if="brandProductLines.length > 0" class="space-y-2">
-          <Label>Избранные линейки (отображаются крупно)</Label>
+          <Label>Избранные коллекции <span class="text-muted-foreground font-normal">(отображаются крупными карточками)</span></Label>
           <div class="grid grid-cols-1 gap-2">
             <label
               v-for="line in brandProductLines"
@@ -312,11 +315,11 @@ onBeforeUnmount(() => {
             </label>
           </div>
           <p class="text-xs text-muted-foreground">
-            Выбранные линейки будут отображаться крупными карточками в верхней части страницы
+            Выбранные коллекции будут показаны крупными карточками. Остальные — в компактной сетке с поиском.
           </p>
         </div>
         <div v-else class="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
-          Нет линеек для этого бренда. Добавьте линейки во вкладке "Линейки".
+          Нет коллекций для этого бренда. Добавьте линейки во вкладке "Линейки".
         </div>
       </template>
     </div>

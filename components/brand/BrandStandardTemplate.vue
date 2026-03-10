@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Brand, IBreadcrumbItem, ProductWithGallery } from '@/types'
+import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import { ArrowLeft, ChevronDown, Package, TrendingUp } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
@@ -7,6 +7,7 @@ import { BUCKET_NAME_BRANDS } from '@/constants'
 const props = defineProps<{
   brand: Brand
   products: ProductWithGallery[]
+  productLines?: ProductLine[]
   isLoading: boolean
   sortBy: 'newest' | 'price_asc' | 'price_desc' | 'popularity'
   breadcrumbs: IBreadcrumbItem[]
@@ -99,6 +100,18 @@ const localSortBy = computed({
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Коллекции: минималистичные бейджи-ссылки -->
+    <div v-if="productLines && productLines.length > 0" class="flex flex-wrap gap-2">
+      <NuxtLink
+        v-for="line in productLines"
+        :key="line.id"
+        :to="`/catalog/all?brands=${brand.id}&lines=${line.id}`"
+        class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-colors"
+      >
+        {{ line.name }}
+      </NuxtLink>
     </div>
 
     <!-- Фильтры и сортировка -->
