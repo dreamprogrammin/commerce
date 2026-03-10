@@ -107,17 +107,17 @@ const otherProductLines = computed(() => {
       </div>
     </div>
 
-    <!-- Featured Product Lines -->
+    <!-- Featured Product Lines — Liquid Glass -->
     <div v-if="featuredProductLines.length > 0">
-      <h2 class="text-base md:text-lg font-semibold text-muted-foreground mb-3">
-        Популярные коллекции
+      <h2 class="text-sm font-semibold text-foreground/50 tracking-wide uppercase mb-3">
+        Популярные серии
       </h2>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
         <NuxtLink
           v-for="line in featuredProductLines"
           :key="line.id"
           :to="`/catalog/all?brands=${brand.id}&lines=${line.id}`"
-          class="group relative aspect-[3/2] rounded-xl overflow-hidden border border-border/60 hover:border-primary/40 hover:shadow-md transition-all duration-200"
+          class="featured-glass-card group"
         >
           <template v-if="line.logo_url">
             <ProgressiveImage
@@ -125,11 +125,16 @@ const otherProductLines = computed(() => {
               :alt="line.name"
               object-fit="cover"
               placeholder-type="shimmer"
-              class="w-full h-full group-hover:scale-105 transition-transform duration-500"
+              class="w-full h-full group-hover:scale-[1.06] transition-transform duration-500 ease-out"
             />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-            <div class="absolute inset-x-0 bottom-0 px-2.5 py-2 md:px-3 md:py-2.5">
-              <span class="text-white text-xs md:text-sm font-semibold line-clamp-1 drop-shadow-sm">
+            <!-- Glass overlay -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/8 to-transparent" />
+            <!-- Name pill -->
+            <div class="absolute inset-x-0 bottom-0 px-2.5 py-2">
+              <span
+                class="inline-block text-white text-xs md:text-sm font-semibold line-clamp-1
+                       drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+              >
                 {{ line.name }}
               </span>
             </div>
@@ -137,12 +142,16 @@ const otherProductLines = computed(() => {
 
           <div
             v-else
-            class="w-full h-full bg-gradient-to-br from-primary/70 to-secondary/70 flex items-end p-2.5 md:p-3"
+            class="w-full h-full bg-gradient-to-br from-primary/55 via-primary/35 to-secondary/55
+                   flex items-end p-2.5"
           >
-            <span class="text-white text-xs md:text-sm font-semibold line-clamp-2">
+            <span class="text-white text-xs md:text-sm font-semibold line-clamp-2 drop-shadow-sm">
               {{ line.name }}
             </span>
           </div>
+
+          <!-- Top highlight on hover -->
+          <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </NuxtLink>
       </div>
     </div>
@@ -205,3 +214,30 @@ const otherProductLines = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.featured-glass-card {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 4px 16px rgba(31, 38, 135, 0.07),
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    box-shadow 0.35s ease,
+    border-color 0.35s ease,
+    transform 0.35s ease;
+}
+
+.featured-glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 12px 32px rgba(31, 38, 135, 0.14),
+    0 3px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transform: translateY(-3px);
+}
+</style>

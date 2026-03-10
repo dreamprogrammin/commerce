@@ -107,37 +107,42 @@ function getCatalogLink(lineId: string): string {
   </button>
 
   <!-- ────────────────────────────────────────────────────
-       Desktop: glass-панель с поиском + раскрывающаяся сетка
+       Desktop: Liquid Glass панель
   ──────────────────────────────────────────────────────── -->
-  <div
-    class="hidden md:block rounded-2xl border border-white/40 bg-white/50 backdrop-blur-md shadow-sm shadow-black/5 overflow-hidden"
-  >
-    <!-- Glass-шапка: заголовок + счётчик + поиск -->
-    <div class="flex items-center gap-3 px-4 py-3 border-b border-black/5 bg-white/20">
-      <div class="flex items-center gap-2 shrink-0">
-        <span class="text-sm font-semibold">Коллекции</span>
-        <span class="text-[11px] text-muted-foreground bg-black/6 rounded-full px-2 py-0.5 tabular-nums">
+  <div class="hidden md:block liquid-glass-panel relative rounded-[20px] overflow-hidden">
+    <!-- Highlight-блик (верхний свет) -->
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+
+    <!-- ── Шапка: заголовок + pill-счётчик + поиск ── -->
+    <div class="relative flex items-center gap-3 px-5 py-3.5 border-b border-white/15">
+      <div class="flex items-center gap-2.5 shrink-0">
+        <span class="text-sm font-semibold tracking-tight">Коллекции</span>
+        <span
+          class="text-[10px] tabular-nums font-medium px-2 py-0.5 rounded-full
+                 bg-white/25 border border-white/30 text-foreground/70
+                 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]"
+        >
           {{ filteredLines.length }}
         </span>
       </div>
-      <div class="flex-1 max-w-xs">
+      <div class="flex-1 max-w-56">
         <BrandSearchInput
           v-model="searchQuery"
-          placeholder="Поиск..."
+          placeholder="Найти серию..."
           aria-label="Поиск по коллекциям бренда"
+          glass
         />
       </div>
     </div>
 
-    <!-- Тело: карточки -->
+    <!-- ── Тело: сетка карточек ── -->
     <div class="p-3">
-      <!-- Первые N -->
-      <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+      <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
         <NuxtLink
           v-for="line in visibleLines"
           :key="line.id"
           :to="getCatalogLink(line.id)"
-          class="group relative aspect-[3/2] rounded-xl overflow-hidden border border-white/30 hover:border-primary/40 hover:shadow-md transition-all duration-200"
+          class="liquid-glass-card group"
         >
           <template v-if="line.logo_url">
             <ProgressiveImage
@@ -145,36 +150,35 @@ function getCatalogLink(lineId: string): string {
               :alt="line.name"
               object-fit="cover"
               placeholder-type="shimmer"
-              class="w-full h-full group-hover:scale-105 transition-transform duration-300"
+              class="w-full h-full group-hover:scale-[1.06] transition-transform duration-500 ease-out"
             />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
-            <div class="absolute inset-x-0 bottom-0 px-2 py-1.5">
-              <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-1 drop-shadow">{{ line.name }}</span>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+            <div class="absolute inset-x-0 bottom-0 px-2.5 py-2">
+              <span class="text-white text-[11px] font-semibold line-clamp-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{{ line.name }}</span>
             </div>
           </template>
-          <div
-            v-else
-            class="w-full h-full bg-gradient-to-br from-primary/70 to-secondary/70 flex items-end p-2"
-          >
-            <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-2">{{ line.name }}</span>
+          <div v-else class="w-full h-full bg-gradient-to-br from-primary/60 via-primary/40 to-secondary/60 flex items-end p-2.5">
+            <span class="text-white text-[11px] font-semibold line-clamp-2 drop-shadow-sm">{{ line.name }}</span>
           </div>
+          <!-- Карточка: inner highlight -->
+          <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </NuxtLink>
       </div>
 
       <!-- Раскрывающийся блок -->
       <div
-        class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out"
+        class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out"
         :style="{
-          maxHeight: isExpanded ? `${Math.ceil(extraLines.length / 6) * 180}px` : '0px',
+          maxHeight: isExpanded ? `${Math.ceil(extraLines.length / 6) * 200}px` : '0px',
           opacity: isExpanded ? 1 : 0,
-          marginTop: isExpanded && extraLines.length ? '0.5rem' : '0',
+          marginTop: isExpanded && extraLines.length ? '0.625rem' : '0',
         }"
       >
         <NuxtLink
           v-for="line in extraLines"
           :key="line.id"
           :to="getCatalogLink(line.id)"
-          class="group relative aspect-[3/2] rounded-xl overflow-hidden border border-white/30 hover:border-primary/40 hover:shadow-md transition-all duration-200"
+          class="liquid-glass-card group"
         >
           <template v-if="line.logo_url">
             <ProgressiveImage
@@ -182,44 +186,47 @@ function getCatalogLink(lineId: string): string {
               :alt="line.name"
               object-fit="cover"
               placeholder-type="shimmer"
-              class="w-full h-full group-hover:scale-105 transition-transform duration-300"
+              class="w-full h-full group-hover:scale-[1.06] transition-transform duration-500 ease-out"
             />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
-            <div class="absolute inset-x-0 bottom-0 px-2 py-1.5">
-              <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-1 drop-shadow">{{ line.name }}</span>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+            <div class="absolute inset-x-0 bottom-0 px-2.5 py-2">
+              <span class="text-white text-[11px] font-semibold line-clamp-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{{ line.name }}</span>
             </div>
           </template>
-          <div
-            v-else
-            class="w-full h-full bg-gradient-to-br from-primary/70 to-secondary/70 flex items-end p-2"
-          >
-            <span class="text-white text-[11px] md:text-xs font-semibold line-clamp-2">{{ line.name }}</span>
+          <div v-else class="w-full h-full bg-gradient-to-br from-primary/60 via-primary/40 to-secondary/60 flex items-end p-2.5">
+            <span class="text-white text-[11px] font-semibold line-clamp-2 drop-shadow-sm">{{ line.name }}</span>
           </div>
+          <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </NuxtLink>
       </div>
 
       <!-- Пустой поиск -->
-      <div v-if="filteredLines.length === 0 && searchQuery" class="py-8 text-center text-muted-foreground text-sm">
-        Ничего не найдено
+      <div v-if="filteredLines.length === 0 && searchQuery" class="py-10 text-center">
+        <p class="text-sm text-muted-foreground/70">Ничего не найдено</p>
       </div>
     </div>
 
-    <!-- Glass-футер: кнопка раскрытия -->
+    <!-- ── Футер: кнопка раскрытия ── -->
     <div
       v-if="hasMore"
-      class="border-t border-black/5 bg-white/10 flex justify-center py-2"
+      class="border-t border-white/15 flex justify-center py-2.5"
     >
       <button
-        class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded-lg hover:bg-black/5"
+        class="flex items-center gap-1.5 text-[11px] font-medium text-foreground/50
+               hover:text-foreground/80 transition-colors px-3.5 py-1 rounded-full
+               hover:bg-white/20 active:bg-white/30"
         @click="isExpanded = !isExpanded"
       >
         <ChevronDown
-          class="w-3.5 h-3.5 transition-transform duration-300"
+          class="w-3 h-3 transition-transform duration-300"
           :class="isExpanded ? 'rotate-180' : ''"
         />
-        {{ isExpanded ? 'Свернуть' : `Ещё ${extraLines.length} коллекций` }}
+        {{ isExpanded ? 'Свернуть' : `Ещё ${extraLines.length}` }}
       </button>
     </div>
+
+    <!-- Bottom highlight -->
+    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
   </div>
 
   <!-- Drawer со всеми коллекциями (только мобилка) -->
@@ -229,3 +236,42 @@ function getCatalogLink(lineId: string): string {
     :brand-id="brandId"
   />
 </template>
+
+<style scoped>
+/* ── Liquid Glass: панель-контейнер ── */
+.liquid-glass-panel {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 8px 32px rgba(31, 38, 135, 0.08),
+    0 1.5px 4px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ── Liquid Glass: карточка коллекции ── */
+.liquid-glass-card {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 0.5px 0 rgba(255, 255, 255, 0.3) inset;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.3s ease;
+}
+
+.liquid-glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 8px 24px rgba(31, 38, 135, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+</style>
