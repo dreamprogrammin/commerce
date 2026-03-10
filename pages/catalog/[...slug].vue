@@ -188,13 +188,14 @@ const categoryOgImageUrl = computed(() => {
 })
 
 // Название категории (для breadcrumbs и fallback)
+// Используем чистые breadcrumbs без бренда, чтобы избежать дублирования: "Smoneo Smoneo В Алматы"
 const categoryName = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
   }
-  const path = breadcrumbs.value
-  if (path && path.length > 0)
-    return path[path.length - 1]?.name
+  const crumbs = categoriesStore.getBreadcrumbs(currentCategorySlug.value)
+  if (crumbs && crumbs.length > 0)
+    return crumbs[crumbs.length - 1]?.name
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 
@@ -1639,30 +1640,6 @@ useHead(() => {
           </div>
         </Transition>
       </div>
-    </div>
-
-    <!-- 📄 SEO описание после каталога (для Google индексации) -->
-    <div
-      v-if="seoText"
-      class="mt-12 pt-8 border-t"
-    >
-      <div
-        class="prose prose-sm max-w-none text-gray-700
-               prose-headings:font-bold prose-headings:text-gray-900
-               prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3
-               prose-h3:text-lg prose-h3:mt-4 prose-h3:mb-2
-               prose-p:leading-relaxed prose-p:mb-4
-               prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-a:font-medium
-               prose-strong:text-gray-900 prose-strong:font-semibold
-               prose-ul:list-disc prose-ul:ml-6 prose-ul:my-4
-               prose-ol:list-decimal prose-ol:ml-6 prose-ol:my-4
-               prose-li:my-1 prose-li:leading-relaxed
-               prose-blockquote:border-l-4 prose-blockquote:border-blue-300 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-600
-               prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono
-               prose-pre:bg-gray-100 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
-               prose-img:rounded-lg prose-img:shadow-md"
-        v-html="seoText"
-      />
     </div>
 
     <!-- FAQ блок для категории -->
