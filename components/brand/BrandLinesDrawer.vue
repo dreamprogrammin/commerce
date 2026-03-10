@@ -38,10 +38,9 @@ function handleLineClick() {
   isOpen.value = false
 }
 
-// Сбрасываем поиск при закрытии
-watch(isOpen, (opened) => {
-  if (!opened)
-    searchQuery.value = ''
+// Гарантированный сброс при каждом открытии/закрытии
+watch(isOpen, () => {
+  searchQuery.value = ''
 })
 </script>
 
@@ -72,7 +71,6 @@ watch(isOpen, (opened) => {
             <NuxtLink
               v-for="line in filteredLines"
               :key="line.id"
-              v-memo="[line.id, line.name, line.logo_url]"
               :to="`/catalog/all?brands=${brandId}&lines=${line.id}`"
               class="group relative aspect-[3/2] rounded-lg overflow-hidden border border-border/60 hover:border-primary/40 hover:shadow-md transition-all duration-200"
               @click="handleLineClick"
