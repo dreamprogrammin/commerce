@@ -83,7 +83,6 @@ watch(isOpen, () => {
                   placeholder-type="shimmer"
                   class="w-full h-full group-hover:scale-105 transition-transform duration-300"
                 />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
                 <div class="absolute inset-x-0 bottom-0 px-2 py-1.5">
                   <span class="text-white text-xs font-semibold line-clamp-1 drop-shadow-sm">{{ line.name }}</span>
                 </div>

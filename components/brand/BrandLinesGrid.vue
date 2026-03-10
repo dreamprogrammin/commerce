@@ -152,7 +152,6 @@ function getCatalogLink(lineId: string): string {
               placeholder-type="shimmer"
               class="w-full h-full group-hover:scale-[1.06] transition-transform duration-500 ease-out"
             />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
             <div class="absolute inset-x-0 bottom-0 px-2.5 py-2">
               <span class="text-white text-[11px] font-semibold line-clamp-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{{ line.name }}</span>
             </div>
@@ -188,7 +187,6 @@ function getCatalogLink(lineId: string): string {
               placeholder-type="shimmer"
               class="w-full h-full group-hover:scale-[1.06] transition-transform duration-500 ease-out"
             />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
             <div class="absolute inset-x-0 bottom-0 px-2.5 py-2">
               <span class="text-white text-[11px] font-semibold line-clamp-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{{ line.name }}</span>
             </div>
