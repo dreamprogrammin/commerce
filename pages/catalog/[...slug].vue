@@ -217,7 +217,11 @@ const title = computed(() => {
     if (categoryBrandSeo.value?.seo_h1) {
       return categoryBrandSeo.value.seo_h1
     }
-    return `${categoryName.value} ${activeBrand.value.name} в Алматы`
+    const catName = categoryName.value
+    const brandName = activeBrand.value.name
+    // Не дублируем бренд если название категории совпадает с брендом (напр. категория "LEGO" + бренд "LEGO")
+    const prefix = catName.toLowerCase() === brandName.toLowerCase() ? catName : `${catName} ${brandName}`
+    return `${prefix} в Алматы`
   }
 
   return currentCategory.value?.seo_h1 || categoryName.value
