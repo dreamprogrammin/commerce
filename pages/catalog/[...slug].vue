@@ -1297,6 +1297,15 @@ useHead(() => {
       {{ title }}
     </h1>
 
+    <!-- 🔥 Бренды как 3-й уровень навигации (перед товарами) -->
+    <CategoryBrands
+      v-if="availableBrands.length > 1 && !activeBrandSlug"
+      :brands="availableBrands"
+      :category-slug="currentCategorySlug"
+      :category-name="categoryName || undefined"
+      :active-brand-slug="activeBrandSlug"
+    />
+
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- Десктоп фильтры -->
       <ClientOnly>
@@ -1623,9 +1632,9 @@ useHead(() => {
       />
     </ClientOnly>
 
-    <!-- Бренды в категории (3-й уровень навигации) -->
+    <!-- Другие бренды внизу (показываем только когда бренд уже выбран) -->
     <CategoryBrands
-      v-if="availableBrands.length > 0"
+      v-if="availableBrands.length > 1 && activeBrandSlug"
       :brands="availableBrands"
       :category-slug="currentCategorySlug"
       :category-name="categoryName || undefined"
