@@ -235,6 +235,8 @@ export type CategoryUpdate = Database['public']['Tables']['categories']['Update'
 
 export type CategoryMenuItem = CategoryRow & {
   children?: CategoryMenuItem[]
+  brands?: BrandForFilter[]
+  brandsLoaded?: boolean
 }
 
 export type EditableCategory = CategoryRow & {

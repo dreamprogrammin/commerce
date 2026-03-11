@@ -1079,19 +1079,26 @@ useHead(() => {
     }),
   })
 
-  // 3. SiteNavigationElement Schema (Подкатегории для sitelinks)
-  if (subcategories.value.length > 0) {
+  // 3. SiteNavigationElement Schema (Подкатегории + бренды для sitelinks)
+  const subcatParts = subcategories.value.slice(0, 6).map(cat => ({
+    '@type': 'WebPage',
+    'name': cat.name,
+    'url': `https://uhti.kz${cat.href}`,
+  }))
+  const brandParts = availableBrands.value.slice(0, 6).map(brand => ({
+    '@type': 'WebPage',
+    'name': `${categoryName.value} ${brand.name}`,
+    'url': `https://uhti.kz${currentCategory.value?.href}?brand=${brand.slug}`,
+  }))
+  const navParts = [...subcatParts, ...brandParts]
+  if (navParts.length > 0) {
     schemas.push({
       type: 'application/ld+json',
       children: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'SiteNavigationElement',
         'name': `Подкатегории ${categoryName.value}`,
-        'hasPart': subcategories.value.slice(0, 6).map(cat => ({
-          '@type': 'WebPage',
-          'name': cat.name,
-          'url': `https://uhti.kz${cat.href}`,
-        })),
+        'hasPart': navParts,
       }),
     })
   }

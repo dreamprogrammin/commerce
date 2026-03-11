@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { carouselContainerVariants } from '@/lib/variants'
+import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 const container = carouselContainerVariants({ contained: 'always' })
+const categoriesStore = useCategoriesStore()
+const isCatalogOpen = ref(false)
+
+function openCatalog() {
+  isCatalogOpen.value = true
+}
 const isVisible = ref(true)
 let lastScrollY = 0
 let ticking = false
@@ -40,6 +47,7 @@ function openSearch() {
 onMounted(() => {
   lastScrollY = window.scrollY
   window.addEventListener('scroll', handleScroll, { passive: true })
+  categoriesStore.fetchCategoryData()
 })
 
 onUnmounted(() => {
@@ -75,15 +83,16 @@ onUnmounted(() => {
         <SearchDrawer v-model:is-open="isSearchOpen" />
 
         <!-- Кнопка "Каталог" -->
-        <NuxtLink
-          to="/catalog"
-          class="group flex items-center justify-center gap-2 hover:bg-blue/200 h-11 px-6 rounded-lg transition-colors bg-blue-500"
+        <button
+          class="group flex items-center justify-center gap-2 hover:bg-blue-600 h-11 px-6 rounded-lg transition-colors bg-blue-500"
+          @click="openCatalog"
         >
           <Icon name="lucide:layout-grid" class="w-5 h-5 text-white" />
           <span class="text-sm text-white font-semibold">
             Каталог
           </span>
-        </NuxtLink>
+        </button>
+        <CommonCatalogDrawer v-model="isCatalogOpen" />
       </div>
     </div>
   </Transition>

@@ -106,6 +106,13 @@ const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems)
 useAsyncData('category-data', () => categoriesStore.fetchCategoryData())
 useAsyncData('additional-menu-items', () => categoriesStore.fetchAdditionalMenuItems())
 
+// Загружаем бренды для меню после загрузки категорий (client-only)
+watch(() => menuTree.value.length, (len) => {
+  if (len > 0) {
+    categoriesStore.loadBrandsForMenuCategories()
+  }
+})
+
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
 )
@@ -476,6 +483,29 @@ defineExpose({ closeAllPopups })
                           </NuxtLink>
                         </li>
                       </ul>
+
+                      <!-- Бренды 3-го уровня -->
+                      <div v-if="childItem.brandsLoaded && childItem.brands && childItem.brands.length > 0" class="ml-2 mt-1">
+                        <div
+                          v-if="childItem.children && childItem.children.length > 0"
+                          class="border-t border-gray-100 dark:border-gray-800 my-1"
+                        />
+                        <ul class="space-y-1 list-none">
+                          <li v-for="brand in childItem.brands" :key="brand.id">
+                            <NuxtLink
+                              :to="`${childItem.href}?brand=${brand.slug}`"
+                              class="flex items-center gap-2 select-none rounded-lg py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium"
+                              @click="handleLinkClick"
+                            >
+                              <Icon name="lucide:tag" class="w-3 h-3" />
+                              {{ childItem.name }} {{ brand.name }}
+                            </NuxtLink>
+                          </li>
+                        </ul>
+                      </div>
+                      <div v-else-if="categoriesStore.brandsLoading && !childItem.brandsLoaded" class="ml-2 mt-2 space-y-2 px-3">
+                        <div v-for="n in 3" :key="n" class="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      </div>
                     </li>
                   </ul>
                   <div
