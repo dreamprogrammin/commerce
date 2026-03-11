@@ -475,7 +475,7 @@ defineExpose({ closeAllPopups })
                         >
                           <NuxtLink
                             :to="grandChildItem.href"
-                            class="block select-none py-1 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                            class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                             @click="handleLinkClick"
                           >
                             {{ grandChildItem.name }}
@@ -493,7 +493,7 @@ defineExpose({ closeAllPopups })
                           <li v-for="brand in childItem.brands" :key="brand.id">
                             <NuxtLink
                               :to="`${childItem.href}?brand=${brand.slug}`"
-                              class="block select-none py-1 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                              class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                               @click="handleLinkClick"
                             >
                               {{ rootItem.name }} {{ brand.name }}
