@@ -475,10 +475,9 @@ defineExpose({ closeAllPopups })
                         >
                           <NuxtLink
                             :to="grandChildItem.href"
-                            class="flex items-center gap-2 select-none rounded-lg py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium"
+                            class="block select-none py-1 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                             @click="handleLinkClick"
                           >
-                            <Icon name="lucide:chevron-right" class="w-3 h-3" />
                             {{ grandChildItem.name }}
                           </NuxtLink>
                         </li>
@@ -494,10 +493,9 @@ defineExpose({ closeAllPopups })
                           <li v-for="brand in childItem.brands" :key="brand.id">
                             <NuxtLink
                               :to="`${childItem.href}?brand=${brand.slug}`"
-                              class="flex items-center gap-2 select-none rounded-lg py-1.5 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium"
+                              class="block select-none py-1 px-3 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                               @click="handleLinkClick"
                             >
-                              <Icon name="lucide:tag" class="w-3 h-3" />
                               {{ rootItem.name }} {{ brand.name }}
                             </NuxtLink>
                           </li>
