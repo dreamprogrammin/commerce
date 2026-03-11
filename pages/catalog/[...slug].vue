@@ -724,7 +724,10 @@ const metaDescription = computed(() => {
     if (categoryBrandSeo.value?.seo_description) {
       return categoryBrandSeo.value.seo_description
     }
-    return `В каталоге Ухтышка вы можете купить ${(categoryName.value || '').toLowerCase()} ${activeBrand.value.name}. Большой выбор, гарантия оригинала, доставка по Алматы.`
+    const catName = (categoryName.value || '').toLowerCase()
+    const brandName = activeBrand.value.name
+    const productName = catName === brandName.toLowerCase() ? brandName : `${catName} ${brandName}`
+    return `В каталоге Ухтышка вы можете купить ${productName}. Большой выбор, гарантия оригинала, доставка по Алматы.`
   }
 
   // SEO: если выбрана одна линейка — специальное описание
@@ -780,7 +783,10 @@ const metaTitle = computed(() => {
     if (categoryBrandSeo.value?.seo_title) {
       return categoryBrandSeo.value.seo_title
     }
-    return `Купить ${categoryName.value} ${activeBrand.value.name} в Алматы | Ухтышка`
+    const catName = categoryName.value
+    const brandName = activeBrand.value.name
+    const prefix = catName.toLowerCase() === brandName.toLowerCase() ? catName : `${catName} ${brandName}`
+    return `Купить ${prefix} в Алматы | Ухтышка`
   }
 
   // SEO: если выбрана одна линейка — специальный title
