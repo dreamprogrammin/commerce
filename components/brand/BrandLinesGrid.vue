@@ -10,6 +10,7 @@ const props = defineProps<{
   /** Все коллекции — для мобильного Drawer и счётчика */
   allLines: ProductLine[]
   brandId: string
+  brandSlug: string
 }>()
 
 const { getVariantUrl } = useSupabaseStorage()
@@ -62,8 +63,8 @@ function getLogoUrl(logoUrl: string | null): string | null {
   return getVariantUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, 'sm')
 }
 
-function getCatalogLink(lineId: string): string {
-  return `/catalog/all?brands=${props.brandId}&lines=${lineId}`
+function getLineLink(lineSlug: string): string {
+  return `/brand/${props.brandSlug}/${lineSlug}`
 }
 </script>
 
@@ -141,7 +142,7 @@ function getCatalogLink(lineId: string): string {
         <NuxtLink
           v-for="line in visibleLines"
           :key="line.id"
-          :to="getCatalogLink(line.id)"
+          :to="getLineLink(line.slug)"
           class="liquid-glass-card group"
         >
           <template v-if="line.logo_url">
@@ -176,7 +177,7 @@ function getCatalogLink(lineId: string): string {
         <NuxtLink
           v-for="line in extraLines"
           :key="line.id"
-          :to="getCatalogLink(line.id)"
+          :to="getLineLink(line.slug)"
           class="liquid-glass-card group"
         >
           <template v-if="line.logo_url">

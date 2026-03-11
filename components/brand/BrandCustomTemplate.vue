@@ -116,7 +116,7 @@ const otherProductLines = computed(() => {
         <NuxtLink
           v-for="line in featuredProductLines"
           :key="line.id"
-          :to="`/catalog/all?brands=${brand.id}&lines=${line.id}`"
+          :to="`/brand/${brand.slug}/${line.slug}`"
           class="featured-glass-card group"
         >
           <template v-if="line.logo_url">
@@ -160,6 +160,7 @@ const otherProductLines = computed(() => {
       :lines="otherProductLines"
       :all-lines="productLines"
       :brand-id="brand.id"
+      :brand-slug="brand.slug"
     />
 
     <!-- Каталог товаров -->

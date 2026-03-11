@@ -107,7 +107,7 @@ const localSortBy = computed({
       <NuxtLink
         v-for="line in productLines"
         :key="line.id"
-        :to="`/catalog/all?brands=${brand.id}&lines=${line.id}`"
+        :to="`/brand/${brand.slug}/${line.slug}`"
         class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-colors"
       >
         {{ line.name }}
