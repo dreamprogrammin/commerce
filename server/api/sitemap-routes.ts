@@ -151,6 +151,43 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       })
     }
 
+    // --- BRAND LANDING PAGES (?brand=slug) ---
+    // Запрашиваем все уникальные комбинации категория+бренд из товаров
+    const { data: brandLandings, error: brandLandingsError } = await client
+      .from('products')
+      .select('categories!inner(slug, href, parent_id), brands!inner(slug, updated_at)')
+      .eq('is_active', true)
+      .not('categories.slug', 'is', null)
+      .not('brands.slug', 'is', null)
+      .limit(10000)
+
+    if (brandLandingsError) {
+      console.error('❌ Ошибка загрузки brand landing для sitemap:', brandLandingsError)
+    }
+
+    if (brandLandings && brandLandings.length > 0) {
+      // Дедупликация — уникальные пары (categoryHref, brandSlug)
+      const seen = new Set<string>()
+      brandLandings.forEach((item: any) => {
+        const category = item.categories
+        const brand = item.brands
+        if (!category || !brand) return
+        // Brand landing только для категорий второго уровня (имеющих родителя)
+        if (!category.parent_id) return
+        const categoryPath = category.href || `/catalog/${category.slug}`
+        const key = `${categoryPath}|${brand.slug}`
+        if (seen.has(key)) return
+        seen.add(key)
+        sitemapRoutes.push({
+          loc: `${categoryPath}?brand=${brand.slug}`,
+          lastmod: brand.updated_at ?? new Date().toISOString(),
+          changefreq: 'weekly',
+          priority: 0.65,
+        })
+      })
+      console.log(`✅ Sitemap: Загружено ${seen.size} brand landing страниц`)
+    }
+
     // ✅ Итоговое логирование
     console.log(`✅ Sitemap: Всего сгенерировано ${sitemapRoutes.length} URLs`)
 

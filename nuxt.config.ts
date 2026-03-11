@@ -104,6 +104,9 @@ export default defineNuxtConfig({
           '/catalog/**',
           '/brand/**',
         ],
+        allow: [
+          '/*?brand=*',
+        ],
         disallow: [
           '/admin',
           '/confirm',
