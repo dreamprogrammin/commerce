@@ -111,7 +111,7 @@ watch(() => menuTree.value.length, (len) => {
   if (len > 0) {
     categoriesStore.loadBrandsForMenuCategories()
   }
-})
+}, { immediate: true })
 
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
@@ -498,7 +498,7 @@ defineExpose({ closeAllPopups })
                               @click="handleLinkClick"
                             >
                               <Icon name="lucide:tag" class="w-3 h-3" />
-                              {{ childItem.name }} {{ brand.name }}
+                              {{ rootItem.name }} {{ brand.name }}
                             </NuxtLink>
                           </li>
                         </ul>
