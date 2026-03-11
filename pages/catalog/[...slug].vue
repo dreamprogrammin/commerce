@@ -53,6 +53,7 @@ const categoryBrandSeo = ref<{
   seo_description: string | null
   seo_text: string | null
 } | null>(null)
+const brandSeoLoading = ref(false)
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
 // Локальные интерфейсы для избежания циклической зависимости типов
@@ -483,6 +484,7 @@ async function loadFilterData(slug: string) {
 
     // Загружаем SEO-текст для связки бренд+категория (если есть ?brand)
     if (brandSlugParam && !Array.isArray(brandSlugParam)) {
+      brandSeoLoading.value = true
       try {
         const { data: seoData } = await supabase.rpc('get_category_brand_seo', {
           p_category_slug: slug,
@@ -492,6 +494,9 @@ async function loadFilterData(slug: string) {
       }
       catch {
         categoryBrandSeo.value = null
+      }
+      finally {
+        brandSeoLoading.value = false
       }
     }
     else {
@@ -563,6 +568,7 @@ watch(activeBrandSlug, async (newSlug) => {
       }
     }
     // Перезагружаем SEO данные для новой связки бренд+категория
+    brandSeoLoading.value = true
     try {
       const { data: seoData } = await supabase.rpc('get_category_brand_seo', {
         p_category_slug: currentCategorySlug.value,
@@ -572,6 +578,9 @@ watch(activeBrandSlug, async (newSlug) => {
     }
     catch {
       categoryBrandSeo.value = null
+    }
+    finally {
+      brandSeoLoading.value = false
     }
   }
   else if (!newSlug) {
@@ -1259,7 +1268,7 @@ useHead(() => {
           </div>
 
           <!-- Заголовок (только мобильная версия) -->
-          <h1 class="text-xl font-bold capitalize flex-1 leading-tight lg:hidden">
+          <h1 class="text-xl font-bold capitalize flex-1 leading-tight lg:hidden transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
             {{ title }}
           </h1>
         </div>
@@ -1313,7 +1322,7 @@ useHead(() => {
         <!-- Текстовый блок справа -->
         <div :class="currentCategory.image_url ? 'col-span-9' : 'col-span-12'" class="space-y-4">
           <!-- Заголовок (только десктопная версия) -->
-          <h1 class="hidden lg:block text-2xl md:text-3xl font-bold capitalize">
+          <h1 class="hidden lg:block text-2xl md:text-3xl font-bold capitalize min-h-[4.5rem] transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
             {{ title }}
           </h1>
 
@@ -1349,7 +1358,7 @@ useHead(() => {
     </div>
 
     <!-- Заголовок для случая с активными фильтрами или без описания -->
-    <h1 v-else class="text-xl md:text-3xl font-bold mb-3 lg:mb-4 capitalize">
+    <h1 v-else class="text-xl md:text-3xl font-bold mb-3 lg:mb-4 capitalize transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
       {{ title }}
     </h1>
 
