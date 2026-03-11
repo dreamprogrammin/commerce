@@ -107,6 +107,7 @@ const isLoadingProductLines = ref(false)
 const fileInputKey = ref(0)
 const isSlugManuallyEdited = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const isSettingUp = ref(false)
 
 // 🎯 Информация об оптимизации
 const optimizationInfo = computed(() => getOptimizationInfo())
@@ -114,6 +115,7 @@ const optimizationInfo = computed(() => getOptimizationInfo())
 // --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ---
 
 function setupFormData(product: FullProduct | null | undefined) {
+  isSettingUp.value = true
   newImageFiles.value = []
   imagesToDelete.value = []
   linkedAccessories.value = []
@@ -197,6 +199,9 @@ function setupFormData(product: FullProduct | null | undefined) {
     existingImages.value = []
     selectedBonusPercent.value = 5
   }
+  nextTick(() => {
+    isSettingUp.value = false
+  })
 }
 
 watch(
@@ -255,8 +260,8 @@ async function handleProductLineCreate(payload: { data: ProductLineInsert, file:
 
 // Загружаем линейки при смене бренда
 watch(() => formData.value.brand_id, async (newBrandId, oldBrandId) => {
-  // Сбрасываем линейку при смене бренда
-  if (newBrandId !== oldBrandId) {
+  // Сбрасываем линейку при смене бренда (но не при инициализации формы)
+  if (newBrandId !== oldBrandId && !isSettingUp.value) {
     formData.value.product_line_id = null
   }
 
