@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { LocationQueryValue } from 'vue-router'
 import type { AttributeFilter, AttributeWithValue, BrandForFilter, Country, IBreadcrumbItem, IProductFilters, Material, NumericAttributeFilter, ProductLine, SortByType } from '@/types'
+import { useQuery } from '@tanstack/vue-query'
 import { watchDebounced } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CategoryBrands from '@/components/category/CategoryBrands.vue'
 import CategoryProductLines from '@/components/category/CategoryProductLines.vue'
 import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
+import CategoryRatingBlock from '@/components/category/CategoryRatingBlock.vue'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -911,33 +913,38 @@ const { data: categoryQuestions } = await useAsyncData(
 
 const faqQuestions = computed(() => categoryQuestions.value || [])
 
-// 🆕 Агрегированный рейтинг категории для Schema.org aggregateRating
+// 🆕 Агрегированный рейтинг категории (TanStack Query — кэш 5 мин)
 const supabase = useSupabaseClient()
-const { data: categoryRatingData } = await useAsyncData(
-  `catalog-rating-${currentCategorySlug.value}`,
-  async () => {
-    const category = categoriesStore.allCategories.find(c => c.slug === currentCategorySlug.value)
-    if (!category?.id || currentCategorySlug.value === 'all')
+const currentCategoryId = computed(() => {
+  const cat = categoriesStore.allCategories.find(c => c.slug === currentCategorySlug.value)
+  return cat?.id || null
+})
+
+const { data: categoryRatingData } = useQuery({
+  queryKey: ['category-rating', currentCategoryId],
+  queryFn: async () => {
+    if (!currentCategoryId.value || currentCategorySlug.value === 'all')
       return null
 
-    try {
-      const { data, error } = await supabase.rpc('get_category_aggregate_rating', {
-        p_category_id: category.id,
-      })
-      if (error) {
-        console.error('Error fetching category rating:', error)
-        return null
-      }
-      return data as { avg_rating: number, total_reviews: number } | null
-    }
-    catch {
+    const { data, error } = await supabase.rpc('get_category_aggregate_rating', {
+      p_category_id: currentCategoryId.value,
+    })
+    if (error) {
+      console.error('Error fetching category rating:', error)
       return null
     }
+    return data as { avg_rating: number, total_reviews: number } | null
   },
-  {
-    watch: [currentCategorySlug],
-    server: true,
-  },
+  enabled: computed(() => !!currentCategoryId.value && currentCategorySlug.value !== 'all'),
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+})
+
+// Показываем блок рейтинга только при >= 3 отзывах
+const showCategoryRating = computed(() =>
+  categoryRatingData.value
+  && categoryRatingData.value.total_reviews >= 3
+  && categoryRatingData.value.avg_rating > 0,
 )
 
 // 🆕 Уменьшен debounce до 300ms
@@ -1273,6 +1280,13 @@ useHead(() => {
           </h1>
         </div>
 
+        <!-- Рейтинг категории (мобильная) -->
+        <CategoryRatingBlock
+          v-if="showCategoryRating"
+          :avg-rating="categoryRatingData!.avg_rating"
+          :total-reviews="categoryRatingData!.total_reviews"
+        />
+
         <!-- Описание (обрезанное) -->
         <p class="text-sm text-muted-foreground leading-relaxed line-clamp-2">
           {{ currentCategory.description }}
@@ -1326,6 +1340,13 @@ useHead(() => {
             {{ title }}
           </h1>
 
+          <!-- Рейтинг категории (десктоп) -->
+          <CategoryRatingBlock
+            v-if="showCategoryRating"
+            :avg-rating="categoryRatingData!.avg_rating"
+            :total-reviews="categoryRatingData!.total_reviews"
+          />
+
           <!-- Описание категории из БД -->
           <p
             v-if="currentCategory.description"
@@ -1358,9 +1379,18 @@ useHead(() => {
     </div>
 
     <!-- Заголовок для случая с активными фильтрами или без описания -->
-    <h1 v-else class="text-xl md:text-3xl font-bold mb-3 lg:mb-4 capitalize transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
-      {{ title }}
-    </h1>
+    <template v-else>
+      <h1 class="text-xl md:text-3xl font-bold mb-1 lg:mb-2 capitalize transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
+        {{ title }}
+      </h1>
+      <CategoryRatingBlock
+        v-if="showCategoryRating"
+        :avg-rating="categoryRatingData!.avg_rating"
+        :total-reviews="categoryRatingData!.total_reviews"
+        class="mb-3 lg:mb-4"
+      />
+      <div v-else class="mb-3 lg:mb-4" />
+    </template>
 
     <!-- 🔥 Бренды как 3-й уровень навигации (перед товарами) -->
     <CategoryBrands
