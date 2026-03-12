@@ -381,14 +381,14 @@ useRobotsRule({
           <Skeleton class="h-4 md:h-5 w-24 md:w-32" />
         </div>
 
-        <div class="bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12">
-          <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
-            <Skeleton class="w-20 h-20 md:w-32 md:h-32 rounded-xl md:rounded-2xl" />
-            <div class="flex-1 space-y-3 md:space-y-4 text-center md:text-left w-full">
-              <Skeleton class="h-7 md:h-10 w-32 md:w-48 mx-auto md:mx-0" />
-              <div class="flex gap-2 md:gap-4 justify-center md:justify-start">
-                <Skeleton class="h-12 md:h-16 w-20 md:w-24 rounded-lg" />
-                <Skeleton class="h-12 md:h-16 w-20 md:w-24 rounded-lg" />
+        <div class="rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background p-5 md:p-10 lg:p-12">
+          <div class="flex flex-col md:flex-row items-center gap-5 md:gap-8">
+            <Skeleton class="w-20 h-20 md:w-32 md:h-32 rounded-2xl" />
+            <div class="flex-1 space-y-3 text-center md:text-left w-full">
+              <Skeleton class="h-8 md:h-12 w-40 md:w-56 mx-auto md:mx-0" />
+              <div class="flex gap-2 justify-center md:justify-start">
+                <Skeleton class="h-7 w-28 rounded-full" />
+                <Skeleton class="h-7 w-24 rounded-full" />
               </div>
             </div>
           </div>

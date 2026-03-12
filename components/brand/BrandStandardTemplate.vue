@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
-import { ArrowLeft, ChevronDown, Package, TrendingUp } from 'lucide-vue-next'
+import { ArrowLeft, ChevronDown, Package, ShieldCheck } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 
 const props = defineProps<{
   brand: Brand
@@ -41,77 +41,82 @@ const localSortBy = computed({
     <!-- Breadcrumbs -->
     <Breadcrumbs :items="breadcrumbs" />
 
-    <!-- Hero section с градиентом -->
-    <div class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
-      <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl z-0" />
-      <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl z-0" />
+    <!-- Hero section -->
+    <div class="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]" />
 
-      <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
-        <!-- Логотип бренда -->
-        <div v-if="brand.logo_url" class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg border border-border overflow-hidden">
-          <ProgressiveImage
-            :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
-            :alt="`Логотип ${brand.name}`"
-            object-fit="contain"
-            placeholder-type="shimmer"
-            eager
-            class="w-full h-full"
-          />
-        </div>
-
-        <!-- Информация о бренде -->
-        <div class="flex-1 text-center md:text-left">
-          <h1 class="text-2xl md:text-5xl font-bold mb-3 md:mb-6 bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-            {{ brand.name }}
-          </h1>
-
-          <div class="flex flex-wrap gap-2 md:gap-4 justify-center md:justify-start">
-            <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
-              <div class="flex items-center gap-2 md:gap-3">
-                <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Package class="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                </div>
-                <div class="text-left">
-                  <div class="text-lg md:text-2xl font-bold text-gray-900">
-                    {{ products.length }}
-                  </div>
-                  <div class="text-[10px] md:text-xs text-muted-foreground">
-                    {{ products.length === 1 ? 'Товар' : products.length < 5 ? 'Товара' : 'Товаров' }}
-                  </div>
-                </div>
-              </div>
+      <div class="relative p-5 md:p-10 lg:p-12">
+        <div class="flex flex-col md:flex-row items-center gap-5 md:gap-8">
+          <!-- Логотип бренда -->
+          <div v-if="brand.logo_url" class="shrink-0">
+            <div class="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white shadow-md ring-1 ring-border overflow-hidden">
+              <ProgressiveImage
+                :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
+                :alt="`Логотип ${brand.name}`"
+                object-fit="contain"
+                placeholder-type="shimmer"
+                :use-transform="false"
+                eager
+                class="w-full h-full"
+              />
             </div>
+          </div>
 
-            <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
-              <div class="flex items-center gap-2 md:gap-3">
-                <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <TrendingUp class="w-4 h-4 md:w-5 md:h-5 text-green-600" />
-                </div>
-                <div class="text-left">
-                  <div class="text-xs md:text-sm font-semibold text-gray-900">
-                    Оригинал
-                  </div>
-                  <div class="text-[10px] md:text-xs text-muted-foreground">
-                    Гарантия
-                  </div>
-                </div>
-              </div>
+          <!-- Информация о бренде -->
+          <div class="flex-1 text-center md:text-left space-y-3">
+            <h1 class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+              {{ brand.name }}
+            </h1>
+
+            <div class="flex flex-wrap gap-2 justify-center md:justify-start">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium">
+                <Package class="w-3.5 h-3.5" />
+                {{ products.length }} {{ products.length === 1 ? 'товар' : products.length < 5 ? 'товара' : 'товаров' }}
+              </span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium">
+                <ShieldCheck class="w-3.5 h-3.5" />
+                Оригинал
+              </span>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Коллекции: минималистичные бейджи-ссылки -->
-    <div v-if="productLines && productLines.length > 0" class="flex flex-wrap gap-2">
-      <NuxtLink
-        v-for="line in productLines"
-        :key="line.id"
-        :to="`/brand/${brand.slug}/${line.slug}`"
-        class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border border-border bg-muted/40 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-colors"
-      >
-        {{ line.name }}
-      </NuxtLink>
+    <!-- Коллекции — карточки с логотипами -->
+    <div v-if="productLines && productLines.length > 0">
+      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+        Коллекции
+      </h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+        <NuxtLink
+          v-for="line in productLines"
+          :key="line.id"
+          :to="`/brand/${brand.slug}/${line.slug}`"
+          class="group relative aspect-[3/2] rounded-xl overflow-hidden border border-border/60 bg-muted/20 hover:border-primary/30 hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <template v-if="line.logo_url">
+            <ProgressiveImage
+              :src="getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm')"
+              :alt="line.name"
+              object-fit="cover"
+              placeholder-type="shimmer"
+              :use-transform="false"
+              class="w-full h-full group-hover:scale-105 transition-transform duration-500"
+            />
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent px-2.5 pb-2 pt-8">
+              <span class="text-white text-xs md:text-sm font-semibold line-clamp-1 drop-shadow-sm">
+                {{ line.name }}
+              </span>
+            </div>
+          </template>
+          <div v-else class="w-full h-full bg-gradient-to-br from-primary/50 via-primary/30 to-secondary/50 flex items-end p-2.5">
+            <span class="text-white text-xs md:text-sm font-semibold line-clamp-2 drop-shadow-sm">
+              {{ line.name }}
+            </span>
+          </div>
+        </NuxtLink>
+      </div>
     </div>
 
     <!-- Фильтры и сортировка -->

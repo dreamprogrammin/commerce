@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Brand, IBreadcrumbItem, ProductImageRow, ProductLine, ProductWithGallery, SimpleBrand } from '@/types'
-import { ArrowLeft, ChevronDown, Package, Sparkles, TrendingUp } from 'lucide-vue-next'
+import { ArrowLeft, ChevronDown, Package, ShieldCheck, Sparkles } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -402,15 +402,15 @@ useRobotsRule({
         </div>
 
         <!-- Hero skeleton -->
-        <div class="bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12">
-          <div class="flex flex-col md:flex-row items-center gap-4 md:gap-8">
-            <Skeleton class="w-20 h-20 md:w-32 md:h-32 rounded-xl md:rounded-2xl" />
-            <div class="flex-1 space-y-3 md:space-y-4 text-center md:text-left w-full">
-              <Skeleton class="h-7 md:h-10 w-32 md:w-48 mx-auto md:mx-0" />
-              <Skeleton class="h-4 md:h-5 w-24 md:w-32 mx-auto md:mx-0" />
-              <div class="flex gap-2 md:gap-4 justify-center md:justify-start">
-                <Skeleton class="h-12 md:h-16 w-20 md:w-24 rounded-lg" />
-                <Skeleton class="h-12 md:h-16 w-20 md:w-24 rounded-lg" />
+        <div class="rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background p-5 md:p-10 lg:p-12">
+          <div class="flex flex-col md:flex-row items-center gap-5 md:gap-8">
+            <Skeleton class="w-20 h-20 md:w-32 md:h-32 rounded-2xl" />
+            <div class="flex-1 space-y-3 text-center md:text-left w-full">
+              <Skeleton class="h-8 md:h-12 w-40 md:w-56 mx-auto md:mx-0" />
+              <Skeleton class="h-5 w-24 md:w-32 mx-auto md:mx-0" />
+              <div class="flex gap-2 justify-center md:justify-start">
+                <Skeleton class="h-7 w-28 rounded-full" />
+                <Skeleton class="h-7 w-24 rounded-full" />
               </div>
             </div>
           </div>
@@ -465,96 +465,74 @@ useRobotsRule({
       <!-- Breadcrumbs -->
       <Breadcrumbs :items="breadcrumbs" />
 
-      <!-- Hero section с градиентом -->
-      <div class="relative overflow-hidden bg-linear-to-br from-primary/5 via-purple-50 to-pink-50 rounded-2xl md:rounded-3xl p-4 md:p-12 border border-primary/10">
-        <!-- Декоративные элементы -->
-        <div class="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl z-0" />
-        <div class="hidden md:block absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl z-0" />
+      <!-- Hero section -->
+      <div class="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background">
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]" />
 
-        <div class="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8">
-          <!-- Логотип линейки (или бренда если нет) -->
-          <div
-            class="shrink-0 w-20 h-20 md:w-40 md:h-40 bg-white rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
-          >
-            <ProgressiveImage
-              v-if="lineLogoUrl"
-              :src="lineLogoUrl"
-              :alt="productLine.name"
-              aspect-ratio="square"
-              object-fit="contain"
-              placeholder-type="shimmer"
-              :use-transform="false"
-              eager
-            />
-            <ProgressiveImage
-              v-else-if="brandLogoUrl"
-              :src="brandLogoUrl"
-              :alt="brand.name"
-              aspect-ratio="square"
-              object-fit="contain"
-              placeholder-type="shimmer"
-              :use-transform="false"
-              eager
-            />
-            <!-- Плейсхолдер если нет логотипа -->
-            <div v-else class="w-full h-full flex items-center justify-center">
-              <Sparkles class="w-8 h-8 md:w-12 md:h-12 text-primary/60" />
-            </div>
-          </div>
-
-          <!-- Информация о линейке -->
-          <div class="flex-1 text-center md:text-left">
-            <h1 class="text-2xl md:text-5xl font-bold mb-2 md:mb-4 bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-              {{ productLine.name }}
-            </h1>
-            <!-- Бренд -->
-            <NuxtLink
-              :to="`/brand/${brand.slug}`"
-              class="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-3 md:mb-6"
-            >
-              <ProgressiveImage
-                v-if="brandLogoUrl"
-                :src="brandLogoUrl"
-                :alt="brand.name"
-                object-fit="contain"
-                placeholder-type="shimmer"
-                class="w-5 h-5 flex-shrink-0"
-              />
-              <span class="text-sm md:text-base">{{ brand.name }}</span>
-            </NuxtLink>
-
-            <!-- Статистика -->
-            <div class="flex flex-wrap gap-2 md:gap-4 justify-center md:justify-start">
-              <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
-                <div class="flex items-center gap-2 md:gap-3">
-                  <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Package class="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                  </div>
-                  <div class="text-left">
-                    <div class="text-lg md:text-2xl font-bold text-gray-900">
-                      {{ products.length }}
-                    </div>
-                    <div class="text-[10px] md:text-xs text-muted-foreground">
-                      {{ products.length === 1 ? 'Товар' : products.length < 5 ? 'Товара' : 'Товаров' }}
-                    </div>
-                  </div>
+        <div class="relative p-5 md:p-10 lg:p-12">
+          <div class="flex flex-col md:flex-row items-center gap-5 md:gap-8">
+            <!-- Логотип линейки (или бренда если нет) -->
+            <div class="shrink-0">
+              <div class="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white shadow-md ring-1 ring-border overflow-hidden">
+                <ProgressiveImage
+                  v-if="lineLogoUrl"
+                  :src="lineLogoUrl"
+                  :alt="productLine.name"
+                  aspect-ratio="square"
+                  object-fit="contain"
+                  placeholder-type="shimmer"
+                  :use-transform="false"
+                  eager
+                />
+                <ProgressiveImage
+                  v-else-if="brandLogoUrl"
+                  :src="brandLogoUrl"
+                  :alt="brand.name"
+                  aspect-ratio="square"
+                  object-fit="contain"
+                  placeholder-type="shimmer"
+                  :use-transform="false"
+                  eager
+                />
+                <div v-else class="w-full h-full flex items-center justify-center bg-muted/30">
+                  <Sparkles class="w-8 h-8 md:w-10 md:h-10 text-primary/40" />
                 </div>
               </div>
+            </div>
 
-              <div class="bg-white/80 backdrop-blur rounded-lg md:rounded-xl px-3 py-2 md:px-6 md:py-4 shadow-sm border border-primary/10">
-                <div class="flex items-center gap-2 md:gap-3">
-                  <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                    <TrendingUp class="w-4 h-4 md:w-5 md:h-5 text-green-600" />
-                  </div>
-                  <div class="text-left">
-                    <div class="text-xs md:text-sm font-semibold text-gray-900">
-                      Оригинал
-                    </div>
-                    <div class="text-[10px] md:text-xs text-muted-foreground">
-                      Гарантия
-                    </div>
-                  </div>
-                </div>
+            <!-- Информация о линейке -->
+            <div class="flex-1 text-center md:text-left space-y-2.5 md:space-y-3">
+              <h1 class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+                {{ productLine.name }}
+              </h1>
+
+              <!-- Ссылка на бренд -->
+              <NuxtLink
+                :to="`/brand/${brand.slug}`"
+                class="inline-flex items-center gap-2 px-2.5 py-1 -ml-2.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
+              >
+                <ProgressiveImage
+                  v-if="brandLogoUrl"
+                  :src="brandLogoUrl"
+                  :alt="brand.name"
+                  object-fit="contain"
+                  placeholder-type="shimmer"
+                  :use-transform="false"
+                  class="w-5 h-5 flex-shrink-0 rounded"
+                />
+                <span class="text-sm md:text-base font-medium">{{ brand.name }}</span>
+              </NuxtLink>
+
+              <!-- Статистика -->
+              <div class="flex flex-wrap gap-2 justify-center md:justify-start">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium">
+                  <Package class="w-3.5 h-3.5" />
+                  {{ products.length }} {{ products.length === 1 ? 'товар' : products.length < 5 ? 'товара' : 'товаров' }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium">
+                  <ShieldCheck class="w-3.5 h-3.5" />
+                  Оригинал
+                </span>
               </div>
             </div>
           </div>
