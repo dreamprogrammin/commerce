@@ -480,22 +480,20 @@ useRobotsRule({
               v-if="lineLogoUrl"
               :src="lineLogoUrl"
               :alt="productLine.name"
-              :bucket-name="BUCKET_NAME_PRODUCT_LINES"
-              :file-path="productLine.logo_url ?? undefined"
               aspect-ratio="square"
               object-fit="contain"
               placeholder-type="shimmer"
+              :use-transform="false"
               eager
             />
             <ProgressiveImage
               v-else-if="brandLogoUrl"
               :src="brandLogoUrl"
               :alt="brand.name"
-              :bucket-name="BUCKET_NAME_BRANDS"
-              :file-path="brand.logo_url ?? undefined"
               aspect-ratio="square"
               object-fit="contain"
               placeholder-type="shimmer"
+              :use-transform="false"
               eager
             />
             <!-- Плейсхолдер если нет логотипа -->
