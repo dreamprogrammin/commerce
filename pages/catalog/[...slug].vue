@@ -1275,7 +1275,7 @@ useHead(() => {
           </div>
 
           <!-- Заголовок (только мобильная версия) -->
-          <h1 class="text-xl font-bold capitalize flex-1 leading-tight lg:hidden transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
+          <h1 class="text-xl font-bold flex-1 leading-tight lg:hidden transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
             {{ title }}
           </h1>
         </div>
@@ -1336,7 +1336,7 @@ useHead(() => {
         <!-- Текстовый блок справа -->
         <div :class="currentCategory.image_url ? 'col-span-9' : 'col-span-12'" class="space-y-4">
           <!-- Заголовок (только десктопная версия) -->
-          <h1 class="hidden lg:block text-2xl md:text-3xl font-bold capitalize min-h-[4.5rem] transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
+          <h1 class="hidden lg:block text-2xl md:text-3xl font-bold min-h-[4.5rem] transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
             {{ title }}
           </h1>
 
@@ -1380,7 +1380,7 @@ useHead(() => {
 
     <!-- Заголовок для случая с активными фильтрами или без описания -->
     <template v-else>
-      <h1 class="text-xl md:text-3xl font-bold mb-1 lg:mb-2 capitalize transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
+      <h1 class="text-xl md:text-3xl font-bold mb-1 lg:mb-2 transition-opacity duration-200" :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'">
         {{ title }}
       </h1>
       <CategoryRatingBlock

@@ -333,10 +333,12 @@ function onSlugInput() {
 }
 
 watch(
-  [() => formData.value.price, selectedBonusPercent],
-  ([price, percent]) => {
+  [() => formData.value.price, () => formData.value.discount_percentage, selectedBonusPercent],
+  ([price, discount, percent]) => {
     if (formData.value && typeof price === 'number' && typeof percent === 'number') {
-      formData.value.bonus_points_award = Math.round(price * (percent / 100))
+      const discountPct = typeof discount === 'number' && discount > 0 ? discount : 0
+      const sellingPrice = discountPct > 0 ? Math.round(price * (1 - discountPct / 100)) : price
+      formData.value.bonus_points_award = Math.round(sellingPrice * (percent / 100))
     }
   },
 )
@@ -718,7 +720,8 @@ const priceBreakdown = computed(() => {
   const acquiring = Math.round(sellingPrice * acquiringRate.value / 100)
   const bonusPoints = formData.value.bonus_points_award || 0
   const totalExpenses = costPrice + tax + acquiring
-  const netProfit = sellingPrice - totalExpenses
+  const netProfitBeforeBonus = sellingPrice - totalExpenses
+  const netProfit = netProfitBeforeBonus - bonusPoints
   const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0
 
   return {
@@ -1000,11 +1003,15 @@ const seoKeywordsString = computed({
                 <span class="text-muted-foreground">Эквайринг ({{ acquiringRate }}%):</span>
                 <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.acquiring) }} ₸</span>
               </div>
+              <div v-if="priceBreakdown.bonusPoints > 0" class="flex justify-between">
+                <span class="text-muted-foreground">Бонусы клиенту ({{ selectedBonusPercent }}%):</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.bonusPoints) }} ₸</span>
+              </div>
             </div>
             <!-- Итого расходы -->
             <div class="flex justify-between border-t pt-2 text-muted-foreground">
-              <span>Итого расходы:</span>
-              <span class="font-medium">{{ formatPrice(priceBreakdown.totalExpenses) }} ₸</span>
+              <span>Итого расходы + бонусы:</span>
+              <span class="font-medium">{{ formatPrice(priceBreakdown.totalExpenses + priceBreakdown.bonusPoints) }} ₸</span>
             </div>
             <!-- Чистая прибыль -->
             <div
@@ -1014,10 +1021,15 @@ const seoKeywordsString = computed({
               <span>Чистая прибыль:</span>
               <span>{{ formatPrice(priceBreakdown.netProfit) }} ₸ ({{ priceBreakdown.netMargin }}%)</span>
             </div>
-            <!-- Бонусы (информативно) -->
-            <div v-if="priceBreakdown.bonusPoints > 0" class="flex justify-between pt-1 text-xs text-muted-foreground">
-              <span>Бонусы клиенту:</span>
-              <span>{{ priceBreakdown.bonusPoints }} бонусов</span>
+            <!-- Предупреждение о низкой марже -->
+            <div
+              v-if="priceBreakdown.netMargin < 10 && priceBreakdown.sellingPrice > 0"
+              class="flex items-center gap-2 p-2 rounded-lg text-xs font-medium"
+              :class="priceBreakdown.netProfit <= 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'"
+            >
+              <Icon :name="priceBreakdown.netProfit <= 0 ? 'lucide:alert-triangle' : 'lucide:alert-circle'" class="w-4 h-4 shrink-0" />
+              <span v-if="priceBreakdown.netProfit <= 0">Товар продаётся в убыток! Проверьте цену, скидку и бонусы.</span>
+              <span v-else>Маржа ниже 10%. Рекомендуется пересмотреть условия.</span>
             </div>
           </div>
           <div class="p-3 bg-muted/50 rounded-md sm:col-span-2">
@@ -1036,6 +1048,9 @@ const seoKeywordsString = computed({
               Будет начислено:
               <span class="font-bold text-primary">
                 {{ formData.bonus_points_award || 0 }} бонусов
+              </span>
+              <span v-if="discountedPrice" class="text-xs">
+                (от цены со скидкой {{ formatPrice(discountedPrice) }} ₸)
               </span>
             </p>
           </div>
