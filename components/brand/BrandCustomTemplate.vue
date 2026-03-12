@@ -1,30 +1,21 @@
 <script setup lang="ts">
-import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
-import { ArrowLeft, Package, ShieldCheck } from 'lucide-vue-next'
+import type { BrandFilterState } from '@/composables/useBrandPageFilters'
+import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
+import { ArrowLeft, Package, ShieldCheck, SlidersHorizontal } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import BrandLinesGrid from './BrandLinesGrid.vue'
 
 const props = defineProps<{
   brand: Brand
-  products: ProductWithGallery[]
   productLines: ProductLine[]
   featuredProductLines: ProductLine[]
-  isLoading: boolean
-  sortBy: 'newest' | 'price_asc' | 'price_desc' | 'popularity'
   breadcrumbs: IBreadcrumbItem[]
+  filterState: BrandFilterState
 }>()
 
-const emit = defineEmits<{
-  (e: 'update:sortBy', value: 'newest' | 'price_asc' | 'price_desc' | 'popularity'): void
-}>()
-
+const fs = props.filterState
 const { getVariantUrl } = useSupabaseStorage()
-
-const localSortBy = computed({
-  get: () => props.sortBy,
-  set: val => emit('update:sortBy', val),
-})
 
 const displayH1 = computed(() => props.brand.seo_h1 || props.brand.name)
 
@@ -33,7 +24,6 @@ const otherProductLines = computed(() => {
   const featuredIds = new Set(props.featuredProductLines.map(line => line.id))
   return props.productLines.filter(line => !featuredIds.has(line.id))
 })
-
 </script>
 
 <template>
@@ -76,7 +66,7 @@ const otherProductLines = computed(() => {
             <div class="flex flex-wrap gap-2 justify-center md:justify-start">
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium">
                 <Package class="w-3.5 h-3.5" />
-                {{ products.length }} {{ products.length === 1 ? 'товар' : products.length < 5 ? 'товара' : 'товаров' }}
+                {{ fs.products.value.length }} {{ fs.products.value.length === 1 ? 'товар' : fs.products.value.length < 5 ? 'товара' : 'товаров' }}
               </span>
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium">
                 <ShieldCheck class="w-3.5 h-3.5" />
@@ -144,39 +134,69 @@ const otherProductLines = computed(() => {
       :brand-slug="brand.slug"
     />
 
-    <!-- Каталог товаров -->
+    <!-- Catalog header + Filter trigger -->
     <div class="flex flex-row justify-between items-center gap-2">
       <h2 class="text-xl md:text-3xl font-bold">
         Каталог товаров
       </h2>
-      <CatalogHeader v-model:sort-by="localSortBy" />
+      <div class="flex items-center gap-2">
+        <!-- Mobile filter button -->
+        <Button
+          variant="outline"
+          size="sm"
+          class="lg:hidden relative"
+          @click="fs.mobileFiltersOpen.value = true"
+        >
+          <SlidersHorizontal class="w-4 h-4" />
+          <span class="sr-only">Фильтры</span>
+          <span
+            v-if="fs.activeFiltersCount.value > 0"
+            class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center"
+          >
+            {{ fs.activeFiltersCount.value }}
+          </span>
+        </Button>
+        <CatalogHeader v-model:sort-by="fs.sortBy.value" />
+      </div>
     </div>
 
-    <main>
-      <ProductGridSkeleton v-if="isLoading" />
+    <!-- Sidebar + Products grid -->
+    <div class="flex gap-6">
+      <!-- Desktop Sidebar -->
+      <aside class="hidden lg:block w-64 shrink-0">
+        <BrandFilterSidebar :state="fs" />
+      </aside>
 
-      <ProductGrid v-else-if="products.length > 0" :products="products" />
+      <!-- Products -->
+      <main class="flex-1 min-w-0">
+        <ProductGridSkeleton v-if="fs.isLoading.value" />
 
-      <Card v-else class="border-2 border-dashed">
-        <CardContent class="flex flex-col items-center justify-center py-10 md:py-16 text-center px-4">
-          <div class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-muted flex items-center justify-center mb-3 md:mb-4">
-            <Package class="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
-          </div>
-          <h3 class="text-lg md:text-xl font-semibold mb-2">
-            Товаров пока нет
-          </h3>
-          <p class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm">
-            К сожалению, товары бренда {{ brand.name }} временно отсутствуют в продаже.
-          </p>
-          <NuxtLink to="/catalog/all">
-            <Button variant="outline">
-              <ArrowLeft class="w-4 h-4 mr-2" />
-              Вернуться в каталог
-            </Button>
-          </NuxtLink>
-        </CardContent>
-      </Card>
-    </main>
+        <ProductGrid v-else-if="fs.products.value.length > 0" :products="fs.products.value" />
+
+        <Card v-else class="border-2 border-dashed">
+          <CardContent class="flex flex-col items-center justify-center py-10 md:py-16 text-center px-4">
+            <div class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-muted flex items-center justify-center mb-3 md:mb-4">
+              <Package class="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
+            </div>
+            <h3 class="text-lg md:text-xl font-semibold mb-2">
+              Товаров пока нет
+            </h3>
+            <p class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm">
+              К сожалению, товары бренда {{ brand.name }} временно отсутствуют в продаже.
+            </p>
+            <NuxtLink to="/catalog/all">
+              <Button variant="outline">
+                <ArrowLeft class="w-4 h-4 mr-2" />
+                Вернуться в каталог
+              </Button>
+            </NuxtLink>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+
+    <!-- Mobile filter drawer -->
+    <BrandFilterMobile :state="fs" />
 
     <!-- SEO текст -->
     <div v-if="brand.seo_text" class="mt-6 md:mt-12 border-t pt-6 md:pt-10">

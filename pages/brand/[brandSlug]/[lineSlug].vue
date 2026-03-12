@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { Brand, IBreadcrumbItem, ProductImageRow, ProductLine, ProductWithGallery, SimpleBrand } from '@/types'
-import { ArrowLeft, ChevronDown, Package, ShieldCheck, Sparkles } from 'lucide-vue-next'
+import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
+import { ArrowLeft, ChevronDown, Package, ShieldCheck, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
+import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -13,10 +14,6 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 const brandSlug = route.params.brandSlug as string
 const lineSlug = route.params.lineSlug as string
 
-// -- Локальное состояние страницы --
-const products = ref<ProductWithGallery[]>([])
-const isLoading = ref(true)
-const sortBy = ref<'newest' | 'price_asc' | 'price_desc' | 'popularity'>('newest')
 const isSeoExpanded = ref(false)
 
 // 1. Загрузка бренда
@@ -61,70 +58,20 @@ const { data: productLine, pending: linePending } = await useAsyncData(
   { watch: [brand] },
 )
 
-// 3. Загружаем товары этой линейки
-async function loadProducts() {
-  if (!productLine.value) {
-    return
-  }
+// 3. Smart Sidebar: composable для фильтрации (context: 'line')
+const brandId = computed(() => brand.value?.id)
+const productLineId = computed(() => productLine.value?.id)
+const filterState = useBrandPageFilters({
+  brandId,
+  productLineId,
+  context: 'line',
+})
 
-  isLoading.value = true
-  products.value = []
-
-  try {
-    // Строим запрос с сортировкой
-    let query = supabase
-      .from('products')
-      .select(`
-        *,
-        product_images(id, image_url, blur_placeholder, display_order, alt_text),
-        brands(id, name, slug),
-        categories(name, slug)
-      `)
-      .eq('product_line_id', productLine.value.id)
-      .eq('is_active', true)
-
-    // Применяем сортировку
-    switch (sortBy.value) {
-      case 'newest':
-        query = query.order('created_at', { ascending: false })
-        break
-      case 'price_asc':
-        query = query.order('price', { ascending: true })
-        break
-      case 'price_desc':
-        query = query.order('price', { ascending: false })
-        break
-      case 'popularity':
-        query = query.order('sales_count', { ascending: false })
-        break
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      throw error
-    }
-
-    products.value = (data || []).map(product => ({
-      ...product,
-      product_images: Array.isArray(product.product_images)
-        ? (product.product_images as ProductImageRow[]).sort((a, b) => a.display_order - b.display_order)
-        : [],
-      brands: product.brands as SimpleBrand | null,
-    })) as unknown as ProductWithGallery[]
-  }
-  catch (error) {
-    console.error('Error loading products:', error)
-  }
-  finally {
-    isLoading.value = false
-  }
-}
-
-// Загружаем товары при монтировании и при изменении сортировки
+// Загружаем товары при монтировании
 watchEffect(() => {
-  if (productLine.value) {
-    loadProducts()
+  if (productLine.value && brand.value) {
+    filterState.loadProducts()
+    filterState.loadFilterData()
   }
 })
 
@@ -327,16 +274,16 @@ useHead({
             ...(metaKeywords.value && {
               keywords: metaKeywords.value,
             }),
-            ...(products.value.length > 0 && {
-              numberOfItems: products.value.length,
+            ...(filterState.products.value.length > 0 && {
+              numberOfItems: filterState.products.value.length,
             }),
-            ...(products.value.length > 0 && {
+            ...(filterState.products.value.length > 0 && {
               offers: {
                 '@type': 'AggregateOffer',
-                'lowPrice': Math.min(...products.value.map(p => Number(p.price))),
-                'highPrice': Math.max(...products.value.map(p => Number(p.price))),
+                'lowPrice': Math.min(...filterState.products.value.map(p => Number(p.price))),
+                'highPrice': Math.max(...filterState.products.value.map(p => Number(p.price))),
                 'priceCurrency': 'KZT',
-                'offerCount': products.value.length,
+                'offerCount': filterState.products.value.length,
               },
             }),
             'isPartOf': {
@@ -349,8 +296,8 @@ useHead({
             },
             'mainEntity': {
               '@type': 'ItemList',
-              'numberOfItems': products.value.length,
-              'itemListElement': products.value.slice(0, 10).map((product, index) => ({
+              'numberOfItems': filterState.products.value.length,
+              'itemListElement': filterState.products.value.slice(0, 10).map((product, index) => ({
                 '@type': 'ListItem',
                 'position': index + 1,
                 'item': {
@@ -527,7 +474,7 @@ useRobotsRule({
               <div class="flex flex-wrap gap-2 justify-center md:justify-start">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium">
                   <Package class="w-3.5 h-3.5" />
-                  {{ products.length }} {{ products.length === 1 ? 'товар' : products.length < 5 ? 'товара' : 'товаров' }}
+                  {{ filterState.products.value.length }} {{ filterState.products.value.length === 1 ? 'товар' : filterState.products.value.length < 5 ? 'товара' : 'товаров' }}
                 </span>
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium">
                   <ShieldCheck class="w-3.5 h-3.5" />
@@ -539,44 +486,69 @@ useRobotsRule({
         </div>
       </div>
 
-      <!-- Фильтры и сортировка -->
+      <!-- Catalog header + Filter trigger -->
       <div class="flex flex-row justify-between items-center gap-2">
         <h2 class="text-xl md:text-3xl font-bold">
           Товары {{ productLine.name }}
         </h2>
-
-        <CatalogHeader v-model:sort-by="sortBy" />
+        <div class="flex items-center gap-2">
+          <!-- Mobile filter button -->
+          <Button
+            variant="outline"
+            size="sm"
+            class="lg:hidden relative"
+            @click="filterState.mobileFiltersOpen.value = true"
+          >
+            <SlidersHorizontal class="w-4 h-4" />
+            <span class="sr-only">Фильтры</span>
+            <span
+              v-if="filterState.activeFiltersCount.value > 0"
+              class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center"
+            >
+              {{ filterState.activeFiltersCount.value }}
+            </span>
+          </Button>
+          <CatalogHeader v-model:sort-by="filterState.sortBy.value" />
+        </div>
       </div>
 
-      <!-- Сетка с товарами -->
-      <main>
-        <!-- Skeleton загрузки товаров -->
-        <ProductGridSkeleton v-if="isLoading" />
+      <!-- Sidebar + Products grid -->
+      <div class="flex gap-6">
+        <!-- Desktop Sidebar -->
+        <aside class="hidden lg:block w-64 shrink-0">
+          <BrandFilterSidebar :state="filterState" />
+        </aside>
 
-        <!-- Товары -->
-        <ProductGrid v-else-if="products.length > 0" :products="products" />
+        <!-- Products -->
+        <main class="flex-1 min-w-0">
+          <ProductGridSkeleton v-if="filterState.isLoading.value" />
 
-        <!-- Пустое состояние -->
-        <Card v-else class="border-2 border-dashed">
-          <CardContent class="flex flex-col items-center justify-center py-10 md:py-16 text-center px-4">
-            <div class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-muted flex items-center justify-center mb-3 md:mb-4">
-              <Sparkles class="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
-            </div>
-            <h3 class="text-lg md:text-xl font-semibold mb-2">
-              Товаров пока нет
-            </h3>
-            <p class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm">
-              К сожалению, товары линейки {{ productLine.name }} временно отсутствуют в продаже.
-            </p>
-            <NuxtLink :to="`/brand/${brand.slug}`">
-              <Button variant="outline">
-                <ArrowLeft class="w-4 h-4 mr-2" />
-                Все товары {{ brand.name }}
-              </Button>
-            </NuxtLink>
-          </CardContent>
-        </Card>
-      </main>
+          <ProductGrid v-else-if="filterState.products.value.length > 0" :products="filterState.products.value" />
+
+          <Card v-else class="border-2 border-dashed">
+            <CardContent class="flex flex-col items-center justify-center py-10 md:py-16 text-center px-4">
+              <div class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-muted flex items-center justify-center mb-3 md:mb-4">
+                <Sparkles class="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
+              </div>
+              <h3 class="text-lg md:text-xl font-semibold mb-2">
+                Товаров пока нет
+              </h3>
+              <p class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm">
+                К сожалению, товары линейки {{ productLine.name }} временно отсутствуют в продаже.
+              </p>
+              <NuxtLink :to="`/brand/${brand.slug}`">
+                <Button variant="outline">
+                  <ArrowLeft class="w-4 h-4 mr-2" />
+                  Все товары {{ brand.name }}
+                </Button>
+              </NuxtLink>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+
+      <!-- Mobile filter drawer -->
+      <BrandFilterMobile :state="filterState" />
 
       <!-- Описание линейки (внизу страницы, разворачивается) -->
       <div v-if="productLine.description || productLine.seo_description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">

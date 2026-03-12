@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { BrandPageLayout, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
+import type { BrandPageLayout, IBreadcrumbItem, ProductLine } from '@/types'
 import { ArrowLeft, Package } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -12,11 +13,6 @@ const productsStore = useProductsStore()
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 const containerClass = carouselContainerVariants({ contained: 'always' })
-
-// -- Локальное состояние страницы --
-const products = ref<ProductWithGallery[]>([])
-const isLoading = ref(true)
-const sortBy = ref<'newest' | 'price_asc' | 'price_desc' | 'popularity'>('newest')
 
 // 1. Умная загрузка информации о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(
@@ -33,24 +29,6 @@ const { data: brand, pending: brandPending } = await useAsyncData(
     return foundBrand || null
   },
 )
-
-// 2. Загружаем товары, принадлежащие этому бренду
-async function loadProducts() {
-  if (!brand.value)
-    return
-
-  isLoading.value = true
-  products.value = []
-
-  const result = await productsStore.fetchProducts({
-    categorySlug: 'all',
-    brandIds: [brand.value.id],
-    sortBy: sortBy.value,
-  })
-
-  products.value = result.products
-  isLoading.value = false
-}
 
 // Загружаем линейки бренда
 const brandProductLines = ref<ProductLine[]>([])
@@ -98,12 +76,21 @@ async function loadAggregateRating() {
   }
 }
 
-// Загружаем данные при монтировании и при изменении сортировки
+// Smart Sidebar: composable для фильтрации
+const brandId = computed(() => brand.value?.id)
+const filterState = useBrandPageFilters({
+  brandId,
+  context: 'brand',
+  brandProductLines,
+})
+
+// Загружаем данные при монтировании
 watchEffect(() => {
   if (brand.value) {
-    loadProducts()
     loadProductLines()
     loadAggregateRating()
+    filterState.loadProducts()
+    filterState.loadFilterData()
   }
 })
 
@@ -300,16 +287,16 @@ useHead({
               'name': siteName,
               'url': siteUrl,
             },
-            ...(products.value.length > 0 && {
-              numberOfItems: products.value.length,
+            ...(filterState.products.value.length > 0 && {
+              numberOfItems: filterState.products.value.length,
             }),
-            ...(products.value.length > 0 && {
+            ...(filterState.products.value.length > 0 && {
               offers: {
                 '@type': 'AggregateOffer',
-                'lowPrice': Math.min(...products.value.map(p => Number(p.price))),
-                'highPrice': Math.max(...products.value.map(p => Number(p.price))),
+                'lowPrice': Math.min(...filterState.products.value.map(p => Number(p.price))),
+                'highPrice': Math.max(...filterState.products.value.map(p => Number(p.price))),
                 'priceCurrency': 'KZT',
-                'offerCount': products.value.length,
+                'offerCount': filterState.products.value.length,
               },
             }),
             ...(aggregateRating.value && aggregateRating.value.total_reviews > 0 && {
@@ -327,12 +314,12 @@ useHead({
     // ItemList Schema
     {
       type: 'application/ld+json',
-      innerHTML: () => brand.value && products.value.length > 0
+      innerHTML: () => brand.value && filterState.products.value.length > 0
         ? JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'ItemList',
-            'numberOfItems': products.value.length,
-            'itemListElement': products.value.slice(0, 10).map((product, index) => ({
+            'numberOfItems': filterState.products.value.length,
+            'itemListElement': filterState.products.value.slice(0, 10).map((product, index) => ({
               '@type': 'ListItem',
               'position': index + 1,
               'item': {
@@ -421,13 +408,10 @@ useRobotsRule({
     <div v-else-if="isCustomPage" :class="`${containerClass} py-4 md:py-8`">
       <BrandCustomTemplate
         :brand="brand"
-        :products="products"
         :product-lines="brandProductLines"
         :featured-product-lines="featuredProductLines"
-        :is-loading="isLoading"
-        :sort-by="sortBy"
         :breadcrumbs="breadcrumbs"
-        @update:sort-by="sortBy = $event"
+        :filter-state="filterState"
       />
     </div>
 
@@ -435,12 +419,9 @@ useRobotsRule({
     <div v-else :class="`${containerClass} py-4 md:py-8`">
       <BrandStandardTemplate
         :brand="brand"
-        :products="products"
         :product-lines="brandProductLines"
-        :is-loading="isLoading"
-        :sort-by="sortBy"
         :breadcrumbs="breadcrumbs"
-        @update:sort-by="sortBy = $event"
+        :filter-state="filterState"
       />
     </div>
   </div>
