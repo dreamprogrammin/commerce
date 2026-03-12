@@ -6,6 +6,7 @@ import { BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 const props = defineProps<{
   lines: ProductLine[]
   brandId: string
+  brandSlug: string
   modelValue: boolean
 }>()
 
@@ -71,7 +72,7 @@ watch(isOpen, () => {
             <NuxtLink
               v-for="line in filteredLines"
               :key="line.id"
-              :to="`/catalog/all?brands=${brandId}&lines=${line.id}`"
+              :to="`/brand/${brandSlug}/${line.slug}`"
               class="group relative aspect-[3/2] rounded-lg overflow-hidden border border-border/60 hover:border-primary/40 hover:shadow-md transition-all duration-200"
               @click="handleLineClick"
             >

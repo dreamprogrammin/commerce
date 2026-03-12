@@ -233,6 +233,7 @@ function getLineLink(lineSlug: string): string {
     v-model="isDrawerOpen"
     :lines="allLines"
     :brand-id="brandId"
+    :brand-slug="brandSlug"
   />
 </template>
 
