@@ -28,6 +28,7 @@ import {
   getOptimizationInfo,
   optimizeImageBeforeUpload,
 } from '@/utils/imageOptimizer'
+import { calculateBonusPoints } from '@/utils/bonusCalculator'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
 import ProductLineForm from '../product-lines/ProductLineForm.vue'
@@ -336,9 +337,7 @@ watch(
   [() => formData.value.price, () => formData.value.discount_percentage, selectedBonusPercent],
   ([price, discount, percent]) => {
     if (formData.value && typeof price === 'number' && typeof percent === 'number') {
-      const discountPct = typeof discount === 'number' && discount > 0 ? discount : 0
-      const sellingPrice = discountPct > 0 ? Math.round(price * (1 - discountPct / 100)) : price
-      formData.value.bonus_points_award = Math.round(sellingPrice * (percent / 100))
+      formData.value.bonus_points_award = calculateBonusPoints(price, discount || 0, percent)
     }
   },
 )
