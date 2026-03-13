@@ -2,9 +2,9 @@
 import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
 import { ArrowLeft, ChevronDown, Package, ShieldCheck, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
-import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -67,11 +67,34 @@ const filterState = useBrandPageFilters({
   context: 'line',
 })
 
+// Загружаем статистику линейки (отзывы на товары этой линейки)
+const lineStats = ref<{ average_rating: number, total_reviews_count: number } | null>(null)
+
+async function loadLineStats() {
+  if (!brand.value)
+    return
+  try {
+    const { data, error } = await supabase.rpc('get_brand_stats', {
+      p_brand_id: brand.value.id,
+    })
+    if (!error && data) {
+      const stats = data as { average_rating: number, total_reviews_count: number }
+      if (stats.total_reviews_count > 0) {
+        lineStats.value = stats
+      }
+    }
+  }
+  catch {
+    // Функция может не существовать до миграции
+  }
+}
+
 // Загружаем товары при монтировании
 watchEffect(() => {
   if (productLine.value && brand.value) {
     filterState.loadProducts()
     filterState.loadFilterData()
+    loadLineStats()
   }
 })
 
@@ -253,6 +276,16 @@ useHead({
               'url': `${siteUrl}/brand/${brand.value.slug}`,
               ...(brandLogoUrl.value && { logo: brandLogoUrl.value }),
             },
+            // Агрегированный рейтинг
+            ...(lineStats.value && lineStats.value.total_reviews_count > 0 && {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                'ratingValue': lineStats.value.average_rating,
+                'reviewCount': lineStats.value.total_reviews_count,
+                'bestRating': 5,
+                'worstRating': 1,
+              },
+            }),
             // Ключевые слова
             ...(productLine.value.seo_keywords?.length && {
               keywords: productLine.value.seo_keywords.join(', '),
@@ -549,6 +582,14 @@ useRobotsRule({
 
       <!-- Mobile filter drawer -->
       <BrandFilterMobile :state="filterState" />
+
+      <!-- Отзывы о бренде -->
+      <div class="border-t pt-4 md:pt-8">
+        <BrandReviewsList
+          :brand-id="brand.id"
+          :brand-name="brand.name"
+        />
+      </div>
 
       <!-- Описание линейки (внизу страницы, разворачивается) -->
       <div v-if="productLine.description || productLine.seo_description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">

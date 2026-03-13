@@ -2,10 +2,10 @@
 import type { BrandPageLayout, IBreadcrumbItem, ProductLine } from '@/types'
 import { ArrowLeft, Package } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -53,21 +53,21 @@ async function loadProductLines() {
   }
 }
 
-// Загружаем агрегированный рейтинг бренда
-const aggregateRating = ref<{ avg_rating: number, total_reviews: number } | null>(null)
+// Загружаем агрегированную статистику бренда (рейтинг + кол-во отзывов)
+const brandStats = ref<{ average_rating: number, total_reviews_count: number } | null>(null)
 
-async function loadAggregateRating() {
+async function loadBrandStats() {
   if (!brand.value)
     return
 
   try {
-    const { data, error } = await supabase.rpc('get_brand_aggregate_rating', {
+    const { data, error } = await supabase.rpc('get_brand_stats', {
       p_brand_id: brand.value.id,
     })
     if (!error && data) {
-      const rating = data as { avg_rating: number, total_reviews: number }
-      if (rating.total_reviews > 0) {
-        aggregateRating.value = rating
+      const stats = data as { average_rating: number, total_reviews_count: number }
+      if (stats.total_reviews_count > 0) {
+        brandStats.value = stats
       }
     }
   }
@@ -88,7 +88,7 @@ const filterState = useBrandPageFilters({
 watchEffect(() => {
   if (brand.value) {
     loadProductLines()
-    loadAggregateRating()
+    loadBrandStats()
     filterState.loadProducts()
     filterState.loadFilterData()
   }
@@ -254,6 +254,15 @@ useHead({
             'url': brandUrl.value,
             'logo': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
             'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+            ...(brandStats.value && brandStats.value.total_reviews_count > 0 && {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                'ratingValue': brandStats.value.average_rating,
+                'reviewCount': brandStats.value.total_reviews_count,
+                'bestRating': 5,
+                'worstRating': 1,
+              },
+            }),
             ...(brand.value.seo_keywords?.length && {
               keywords: brand.value.seo_keywords.join(', '),
             }),
@@ -299,11 +308,11 @@ useHead({
                 'offerCount': filterState.products.value.length,
               },
             }),
-            ...(aggregateRating.value && aggregateRating.value.total_reviews > 0 && {
+            ...(brandStats.value && brandStats.value.total_reviews_count > 0 && {
               aggregateRating: {
                 '@type': 'AggregateRating',
-                'ratingValue': aggregateRating.value.avg_rating,
-                'reviewCount': aggregateRating.value.total_reviews,
+                'ratingValue': brandStats.value.average_rating,
+                'reviewCount': brandStats.value.total_reviews_count,
                 'bestRating': 5,
                 'worstRating': 1,
               },

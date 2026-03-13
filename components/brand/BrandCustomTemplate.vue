@@ -198,6 +198,14 @@ const otherProductLines = computed(() => {
     <!-- Mobile filter drawer -->
     <BrandFilterMobile :state="fs" />
 
+    <!-- Отзывы о бренде -->
+    <div class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
+      <BrandReviewsList
+        :brand-id="brand.id"
+        :brand-name="brand.name"
+      />
+    </div>
+
     <!-- SEO текст -->
     <div v-if="brand.seo_text" class="mt-6 md:mt-12 border-t pt-6 md:pt-10">
       <div class="brand-description text-foreground">

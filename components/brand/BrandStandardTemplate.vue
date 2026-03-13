@@ -172,6 +172,14 @@ function toggleSeoExpanded() {
     <!-- Mobile filter drawer -->
     <BrandFilterMobile :state="fs" />
 
+    <!-- Отзывы о бренде -->
+    <div class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
+      <BrandReviewsList
+        :brand-id="brand.id"
+        :brand-name="brand.name"
+      />
+    </div>
+
     <!-- Описание бренда -->
     <div v-if="brand.description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
       <div class="space-y-3 md:space-y-4">
