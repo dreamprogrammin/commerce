@@ -1,4 +1,5 @@
 import type { Country, IProductFilters, Material, ProductLine, ProductWithGallery, SortByType } from '@/types'
+import { useQuery } from '@tanstack/vue-query'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 export type BrandPageContext = 'brand' | 'line'
@@ -37,7 +38,8 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
   const hideProductLines = computed(() => options.context === 'line')
 
   const availableProductLines = computed<ProductLine[]>(() => {
-    if (options.context === 'line') return []
+    if (options.context === 'line')
+      return []
     return options.brandProductLines?.value || []
   })
 
@@ -74,18 +76,46 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
     return filters
   })
 
-  // ── Load products ──
-  async function loadProducts() {
-    if (!options.brandId.value) return
+  // ── TanStack Query для кеширования товаров ──
+  const queryKey = computed(() => {
+    const f = catalogFilters.value
+    return [
+      'brand-page-products',
+      options.context,
+      f.brandIds?.join(',') || '',
+      f.productLineIds?.join(',') || '',
+      f.sortBy,
+      f.materialIds?.join(',') || '',
+      f.countryIds?.join(',') || '',
+      `${f.priceMin ?? 0}-${f.priceMax ?? 0}`,
+    ]
+  })
 
-    isLoading.value = true
-    try {
+  const queryEnabled = computed(() => !!options.brandId.value)
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
       const result = await productsStore.fetchProducts(catalogFilters.value, 1, 200)
-      products.value = result.products
+      return result.products
+    },
+    enabled: queryEnabled,
+    staleTime: 2 * 60 * 1000, // 2 минуты — показываем кеш, обновляем в фоне
+    gcTime: 10 * 60 * 1000, // 10 минут в памяти
+    retry: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchOnReconnect: false,
+  })
+
+  // Синхронизируем query → products
+  watch(() => query.data.value, (data) => {
+    if (data) {
+      products.value = data
 
       // Calculate price range from first load
-      if (!priceRangeInitialized && products.value.length > 0) {
-        const prices = products.value.map(p => Number(p.price)).filter(p => p > 0)
+      if (!priceRangeInitialized && data.length > 0) {
+        const prices = data.map(p => Number(p.price)).filter(p => p > 0)
         if (prices.length > 0) {
           const min = Math.floor(Math.min(...prices) / 100) * 100
           const max = Math.ceil(Math.max(...prices) / 100) * 100
@@ -96,12 +126,16 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
         }
       }
     }
-    catch (error) {
-      console.error('Error loading products:', error)
-    }
-    finally {
-      isLoading.value = false
-    }
+  }, { immediate: true })
+
+  // Синхронизируем isLoading
+  watch(() => query.isLoading.value, (val) => {
+    isLoading.value = val
+  }, { immediate: true })
+
+  // Обратная совместимость — вызывается из страниц, но теперь query сам обновляется
+  function loadProducts() {
+    query.refetch()
   }
 
   // ── Load filter metadata ──
@@ -119,7 +153,8 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
   // ── Active filter count ──
   const activeFiltersCount = computed(() => {
     let count = 0
-    if (!hideProductLines.value) count += selectedProductLineIds.value.length
+    if (!hideProductLines.value)
+      count += selectedProductLineIds.value.length
     count += selectedMaterialIds.value.length
     count += selectedCountryIds.value.length
     if (
@@ -143,19 +178,22 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
   // ── Toggle helpers ──
   function toggleProductLine(id: string) {
     const idx = selectedProductLineIds.value.indexOf(id)
-    if (idx >= 0) selectedProductLineIds.value.splice(idx, 1)
+    if (idx >= 0)
+      selectedProductLineIds.value.splice(idx, 1)
     else selectedProductLineIds.value.push(id)
   }
 
   function toggleMaterial(id: string) {
     const idx = selectedMaterialIds.value.indexOf(id)
-    if (idx >= 0) selectedMaterialIds.value.splice(idx, 1)
+    if (idx >= 0)
+      selectedMaterialIds.value.splice(idx, 1)
     else selectedMaterialIds.value.push(id)
   }
 
   function toggleCountry(id: string) {
     const idx = selectedCountryIds.value.indexOf(id)
-    if (idx >= 0) selectedCountryIds.value.splice(idx, 1)
+    if (idx >= 0)
+      selectedCountryIds.value.splice(idx, 1)
     else selectedCountryIds.value.push(id)
   }
 
@@ -165,19 +203,7 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
     }
   }
 
-  // ── Watch filters → reload products (debounced) ──
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-  watch(
-    [selectedProductLineIds, selectedMaterialIds, selectedCountryIds, priceFilter, sortBy],
-    () => {
-      if (debounceTimer) clearTimeout(debounceTimer)
-      debounceTimer = setTimeout(() => {
-        loadProducts()
-      }, 300)
-    },
-    { deep: true },
-  )
+  // TanStack Query автоматически refetch при изменении queryKey (фильтры/сортировка)
 
   return {
     products,
