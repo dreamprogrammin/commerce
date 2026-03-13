@@ -320,24 +320,29 @@ useHead({
           })
         : '{}',
     },
-    // ItemList Schema
+    // ItemList Schema — все товары бренда в порядке текущей сортировки
     {
       type: 'application/ld+json',
       innerHTML: () => brand.value && filterState.products.value.length > 0
         ? JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'ItemList',
+            'name': `Товары бренда ${brand.value.name}`,
             'numberOfItems': filterState.products.value.length,
-            'itemListElement': filterState.products.value.slice(0, 10).map((product, index) => ({
+            'itemListElement': filterState.products.value.map((product, index) => ({
               '@type': 'ListItem',
               'position': index + 1,
               'item': {
                 '@type': 'Product',
                 'name': product.name,
                 'url': `${siteUrl}/catalog/products/${product.slug}`,
+                ...(product.description && {
+                  description: product.description.substring(0, 200),
+                }),
                 ...(product.product_images?.[0]?.image_url && {
                   image: getImageUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url),
                 }),
+                'sku': product.slug,
                 'brand': {
                   '@type': 'Brand',
                   '@id': `${brandUrl.value}#brand`,
@@ -345,12 +350,22 @@ useHead({
                 },
                 'offers': {
                   '@type': 'Offer',
-                  'price': product.price,
+                  'price': product.final_price ?? product.price,
                   'priceCurrency': 'KZT',
                   'availability': product.stock_quantity > 0
                     ? 'https://schema.org/InStock'
                     : 'https://schema.org/OutOfStock',
+                  'url': `${siteUrl}/catalog/products/${product.slug}`,
                 },
+                ...(product.avg_rating && product.review_count && product.review_count > 0 && {
+                  aggregateRating: {
+                    '@type': 'AggregateRating',
+                    'ratingValue': product.avg_rating,
+                    'reviewCount': product.review_count,
+                    'bestRating': 5,
+                    'worstRating': 1,
+                  },
+                }),
               },
             })),
           })
