@@ -30,6 +30,9 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
+// Фиксированная дата для priceValidUntil (избегаем гидратации с new Date())
+const priceValidUntil = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
+
 // 🆕 Отмена запросов при размонтировании
 const abortController = ref<AbortController | null>(null)
 
@@ -520,12 +523,27 @@ async function loadFilterData(slug: string) {
 
     currentPage.value = 1
     accumulatedProducts.value = []
+
+    // Возвращаем данные для гидратации useAsyncData
+    return {
+      brands: availableBrands.value,
+      productLines: availableProductLines.value,
+      filters: availableFilters.value as FilterAttribute[],
+      materials: availableMaterials.value,
+      countries: availableCountries.value,
+      priceRange: priceRange.value,
+      pieceCountRange: pieceCountRange.value,
+      numericRanges: numericAttributeRanges.value,
+      activeFilters: activeFilters.value,
+      categoryBrandSeo: categoryBrandSeo.value,
+    }
   }
   catch (error: unknown) {
     // Игнорируем ошибки отмены
     if (error instanceof Error && error.name !== 'AbortError') {
       console.error('Error loading filters:', error)
     }
+    return null
   }
   finally {
     isLoadingFilters.value = false
@@ -879,7 +897,7 @@ await useAsyncData(
   { watch: [currentCategorySlug] },
 )
 
-await useAsyncData(
+const { data: _filterPayload } = await useAsyncData(
   `catalog-filters-${currentCategorySlug.value}`,
   () => loadFilterData(currentCategorySlug.value),
   {
@@ -887,6 +905,22 @@ await useAsyncData(
     server: true,
   },
 )
+
+// Восстанавливаем refs из hydrated payload на клиенте
+// (loadFilterData обновляет refs как side-effect, но useAsyncData не перезапускает handler при гидратации)
+if (import.meta.client && _filterPayload.value) {
+  availableBrands.value = _filterPayload.value.brands
+  availableProductLines.value = _filterPayload.value.productLines
+  availableFilters.value = _filterPayload.value.filters
+  availableMaterials.value = _filterPayload.value.materials
+  availableCountries.value = _filterPayload.value.countries
+  priceRange.value = _filterPayload.value.priceRange
+  pieceCountRange.value = _filterPayload.value.pieceCountRange
+  numericAttributeRanges.value = _filterPayload.value.numericRanges
+  activeFilters.value = _filterPayload.value.activeFilters
+  categoryBrandSeo.value = _filterPayload.value.categoryBrandSeo
+  isLoadingFilters.value = false
+}
 
 // 🆕 Загружаем FAQ вопросы для Schema.org
 const { data: categoryQuestions } = await useAsyncData(
@@ -1158,7 +1192,7 @@ useHead(() => {
                 ? 'https://schema.org/InStock'
                 : 'https://schema.org/OutOfStock',
               'url': `https://uhti.kz/catalog/products/${product.slug}`,
-              'priceValidUntil': new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+              'priceValidUntil': priceValidUntil,
               'seller': {
                 '@type': 'Organization',
                 'name': 'Ухтышка',
@@ -1294,10 +1328,12 @@ useHead(() => {
 
         <!-- Компактная статистика -->
         <div class="flex items-center gap-3 text-xs text-muted-foreground">
-          <div class="flex items-center gap-1.5">
-            <Icon name="lucide:package" class="w-3.5 h-3.5 text-blue-500" />
-            <span>{{ displayedProducts.length }}</span>
-          </div>
+          <ClientOnly>
+            <div class="flex items-center gap-1.5">
+              <Icon name="lucide:package" class="w-3.5 h-3.5 text-blue-500" />
+              <span>{{ displayedProducts.length }}</span>
+            </div>
+          </ClientOnly>
           <ClientOnly>
             <div v-if="availableBrands.length > 0" class="flex items-center gap-1.5">
               <Icon name="lucide:award" class="w-3.5 h-3.5 text-purple-500" />
@@ -1357,10 +1393,12 @@ useHead(() => {
 
           <!-- Статистика категории -->
           <div class="flex flex-wrap gap-4 pt-2">
-            <div class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Icon name="lucide:package" class="w-4 h-4 text-blue-500" />
-              <span>{{ displayedProducts.length }} товаров</span>
-            </div>
+            <ClientOnly>
+              <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                <Icon name="lucide:package" class="w-4 h-4 text-blue-500" />
+                <span>{{ displayedProducts.length }} товаров</span>
+              </div>
+            </ClientOnly>
             <ClientOnly>
               <div v-if="availableBrands.length > 0" class="flex items-center gap-2 text-sm text-muted-foreground">
                 <Icon name="lucide:award" class="w-4 h-4 text-purple-500" />

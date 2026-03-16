@@ -27,6 +27,9 @@ const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 
+// Фиксированная дата для priceValidUntil (избегаем гидратации с Date.now())
+const priceValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
 const slug = computed(() => route.params.slug as string)
 
 // Selected accessories for adding to cart together with main product
@@ -788,7 +791,7 @@ useHead(() => ({
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
           'url': canonicalUrl.value,
-          'priceValidUntil': new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          'priceValidUntil': priceValidUntil,
           'itemCondition': 'https://schema.org/NewCondition',
           'seller': {
             '@type': 'Organization',
