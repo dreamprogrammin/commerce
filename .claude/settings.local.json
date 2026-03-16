@@ -106,7 +106,8 @@
       "Bash(pnpm exec:*)",
       "Bash(git pull:*)",
       "Bash(head:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(npx nuxi:*)"
     ]
   }
 }
