@@ -63,12 +63,10 @@ async function fetchRestockList() {
 
 onMounted(fetchRestockList)
 
-// Общее кол-во товаров к закупке
 const totalProducts = computed(() =>
   groups.value.reduce((sum, g) => sum + (g.product_count || 0), 0),
 )
 
-// Сворачивание/разворачивание группы
 function toggleGroup(groupKey: string) {
   if (collapsedGroups.value.has(groupKey))
     collapsedGroups.value.delete(groupKey)
@@ -157,41 +155,27 @@ function formatPrice(value: number): string {
       >
         <!-- Заголовок поставщика -->
         <CardHeader
-          class="cursor-pointer hover:bg-muted/50 transition-colors"
+          class="cursor-pointer hover:bg-muted/50 transition-colors px-4 md:px-6"
           @click="toggleGroup(group.supplier_id || 'no-supplier')"
         >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-3 min-w-0">
               <div
                 class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                 :class="group.supplier_id ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'"
               >
                 <User class="w-5 h-5" />
               </div>
-              <div>
-                <CardTitle class="text-base">
+              <div class="min-w-0">
+                <CardTitle class="text-base truncate">
                   {{ group.supplier_name }}
                 </CardTitle>
-                <div class="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                  <span v-if="group.supplier_contact">
-                    {{ group.supplier_contact }}
-                  </span>
-                  <a
-                    v-if="group.supplier_phone"
-                    :href="`tel:${group.supplier_phone}`"
-                    class="inline-flex items-center gap-1 text-primary hover:underline"
-                    @click.stop
-                  >
-                    <Phone class="w-3 h-3" />
-                    {{ group.supplier_phone }}
-                  </a>
-                  <span v-if="group.supplier_address" class="hidden md:inline">
-                    {{ group.supplier_address }}
-                  </span>
-                </div>
+                <p v-if="group.supplier_contact" class="text-sm text-muted-foreground truncate">
+                  {{ group.supplier_contact }}
+                </p>
               </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-shrink-0">
               <Badge variant="outline">
                 {{ group.product_count }} шт
               </Badge>
@@ -205,14 +189,34 @@ function formatPrice(value: number): string {
               />
             </div>
           </div>
+
+          <!-- Телефон — большая кнопка на мобилке -->
+          <a
+            v-if="group.supplier_phone"
+            :href="`tel:${group.supplier_phone}`"
+            class="flex items-center justify-center gap-2 mt-3 py-2.5 px-4 rounded-lg border bg-primary/5 text-primary font-medium text-sm md:inline-flex md:w-auto md:mt-2 md:py-1.5 md:text-xs"
+            @click.stop
+          >
+            <Phone class="w-4 h-4" />
+            {{ group.supplier_phone }}
+          </a>
+
+          <!-- Адрес (десктоп) -->
+          <p
+            v-if="group.supplier_address"
+            class="text-xs text-muted-foreground mt-1 hidden md:block"
+          >
+            {{ group.supplier_address }}
+          </p>
         </CardHeader>
 
         <!-- Товары -->
         <CardContent
           v-if="!isCollapsed(group.supplier_id || 'no-supplier')"
-          class="pt-0"
+          class="pt-0 px-4 md:px-6"
         >
-          <div class="border rounded-lg overflow-hidden">
+          <!-- Десктоп: таблица -->
+          <div class="border rounded-lg overflow-hidden hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -221,10 +225,10 @@ function formatPrice(value: number): string {
                   <TableHead class="text-center w-24">
                     Остаток
                   </TableHead>
-                  <TableHead class="text-center w-28 hidden sm:table-cell">
+                  <TableHead class="text-center w-28">
                     Дозаказать
                   </TableHead>
-                  <TableHead class="text-right w-28 hidden md:table-cell">
+                  <TableHead class="text-right w-28">
                     Цена
                   </TableHead>
                 </TableRow>
@@ -234,7 +238,6 @@ function formatPrice(value: number): string {
                   v-for="product in group.products"
                   :key="product.id"
                 >
-                  <!-- Картинка -->
                   <TableCell>
                     <div class="w-10 h-10 rounded-md bg-muted overflow-hidden flex-shrink-0">
                       <img
@@ -248,8 +251,6 @@ function formatPrice(value: number): string {
                       </div>
                     </div>
                   </TableCell>
-
-                  <!-- Название -->
                   <TableCell>
                     <NuxtLink
                       :to="`/admin/products/${product.id}`"
@@ -259,12 +260,8 @@ function formatPrice(value: number): string {
                     </NuxtLink>
                     <div class="text-xs text-muted-foreground mt-0.5">
                       <span v-if="product.sku">SKU: {{ product.sku }}</span>
-                      <span v-if="product.sku && product.sales_count"> · </span>
-                      <span v-if="product.sales_count">Продано: {{ product.sales_count }}</span>
                     </div>
                   </TableCell>
-
-                  <!-- Остаток -->
                   <TableCell class="text-center">
                     <Badge
                       :variant="product.stock_quantity === 0 ? 'destructive' : 'outline'"
@@ -277,21 +274,67 @@ function formatPrice(value: number): string {
                       {{ product.stock_quantity }} шт
                     </Badge>
                   </TableCell>
-
-                  <!-- Дозаказать -->
-                  <TableCell class="text-center hidden sm:table-cell">
+                  <TableCell class="text-center">
                     <span class="font-semibold text-primary">
                       +{{ product.restock_quantity }} шт
                     </span>
                   </TableCell>
-
-                  <!-- Цена -->
-                  <TableCell class="text-right hidden md:table-cell text-muted-foreground">
+                  <TableCell class="text-right text-muted-foreground">
                     {{ formatPrice(product.price) }} ₸
                   </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
+          </div>
+
+          <!-- Мобайл: компактный список -->
+          <div class="md:hidden space-y-2">
+            <NuxtLink
+              v-for="product in group.products"
+              :key="product.id"
+              :to="`/admin/products/${product.id}`"
+              class="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+            >
+              <!-- Картинка -->
+              <div class="w-11 h-11 rounded-md bg-muted overflow-hidden flex-shrink-0">
+                <img
+                  v-if="getProductImage(product.image_url)"
+                  :src="getProductImage(product.image_url)"
+                  :alt="product.name"
+                  class="w-full h-full object-cover"
+                >
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <Package class="w-4 h-4 text-muted-foreground" />
+                </div>
+              </div>
+
+              <!-- Инфо -->
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">
+                  {{ product.name }}
+                </p>
+                <p class="text-xs text-muted-foreground">
+                  {{ formatPrice(product.price) }} ₸
+                </p>
+              </div>
+
+              <!-- Остаток + Дозаказать -->
+              <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                <Badge
+                  :variant="product.stock_quantity === 0 ? 'destructive' : 'outline'"
+                  class="font-mono text-[10px]"
+                >
+                  <AlertTriangle
+                    v-if="product.stock_quantity === 0"
+                    class="w-2.5 h-2.5 mr-0.5"
+                  />
+                  {{ product.stock_quantity }} шт
+                </Badge>
+                <span class="text-xs font-semibold text-primary">
+                  +{{ product.restock_quantity }}
+                </span>
+              </div>
+            </NuxtLink>
           </div>
         </CardContent>
       </Card>

@@ -130,119 +130,152 @@ async function handleDelete() {
       </CardContent>
     </Card>
 
-    <!-- Таблица поставщиков -->
-    <Card>
-      <CardContent class="p-0">
-        <!-- Skeleton -->
-        <div v-if="isLoading" class="p-6">
-          <div class="space-y-4">
-            <div v-for="i in 5" :key="i" class="flex items-center gap-4">
-              <div class="flex-1 space-y-2">
-                <Skeleton class="h-4 w-1/3" />
-                <Skeleton class="h-3 w-1/4" />
-              </div>
-              <Skeleton class="h-8 w-24" />
-            </div>
-          </div>
+    <!-- Загрузка -->
+    <div v-if="isLoading" class="space-y-4">
+      <div v-for="i in 5" :key="i" class="flex items-center gap-4">
+        <div class="flex-1 space-y-2">
+          <Skeleton class="h-4 w-1/3" />
+          <Skeleton class="h-3 w-1/4" />
         </div>
+        <Skeleton class="h-8 w-24" />
+      </div>
+    </div>
 
-        <!-- Таблица -->
-        <Table v-else>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Название</TableHead>
-              <TableHead class="hidden md:table-cell">
-                Контактное лицо
-              </TableHead>
-              <TableHead class="hidden md:table-cell">
-                Телефон
-              </TableHead>
-              <TableHead class="hidden lg:table-cell">
-                Адрес
-              </TableHead>
-              <TableHead class="text-right">
-                Действия
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <!-- Пустое состояние -->
-            <TableRow v-if="filteredSuppliers.length === 0">
-              <TableCell colspan="5" class="h-32 text-center">
-                <div class="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <Search class="w-8 h-8 opacity-50" />
-                  <p v-if="searchQuery">
-                    Поставщики не найдены по запросу "{{ searchQuery }}"
-                  </p>
-                  <p v-else>
-                    Поставщиков пока нет. Добавьте первого.
-                  </p>
-                </div>
-              </TableCell>
-            </TableRow>
+    <template v-else>
+      <!-- Пустое состояние -->
+      <Card v-if="filteredSuppliers.length === 0">
+        <CardContent class="py-16 text-center">
+          <div class="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Search class="w-8 h-8 opacity-50" />
+            <p v-if="searchQuery">
+              Поставщики не найдены по запросу "{{ searchQuery }}"
+            </p>
+            <p v-else>
+              Поставщиков пока нет. Добавьте первого.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
-            <!-- Строки -->
-            <TableRow v-for="supplier in filteredSuppliers" :key="supplier.id" class="group">
-              <TableCell>
-                <div class="font-medium">
+      <!-- Десктоп: таблица -->
+      <Card v-else class="hidden md:block">
+        <CardContent class="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Название</TableHead>
+                <TableHead>Контактное лицо</TableHead>
+                <TableHead>Телефон</TableHead>
+                <TableHead class="hidden lg:table-cell">
+                  Адрес
+                </TableHead>
+                <TableHead class="text-right">
+                  Действия
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="supplier in filteredSuppliers" :key="supplier.id" class="group">
+                <TableCell class="font-medium">
                   {{ supplier.name }}
-                </div>
-                <div class="text-xs text-muted-foreground md:hidden">
+                </TableCell>
+                <TableCell>
+                  {{ supplier.contact_person || '—' }}
+                </TableCell>
+                <TableCell>
+                  <a
+                    v-if="supplier.phone"
+                    :href="`tel:${supplier.phone}`"
+                    class="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <Phone class="w-3.5 h-3.5" />
+                    {{ supplier.phone }}
+                  </a>
+                  <span v-else class="text-muted-foreground">—</span>
+                </TableCell>
+                <TableCell class="hidden lg:table-cell text-muted-foreground text-sm">
+                  {{ supplier.address || '—' }}
+                </TableCell>
+                <TableCell class="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal class="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem @click="openEditDialog(supplier)">
+                        <Pencil class="w-4 h-4 mr-2" />
+                        Редактировать
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        class="text-destructive focus:text-destructive"
+                        @click="openDeleteDialog(supplier)"
+                      >
+                        <Trash2 class="w-4 h-4 mr-2" />
+                        Удалить
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <!-- Мобайл: карточки -->
+      <div v-if="filteredSuppliers.length > 0" class="md:hidden space-y-3">
+        <Card v-for="supplier in filteredSuppliers" :key="supplier.id">
+          <CardContent class="p-4">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="font-medium truncate">
+                  {{ supplier.name }}
+                </p>
+                <p v-if="supplier.contact_person" class="text-sm text-muted-foreground">
                   {{ supplier.contact_person }}
-                </div>
-              </TableCell>
-
-              <TableCell class="hidden md:table-cell">
-                {{ supplier.contact_person || '—' }}
-              </TableCell>
-
-              <TableCell class="hidden md:table-cell">
-                <a
-                  v-if="supplier.phone"
-                  :href="`tel:${supplier.phone}`"
-                  class="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  <Phone class="w-3.5 h-3.5" />
-                  {{ supplier.phone }}
-                </a>
-                <span v-else class="text-muted-foreground">—</span>
-              </TableCell>
-
-              <TableCell class="hidden lg:table-cell text-muted-foreground text-sm">
-                {{ supplier.address || '—' }}
-              </TableCell>
-
-              <TableCell class="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal class="w-4 h-4" />
-                      <span class="sr-only">Открыть меню</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Действия</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem @click="openEditDialog(supplier)">
-                      <Pencil class="w-4 h-4 mr-2" />
-                      Редактировать
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      class="text-destructive focus:text-destructive"
-                      @click="openDeleteDialog(supplier)"
-                    >
-                      <Trash2 class="w-4 h-4 mr-2" />
-                      Удалить
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                </p>
+                <p v-if="supplier.address" class="text-xs text-muted-foreground mt-0.5">
+                  {{ supplier.address }}
+                </p>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="sm" class="flex-shrink-0">
+                    <MoreHorizontal class="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @click="openEditDialog(supplier)">
+                    <Pencil class="w-4 h-4 mr-2" />
+                    Редактировать
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    class="text-destructive focus:text-destructive"
+                    @click="openDeleteDialog(supplier)"
+                  >
+                    <Trash2 class="w-4 h-4 mr-2" />
+                    Удалить
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <!-- Кнопка звонка -->
+            <a
+              v-if="supplier.phone"
+              :href="`tel:${supplier.phone}`"
+              class="flex items-center justify-center gap-2 mt-3 py-2.5 rounded-lg border bg-primary/5 text-primary font-medium text-sm w-full"
+            >
+              <Phone class="w-4 h-4" />
+              {{ supplier.phone }}
+            </a>
+          </CardContent>
+        </Card>
+      </div>
+    </template>
 
     <!-- Счётчик -->
     <div v-if="!isLoading" class="text-sm text-muted-foreground text-center">
