@@ -23,6 +23,7 @@ import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
+import { useAdminSuppliersStore } from '@/stores/adminStore/adminSuppliersStore'
 import {
   formatFileSize,
   getOptimizationInfo,
@@ -71,6 +72,8 @@ const categoriesStore = useAdminCategoriesStore()
 const productStore = useAdminProductsStore()
 const brandsStore = useAdminBrandsStore()
 const productLinesStore = useAdminProductLinesStore()
+const suppliersStore = useAdminSuppliersStore()
+const { suppliers } = storeToRefs(suppliersStore)
 const { getVariantUrl } = useSupabaseStorage()
 
 const { brands, countries, materials } = storeToRefs(productStore)
@@ -141,6 +144,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       sku: product.sku,
       brand_id: product.brand_id,
       product_line_id: product.product_line_id || null,
+      supplier_id: (product as any).supplier_id || null,
       origin_country_id: product.origin_country_id,
       discount_percentage: product.discount_percentage || 0,
       material_id: product.material_id,
@@ -152,6 +156,9 @@ function setupFormData(product: FullProduct | null | undefined) {
       seo_keywords: product.seo_keywords || null,
       // Количество деталей для конструкторов
       piece_count: product.piece_count || null,
+      // Закупки
+      min_stock_level: (product as any).min_stock_level ?? 2,
+      restock_quantity: (product as any).restock_quantity ?? 5,
     }
     // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
     existingImages.value = [...(product.product_images || [])].sort((a, b) => a.display_order - b.display_order)
@@ -185,6 +192,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       sku: null,
       brand_id: null,
       product_line_id: null,
+      supplier_id: null,
       origin_country_id: null,
       discount_percentage: 0,
       material_id: null,
@@ -196,6 +204,9 @@ function setupFormData(product: FullProduct | null | undefined) {
       seo_keywords: null,
       // Количество деталей для конструкторов
       piece_count: null,
+      // Закупки
+      min_stock_level: 2,
+      restock_quantity: 5,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -597,6 +608,9 @@ onMounted(() => {
   }
   if (productStore.materials.length === 0) {
     productStore.fetchAllMaterials()
+  }
+  if (suppliersStore.suppliers.length === 0) {
+    suppliersStore.fetchSuppliers()
   }
 })
 
@@ -1371,6 +1385,33 @@ const seoKeywordsString = computed({
             </Dialog>
           </div>
 
+          <!-- Поставщик -->
+          <div>
+            <Label>Поставщик</Label>
+            <Select v-model="formData.supplier_id">
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите поставщика" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="null">
+                  Не указан
+                </SelectItem>
+                <SelectItem
+                  v-for="s in suppliers"
+                  :key="s.id"
+                  :value="s.id"
+                >
+                  {{ s.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p class="text-xs text-muted-foreground mt-1">
+              <NuxtLink to="/admin/suppliers" target="_blank" class="text-primary hover:underline">
+                Управление поставщиками
+              </NuxtLink>
+            </p>
+          </div>
+
           <div>
             <Label>Страна происхождения</Label>
             <Select v-model="formData.origin_country_id">
@@ -1422,6 +1463,39 @@ const seoKeywordsString = computed({
               placeholder="0"
               min="0"
             />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <Label for="min_stock_level">
+                Мин. остаток
+              </Label>
+              <Input
+                id="min_stock_level"
+                v-model.number="formData.min_stock_level"
+                type="number"
+                placeholder="2"
+                min="0"
+              />
+              <p class="text-xs text-muted-foreground mt-1">
+                Ниже этого — в список закупок
+              </p>
+            </div>
+            <div>
+              <Label for="restock_quantity">
+                Дозаказать (шт)
+              </Label>
+              <Input
+                id="restock_quantity"
+                v-model.number="formData.restock_quantity"
+                type="number"
+                placeholder="5"
+                min="1"
+              />
+              <p class="text-xs text-muted-foreground mt-1">
+                Сколько заказывать
+              </p>
+            </div>
           </div>
 
           <!-- Поле "Количество деталей" только для категорий с атрибутом number_range (конструкторы) -->

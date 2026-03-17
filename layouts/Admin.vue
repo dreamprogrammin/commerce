@@ -118,6 +118,22 @@ onMounted(() => {
         </NuxtLink>
 
         <NuxtLink
+          to="/admin/suppliers"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          Поставщики
+        </NuxtLink>
+
+        <NuxtLink
+          to="/admin/restock"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          active-class="bg-muted text-primary"
+        >
+          К закупке
+        </NuxtLink>
+
+        <NuxtLink
           to="/admin/pos"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
           active-class="bg-muted text-primary"

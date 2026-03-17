@@ -124,6 +124,22 @@ export interface IStaticMainMenuItem {
   iconName?: string
 }
 
+// Поставщик (supplier)
+export interface Supplier {
+  id: string
+  name: string
+  contact_person: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type SupplierInsert = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>
+export type SupplierUpdate = Partial<SupplierInsert>
+
 export type SlideRow = Database['public']['Tables']['slides']['Row']
 export type SlideInsert = Database['public']['Tables']['slides']['Insert']
 export type SlideUpdate = Database['public']['Tables']['slides']['Update']
@@ -315,6 +331,7 @@ export interface ProductFormData {
   sku: string | null
   brand_id: string | null
   product_line_id: string | null // Линейка продуктов (Barbie, Hot Wheels и т.д.)
+  supplier_id: string | null
   discount_percentage: number
   origin_country_id: number | null
   material_id: number | null
@@ -323,6 +340,9 @@ export interface ProductFormData {
   featured_order?: number
   // Количество деталей для конструкторов (автоматический выбор диапазона)
   piece_count?: number | null
+  // Закупки
+  min_stock_level: number
+  restock_quantity: number
   // SEO поля
   seo_description: string | null
   seo_keywords: string[] | null
