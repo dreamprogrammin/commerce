@@ -4,20 +4,26 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Link,
   Package,
   Phone,
   RefreshCw,
   ShoppingCart,
   User,
 } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useAdminSuppliersStore } from '@/stores/adminStore/adminSuppliersStore'
 
 definePageMeta({ layout: 'admin' })
 
 const supabase = useSupabaseClient<Database>()
 const { getVariantUrl } = useSupabaseStorage()
+
+const suppliersStore = useAdminSuppliersStore()
+const { suppliers } = storeToRefs(suppliersStore)
 
 interface RestockProduct {
   id: string
@@ -48,7 +54,7 @@ const collapsedGroups = ref<Set<string>>(new Set())
 async function fetchRestockList() {
   isLoading.value = true
   try {
-    const { data, error } = await supabase.rpc('get_restock_list')
+    const { data, error } = await supabase.rpc('get_restock_list' as any)
     if (error)
       throw error
     groups.value = (data as unknown as SupplierGroup[]) || []
@@ -61,7 +67,11 @@ async function fetchRestockList() {
   }
 }
 
-onMounted(fetchRestockList)
+onMounted(() => {
+  fetchRestockList()
+  if (suppliers.value.length === 0)
+    suppliersStore.fetchSuppliers()
+})
 
 const totalProducts = computed(() =>
   groups.value.reduce((sum, g) => sum + (g.product_count || 0), 0),
@@ -86,6 +96,30 @@ function getProductImage(imageUrl: string | null): string | undefined {
 
 function formatPrice(value: number): string {
   return new Intl.NumberFormat('ru-RU').format(Math.round(value))
+}
+
+// Назначение поставщика товару прямо со страницы закупок
+const assigningProductId = ref<string | null>(null)
+
+async function assignSupplier(productId: string, supplierId: string) {
+  assigningProductId.value = productId
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ supplier_id: supplierId } as any)
+      .eq('id', productId)
+    if (error)
+      throw error
+
+    toast.success('Поставщик назначен')
+    await fetchRestockList()
+  }
+  catch (error: any) {
+    toast.error('Ошибка назначения поставщика', { description: error.message })
+  }
+  finally {
+    assigningProductId.value = null
+  }
 }
 </script>
 
@@ -231,6 +265,9 @@ function formatPrice(value: number): string {
                   <TableHead class="text-right w-28">
                     Цена
                   </TableHead>
+                  <TableHead v-if="!group.supplier_id" class="w-48">
+                    Поставщик
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -282,6 +319,25 @@ function formatPrice(value: number): string {
                   <TableCell class="text-right text-muted-foreground">
                     {{ formatPrice(product.price) }} ₸
                   </TableCell>
+                  <TableCell v-if="!group.supplier_id">
+                    <Select
+                      :disabled="assigningProductId === product.id"
+                      @update:model-value="(val) => assignSupplier(product.id, String(val))"
+                    >
+                      <SelectTrigger class="h-8 text-xs">
+                        <SelectValue placeholder="Назначить..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          v-for="s in suppliers"
+                          :key="s.id"
+                          :value="s.id"
+                        >
+                          {{ s.name }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -289,52 +345,77 @@ function formatPrice(value: number): string {
 
           <!-- Мобайл: компактный список -->
           <div class="md:hidden space-y-2">
-            <NuxtLink
+            <div
               v-for="product in group.products"
               :key="product.id"
-              :to="`/admin/products/${product.id}`"
-              class="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+              class="rounded-lg border bg-card"
             >
-              <!-- Картинка -->
-              <div class="w-11 h-11 rounded-md bg-muted overflow-hidden flex-shrink-0">
-                <img
-                  v-if="getProductImage(product.image_url)"
-                  :src="getProductImage(product.image_url)"
-                  :alt="product.name"
-                  class="w-full h-full object-cover"
-                >
-                <div v-else class="w-full h-full flex items-center justify-center">
-                  <Package class="w-4 h-4 text-muted-foreground" />
+              <NuxtLink
+                :to="`/admin/products/${product.id}`"
+                class="flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors"
+              >
+                <!-- Картинка -->
+                <div class="w-11 h-11 rounded-md bg-muted overflow-hidden flex-shrink-0">
+                  <img
+                    v-if="getProductImage(product.image_url)"
+                    :src="getProductImage(product.image_url)"
+                    :alt="product.name"
+                    class="w-full h-full object-cover"
+                  >
+                  <div v-else class="w-full h-full flex items-center justify-center">
+                    <Package class="w-4 h-4 text-muted-foreground" />
+                  </div>
                 </div>
-              </div>
 
-              <!-- Инфо -->
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">
-                  {{ product.name }}
-                </p>
-                <p class="text-xs text-muted-foreground">
-                  {{ formatPrice(product.price) }} ₸
-                </p>
-              </div>
+                <!-- Инфо -->
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium truncate">
+                    {{ product.name }}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    {{ formatPrice(product.price) }} ₸
+                  </p>
+                </div>
 
-              <!-- Остаток + Дозаказать -->
-              <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                <Badge
-                  :variant="product.stock_quantity === 0 ? 'destructive' : 'outline'"
-                  class="font-mono text-[10px]"
+                <!-- Остаток + Дозаказать -->
+                <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                  <Badge
+                    :variant="product.stock_quantity === 0 ? 'destructive' : 'outline'"
+                    class="font-mono text-[10px]"
+                  >
+                    <AlertTriangle
+                      v-if="product.stock_quantity === 0"
+                      class="w-2.5 h-2.5 mr-0.5"
+                    />
+                    {{ product.stock_quantity }} шт
+                  </Badge>
+                  <span class="text-xs font-semibold text-primary">
+                    +{{ product.restock_quantity }}
+                  </span>
+                </div>
+              </NuxtLink>
+              <!-- Назначить поставщика (мобайл) -->
+              <div v-if="!group.supplier_id" class="px-3 pb-3">
+                <Select
+                  :disabled="assigningProductId === product.id"
+                  @update:model-value="(val) => assignSupplier(product.id, String(val))"
                 >
-                  <AlertTriangle
-                    v-if="product.stock_quantity === 0"
-                    class="w-2.5 h-2.5 mr-0.5"
-                  />
-                  {{ product.stock_quantity }} шт
-                </Badge>
-                <span class="text-xs font-semibold text-primary">
-                  +{{ product.restock_quantity }}
-                </span>
+                  <SelectTrigger class="h-9 text-xs">
+                    <Link class="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                    <SelectValue placeholder="Назначить поставщика..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="s in suppliers"
+                      :key="s.id"
+                      :value="s.id"
+                    >
+                      {{ s.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </NuxtLink>
+            </div>
           </div>
         </CardContent>
       </Card>
