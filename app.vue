@@ -222,9 +222,9 @@ useSchemaOrg([
       </ClientOnly>
     </NuxtLayout>
 
-    <!-- 🆕 Мобильная навигация -->
+    <!-- 🆕 Мобильная навигация (скрыта в админке — там своя) -->
     <ClientOnly>
-      <MobileBottomNav />
+      <MobileBottomNav v-if="!route.path.startsWith('/admin')" />
     </ClientOnly>
 
     <!-- Авторизация: Drawer на мобильных, Modal на десктопе -->
