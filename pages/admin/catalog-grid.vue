@@ -231,6 +231,22 @@ const sizeLabels = {
   large: 'Большая',
 }
 
+// Палитра пастельных фонов
+const pastelColors = [
+  'bg-rose-50',
+  'bg-sky-50',
+  'bg-amber-50',
+  'bg-emerald-50',
+  'bg-violet-50',
+  'bg-orange-50',
+  'bg-teal-50',
+  'bg-pink-50',
+  'bg-indigo-50',
+  'bg-lime-50',
+  'bg-cyan-50',
+  'bg-fuchsia-50',
+]
+
 // Активная вкладка
 const activeTab = ref('preview')
 </script>
@@ -369,110 +385,90 @@ const activeTab = ref('preview')
               </CardHeader>
               <CardContent class="p-6">
                 <!-- Симуляция настоящей сетки каталога -->
-                <div class="grid grid-cols-2 gap-2 auto-rows-[180px]">
-                  <!-- Дополнительные пункты -->
-                  <div
-                    v-for="item in additionalItems"
-                    :key="item.id"
-                    class="relative overflow-hidden rounded-2xl border-2 border-border/50 h-[180px] shadow-sm bg-muted hover:shadow-md transition-all hover:scale-[1.02]"
-                  >
-                    <div class="absolute bottom-0 left-0 right-0 p-4">
-                      <div class="space-y-2">
-                        <div class="w-12 h-12 rounded-xl bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-sm">
-                          <Icon :name="item.icon" class="w-6 h-6 text-foreground" />
-                        </div>
-                        <h3 class="font-semibold text-foreground leading-tight text-base">
+                <div class="space-y-3">
+                  <!-- Промо-карточки -->
+                  <div class="grid grid-cols-2 gap-3">
+                    <div
+                      v-for="item in additionalItems"
+                      :key="item.id"
+                      class="relative overflow-hidden rounded-2xl aspect-[4/3]"
+                      :class="item.id === 'sale'
+                        ? 'bg-gradient-to-br from-amber-400 via-orange-400 to-red-400'
+                        : 'bg-gradient-to-br from-blue-400 via-indigo-400 to-violet-400'"
+                    >
+                      <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/15 blur-xl" />
+                      <div class="relative h-full flex flex-col justify-between p-4">
+                        <span class="text-5xl drop-shadow-lg">
+                          {{ item.id === 'sale' ? '🏷️' : '✨' }}
+                        </span>
+                        <h3 class="text-lg font-bold text-white leading-tight drop-shadow-md">
                           {{ item.name }}
                         </h3>
                       </div>
                     </div>
-                    <div class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-sm">
-                      <Icon name="lucide:chevron-right" class="w-4 h-4 text-foreground" />
-                    </div>
                   </div>
 
-                  <!-- Категории -->
-                  <div
-                    v-for="category in secondLevelCategories"
-                    :key="category.id"
-                    class="relative overflow-hidden rounded-2xl border-2 transition-all cursor-pointer group shadow-sm hover:shadow-lg"
-                    :class="[
-                      selectedCategories.includes(category.id)
-                        ? 'border-primary shadow-lg ring-4 ring-primary/20 scale-[1.02]'
-                        : 'border-border/50 hover:border-primary/50 hover:scale-[1.02]',
-                      getCategorySize(category) === 'large'
-                        ? 'row-span-2 h-auto'
-                        : getCategorySize(category) === 'medium'
-                          ? 'row-span-2 h-auto'
-                          : 'h-[180px]',
-                    ]"
-                    @click="toggleSelection(category.id)"
-                  >
-                    <!-- Изображение категории -->
-                    <div v-if="category.image_url" class="absolute inset-0">
-                      <img
-                        :src="getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'sm') || ''"
-                        :alt="category.name"
-                        class="w-full h-full object-cover transition-transform group-hover:scale-105"
-                        loading="lazy"
-                      >
-                    </div>
-
-                    <!-- Фоллбэк без изображения -->
+                  <!-- Сетка категорий -->
+                  <div class="admin-catalog-grid">
                     <div
-                      v-else
-                      class="absolute inset-0 bg-muted flex items-center justify-center"
+                      v-for="(category, index) in secondLevelCategories"
+                      :key="category.id"
+                      class="relative overflow-hidden rounded-2xl border-2 transition-all cursor-pointer group"
+                      :class="[
+                        selectedCategories.includes(category.id)
+                          ? 'border-primary shadow-lg ring-4 ring-primary/20 scale-[1.02]'
+                          : 'border-border/50 hover:border-primary/50 hover:scale-[1.02]',
+                        pastelColors[index % pastelColors.length],
+                        getCategorySize(category) === 'large'
+                          ? 'admin-card-large'
+                          : getCategorySize(category) === 'medium'
+                            ? 'admin-card-medium'
+                            : 'admin-card-small',
+                      ]"
+                      @click="toggleSelection(category.id)"
                     >
-                      <Icon
-                        :name="category.icon_name || 'lucide:package'"
-                        class="w-16 h-16 text-muted-foreground opacity-40"
-                      />
-                    </div>
+                      <!-- Изображение категории -->
+                      <div v-if="category.image_url" class="absolute bottom-0 right-0 w-[70%] h-[80%]">
+                        <img
+                          :src="getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'sm') || ''"
+                          :alt="category.name"
+                          class="w-full h-full object-contain transition-transform group-hover:scale-105"
+                          loading="lazy"
+                        >
+                      </div>
 
-                    <!-- Контент -->
-                    <div class="absolute bottom-0 left-0 right-0 p-4">
-                      <div class="space-y-2">
+                      <!-- Фоллбэк без изображения -->
+                      <div
+                        v-else
+                        class="absolute bottom-0 right-0 w-[70%] h-[70%] flex items-end justify-center opacity-20"
+                      >
+                        <Icon
+                          :name="category.icon_name || 'lucide:package'"
+                          class="w-16 h-16 text-muted-foreground"
+                        />
+                      </div>
+
+                      <!-- Контент -->
+                      <div class="absolute top-0 left-0 p-3 max-w-[65%] z-10 space-y-1.5">
                         <Badge
                           :variant="sizeColors[getCategorySize(category)]"
-                          class="w-fit shadow-sm"
+                          class="w-fit shadow-sm text-[10px]"
                         >
                           {{ sizeLabels[getCategorySize(category)] }}
                         </Badge>
-
-                        <h3
-                          class="font-semibold text-white leading-tight drop-shadow-lg"
-                          :class="getCategorySize(category) === 'large' ? 'text-lg' : 'text-base'"
-                        >
+                        <h3 class="font-bold text-foreground leading-snug text-sm">
                           {{ category.name }}
                         </h3>
+                      </div>
 
-                        <p
-                          v-if="category.description && getCategorySize(category) !== 'small'"
-                          class="text-xs text-white/95 leading-snug drop-shadow-md line-clamp-2"
-                        >
-                          {{ category.description }}
-                        </p>
+                      <!-- Индикатор выбора -->
+                      <div
+                        v-if="selectedCategories.includes(category.id)"
+                        class="absolute top-3 right-3 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg z-10 animate-in zoom-in-50"
+                      >
+                        <Icon name="lucide:check" class="w-4 h-4 text-primary-foreground" />
                       </div>
                     </div>
-
-                    <!-- Индикатор выбора -->
-                    <div
-                      v-if="selectedCategories.includes(category.id)"
-                      class="absolute top-3 right-3 w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-lg z-10 animate-in zoom-in-50"
-                    >
-                      <Icon name="lucide:check" class="w-5 h-5 text-primary-foreground" />
-                    </div>
-
-                    <!-- Иконка стрелки -->
-                    <div
-                      v-else
-                      class="absolute top-3 right-3 w-9 h-9 rounded-xl bg-white/90 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                    >
-                      <Icon name="lucide:chevron-right" class="w-5 h-5 text-foreground" />
-                    </div>
-
-                    <!-- Hover эффект -->
-                    <div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </div>
 
@@ -679,27 +675,27 @@ const activeTab = ref('preview')
               <Icon name="lucide:square" class="w-5 h-5 text-primary shrink-0 mt-0.5" />
               <div>
                 <strong class="text-foreground">Обычная карточка:</strong>
-                <span class="text-muted-foreground"> Стандартная высота (180px), 1 клетка</span>
+                <span class="text-muted-foreground"> Стандартная высота (130px), 1 ряд</span>
               </div>
             </div>
             <div class="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
               <Icon name="lucide:square-stack" class="w-5 h-5 text-primary shrink-0 mt-0.5" />
               <div>
                 <strong class="text-foreground">Средняя карточка:</strong>
-                <span class="text-muted-foreground"> Двойная высота (360px), 2 клетки, показывает описание</span>
+                <span class="text-muted-foreground"> Двойная высота (268px), 2 ряда</span>
               </div>
             </div>
             <div class="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
               <Icon name="lucide:maximize-2" class="w-5 h-5 text-primary shrink-0 mt-0.5" />
               <div>
                 <strong class="text-foreground">Большая карточка:</strong>
-                <span class="text-muted-foreground"> Двойная высота (360px), акцентная с описанием</span>
+                <span class="text-muted-foreground"> Двойная высота (268px), 2 ряда, акцентная</span>
               </div>
             </div>
             <div class="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border-l-4 border-primary mt-4">
               <Icon name="lucide:info" class="w-5 h-5 text-primary shrink-0 mt-0.5" />
               <p class="text-muted-foreground">
-                Все карточки занимают 1 колонку по ширине, но различаются по высоте (1 или 2 клетки)
+                Мобайл: 2 колонки, десктоп: 3 колонки. Карточки имеют пастельные фоны и изображение товара справа внизу.
               </p>
             </div>
           </CardContent>
@@ -708,3 +704,27 @@ const activeTab = ref('preview')
     </div>
   </ClientOnly>
 </template>
+
+<style scoped>
+.admin-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: minmax(130px, auto);
+  gap: 0.75rem;
+}
+
+.admin-card-small {
+  grid-row: span 1;
+  min-height: 130px;
+}
+
+.admin-card-medium {
+  grid-row: span 2;
+  min-height: 268px;
+}
+
+.admin-card-large {
+  grid-row: span 2;
+  min-height: 268px;
+}
+</style>

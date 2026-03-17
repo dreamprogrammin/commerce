@@ -19,7 +19,7 @@ const metaDescription = 'Полный каталог детских игруше
 const categoriesStore = useCategoriesStore()
 const { getVariantUrl } = useSupabaseStorage()
 
-// 🚀 Оптимизированный useAsyncData: неблокирующий + SSR + кеширование
+// Оптимизированный useAsyncData: неблокирующий + SSR + кеширование
 const { data: catalogData, pending } = useAsyncData(
   'catalog-page',
   async () => {
@@ -34,10 +34,9 @@ const { data: catalogData, pending } = useAsyncData(
     }
   },
   {
-    lazy: true, // ✅ Неблокирующая загрузка - страница рендерится сразу
-    server: true, // ✅ SSR сохраняется для SEO
-    dedupe: 'defer', // ✅ Предотвращает дублирующие запросы
-    // ✅ Упрощенное кеширование
+    lazy: true,
+    server: true,
+    dedupe: 'defer',
     getCachedData(key) {
       const data = useNuxtData(key)
       return data.data.value
@@ -59,10 +58,9 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
     .sort((a, b) => a.display_order - b.display_order)
 })
 
-// 🔥 SEO - Динамические мета-теги + structured data с категориями
+// SEO - Динамические мета-теги + structured data с категориями
 useHead(() => {
   const schemas = [
-    // BreadcrumbList Schema
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
@@ -84,7 +82,6 @@ useHead(() => {
         ],
       }),
     },
-    // CollectionPage Schema
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
@@ -102,7 +99,6 @@ useHead(() => {
     },
   ]
 
-  // 🔥 Добавляем ItemList schema для категорий (важно для Google!)
   if (secondLevelCategories.value.length > 0) {
     schemas.push({
       type: 'application/ld+json',
@@ -133,8 +129,6 @@ useHead(() => {
     meta: [
       { name: 'description', content: metaDescription },
       { name: 'keywords', content: 'каталог игрушек, детские товары, игрушки Алматы, купить игрушки, категории игрушек' },
-
-      // Open Graph
       { property: 'og:title', content: metaTitle },
       { property: 'og:description', content: metaDescription },
       { property: 'og:url', content: catalogUrl },
@@ -142,30 +136,22 @@ useHead(() => {
       { property: 'og:site_name', content: siteName },
       { property: 'og:locale', content: 'ru_RU' },
       { property: 'og:image', content: `${siteUrl}/og-catalog.jpeg` },
-
-      // Twitter Card
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: metaTitle },
       { name: 'twitter:description', content: metaDescription },
       { name: 'twitter:image', content: `${siteUrl}/og-catalog.jpeg` },
-
-      // Robots
       { name: 'robots', content: 'index, follow' },
     ],
     script: schemas,
   }
 })
 
-// Robots правило
 useRobotsRule({
   index: true,
   follow: true,
 })
 
-// ✅ Показываем skeleton только если идёт загрузка И данных нет
 const showSkeleton = computed(() => pending.value && !catalogData.value)
-
-// Дополнительные пункты (Акции, Новинки)
 const additionalItems = computed(() => catalogData.value?.additional || [])
 
 // Определяем размер карточки
@@ -178,43 +164,45 @@ function getCategorySize(category: CategoryRow): 'small' | 'medium' | 'large' {
   return 'small'
 }
 
-// 🚀 Оптимизированное получение URL с правильными размерами
+// Оптимизированное получение URL с правильными размерами
 function getCategoryImageUrl(category: CategoryRow): string | null {
   if (!category.image_url)
     return null
-
   const size = getCategorySize(category)
-
-  // Выбираем вариант по размеру карточки
   const variant = size === 'large' ? 'md' as const : 'sm' as const
-
   return getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, variant)
 }
 
-// 🔧 Безопасное получение blur placeholder
+// Безопасное получение blur placeholder
 function getCategoryBlurUrl(category: CategoryRow): string | null {
   const blur = category.blur_placeholder
-
-  // Возвращаем null если пустая строка или null
   return blur && blur.trim() !== '' ? blur : null
 }
 
-// Современные яркие градиенты
-const additionalItemStyles = {
-  new: {
-    gradient: 'bg-gray-50',
-    shadow: 'shadow-emerald-500/30',
-  },
-  sale: {
-    gradient: 'bg-gray-50',
-    shadow: 'shadow-yellow-500/30',
-  },
+// Палитра пастельных фонов для категорий
+const pastelColors = [
+  'bg-rose-50',
+  'bg-sky-50',
+  'bg-amber-50',
+  'bg-emerald-50',
+  'bg-violet-50',
+  'bg-orange-50',
+  'bg-teal-50',
+  'bg-pink-50',
+  'bg-indigo-50',
+  'bg-lime-50',
+  'bg-cyan-50',
+  'bg-fuchsia-50',
+]
+
+function getCategoryColor(index: number): string {
+  return pastelColors[index % pastelColors.length]
 }
 </script>
 
 <template>
   <div class="min-h-screen bg-background pb-20">
-    <!-- Шапка с навигацией -->
+    <!-- Шапка -->
     <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b sr-only">
       <div class="px-4 py-3">
         <h1 class="text-2xl font-bold">
@@ -224,84 +212,83 @@ const additionalItemStyles = {
     </div>
 
     <!-- Основной контент -->
-    <div class="px-2 py-4">
-      <!-- 🎨 Улучшенный скелетон - показываем только если идёт загрузка И данных нет -->
-      <div v-if="showSkeleton" class="space-y-2">
-        <!-- Блоки Акции и Новинки -->
-        <div class="grid grid-cols-2 gap-2">
-          <Skeleton class="w-full h-[200px] rounded-3xl" />
-          <Skeleton class="w-full h-[200px] rounded-3xl" />
+    <div class="px-3 py-4 md:px-6 lg:px-8 max-w-6xl mx-auto">
+      <!-- Скелетон -->
+      <div v-if="showSkeleton" class="space-y-3">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
         </div>
-
-        <!-- Сетка категорий -->
-        <div class="grid grid-cols-2 gap-2 auto-rows-[120px]">
-          <Skeleton class="w-full h-full rounded-2xl row-span-2" />
-          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
-          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
-          <Skeleton class="w-full h-full rounded-2xl row-span-2" />
-          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
-          <Skeleton class="w-full h-full rounded-2xl row-span-1" />
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <Skeleton class="w-full aspect-square rounded-2xl row-span-2" />
+          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
         </div>
       </div>
 
-      <!-- Контент - рендерится сразу после загрузки -->
-      <div v-else class="space-y-2">
-        <!-- Блоки Акции и Новинки -->
-        <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-2">
+      <!-- Контент -->
+      <div v-else class="space-y-3">
+        <!-- Акции и Новинки -->
+        <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-3">
           <NuxtLink
             v-for="item in additionalItems"
             :key="item.id"
             :to="item.href"
-            class="relative block overflow-hidden rounded-3xl h-[200px] hover:shadow-2xl active:scale-[0.97] transition-transform duration-200 group"
-            :class="additionalItemStyles[item.id as keyof typeof additionalItemStyles]?.shadow || 'shadow-lg'"
+            class="promo-card relative block overflow-hidden rounded-2xl active:scale-[0.97] transition-transform duration-200 group"
+            :class="item.id === 'sale'
+              ? 'bg-gradient-to-br from-amber-400 via-orange-400 to-red-400'
+              : 'bg-gradient-to-br from-blue-400 via-indigo-400 to-violet-400'"
           >
-            <div
-              class="relative h-full bg-gradient-to-br overflow-hidden"
-              :class="additionalItemStyles[item.id as keyof typeof additionalItemStyles]?.gradient || 'from-primary to-primary/80'"
-            >
-              <!-- Декоративные элементы -->
-              <div class="absolute top-0 right-0 w-full h-full">
-                <div class="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-white/20 blur-3xl" />
-              </div>
-              <div class="absolute bottom-0 left-0 w-full h-full">
-                <div class="absolute -bottom-16 -left-16 w-56 h-56 rounded-full bg-white/10 blur-2xl" />
-              </div>
+            <div class="relative aspect-[4/3] flex flex-col justify-between p-4">
+              <!-- Декор -->
+              <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/15 blur-xl" />
+              <div class="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-lg" />
 
-              <!-- Эмодзи -->
-              <div class="absolute -top-3 -right-3 z-10 transform group-hover:scale-110 transition-transform duration-300">
-                <span class="text-9xl drop-shadow-2xl">
-                  {{ item.id === 'sale' ? '🏷️' : '⭐' }}
+              <!-- Иконка -->
+              <div class="relative z-10">
+                <span class="text-5xl md:text-6xl drop-shadow-lg">
+                  {{ item.id === 'sale' ? '🏷️' : '✨' }}
                 </span>
               </div>
 
-              <!-- Контент -->
-              <div class="absolute left-0 top-1/2 -translate-y-1/2 p-5 z-10 max-w-[55%]">
-                <div class="space-y-1">
-                  <h3 class="text-xl font-bold leading-tight tracking-tight">
-                    {{ item.name }}
-                  </h3>
-                </div>
+              <!-- Текст -->
+              <div class="relative z-10">
+                <h3 class="text-lg md:text-xl font-bold text-white leading-tight drop-shadow-md">
+                  {{ item.name }}
+                </h3>
+                <p class="text-xs md:text-sm text-white/80 mt-0.5">
+                  {{ item.id === 'sale' ? 'Скидки до 50%' : 'Новые поступления' }}
+                </p>
               </div>
             </div>
           </NuxtLink>
         </div>
 
-        <!-- Сетка категорий - с оптимизированными изображениями -->
-        <div v-if="secondLevelCategories.length > 0" class="grid grid-cols-2 gap-2 auto-rows-[120px]">
+        <!-- Сетка категорий -->
+        <div
+          v-if="secondLevelCategories.length > 0"
+          class="catalog-grid"
+        >
           <NuxtLink
             v-for="(category, index) in secondLevelCategories"
             :key="category.id"
             :to="category.href"
-            class="category-card relative block overflow-hidden rounded-2xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 bg-gray-50"
+            class="category-card relative block overflow-hidden rounded-2xl active:scale-[0.97] transition-all duration-200 group"
             :class="[
-              getCategorySize(category) === 'large' ? 'row-span-2'
-              : getCategorySize(category) === 'medium' ? 'row-span-2'
-                : 'row-span-1',
+              getCategoryColor(index),
+              getCategorySize(category) === 'large' ? 'catalog-card-large'
+              : getCategorySize(category) === 'medium' ? 'catalog-card-medium'
+                : 'catalog-card-small',
             ]"
-            :style="{ '--animation-delay': `${Math.min(index * 30, 300)}ms` }"
+            :style="{ '--animation-delay': `${Math.min(index * 40, 400)}ms` }"
           >
-            <!-- 🖼️ Изображение через ProgressiveImage с исправленной передачей blur -->
-            <div v-if="category.image_url" class="absolute bottom-0 right-0 w-[85%] h-[85%]">
+            <!-- Изображение -->
+            <div
+              v-if="category.image_url"
+              class="absolute bottom-0 right-0 w-[70%] h-[80%] flex items-end justify-end"
+            >
               <ProgressiveImage
                 :src="getCategoryImageUrl(category)"
                 :alt="category.name"
@@ -313,19 +300,24 @@ const additionalItemStyles = {
               />
             </div>
 
-            <!-- Фоллбэк без изображения -->
-            <div v-else class="absolute bottom-0 right-0 w-[85%] h-[85%] flex items-end justify-center">
+            <!-- Фоллбэк -->
+            <div v-else class="absolute bottom-0 right-0 w-[70%] h-[70%] flex items-end justify-center opacity-20">
               <Icon
                 :name="category.icon_name || 'lucide:package'"
-                class="w-20 h-20 text-muted-foreground opacity-30"
+                class="w-20 h-20 text-muted-foreground"
               />
             </div>
 
-            <!-- Контент карточки - показывается сразу -->
-            <div class="absolute top-0 left-0 p-4 max-w-[70%] z-20">
-              <h3 class="font-bold leading-tight text-foreground text-sm">
+            <!-- Название -->
+            <div class="absolute top-0 left-0 p-3 md:p-4 max-w-[65%] z-10">
+              <h3 class="font-bold text-foreground leading-snug text-sm md:text-base">
                 {{ category.name }}
               </h3>
+            </div>
+
+            <!-- Стрелка при наведении (десктоп) -->
+            <div class="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm items-center justify-center shadow-sm hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity">
+              <Icon name="lucide:arrow-right" class="w-4 h-4 text-foreground" />
             </div>
           </NuxtLink>
         </div>
@@ -346,11 +338,11 @@ const additionalItemStyles = {
 </template>
 
 <style scoped>
-/* Анимация появления карточек */
+/* Анимация появления */
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -362,5 +354,61 @@ const additionalItemStyles = {
   animation: fadeInUp 0.4s ease-out forwards;
   opacity: 0;
   animation-delay: var(--animation-delay, 0ms);
+}
+
+.promo-card {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+/* ==========================================
+   Сетка каталога — mobile: 2 колонки, desktop: 3 колонки
+   Masonry-подобная сетка с row-span для больших карточек
+   ========================================== */
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: minmax(130px, auto);
+  gap: 0.75rem;
+}
+
+/* Маленькая карточка: 1 ряд */
+.catalog-card-small {
+  grid-row: span 1;
+  min-height: 130px;
+}
+
+/* Средняя карточка: 2 ряда */
+.catalog-card-medium {
+  grid-row: span 2;
+  min-height: 268px;
+}
+
+/* Большая карточка: 2 ряда */
+.catalog-card-large {
+  grid-row: span 2;
+  min-height: 268px;
+}
+
+/* Desktop: 3 колонки с увеличенными высотами */
+@media (min-width: 768px) {
+  .catalog-grid {
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: minmax(160px, auto);
+    gap: 1rem;
+  }
+
+  .catalog-card-small {
+    min-height: 160px;
+  }
+
+  .catalog-card-medium {
+    grid-row: span 2;
+    min-height: 330px;
+  }
+
+  .catalog-card-large {
+    grid-row: span 2;
+    min-height: 330px;
+  }
 }
 </style>
