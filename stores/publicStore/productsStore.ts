@@ -486,9 +486,10 @@ export const useProductsStore = defineStore('productsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, product_images(*), categories(name, slug)')
+        .select('*, product_images(*), categories(name, slug), brands(id, name, slug, logo_url)')
         .in('id', ids)
         .eq('is_active', true)
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
 
       if (error)
         throw error

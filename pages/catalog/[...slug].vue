@@ -729,11 +729,6 @@ const hasActiveFilters = computed(() => {
 // SEO описание: приоритет у описания из БД
 const categoryDescription = computed(() => currentCategory.value?.description || null)
 
-// Форматирование цены для SEO
-function formatPriceForSeo(price: number): string {
-  return new Intl.NumberFormat('ru-RU').format(Math.round(price))
-}
-
 // SEO: выбрана ровно одна линейка / один бренд
 const selectedSingleLine = computed(() => {
   if (activeFilters.value.productLineIds.length !== 1)
@@ -788,20 +783,8 @@ const metaDescription = computed(() => {
   // Название категории
   parts.push(`${categoryName.value}`)
 
-  // Диапазон цен (если загружен)
-  if (priceRange.value.min > 0 || priceRange.value.max < 50000) {
-    parts.push(`⚡ по цене от ${formatPriceForSeo(priceRange.value.min)} ₸ до ${formatPriceForSeo(priceRange.value.max)} ₸`)
-  }
-
-  // Количество товаров
-  const productsCount = displayedProducts.value.length
-  if (productsCount > 0) {
-    const productWord = productsCount === 1 ? 'товар' : productsCount < 5 ? 'товара' : 'товаров'
-    parts.push(`В наличии ${productsCount} ${productWord}`)
-  }
-
   // Магазин и доставка
-  parts.push('в интернет-магазине Ухтышка ✔️ Быстрая доставка в Алматы и по всему Казахстану')
+  parts.push('купить в интернет-магазине Ухтышка ✔️ Большой выбор, доставка по Алматы и Казахстану')
 
   return parts.join('. ')
 })
@@ -1105,16 +1088,6 @@ useHead(() => {
       // Добавляем информацию о товарах для rich snippets
       ...(displayedProducts.value.length > 0 && {
         numberOfItems: displayedProducts.value.length,
-      }),
-      // Диапазон цен
-      ...(priceRange.value.min > 0 && {
-        offers: {
-          '@type': 'AggregateOffer',
-          'lowPrice': priceRange.value.min,
-          'highPrice': priceRange.value.max,
-          'priceCurrency': 'KZT',
-          'offerCount': displayedProducts.value.length,
-        },
       }),
       // Агрегированный рейтинг (только если есть реальные отзывы)
       ...(categoryRatingData.value && categoryRatingData.value.total_reviews > 0 && {
