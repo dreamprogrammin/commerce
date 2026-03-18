@@ -272,5 +272,6 @@ export const useProfileStore = defineStore('profileStore', () => {
   persist: {
     key: 'profile-store',
     pick: ['profile'], // Сохраняем только profile, не isLoading/isSaving
+    storage: piniaPluginPersistedstate.localStorage(),
   },
 })

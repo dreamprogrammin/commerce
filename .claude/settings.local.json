@@ -107,7 +107,8 @@
       "Bash(git pull:*)",
       "Bash(head:*)",
       "Bash(sed:*)",
-      "Bash(npx nuxi:*)"
+      "Bash(npx nuxi:*)",
+      "WebFetch(domain:www.detmir.ru)"
     ]
   }
 }
