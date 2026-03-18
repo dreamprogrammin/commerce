@@ -467,6 +467,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       `)
       .eq('slug', slug)
       .eq('is_active', true)
+      .order('display_order', { referencedTable: 'product_images', ascending: true })
       .single()
 
     // Товар не найден — возвращаем null (вызывающий код покажет 404)
@@ -509,6 +510,7 @@ export const useProductsStore = defineStore('productsStore', () => {
         .eq('is_active', true)
         .eq('is_featured', true) // 🎯 Только избранные
         .order('featured_order', { ascending: true }) // 🎯 По порядку
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
         .limit(limit)
 
       if (error)
@@ -521,6 +523,7 @@ export const useProductsStore = defineStore('productsStore', () => {
           .select('*, categories(name, slug), product_images(*)')
           .eq('is_active', true)
           .order('bonus_points_award', { ascending: false })
+          .order('display_order', { referencedTable: 'product_images', ascending: true })
           .limit(limit)
 
         if (fallbackError)
@@ -576,6 +579,7 @@ export const useProductsStore = defineStore('productsStore', () => {
         .eq('category_id', categoryId)
         .eq('is_active', true)
         .not('id', 'in', `(${excludeIds.join(',')})`)
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
 
       if (limit && limit > 0) {
         query = query.limit(limit)

@@ -122,14 +122,15 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select(`*, 
-          categories(name, slug), 
-          product_images(*), 
-          brands(*), 
+        .select(`*,
+          categories(name, slug),
+          product_images(*),
+          brands(*),
           countries(*),
           materials(*)`,
         )
         .order('created_at', { ascending: false })
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
       if (error)
         throw error
       products.value = (data as ProductListAdmin[]) || []
@@ -159,6 +160,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         product_attribute_values!left(*, attributes!left(*, attribute_options!left(*)))
       `)
         .eq('id', id)
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
         .single()
 
       if (error && error.code !== 'PGRST116')
@@ -193,6 +195,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
           materials(*)
         `)
         .eq('sku', sku.trim())
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
         .single()
 
       if (error && error.code !== 'PGRST116')
@@ -218,6 +221,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         .from('products')
         .select('*, product_images(*)')
         .in('id', ids)
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
 
       if (error)
         throw error
