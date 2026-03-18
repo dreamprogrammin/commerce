@@ -394,31 +394,11 @@ useHead({
 
         <!-- Сетка товаров -->
         <div v-else class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <NuxtLink
+          <ProductCard
             v-for="product in recentWishlist"
             :key="product.id"
-            :to="`/catalog/products/${product.slug}`"
-            class="group"
-          >
-            <div class="aspect-square rounded-lg bg-muted overflow-hidden mb-2">
-              <ProgressiveImage
-                v-if="product.product_images?.[0]"
-                :src="getPublicUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url)"
-                :blur-data-url="product.product_images[0].blur_placeholder"
-                :alt="product.name"
-                aspect-ratio="square"
-                object-fit="cover"
-                placeholder-type="lqip"
-                class="group-hover:scale-105 transition-transform"
-              />
-            </div>
-            <p class="text-sm font-medium line-clamp-2">
-              {{ product.name }}
-            </p>
-            <p class="text-sm font-bold text-primary">
-              {{ product.price.toLocaleString('ru-RU') }} ₸
-            </p>
-          </NuxtLink>
+            :product="product"
+          />
         </div>
       </CardContent>
     </Card>
