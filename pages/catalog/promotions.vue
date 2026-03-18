@@ -53,6 +53,12 @@ const { data: products, pending } = await useAsyncData(
   },
 )
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema([
+  { name: 'Каталог', path: '/catalog' },
+  { name: 'Акции' },
+])
+
 // SEO мета-теги
 useHead({
   title: metaTitle,

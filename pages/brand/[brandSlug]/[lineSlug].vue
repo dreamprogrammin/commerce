@@ -204,6 +204,13 @@ useSeoMeta({
   robots: 'index, follow',
 })
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema(computed(() => [
+  { name: 'Бренды', path: '/brand/all' },
+  ...(brand.value ? [{ name: brand.value.name, path: `/brand/${brand.value.slug}` }] : []),
+  ...(productLine.value ? [{ name: productLine.value.name }] : []),
+]))
+
 useHead({
   meta: [
     {
@@ -215,44 +222,6 @@ useHead({
     { rel: 'canonical', href: pageUrl.value },
   ],
   script: [
-    // BreadcrumbList Schema
-    {
-      type: 'application/ld+json',
-      innerHTML: () => JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        'itemListElement': [
-          {
-            '@type': 'ListItem',
-            'position': 1,
-            'name': 'Главная',
-            'item': siteUrl,
-          },
-          {
-            '@type': 'ListItem',
-            'position': 2,
-            'name': 'Бренды',
-            'item': `${siteUrl}/brand/all`,
-          },
-          ...(brand.value
-            ? [{
-                '@type': 'ListItem',
-                'position': 3,
-                'name': brand.value.name,
-                'item': `${siteUrl}/brand/${brand.value.slug}`,
-              }]
-            : []),
-          ...(productLine.value
-            ? [{
-                '@type': 'ListItem',
-                'position': 4,
-                'name': productLine.value.name,
-                'item': pageUrl.value,
-              }]
-            : []),
-        ],
-      }),
-    },
     // Brand Schema для линейки (суб-бренд)
     {
       type: 'application/ld+json',

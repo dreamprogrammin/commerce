@@ -90,6 +90,12 @@ const metaDescription = computed(() =>
   campaign.value?.description || `Специальная акция в ${siteName} — скидки на детские игрушки`,
 )
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema(computed(() => [
+  { name: 'Акции', path: '/catalog/promotions' },
+  ...(campaign.value ? [{ name: campaign.value.title }] : []),
+]))
+
 useHead({
   title: metaTitle,
   link: [

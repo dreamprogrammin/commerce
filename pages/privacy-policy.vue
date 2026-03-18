@@ -1,4 +1,9 @@
 <script setup lang="ts">
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema([
+  { name: 'Политика конфиденциальности' },
+])
+
 useHead({
   title: 'Политика конфиденциальности — uhti.kz',
   meta: [

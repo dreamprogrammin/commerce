@@ -703,6 +703,14 @@ useSeoMeta({
   robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
 })
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema(computed(() =>
+  breadcrumbs.value.map(crumb => ({
+    name: crumb.name,
+    ...(crumb.href ? { path: crumb.href } : {}),
+  })),
+))
+
 useHead(() => ({
   meta: [
     { name: 'keywords', content: metaKeywords.value || '' },
@@ -719,22 +727,7 @@ useHead(() => ({
     { rel: 'canonical', href: canonicalUrl.value },
   ],
   script: [
-    // 1. BreadcrumbList Schema (хлебные крошки для sitelinks)
-    {
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        'itemListElement': breadcrumbs.value.map((crumb, index) => ({
-          '@type': 'ListItem',
-          'position': index + 1,
-          'name': crumb.name,
-          // Для последнего элемента используем canonicalUrl, для остальных - crumb.href
-          'item': crumb.href ? `https://uhti.kz${crumb.href}` : canonicalUrl.value,
-        })),
-      }),
-    },
-    // 2. FAQPage Schema (вопросы с ответами)
+    // FAQPage Schema (вопросы с ответами)
     ...(faqSchemaItems.value.length > 0
       ? [{
           type: 'application/ld+json',

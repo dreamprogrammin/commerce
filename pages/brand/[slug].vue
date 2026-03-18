@@ -200,6 +200,12 @@ useSeoMeta({
   robots: 'index, follow',
 })
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema(computed(() => [
+  { name: 'Бренды', path: '/brand/all' },
+  ...(brand.value ? [{ name: brand.value.name }] : []),
+]))
+
 useHead({
   meta: [
     {
@@ -211,36 +217,6 @@ useHead({
     { rel: 'canonical', href: brandUrl.value },
   ],
   script: [
-    // BreadcrumbList Schema
-    {
-      type: 'application/ld+json',
-      innerHTML: () => JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        'itemListElement': [
-          {
-            '@type': 'ListItem',
-            'position': 1,
-            'name': 'Главная',
-            'item': siteUrl,
-          },
-          {
-            '@type': 'ListItem',
-            'position': 2,
-            'name': 'Бренды',
-            'item': `${siteUrl}/brand/all`,
-          },
-          ...(brand.value
-            ? [{
-                '@type': 'ListItem',
-                'position': 3,
-                'name': brand.value.name,
-                'item': brandUrl.value,
-              }]
-            : []),
-        ],
-      }),
-    },
     // Brand Schema с линейками как subOrganization
     {
       type: 'application/ld+json',

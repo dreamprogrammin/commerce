@@ -53,6 +53,11 @@ const { data: brands } = useQuery<Brand[]>({
 const siteName = 'Ухтышка'
 const siteUrl = 'https://uhti.kz'
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema([
+  { name: 'Бренды' },
+])
+
 useSeoMeta({
   title: `Все бренды игрушек | ${siteName}`,
   description: 'Широкий выбор брендов детских игрушек и товаров для детей. LEGO, Mattel, Hasbro и другие популярные производители. Доставка по Казахстану.',

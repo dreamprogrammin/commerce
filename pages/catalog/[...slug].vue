@@ -1019,39 +1019,19 @@ useHead({
   ],
 })
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema(computed(() =>
+  breadcrumbs.value.map(crumb => ({
+    name: crumb.name,
+    ...(crumb.href ? { path: crumb.href } : {}),
+  })),
+))
+
 // SEO structured data & canonical
 useHead(() => {
   const schemas = []
 
-  // 1. Breadcrumb Schema (Хлебные крошки)
-  if (breadcrumbs.value.length > 0) {
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        'itemListElement': breadcrumbs.value.map((crumb, index) => {
-          const listItem: {
-            '@type': 'ListItem'
-            'position': number
-            'name': string
-            'item'?: string
-          } = {
-            '@type': 'ListItem',
-            'position': index + 1,
-            'name': crumb.name,
-          }
-          // Добавляем поле item только если есть href
-          if (crumb.href) {
-            listItem.item = `https://uhti.kz${crumb.href}`
-          }
-          return listItem
-        }),
-      }),
-    })
-  }
-
-  // 2. CollectionPage Schema (Страница коллекции/категории)
+  // CollectionPage Schema (Страница коллекции/категории)
   schemas.push({
     type: 'application/ld+json',
     children: JSON.stringify({

@@ -308,14 +308,8 @@ const categoriesListSchema = computed(() => ({
   })),
 }))
 
-const breadcrumbSchema = computed(() => ({
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  '@id': `${siteUrl}/#breadcrumb`,
-  'itemListElement': [
-    { '@type': 'ListItem', 'position': 1, 'name': 'Главная', 'item': siteUrl },
-  ],
-}))
+// BreadcrumbList JSON-LD (только "Главная")
+useBreadcrumbSchema([])
 
 // Collection Page schema для главной страницы с товарами
 const collectionPageSchema = computed(() => ({
@@ -353,10 +347,6 @@ useHead(() => ({
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify(collectionPageSchema.value),
-    },
-    {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify(breadcrumbSchema.value),
     },
   ],
 }))

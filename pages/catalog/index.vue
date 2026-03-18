@@ -58,30 +58,14 @@ const secondLevelCategories = computed<CategoryRow[]>(() => {
     .sort((a, b) => a.display_order - b.display_order)
 })
 
+// BreadcrumbList JSON-LD
+useBreadcrumbSchema([
+  { name: 'Каталог', path: '/catalog' },
+])
+
 // SEO - Динамические мета-теги + structured data с категориями
 useHead(() => {
   const schemas = [
-    {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        'itemListElement': [
-          {
-            '@type': 'ListItem',
-            'position': 1,
-            'name': 'Главная',
-            'item': siteUrl,
-          },
-          {
-            '@type': 'ListItem',
-            'position': 2,
-            'name': 'Каталог',
-            'item': catalogUrl,
-          },
-        ],
-      }),
-    },
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
