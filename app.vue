@@ -27,7 +27,7 @@ watch(supabaseUser, (newUser) => {
     return
   if (newUser) {
     wishlistStore.fetchWishlistIds()
-    cartStore.mergeOnLogin()
+    // mergeOnLogin вызывается в auth-init.client.ts при SIGNED_IN
   }
   else {
     wishlistStore.wishlistProductIds = []

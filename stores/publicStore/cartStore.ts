@@ -21,6 +21,7 @@ export const useCartStore = defineStore('cartStore', () => {
   const bonusesToSpend = ref(0)
   const isAddingItem = ref(false) // Флаг для предотвращения race condition
   const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
+  const isMergingFromServer = ref(false) // Блокирует sync→server пока грузим данные с сервера
 
   // @ts-expect-error - Deep type instantiation with computed ref
   const totalItems = computed(() => items.value.reduce((sum: number, item) => sum + item.quantity, 0))
@@ -142,18 +143,21 @@ export const useCartStore = defineStore('cartStore', () => {
     }
   }
 
-  function clearCart() {
+  async function clearCart() {
     items.value = []
     bonusesToSpend.value = 0
     // Очищаем серверную корзину
     if (user.value) {
-      supabase.from('server_carts')
+      const { error } = await supabase.from('server_carts')
         .upsert({
           user_id: user.value.id,
           items: [] as any,
           total_amount: 0,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
+      if (error) {
+        console.error('[CartStore] Failed to clear server cart:', error.message)
+      }
     }
   }
 
@@ -184,7 +188,7 @@ export const useCartStore = defineStore('cartStore', () => {
 
   // Немедленная синхронизация без debounce
   async function forceSyncToServer() {
-    if (!user.value) return
+    if (!user.value || isMergingFromServer.value) return
 
     if (syncTimeout.value) {
       clearTimeout(syncTimeout.value)
@@ -196,7 +200,7 @@ export const useCartStore = defineStore('cartStore', () => {
       quantity: i.quantity,
     }))
 
-    await supabase.from('server_carts').upsert({
+    const { error } = await supabase.from('server_carts').upsert({
       user_id: user.value!.id,
       items: cartItems as any,
       total_amount: subtotal.value,
@@ -204,6 +208,10 @@ export const useCartStore = defineStore('cartStore', () => {
       reminder_1h_sent: false,
       reminder_24h_sent: false,
     }, { onConflict: 'user_id' })
+
+    if (error) {
+      console.error('[CartStore] Sync to server failed:', error.message)
+    }
   }
 
   // Загрузка серверной корзины
@@ -267,9 +275,15 @@ export const useCartStore = defineStore('cartStore', () => {
     }
     else {
       // Локальная корзина пустая → загружаем серверную
-      const serverItems = await loadServerCart()
-      if (serverItems.length > 0) {
-        items.value = serverItems
+      isMergingFromServer.value = true
+      try {
+        const serverItems = await loadServerCart()
+        if (serverItems.length > 0) {
+          items.value = serverItems
+        }
+      }
+      finally {
+        isMergingFromServer.value = false
       }
     }
   }
