@@ -231,13 +231,6 @@ useHead({
             'logo': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
             'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
             ...(brandStats.value && brandStats.value.total_reviews_count > 0 && {
-              aggregateRating: {
-                '@type': 'AggregateRating',
-                'ratingValue': brandStats.value.average_rating,
-                'reviewCount': brandStats.value.total_reviews_count,
-                'bestRating': 5,
-                'worstRating': 1,
-              },
             }),
             ...(brand.value.seo_keywords?.length && {
               keywords: brand.value.seo_keywords.join(', '),
