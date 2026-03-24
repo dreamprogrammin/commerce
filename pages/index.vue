@@ -11,6 +11,7 @@ import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategorie
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
