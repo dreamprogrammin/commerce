@@ -25,11 +25,10 @@ export function useBreadcrumbSchema(items: MaybeRef<BreadcrumbItem[]>) {
 
   useHead(() => {
     const crumbs = unref(items)
-    if (!crumbs || crumbs.length === 0) return {}
 
     const allItems: BreadcrumbItem[] = [
       { name: 'Главная', path: '/' },
-      ...crumbs,
+      ...crumbs, // пустой массив — только главная
     ]
 
     return {
