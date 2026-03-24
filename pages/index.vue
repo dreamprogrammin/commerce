@@ -11,7 +11,6 @@ import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategorie
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
-import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
@@ -309,8 +308,6 @@ const categoriesListSchema = computed(() => ({
   })),
 }))
 
-// BreadcrumbList JSON-LD (только "Главная")
-useBreadcrumbSchema([])
 
 // Collection Page schema для главной страницы с товарами
 const collectionPageSchema = computed(() => ({
@@ -353,6 +350,18 @@ useHead(() => ({
 }))
 
 useSchemaOrg([
+  {
+    '@type': 'BreadcrumbList',
+    '@id': `${siteUrl}/#breadcrumb`,
+    'itemListElement': [
+      {
+        '@type': 'ListItem',
+        'position': 1,
+        'name': 'Главная',
+        'item': siteUrl,
+      },
+    ],
+  },
   {
     '@type': 'WebPage',
     '@id': `${siteUrl}/#webpage`,
