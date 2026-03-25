@@ -276,13 +276,6 @@ useHead({
               },
             }),
             ...(brandStats.value && brandStats.value.total_reviews_count > 0 && {
-              aggregateRating: {
-                '@type': 'AggregateRating',
-                'ratingValue': brandStats.value.average_rating,
-                'reviewCount': brandStats.value.total_reviews_count,
-                'bestRating': 5,
-                'worstRating': 1,
-              },
             }),
           })
         : '{}',
