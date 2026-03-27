@@ -261,6 +261,8 @@ const storeSchema = computed(() => ({
     '@type': 'PostalAddress',
     'addressCountry': 'KZ',
     'addressLocality': 'Алматы',
+    'streetAddress': 'мкр. Шапагат, ул. Амангельды',
+    'postalCode': '050058',
   },
   'geo': {
     '@type': 'GeoCoordinates',
