@@ -374,6 +374,19 @@ function prefetchProduct(productSlug: string) {
 }
 
 // 🔥 SEO & OG IMAGE - теперь данные доступны на сервере
+const productSku = computed(() => {
+  if (!product.value) return undefined
+  if (product.value.sku) return product.value.sku
+  return product.value.id
+    ? product.value.id.replace(/-/g, '').substring(0, 10).toUpperCase()
+    : undefined
+})
+
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s{2,}/g, ' ').trim()
+}
+
 const canonicalUrl = computed(() => {
   if (!product.value)
     return ''
@@ -747,7 +760,7 @@ useHead(() => ({
         'name': metaTitle.value,
         'description': metaDescription.value,
         'image': productImages.value,
-        'sku': product.value?.sku || undefined,
+        ...(productSku.value && { 'sku': productSku.value }),
         ...(product.value?.barcode && { 'gtin': product.value.barcode }),
         // 🔥 Если есть линейка - показываем её как бренд с parentOrganization
         // Это позволяет Google понять иерархию: Mattel → Barbie → Товар
