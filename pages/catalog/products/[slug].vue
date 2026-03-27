@@ -382,11 +382,6 @@ const productSku = computed(() => {
     : undefined
 })
 
-function stripHtml(html: string | null | undefined): string {
-  if (!html) return ''
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s{2,}/g, ' ').trim()
-}
-
 const canonicalUrl = computed(() => {
   if (!product.value)
     return ''
@@ -770,14 +765,11 @@ useHead(() => ({
               '@id': `https://uhti.kz${productLineLink.value}#brand`,
               'name': productLineName.value,
               'url': `https://uhti.kz${productLineLink.value}`,
-              // Родительский бренд (Mattel для Barbie)
               'parentOrganization': {
                 '@type': 'Brand',
                 '@id': `https://uhti.kz${brandLink.value}#brand`,
-                'name': brandName.value,
-                ...(brandLink.value && {
-                  url: `https://uhti.kz${brandLink.value}`,
-                }),
+              'name': brandName.value || 'Ухтышка',
+              ...(brandLink.value && { 'url': `https://uhti.kz${brandLink.value}` }),
               },
             }
           : {
