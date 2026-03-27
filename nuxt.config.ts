@@ -63,6 +63,8 @@ export default defineNuxtConfig({
       address: {
         addressCountry: 'KZ',
         addressLocality: 'Алматы',
+        streetAddress: 'мкр. Шапагат, ул. Амангельды',
+        postalCode: '050058',
       },
       contactPoint: {
         telephone: '+7-702-537-94-73',
