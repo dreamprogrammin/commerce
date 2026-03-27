@@ -163,7 +163,9 @@ useSchemaOrg([
       '@type': 'PostalAddress',
       'addressCountry': 'KZ',
       'addressLocality': 'Алматы',
-      'addressRegion': 'Алматинская область',
+      'addressRegion': 'Алматинская область', 
+      'streetAddress': 'мкр. Шапагат, ул. Амангельды', 
+      'postalCode': '050058',                            
     },
     'contactPoint': {
       '@type': 'ContactPoint',
