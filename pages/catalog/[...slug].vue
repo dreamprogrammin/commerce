@@ -40,6 +40,11 @@ onUnmounted(() => {
   }
 })
 
+function cleanDescription(html: string | null, maxLength = 200): string {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().substring(0, maxLength)
+}
+
 // --- 1.5. Brand Landing ---
 const activeBrandSlug = computed(() => {
   const brandParam = route.query.brand
@@ -951,7 +956,7 @@ useHead(() => ({
 useSchemaOrg(
   computed(() => {
     const schemas: any[] = []
-
+ 
     // 1. CollectionPage
     schemas.push({
       '@type': 'CollectionPage',
@@ -965,12 +970,18 @@ useSchemaOrg(
       },
       ...(categoryOgImageUrl.value && { image: categoryOgImageUrl.value }),
       ...(metaKeywords.value && { keywords: metaKeywords.value }),
+      // FIX: добавлены image и url в author для Article schema
       ...(seoText.value && {
         mainEntity: {
           '@type': 'Article',
           'headline': title.value,
-          'articleBody': seoText.value.replace(/<[^>]*>/g, '').substring(0, 500),
-          'author': { '@type': 'Organization', 'name': 'Ухтышка' },
+          'image': 'https://uhti.kz/logo.png',
+          'articleBody': cleanDescription(seoText.value, 500),
+          'author': {
+            '@type': 'Organization',
+            'name': 'Ухтышка',
+            'url': 'https://uhti.kz',
+          },
         },
       }),
       ...(displayedProducts.value.length > 0 && {
@@ -986,7 +997,7 @@ useSchemaOrg(
         },
       }),
     })
-
+ 
     // 2. SiteNavigationElement (подкатегории + бренды)
     const subcatParts = subcategories.value.slice(0, 6).map(cat => ({
       '@type': 'WebPage',
@@ -1006,9 +1017,8 @@ useSchemaOrg(
         'hasPart': navParts,
       })
     }
-
+ 
     // 3. ItemList (список товаров с ценами)
-    // Рендерится только если useCatalogQuery вернул данные на сервере (SSR prefetch)
     if (displayedProducts.value.length > 0) {
       schemas.push({
         '@type': 'ItemList',
@@ -1019,7 +1029,8 @@ useSchemaOrg(
           'item': {
             '@type': 'Product',
             'name': product.name,
-            'description': product.description || product.name,
+            // FIX: очищаем HTML и обрезаем до 200 символов
+            'description': cleanDescription(product.description) || product.name,
             'url': `https://uhti.kz/catalog/products/${product.slug}`,
             'sku': product.id,
             ...(product.product_images?.[0]?.image_url && {
@@ -1073,9 +1084,8 @@ useSchemaOrg(
         })),
       })
     }
-
+ 
     // 4. FAQPage — без фильтров ИЛИ на Brand Landing (?brand=X)
-    // FIX: раньше блокировался при любых фильтрах, теперь работает и на Brand Landing
     if (faqQuestions.value.length > 0 && (!hasActiveFilters.value || activeBrand.value)) {
       schemas.push({
         '@type': 'FAQPage',
@@ -1089,7 +1099,7 @@ useSchemaOrg(
         })),
       })
     }
-
+ 
     return schemas
   }),
 )
