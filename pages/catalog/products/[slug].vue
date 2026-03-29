@@ -15,6 +15,7 @@ import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
 import ProductDescription from '@/components/product/ProductDescription.vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
+import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
 
 const route = useRoute()
 const router = useRouter()
@@ -52,12 +53,9 @@ if (import.meta.server) {
     initialProduct = product
   }
   catch {
-    // Supabase недоступен (522, таймаут и т.д.) — не бросаем 404,
-    // клиент перезагрузит данные после гидратации
     ssrFetchFailed = true
   }
 
-  // 404 только когда Supabase ответил нормально, но товар не найден
   if (!initialProduct && !ssrFetchFailed) {
     throw createError({
       statusCode: 404,
@@ -79,8 +77,6 @@ const {
 } = useQuery({
   queryKey: ['product', slug],
   queryFn: async () => {
-    // fetchProductBySlug бросает ошибку при проблемах сети — TanStack Query сделает retry
-    // Возвращает null если товар не найден (PGRST116)
     const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
     if (!fetchedProduct) {
       throw new Error('Товар не найден')
@@ -89,10 +85,9 @@ const {
   },
   staleTime: 2 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  retry: 2, // 2 попытки при ошибке сети
-  refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (даже если SSR кеш свежий)
-  refetchOnWindowFocus: true, // Проверить при возврате на вкладку (если > staleTime)
-  // 🔥 На сервере данные уже в кеше, не делаем повторный запрос
+  retry: 2,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: true,
   initialData: import.meta.server
     ? queryClient.getQueryData(['product', slug.value])
     : undefined,
@@ -109,7 +104,7 @@ watch([isProductError, product], ([error, prod]) => {
   }
 })
 
-// ✅ 3. Аксессуары - загружаются после основного продукта
+// ✅ Аксессуары
 const { data: accessories, isLoading: accessoriesLoading } = useQuery({
   queryKey: ['product-accessories', computed(() => product.value?.id)],
   queryFn: async () => {
@@ -122,7 +117,7 @@ const { data: accessories, isLoading: accessoriesLoading } = useQuery({
   gcTime: 30 * 60 * 1000,
 })
 
-// ✅ 4. Похожие товары
+// ✅ Похожие товары
 const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
   queryKey: ['similar-products', computed(() => product.value?.category_id)],
   queryFn: async () => {
@@ -138,7 +133,7 @@ const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
   gcTime: 30 * 60 * 1000,
 })
 
-// ✅ 5. Вопросы и ответы
+// ✅ Вопросы и ответы
 const { data: productQuestions } = useQuery({
   queryKey: ['product-questions', computed(() => product.value?.id)],
   queryFn: async () => {
@@ -151,7 +146,7 @@ const { data: productQuestions } = useQuery({
   gcTime: 10 * 60 * 1000,
 })
 
-// ✅ 6. Отзывы
+// ✅ Отзывы
 const { data: productReviews } = useQuery({
   queryKey: ['product-reviews', computed(() => product.value?.id)],
   queryFn: async () => {
@@ -220,10 +215,8 @@ const mainProductPrice = computed(() => {
 const totalPrice = computed(() => {
   if (!product.value)
     return 0
-  // Используем финальную цену со скидкой для основного товара
   let total = mainProductPrice.value.final
 
-  // Добавляем цены выбранных аксессуаров с учетом их скидок
   const selected = (accessories.value || []).filter((acc: ProductWithImages) => selectedAccessoryIds.value.includes(acc.id))
   for (const acc of selected) {
     const accPrice = formatPriceWithDiscount(
@@ -263,15 +256,12 @@ const priceChars = computed(() => {
   })
 })
 
-// Выбранные аксессуары (полные объекты)
 const selectedAccessoriesData = computed(() =>
   (accessories.value || []).filter((acc: ProductWithImages) => selectedAccessoryIds.value.includes(acc.id)),
 )
 
-// Есть ли хоть один выбранный аксессуар
 const hasAccessoriesSelected = computed(() => selectedAccessoriesData.value.length > 0)
 
-// Синхронизация: при загрузке аксессуаров предвыбрать те, что уже в корзине
 watch(accessories, (newAccessories) => {
   if (!newAccessories?.length)
     return
@@ -300,13 +290,11 @@ async function addToCart() {
 
   let addedCount = 0
 
-  // Add main product if not in cart
   if (!mainItemInCart.value) {
     await cartStore.addItem(product.value, 1)
     addedCount++
   }
 
-  // Add selected accessories to cart
   const selectedAccessories = (accessories.value || []).filter((acc: ProductWithImages) =>
     selectedAccessoryIds.value.includes(acc.id),
   )
@@ -319,7 +307,6 @@ async function addToCart() {
     }
   }
 
-  // Show success message only if we added something
   if (addedCount > 0) {
     if (addedCount === 1) {
       toast.success('Товар добавлен в корзину')
@@ -329,14 +316,12 @@ async function addToCart() {
     }
   }
   else if (selectedAccessories.length > 0) {
-    // If we selected accessories but they were already in cart
     toast.info('Выбранные товары уже в корзине')
   }
 }
 
 useFlipCounter(totalPrice, digitColumns)
 
-// Синхронизируем sticky-панель с видимостью навбара (тот же порог скролла)
 const isNavVisible = ref(true)
 let stickyLastScrollY = 0
 
@@ -373,7 +358,6 @@ function prefetchProduct(productSlug: string) {
   })
 }
 
-// 🔥 SEO & OG IMAGE - теперь данные доступны на сервере
 const productSku = computed(() => {
   if (!product.value) return undefined
   if (product.value.sku) return product.value.sku
@@ -392,7 +376,6 @@ const metaTitle = computed(() => {
   if (!product.value)
     return 'Товар | Ухтышка'
 
-  // Приоритет: meta_title > seo_title > автогенерация
   if (product.value.meta_title) {
     return product.value.meta_title
   }
@@ -403,7 +386,6 @@ const metaTitle = computed(() => {
   return `${product.value.name} - Купить в интернет-магазине | Ухтышка`
 })
 
-// Хелперы для возраста и пола
 const ageRangeText = computed(() => {
   if (!product.value)
     return null
@@ -447,7 +429,6 @@ const metaDescription = computed(() => {
   if (!product.value)
     return ''
 
-  // Приоритет: meta_description > seo_description > автогенерация
   if (product.value.meta_description) {
     return product.value.meta_description
   }
@@ -455,10 +436,8 @@ const metaDescription = computed(() => {
     return product.value.seo_description
   }
 
-  // Автогенерация с учетом возраста и пола
   const parts: string[] = []
 
-  // Название + аудитория
   if (audienceText.value) {
     parts.push(`${product.value.name} ${audienceText.value}`)
   }
@@ -466,7 +445,6 @@ const metaDescription = computed(() => {
     parts.push(product.value.name)
   }
 
-  // Цена и наличие
   parts.push(`Цена: ${formatPrice(product.value.price)} ₸`)
   parts.push(product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ')
   parts.push('Доставка по Казахстану')
@@ -477,24 +455,20 @@ const metaDescription = computed(() => {
 const categoryName = computed(() => product.value?.categories?.name)
 const categorySlug = computed(() => product.value?.categories?.slug)
 
-// Получаем полные данные категории из store (как в catalog/[...slug].vue)
 const fullCategory = computed(() => {
   if (!categorySlug.value || !categoriesStore.allCategories.length)
     return null
   return categoriesStore.allCategories.find(c => c.slug === categorySlug.value)
 })
 
-// Получаем родительские категории с полными данными из store
 const parentCategories = computed(() => {
   if (!categoriesStore.allCategories.length)
     return []
 
   return breadcrumbs.value
-    .slice(0, -1) // Убираем последний элемент (товар)
-    .filter(crumb => crumb.href && crumb.name !== categoryName.value) // Убираем текущую категорию
+    .slice(0, -1)
+    .filter(crumb => crumb.href && crumb.name !== categoryName.value)
     .map(crumb => {
-      // Берем только последнюю часть пути (slug категории)
-      // Например: /catalog/boys/mashinki -> mashinki
       const slug = crumb.href?.split('/').pop()
       const category = categoriesStore.allCategories.find(c => c.slug === slug)
 
@@ -503,10 +477,9 @@ const parentCategories = computed(() => {
         category,
       }
     })
-    .filter(item => item.category) // Оставляем только найденные категории
+    .filter(item => item.category)
 })
 
-// Загружаем атрибуты категории чтобы проверить есть ли number_range
 const categoryAttributes = ref<AttributeWithValue[]>([])
 
 watch(() => categorySlug.value, async (newSlug) => {
@@ -515,12 +488,10 @@ watch(() => categorySlug.value, async (newSlug) => {
   }
 }, { immediate: true })
 
-// Проверяем есть ли у категории товара атрибут "Количество деталей" (number_range)
 const hasPieceCountAttribute = computed(() => {
   return categoryAttributes.value.some(attr => attr.display_type === 'number_range')
 })
 
-// Типизация для product_lines (расширяем базовый тип)
 interface ProductWithProductLine {
   product_lines?: { name: string, slug: string } | null
 }
@@ -530,7 +501,6 @@ const brandSlug = computed(() => product.value?.brands?.slug)
 const productLineName = computed(() => (product.value as ProductWithProductLine | null)?.product_lines?.name)
 const productLineSlug = computed(() => (product.value as ProductWithProductLine | null)?.product_lines?.slug)
 
-// Ссылка на страницу линейки (если будет создана)
 const productLineLink = computed(() => {
   if (!productLineSlug.value || !brandSlug.value)
     return null
@@ -540,7 +510,6 @@ const productLineLink = computed(() => {
 const metaKeywords = computed(() => {
   const keywords: string[] = []
 
-  // Пользовательские ключевые слова (приоритет: meta_keywords > seo_keywords)
   if (product.value?.meta_keywords?.length) {
     keywords.push(...product.value.meta_keywords)
   }
@@ -548,17 +517,14 @@ const metaKeywords = computed(() => {
     keywords.push(...product.value.seo_keywords)
   }
 
-  // Автоматические ключевые слова на основе данных товара
   if (product.value) {
     keywords.push(product.value.name)
 
-    // Добавляем возраст в ключевые слова
     if (product.value.min_age_years !== null) {
       keywords.push(`игрушки от ${product.value.min_age_years} лет`)
       keywords.push(`${product.value.min_age_years} года`)
     }
 
-    // Добавляем пол
     if (product.value.gender === 'female') {
       keywords.push('игрушки для девочек', 'подарок девочке')
     }
@@ -566,21 +532,17 @@ const metaKeywords = computed(() => {
       keywords.push('игрушки для мальчиков', 'подарок мальчику')
     }
 
-    // Бренд
     if (brandName.value) {
       keywords.push(brandName.value)
     }
 
-    // Линейка продуктов (Barbie, Hot Wheels и т.д.)
     if (productLineName.value) {
       keywords.push(productLineName.value)
-      // Комбинация бренд + линейка для поиска
       if (brandName.value) {
         keywords.push(`${brandName.value} ${productLineName.value}`)
       }
     }
 
-    // Категория
     if (categoryName.value) {
       keywords.push(categoryName.value)
     }
@@ -591,7 +553,6 @@ const metaKeywords = computed(() => {
   return keywords.length > 0 ? [...new Set(keywords)].join(', ') : null
 })
 
-// URL логотипа бренда
 const brandLogoUrl = computed(() => {
   const logoUrl = product.value?.brands?.logo_url
   if (!logoUrl)
@@ -599,7 +560,6 @@ const brandLogoUrl = computed(() => {
   return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 })
 
-// URL логотипа линейки
 const productLineLogoUrl = computed(() => {
   const logoUrl = product.value?.product_lines?.logo_url
   if (!logoUrl)
@@ -607,7 +567,6 @@ const productLineLogoUrl = computed(() => {
   return getVariantUrl(BUCKET_NAME_PRODUCT_LINES, logoUrl, 'sm')
 })
 
-// Ссылки для SEO блока "Ещё товары"
 const brandLink = computed(() => {
   if (!brandSlug.value)
     return null
@@ -620,7 +579,6 @@ const categoryLink = computed(() => {
   return `/catalog/${categorySlug.value}`
 })
 
-// Динамические атрибуты товара для Schema.org additionalProperty
 const schemaAdditionalProperties = computed(() => {
   const pavs = product.value?.product_attribute_values
   if (!pavs?.length)
@@ -674,7 +632,6 @@ const ogImageUrl = computed(() => {
   return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${imageUrl}`
 })
 
-// Массив всех изображений для JSON-LD (Google рекомендует несколько)
 const productImages = computed(() => {
   if (!product.value?.product_images?.length) {
     return ['https://uhti.kz/og-default.jpg']
@@ -719,189 +676,186 @@ useBreadcrumbSchema(computed(() =>
   })),
 ))
 
-useHead(() => ({
-  meta: [
-    { name: 'keywords', content: metaKeywords.value || '' },
-    { property: 'og:type', content: 'product' },
-    { property: 'product:price:amount', content: String(product.value?.price || 0) },
-    { property: 'product:price:currency', content: 'KZT' },
-    { property: 'product:availability', content: (product.value?.stock_quantity || 0) > 0 ? 'in stock' : 'out of stock' },
-    { property: 'product:brand', content: brandName.value || '' },
-    // Линейка продуктов (Barbie, Hot Wheels)
-    ...(productLineName.value ? [{ property: 'product:product_line', content: productLineName.value }] : []),
-    { property: 'product:category', content: categoryName.value || '' },
-  ],
-  link: [
-    { rel: 'canonical', href: canonicalUrl.value },
-  ],
-  script: [
-    // FAQPage Schema (вопросы с ответами)
-    ...(faqSchemaItems.value.length > 0
-      ? [{
-          type: 'application/ld+json',
-          children: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            'mainEntity': faqSchemaItems.value,
-          }),
-        }]
-      : []),
-    // 3. Product Schema
-    {
+// ✅ Product JSON-LD — строится только когда product.value есть
+const productJsonLd = computed(() => {
+  if (!product.value) return null
+
+  const p = product.value
+  const finalPrice = p.discount_percentage
+    ? Math.round(Number(p.price) * (100 - p.discount_percentage) / 100)
+    : Math.round(Number(p.price))
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    'name': metaTitle.value,
+    'description': metaDescription.value,
+    'image': productImages.value,
+    ...(productSku.value && { sku: productSku.value }),
+    ...(p.barcode && { gtin: p.barcode }),
+    'brand': productLineName.value
+      ? {
+          '@type': 'Brand',
+          '@id': `https://uhti.kz${productLineLink.value}#brand`,
+          'name': productLineName.value,
+          'url': `https://uhti.kz${productLineLink.value}`,
+          'parentOrganization': {
+            '@type': 'Brand',
+            '@id': `https://uhti.kz${brandLink.value}#brand`,
+            'name': brandName.value || 'Ухтышка',
+            ...(brandLink.value && { url: `https://uhti.kz${brandLink.value}` }),
+          },
+        }
+      : {
+          '@type': 'Brand',
+          'name': brandName.value || 'Ухтышка',
+          ...(brandLink.value && { url: `https://uhti.kz${brandLink.value}` }),
+        },
+    'offers': {
+      '@type': 'Offer',
+      'price': finalPrice,
+      'priceCurrency': 'KZT',
+      'availability': p.stock_quantity > 0
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      'url': canonicalUrl.value,
+      'priceValidUntil': priceValidUntil,
+      'itemCondition': 'https://schema.org/NewCondition',
+      'seller': {
+        '@type': 'Organization',
+        'name': 'Ухтышка',
+        'url': 'https://uhti.kz',
+      },
+      'hasMerchantReturnPolicy': {
+        '@type': 'MerchantReturnPolicy',
+        'applicableCountry': 'KZ',
+        'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        'merchantReturnDays': 14,
+        'returnMethod': 'https://schema.org/ReturnByMail',
+        'returnFees': 'https://schema.org/FreeReturn',
+      },
+      'shippingDetails': {
+        '@type': 'OfferShippingDetails',
+        'shippingRate': {
+          '@type': 'MonetaryAmount',
+          'value': 0,
+          'currency': 'KZT',
+        },
+        'shippingDestination': {
+          '@type': 'DefinedRegion',
+          'addressCountry': 'KZ',
+          'addressRegion': 'Алматы',
+        },
+        'deliveryTime': {
+          '@type': 'ShippingDeliveryTime',
+          'handlingTime': {
+            '@type': 'QuantitativeValue',
+            'minValue': 0,
+            'maxValue': 1,
+            'unitCode': 'DAY',
+          },
+          'transitTime': {
+            '@type': 'QuantitativeValue',
+            'minValue': 1,
+            'maxValue': 3,
+            'unitCode': 'DAY',
+          },
+        },
+      },
+    },
+    ...(categoryName.value && { category: categoryName.value }),
+    ...(categoryLink.value && {
+      isRelatedTo: {
+        '@type': 'CollectionPage',
+        'name': categoryName.value,
+        'url': `https://uhti.kz${categoryLink.value}`,
+      },
+    }),
+    ...((p.min_age_years !== null || p.max_age_years !== null) && {
+      audience: {
+        '@type': 'PeopleAudience',
+        ...(p.min_age_years !== null && { suggestedMinAge: p.min_age_years }),
+        ...(p.max_age_years !== null && { suggestedMaxAge: p.max_age_years }),
+        ...(p.gender && p.gender !== 'unisex' && {
+          suggestedGender: p.gender === 'female' ? 'female' : 'male',
+        }),
+      },
+    }),
+    ...(metaKeywords.value && { keywords: metaKeywords.value }),
+    ...(schemaAdditionalProperties.value.length > 0 && {
+      additionalProperty: schemaAdditionalProperties.value,
+    }),
+    ...(p.review_count && p.review_count > 0 && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        'ratingValue': String(p.avg_rating || 0),
+        'reviewCount': String(p.review_count),
+        'bestRating': '5',
+        'worstRating': '1',
+      },
+    }),
+    ...(productReviews.value?.length && {
+      review: productReviews.value.slice(0, 5).map(r => ({
+        '@type': 'Review',
+        'author': {
+          '@type': 'Person',
+          'name': [r.profiles?.first_name, r.profiles?.last_name].filter(Boolean).join(' ') || 'Покупатель',
+        },
+        'datePublished': r.created_at.split('T')[0],
+        ...(r.text && { reviewBody: r.text }),
+        'reviewRating': {
+          '@type': 'Rating',
+          'ratingValue': String(r.rating),
+          'bestRating': '5',
+          'worstRating': '1',
+        },
+      })),
+    }),
+  }
+})
+
+// ✅ useHead — guard: если product.value нет, возвращаем пустой объект
+useHead(() => {
+  if (!product.value) return {}
+
+  const scripts = []
+
+  if (faqSchemaItems.value.length > 0) {
+    scripts.push({
       type: 'application/ld+json',
       children: JSON.stringify({
         '@context': 'https://schema.org',
-        '@type': 'Product',
-        'name': metaTitle.value,
-        'description': metaDescription.value,
-        'image': productImages.value,
-        ...(productSku.value && { 'sku': productSku.value }),
-        ...(product.value?.barcode && { 'gtin': product.value.barcode }),
-        // 🔥 Если есть линейка - показываем её как бренд с parentOrganization
-        // Это позволяет Google понять иерархию: Mattel → Barbie → Товар
-        'brand': productLineName.value
-          ? {
-              '@type': 'Brand',
-              '@id': `https://uhti.kz${productLineLink.value}#brand`,
-              'name': productLineName.value,
-              'url': `https://uhti.kz${productLineLink.value}`,
-              'parentOrganization': {
-                '@type': 'Brand',
-                '@id': `https://uhti.kz${brandLink.value}#brand`,
-              'name': brandName.value || 'Ухтышка',
-              ...(brandLink.value && { 'url': `https://uhti.kz${brandLink.value}` }),
-              },
-            }
-          : {
-              '@type': 'Brand',
-              'name': brandName.value || 'Ухтышка',
-              ...(brandLink.value && {
-                url: `https://uhti.kz${brandLink.value}`,
-              }),
-            },
-        'offers': {
-          '@type': 'Offer',
-          'price': product.value?.discount_percentage
-            ? Math.round(Number(product.value.price) * (100 - product.value.discount_percentage) / 100)
-            : Math.round(Number(product.value?.price || 0)),
-          'priceCurrency': 'KZT',
-          'availability': (product.value?.stock_quantity || 0) > 0
-            ? 'https://schema.org/InStock'
-            : 'https://schema.org/OutOfStock',
-          'url': canonicalUrl.value,
-          'priceValidUntil': priceValidUntil,
-          'itemCondition': 'https://schema.org/NewCondition',
-          'seller': {
-            '@type': 'Organization',
-            'name': 'Ухтышка',
-            'url': 'https://uhti.kz',
-          },
-          'hasMerchantReturnPolicy': {
-            '@type': 'MerchantReturnPolicy',
-            'applicableCountry': 'KZ',
-            'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
-            'merchantReturnDays': 14,
-            'returnMethod': 'https://schema.org/ReturnByMail',
-            'returnFees': 'https://schema.org/FreeReturn',
-          },
-          'shippingDetails': {
-            '@type': 'OfferShippingDetails',
-            'shippingRate': {
-              '@type': 'MonetaryAmount',
-              'value': 0,
-              'currency': 'KZT',
-            },
-            'shippingDestination': {
-              '@type': 'DefinedRegion',
-              'addressCountry': 'KZ',
-              'addressRegion': 'Алматы',
-            },
-            'deliveryTime': {
-              '@type': 'ShippingDeliveryTime',
-              'handlingTime': {
-                '@type': 'QuantitativeValue',
-                'minValue': 0,
-                'maxValue': 1,
-                'unitCode': 'DAY',
-              },
-              'transitTime': {
-                '@type': 'QuantitativeValue',
-                'minValue': 1,
-                'maxValue': 3,
-                'unitCode': 'DAY',
-              },
-            },
-          },
-        },
-        // Категория товара с URL
-        ...(categoryName.value && {
-          category: categoryName.value,
-        }),
-        // 🔥 Связь с категорией для SEO
-        ...(categoryLink.value && {
-          isRelatedTo: {
-            '@type': 'CollectionPage',
-            'name': categoryName.value,
-            'url': `https://uhti.kz${categoryLink.value}`,
-          },
-        }),
-        // Рекомендуемый возраст (Schema.org suggestedAge)
-        ...((product.value?.min_age_years !== null || product.value?.max_age_years !== null) && {
-          audience: {
-            '@type': 'PeopleAudience',
-            ...(product.value?.min_age_years !== null && {
-              suggestedMinAge: product.value?.min_age_years,
-            }),
-            ...(product.value?.max_age_years !== null && {
-              suggestedMaxAge: product.value?.max_age_years,
-            }),
-            // Пол аудитории
-            ...(product.value?.gender && product.value?.gender !== 'unisex' && {
-              suggestedGender: product.value?.gender === 'female' ? 'female' : 'male',
-            }),
-          },
-        }),
-        // Ключевые слова для поиска
-        ...(metaKeywords.value && {
-          keywords: metaKeywords.value,
-        }),
-        // Динамические атрибуты (размер, цвет и т.д.)
-        ...(schemaAdditionalProperties.value.length > 0 && {
-          additionalProperty: schemaAdditionalProperties.value,
-        }),
-        // Рейтинг и отзывы (SEO aggregateRating)
-        ...(product.value?.review_count && product.value.review_count > 0 && {
-          'aggregateRating': {
-            '@type': 'AggregateRating',
-            'ratingValue': String(product.value.avg_rating || 0),
-            'reviewCount': String(product.value.review_count),
-            'bestRating': '5',
-            'worstRating': '1',
-          },
-        }),
-        ...(productReviews.value?.length && {
-          'review': productReviews.value.slice(0, 5).map(r => ({
-            '@type': 'Review',
-            'author': {
-              '@type': 'Person',
-              'name': [r.profiles?.first_name, r.profiles?.last_name].filter(Boolean).join(' ') || 'Покупатель',
-            },
-            'datePublished': r.created_at.split('T')[0],
-            ...(r.text && { 'reviewBody': r.text }),
-            'reviewRating': {
-              '@type': 'Rating',
-              'ratingValue': String(r.rating),
-              'bestRating': '5',
-              'worstRating': '1',
-            },
-          })),
-        }),
+        '@type': 'FAQPage',
+        'mainEntity': faqSchemaItems.value,
       }),
-    },
-  ],
-}))
-</script>
+    })
+  }
 
+  if (productJsonLd.value) {
+    scripts.push({
+      type: 'application/ld+json',
+      children: JSON.stringify(productJsonLd.value),
+    })
+  }
+
+  return {
+    meta: [
+      { name: 'keywords', content: metaKeywords.value || '' },
+      { property: 'og:type', content: 'product' },
+      { property: 'product:price:amount', content: String(product.value.price) },
+      { property: 'product:price:currency', content: 'KZT' },
+      { property: 'product:availability', content: product.value.stock_quantity > 0 ? 'in stock' : 'out of stock' },
+      { property: 'product:brand', content: brandName.value || '' },
+      ...(productLineName.value ? [{ property: 'product:product_line', content: productLineName.value }] : []),
+      { property: 'product:category', content: categoryName.value || '' },
+    ],
+    link: [
+      { rel: 'canonical', href: canonicalUrl.value },
+    ],
+    script: scripts,
+  }
+})
+</script>
 <template>
   <div class="bg-background">
     <div :class="`${containerClass} py-4 lg:py-6`">
