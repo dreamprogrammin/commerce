@@ -15,7 +15,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants' // Проверь правильность пути
+import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
@@ -30,20 +30,17 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
-// Фиксированная дата для priceValidUntil (избегаем гидратации с new Date())
 const priceValidUntil = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
 
-// 🆕 Отмена запросов при размонтировании
 const abortController = ref<AbortController | null>(null)
 
 onUnmounted(() => {
-  // Отменяем все активные запросы при уходе со страницы
   if (abortController.value) {
     abortController.value.abort()
   }
 })
 
-// --- 1.5. Brand Landing (3-й уровень навигации) ---
+// --- 1.5. Brand Landing ---
 const activeBrandSlug = computed(() => {
   const brandParam = route.query.brand
   if (!brandParam || Array.isArray(brandParam))
@@ -51,7 +48,6 @@ const activeBrandSlug = computed(() => {
   return brandParam as string
 })
 
-// SEO данные для связки бренд+категория (из БД)
 const categoryBrandSeo = ref<{
   seo_h1: string | null
   seo_title: string | null
@@ -61,7 +57,6 @@ const categoryBrandSeo = ref<{
 const brandSeoLoading = ref(false)
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
-// Локальные интерфейсы для избежания циклической зависимости типов
 interface FilterAttribute {
   id: number
   name: string
@@ -104,17 +99,14 @@ const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
 
-// Фильтруем атрибуты - number_range заменён на слайдер piece_count, numeric обрабатывается отдельно
 const displayableFilters = computed<FilterAttribute[]>(() => {
   return availableFilters.value.filter(f => f.display_type !== 'number_range' && f.display_type !== 'numeric')
 })
 
-// Числовые атрибуты
 const numericFilters = computed<FilterAttribute[]>(() => {
   return availableFilters.value.filter(f => f.display_type === 'numeric')
 })
 
-// Диапазоны числовых атрибутов
 const numericAttributeRanges = ref<Record<number, { min: number, max: number }>>({})
 const accumulatedProducts = ref<CatalogProduct[]>([])
 const isMobileFiltersOpen = ref(false)
@@ -146,7 +138,6 @@ const activeFilters = ref<ActiveFilters>({
   numericAttributes: {},
 })
 
-// Smart UI: фильтруем линейки по выбранному бренду
 const filteredProductLines = computed(() => {
   const selectedBrands = activeFilters.value.brandIds
   if (selectedBrands.length === 0)
@@ -163,20 +154,19 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   }
   const crumbs = categoriesStore.getBreadcrumbs(currentCategorySlug.value)
 
-  // Brand Landing: добавляем бренд как последний элемент хлебных крошек
   if (activeBrand.value && crumbs.length > 0) {
     return [
       ...crumbs,
       {
         id: `brand-${activeBrand.value.id}`,
         name: activeBrand.value.name,
-        // Без href — текущая страница, не ссылка
       },
     ]
   }
 
   return crumbs
 })
+
 const currentCategory = computed(() => {
   if (!categoriesStore.allCategories.length)
     return null
@@ -185,16 +175,11 @@ const currentCategory = computed(() => {
 
 const categoryOgImageUrl = computed(() => {
   const imageFilename = currentCategory.value?.image_url
-
   if (!imageFilename)
     return undefined
-
-  // Используем пресет OG_IMAGE для Open Graph (1200x630)
   return getVariantUrl(BUCKET_NAME_CATEGORY, imageFilename, 'lg')
 })
 
-// Название категории (для breadcrumbs и fallback)
-// Используем чистые breadcrumbs без бренда, чтобы избежать дублирования: "Smoneo Smoneo В Алматы"
 const categoryName = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
@@ -205,27 +190,23 @@ const categoryName = computed(() => {
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 
-// Активный бренд (объект) для SEO
 const activeBrand = computed(() => {
   if (!activeBrandSlug.value || availableBrands.value.length === 0)
     return null
   return availableBrands.value.find(b => b.slug === activeBrandSlug.value) || null
 })
 
-// H1 заголовок (приоритет: brand_seo_h1 > автогенерация с брендом > seo_h1 > name)
 const title = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
   }
 
-  // Brand Landing: кастомный H1 из БД или автогенерация
   if (activeBrand.value) {
     if (categoryBrandSeo.value?.seo_h1) {
       return categoryBrandSeo.value.seo_h1
     }
     const catName = categoryName.value
     const brandName = activeBrand.value.name
-    // Не дублируем бренд если название категории совпадает с брендом (напр. категория "LEGO" + бренд "LEGO")
     const prefix = catName.toLowerCase() === brandName.toLowerCase() ? catName : `${catName} ${brandName}`
     return `${prefix} в Алматы`
   }
@@ -236,7 +217,6 @@ const title = computed(() => {
 const priceRange = ref({ min: 0, max: 50000 })
 const pieceCountRange = ref<{ min: number, max: number } | null>(null)
 
-// Получаем подкатегории из store
 const subcategories = computed(() => categoriesStore.getSubcategories(currentCategorySlug.value))
 
 const activeSubcategoryLabel = computed(() => {
@@ -274,7 +254,6 @@ const activeFiltersCount = computed(() => {
     count += 1
   }
 
-  // Фильтр по количеству деталей
   if (pieceCountRange.value && activeFilters.value.pieceCount) {
     if (activeFilters.value.pieceCount[0] !== pieceCountRange.value.min
       || activeFilters.value.pieceCount[1] !== pieceCountRange.value.max) {
@@ -282,7 +261,6 @@ const activeFiltersCount = computed(() => {
     }
   }
 
-  // Числовые атрибуты
   Object.entries(activeFilters.value.numericAttributes).forEach(([attrId, range]) => {
     const attrRange = numericAttributeRanges.value[Number(attrId)]
     if (attrRange && (range[0] !== attrRange.min || range[1] !== attrRange.max)) {
@@ -292,6 +270,7 @@ const activeFiltersCount = computed(() => {
 
   return count
 })
+
 const canonicalUrl = computed(() => {
   const baseUrl = 'https://uhti.kz'
   let basePath: string
@@ -306,7 +285,6 @@ const canonicalUrl = computed(() => {
     basePath = route.path
   }
 
-  // Brand Landing: canonical включает ?brand=slug
   if (activeBrandSlug.value) {
     return `${baseUrl}${basePath}?brand=${activeBrandSlug.value}`
   }
@@ -319,11 +297,9 @@ const catalogFilters = computed<IProductFilters>(() => {
     .filter(([, optionIds]) => optionIds.length > 0)
     .map(([slug, optionIds]) => ({ slug, option_ids: optionIds as number[] }))
 
-  // Преобразуем числовые атрибуты в формат для API
   const numericAttributeFilters: NumericAttributeFilter[] = Object.entries(activeFilters.value.numericAttributes)
     .filter(([attrId, range]) => {
       const attrRange = numericAttributeRanges.value[Number(attrId)]
-      // Отправляем только если диапазон отличается от полного
       return attrRange && (range[0] !== attrRange.min || range[1] !== attrRange.max)
     })
     .map(([attrId, range]) => ({
@@ -383,9 +359,7 @@ function getSortByFromQuery(queryValue: LocationQueryValue | LocationQueryValue[
   return 'popularity'
 }
 
-// 🆕 Оптимизированная загрузка фильтров с отменой
 async function loadFilterData(slug: string) {
-  // Отменяем предыдущий запрос
   if (abortController.value) {
     abortController.value.abort()
   }
@@ -396,7 +370,6 @@ async function loadFilterData(slug: string) {
   try {
     const productsStore = useProductsStore()
 
-    // 🆕 Используем Promise.allSettled для продолжения при частичных ошибках
     const results = await Promise.allSettled([
       productsStore.fetchBrandsForCategory(slug),
       productsStore.fetchProductLinesForCategory(slug),
@@ -407,7 +380,6 @@ async function loadFilterData(slug: string) {
       productsStore.fetchPieceCountRangeForCategory(slug),
     ])
 
-    // Обрабатываем успешные результаты
     const [brandsResult, productLinesResult, attributesResult, materialsResult, countriesResult, priceRangeResult, pieceCountRangeResult] = results
 
     availableBrands.value = brandsResult.status === 'fulfilled' ? brandsResult.value : []
@@ -424,13 +396,11 @@ async function loadFilterData(slug: string) {
     const priceMax = Math.ceil(Number(priceRangeData.max_price))
     priceRange.value = { min: priceMin, max: priceMax }
 
-    // Диапазон количества деталей (может быть null если в категории нет товаров с piece_count)
     const pieceCountRangeData = pieceCountRangeResult.status === 'fulfilled' ? pieceCountRangeResult.value : null
     pieceCountRange.value = pieceCountRangeData
       ? { min: pieceCountRangeData.min_count, max: pieceCountRangeData.max_count }
       : null
 
-    // Загружаем диапазоны для числовых атрибутов
     const numericAttrs = availableFilters.value.filter(f => f.display_type === 'numeric')
     const numericRangesResults = await Promise.allSettled(
       numericAttrs.map(attr => productsStore.fetchNumericAttributeRange(slug, attr.id)),
@@ -461,11 +431,9 @@ async function loadFilterData(slug: string) {
     const priceMinFromQuery = route.query.price_min ? Number(route.query.price_min) : priceMin
     const priceMaxFromQuery = route.query.price_max ? Number(route.query.price_max) : priceMax
 
-    // Диапазон деталей из query (если есть)
     const pieceCountMinFromQuery = route.query.piece_count_min ? Number(route.query.piece_count_min) : pieceCountRangeData?.min_count
     const pieceCountMaxFromQuery = route.query.piece_count_max ? Number(route.query.piece_count_max) : pieceCountRangeData?.max_count
 
-    // Инициализируем числовые атрибуты их диапазонами (или из query)
     const initNumericAttrs: Record<number, [number, number]> = {}
     Object.entries(newNumericRanges).forEach(([attrId, range]) => {
       const id = Number(attrId)
@@ -477,7 +445,6 @@ async function loadFilterData(slug: string) {
       ]
     })
 
-    // Brand Landing: если есть ?brand=slug, резолвим в UUID
     let resolvedBrandIds = getArrayFromQuery(route.query.brands)
     const brandSlugParam = route.query.brand
     if (brandSlugParam && !Array.isArray(brandSlugParam) && availableBrands.value.length > 0) {
@@ -487,7 +454,6 @@ async function loadFilterData(slug: string) {
       }
     }
 
-    // Загружаем SEO-текст для связки бренд+категория (если есть ?brand)
     if (brandSlugParam && !Array.isArray(brandSlugParam)) {
       brandSeoLoading.value = true
       try {
@@ -524,7 +490,6 @@ async function loadFilterData(slug: string) {
     currentPage.value = 1
     accumulatedProducts.value = []
 
-    // Возвращаем данные для гидратации useAsyncData
     return {
       brands: availableBrands.value,
       productLines: availableProductLines.value,
@@ -539,7 +504,6 @@ async function loadFilterData(slug: string) {
     }
   }
   catch (error: unknown) {
-    // Игнорируем ошибки отмены
     if (error instanceof Error && error.name !== 'AbortError') {
       console.error('Error loading filters:', error)
     }
@@ -557,7 +521,6 @@ function loadMoreProducts() {
   currentPage.value++
 }
 
-// При смене бренда — очищаем выбранные линейки, которые не принадлежат выбранным брендам
 watch(() => activeFilters.value.brandIds, (newBrandIds) => {
   if (newBrandIds.length === 0)
     return
@@ -570,8 +533,6 @@ watch(() => activeFilters.value.brandIds, (newBrandIds) => {
   }
 })
 
-// 🔥 BUGFIX: Синхронизация ?brand= параметра с фильтрами при навигации
-// в рамках той же категории (loadFilterData не перезапускается если slug категории не менялся)
 watch(activeBrandSlug, async (newSlug) => {
   if (newSlug && availableBrands.value.length > 0) {
     const brand = availableBrands.value.find(b => b.slug === newSlug)
@@ -587,7 +548,6 @@ watch(activeBrandSlug, async (newSlug) => {
         accumulatedProducts.value = []
       }
     }
-    // Перезагружаем SEO данные для новой связки бренд+категория
     brandSeoLoading.value = true
     try {
       const { data: seoData } = await supabase.rpc('get_category_brand_seo', {
@@ -667,7 +627,6 @@ function toggleSubCategory(catId: string) {
   }
 }
 
-// 🆕 Дебаунс для query params (уменьшен до 300ms)
 function updateQueryParams() {
   const query: Record<string, any> = {}
 
@@ -679,7 +638,6 @@ function updateQueryParams() {
     query.subcategories = activeFilters.value.subCategoryIds
   }
 
-  // Brand Landing: если бренд выбран через ?brand=slug, сохраняем slug-формат
   if (activeBrandSlug.value && activeFilters.value.brandIds.length === 1) {
     const matchedBrand = availableBrands.value.find(b => b.id === activeFilters.value.brandIds[0])
     if (matchedBrand && matchedBrand.slug === activeBrandSlug.value) {
@@ -726,10 +684,8 @@ const hasActiveFilters = computed(() => {
   return activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity'
 })
 
-// SEO описание: приоритет у описания из БД
 const categoryDescription = computed(() => currentCategory.value?.description || null)
 
-// SEO: выбрана ровно одна линейка / один бренд
 const selectedSingleLine = computed(() => {
   if (activeFilters.value.productLineIds.length !== 1)
     return null
@@ -743,7 +699,6 @@ const selectedSingleBrand = computed(() => {
 })
 
 const metaDescription = computed(() => {
-  // Brand Landing: кастомное описание
   if (activeBrand.value) {
     if (categoryBrandSeo.value?.seo_description) {
       return categoryBrandSeo.value.seo_description
@@ -754,7 +709,6 @@ const metaDescription = computed(() => {
     return `В каталоге Ухтышка вы можете купить ${productName}. Большой выбор, гарантия оригинала, доставка по Алматы.`
   }
 
-  // SEO: если выбрана одна линейка — специальное описание
   if (selectedSingleLine.value) {
     const brandName = selectedSingleBrand.value?.name || ''
     const lineName = selectedSingleLine.value.name
@@ -762,35 +716,25 @@ const metaDescription = computed(() => {
     return `${prefix} — широкий ассортимент в интернет-магазине Ухтышка. Быстрая доставка в Алматы и по Казахстану.`
   }
 
-  // Если есть фильтры - показываем общее описание
   if (hasActiveFilters.value) {
     return `Результаты фильтрации для категории "${categoryName.value}". Широкий выбор товаров.`
   }
 
-  // 🆕 Приоритет: meta_description > description > автогенерация
   if (currentCategory.value?.meta_description) {
     return currentCategory.value.meta_description
   }
 
-  // Если есть описание категории из БД - используем его
   if (categoryDescription.value) {
     return categoryDescription.value
   }
 
-  // 🔥 Автогенерация в стиле detmir.kz
   const parts: string[] = []
-
-  // Название категории
   parts.push(`${categoryName.value}`)
-
-  // Магазин и доставка
   parts.push('купить в интернет-магазине Ухтышка ✔️ Большой выбор, доставка по Алматы и Казахстану')
-
   return parts.join('. ')
 })
 
 const metaTitle = computed(() => {
-  // Brand Landing: кастомный title
   if (activeBrand.value) {
     if (categoryBrandSeo.value?.seo_title) {
       return categoryBrandSeo.value.seo_title
@@ -801,7 +745,6 @@ const metaTitle = computed(() => {
     return `Купить ${prefix} в Алматы | Ухтышка`
   }
 
-  // SEO: если выбрана одна линейка — специальный title
   if (selectedSingleLine.value) {
     const brandName = selectedSingleBrand.value?.name || ''
     const lineName = selectedSingleLine.value.name
@@ -812,25 +755,24 @@ const metaTitle = computed(() => {
   if (hasActiveFilters.value) {
     return `${categoryName.value} - Фильтр | Ухтышка`
   }
-  // Приоритет: meta_title > seo_title > автогенерация
+
   if (currentCategory.value?.meta_title) {
     return currentCategory.value.meta_title
   }
+
   const seoTitle = currentCategory.value?.seo_title
   if (seoTitle) {
     return seoTitle
   }
+
   return `${categoryName.value} купить в интернет-магазине Ухтышка Казахстан`
 })
 
-// 🆕 Ключевые слова (приоритет: meta_keywords > seo_keywords)
 const metaKeywords = computed(() => {
-  // Приоритет новому полю meta_keywords
   const metaKw = currentCategory.value?.meta_keywords
   if (metaKw && metaKw.length > 0) {
     return metaKw.join(', ')
   }
-  // Fallback на старое поле seo_keywords
   const keywords = currentCategory.value?.seo_keywords
   if (keywords && keywords.length > 0) {
     return keywords.join(', ')
@@ -838,10 +780,8 @@ const metaKeywords = computed(() => {
   return null
 })
 
-// SEO текст (только из БД, без автогенерации)
 const seoText = computed(() => {
   if (activeBrand.value) {
-    // Brand Landing: только если есть кастомный текст в БД
     return categoryBrandSeo.value?.seo_text
       ? sanitizeHtml(categoryBrandSeo.value.seo_text)
       : null
@@ -852,27 +792,16 @@ const seoText = computed(() => {
 })
 
 const robotsRule = computed(() => {
-  // Brand Landing: страницы бренд+категория разрешаем индексировать
   if (activeBrandSlug.value && activeFilters.value.brandIds.length === 1) {
-    return {
-      index: true,
-      follow: true,
-    }
+    return { index: true, follow: true }
   }
-  // Если есть фильтры ИЛИ сортировка не по умолчанию
   if (activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity') {
-    return {
-      noindex: true,
-      follow: true,
-    }
+    return { noindex: true, follow: true }
   }
-  return {
-    index: true,
-    follow: true,
-  }
+  return { index: true, follow: true }
 })
 
-// --- 5. Логика загрузки данных и реакции на изменения ---
+// --- 5. Загрузка данных ---
 
 await useAsyncData(
   `catalog-meta-${currentCategorySlug.value}`,
@@ -889,8 +818,6 @@ const { data: _filterPayload } = await useAsyncData(
   },
 )
 
-// Восстанавливаем refs из hydrated payload на клиенте
-// (loadFilterData обновляет refs как side-effect, но useAsyncData не перезапускает handler при гидратации)
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
   availableProductLines.value = _filterPayload.value.productLines
@@ -905,11 +832,9 @@ if (import.meta.client && _filterPayload.value) {
   isLoadingFilters.value = false
 }
 
-// 🆕 Загружаем FAQ вопросы для Schema.org
 const { data: categoryQuestions } = await useAsyncData(
   `catalog-faq-${currentCategorySlug.value}`,
   async () => {
-    // Получаем ID категории по slug
     const category = categoriesStore.allCategories.find(c => c.slug === currentCategorySlug.value)
     if (!category?.id || currentCategorySlug.value === 'all')
       return []
@@ -930,7 +855,6 @@ const { data: categoryQuestions } = await useAsyncData(
 
 const faqQuestions = computed(() => categoryQuestions.value || [])
 
-// 🆕 Агрегированный рейтинг категории (TanStack Query — кэш 5 мин)
 const supabase = useSupabaseClient()
 const currentCategoryId = computed(() => {
   const cat = categoriesStore.allCategories.find(c => c.slug === currentCategorySlug.value)
@@ -957,14 +881,12 @@ const { data: categoryRatingData } = useQuery({
   gcTime: 10 * 60 * 1000,
 })
 
-// Показываем блок рейтинга только при >= 3 отзывах
 const showCategoryRating = computed(() =>
   categoryRatingData.value
   && categoryRatingData.value.total_reviews >= 3
   && categoryRatingData.value.avg_rating > 0,
 )
 
-// 🆕 Уменьшен debounce до 300ms
 watchDebounced(
   activeFilters,
   () => {
@@ -979,7 +901,6 @@ useRobotsRule(robotsRule)
 
 const isLoading = computed(() => isLoadingFilters.value || (isLoadingProducts.value && currentPage.value === 1))
 
-// 🔥 Подготовка данных для OG Image
 const ogImageDescription = computed(() => {
   if (hasActiveFilters.value) {
     return `Найдено товаров: ${displayedProducts.value.length}`
@@ -987,7 +908,6 @@ const ogImageDescription = computed(() => {
   return 'Широкий ассортимент качественных товаров по выгодным ценам'
 })
 
-// 🔥 Используй кастомный OG Image компонент
 defineOgImageComponent('OgImageCatalog', {
   title: title.value,
   description: ogImageDescription.value,
@@ -1009,16 +929,6 @@ useSeoMeta({
   robots: computed(() => robotsRule.value.noindex ? 'noindex, follow' : 'index, follow'),
 })
 
-// Добавляем keywords через useHead для совместимости
-useHead({
-  meta: [
-    {
-      name: 'keywords',
-      content: () => metaKeywords.value || '',
-    },
-  ],
-})
-
 // BreadcrumbList JSON-LD
 useBreadcrumbSchema(computed(() =>
   breadcrumbs.value.map(crumb => ({
@@ -1027,15 +937,23 @@ useBreadcrumbSchema(computed(() =>
   })),
 ))
 
-// SEO structured data & canonical
-useHead(() => {
-  const schemas = []
+// ─── useHead: только meta keywords + canonical, без JSON-LD ─────────────────
+useHead(() => ({
+  meta: [
+    { name: 'keywords', content: metaKeywords.value || '' },
+  ],
+  link: [
+    { rel: 'canonical', href: canonicalUrl.value },
+  ],
+}))
 
-  // CollectionPage Schema (Страница коллекции/категории)
-  schemas.push({
-    type: 'application/ld+json',
-    children: JSON.stringify({
-      '@context': 'https://schema.org',
+// ─── useSchemaOrg: все JSON-LD схемы — гарантированный SSR ──────────────────
+useSchemaOrg(
+  computed(() => {
+    const schemas: any[] = []
+
+    // 1. CollectionPage
+    schemas.push({
       '@type': 'CollectionPage',
       'name': metaTitle.value,
       'description': metaDescription.value,
@@ -1045,31 +963,19 @@ useHead(() => {
         'name': 'Ухтышка',
         'url': 'https://uhti.kz',
       },
-      // Если есть картинка категории
-      ...(categoryOgImageUrl.value && {
-        image: categoryOgImageUrl.value,
-      }),
-      // Ключевые слова категории
-      ...(metaKeywords.value && {
-        keywords: metaKeywords.value,
-      }),
-      // 🆕 Добавляем основной контент страницы (если есть SEO текст)
+      ...(categoryOgImageUrl.value && { image: categoryOgImageUrl.value }),
+      ...(metaKeywords.value && { keywords: metaKeywords.value }),
       ...(seoText.value && {
         mainEntity: {
           '@type': 'Article',
           'headline': title.value,
-          'articleBody': seoText.value.replace(/<[^>]*>/g, '').substring(0, 500), // Убираем HTML теги для articleBody
-          'author': {
-            '@type': 'Organization',
-            'name': 'Ухтышка',
-          },
+          'articleBody': seoText.value.replace(/<[^>]*>/g, '').substring(0, 500),
+          'author': { '@type': 'Organization', 'name': 'Ухтышка' },
         },
       }),
-      // Добавляем информацию о товарах для rich snippets
       ...(displayedProducts.value.length > 0 && {
         numberOfItems: displayedProducts.value.length,
       }),
-      // Агрегированный рейтинг (только если есть реальные отзывы)
       ...(categoryRatingData.value && categoryRatingData.value.total_reviews > 0 && {
         aggregateRating: {
           '@type': 'AggregateRating',
@@ -1079,39 +985,32 @@ useHead(() => {
           'worstRating': 1,
         },
       }),
-    }),
-  })
+    })
 
-  // 3. SiteNavigationElement Schema (Подкатегории + бренды для sitelinks)
-  const subcatParts = subcategories.value.slice(0, 6).map(cat => ({
-    '@type': 'WebPage',
-    'name': cat.name,
-    'url': `https://uhti.kz${cat.href}`,
-  }))
-  const brandParts = availableBrands.value.slice(0, 6).map(brand => ({
-    '@type': 'WebPage',
-    'name': `${categoryName.value} ${brand.name}`,
-    'url': `https://uhti.kz${currentCategory.value?.href}?brand=${brand.slug}`,
-  }))
-  const navParts = [...subcatParts, ...brandParts]
-  if (navParts.length > 0) {
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
+    // 2. SiteNavigationElement (подкатегории + бренды)
+    const subcatParts = subcategories.value.slice(0, 6).map(cat => ({
+      '@type': 'WebPage',
+      'name': cat.name,
+      'url': `https://uhti.kz${cat.href}`,
+    }))
+    const brandParts = availableBrands.value.slice(0, 6).map(brand => ({
+      '@type': 'WebPage',
+      'name': `${categoryName.value} ${brand.name}`,
+      'url': `https://uhti.kz${currentCategory.value?.href}?brand=${brand.slug}`,
+    }))
+    const navParts = [...subcatParts, ...brandParts]
+    if (navParts.length > 0) {
+      schemas.push({
         '@type': 'SiteNavigationElement',
         'name': `Подкатегории ${categoryName.value}`,
         'hasPart': navParts,
-      }),
-    })
-  }
+      })
+    }
 
-  // 4. ItemList Schema (Список товаров в категории с ценами)
-  if (displayedProducts.value.length > 0) {
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
+    // 3. ItemList (список товаров с ценами)
+    // Рендерится только если useCatalogQuery вернул данные на сервере (SSR prefetch)
+    if (displayedProducts.value.length > 0) {
+      schemas.push({
         '@type': 'ItemList',
         'numberOfItems': displayedProducts.value.length,
         'itemListElement': displayedProducts.value.slice(0, 10).map((product, index) => ({
@@ -1123,9 +1022,9 @@ useHead(() => {
             'description': product.description || product.name,
             'url': `https://uhti.kz/catalog/products/${product.slug}`,
             'sku': product.id,
-            'image': product.product_images?.[0]?.image_url
-              ? getImageUrl(BUCKET_NAME_PRODUCT, product.product_images?.[0]?.image_url, IMAGE_SIZES.CARD)
-              : undefined,
+            ...(product.product_images?.[0]?.image_url && {
+              image: getImageUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url, IMAGE_SIZES.CARD),
+            }),
             ...(product.brands?.name && {
               brand: {
                 '@type': 'Brand',
@@ -1146,10 +1045,7 @@ useHead(() => {
                 : 'https://schema.org/OutOfStock',
               'url': `https://uhti.kz/catalog/products/${product.slug}`,
               'priceValidUntil': priceValidUntil,
-              'seller': {
-                '@type': 'Organization',
-                'name': 'Ухтышка',
-              },
+              'seller': { '@type': 'Organization', 'name': 'Ухтышка' },
               'hasMerchantReturnPolicy': {
                 '@type': 'MerchantReturnPolicy',
                 'applicableCountry': 'KZ',
@@ -1165,40 +1061,23 @@ useHead(() => {
                   'addressCountry': 'KZ',
                   'addressRegion': 'Алматы',
                 },
-                'shippingRate': {
-                  '@type': 'MonetaryAmount',
-                  'value': 0,
-                  'currency': 'KZT',
-                },
+                'shippingRate': { '@type': 'MonetaryAmount', 'value': 0, 'currency': 'KZT' },
                 'deliveryTime': {
                   '@type': 'ShippingDeliveryTime',
-                  'handlingTime': {
-                    '@type': 'QuantitativeValue',
-                    'minValue': 0,
-                    'maxValue': 1,
-                    'unitCode': 'DAY',
-                  },
-                  'transitTime': {
-                    '@type': 'QuantitativeValue',
-                    'minValue': 1,
-                    'maxValue': 3,
-                    'unitCode': 'DAY',
-                  },
+                  'handlingTime': { '@type': 'QuantitativeValue', 'minValue': 0, 'maxValue': 1, 'unitCode': 'DAY' },
+                  'transitTime': { '@type': 'QuantitativeValue', 'minValue': 1, 'maxValue': 3, 'unitCode': 'DAY' },
                 },
               },
             },
           },
         })),
-      }),
-    })
-  }
+      })
+    }
 
-  // 10. FAQPage Schema (Часто задаваемые вопросы категории)
-  if (faqQuestions.value.length > 0 && !hasActiveFilters.value) {
-    schemas.push({
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
+    // 4. FAQPage — без фильтров ИЛИ на Brand Landing (?brand=X)
+    // FIX: раньше блокировался при любых фильтрах, теперь работает и на Brand Landing
+    if (faqQuestions.value.length > 0 && (!hasActiveFilters.value || activeBrand.value)) {
+      schemas.push({
         '@type': 'FAQPage',
         'mainEntity': faqQuestions.value.map(q => ({
           '@type': 'Question',
@@ -1208,17 +1087,12 @@ useHead(() => {
             'text': q.answer_text || 'Ответ скоро будет добавлен.',
           },
         })),
-      }),
-    })
-  }
+      })
+    }
 
-  return {
-    link: [
-      { rel: 'canonical', href: canonicalUrl.value },
-    ],
-    script: schemas,
-  }
-})
+    return schemas
+  }),
+)
 </script>
 
 <template>

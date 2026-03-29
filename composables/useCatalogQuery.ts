@@ -1,5 +1,5 @@
 import type { IProductFilters, ProductWithGallery } from '@/types'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 export function useCatalogQuery(
@@ -8,8 +8,8 @@ export function useCatalogQuery(
   pageSize: number = 12,
 ) {
   const productStore = useProductsStore()
+  const queryClient = useQueryClient()
 
-  // 🔥 Генерируем простой ключ для кэша
   const queryKey = computed(() => {
     const f = unref(filters)
     return [
@@ -30,24 +30,43 @@ export function useCatalogQuery(
   })
 
   const queryFn = async () => {
-    const result = await productStore.fetchProducts(
+    return await productStore.fetchProducts(
       unref(filters),
       unref(currentPage),
       pageSize,
     )
-    return result
   }
 
-  // ✅ Stale-While-Revalidate подход с принудительной проверкой при перезагрузке
+  // 🔥 SSR prefetch: на сервере дожидаемся данных и кладём в кеш TanStack Query
+  // Без этого на сервере query.data.value === undefined и ItemList не рендерится
+  if (import.meta.server) {
+    const ssrKey = computed(() => `ssr-catalog-${JSON.stringify(queryKey.value)}`)
+
+    const { data: ssrData } = useAsyncData(
+      ssrKey.value,
+      () => queryFn(),
+      { server: true },
+    )
+
+    // Кладём SSR-данные в кеш TanStack Query чтобы useQuery взял их синхронно
+    if (ssrData.value) {
+      queryClient.setQueryData(queryKey.value, ssrData.value)
+    }
+  }
+
   const query = useQuery({
     queryKey,
     queryFn,
-    staleTime: 2 * 60 * 1000, // 2 минуты - показываем старые данные, загружаем новые в фоне
-    gcTime: 10 * 60 * 1000, // 10 минут в памяти
-    retry: false, // Отключаем retry для быстроты
-    refetchOnWindowFocus: true, // Проверить при возврате на вкладку
-    refetchOnMount: 'always', // ВСЕГДА проверять при перезагрузке (актуальные остатки)
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
     refetchOnReconnect: false,
+    // На сервере берём данные из кеша (setQueryData выше)
+    initialData: import.meta.server
+      ? queryClient.getQueryData(queryKey.value)
+      : undefined,
   })
 
   const products = computed<ProductWithGallery[]>(() =>
