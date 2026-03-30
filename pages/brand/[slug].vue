@@ -14,6 +14,18 @@ const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
+// ─── Утилита: очистка HTML + обрезка ────────────────────────────────────────
+function cleanDescription(html: string | null | undefined, maxLength = 200): string {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().substring(0, maxLength)
+}
+
+// ─── Утилита: короткий SKU ───────────────────────────────────────────────────
+function getProductSku(product: { sku?: string | null, id: string }): string {
+  if (product.sku) return product.sku
+  return product.id.replace(/-/g, '').substring(0, 10).toUpperCase()
+}
+
 // 1. Умная загрузка информации о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(
   `brand-${brandSlug}`,
@@ -53,7 +65,7 @@ async function loadProductLines() {
   }
 }
 
-// Загружаем агрегированную статистику бренда (рейтинг + кол-во отзывов)
+// Загружаем агрегированную статистику бренда
 const brandStats = ref<{ average_rating: number, total_reviews_count: number } | null>(null)
 
 async function loadBrandStats() {
@@ -76,7 +88,7 @@ async function loadBrandStats() {
   }
 }
 
-// Smart Sidebar: composable для фильтрации
+// Smart Sidebar
 const brandId = computed(() => brand.value?.id)
 const filterState = useBrandPageFilters({
   brandId,
@@ -84,7 +96,6 @@ const filterState = useBrandPageFilters({
   brandProductLines,
 })
 
-// Загружаем данные при монтировании
 watchEffect(() => {
   if (brand.value) {
     loadProductLines()
@@ -94,7 +105,7 @@ watchEffect(() => {
   }
 })
 
-// 3. Собираем "хлебные крошки"
+// Хлебные крошки
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   const crumbs: IBreadcrumbItem[] = [
     { id: 'brands', name: 'Бренды', href: '/brand/all' },
@@ -105,11 +116,9 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   return crumbs
 })
 
-// Кастомная страница
 const isCustomPage = computed(() => !!(brand.value as any)?.is_custom_page)
 const pageLayout = computed(() => (brand.value as any)?.page_layout as BrandPageLayout | null)
 
-// Featured product lines (из page_layout.featuredLineIds)
 const featuredProductLines = computed(() => {
   if (!pageLayout.value?.featuredLineIds?.length)
     return []
@@ -117,61 +126,38 @@ const featuredProductLines = computed(() => {
   return brandProductLines.value.filter(l => ids.has(l.id))
 })
 
-// Оптимизированный URL логотипа бренда (для SEO meta tags)
 const brandLogoUrl = computed(() => {
   if (!brand.value?.logo_url)
     return null
   return getVariantUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, 'sm')
 })
 
-// ========================================
-// SEO META TAGS + STRUCTURED DATA
-// ========================================
+// ─── SEO ────────────────────────────────────────────────────────────────────
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
 
 const brandUrl = computed(() => `${siteUrl}/brand/${brandSlug}`)
 
 const metaTitle = computed(() => {
-  if (!brand.value)
-    return 'Бренд не найден'
-
-  if (brand.value.meta_title) {
-    return brand.value.meta_title
-  }
-  if (brand.value.seo_title) {
-    return brand.value.seo_title
-  }
-
+  if (!brand.value) return 'Бренд не найден'
+  if (brand.value.meta_title) return brand.value.meta_title
+  if (brand.value.seo_title) return brand.value.seo_title
   return `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}`
 })
 
 const metaDescription = computed(() => {
-  if (!brand.value)
-    return `Товары бренда в ${siteName}`
-
-  if (brand.value.meta_description) {
-    return brand.value.meta_description
-  }
-
-  if (brand.value.seo_description) {
-    return brand.value.seo_description
-  }
-
+  if (!brand.value) return `Товары бренда в ${siteName}`
+  if (brand.value.meta_description) return brand.value.meta_description
+  if (brand.value.seo_description) return brand.value.seo_description
   if (brand.value.description) {
     return `${brand.value.description.substring(0, 140)}. Доставка по Казахстану.`
   }
-
   return `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
 
 const metaKeywords = computed(() => {
-  if (brand.value?.meta_keywords?.length) {
-    return brand.value.meta_keywords.join(', ')
-  }
-  if (brand.value?.seo_keywords?.length) {
-    return brand.value.seo_keywords.join(', ')
-  }
+  if (brand.value?.meta_keywords?.length) return brand.value.meta_keywords.join(', ')
+  if (brand.value?.seo_keywords?.length) return brand.value.seo_keywords.join(', ')
   return `${brand.value?.name || 'бренд'}, товары бренда, оригинальная продукция, Алматы, Казахстан`
 })
 
@@ -208,10 +194,7 @@ useBreadcrumbSchema(computed(() => [
 
 useHead({
   meta: [
-    {
-      name: 'keywords',
-      content: () => metaKeywords.value || '',
-    },
+    { name: 'keywords', content: () => metaKeywords.value || '' },
   ],
   link: [
     { rel: 'canonical', href: brandUrl.value },
@@ -225,7 +208,7 @@ useHead({
             '@context': 'https://schema.org',
             '@type': 'Brand',
             '@id': `${brandUrl.value}#brand`,
-            'name': metaTitle.value,
+            'name': brand.value.name, // FIX: чистое название без дублирования
             'description': metaDescription.value,
             'url': brandUrl.value,
             'logo': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
@@ -242,13 +225,16 @@ useHead({
                 ...(line.logo_url && {
                   logo: getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm'),
                 }),
-                ...(line.description && { description: line.description }),
+                ...(line.description && {
+                  description: cleanDescription(line.description, 200),
+                }),
               })),
             }),
           })
         : '{}',
     },
-    // CollectionPage Schema with aggregateRating
+
+    // CollectionPage Schema
     {
       type: 'application/ld+json',
       innerHTML: () => brand.value
@@ -265,8 +251,6 @@ useHead({
             },
             ...(filterState.products.value.length > 0 && {
               numberOfItems: filterState.products.value.length,
-            }),
-            ...(filterState.products.value.length > 0 && {
               offers: {
                 '@type': 'AggregateOffer',
                 'lowPrice': Math.min(...filterState.products.value.map(p => Number(p.price))),
@@ -275,12 +259,11 @@ useHead({
                 'offerCount': filterState.products.value.length,
               },
             }),
-            ...(brandStats.value && brandStats.value.total_reviews_count > 0 && {
-            }),
           })
         : '{}',
     },
-    // ItemList Schema — все товары бренда в порядке текущей сортировки
+
+    // ItemList Schema — товары бренда
     {
       type: 'application/ld+json',
       innerHTML: () => brand.value && filterState.products.value.length > 0
@@ -289,20 +272,23 @@ useHead({
             '@type': 'ItemList',
             'name': `Товары бренда ${brand.value.name}`,
             'numberOfItems': filterState.products.value.length,
-            'itemListElement': filterState.products.value.map((product, index) => ({
+            'itemListElement': filterState.products.value.slice(0, 10).map((product, index) => ({
               '@type': 'ListItem',
               'position': index + 1,
               'item': {
                 '@type': 'Product',
                 'name': product.name,
                 'url': `${siteUrl}/catalog/products/${product.slug}`,
+                // FIX: очищаем HTML и обрезаем до 200 символов
                 ...(product.description && {
-                  description: product.description.substring(0, 200),
+                  description: cleanDescription(product.description, 200),
                 }),
                 ...(product.product_images?.[0]?.image_url && {
                   image: getImageUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url),
                 }),
-                'sku': product.slug,
+                // FIX: короткий SKU из поля БД, не slug
+                'sku': getProductSku(product),
+                // FIX: brand без дублирования name
                 'brand': {
                   '@type': 'Brand',
                   '@id': `${brandUrl.value}#brand`,
@@ -312,10 +298,55 @@ useHead({
                   '@type': 'Offer',
                   'price': product.final_price ?? product.price,
                   'priceCurrency': 'KZT',
+                  // FIX: https вместо http
                   'availability': product.stock_quantity > 0
                     ? 'https://schema.org/InStock'
                     : 'https://schema.org/OutOfStock',
                   'url': `${siteUrl}/catalog/products/${product.slug}`,
+                  'itemCondition': 'https://schema.org/NewCondition',
+                  'seller': {
+                    '@type': 'Organization',
+                    'name': siteName,
+                    'url': siteUrl,
+                  },
+                  // FIX: добавлена политика возврата
+                  'hasMerchantReturnPolicy': {
+                    '@type': 'MerchantReturnPolicy',
+                    'applicableCountry': 'KZ',
+                    'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+                    'merchantReturnDays': 14,
+                    'returnMethod': 'https://schema.org/ReturnByMail',
+                    'returnFees': 'https://schema.org/FreeReturn',
+                  },
+                  // FIX: добавлена доставка
+                  'shippingDetails': {
+                    '@type': 'OfferShippingDetails',
+                    'shippingRate': {
+                      '@type': 'MonetaryAmount',
+                      'value': 0,
+                      'currency': 'KZT',
+                    },
+                    'shippingDestination': {
+                      '@type': 'DefinedRegion',
+                      'addressCountry': 'KZ',
+                      'addressRegion': 'Алматы',
+                    },
+                    'deliveryTime': {
+                      '@type': 'ShippingDeliveryTime',
+                      'handlingTime': {
+                        '@type': 'QuantitativeValue',
+                        'minValue': 0,
+                        'maxValue': 1,
+                        'unitCode': 'DAY',
+                      },
+                      'transitTime': {
+                        '@type': 'QuantitativeValue',
+                        'minValue': 1,
+                        'maxValue': 3,
+                        'unitCode': 'DAY',
+                      },
+                    },
+                  },
                 },
                 ...(product.avg_rating && product.review_count && product.review_count > 0 && {
                   aggregateRating: {
@@ -334,11 +365,7 @@ useHead({
   ],
 })
 
-// Robots правило
-useRobotsRule({
-  index: true,
-  follow: true,
-})
+useRobotsRule({ index: true, follow: true })
 </script>
 
 <template>
