@@ -16,7 +16,33 @@ const lineSlug = route.params.lineSlug as string
 
 const isSeoExpanded = ref(false)
 
-// 1. Загрузка бренда
+// ─── Утилиты ────────────────────────────────────────────────────────────────
+
+// Очистка HTML + обрезка
+function cleanDescription(html: string | null | undefined, maxLength = 200): string {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().substring(0, maxLength)
+}
+
+// Короткий SKU из БД, fallback — первые 10 символов id
+function getProductSku(product: { sku?: string | null, id: string }): string {
+  if (product.sku) return product.sku
+  return product.id.replace(/-/g, '').substring(0, 10).toUpperCase()
+}
+
+// Описание товара с упоминанием серии: "Конструктор из серии LEGO Marvel: [название]..."
+function buildProductDescription(
+  product: { description?: string | null, name: string },
+  brandName: string,
+  lineName: string,
+  maxLength = 200,
+): string {
+  const prefix = `${brandName} ${lineName}: `
+  const base = cleanDescription(product.description, maxLength - prefix.length) || product.name
+  return `${prefix}${base}`.substring(0, maxLength)
+}
+
+// ─── 1. Загрузка бренда ─────────────────────────────────────────────────────
 const { data: brand, pending: brandPending } = await useAsyncData(
   `brand-${brandSlug}`,
   async () => {
@@ -34,13 +60,11 @@ const { data: brand, pending: brandPending } = await useAsyncData(
   },
 )
 
-// 2. Загрузка линейки продуктов
+// ─── 2. Загрузка линейки ────────────────────────────────────────────────────
 const { data: productLine, pending: linePending } = await useAsyncData(
   `product-line-${brandSlug}-${lineSlug}`,
   async () => {
-    if (!brand.value) {
-      return null
-    }
+    if (!brand.value) return null
 
     const { data, error } = await supabase
       .from('product_lines')
@@ -58,7 +82,7 @@ const { data: productLine, pending: linePending } = await useAsyncData(
   { watch: [brand] },
 )
 
-// 3. Smart Sidebar: composable для фильтрации (context: 'line')
+// ─── 3. Smart Sidebar ───────────────────────────────────────────────────────
 const brandId = computed(() => brand.value?.id)
 const productLineId = computed(() => productLine.value?.id)
 const filterState = useBrandPageFilters({
@@ -67,12 +91,11 @@ const filterState = useBrandPageFilters({
   context: 'line',
 })
 
-// Загружаем статистику линейки (отзывы на товары этой линейки)
+// Статистика линейки
 const lineStats = ref<{ average_rating: number, total_reviews_count: number } | null>(null)
 
 async function loadLineStats() {
-  if (!brand.value)
-    return
+  if (!brand.value) return
   try {
     const { data, error } = await supabase.rpc('get_brand_stats', {
       p_brand_id: brand.value.id,
@@ -89,7 +112,6 @@ async function loadLineStats() {
   }
 }
 
-// Загружаем товары при монтировании
 watchEffect(() => {
   if (productLine.value && brand.value) {
     filterState.loadProducts()
@@ -98,84 +120,54 @@ watchEffect(() => {
   }
 })
 
-// 4. Breadcrumbs
+// ─── 4. Breadcrumbs ─────────────────────────────────────────────────────────
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   const crumbs: IBreadcrumbItem[] = [
     { id: 'brands', name: 'Бренды', href: '/brand/all' },
   ]
   if (brand.value) {
-    crumbs.push({
-      id: brand.value.id,
-      name: brand.value.name,
-      href: `/brand/${brand.value.slug}`,
-    })
+    crumbs.push({ id: brand.value.id, name: brand.value.name, href: `/brand/${brand.value.slug}` })
   }
   if (productLine.value) {
-    crumbs.push({
-      id: productLine.value.id,
-      name: productLine.value.name,
-      href: `/brand/${brandSlug}/${lineSlug}`,
-    })
+    crumbs.push({ id: productLine.value.id, name: productLine.value.name, href: `/brand/${brandSlug}/${lineSlug}` })
   }
   return crumbs
 })
 
-// URL логотипа бренда
+// ─── Изображения ────────────────────────────────────────────────────────────
 const brandLogoUrl = computed(() => {
-  if (!brand.value?.logo_url) {
-    return null
-  }
+  if (!brand.value?.logo_url) return null
   return getVariantUrl(BUCKET_NAME_BRANDS, brand.value.logo_url, 'sm')
 })
 
-// URL логотипа линейки
+// Hero Image линейки — используем 'md' вариант для schema.org
 const lineLogoUrl = computed(() => {
-  if (!productLine.value?.logo_url) {
-    return null
-  }
-  return getVariantUrl(BUCKET_NAME_PRODUCT_LINES, productLine.value.logo_url, 'sm')
+  if (!productLine.value?.logo_url) return null
+  return getVariantUrl(BUCKET_NAME_PRODUCT_LINES, productLine.value.logo_url, 'md')
 })
 
-// ========================================
-// SEO META TAGS + STRUCTURED DATA
-// ========================================
+// ─── SEO ────────────────────────────────────────────────────────────────────
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
 
 const pageUrl = computed(() => `${siteUrl}/brand/${brandSlug}/${lineSlug}`)
 
-// Meta Title: автогенерация из названия линейки и бренда
 const metaTitle = computed(() => {
-  if (!productLine.value || !brand.value) {
-    return 'Линейка не найдена'
-  }
-
+  if (!productLine.value || !brand.value) return 'Линейка не найдена'
   return `${productLine.value.name} от ${brand.value.name} - Купить в Алматы | ${siteName}`
 })
 
-// SEO описание: приоритет seo_description > description > автогенерация
 const metaDescription = computed(() => {
-  if (!productLine.value || !brand.value) {
-    return `Товары линейки в ${siteName}`
-  }
-
-  // Приоритет: seo_description > description > автогенерация
-  if (productLine.value.seo_description) {
-    return productLine.value.seo_description
-  }
-
+  if (!productLine.value || !brand.value) return `Товары линейки в ${siteName}`
+  if (productLine.value.seo_description) return productLine.value.seo_description
   if (productLine.value.description) {
-    return `${productLine.value.description.substring(0, 140)}. Доставка по Казахстану.`
+    return `${cleanDescription(productLine.value.description, 140)}. Доставка по Казахстану.`
   }
-
   return `Каталог товаров ${productLine.value.name} от бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
 
-// Ключевые слова
 const metaKeywords = computed(() => {
-  if (productLine.value?.seo_keywords?.length) {
-    return productLine.value.seo_keywords.join(', ')
-  }
+  if (productLine.value?.seo_keywords?.length) return productLine.value.seo_keywords.join(', ')
   return `${productLine.value?.name || 'линейка'}, ${brand.value?.name || 'бренд'}, товары, оригинальная продукция, Алматы, Казахстан`
 })
 
@@ -204,7 +196,6 @@ useSeoMeta({
   robots: 'index, follow',
 })
 
-// BreadcrumbList JSON-LD
 useBreadcrumbSchema(computed(() => [
   { name: 'Бренды', path: '/brand/all' },
   ...(brand.value ? [{ name: brand.value.name, path: `/brand/${brand.value.slug}` }] : []),
@@ -213,16 +204,13 @@ useBreadcrumbSchema(computed(() => [
 
 useHead({
   meta: [
-    {
-      name: 'keywords',
-      content: () => metaKeywords.value || '',
-    },
+    { name: 'keywords', content: () => metaKeywords.value || '' },
   ],
   link: [
     { rel: 'canonical', href: pageUrl.value },
   ],
   script: [
-    // Brand Schema для линейки (суб-бренд)
+    // ── Brand Schema для линейки (суб-бренд с parentOrganization) ────────────
     {
       type: 'application/ld+json',
       innerHTML: () => productLine.value && brand.value
@@ -230,14 +218,16 @@ useHead({
             '@context': 'https://schema.org',
             '@type': 'Brand',
             '@id': `${pageUrl.value}#brand`,
-            'name': metaTitle.value,
+            // FIX: чистое название линейки без дублирования
+            'name': productLine.value.name,
             'description': metaDescription.value,
             'url': pageUrl.value,
+            // FIX: Hero Image через getVariantUrl(..., 'md')
             ...(lineLogoUrl.value && {
               logo: lineLogoUrl.value,
               image: lineLogoUrl.value,
             }),
-            // Связь с родительским брендом
+            // FIX: parentOrganization — семантическая связь с родительским брендом
             'parentOrganization': {
               '@type': 'Brand',
               '@id': `${siteUrl}/brand/${brand.value.slug}#brand`,
@@ -245,7 +235,7 @@ useHead({
               'url': `${siteUrl}/brand/${brand.value.slug}`,
               ...(brandLogoUrl.value && { logo: brandLogoUrl.value }),
             },
-            // Агрегированный рейтинг
+            // FIX: aggregateRating линейки — зажигает звёзды в поиске
             ...(lineStats.value && lineStats.value.total_reviews_count > 0 && {
               aggregateRating: {
                 '@type': 'AggregateRating',
@@ -255,14 +245,14 @@ useHead({
                 'worstRating': 1,
               },
             }),
-            // Ключевые слова
             ...(productLine.value.seo_keywords?.length && {
               keywords: productLine.value.seo_keywords.join(', '),
             }),
           })
         : '{}',
     },
-    // CollectionPage Schema
+
+    // ── CollectionPage Schema с aggregateRating ───────────────────────────────
     {
       type: 'application/ld+json',
       innerHTML: () => productLine.value && brand.value
@@ -272,20 +262,27 @@ useHead({
             'name': metaTitle.value,
             'description': metaDescription.value,
             'url': pageUrl.value,
+            // FIX: Hero Image линейки для CollectionPage
             ...(lineLogoUrl.value && { image: lineLogoUrl.value }),
-            ...(metaKeywords.value && {
-              keywords: metaKeywords.value,
-            }),
+            ...(metaKeywords.value && { keywords: metaKeywords.value }),
             ...(filterState.products.value.length > 0 && {
               numberOfItems: filterState.products.value.length,
-            }),
-            ...(filterState.products.value.length > 0 && {
               offers: {
                 '@type': 'AggregateOffer',
                 'lowPrice': Math.min(...filterState.products.value.map(p => Number(p.price))),
                 'highPrice': Math.max(...filterState.products.value.map(p => Number(p.price))),
                 'priceCurrency': 'KZT',
                 'offerCount': filterState.products.value.length,
+              },
+            }),
+            // FIX: aggregateRating на CollectionPage — звёзды по запросу "LEGO Marvel"
+            ...(lineStats.value && lineStats.value.total_reviews_count > 0 && {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                'ratingValue': lineStats.value.average_rating,
+                'reviewCount': lineStats.value.total_reviews_count,
+                'bestRating': 5,
+                'worstRating': 1,
               },
             }),
             'isPartOf': {
@@ -296,61 +293,115 @@ useHead({
             'about': {
               '@id': `${pageUrl.value}#brand`,
             },
-            'mainEntity': {
-              '@type': 'ItemList',
-              'name': `Товары ${productLine.value.name} от ${brand.value.name}`,
-              'numberOfItems': filterState.products.value.length,
-              'itemListElement': filterState.products.value.map((product, index) => ({
-                '@type': 'ListItem',
-                'position': index + 1,
-                'item': {
-                  '@type': 'Product',
-                  'name': product.name,
-                  'url': `${siteUrl}/catalog/products/${product.slug}`,
-                  ...(product.description && {
-                    description: product.description.substring(0, 200),
-                  }),
-                  ...(product.product_images?.[0]?.image_url && {
-                    image: getImageUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url),
-                  }),
-                  'sku': product.slug,
-                  'brand': {
+          })
+        : '{}',
+    },
+
+    // ── ItemList — товары линейки ─────────────────────────────────────────────
+    {
+      type: 'application/ld+json',
+      innerHTML: () => productLine.value && brand.value && filterState.products.value.length > 0
+        ? JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            'name': `Товары ${productLine.value.name} от ${brand.value.name}`,
+            'numberOfItems': filterState.products.value.length,
+            'itemListElement': filterState.products.value.slice(0, 10).map((product, index) => ({
+              '@type': 'ListItem',
+              'position': index + 1,
+              'item': {
+                '@type': 'Product',
+                'name': product.name,
+                'url': `${siteUrl}/catalog/products/${product.slug}`,
+                // FIX: описание с упоминанием серии + очистка HTML + обрезка 200 символов
+                'description': buildProductDescription(product, brand.value!.name, productLine.value!.name, 200),
+                ...(product.product_images?.[0]?.image_url && {
+                  image: getImageUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url),
+                }),
+                // FIX: короткий SKU из БД, не slug
+                'sku': getProductSku(product),
+                // FIX: brand без дублирования name
+                'brand': {
+                  '@type': 'Brand',
+                  '@id': `${pageUrl.value}#brand`,
+                  'name': productLine.value!.name,
+                  'parentOrganization': {
                     '@type': 'Brand',
-                    '@id': `${pageUrl.value}#brand`,
-                    'name': brand.value.name,
+                    'name': brand.value!.name,
                   },
-                  'offers': {
-                    '@type': 'Offer',
-                    'price': product.final_price ?? product.price,
-                    'priceCurrency': 'KZT',
-                    'availability': product.stock_quantity > 0
-                      ? 'https://schema.org/InStock'
-                      : 'https://schema.org/OutOfStock',
-                    'url': `${siteUrl}/catalog/products/${product.slug}`,
-                  },
-                  ...(product.avg_rating && product.review_count && product.review_count > 0 && {
-                    aggregateRating: {
-                      '@type': 'AggregateRating',
-                      'ratingValue': product.avg_rating,
-                      'reviewCount': product.review_count,
-                      'bestRating': 5,
-                      'worstRating': 1,
-                    },
-                  }),
                 },
-              })),
-            },
+                'offers': {
+                  '@type': 'Offer',
+                  'price': product.final_price ?? product.price,
+                  'priceCurrency': 'KZT',
+                  // FIX: https
+                  'availability': product.stock_quantity > 0
+                    ? 'https://schema.org/InStock'
+                    : 'https://schema.org/OutOfStock',
+                  'url': `${siteUrl}/catalog/products/${product.slug}`,
+                  'itemCondition': 'https://schema.org/NewCondition',
+                  'seller': {
+                    '@type': 'Organization',
+                    'name': siteName,
+                    'url': siteUrl,
+                  },
+                  // FIX: политика возврата
+                  'hasMerchantReturnPolicy': {
+                    '@type': 'MerchantReturnPolicy',
+                    'applicableCountry': 'KZ',
+                    'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+                    'merchantReturnDays': 14,
+                    'returnMethod': 'https://schema.org/ReturnByMail',
+                    'returnFees': 'https://schema.org/FreeReturn',
+                  },
+                  // FIX: доставка
+                  'shippingDetails': {
+                    '@type': 'OfferShippingDetails',
+                    'shippingRate': {
+                      '@type': 'MonetaryAmount',
+                      'value': 0,
+                      'currency': 'KZT',
+                    },
+                    'shippingDestination': {
+                      '@type': 'DefinedRegion',
+                      'addressCountry': 'KZ',
+                      'addressRegion': 'Алматы',
+                    },
+                    'deliveryTime': {
+                      '@type': 'ShippingDeliveryTime',
+                      'handlingTime': {
+                        '@type': 'QuantitativeValue',
+                        'minValue': 0,
+                        'maxValue': 1,
+                        'unitCode': 'DAY',
+                      },
+                      'transitTime': {
+                        '@type': 'QuantitativeValue',
+                        'minValue': 1,
+                        'maxValue': 3,
+                        'unitCode': 'DAY',
+                      },
+                    },
+                  },
+                },
+                ...(product.avg_rating && product.review_count && product.review_count > 0 && {
+                  aggregateRating: {
+                    '@type': 'AggregateRating',
+                    'ratingValue': product.avg_rating,
+                    'reviewCount': product.review_count,
+                    'bestRating': 5,
+                    'worstRating': 1,
+                  },
+                }),
+              },
+            })),
           })
         : '{}',
     },
   ],
 })
 
-// Robots правило
-useRobotsRule({
-  index: true,
-  follow: true,
-})
+useRobotsRule({ index: true, follow: true })
 </script>
 
 <template>
