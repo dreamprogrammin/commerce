@@ -3,9 +3,11 @@ import { useCartStore } from "@/stores/publicStore/cartStore";
 import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
 import { BUCKET_NAME_PRODUCT } from "@/constants";
 import { formatPrice } from "@/utils/formatPrice";
+import type { ProductWithImages } from "@/types";
 
 const cartStore = useCartStore();
 const router = useRouter();
+const supabase = useSupabaseClient();
 const { getVariantUrl } = useSupabaseStorage();
 
 // 🔥 Константа порога бесплатной доставки
@@ -26,6 +28,79 @@ const hasFreeShipping = computed(
   () => cartStore.subtotal >= FREE_SHIPPING_THRESHOLD,
 );
 
+// 🔥 Cross-sell: Рекомендованные аксессуары
+const suggestedAccessories = ref<ProductWithImages[]>([]);
+const isLoadingAccessories = ref(false);
+
+// Загрузка рекомендованных аксессуаров
+async function loadSuggestedAccessories() {
+  if (cartStore.items.length === 0) {
+    suggestedAccessories.value = [];
+    return;
+  }
+
+  isLoadingAccessories.value = true;
+  try {
+    // Собираем все accessory_ids из товаров в корзине
+    const allAccessoryIds = new Set<string>();
+    const cartProductIds = new Set(
+      cartStore.items.map((item) => item.product.id),
+    );
+
+    for (const item of cartStore.items) {
+      if (item.product.accessory_ids?.length) {
+        item.product.accessory_ids.forEach((id) => {
+          // Добавляем только если этого товара еще нет в корзине
+          if (!cartProductIds.has(id)) {
+            allAccessoryIds.add(id);
+          }
+        });
+      }
+    }
+
+    if (allAccessoryIds.size === 0) {
+      suggestedAccessories.value = [];
+      return;
+    }
+
+    // Загружаем аксессуары (максимум 3)
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        `
+        *,
+        product_images (
+          id,
+          image_url,
+          blur_placeholder,
+          alt_text,
+          display_order
+        )
+      `,
+      )
+      .in("id", Array.from(allAccessoryIds).slice(0, 3))
+      .eq("is_active", true)
+      .order("display_order", {
+        foreignTable: "product_images",
+        ascending: true,
+      });
+
+    if (!error && data) {
+      suggestedAccessories.value = data as ProductWithImages[];
+    }
+  } catch (e) {
+    console.error("Error loading suggested accessories:", e);
+  } finally {
+    isLoadingAccessories.value = false;
+  }
+}
+
+// Загружаем аксессуары при изменении корзины
+watch(() => cartStore.items, loadSuggestedAccessories, {
+  deep: true,
+  immediate: true,
+});
+
 // Закрыть корзину
 function closeCart() {
   cartStore.isCartOpen = false;
@@ -45,6 +120,11 @@ function getProductImageUrl(product: any) {
     product.product_images[0].image_url,
     "sm",
   );
+}
+
+// Добавить аксессуар в корзину
+async function addAccessoryToCart(accessory: ProductWithImages) {
+  await cartStore.addItem(accessory.id, 1);
 }
 </script>
 
@@ -201,6 +281,64 @@ function getProductImageUrl(product: any) {
         v-if="cartStore.items.length > 0"
         class="border-t px-6 py-4 space-y-4"
       >
+        <!-- 🔥 Cross-sell: Рекомендованные аксессуары -->
+        <div v-if="suggestedAccessories.length > 0" class="pb-4 border-b">
+          <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Icon name="lucide:sparkles" class="w-4 h-4 text-primary" />
+            Не забудьте добавить:
+          </h4>
+          <div class="space-y-2">
+            <div
+              v-for="acc in suggestedAccessories"
+              :key="acc.id"
+              class="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <!-- Изображение -->
+              <div
+                class="w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0"
+              >
+                <ProgressiveImage
+                  v-if="getProductImageUrl(acc)"
+                  :src="getProductImageUrl(acc)"
+                  :alt="acc.name"
+                  aspect-ratio="square"
+                  object-fit="cover"
+                  placeholder-type="shimmer"
+                  class="w-full h-full"
+                />
+                <div
+                  v-else
+                  class="w-full h-full flex items-center justify-center"
+                >
+                  <Icon
+                    name="lucide:image-off"
+                    class="w-6 h-6 text-muted-foreground"
+                  />
+                </div>
+              </div>
+
+              <!-- Информация -->
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium line-clamp-1">{{ acc.name }}</p>
+                <p class="text-xs text-muted-foreground">
+                  {{ formatPrice(acc.price) }} ₸
+                </p>
+              </div>
+
+              <!-- Кнопка добавить -->
+              <Button
+                size="sm"
+                variant="outline"
+                class="flex-shrink-0"
+                @click="addAccessoryToCart(acc)"
+              >
+                <Icon name="lucide:plus" class="w-4 h-4 mr-1" />
+                Добавить
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <!-- Бонусы -->
         <div
           class="flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-600 rounded-lg text-sm"

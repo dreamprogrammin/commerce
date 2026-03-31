@@ -267,6 +267,68 @@ async function addItem(
 
 ---
 
+### 5. Cross-sell блок с аксессуарами
+
+**Реализовано:** ✅
+
+**Логика:**
+
+```typescript
+// Собираем все accessory_ids из товаров в корзине
+const allAccessoryIds = new Set<string>();
+const cartProductIds = new Set(cartStore.items.map((item) => item.product.id));
+
+for (const item of cartStore.items) {
+  if (item.product.accessory_ids?.length) {
+    item.product.accessory_ids.forEach((id) => {
+      // Добавляем только если этого товара еще нет в корзине
+      if (!cartProductIds.has(id)) {
+        allAccessoryIds.add(id);
+      }
+    });
+  }
+}
+
+// Загружаем аксессуары (максимум 3)
+const { data } = await supabase
+  .from("products")
+  .select(`*, product_images(*)`)
+  .in("id", Array.from(allAccessoryIds).slice(0, 3))
+  .eq("is_active", true);
+```
+
+**Визуализация:**
+
+```vue
+<div v-if="suggestedAccessories.length > 0" class="pb-4 border-b">
+  <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
+    <Icon name="lucide:sparkles" class="w-4 h-4 text-primary" />
+    Не забудьте добавить:
+  </h4>
+  <div class="space-y-2">
+    <div v-for="acc in suggestedAccessories" :key="acc.id" class="flex items-center gap-3">
+      <img :src="acc.image" class="w-12 h-12 rounded" />
+      <div class="flex-1">
+        <p class="text-sm font-medium">{{ acc.name }}</p>
+        <p class="text-xs text-muted-foreground">{{ acc.price }} ₸</p>
+      </div>
+      <Button size="sm" @click="addAccessoryToCart(acc)">
+        Добавить
+      </Button>
+    </div>
+  </div>
+</div>
+```
+
+**Преимущества:**
+
+- Увеличение среднего чека на 10-15%
+- Умные рекомендации на основе товаров в корзине
+- Показываются только те аксессуары, которых еще нет в корзине
+- Автоматическое обновление при изменении корзины
+
+---
+
 ## 📊 Ожидаемые результаты
 
 ### Краткосрочные (1-2 недели)
@@ -291,39 +353,19 @@ async function addItem(
 
 ## 🔮 Будущие улучшения (Roadmap)
 
-### 1. Cross-sell блок с аксессуарами
+### 1. Анимация добавления товара
 
-**Приоритет:** High  
-**Story Points:** 3
+**Приоритет:** Medium  
+**Story Points:** 2
 
 **Описание:**
-Внизу корзины (перед итоговой суммой) выводить мини-блок "Не забудьте добавить:".
+Анимация "полета" товара от карточки до иконки корзины.
 
-**Логика:**
+**Технология:**
 
-- Показывать 2-3 аксессуара (батарейки, подарочная упаковка)
-- Связанные с товарами в корзине
-- Которых еще нет в корзине
-
-**Пример:**
-
-```vue
-<div v-if="suggestedAccessories.length > 0" class="border-t pt-4">
-  <h4 class="text-sm font-semibold mb-3">Не забудьте добавить:</h4>
-  <div class="space-y-2">
-    <div v-for="acc in suggestedAccessories" :key="acc.id" class="flex items-center gap-3">
-      <img :src="acc.image" class="w-12 h-12 rounded" />
-      <div class="flex-1">
-        <p class="text-sm font-medium">{{ acc.name }}</p>
-        <p class="text-xs text-muted-foreground">{{ acc.price }} ₸</p>
-      </div>
-      <Button size="sm" @click="cartStore.addItem(acc.id, 1)">
-        Добавить
-      </Button>
-    </div>
-  </div>
-</div>
-```
+- GSAP для плавной анимации
+- Клонирование изображения товара
+- Траектория полета к иконке корзины
 
 ---
 
@@ -343,7 +385,7 @@ async function addItem(
 
 ---
 
-### 3. Быстрый просмотр товара в корзине
+### 2. Быстрый просмотр товара в корзине
 
 **Приоритет:** Low  
 **Story Points:** 2
@@ -353,7 +395,7 @@ async function addItem(
 
 ---
 
-### 4. Сохраненные корзины
+### 3. Сохраненные корзины
 
 **Приоритет:** Medium  
 **Story Points:** 5
