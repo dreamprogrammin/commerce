@@ -7,6 +7,7 @@ import { useModalStore } from "@/stores/modal/useModalStore";
 import { useCartStore } from "@/stores/publicStore/cartStore";
 import { useWishlistStore } from "@/stores/publicStore/wishlistStore";
 import "vue-sonner/style.css";
+import SlideCart from "./components/cart/SlideCart.vue";
 
 const nuxtApp = useNuxtApp();
 const isMobile = useMediaQuery("(max-width: 1023px)");
