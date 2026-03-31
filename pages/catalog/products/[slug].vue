@@ -47,9 +47,10 @@ const slug = computed(() => route.params.slug as string);
 const selectedAccessoryIds = ref<string[]>([]);
 const isDescriptionExpanded = ref(false);
 
-// 🔥 SSR: загружаем категории и продукт ПАРАЛЛЕЛЬНО
+// 🔥 SSR: загружаем категории, продукт и отзывы ПАРАЛЛЕЛЬНО
 if (import.meta.server) {
   let initialProduct = null;
+  let initialReviews = null;
   let ssrFetchFailed = false;
 
   try {
@@ -60,6 +61,11 @@ if (import.meta.server) {
       productsStore.fetchProductBySlug(slug.value),
     ]);
     initialProduct = product;
+    
+    // Загружаем отзывы для Schema.org
+    if (initialProduct?.id) {
+      initialReviews = await reviewsStore.fetchReviews(initialProduct.id).catch(() => []);
+    }
   } catch {
     ssrFetchFailed = true;
   }
@@ -74,6 +80,10 @@ if (import.meta.server) {
 
   if (initialProduct) {
     queryClient.setQueryData(["product", slug.value], initialProduct);
+  }
+  
+  if (initialReviews) {
+    queryClient.setQueryData(["product-reviews", initialProduct.id], initialReviews);
   }
 }
 
