@@ -1,34 +1,37 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { useProfileStore } from '@/stores/core/profileStore'
-import { useAuthStore } from '@/stores/core/useAuthStore'
-import { useModalStore } from '@/stores/modal/useModalStore'
-import { useCartStore } from '@/stores/publicStore/cartStore'
-import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import { storeToRefs } from "pinia";
+import { useProfileStore } from "@/stores/core/profileStore";
+import { useAuthStore } from "@/stores/core/useAuthStore";
+import { useModalStore } from "@/stores/modal/useModalStore";
+import { useCartStore } from "@/stores/publicStore/cartStore";
+import { useWishlistStore } from "@/stores/publicStore/wishlistStore";
 
-const authStore = useAuthStore()
-const profileStore = useProfileStore()
-const wishlistStore = useWishlistStore()
-const cartStore = useCartStore()
-const modalStore = useModalStore()
+const authStore = useAuthStore();
+const profileStore = useProfileStore();
+const wishlistStore = useWishlistStore();
+const cartStore = useCartStore();
+const modalStore = useModalStore();
 
-const { user, isLoggedIn: isAuth } = storeToRefs(authStore)
-const { fullName, bonusBalance, isLoggedIn: isProfileLoaded } = storeToRefs(profileStore)
+const { user, isLoggedIn: isAuth } = storeToRefs(authStore);
+const {
+  fullName,
+  bonusBalance,
+  isLoggedIn: isProfileLoaded,
+} = storeToRefs(profileStore);
 
-const wishlistCount = computed(() => wishlistStore.wishlistProductIds.length)
-const cartCount = computed(() => cartStore.items.length)
-const userInitial = computed(() => fullName.value?.charAt(0) || 'П')
+const wishlistCount = computed(() => wishlistStore.wishlistProductIds.length);
+const cartCount = computed(() => cartStore.items.length);
+const userInitial = computed(() => fullName.value?.charAt(0) || "П");
 
 // Форматирование бонусов для отображения
 const formattedBonus = computed(() => {
-  if (!isProfileLoaded.value || bonusBalance.value === 0)
-    return '0'
-  return bonusBalance.value.toLocaleString('ru-KZ')
-})
+  if (!isProfileLoaded.value || bonusBalance.value === 0) return "0";
+  return bonusBalance.value.toLocaleString("ru-KZ");
+});
 
 // ✅ Функция открытия модального окна логина
 function openLoginModal() {
-  modalStore.openLoginModal()
+  modalStore.openLoginModal();
 }
 </script>
 
@@ -40,10 +43,14 @@ function openLoginModal() {
         to="/"
         class="flex items-center gap-2.5 md:gap-3 group transition-transform hover:scale-105 active:scale-95"
       >
-        <div class="bg-linear-to-br from-blue-500 to-blue-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow">
+        <div
+          class="bg-linear-to-br from-blue-500 to-blue-600 p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow"
+        >
           <Icon name="ic:round-toys" class="size-5 md:size-6 text-white" />
         </div>
-        <span class="text-xl md:text-2xl font-bold bg-linear-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 md:from-white md:to-white/90 bg-clip-text text-transparent">
+        <span
+          class="text-xl md:text-2xl font-bold bg-linear-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 md:from-white md:to-white/90 bg-clip-text text-transparent"
+        >
           Ухтышка
         </span>
       </NuxtLink>
@@ -51,11 +58,10 @@ function openLoginModal() {
       <!-- Action Buttons -->
       <div class="flex items-center gap-2 md:gap-3">
         <!-- Wishlist -->
-        <NuxtLink
-          to="/profile/wishlist"
-          class="relative group"
-        >
-          <div class="p-2 md:p-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg">
+        <NuxtLink to="/profile/wishlist" class="relative group">
+          <div
+            class="p-2 md:p-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
+          >
             <Icon
               name="line-md:heart"
               class="size-5 md:size-7 text-primary md:text-white"
@@ -72,18 +78,17 @@ function openLoginModal() {
                 v-if="wishlistCount > 0"
                 class="absolute -top-1 -right-1 bg-linear-to-r from-red-500 to-pink-500 text-white text-[10px] md:text-[11px] font-bold rounded-full min-w-4.5 md:min-w-5 h-4.5 md:h-5 flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 md:border-blue-500 shadow-lg"
               >
-                {{ wishlistCount > 9 ? '9+' : wishlistCount }}
+                {{ wishlistCount > 9 ? "9+" : wishlistCount }}
               </div>
             </Transition>
           </ClientOnly>
         </NuxtLink>
 
         <!-- Cart -->
-        <NuxtLink
-          to="/cart"
-          class="relative group"
-        >
-          <div class="p-2 md:p-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg">
+        <button class="relative group" @click="cartStore.isCartOpen = true">
+          <div
+            class="p-2 md:p-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
+          >
             <Icon
               name="solar:cart-3-bold"
               class="size-5 md:size-7 text-gray-700 dark:text-gray-300 md:text-white"
@@ -100,11 +105,11 @@ function openLoginModal() {
                 v-if="cartCount > 0"
                 class="absolute -top-1 -right-1 bg-linear-to-r from-blue-500 to-blue-600 text-white text-[10px] md:text-[11px] font-bold rounded-full min-w-4.5 md:min-w-5 h-4.5 md:h-5 flex items-center justify-center px-1 border-2 border-white dark:border-gray-900 md:border-blue-500 shadow-lg"
               >
-                {{ cartCount > 9 ? '9+' : cartCount }}
+                {{ cartCount > 9 ? "9+" : cartCount }}
               </div>
             </Transition>
           </ClientOnly>
-        </NuxtLink>
+        </button>
 
         <!-- Notifications -->
         <ClientOnly>
@@ -119,12 +124,22 @@ function openLoginModal() {
             class="hidden md:flex items-center gap-2.5 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg group"
           >
             <div class="relative">
-              <Icon name="lucide:star" class="size-5 text-yellow-400 group-hover:text-yellow-300 transition-colors" />
-              <div v-if="bonusBalance > 0" class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+              <Icon
+                name="lucide:star"
+                class="size-5 text-yellow-400 group-hover:text-yellow-300 transition-colors"
+              />
+              <div
+                v-if="bonusBalance > 0"
+                class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"
+              />
             </div>
             <div class="flex flex-col items-start">
-              <span class="text-[10px] text-white/60 leading-none mb-0.5">Бонусы</span>
-              <span class="text-sm font-bold text-white leading-none">{{ formattedBonus }} ₸</span>
+              <span class="text-[10px] text-white/60 leading-none mb-0.5"
+                >Бонусы</span
+              >
+              <span class="text-sm font-bold text-white leading-none"
+                >{{ formattedBonus }} ₸</span
+              >
             </div>
           </NuxtLink>
         </ClientOnly>
@@ -132,36 +147,29 @@ function openLoginModal() {
         <!-- ✅ Profile Button / Login Button -->
         <ClientOnly>
           <!-- Авторизованный пользователь -->
-          <NuxtLink
-            v-if="isAuth"
-            to="/profile"
-            class="group"
-          >
+          <NuxtLink v-if="isAuth" to="/profile" class="group">
             <div
               class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl shadow-lg md:shadow-lg transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20"
             >
-              <div class="size-6 md:size-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center font-bold text-white text-sm border border-white/30">
+              <div
+                class="size-6 md:size-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center font-bold text-white text-sm border border-white/30"
+              >
                 {{ userInitial }}
               </div>
-              <span class="hidden md:block text-sm font-semibold text-white max-w-30 truncate">
+              <span
+                class="hidden md:block text-sm font-semibold text-white max-w-30 truncate"
+              >
                 {{ fullName }}
               </span>
             </div>
           </NuxtLink>
 
           <!-- ✅ Неавторизованный пользователь - ОТКРЫВАЕТ МОДАЛКУ -->
-          <button
-            v-else
-            class="group"
-            @click="openLoginModal"
-          >
+          <button v-else class="group" @click="openLoginModal">
             <div
               class="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 md:from-white/10 md:to-white/10 md:hover:from-white/20 md:hover:to-white/20 rounded-xl md:rounded-2xl transition-all group-hover:scale-105 active:scale-95 md:backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
             >
-              <Icon
-                name="lucide:user"
-                class="size-5 text-white"
-              />
+              <Icon name="lucide:user" class="size-5 text-white" />
               <span class="hidden md:block text-sm font-semibold text-white">
                 Войти
               </span>
@@ -169,9 +177,15 @@ function openLoginModal() {
           </button>
 
           <template #fallback>
-            <div class="flex items-center gap-2 px-4 py-2.5 bg-gray-100/50 dark:bg-gray-800/50 md:bg-white/10 rounded-2xl animate-pulse md:backdrop-blur-sm">
-              <div class="size-7 rounded-full bg-gray-200 dark:bg-gray-700 md:bg-white/20" />
-              <div class="hidden md:block w-20 h-4 bg-gray-200 dark:bg-gray-700 md:bg-white/20 rounded" />
+            <div
+              class="flex items-center gap-2 px-4 py-2.5 bg-gray-100/50 dark:bg-gray-800/50 md:bg-white/10 rounded-2xl animate-pulse md:backdrop-blur-sm"
+            >
+              <div
+                class="size-7 rounded-full bg-gray-200 dark:bg-gray-700 md:bg-white/20"
+              />
+              <div
+                class="hidden md:block w-20 h-4 bg-gray-200 dark:bg-gray-700 md:bg-white/20 rounded"
+              />
             </div>
           </template>
         </ClientOnly>
