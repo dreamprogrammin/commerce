@@ -2,6 +2,10 @@
 
 Этот файл содержит ссылки на всю техническую документацию проекта.
 
+## 🎯 Обзор проекта
+
+- [**OVERVIEW.md**](./OVERVIEW.md) — **Общий обзор платформы** (что умеет приложение, для кого создано, бизнес-логика, уникальные особенности).
+
 ## 🏗️ Архитектура проекта
 
 - [**PROJECT_ARCHITECTURE.md**](./PROJECT_ARCHITECTURE.md) — **Полная архитектурная документация проекта** (структура, технологии, компоненты, backend, маршрутизация).
@@ -36,6 +40,8 @@
 ## 🔍 SEO и Индексация
 
 - [**SEO_SETUP.md**](./SEO_SETUP.md) — Полное руководство по SEO настройке и индексации в Google (sitemap, structured data, meta tags, robots.txt).
+- [**PAA_OPTIMIZATION.md**](./PAA_OPTIMIZATION.md) — 🎯 **Оптимизация для Google PAA Snippets** (захват блока "Вопросы по теме", The Snippet Pattern, приоритеты вопросов).
+- [**PRODUCT_SCHEMA_OPTIMIZATION.md**](./PRODUCT_SCHEMA_OPTIMIZATION.md) — 🚀 **Прокачка Schema.org для товаров** (Deep Crawling, Out-of-Stock Fix, Long-tail Keywords, Price Drop Snippets).
 - [**GOOGLE_SEARCH_PREVIEW.md**](./GOOGLE_SEARCH_PREVIEW.md) — 📊 **Визуализация отображения в Google** (как сайт будет выглядеть в поисковой выдаче с Rich Snippets, категориями, брендами и товарными линейками).
 
 ## 🤖 Интеграции

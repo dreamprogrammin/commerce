@@ -1,47 +1,63 @@
 <script setup lang="ts">
-import { useQuery } from '@tanstack/vue-query'
-import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
+import { useQuery } from "@tanstack/vue-query";
+import { useCategoryQuestionsStore } from "@/stores/publicStore/categoryQuestionsStore";
 
 const props = defineProps<{
-  categoryId: string
-  categoryName?: string
-}>()
+  categoryId: string;
+  categoryName?: string;
+}>();
 
-const questionsStore = useCategoryQuestionsStore()
+const questionsStore = useCategoryQuestionsStore();
 
 const { data: questions, isLoading } = useQuery({
-  queryKey: ['category-questions', () => props.categoryId],
+  queryKey: ["category-questions", () => props.categoryId],
   queryFn: () => questionsStore.fetchQuestions(props.categoryId),
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-})
+});
 
 // Показать все вопросы
 const displayedQuestions = computed(() => {
-  if (!questions.value)
-    return []
-  return questions.value
-})
+  if (!questions.value) return [];
+  return questions.value;
+});
 
 // Форматирование даты
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return new Date(dateStr).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+// Функция для безопасного рендеринга HTML (только разрешенные теги)
+function sanitizeAndRenderHTML(html: string | null): string {
+  if (!html) return "";
+
+  // Разрешаем только безопасные теги для SEO
+  const allowedTags = ["strong", "ul", "li", "a", "br", "p"];
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = html;
+
+  // Удаляем все скрипты и опасные атрибуты
+  const scripts = tempDiv.querySelectorAll("script, style");
+  scripts.forEach((s) => s.remove());
+
+  return tempDiv.innerHTML;
 }
 </script>
 
 <template>
-  <div v-if="displayedQuestions.length" class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8">
+  <div
+    v-if="displayedQuestions.length"
+    class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8"
+  >
     <!-- Заголовок -->
     <div class="mb-6">
-      <h2 class="text-2xl font-bold mb-2">
-        Часто задаваемые вопросы
-      </h2>
+      <h2 class="text-2xl font-bold mb-2">Часто задаваемые вопросы</h2>
       <p class="text-muted-foreground text-sm">
-        Ответы на популярные вопросы о категории {{ categoryName || 'игрушек' }}
+        Ответы на популярные вопросы о категории {{ categoryName || "игрушек" }}
       </p>
     </div>
 
@@ -63,7 +79,9 @@ function formatDate(dateStr: string) {
       >
         <!-- Вопрос -->
         <div class="flex items-start gap-3 mb-3">
-          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"
+          >
             <span class="text-sm font-bold text-primary">{{ index + 1 }}</span>
           </div>
           <div class="flex-1">
@@ -73,13 +91,37 @@ function formatDate(dateStr: string) {
           </div>
         </div>
 
-        <!-- Ответ -->
+        <!-- Ответ с HTML-разметкой -->
         <div v-if="q.answer_text" class="pl-11">
-          <p class="text-sm leading-relaxed text-muted-foreground">
-            {{ q.answer_text }}
-          </p>
+          <div
+            class="text-sm leading-relaxed text-muted-foreground prose prose-sm max-w-none"
+            v-html="sanitizeAndRenderHTML(q.answer_text)"
+          />
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Стили для HTML-контента в ответах */
+.prose :deep(strong) {
+  @apply font-semibold text-foreground;
+}
+
+.prose :deep(ul) {
+  @apply list-disc list-inside my-2 space-y-1;
+}
+
+.prose :deep(li) {
+  @apply text-muted-foreground;
+}
+
+.prose :deep(a) {
+  @apply text-primary hover:underline font-medium;
+}
+
+.prose :deep(p) {
+  @apply mb-2;
+}
+</style>
