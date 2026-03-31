@@ -22,7 +22,7 @@
   // Для Vue-файлов мы хотим, чтобы работал только ESLint, а не Prettier.
   // Эта настройка гарантирует, что для .vue файлов будет использоваться ESLint.
   "[vue]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
   },
   "[javascript]": {
     "editor.defaultFormatter": "dbaeumer.vscode-eslint"

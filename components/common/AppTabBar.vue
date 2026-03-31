@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search } from 'lucide-vue-next'
+import { Search } from "lucide-vue-next";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -7,20 +7,20 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
-} from '@/components/ui/navigation-menu'
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants'
-import { carouselContainerVariants } from '@/lib/variants'
-import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
-import { HeaderOverlayKey } from '@/types/app'
+} from "@/components/ui/navigation-menu";
+import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
+import { IMAGE_SIZES } from "@/config/images";
+import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from "@/constants";
+import { carouselContainerVariants } from "@/lib/variants";
+import { useCategoriesStore } from "@/stores/publicStore/categoriesStore";
+import { HeaderOverlayKey } from "@/types/app";
 
-const headerOverlay = inject(HeaderOverlayKey)
+const headerOverlay = inject(HeaderOverlayKey);
 
-const containerClass = carouselContainerVariants({ contained: 'always' })
+const containerClass = carouselContainerVariants({ contained: "always" });
 
-const activeMenuValue = ref<string | undefined>()
-const isSearchOpen = ref(false)
+const activeMenuValue = ref<string | undefined>();
+const isSearchOpen = ref(false);
 
 // Поиск товаров
 const {
@@ -36,130 +36,140 @@ const {
   selectSuggestion,
   removeHistoryItem,
   clearSearchHistory,
-} = useProductSearch()
+} = useProductSearch();
 
-const { getImageUrl: getSupabaseImageUrl, getVariantUrl } = useSupabaseStorage()
+const { getImageUrl: getSupabaseImageUrl, getVariantUrl } =
+  useSupabaseStorage();
 
 // Живой поиск при вводе
 watch(searchQuery, (newQuery) => {
   if (newQuery.trim().length >= 4) {
-    debouncedSearch(newQuery)
+    debouncedSearch(newQuery);
+  } else {
+    searchResults.value = [];
   }
-  else {
-    searchResults.value = []
-  }
-})
+});
 
 // Очистка при закрытии
 watch(isSearchOpen, (isOpen) => {
   if (isOpen !== undefined && activeMenuValue.value) {
-    activeMenuValue.value = undefined
+    activeMenuValue.value = undefined;
   }
   if (!isOpen) {
-    searchQuery.value = ''
-    searchResults.value = []
+    searchQuery.value = "";
+    searchResults.value = [];
   }
-})
+});
 
 function handleSearch() {
-  performSearch()
-  isSearchOpen.value = false
+  performSearch();
+  isSearchOpen.value = false;
 }
 
 function handleSelectSuggestion(suggestion: string) {
-  selectSuggestion(suggestion)
-  isSearchOpen.value = false
+  selectSuggestion(suggestion);
+  isSearchOpen.value = false;
 }
 
 function handleRemoveHistory(text: string, event: Event) {
-  event.stopPropagation()
-  removeHistoryItem(text)
+  event.stopPropagation();
+  removeHistoryItem(text);
 }
 
 function getProductImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl)
-    return null
+  if (!imageUrl) return null;
   return getSupabaseImageUrl(BUCKET_NAME_PRODUCT, imageUrl, {
     width: IMAGE_SIZES.THUMBNAIL.width,
     height: IMAGE_SIZES.THUMBNAIL.height,
     quality: 80,
-    format: 'webp',
-    resize: 'cover',
-  })
+    format: "webp",
+    resize: "cover",
+  });
 }
 
-function formatPrice(price: number, discount?: number): { original: string, final: string, hasDiscount: boolean } {
-  const original = price.toLocaleString('ru-RU')
-  const hasDiscount = !!discount && discount > 0
-  const final = hasDiscount
-    ? (price * (1 - discount / 100)).toLocaleString('ru-RU')
-    : original
+function formatPrice(
+  price: number,
+  discount?: number,
+  finalPrice?: number,
+): { original: string; final: string; hasDiscount: boolean } {
+  const original = price.toLocaleString("ru-RU");
+  const hasDiscount = !!discount && discount > 0;
+  // 🔥 Используем final_price из базы данных (с психологическим округлением)
+  const final = finalPrice
+    ? finalPrice.toLocaleString("ru-RU")
+    : hasDiscount
+      ? (price * (1 - discount / 100)).toLocaleString("ru-RU")
+      : original;
 
-  return { original, final, hasDiscount }
+  return { original, final, hasDiscount };
 }
 
-const categoriesStore = useCategoriesStore()
+const categoriesStore = useCategoriesStore();
 
-const menuTree = computed(() => categoriesStore.menuTree)
-const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems)
+const menuTree = computed(() => categoriesStore.menuTree);
+const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems);
 
-useAsyncData('category-data', () => categoriesStore.fetchCategoryData())
-useAsyncData('additional-menu-items', () => categoriesStore.fetchAdditionalMenuItems())
+useAsyncData("category-data", () => categoriesStore.fetchCategoryData());
+useAsyncData("additional-menu-items", () =>
+  categoriesStore.fetchAdditionalMenuItems(),
+);
 
 // Загружаем бренды для меню после загрузки категорий (client-only)
-watch(() => menuTree.value.length, (len) => {
-  if (len > 0) {
-    categoriesStore.loadBrandsForMenuCategories()
-  }
-}, { immediate: true })
+watch(
+  () => menuTree.value.length,
+  (len) => {
+    if (len > 0) {
+      categoriesStore.loadBrandsForMenuCategories();
+    }
+  },
+  { immediate: true },
+);
 
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
-)
+);
 
 watch(isAnyPopupOpenInTabBar, (isOpen) => {
   if (isOpen) {
-    headerOverlay?.showOverlay()
-  }
-  else {
+    headerOverlay?.showOverlay();
+  } else {
     setTimeout(() => {
       if (!activeMenuValue.value && !isSearchOpen.value) {
-        headerOverlay?.hideOverlay()
+        headerOverlay?.hideOverlay();
       }
-    }, 50)
+    }, 50);
   }
-})
+});
 
 // Закрываем поиск при открытии меню
 watch(activeMenuValue, (newValue) => {
   if (newValue !== undefined && isSearchOpen.value) {
-    isSearchOpen.value = false
+    isSearchOpen.value = false;
   }
-})
+});
 
 onUnmounted(() => {
   if (isAnyPopupOpenInTabBar.value) {
-    headerOverlay?.hideOverlay()
+    headerOverlay?.hideOverlay();
   }
-})
+});
 
 function closeAllPopups() {
-  activeMenuValue.value = undefined
-  isSearchOpen.value = false
+  activeMenuValue.value = undefined;
+  isSearchOpen.value = false;
 }
 
 function getCategoryImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl)
-    return null
-  return getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, 'sm')
+  if (!imageUrl) return null;
+  return getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, "sm");
 }
 
 // Функция для закрытия меню после клика по ссылке
 function handleLinkClick() {
-  activeMenuValue.value = undefined
+  activeMenuValue.value = undefined;
 }
 
-defineExpose({ closeAllPopups })
+defineExpose({ closeAllPopups });
 </script>
 
 <template>
@@ -171,10 +181,16 @@ defineExpose({ closeAllPopups })
           class="group max-w-3xs shrink-0 w-full justify-start bg-white/15 hover:bg-white/20 transition-all duration-200 p-0 h-11 rounded-xl px-4 relative backdrop-blur-sm border border-white/10 hover:border-white/20 shadow-lg"
         >
           <div class="relative w-full items-center flex">
-            <span class="absolute start-0 inset-y-0 flex items-center justify-center px-2">
-              <Search class="size-4.5 text-white/80 transition-all duration-200 group-hover:text-white group-hover:scale-110" />
+            <span
+              class="absolute start-0 inset-y-0 flex items-center justify-center px-2"
+            >
+              <Search
+                class="size-4.5 text-white/80 transition-all duration-200 group-hover:text-white group-hover:scale-110"
+              />
             </span>
-            <span class="pl-8 pr-4 text-sm text-white/80 w-full text-left font-medium group-hover:text-white transition-colors duration-200">
+            <span
+              class="pl-8 pr-4 text-sm text-white/80 w-full text-left font-medium group-hover:text-white transition-colors duration-200"
+            >
               Поиск товаров
             </span>
           </div>
@@ -196,7 +212,9 @@ defineExpose({ closeAllPopups })
               @keydown.enter="handleSearch"
               @keydown.esc="isSearchOpen = false"
             />
-            <span class="absolute start-6 top-6 inset-y-0 flex items-center justify-center px-2">
+            <span
+              class="absolute start-6 top-6 inset-y-0 flex items-center justify-center px-2"
+            >
               <Search class="size-5 text-gray-400" />
             </span>
 
@@ -220,10 +238,15 @@ defineExpose({ closeAllPopups })
           </div>
 
           <!-- Результаты поиска -->
-          <div v-else-if="hasResults || brandSuggestions.length > 0" class="max-h-[60vh] overflow-y-auto p-4 space-y-4">
+          <div
+            v-else-if="hasResults || brandSuggestions.length > 0"
+            class="max-h-[60vh] overflow-y-auto p-4 space-y-4"
+          >
             <!-- Бренды -->
             <div v-if="brandSuggestions.length > 0" class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
+              <h3
+                class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2"
+              >
                 Бренды
               </h3>
               <div class="grid grid-cols-2 gap-2">
@@ -234,7 +257,10 @@ defineExpose({ closeAllPopups })
                   class="flex items-center gap-3 px-3 py-2.5 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg hover:shadow-md transition-all border border-blue-100"
                   @click="isSearchOpen = false"
                 >
-                  <Icon name="lucide:tag" class="w-4 h-4 text-blue-600 shrink-0" />
+                  <Icon
+                    name="lucide:tag"
+                    class="w-4 h-4 text-blue-600 shrink-0"
+                  />
                   <span class="text-sm font-medium text-gray-900 truncate">
                     {{ brand.name }}
                   </span>
@@ -245,7 +271,9 @@ defineExpose({ closeAllPopups })
             <!-- Товары -->
             <div v-if="hasResults" class="space-y-2">
               <div class="flex items-center justify-between px-2">
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <h3
+                  class="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                >
                   Товары · {{ searchResults.length }}
                 </h3>
                 <button
@@ -266,44 +294,86 @@ defineExpose({ closeAllPopups })
                   @click="isSearchOpen = false"
                 >
                   <!-- Изображение товара -->
-                  <div class="aspect-square rounded-lg overflow-hidden bg-gray-50">
+                  <div
+                    class="aspect-square rounded-lg overflow-hidden bg-gray-50"
+                  >
                     <ProgressiveImage
                       v-if="product.product_images[0]?.image_url"
-                      :src="getProductImageUrl(product.product_images[0].image_url)"
+                      :src="
+                        getProductImageUrl(product.product_images[0].image_url)
+                      "
                       :alt="product.name"
                       aspect-ratio="square"
                       object-fit="cover"
                       placeholder-type="lqip"
-                      :blur-data-url="product.product_images[0].blur_placeholder"
+                      :blur-data-url="
+                        product.product_images[0].blur_placeholder
+                      "
                       :bucket-name="BUCKET_NAME_PRODUCT"
                       :file-path="product.product_images[0].image_url"
                       class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                       eager
                     />
-                    <div v-else class="w-full h-full flex items-center justify-center">
-                      <Icon name="lucide:package" class="w-8 h-8 text-gray-300" />
+                    <div
+                      v-else
+                      class="w-full h-full flex items-center justify-center"
+                    >
+                      <Icon
+                        name="lucide:package"
+                        class="w-8 h-8 text-gray-300"
+                      />
                     </div>
                   </div>
 
                   <!-- Информация о товаре -->
                   <div class="flex-1 flex flex-col gap-1">
-                    <h4 class="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">
+                    <h4
+                      class="text-sm font-medium text-gray-900 line-clamp-2 leading-tight"
+                    >
                       {{ product.name }}
                     </h4>
 
                     <div class="flex items-center gap-1.5 mt-auto">
                       <span
                         class="text-base font-bold"
-                        :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-red-600' : 'text-gray-900'"
+                        :class="
+                          formatPrice(
+                            product.price,
+                            product.discount_percentage,
+                            product.final_price,
+                          ).hasDiscount
+                            ? 'text-red-600'
+                            : 'text-gray-900'
+                        "
                       >
-                        {{ formatPrice(product.price, product.discount_percentage).final }} ₸
+                        {{
+                          formatPrice(
+                            product.price,
+                            product.discount_percentage,
+                            product.final_price,
+                          ).final
+                        }}
+                        ₸
                       </span>
 
                       <span
-                        v-if="formatPrice(product.price, product.discount_percentage).hasDiscount"
+                        v-if="
+                          formatPrice(
+                            product.price,
+                            product.discount_percentage,
+                            product.final_price,
+                          ).hasDiscount
+                        "
                         class="text-xs text-gray-400 line-through"
                       >
-                        {{ formatPrice(product.price, product.discount_percentage).original }} ₸
+                        {{
+                          formatPrice(
+                            product.price,
+                            product.discount_percentage,
+                            product.final_price,
+                          ).original
+                        }}
+                        ₸
                       </span>
                     </div>
 
@@ -314,10 +384,7 @@ defineExpose({ closeAllPopups })
                       <Icon name="lucide:check-circle" class="w-3 h-3" />
                       <span>В наличии</span>
                     </div>
-                    <div
-                      v-else
-                      class="text-xs text-gray-400"
-                    >
+                    <div v-else class="text-xs text-gray-400">
                       Нет в наличии
                     </div>
                   </div>
@@ -328,18 +395,17 @@ defineExpose({ closeAllPopups })
 
           <!-- Нет результатов -->
           <div v-else-if="hasQuery && !isSearching" class="p-8 text-center">
-            <Icon name="lucide:search-x" class="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <Icon
+              name="lucide:search-x"
+              class="w-16 h-16 mx-auto text-gray-300 mb-4"
+            />
             <h3 class="text-lg font-semibold text-gray-700 mb-2">
               Ничего не найдено
             </h3>
             <p class="text-sm text-gray-500 mb-4">
               Попробуйте изменить поисковый запрос
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              @click="searchQuery = ''"
-            >
+            <Button variant="outline" size="sm" @click="searchQuery = ''">
               Очистить поиск
             </Button>
           </div>
@@ -348,11 +414,13 @@ defineExpose({ closeAllPopups })
           <div v-else class="max-h-[60vh] overflow-y-auto p-4 space-y-4">
             <div v-if="suggestions.length > 0">
               <div class="flex items-center justify-between px-2 mb-3">
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  {{ hasQuery ? 'Из истории' : 'Недавние запросы' }}
+                <h3
+                  class="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                >
+                  {{ hasQuery ? "Из истории" : "Недавние запросы" }}
                 </h3>
                 <button
-                  v-if="suggestions.some(s => s.type === 'history')"
+                  v-if="suggestions.some((s) => s.type === 'history')"
                   type="button"
                   class="text-xs text-blue-600 hover:text-blue-700 font-medium"
                   @click="clearSearchHistory"
@@ -371,15 +439,29 @@ defineExpose({ closeAllPopups })
                 >
                   <div
                     class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
-                    :class="item.type === 'history' ? 'bg-gray-100 group-hover:bg-blue-100' : 'bg-blue-50 group-hover:bg-blue-100'"
+                    :class="
+                      item.type === 'history'
+                        ? 'bg-gray-100 group-hover:bg-blue-100'
+                        : 'bg-blue-50 group-hover:bg-blue-100'
+                    "
                   >
                     <Icon
-                      :name="item.type === 'history' ? 'lucide:history' : 'lucide:trending-up'"
+                      :name="
+                        item.type === 'history'
+                          ? 'lucide:history'
+                          : 'lucide:trending-up'
+                      "
                       class="w-4 h-4 transition-colors"
-                      :class="item.type === 'history' ? 'text-gray-600 group-hover:text-blue-600' : 'text-blue-500'"
+                      :class="
+                        item.type === 'history'
+                          ? 'text-gray-600 group-hover:text-blue-600'
+                          : 'text-blue-500'
+                      "
                     />
                   </div>
-                  <span class="flex-1 truncate text-gray-700 group-hover:text-gray-900 font-medium">
+                  <span
+                    class="flex-1 truncate text-gray-700 group-hover:text-gray-900 font-medium"
+                  >
                     {{ item.text }}
                   </span>
                   <button
@@ -388,7 +470,10 @@ defineExpose({ closeAllPopups })
                     class="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 transition-all"
                     @click="handleRemoveHistory(item.text, $event)"
                   >
-                    <Icon name="lucide:x" class="w-4 h-4 text-gray-400 hover:text-red-600" />
+                    <Icon
+                      name="lucide:x"
+                      class="w-4 h-4 text-gray-400 hover:text-red-600"
+                    />
                   </button>
                 </button>
               </div>
@@ -406,13 +491,20 @@ defineExpose({ closeAllPopups })
     >
       <NavigationMenuList class="flex w-full items-center justify-end gap-2">
         <!-- Дополнительные пункты меню: Новинки, Акции -->
-        <template v-for="additionalItem in additionalMenuItems" :key="additionalItem.id">
+        <template
+          v-for="additionalItem in additionalMenuItems"
+          :key="additionalItem.id"
+        >
           <NavigationMenuItem :value="additionalItem.id">
             <NuxtLink
               :to="additionalItem.href"
               :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-4 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl flex items-center gap-2`"
             >
-              <Icon v-if="additionalItem.icon" :name="additionalItem.icon" class="w-4 h-4" />
+              <Icon
+                v-if="additionalItem.icon"
+                :name="additionalItem.icon"
+                class="w-4 h-4"
+              />
               {{ additionalItem.name }}
             </NuxtLink>
           </NavigationMenuItem>
@@ -432,7 +524,9 @@ defineExpose({ closeAllPopups })
               </NuxtLink>
 
               <NavigationMenuContent>
-                <div class="min-w-screen h-[45vh] bg-white dark:bg-gray-900 overflow-y-auto">
+                <div
+                  class="min-w-screen h-[45vh] bg-white dark:bg-gray-900 overflow-y-auto"
+                >
                   <ul
                     :class="containerClass"
                     class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 py-12"
@@ -461,12 +555,16 @@ defineExpose({ closeAllPopups })
                             class="w-full h-full transition-transform duration-300 group-hover:scale-105"
                           />
                         </div>
-                        <div class="text-sm font-bold leading-tight text-gray-900 dark:text-gray-100 mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        <div
+                          class="text-sm font-bold leading-tight text-gray-900 dark:text-gray-100 mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                        >
                           {{ childItem.name }}
                         </div>
                       </NuxtLink>
                       <ul
-                        v-if="childItem.children && childItem.children.length > 0"
+                        v-if="
+                          childItem.children && childItem.children.length > 0
+                        "
                         class="ml-2 space-y-1 list-none"
                       >
                         <li
@@ -484,9 +582,18 @@ defineExpose({ closeAllPopups })
                       </ul>
 
                       <!-- Бренды 3-го уровня -->
-                      <div v-if="childItem.brandsLoaded && childItem.brands && childItem.brands.length > 0" class="ml-2 mt-1">
+                      <div
+                        v-if="
+                          childItem.brandsLoaded &&
+                          childItem.brands &&
+                          childItem.brands.length > 0
+                        "
+                        class="ml-2 mt-1"
+                      >
                         <div
-                          v-if="childItem.children && childItem.children.length > 0"
+                          v-if="
+                            childItem.children && childItem.children.length > 0
+                          "
                           class="border-t border-gray-100 dark:border-gray-800 my-1"
                         />
                         <ul class="space-y-1 list-none">
@@ -501,23 +608,40 @@ defineExpose({ closeAllPopups })
                           </li>
                         </ul>
                       </div>
-                      <div v-else-if="categoriesStore.brandsLoading && !childItem.brandsLoaded" class="ml-2 mt-2 space-y-2 px-3">
-                        <div v-for="n in 3" :key="n" class="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div
+                        v-else-if="
+                          categoriesStore.brandsLoading &&
+                          !childItem.brandsLoaded
+                        "
+                        class="ml-2 mt-2 space-y-2 px-3"
+                      >
+                        <div
+                          v-for="n in 3"
+                          :key="n"
+                          class="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                        />
                       </div>
                     </li>
                   </ul>
                   <div
                     v-if="
-                      rootItem.children.length === 0
-                        && !categoriesStore.isLoading
+                      rootItem.children.length === 0 &&
+                      !categoriesStore.isLoading
                     "
                     class="py-20 text-center"
                   >
                     <div class="inline-flex flex-col items-center gap-3">
-                      <div class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                        <Icon name="lucide:package-open" class="w-8 h-8 text-gray-400" />
+                      <div
+                        class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center"
+                      >
+                        <Icon
+                          name="lucide:package-open"
+                          class="w-8 h-8 text-gray-400"
+                        />
                       </div>
-                      <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                      <p
+                        class="text-sm text-gray-500 dark:text-gray-400 font-medium"
+                      >
                         Скоро здесь появятся подкатегории
                       </p>
                     </div>
@@ -526,8 +650,12 @@ defineExpose({ closeAllPopups })
                     v-if="categoriesStore.isLoading"
                     class="py-20 text-center"
                   >
-                    <div class="inline-flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 font-medium">
-                      <div class="h-5 w-5 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500" />
+                    <div
+                      class="inline-flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 font-medium"
+                    >
+                      <div
+                        class="h-5 w-5 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500"
+                      />
                       Загрузка категорий
                     </div>
                   </div>
