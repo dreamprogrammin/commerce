@@ -61,10 +61,12 @@ if (import.meta.server) {
       productsStore.fetchProductBySlug(slug.value),
     ]);
     initialProduct = product;
-    
+
     // Загружаем отзывы для Schema.org
     if (initialProduct?.id) {
-      initialReviews = await reviewsStore.fetchReviews(initialProduct.id).catch(() => []);
+      initialReviews = await reviewsStore
+        .fetchReviews(initialProduct.id)
+        .catch(() => []);
     }
   } catch {
     ssrFetchFailed = true;
@@ -81,9 +83,12 @@ if (import.meta.server) {
   if (initialProduct) {
     queryClient.setQueryData(["product", slug.value], initialProduct);
   }
-  
+
   if (initialReviews) {
-    queryClient.setQueryData(["product-reviews", initialProduct.id], initialReviews);
+    queryClient.setQueryData(
+      ["product-reviews", initialProduct.id],
+      initialReviews,
+    );
   }
 }
 

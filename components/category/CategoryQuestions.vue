@@ -16,13 +16,11 @@ const { data: questions, isLoading } = useQuery({
   gcTime: 10 * 60 * 1000,
 });
 
-// Показать все вопросы
 const displayedQuestions = computed(() => {
   if (!questions.value) return [];
   return questions.value;
 });
 
-// Форматирование даты
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("ru-RU", {
     day: "numeric",
@@ -31,19 +29,12 @@ function formatDate(dateStr: string) {
   });
 }
 
-// Функция для безопасного рендеринга HTML (только разрешенные теги)
 function sanitizeAndRenderHTML(html: string | null): string {
   if (!html) return "";
-
-  // Разрешаем только безопасные теги для SEO
-  const allowedTags = ["strong", "ul", "li", "a", "br", "p"];
   const tempDiv = document.createElement("div");
   tempDiv.innerHTML = html;
-
-  // Удаляем все скрипты и опасные атрибуты
   const scripts = tempDiv.querySelectorAll("script, style");
   scripts.forEach((s) => s.remove());
-
   return tempDiv.innerHTML;
 }
 </script>
@@ -53,7 +44,6 @@ function sanitizeAndRenderHTML(html: string | null): string {
     v-if="displayedQuestions.length"
     class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8"
   >
-    <!-- Заголовок -->
     <div class="mb-6">
       <h2 class="text-2xl font-bold mb-2">Часто задаваемые вопросы</h2>
       <p class="text-muted-foreground text-sm">
@@ -61,7 +51,6 @@ function sanitizeAndRenderHTML(html: string | null): string {
       </p>
     </div>
 
-    <!-- Загрузка -->
     <div v-if="isLoading" class="space-y-4">
       <div v-for="i in 3" :key="i" class="animate-pulse border rounded-lg p-4">
         <div class="h-5 bg-muted rounded w-3/4 mb-3" />
@@ -70,14 +59,12 @@ function sanitizeAndRenderHTML(html: string | null): string {
       </div>
     </div>
 
-    <!-- Список вопросов и ответов -->
     <div v-else class="space-y-4">
       <div
         v-for="(q, index) in displayedQuestions"
         :key="q.id"
         class="border rounded-lg p-5 hover:shadow-md transition-shadow"
       >
-        <!-- Вопрос -->
         <div class="flex items-start gap-3 mb-3">
           <div
             class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"
@@ -91,10 +78,9 @@ function sanitizeAndRenderHTML(html: string | null): string {
           </div>
         </div>
 
-        <!-- Ответ с HTML-разметкой -->
         <div v-if="q.answer_text" class="pl-11">
           <div
-            class="text-sm leading-relaxed text-muted-foreground prose prose-sm max-w-none"
+            class="faq-answer text-sm leading-relaxed text-muted-foreground"
             v-html="sanitizeAndRenderHTML(q.answer_text)"
           />
         </div>
@@ -104,24 +90,26 @@ function sanitizeAndRenderHTML(html: string | null): string {
 </template>
 
 <style scoped>
-/* Стили для HTML-контента в ответах */
-.prose :deep(strong) {
+/* FIX Tailwind v4: @reference нужен чтобы @apply видел утилиты из основного CSS */
+@reference "~/assets/css/tailwind.css";
+
+.faq-answer :deep(strong) {
   @apply font-semibold text-foreground;
 }
 
-.prose :deep(ul) {
+.faq-answer :deep(ul) {
   @apply list-disc list-inside my-2 space-y-1;
 }
 
-.prose :deep(li) {
+.faq-answer :deep(li) {
   @apply text-muted-foreground;
 }
 
-.prose :deep(a) {
+.faq-answer :deep(a) {
   @apply text-primary hover:underline font-medium;
 }
 
-.prose :deep(p) {
+.faq-answer :deep(p) {
   @apply mb-2;
 }
 </style>
