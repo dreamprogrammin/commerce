@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { usePromoCodeStore } from '@/stores/publicStore/promoCodeStore'
+import { carouselContainerVariants } from '@/lib/variants'
 
 const authStore = useAuthStore()
 const cartStore = useCartStore()
@@ -273,10 +274,11 @@ async function placeOrder() {
   // Очищаем промокод после успешного заказа
   promoCodeStore.clearCode()
 }
+const containerClass = carouselContainerVariants({ contained: 'always' })
 </script>
 
 <template>
-  <div class="container py-12">
+  <div :class="containerClass" class="py-12">
     <!-- Модалка для гостей -->
     <GuestBonusModal v-model:open="showGuestModal" />
 
