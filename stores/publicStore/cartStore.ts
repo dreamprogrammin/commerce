@@ -1,6 +1,5 @@
 import type { Database, ICheckoutData, ProductWithImages } from "@/types";
 import { toast } from "vue-sonner";
-import { formatPriceWithDiscount } from "@/utils/formatPrice";
 import { useProfileStore } from "../core/profileStore";
 
 const CART_STORAGE_KEY = "uhti-cart-v1";
@@ -26,19 +25,14 @@ export const useCartStore = defineStore(
     const isMergingFromServer = ref(false); // Блокирует sync→server пока грузим данные с сервера
     const isCartOpen = ref(false); // 🔥 Управление состоянием шторки корзины
 
-    // @ts-expect-error - Deep type instantiation with computed ref
     const totalItems = computed(() =>
       items.value.reduce((sum: number, item) => sum + item.quantity, 0),
     );
 
     const subtotal = computed(() =>
       items.value.reduce((sum: number, item) => {
-        // Используем финальную цену с учетом скидки
-        const priceData = formatPriceWithDiscount(
-          Number(item.product.price),
-          item.product.discount_percentage,
-        );
-        return sum + priceData.finalNumber * item.quantity;
+        // 🔥 Используем final_price из базы данных (с округлением)
+        return sum + item.product.final_price * item.quantity;
       }, 0),
     );
 

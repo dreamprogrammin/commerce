@@ -654,9 +654,8 @@ useSchemaOrg([
     offers: computed(() => {
       if (!product.value) return undefined;
       const p = product.value;
-      const finalPrice = p.discount_percentage
-        ? Math.round((Number(p.price) * (100 - p.discount_percentage)) / 100)
-        : Math.round(Number(p.price));
+      // 🔥 Используем final_price из базы данных (с психологическим округлением)
+      const finalPrice = p.final_price || Math.round(Number(p.price));
       const originalPrice = Math.round(Number(p.price));
 
       return {

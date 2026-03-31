@@ -1,160 +1,165 @@
 <script setup lang="ts">
-import type { CarouselApi } from '../ui/carousel'
-import type { BaseProduct } from '@/types'
-import { computed, ref } from 'vue'
-import { Button } from '@/components/ui/button'
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
-import { useCartStore } from '@/stores/publicStore/cartStore'
-import { formatPrice } from '@/utils/formatPrice'
+import type { CarouselApi } from "../ui/carousel";
+import type { BaseProduct } from "@/types";
+import { computed, ref } from "vue";
+import { Button } from "@/components/ui/button";
+import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
+import { IMAGE_SIZES } from "@/config/images";
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from "@/constants";
+import { useCartStore } from "@/stores/publicStore/cartStore";
+import { formatPrice } from "@/utils/formatPrice";
 
 const props = defineProps<{
-  product: BaseProduct
-}>()
+  product: BaseProduct;
+}>();
 
-const cartStore = useCartStore()
-const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const cartStore = useCartStore();
+const { getImageUrl, getVariantUrl } = useSupabaseStorage();
 
 // --- DEVICE DETECTION ---
-const isTouchDevice = ref(false)
+const isTouchDevice = ref(false);
 onMounted(() => {
-  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-})
+  isTouchDevice.value =
+    "ontouchstart" in window || navigator.maxTouchPoints > 0;
+});
 
 // --- CAROUSEL STATE (для мобилы) ---
-const emblaMobileApi = ref<CarouselApi>()
-const mobileSelectedIndex = ref(0)
+const emblaMobileApi = ref<CarouselApi>();
+const mobileSelectedIndex = ref(0);
 
 function onMobileSelect() {
-  if (!emblaMobileApi.value)
-    return
-  mobileSelectedIndex.value = emblaMobileApi.value.selectedScrollSnap()
+  if (!emblaMobileApi.value) return;
+  mobileSelectedIndex.value = emblaMobileApi.value.selectedScrollSnap();
 }
 
 watch(emblaMobileApi, (api) => {
   if (api) {
-    onMobileSelect()
-    api.on('select', onMobileSelect)
-    api.on('reInit', onMobileSelect)
+    onMobileSelect();
+    api.on("select", onMobileSelect);
+    api.on("reInit", onMobileSelect);
   }
-})
+});
 
 // --- CART STATE ---
 const itemInCart = computed(() => {
-  return cartStore.items.find(item => item.product.id === props.product.id)
-})
+  return cartStore.items.find((item) => item.product.id === props.product.id);
+});
 
 const quantityInCart = computed(() => {
-  return itemInCart.value ? itemInCart.value.quantity : 0
-})
+  return itemInCart.value ? itemInCart.value.quantity : 0;
+});
 
 // --- IMAGE STATE ---
-const activeImageIndex = ref(0)
+const activeImageIndex = ref(0);
 
-const hasMultipleImages = computed(() =>
-  Array.isArray(props.product.product_images) && props.product.product_images.length > 1,
-)
+const hasMultipleImages = computed(
+  () =>
+    Array.isArray(props.product.product_images) &&
+    props.product.product_images.length > 1,
+);
 
 /**
  * Получить URL изображения по индексу
  */
 function getImageUrlByIndex(index: number): string | null {
-  const imageUrl = props.product.product_images?.[index]?.image_url
-  if (!imageUrl)
-    return null
+  const imageUrl = props.product.product_images?.[index]?.image_url;
+  if (!imageUrl) return null;
 
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD);
 }
 
 /**
  * Получить URL вариантов изображения (sm/md/lg) для srcset
  */
 function getVariantUrls(index: number) {
-  const imageUrl = props.product.product_images?.[index]?.image_url
-  if (!imageUrl)
-    return {}
+  const imageUrl = props.product.product_images?.[index]?.image_url;
+  if (!imageUrl) return {};
   return {
-    sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm'),
-    md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'md'),
-    lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'lg'),
-  }
+    sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, "sm"),
+    md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, "md"),
+    lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, "lg"),
+  };
 }
 
 /**
  * Получить URL логотипа бренда
  */
 function getBrandLogoUrl(): string | null {
-  const logoUrl = props.product.brands?.logo_url
-  if (!logoUrl)
-    return null
+  const logoUrl = props.product.brands?.logo_url;
+  if (!logoUrl) return null;
 
-  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, "sm");
 }
 
 /**
  * Активное изображение для десктопа (наведение мышью)
  */
 const activeImageUrl = computed(() => {
-  return getImageUrlByIndex(activeImageIndex.value)
-})
+  return getImageUrlByIndex(activeImageIndex.value);
+});
 
 // --- MOUSE INTERACTION (только для десктопа) ---
 function handleMouseMove(event: MouseEvent) {
-  if (!hasMultipleImages.value || isTouchDevice.value || !props.product.product_images) {
-    return
+  if (
+    !hasMultipleImages.value ||
+    isTouchDevice.value ||
+    !props.product.product_images
+  ) {
+    return;
   }
 
-  const target = event.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const width = rect.width
+  const target = event.currentTarget as HTMLElement;
+  const rect = target.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const width = rect.width;
 
-  if (width === 0)
-    return
+  if (width === 0) return;
 
-  const segmentWidth = width / props.product.product_images.length
+  const segmentWidth = width / props.product.product_images.length;
   const newIndex = Math.min(
     Math.floor(x / segmentWidth),
     props.product.product_images.length - 1,
-  )
+  );
 
   if (newIndex !== activeImageIndex.value) {
-    activeImageIndex.value = newIndex
+    activeImageIndex.value = newIndex;
   }
 }
 
 function handleMouseLeave() {
-  activeImageIndex.value = 0
+  activeImageIndex.value = 0;
 }
 
 // --- PRICE CALCULATION ---
 const priceDetails = computed(() => {
-  const originalPrice = Number(props.product.price)
-  const discountPercent = Number(props.product.discount_percentage)
+  const originalPrice = Number(props.product.price);
+  const discountPercent = Number(props.product.discount_percentage);
 
-  const hasDiscount = discountPercent > 0 && discountPercent <= 100
+  const hasDiscount = discountPercent > 0 && discountPercent <= 100;
 
   if (!hasDiscount) {
     return {
       hasDiscount: false,
       finalPrice: originalPrice,
-    }
+    };
   }
 
-  const finalPrice = originalPrice - (originalPrice * discountPercent / 100)
+  // 🔥 Используем final_price из базы данных (с психологическим округлением)
+  const finalPrice = props.product.final_price || originalPrice;
 
   return {
     hasDiscount: true,
-    finalPrice: Math.round(finalPrice),
+    finalPrice,
     originalPrice,
     percent: Math.round(discountPercent),
-  }
-})
+  };
+});
 </script>
 
 <template>
-  <div class="bg-white border rounded-xl overflow-hidden group transition-all hover:shadow-xl flex flex-col h-full">
+  <div
+    class="bg-white border rounded-xl overflow-hidden group transition-all hover:shadow-xl flex flex-col h-full"
+  >
     <!-- 🖼️ ГАЛЕРЕЯ ИЗОБРАЖЕНИЙ -->
     <div
       class="relative bg-white aspect-square overflow-hidden"
@@ -162,24 +167,30 @@ const priceDetails = computed(() => {
       @mouseleave="handleMouseLeave"
     >
       <!-- 🏷️ БЕЙДЖ СКИДКИ -->
-      <div
-        v-if="priceDetails.hasDiscount"
-        class="absolute top-3 right-3 z-10"
-      >
-        <Badge variant="destructive" class="font-bold text-xs px-2.5 py-1 shadow-lg">
+      <div v-if="priceDetails.hasDiscount" class="absolute top-3 right-3 z-10">
+        <Badge
+          variant="destructive"
+          class="font-bold text-xs px-2.5 py-1 shadow-lg"
+        >
           -{{ priceDetails.percent }}%
         </Badge>
       </div>
 
       <!-- ❤️ КНОПКА ДОБАВЛЕНИЯ В ИЗБРАННОЕ -->
       <div class="absolute top-3 left-3 z-10">
-        <ProductWishlistButton :product-id="product.id" :product-name="product.name" />
+        <ProductWishlistButton
+          :product-id="product.id"
+          :product-name="product.name"
+        />
       </div>
 
       <ClientOnly>
         <!-- 🖥️ ДЕСКТОП: Наведение мышью меняет изображение -->
         <template v-if="!isTouchDevice">
-          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full p-4">
+          <NuxtLink
+            :to="`/catalog/products/${product.slug}`"
+            class="block h-full p-4"
+          >
             <ProgressiveImage
               :src="activeImageUrl"
               :src-sm="getVariantUrls(activeImageIndex).sm"
@@ -190,7 +201,9 @@ const priceDetails = computed(() => {
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="lqip"
-              :blur-data-url="product.product_images?.[activeImageIndex]?.blur_placeholder"
+              :blur-data-url="
+                product.product_images?.[activeImageIndex]?.blur_placeholder
+              "
               eager
               zoom-on-hover
             />
@@ -206,7 +219,7 @@ const priceDetails = computed(() => {
             @touchstart.stop
             @touchmove.stop
             @touchend.stop
-            @init-api="(val) => emblaMobileApi = val"
+            @init-api="(val) => (emblaMobileApi = val)"
           >
             <CarouselContent>
               <CarouselItem
@@ -237,7 +250,11 @@ const priceDetails = computed(() => {
           </Carousel>
 
           <!-- 📷 Одно изображение на мобилке -->
-          <NuxtLink v-else :to="`/catalog/products/${product.slug}`" class="block h-full p-4">
+          <NuxtLink
+            v-else
+            :to="`/catalog/products/${product.slug}`"
+            class="block h-full p-4"
+          >
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
@@ -259,7 +276,10 @@ const priceDetails = computed(() => {
 
         <!-- ⚙️ Fallback для SSR -->
         <template #fallback>
-          <NuxtLink :to="`/catalog/products/${product.slug}`" class="block h-full p-4">
+          <NuxtLink
+            :to="`/catalog/products/${product.slug}`"
+            class="block h-full p-4"
+          >
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
@@ -292,9 +312,10 @@ const priceDetails = computed(() => {
               v-for="(_, index) in product.product_images"
               :key="`dot-desktop-${index}`"
               class="rounded-full transition-all"
-              :class="index === activeImageIndex
-                ? 'w-5 h-1.5 bg-gray-600'
-                : 'w-1.5 h-1.5 bg-gray-300'
+              :class="
+                index === activeImageIndex
+                  ? 'w-5 h-1.5 bg-gray-600'
+                  : 'w-1.5 h-1.5 bg-gray-300'
               "
             />
           </template>
@@ -305,9 +326,10 @@ const priceDetails = computed(() => {
               v-for="(_, index) in product.product_images"
               :key="`dot-mobile-${index}`"
               class="rounded-full transition-all"
-              :class="index === mobileSelectedIndex
-                ? 'w-5 h-1.5 bg-gray-600'
-                : 'w-1.5 h-1.5 bg-gray-300'
+              :class="
+                index === mobileSelectedIndex
+                  ? 'w-5 h-1.5 bg-gray-600'
+                  : 'w-1.5 h-1.5 bg-gray-300'
               "
             />
           </template>
@@ -338,20 +360,27 @@ const priceDetails = computed(() => {
             />
           </div>
           <!-- Название бренда -->
-          <span class="text-xs text-muted-foreground group-hover:text-primary transition-colors font-medium line-clamp-1">
+          <span
+            class="text-xs text-muted-foreground group-hover:text-primary transition-colors font-medium line-clamp-1"
+          >
             {{ product.brands.name }}
           </span>
         </NuxtLink>
       </div>
 
       <!-- 📦 Серия -->
-      <span v-if="product.product_line_name" class="text-[11px] text-pink-600 font-medium">
+      <span
+        v-if="product.product_line_name"
+        class="text-[11px] text-pink-600 font-medium"
+      >
         {{ product.product_line_name }}
       </span>
 
       <!-- 📝 Название товара -->
       <NuxtLink :to="`/catalog/products/${product.slug}`" class="block">
-        <h3 class="font-semibold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
+        <h3
+          class="font-semibold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors"
+        >
           {{ product.name }}
         </h3>
       </NuxtLink>
@@ -362,7 +391,10 @@ const priceDetails = computed(() => {
           <p class="text-xl font-bold text-primary">
             {{ formatPrice(priceDetails.finalPrice) }} ₸
           </p>
-          <p v-if="priceDetails.hasDiscount" class="text-sm text-muted-foreground line-through">
+          <p
+            v-if="priceDetails.hasDiscount"
+            class="text-sm text-muted-foreground line-through"
+          >
             {{ formatPrice(priceDetails.originalPrice) }} ₸
           </p>
         </div>
@@ -388,15 +420,17 @@ const priceDetails = computed(() => {
             @click="cartStore.addItem(product as BaseProduct, 1)"
           >
             <Icon
-              :name="product.stock_quantity && product.stock_quantity > 0 ? 'lucide:shopping-cart' : 'lucide:x-circle'"
+              :name="
+                product.stock_quantity && product.stock_quantity > 0
+                  ? 'lucide:shopping-cart'
+                  : 'lucide:x-circle'
+              "
               class="w-4 h-4 mr-2"
             />
             <span v-if="product.stock_quantity && product.stock_quantity > 0">
               В корзину
             </span>
-            <span v-else>
-              Нет в наличии
-            </span>
+            <span v-else> Нет в наличии </span>
           </Button>
 
           <QuantitySelector

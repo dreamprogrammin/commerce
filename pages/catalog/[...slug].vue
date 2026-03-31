@@ -1206,12 +1206,8 @@ useSchemaOrg(
               }),
               offers: {
                 "@type": "Offer",
-                price: product.discount_percentage
-                  ? Math.round(
-                      (product.price * (100 - product.discount_percentage)) /
-                        100,
-                    )
-                  : product.price,
+                // 🔥 Используем final_price из базы данных (с психологическим округлением)
+                price: product.final_price || product.price,
                 priceCurrency: "KZT",
                 availability:
                   product.stock_quantity > 0
@@ -1392,9 +1388,7 @@ useSchemaOrg(
               <Icon name="lucide:tag" class="w-3.5 h-3.5 text-green-500" />
               <span
                 >от
-                {{
-                  new Intl.NumberFormat("ru-RU").format(priceRange.min)
-                }}
+                {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }}
                 ₸</span
               >
             </div>
@@ -1482,9 +1476,7 @@ useSchemaOrg(
                 <Icon name="lucide:tag" class="w-4 h-4 text-green-500" />
                 <span
                   >от
-                  {{
-                    new Intl.NumberFormat("ru-RU").format(priceRange.min)
-                  }}
+                  {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }}
                   ₸</span
                 >
               </div>
