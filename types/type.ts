@@ -205,6 +205,7 @@ export interface ICheckoutData {
   promoCode?: string;
   contactName?: string;
   contactPhone?: string;
+  comment?: string;
 }
 
 export type CategoryRow = Database["public"]["Tables"]["categories"]["Row"] & {

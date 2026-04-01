@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { Lock, Package, Star, Tag } from 'lucide-vue-next'
-import { vMaska } from 'maska/vue'
-import { storeToRefs } from 'pinia'
-import { toast } from 'vue-sonner'
-import { carouselContainerVariants } from '@/lib/variants'
-import { useAuthStore } from '@/stores/auth'
-import { useProfileStore } from '@/stores/core/profileStore'
-import { useCartStore } from '@/stores/publicStore/cartStore'
-import { usePromoCodeStore } from '@/stores/publicStore/promoCodeStore'
+import { Lock, Package, Star, Tag } from "lucide-vue-next";
+import { vMaska } from "maska/vue";
+import { storeToRefs } from "pinia";
+import { toast } from "vue-sonner";
+import { carouselContainerVariants } from "@/lib/variants";
+import { useAuthStore } from "@/stores/auth";
+import { useProfileStore } from "@/stores/core/profileStore";
+import { useCartStore } from "@/stores/publicStore/cartStore";
+import { usePromoCodeStore } from "@/stores/publicStore/promoCodeStore";
+import { formatPrice } from "@/utils/formatPrice";
 
-const authStore = useAuthStore()
-const cartStore = useCartStore()
-const profileStore = useProfileStore()
-const promoCodeStore = usePromoCodeStore()
+const authStore = useAuthStore();
+const cartStore = useCartStore();
+const profileStore = useProfileStore();
+const promoCodeStore = usePromoCodeStore();
 
-const { user, isLoggedIn } = storeToRefs(authStore)
-const { bonusBalance } = storeToRefs(profileStore)
+const { user, isLoggedIn } = storeToRefs(authStore);
+const { bonusBalance } = storeToRefs(profileStore);
 const {
   subtotal,
   discountAmount,
@@ -24,266 +25,256 @@ const {
   isProcessing,
   bonusesToSpend,
   bonusesToAward,
-} = storeToRefs(cartStore)
+} = storeToRefs(cartStore);
 
 const orderForm = ref({
-  name: '',
-  phone: '',
-  email: '',
-  deliveryMethod: 'pickup' as 'pickup' | 'courier',
-  paymentMethod: 'kaspi_transfer' as 'kaspi_transfer' | 'cash',
+  name: "",
+  phone: "",
+  email: "",
+  deliveryMethod: "pickup" as "pickup" | "courier",
+  paymentMethod: "kaspi_transfer" as "kaspi_transfer" | "cash",
   address: {
-    city: 'Алматы',
-    line1: '',
+    city: "Алматы",
+    line1: "",
   },
-  comment: '',
-})
-const bonusesInput = ref(0)
-const promoCodeInput = ref('')
-const showGuestModal = ref(false)
-const agreedToTerms = ref(true)
+  comment: "",
+});
+const bonusesInput = ref(0);
+const promoCodeInput = ref("");
+const showGuestModal = ref(false);
+const agreedToTerms = ref(true);
 
 const {
   appliedCode: appliedPromoCode,
   discountAmount: promoDiscount,
   isValidating: isPromoValidating,
-} = storeToRefs(promoCodeStore)
+} = storeToRefs(promoCodeStore);
 
 async function applyPromoCode() {
-  await promoCodeStore.validateCode(promoCodeInput.value, subtotal.value)
+  await promoCodeStore.validateCode(promoCodeInput.value, subtotal.value);
 }
 
 function clearPromoCode() {
-  promoCodeStore.clearCode()
-  promoCodeInput.value = ''
+  promoCodeStore.clearCode();
+  promoCodeInput.value = "";
 }
 
 // Маска для телефона (как в Kaspi)
 const phoneMaskOptions = reactive({
-  mask: '+7 (###) ###-##-##',
+  mask: "+7 (###) ###-##-##",
   eager: false, // Маска появляется только при вводе
-})
+});
 
 // При фокусе показываем +7 если поле пустое
 function handlePhoneFocus() {
   if (!orderForm.value.phone) {
-    orderForm.value.phone = '+7 '
+    orderForm.value.phone = "+7 ";
   }
 }
 
 // При потере фокуса очищаем если только +7
 function handlePhoneBlur() {
-  const trimmed = orderForm.value.phone.trim()
-  if (trimmed === '+7' || trimmed === '+7 (' || trimmed === '+7 ()') {
-    orderForm.value.phone = ''
+  const trimmed = orderForm.value.phone.trim();
+  if (trimmed === "+7" || trimmed === "+7 (" || trimmed === "+7 ()") {
+    orderForm.value.phone = "";
   }
 }
 
 // Валидация email
 const isValidEmail = computed(() => {
-  const email = orderForm.value.email
-  if (!email)
-    return true
-  return /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(email)
-})
+  const email = orderForm.value.email;
+  if (!email) return true;
+  return /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(email);
+});
 
 // Валидация имени (минимум 2 символа)
 const isValidName = computed(() => {
-  const name = orderForm.value.name.trim()
-  if (!name)
-    return true
-  return name.length >= 2
-})
+  const name = orderForm.value.name.trim();
+  if (!name) return true;
+  return name.length >= 2;
+});
 
 // Извлекаем только цифры из номера телефона
-const phoneDigits = computed(() => orderForm.value.phone.replace(/\D/g, ''))
+const phoneDigits = computed(() => orderForm.value.phone.replace(/\D/g, ""));
 
 // Валидация казахстанского мобильного телефона
 const isValidPhone = computed(() => {
-  const digits = phoneDigits.value
-  if (!digits)
-    return true
+  const digits = phoneDigits.value;
+  if (!digits) return true;
 
   // Должно быть ровно 11 цифр
-  if (digits.length !== 11)
-    return false
+  if (digits.length !== 11) return false;
 
   // Должно начинаться с 7
-  if (!digits.startsWith('7'))
-    return false
+  if (!digits.startsWith("7")) return false;
 
   // Проверка мобильных кодов: 70X, 74X, 75X, 76X, 77X, 78X
-  const mobileCode = digits.substring(1, 3)
-  const validCodes = ['70', '74', '75', '76', '77', '78']
+  const mobileCode = digits.substring(1, 3);
+  const validCodes = ["70", "74", "75", "76", "77", "78"];
 
-  return validCodes.includes(mobileCode)
-})
+  return validCodes.includes(mobileCode);
+});
 
 // Сообщение об ошибке для телефона
 const phoneErrorMessage = computed(() => {
-  const digits = phoneDigits.value
-  if (!digits)
-    return ''
+  const digits = phoneDigits.value;
+  if (!digits) return "";
 
   if (digits.length < 11) {
-    return 'Введите полный номер телефона'
+    return "Введите полный номер телефона";
   }
 
-  if (!digits.startsWith('7')) {
-    return 'Номер должен начинаться с +7'
+  if (!digits.startsWith("7")) {
+    return "Номер должен начинаться с +7";
   }
 
-  const mobileCode = digits.substring(1, 3)
-  const validCodes = ['70', '74', '75', '76', '77', '78']
+  const mobileCode = digits.substring(1, 3);
+  const validCodes = ["70", "74", "75", "76", "77", "78"];
 
   if (!validCodes.includes(mobileCode)) {
-    return 'Неверный код оператора (700-709, 747-749, 750-759, 760-769, 770-779, 780-789)'
+    return "Неверный код оператора (700-709, 747-749, 750-759, 760-769, 770-779, 780-789)";
   }
 
-  return ''
-})
+  return "";
+});
 
 // Константа порога бесплатной доставки (как в умной корзине)
-const FREE_SHIPPING_THRESHOLD = 15000
+const FREE_SHIPPING_THRESHOLD = 15000;
 
 // Расчет стоимости доставки
 const deliveryCost = computed(() => {
   // Самовывоз — бесплатно
-  if (orderForm.value.deliveryMethod === 'pickup')
-    return 0
+  if (orderForm.value.deliveryMethod === "pickup") return 0;
 
   // Курьер: если сумма >= 15000 ₸ — бесплатно, иначе 1000 ₸
-  return subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : 1000
-})
+  return subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : 1000;
+});
 
 // Итоговая сумма с учетом доставки
 const totalWithDelivery = computed(() => {
-  return total.value + deliveryCost.value
-})
+  return total.value + deliveryCost.value;
+});
 
 // Проверка готовности формы к отправке
 const isFormValid = computed(() => {
-  const { name, email, phone, deliveryMethod, address } = orderForm.value
+  const { name, email, phone, deliveryMethod, address } = orderForm.value;
 
   // Базовые поля
-  if (!name.trim() || !email.trim() || !phone.trim())
-    return false
+  if (!name.trim() || !email.trim() || !phone.trim()) return false;
   if (!isValidName.value || !isValidEmail.value || !isValidPhone.value)
-    return false
+    return false;
 
   // Адрес для курьера
-  if (deliveryMethod === 'courier' && !address.line1.trim())
-    return false
+  if (deliveryMethod === "courier" && !address.line1.trim()) return false;
 
   // Согласие с условиями
-  if (!agreedToTerms.value)
-    return false
+  if (!agreedToTerms.value) return false;
 
-  return true
-})
+  return true;
+});
 
 // Предзаполнение формы
 watch(
   () => profileStore.profile,
   (newProfile) => {
     if (newProfile) {
-      orderForm.value.name
-        = `${newProfile.first_name || ''} ${newProfile.last_name || ''}`.trim()
-      orderForm.value.phone = newProfile.phone || ''
+      orderForm.value.name =
+        `${newProfile.first_name || ""} ${newProfile.last_name || ""}`.trim();
+      orderForm.value.phone = newProfile.phone || "";
     }
     if (user.value) {
-      orderForm.value.email = user.value.email || ''
+      orderForm.value.email = user.value.email || "";
     }
   },
   { immediate: true },
-)
+);
 
 // Модалка для гостей (один раз за сессию)
-const hasSeenModalKey = 'guest_bonus_modal_seen'
+const hasSeenModalKey = "guest_bonus_modal_seen";
 
 onMounted(() => {
-  const hasSeenModal = sessionStorage.getItem(hasSeenModalKey)
+  const hasSeenModal = sessionStorage.getItem(hasSeenModalKey);
 
   if (!isLoggedIn.value && items.value.length > 0 && !hasSeenModal) {
     setTimeout(() => {
-      showGuestModal.value = true
-      sessionStorage.setItem(hasSeenModalKey, 'true')
-    }, 800)
+      showGuestModal.value = true;
+      sessionStorage.setItem(hasSeenModalKey, "true");
+    }, 800);
   }
-})
+});
 
 function applyBonuses() {
   // Проверка 1: Достаточно ли бонусов на балансе
   if (bonusesInput.value > bonusBalance.value) {
-    toast.error('Недостаточно бонусов', {
+    toast.error("Недостаточно бонусов", {
       description: `У вас доступно только ${bonusBalance.value} бонусов`,
-    })
-    bonusesInput.value = bonusBalance.value
-    return
+    });
+    bonusesInput.value = bonusBalance.value;
+    return;
   }
 
   // Проверка 2: Не превышают ли бонусы стоимость заказа
-  const maxBonuses = Math.floor(subtotal.value)
+  const maxBonuses = Math.floor(subtotal.value);
   if (bonusesInput.value > maxBonuses) {
-    toast.warning('Слишком много бонусов', {
+    toast.warning("Слишком много бонусов", {
       description: `Максимум для этого заказа: ${maxBonuses} бонусов (стоимость корзины)`,
-    })
-    bonusesInput.value = maxBonuses
-    cartStore.setBonusesToSpend(maxBonuses)
-    return
+    });
+    bonusesInput.value = maxBonuses;
+    cartStore.setBonusesToSpend(maxBonuses);
+    return;
   }
 
-  cartStore.setBonusesToSpend(bonusesInput.value)
-  bonusesInput.value = bonusesToSpend.value
+  cartStore.setBonusesToSpend(bonusesInput.value);
+  bonusesInput.value = bonusesToSpend.value;
 
   if (bonusesToSpend.value > 0) {
     toast.success(`${bonusesToSpend.value} бонусов применено!`, {
       description: `Скидка: ${bonusesToSpend.value} ₸`,
-    })
+    });
   }
 }
 
 async function placeOrder() {
   // Валидация обязательных полей
   if (
-    !orderForm.value.name.trim()
-    || !orderForm.value.email.trim()
-    || !orderForm.value.phone.trim()
+    !orderForm.value.name.trim() ||
+    !orderForm.value.email.trim() ||
+    !orderForm.value.phone.trim()
   ) {
-    toast.error('Заполните все обязательные поля')
-    return
+    toast.error("Заполните все обязательные поля");
+    return;
   }
 
   // Валидация имени
   if (!isValidName.value) {
-    toast.error('Имя должно содержать минимум 2 символа')
-    return
+    toast.error("Имя должно содержать минимум 2 символа");
+    return;
   }
 
   // Валидация телефона
   if (!isValidPhone.value) {
     toast.error(
-      phoneErrorMessage.value
-      || 'Введите корректный казахстанский мобильный номер',
-    )
-    return
+      phoneErrorMessage.value ||
+        "Введите корректный казахстанский мобильный номер",
+    );
+    return;
   }
 
   // Валидация email
   if (!isValidEmail.value) {
-    toast.error('Введите корректный email')
-    return
+    toast.error("Введите корректный email");
+    return;
   }
 
   // Форматируем номер для отправки в бэк: +77771234567
-  const formattedPhone = `+${phoneDigits.value}`
+  const formattedPhone = `+${phoneDigits.value}`;
 
   // Для залогиненных: сохраняем телефон в профиль, если он отсутствует или изменился
   if (isLoggedIn.value && profileStore.profile?.phone !== formattedPhone) {
     await profileStore.updateProfile(
       { phone: formattedPhone },
       { silent: true },
-    )
+    );
   }
 
   // Для гостей обязательны данные
@@ -293,13 +284,13 @@ async function placeOrder() {
         email: orderForm.value.email.trim(),
         phone: formattedPhone, // Отправляем в формате +77771234567
       }
-    : undefined
+    : undefined;
 
   await cartStore.checkout({
     deliveryMethod: orderForm.value.deliveryMethod,
     paymentMethod: orderForm.value.paymentMethod,
     deliveryAddress:
-      orderForm.value.deliveryMethod === 'courier'
+      orderForm.value.deliveryMethod === "courier"
         ? {
             line1: orderForm.value.address.line1,
             city: orderForm.value.address.city,
@@ -312,12 +303,33 @@ async function placeOrder() {
       : undefined,
     contactPhone: isLoggedIn.value ? formattedPhone : undefined,
     comment: orderForm.value.comment.trim() || undefined,
-  })
+  });
 
   // Очищаем промокод после успешного заказа
-  promoCodeStore.clearCode()
+  promoCodeStore.clearCode();
 }
-const containerClass = carouselContainerVariants({ contained: 'always' })
+const containerClass = carouselContainerVariants({ contained: "always" });
+
+// Scroll-aware visibility для sticky bar
+const isNavVisible = ref(true);
+let lastScrollY = 0;
+
+function handleScroll() {
+  const currentScrollY = window.scrollY;
+  if (currentScrollY < 60) {
+    isNavVisible.value = true;
+  } else if (currentScrollY > lastScrollY) {
+    isNavVisible.value = false;
+  } else {
+    isNavVisible.value = true;
+  }
+  lastScrollY = currentScrollY;
+}
+
+onMounted(() =>
+  window.addEventListener("scroll", handleScroll, { passive: true }),
+);
+onUnmounted(() => window.removeEventListener("scroll", handleScroll));
 </script>
 
 <template>
@@ -330,18 +342,17 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
       v-if="items.length === 0"
       class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4"
     >
-      <h1 class="text-3xl font-bold mb-4">
-        Ваша корзина пуста
-      </h1>
+      <h1 class="text-3xl font-bold mb-4">Ваша корзина пуста</h1>
       <NuxtLink to="/catalog">
-        <Button class="mt-4" size="lg">
-          Начать покупки
-        </Button>
+        <Button class="mt-4" size="lg"> Начать покупки </Button>
       </NuxtLink>
     </div>
 
     <!-- Есть товары в корзине -->
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    <div
+      v-else
+      class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-32 lg:pb-0"
+    >
       <!-- Левая колонка: Форма -->
       <div class="lg:col-span-2 space-y-8">
         <!-- Блок 1: Контактная информация -->
@@ -392,18 +403,18 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                   inputmode="tel"
                   :class="{
                     'border-destructive':
-                      orderForm.phone
-                      && orderForm.phone.length > 4
-                      && !isValidPhone,
+                      orderForm.phone &&
+                      orderForm.phone.length > 4 &&
+                      !isValidPhone,
                   }"
                   @focus="handlePhoneFocus"
                   @blur="handlePhoneBlur"
                 />
                 <p
                   v-if="
-                    orderForm.phone
-                      && orderForm.phone.length > 4
-                      && phoneErrorMessage
+                    orderForm.phone &&
+                    orderForm.phone.length > 4 &&
+                    phoneErrorMessage
                   "
                   class="text-xs text-destructive"
                 >
@@ -464,7 +475,9 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                     class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
                   >
                     <span class="text-sm font-medium">Самовывоз</span>
-                    <span class="text-xs text-muted-foreground mt-1">Бесплатно</span>
+                    <span class="text-xs text-muted-foreground mt-1"
+                      >Бесплатно</span
+                    >
                   </Label>
                 </div>
                 <div>
@@ -478,7 +491,9 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                     class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
                   >
                     <span class="text-sm font-medium">Яндекс Доставка</span>
-                    <span class="text-xs text-muted-foreground mt-1">От 500 ₸</span>
+                    <span class="text-xs text-muted-foreground mt-1"
+                      >От 500 ₸</span
+                    >
                   </Label>
                 </div>
               </RadioGroup>
@@ -537,8 +552,12 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                     <div class="flex items-center gap-3">
                       <span class="text-2xl">🟩</span>
                       <div>
-                        <span class="text-sm font-medium block">Kaspi Перевод</span>
-                        <span class="text-xs text-muted-foreground">Переводом на Kaspi.kz</span>
+                        <span class="text-sm font-medium block"
+                          >Kaspi Перевод</span
+                        >
+                        <span class="text-xs text-muted-foreground"
+                          >Переводом на Kaspi.kz</span
+                        >
                       </div>
                     </div>
                   </Label>
@@ -552,8 +571,12 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                     <div class="flex items-center gap-3">
                       <span class="text-2xl">💵</span>
                       <div>
-                        <span class="text-sm font-medium block">Наличными при получении</span>
-                        <span class="text-xs text-muted-foreground">Оплата курьеру или при самовывозе</span>
+                        <span class="text-sm font-medium block"
+                          >Наличными при получении</span
+                        >
+                        <span class="text-xs text-muted-foreground"
+                          >Оплата курьеру или при самовывозе</span
+                        >
                       </div>
                     </div>
                   </Label>
@@ -640,8 +663,11 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
               <div>
                 <span
                   class="font-semibold text-green-700 dark:text-green-300"
-                >{{ appliedPromoCode }}</span>
-                <span class="text-sm text-muted-foreground ml-2">— скидка {{ promoDiscount }} ₸</span>
+                  >{{ appliedPromoCode }}</span
+                >
+                <span class="text-sm text-muted-foreground ml-2"
+                  >— скидка {{ promoDiscount }} ₸</span
+                >
               </div>
               <Button
                 type="button"
@@ -687,13 +713,15 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
               :key="item.product.id"
               class="flex justify-between items-start"
             >
-              <span class="pr-2">{{ item.product.name }} × {{ item.quantity }}</span>
+              <span class="pr-2"
+                >{{ item.product.name }} × {{ item.quantity }}</span
+              >
               <span class="font-semibold whitespace-nowrap">
                 {{
-                  (
-                    (item.product.final_price || item.product.price)
-                    * item.quantity
-                  ).toFixed(0)
+                  formatPrice(
+                    (item.product.final_price || item.product.price) *
+                      item.quantity,
+                  )
                 }}
                 ₸
               </span>
@@ -703,7 +731,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
             <div class="pt-4 border-t space-y-2">
               <div class="flex justify-between">
                 <span>Сумма:</span>
-                <span>{{ subtotal.toFixed(0) }} ₸</span>
+                <span>{{ formatPrice(subtotal) }} ₸</span>
               </div>
 
               <!-- Скидка бонусами -->
@@ -712,7 +740,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                 class="flex justify-between text-primary font-medium"
               >
                 <span>Скидка бонусами:</span>
-                <span>-{{ discountAmount.toFixed(0) }} ₸</span>
+                <span>-{{ formatPrice(discountAmount) }} ₸</span>
               </div>
 
               <!-- Скидка промокодом -->
@@ -739,13 +767,13 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
               <!-- Прогресс до бесплатной доставки (если курьер и не достигнут порог) -->
               <div
                 v-if="
-                  orderForm.deliveryMethod === 'courier'
-                    && subtotal < FREE_SHIPPING_THRESHOLD
+                  orderForm.deliveryMethod === 'courier' &&
+                  subtotal < FREE_SHIPPING_THRESHOLD
                 "
                 class="text-xs text-muted-foreground"
               >
                 Добавьте товаров на
-                {{ (FREE_SHIPPING_THRESHOLD - subtotal).toFixed(0) }} ₸ для
+                {{ formatPrice(FREE_SHIPPING_THRESHOLD - subtotal) }} ₸ для
                 бесплатной доставки 🚚
               </div>
 
@@ -777,7 +805,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
           <CardFooter class="pt-4 border-t flex-col space-y-4">
             <div class="flex justify-between font-bold text-lg w-full">
               <span>Итого к оплате:</span>
-              <span>{{ totalWithDelivery.toFixed(0) }} ₸</span>
+              <span>{{ formatPrice(totalWithDelivery) }} ₸</span>
             </div>
 
             <!-- Чекбокс согласия -->
@@ -789,31 +817,36 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
                   href="/terms"
                   target="_blank"
                   class="text-primary hover:underline"
-                >Публичной оферты</a>
+                  >Публичной оферты</a
+                >
                 и
                 <a
                   href="/privacy"
                   target="_blank"
                   class="text-primary hover:underline"
-                >политикой обработки персональных данных</a>
+                  >политикой обработки персональных данных</a
+                >
               </Label>
             </div>
 
-            <!-- Кнопка оформления заказа -->
+            <!-- Кнопка оформления заказа (скрыта на мобильных) -->
             <Button
               type="button"
               size="lg"
-              class="w-full text-lg"
+              class="w-full text-lg hidden lg:flex"
               :disabled="isProcessing || !isFormValid"
               @click="placeOrder"
             >
               <span v-if="isProcessing">Оформляем заказ...</span>
-              <span v-else>Подтвердить заказ на {{ totalWithDelivery.toFixed(0) }} ₸</span>
+              <span v-else
+                >Подтвердить заказ на
+                {{ formatPrice(totalWithDelivery) }} ₸</span
+              >
             </Button>
 
-            <!-- Trust Badges -->
+            <!-- Trust Badges (скрыты на мобильных) -->
             <div
-              class="flex items-center justify-center gap-4 text-xs text-muted-foreground w-full pt-2 border-t"
+              class="hidden lg:flex items-center justify-center gap-4 text-xs text-muted-foreground w-full pt-2 border-t"
             >
               <div class="flex items-center gap-1">
                 <Lock class="w-3 h-3" />
@@ -828,5 +861,71 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
         </Card>
       </aside>
     </div>
+
+    <!-- 🎯 Sticky панель для мобильных -->
+    <ClientOnly>
+      <div
+        v-if="items.length > 0"
+        class="lg:hidden fixed left-4 right-4 z-40 checkout-sticky-bar"
+        :class="isNavVisible ? 'sticky-above-nav' : 'sticky-at-bottom'"
+      >
+        <div class="px-4 py-3">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-muted-foreground">Итого к оплате</span>
+              <div class="flex items-baseline gap-0.5">
+                <span class="text-2xl font-bold leading-none text-primary">
+                  {{ formatPrice(totalWithDelivery) }}
+                </span>
+                <span class="text-xl font-bold text-primary">₸</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-muted-foreground">Товары</p>
+              <p class="text-sm font-semibold">{{ totalItems }} шт.</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            class="w-full text-base font-semibold"
+            :disabled="isProcessing || !isFormValid"
+            @click="placeOrder"
+          >
+            <span v-if="isProcessing">Оформляем заказ...</span>
+            <span v-else>Подтвердить заказ</span>
+          </Button>
+        </div>
+      </div>
+    </ClientOnly>
   </div>
 </template>
+
+<style scoped>
+.checkout-sticky-bar {
+  /* Базовая позиция — у нижнего края (когда навбар скрыт) */
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  /* transform анимируется плавно (GPU) в отличие от bottom+env() */
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Навбар виден — поднимаем панель на высоту навбара (84px - 16px = 68px) */
+.sticky-above-nav {
+  transform: translateY(-68px);
+}
+
+/* Навбар скрылся — панель на базовой позиции */
+.sticky-at-bottom {
+  transform: translateY(0);
+}
+</style>
