@@ -1187,22 +1187,29 @@ useSchemaOrg(
               description:
                 cleanDescription(product.description) || product.name,
               url: `https://uhti.kz/catalog/products/${product.slug}`,
-              sku: product.id,
+
+              // ✅ 1. Артикул (есть всегда)
+              sku: product.sku || product.id,
+              mpn: product.sku || product.id,
+
+              // ✅ 2. Бренд (с фоллбэком на магазин)
+              brand: {
+                "@type": "Brand",
+                name: product.brands?.name || "Ухтышка",
+                ...(product.brands?.slug && {
+                  url: `https://uhti.kz/brand/${product.brands.slug}`,
+                }),
+              },
+
+              // ✅ 3. Штрихкод (только если существует)
+              ...(product.barcode && { gtin: product.barcode }),
+
               ...(product.product_images?.[0]?.image_url && {
                 image: getImageUrl(
                   BUCKET_NAME_PRODUCT,
                   product.product_images[0].image_url,
                   IMAGE_SIZES.CARD,
                 ),
-              }),
-              ...(product.brands?.name && {
-                brand: {
-                  "@type": "Brand",
-                  name: product.brands.name,
-                  ...(product.brands.slug && {
-                    url: `https://uhti.kz/brand/${product.brands.slug}`,
-                  }),
-                },
               }),
               offers: {
                 "@type": "Offer",

@@ -626,7 +626,13 @@ useSchemaOrg([
     name: computed(() => product.value?.name || ""),
     description: metaDescription,
     image: productImages,
+
+    // ✅ 1. Артикул (есть всегда)
     sku: productSku,
+    mpn: productSku,
+
+    // ✅ 3. Штрихкод (только если существует)
+    gtin: computed(() => product.value?.barcode || undefined),
 
     brand: computed(() => {
       if (productLineName.value) {
