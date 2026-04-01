@@ -195,14 +195,14 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
 
 const mainProductPrice = computed(() => {
   if (!product.value) return { final: 0, original: 0, hasDiscount: false };
-  const priceData = formatPriceWithDiscount(
-    Number(product.value.price),
-    product.value.discount_percentage,
-  );
+  // 🔥 Используем final_price из базы данных
+  const finalPrice = product.value.final_price || product.value.price;
   return {
-    final: priceData.finalNumber,
+    final: finalPrice,
     original: Number(product.value.price),
-    hasDiscount: priceData.hasDiscount,
+    hasDiscount:
+      !!product.value.discount_percentage &&
+      product.value.discount_percentage > 0,
   };
 });
 
@@ -212,11 +212,11 @@ const totalPrice = computed(() => {
   const selected = (accessories.value || []).filter((acc: ProductWithImages) =>
     selectedAccessoryIds.value.includes(acc.id),
   );
-  for (const acc of selected)
-    total += formatPriceWithDiscount(
-      Number(acc.price),
-      acc.discount_percentage,
-    ).finalNumber;
+  for (const acc of selected) {
+    // 🔥 Используем final_price из базы данных
+    const accFinalPrice = acc.final_price || acc.price;
+    total += accFinalPrice;
+  }
   return total;
 });
 
