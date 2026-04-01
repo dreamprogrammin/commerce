@@ -36,6 +36,10 @@ const hasFreeShipping = computed(
 const suggestedAccessories = ref<ProductWithImages[]>([]);
 const isLoadingAccessories = ref(false);
 
+// 🔥 Cross-sell: Похожие товары ("С этим товаром покупают")
+const similarProducts = ref<ProductWithImages[]>([]);
+const isLoadingSimilarProducts = ref(false);
+
 // Загрузка рекомендованных аксессуаров
 async function loadSuggestedAccessories() {
   if (items.value.length === 0) {
@@ -97,11 +101,84 @@ async function loadSuggestedAccessories() {
   }
 }
 
-// Загружаем аксессуары при изменении корзины
-watch(() => items.value, loadSuggestedAccessories, {
-  deep: true,
-  immediate: true,
-});
+// Загрузка похожих товаров
+async function loadSimilarProducts() {
+  if (items.value.length === 0) {
+    similarProducts.value = [];
+    return;
+  }
+
+  isLoadingSimilarProducts.value = true;
+  try {
+    const cartProductIds = new Set(items.value.map((item) => item.product.id));
+
+    // Собираем категории товаров в корзине
+    const categoryIds = new Set<string>();
+    items.value.forEach((item) => {
+      if (item.product.category_id) {
+        categoryIds.add(item.product.category_id);
+      }
+    });
+
+    if (categoryIds.size === 0) {
+      similarProducts.value = [];
+      return;
+    }
+
+    // Загружаем похожие товары из тех же категорий (максимум 6)
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        `
+        *,
+        product_images (
+          id,
+          image_url,
+          blur_placeholder,
+          alt_text,
+          display_order
+        ),
+        brands (
+          id,
+          name,
+          slug,
+          logo_url
+        )
+      `,
+      )
+      .in("category_id", Array.from(categoryIds))
+      .not("id", "in", `(${Array.from(cartProductIds).join(",")})`)
+      .eq("is_active", true)
+      .gt("stock_quantity", 0)
+      .order("created_at", { ascending: false })
+      .limit(6)
+      .order("display_order", {
+        foreignTable: "product_images",
+        ascending: true,
+      });
+
+    if (!error && data) {
+      similarProducts.value = data as ProductWithImages[];
+    }
+  } catch (e) {
+    console.error("Error loading similar products:", e);
+  } finally {
+    isLoadingSimilarProducts.value = false;
+  }
+}
+
+// Загружаем аксессуары и похожие товары при изменении корзины
+watch(
+  () => items.value,
+  () => {
+    loadSuggestedAccessories();
+    loadSimilarProducts();
+  },
+  {
+    deep: true,
+    immediate: true,
+  },
+);
 
 // Получить URL изображения товара
 function getProductImageUrl(product: any, variant: "sm" | "md" = "sm") {
@@ -484,6 +561,116 @@ const containerClass = carouselContainerVariants({ contained: "always" });
                   </Button>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- 🔥 Cross-sell: С этим товаром покупают -->
+        <Card v-if="similarProducts.length > 0" class="border-blue-200">
+          <CardHeader>
+            <CardTitle class="text-lg flex items-center gap-2">
+              <Icon name="lucide:shopping-bag" class="w-5 h-5 text-blue-600" />
+              С этим товаром покупают
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              <NuxtLink
+                v-for="product in similarProducts"
+                :key="product.id"
+                :to="`/catalog/products/${product.slug}`"
+                class="group"
+              >
+                <div
+                  class="flex flex-col gap-2 p-3 rounded-lg border hover:border-blue-500 hover:shadow-md transition-all bg-white"
+                >
+                  <!-- Изображение -->
+                  <div
+                    class="w-full aspect-square rounded overflow-hidden bg-muted relative"
+                  >
+                    <ProgressiveImage
+                      v-if="getProductImageUrl(product)"
+                      :src="getProductImageUrl(product)!"
+                      :alt="product.name"
+                      aspect-ratio="square"
+                      object-fit="contain"
+                      placeholder-type="shimmer"
+                      class="w-full h-full group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div
+                      v-else
+                      class="w-full h-full flex items-center justify-center"
+                    >
+                      <Icon
+                        name="lucide:image-off"
+                        class="w-8 h-8 text-muted-foreground"
+                      />
+                    </div>
+
+                    <!-- Бейдж скидки -->
+                    <div
+                      v-if="
+                        product.discount_percentage &&
+                        product.discount_percentage > 0
+                      "
+                      class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded"
+                    >
+                      -{{ product.discount_percentage }}%
+                    </div>
+                  </div>
+
+                  <!-- Информация -->
+                  <div class="space-y-1">
+                    <!-- Бренд -->
+                    <p
+                      v-if="product.brands?.name"
+                      class="text-xs text-muted-foreground line-clamp-1"
+                    >
+                      {{ product.brands.name }}
+                    </p>
+
+                    <!-- Название -->
+                    <p
+                      class="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors min-h-[2.5rem]"
+                    >
+                      {{ product.name }}
+                    </p>
+
+                    <!-- Цена -->
+                    <div class="flex flex-col gap-1">
+                      <div class="flex items-center gap-2">
+                        <p class="text-base font-bold text-primary">
+                          {{
+                            formatPrice(product.final_price || product.price)
+                          }}
+                          ₸
+                        </p>
+                        <p
+                          v-if="
+                            product.discount_percentage &&
+                            product.discount_percentage > 0
+                          "
+                          class="text-xs text-muted-foreground line-through"
+                        >
+                          {{ formatPrice(product.price) }} ₸
+                        </p>
+                      </div>
+
+                      <!-- Бонусы -->
+                      <div
+                        v-if="
+                          product.bonus_points_award &&
+                          product.bonus_points_award > 0
+                        "
+                        class="flex items-center gap-1 text-xs text-orange-600"
+                      >
+                        <Icon name="lucide:gift" class="w-3 h-3" />
+                        <span>+{{ product.bonus_points_award }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </NuxtLink>
             </div>
           </CardContent>
         </Card>
