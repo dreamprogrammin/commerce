@@ -622,7 +622,8 @@ useHead(() => {
 // Вызывается в корне <script setup> — вне условий, хуков и ClientOnly
 useSchemaOrg([
   defineProduct({
-    name: metaTitle,
+    // 🔥 Отдаем чистое название товара для робота (без "Купить в Ухтышка")
+    name: computed(() => product.value?.name || ""),
     description: metaDescription,
     image: productImages,
     sku: productSku,
