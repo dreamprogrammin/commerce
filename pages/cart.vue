@@ -1,127 +1,312 @@
 <script setup lang="ts">
-import { Trash2 } from 'lucide-vue-next'
-import { storeToRefs } from 'pinia'
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { carouselContainerVariants } from '@/lib/variants'
-import { useCartStore } from '@/stores/publicStore/cartStore'
-import { formatPrice, formatPriceWithDiscount } from '@/utils/formatPrice'
+import { Trash2 } from "lucide-vue-next";
+import { storeToRefs } from "pinia";
+import { toast } from "vue-sonner";
+import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
+import { BUCKET_NAME_PRODUCT } from "@/constants";
+import { carouselContainerVariants } from "@/lib/variants";
+import { useCartStore } from "@/stores/publicStore/cartStore";
+import { formatPrice } from "@/utils/formatPrice";
+import type { ProductWithImages } from "@/types";
 
-const cartStore = useCartStore()
-const { items, subtotal, totalItems } = storeToRefs(cartStore)
-const { getPublicUrl } = useSupabaseStorage()
+const cartStore = useCartStore();
+const supabase = useSupabaseClient();
+const { items, subtotal, totalItems, bonusesToAward } = storeToRefs(cartStore);
+const { getVariantUrl } = useSupabaseStorage();
 
-// Хелпер для получения первого изображения товара
-function getProductImage(item: typeof items.value[0]) {
-  const firstImage = item.product.product_images?.[0]
-  return firstImage?.image_url || null
+// 🔥 Константа порога бесплатной доставки
+const FREE_SHIPPING_THRESHOLD = 15000;
+
+// Прогресс бесплатной доставки
+const shippingProgress = computed(() => {
+  const progress = (subtotal.value / FREE_SHIPPING_THRESHOLD) * 100;
+  return Math.min(progress, 100);
+});
+
+const remainingForFreeShipping = computed(() => {
+  const remaining = FREE_SHIPPING_THRESHOLD - subtotal.value;
+  return remaining > 0 ? remaining : 0;
+});
+
+const hasFreeShipping = computed(
+  () => subtotal.value >= FREE_SHIPPING_THRESHOLD,
+);
+
+// 🔥 Cross-sell: Рекомендованные аксессуары
+const suggestedAccessories = ref<ProductWithImages[]>([]);
+const isLoadingAccessories = ref(false);
+
+// Загрузка рекомендованных аксессуаров
+async function loadSuggestedAccessories() {
+  if (items.value.length === 0) {
+    suggestedAccessories.value = [];
+    return;
+  }
+
+  isLoadingAccessories.value = true;
+  try {
+    // Собираем все accessory_ids из товаров в корзине
+    const allAccessoryIds = new Set<string>();
+    const cartProductIds = new Set(items.value.map((item) => item.product.id));
+
+    for (const item of items.value) {
+      if (item.product.accessory_ids?.length) {
+        item.product.accessory_ids.forEach((id) => {
+          // Добавляем только если этого товара еще нет в корзине
+          if (!cartProductIds.has(id)) {
+            allAccessoryIds.add(id);
+          }
+        });
+      }
+    }
+
+    if (allAccessoryIds.size === 0) {
+      suggestedAccessories.value = [];
+      return;
+    }
+
+    // Загружаем аксессуары (максимум 3)
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        `
+        *,
+        product_images (
+          id,
+          image_url,
+          blur_placeholder,
+          alt_text,
+          display_order
+        )
+      `,
+      )
+      .in("id", Array.from(allAccessoryIds).slice(0, 3))
+      .eq("is_active", true)
+      .order("display_order", {
+        foreignTable: "product_images",
+        ascending: true,
+      });
+
+    if (!error && data) {
+      suggestedAccessories.value = data as ProductWithImages[];
+    }
+  } catch (e) {
+    console.error("Error loading suggested accessories:", e);
+  } finally {
+    isLoadingAccessories.value = false;
+  }
 }
 
-// Хелпер для получения blur placeholder
-function getProductBlur(item: typeof items.value[0]) {
-  const firstImage = item.product.product_images?.[0]
-  return firstImage?.blur_placeholder || undefined
+// Загружаем аксессуары при изменении корзины
+watch(() => items.value, loadSuggestedAccessories, {
+  deep: true,
+  immediate: true,
+});
+
+// Получить URL изображения товара
+function getProductImageUrl(product: any, variant: "sm" | "md" = "sm") {
+  if (!product.product_images?.[0]?.image_url) return null;
+  return getVariantUrl(
+    BUCKET_NAME_PRODUCT,
+    product.product_images[0].image_url,
+    variant,
+  );
 }
 
-// Хелпер для расчета финальной цены товара с учетом скидки
-function getItemPrice(item: typeof items.value[0]) {
-  const priceData = formatPriceWithDiscount(
-    Number(item.product.price),
-    item.product.discount_percentage,
-  )
-  return priceData
+// Добавить аксессуар в корзину
+async function addAccessoryToCart(accessory: ProductWithImages) {
+  await cartStore.addItem(accessory, 1);
+  toast.success("Товар добавлен в корзину");
 }
 
-// Хелпер для расчета общей цены за товар (цена * количество)
-function getItemTotal(item: typeof items.value[0]) {
-  const priceData = getItemPrice(item)
-  return priceData.finalNumber * item.quantity
-}
+// Показать тостер о прогрессе доставки при изменении суммы
+let previousSubtotal = subtotal.value;
+watch(subtotal, (newSubtotal) => {
+  if (newSubtotal > previousSubtotal && newSubtotal < FREE_SHIPPING_THRESHOLD) {
+    const remaining = FREE_SHIPPING_THRESHOLD - newSubtotal;
+    toast.info(`До бесплатной доставки осталось ${formatPrice(remaining)} ₸`, {
+      description: "🚚 Добавьте ещё товаров для бесплатной доставки",
+      duration: 3000,
+    });
+  } else if (
+    newSubtotal >= FREE_SHIPPING_THRESHOLD &&
+    previousSubtotal < FREE_SHIPPING_THRESHOLD
+  ) {
+    toast.success("🎉 Поздравляем! Доставка бесплатная!", {
+      description: "Вы получили бесплатную доставку",
+      duration: 5000,
+    });
+  }
+  previousSubtotal = newSubtotal;
+});
 
-const containerClass = carouselContainerVariants({ contained: 'always' })
+const containerClass = carouselContainerVariants({ contained: "always" });
 </script>
 
 <template>
   <div :class="`${containerClass} py-6 sm:py-12`">
-    <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-8">
-      Ваша корзина
-    </h1>
+    <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-8">Ваша корзина</h1>
 
-    <div v-if="items.length === 0" class="text-center text-muted-foreground py-12 sm:py-20 border-2 border-dashed rounded-lg">
-      <p class="text-base sm:text-lg">
-        Здесь пока пусто
+    <!-- Пустая корзина -->
+    <div
+      v-if="items.length === 0"
+      class="text-center text-muted-foreground py-12 sm:py-20 border-2 border-dashed rounded-lg"
+    >
+      <Icon
+        name="lucide:shopping-cart"
+        class="w-16 h-16 text-muted-foreground/50 mb-4 mx-auto"
+      />
+      <h3 class="text-lg font-semibold mb-2">Корзина пуста</h3>
+      <p class="text-sm text-muted-foreground mb-4">
+        Добавьте товары, чтобы начать покупки
       </p>
-      <NuxtLink to="/catalog/boys">
-        <Button class="mt-4">
-          Начать покупки
-        </Button>
+      <NuxtLink to="/catalog">
+        <Button size="lg"> Начать покупки </Button>
       </NuxtLink>
     </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 items-start">
+    <!-- Корзина с товарами -->
+    <div
+      v-else
+      class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 items-start"
+    >
       <!-- Список товаров -->
-      <div class="lg:col-span-2 space-y-3 sm:space-y-4">
+      <div class="lg:col-span-2 space-y-4">
+        <!-- Прогресс бесплатной доставки -->
+        <Card
+          class="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20"
+        >
+          <CardContent class="p-4 sm:p-6">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <span v-if="!hasFreeShipping" class="text-sm font-medium">
+                  До бесплатной доставки
+                </span>
+                <span
+                  v-else
+                  class="text-sm font-medium text-green-600 flex items-center gap-1"
+                >
+                  <Icon name="lucide:check-circle" class="w-4 h-4" />
+                  Бесплатная доставка!
+                </span>
+                <span
+                  v-if="!hasFreeShipping"
+                  class="text-lg font-bold text-primary"
+                >
+                  {{ formatPrice(remainingForFreeShipping) }} ₸
+                </span>
+              </div>
+              <Progress :model-value="shippingProgress" class="h-3" />
+              <p v-if="!hasFreeShipping" class="text-xs text-muted-foreground">
+                Добавьте товаров на
+                {{ formatPrice(remainingForFreeShipping) }} ₸ для бесплатной
+                доставки 🚚
+              </p>
+              <p v-else class="text-xs text-green-600 font-medium">
+                🎉 Ура! Доставка за наш счет!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Товары в корзине -->
         <div
           v-for="item in items"
           :key="item.product.id"
-          class="border rounded-lg bg-card overflow-hidden"
+          class="border rounded-lg bg-card overflow-hidden hover:shadow-md transition-shadow"
         >
           <!-- Мобильная версия -->
           <div class="sm:hidden">
             <div class="flex gap-3 p-3">
               <!-- Изображение -->
-              <div class="w-20 h-20 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                <ProgressiveImage
-                  v-if="getProductImage(item)"
-                  :src="getPublicUrl('product-images', getProductImage(item)!) || ''"
-                  :alt="item.product.name"
-                  :placeholder="getProductBlur(item)"
-                  class="w-full h-full object-cover"
-                  width="80"
-                  height="80"
-                  loading="lazy"
-                  edger
-                />
-                <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                  Нет фото
+              <NuxtLink
+                :to="`/catalog/products/${item.product.slug}`"
+                class="flex-shrink-0"
+              >
+                <div class="w-20 h-20 bg-muted rounded-md overflow-hidden">
+                  <ProgressiveImage
+                    v-if="getProductImageUrl(item.product)"
+                    :src="getProductImageUrl(item.product)!"
+                    :alt="item.product.name"
+                    aspect-ratio="square"
+                    object-fit="cover"
+                    placeholder-type="shimmer"
+                    class="w-full h-full"
+                  />
+                  <div
+                    v-else
+                    class="w-full h-full flex items-center justify-center text-muted-foreground text-xs"
+                  >
+                    Нет фото
+                  </div>
                 </div>
-              </div>
+              </NuxtLink>
 
               <!-- Информация -->
               <div class="flex-1 min-w-0">
-                <h3 class="font-semibold text-sm line-clamp-2 mb-1">
-                  {{ item.product.name }}
-                </h3>
+                <NuxtLink :to="`/catalog/products/${item.product.slug}`">
+                  <h3
+                    class="font-semibold text-sm line-clamp-2 mb-1 hover:text-primary transition-colors"
+                  >
+                    {{ item.product.name }}
+                  </h3>
+                </NuxtLink>
                 <div class="flex items-center gap-2 mb-2">
                   <p class="text-sm font-medium">
-                    {{ formatPrice(getItemPrice(item).finalNumber) }} ₸ / шт.
+                    {{
+                      formatPrice(
+                        item.product.final_price || item.product.price,
+                      )
+                    }}
+                    ₸ / шт.
                   </p>
-                  <p v-if="getItemPrice(item).hasDiscount" class="text-xs text-muted-foreground line-through">
-                    {{ formatPrice(Number(item.product.price)) }} ₸
+                  <p
+                    v-if="item.product.discount_percentage"
+                    class="text-xs text-muted-foreground line-through"
+                  >
+                    {{ formatPrice(item.product.price) }} ₸
                   </p>
                 </div>
-                <p class="font-bold text-base">
-                  {{ formatPrice(getItemTotal(item)) }} ₸
+                <p class="font-bold text-base text-primary">
+                  {{
+                    formatPrice(
+                      (item.product.final_price || item.product.price) *
+                        item.quantity,
+                    )
+                  }}
+                  ₸
                 </p>
               </div>
             </div>
 
             <!-- Управление количеством -->
-            <div class="flex items-center justify-between gap-2 px-3 pb-3 border-t pt-3 bg-muted/30">
+            <div
+              class="flex items-center justify-between gap-2 px-3 pb-3 border-t pt-3 bg-muted/30"
+            >
               <div class="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   class="h-8 w-8"
-                  @click="cartStore.updateQuantity(item.product.id, Math.max(1, item.quantity - 1))"
+                  @click="
+                    cartStore.updateQuantity(
+                      item.product.id,
+                      Math.max(1, item.quantity - 1),
+                    )
+                  "
                 >
                   <Icon name="lucide:minus" class="h-3 w-3" />
                 </Button>
-                <span class="font-semibold text-sm min-w-[2rem] text-center">{{ item.quantity }}</span>
+                <span class="font-semibold text-sm min-w-[2rem] text-center">{{
+                  item.quantity
+                }}</span>
                 <Button
                   variant="outline"
                   size="icon"
                   class="h-8 w-8"
-                  @click="cartStore.updateQuantity(item.product.id, item.quantity + 1)"
+                  @click="
+                    cartStore.updateQuantity(item.product.id, item.quantity + 1)
+                  "
                 >
                   <Icon name="lucide:plus" class="h-3 w-3" />
                 </Button>
@@ -129,7 +314,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
               <Button
                 variant="ghost"
                 size="sm"
-                class="text-destructive"
+                class="text-destructive hover:text-destructive"
                 @click="cartStore.removeItem(item.product.id)"
               >
                 <Trash2 class="h-4 w-4 mr-1" />
@@ -141,80 +326,225 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
           <!-- Десктопная версия -->
           <div class="hidden sm:flex items-center gap-4 p-4">
             <!-- Изображение товара -->
-            <div class="w-24 h-24 bg-muted rounded-md overflow-hidden flex-shrink-0">
-              <ProgressiveImage
-                v-if="getProductImage(item)"
-                :src="getPublicUrl('product-images', getProductImage(item)!) || ''"
-                :alt="item.product.name"
-                :placeholder="getProductBlur(item)"
-                class="w-full h-full object-cover"
-                width="96"
-                height="96"
-                loading="lazy"
-                edger
-              />
-              <div v-else class="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                Нет фото
+            <NuxtLink
+              :to="`/catalog/products/${item.product.slug}`"
+              class="flex-shrink-0"
+            >
+              <div
+                class="w-24 h-24 bg-muted rounded-md overflow-hidden hover:opacity-80 transition-opacity"
+              >
+                <ProgressiveImage
+                  v-if="getProductImageUrl(item.product)"
+                  :src="getProductImageUrl(item.product)!"
+                  :alt="item.product.name"
+                  aspect-ratio="square"
+                  object-fit="cover"
+                  placeholder-type="shimmer"
+                  class="w-full h-full"
+                />
+                <div
+                  v-else
+                  class="w-full h-full flex items-center justify-center text-muted-foreground text-xs"
+                >
+                  Нет фото
+                </div>
               </div>
-            </div>
+            </NuxtLink>
 
             <!-- Информация о товаре -->
             <div class="flex-grow">
-              <h3 class="font-semibold">
-                {{ item.product.name }}
-              </h3>
-              <div class="flex items-center gap-2">
+              <NuxtLink :to="`/catalog/products/${item.product.slug}`">
+                <h3 class="font-semibold hover:text-primary transition-colors">
+                  {{ item.product.name }}
+                </h3>
+              </NuxtLink>
+              <div class="flex items-center gap-2 mt-1">
                 <p class="text-sm font-medium">
-                  {{ formatPrice(getItemPrice(item).finalNumber) }} ₸ / шт.
+                  {{
+                    formatPrice(item.product.final_price || item.product.price)
+                  }}
+                  ₸ / шт.
                 </p>
-                <p v-if="getItemPrice(item).hasDiscount" class="text-xs text-muted-foreground line-through">
-                  {{ formatPrice(Number(item.product.price)) }} ₸
+                <p
+                  v-if="item.product.discount_percentage"
+                  class="text-xs text-muted-foreground line-through"
+                >
+                  {{ formatPrice(item.product.price) }} ₸
                 </p>
               </div>
             </div>
 
             <!-- Управление количеством и ценой -->
             <div class="flex items-center gap-4">
-              <Input
-                type="number"
-                :model-value="item.quantity"
-                min="1"
-                class="w-20 text-center"
-                @update:model-value="val => cartStore.updateQuantity(item.product.id, Number(val))"
-              />
-              <p class="font-bold w-24 text-right">
-                {{ formatPrice(getItemTotal(item)) }} ₸
+              <div class="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="h-9 w-9"
+                  @click="
+                    cartStore.updateQuantity(
+                      item.product.id,
+                      Math.max(1, item.quantity - 1),
+                    )
+                  "
+                >
+                  <Icon name="lucide:minus" class="h-4 w-4" />
+                </Button>
+                <span
+                  class="font-semibold text-base min-w-[2.5rem] text-center"
+                  >{{ item.quantity }}</span
+                >
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="h-9 w-9"
+                  @click="
+                    cartStore.updateQuantity(item.product.id, item.quantity + 1)
+                  "
+                >
+                  <Icon name="lucide:plus" class="h-4 w-4" />
+                </Button>
+              </div>
+              <p class="font-bold text-lg w-32 text-right text-primary">
+                {{
+                  formatPrice(
+                    (item.product.final_price || item.product.price) *
+                      item.quantity,
+                  )
+                }}
+                ₸
               </p>
               <Button
                 variant="ghost"
                 size="icon"
+                class="text-destructive hover:text-destructive"
                 @click="cartStore.removeItem(item.product.id)"
               >
-                <Trash2 class="h-4 w-4 text-muted-foreground" />
+                <Trash2 class="h-5 w-5" />
               </Button>
             </div>
           </div>
         </div>
+
+        <!-- Cross-sell: Рекомендованные аксессуары -->
+        <Card v-if="suggestedAccessories.length > 0" class="border-primary/20">
+          <CardHeader>
+            <CardTitle class="text-lg flex items-center gap-2">
+              <Icon name="lucide:sparkles" class="w-5 h-5 text-primary" />
+              Не забудьте добавить
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div
+                v-for="acc in suggestedAccessories"
+                :key="acc.id"
+                class="flex sm:flex-col items-center sm:items-start gap-3 p-3 rounded-lg border hover:border-primary/50 hover:bg-muted/50 transition-all"
+              >
+                <!-- Изображение -->
+                <div
+                  class="w-16 h-16 sm:w-full sm:h-32 rounded overflow-hidden bg-muted flex-shrink-0"
+                >
+                  <ProgressiveImage
+                    v-if="getProductImageUrl(acc)"
+                    :src="getProductImageUrl(acc)!"
+                    :alt="acc.name"
+                    aspect-ratio="square"
+                    object-fit="cover"
+                    placeholder-type="shimmer"
+                    class="w-full h-full"
+                  />
+                  <div
+                    v-else
+                    class="w-full h-full flex items-center justify-center"
+                  >
+                    <Icon
+                      name="lucide:image-off"
+                      class="w-8 h-8 text-muted-foreground"
+                    />
+                  </div>
+                </div>
+
+                <!-- Информация -->
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium line-clamp-2 mb-1">
+                    {{ acc.name }}
+                  </p>
+                  <p class="text-sm font-bold text-primary mb-2">
+                    {{ formatPrice(acc.final_price || acc.price) }} ₸
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    class="w-full"
+                    @click="addAccessoryToCart(acc)"
+                  >
+                    <Icon name="lucide:plus" class="w-4 h-4 mr-1" />
+                    Добавить
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <!-- Итоги и кнопка оформления -->
-      <aside class="lg:col-span-1 lg:sticky lg:top-24 bg-card border rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4">
-        <h2 class="text-xl sm:text-2xl font-semibold">
-          Итого
-        </h2>
-        <div class="flex justify-between text-sm sm:text-base text-muted-foreground">
-          <span>{{ totalItems }} товар(а) на сумму:</span>
-          <span>{{ formatPrice(subtotal) }} ₸</span>
-        </div>
-        <div class="flex justify-between font-bold text-lg sm:text-xl pt-3 sm:pt-4 border-t">
-          <span>К оплате:</span>
-          <span>{{ formatPrice(subtotal) }} ₸</span>
-        </div>
-        <NuxtLink to="/checkout" class="w-full">
-          <Button size="lg" class="w-full">
-            Перейти к оформлению
-          </Button>
-        </NuxtLink>
+      <aside class="lg:col-span-1 lg:sticky lg:top-24 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle class="text-xl">Итого</CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <!-- Бонусы -->
+            <div
+              class="flex items-center gap-2 px-3 py-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg text-sm"
+            >
+              <Icon name="lucide:gift" class="w-4 h-4 flex-shrink-0" />
+              <span>
+                За этот заказ вы получите
+                <strong>+{{ bonusesToAward }} бонусов</strong> 🎁
+              </span>
+            </div>
+
+            <Separator />
+
+            <!-- Расчёты -->
+            <div class="space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="text-muted-foreground"
+                  >Товары ({{ totalItems }})</span
+                >
+                <span>{{ formatPrice(subtotal) }} ₸</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-muted-foreground">Доставка</span>
+                <span v-if="hasFreeShipping" class="text-green-600 font-medium"
+                  >Бесплатно</span
+                >
+                <span v-else>Рассчитается при оформлении</span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div class="flex justify-between font-bold text-xl">
+              <span>К оплате:</span>
+              <span class="text-primary">{{ formatPrice(subtotal) }} ₸</span>
+            </div>
+
+            <NuxtLink to="/checkout" class="w-full block">
+              <Button size="lg" class="w-full">
+                <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
+                Перейти к оформлению
+              </Button>
+            </NuxtLink>
+
+            <Button size="lg" variant="outline" class="w-full" as-child>
+              <NuxtLink to="/catalog"> Продолжить покупки </NuxtLink>
+            </Button>
+          </CardContent>
+        </Card>
       </aside>
     </div>
   </div>
