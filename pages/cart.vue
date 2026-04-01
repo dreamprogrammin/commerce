@@ -218,10 +218,15 @@ watch(subtotal, (newSubtotal) => {
 });
 
 const containerClass = carouselContainerVariants({ contained: "always" });
+
+// Добавляем padding-bottom для мобильной версии, чтобы контент не перекрывался sticky bar
+const contentPaddingClass = computed(() =>
+  items.value.length > 0 ? "pb-24 lg:pb-0" : "",
+);
 </script>
 
 <template>
-  <div :class="`${containerClass} py-6 sm:py-12`">
+  <div :class="`${containerClass} py-6 sm:py-12 ${contentPaddingClass}`">
     <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-8">Ваша корзина</h1>
 
     <!-- Пустая корзина -->
@@ -733,6 +738,34 @@ const containerClass = carouselContainerVariants({ contained: "always" });
           </CardContent>
         </Card>
       </aside>
+    </div>
+
+    <!-- 🔥 Sticky Bottom Bar для мобильных -->
+    <div
+      v-if="items.length > 0"
+      class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-lg"
+      style="padding-bottom: env(safe-area-inset-bottom)"
+    >
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <p class="text-xs text-muted-foreground">Итого</p>
+            <p class="text-xl font-bold text-primary">
+              {{ formatPrice(subtotal) }} ₸
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-muted-foreground">Товары</p>
+            <p class="text-sm font-semibold">{{ totalItems }} шт.</p>
+          </div>
+        </div>
+        <NuxtLink to="/checkout" class="w-full block">
+          <Button size="lg" class="w-full">
+            <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
+            Перейти к оформлению
+          </Button>
+        </NuxtLink>
+      </div>
     </div>
   </div>
 </template>
