@@ -637,28 +637,32 @@ useRobotsRule({ index: true, follow: true });
                 v-if="lineStats && lineStats.total_reviews_count > 0"
                 class="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm p-3 md:p-4 rounded-2xl border border-border/50 shadow-sm mt-4 transition-all hover:shadow-md group"
               >
-                <div class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform">
+                <div
+                  class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform"
+                >
                   <Icon name="streamline-stickies-color:star" class="w-8 h-8" />
                 </div>
 
                 <div class="flex flex-col justify-center">
                   <div class="flex items-center gap-1.5">
                     <span class="text-xl font-black text-foreground">
-                      {{ lineStats.average_rating.toFixed(1).replace('.', ',') }}
+                      {{
+                        lineStats.average_rating.toFixed(1).replace(".", ",")
+                      }}
                     </span>
-                    <span class="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <span
+                      class="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider"
+                    >
                       Рейтинг линейки
                     </span>
                   </div>
 
                   <p class="text-[11px] text-muted-foreground">
-                    На основе <strong class="text-foreground">{{ lineStats.total_reviews_count }}</strong> отзывов покупателей
-                  </p>
-                </div>
-              </div>
-                  <p class="text-xs text-muted-foreground">
-                    Сформирован на основе
-                    {{ lineStats.total_reviews_count }} отзывов о товарах
+                    На основе
+                    <strong class="text-foreground">{{
+                      lineStats.total_reviews_count
+                    }}</strong>
+                    отзывов покупателей
                   </p>
                 </div>
               </div>
