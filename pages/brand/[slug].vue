@@ -401,17 +401,17 @@ useHead({
                         },
                       },
                     },
-                    // ⭐ КРИТИЧНО: Показываем рейтинг для КАЖДОГО товара с отзывами
-                    ...(Number(product.review_count) > 0 && {
-                      aggregateRating: {
-                        "@type": "AggregateRating",
-                        // Если avg_rating null/0, но отзыв есть — ставим 5.0 (отзыв мог не пересчитаться)
-                        ratingValue: String(product.avg_rating || 5),
-                        reviewCount: String(product.review_count),
-                        bestRating: "5",
-                        worstRating: "1",
-                      },
-                    }),
+                    // Показываем рейтинг только если есть реальные отзывы
+                    ...(Number(product.review_count) > 0 &&
+                      product.avg_rating && {
+                        aggregateRating: {
+                          "@type": "AggregateRating",
+                          ratingValue: String(product.avg_rating),
+                          reviewCount: String(product.review_count),
+                          bestRating: "5",
+                          worstRating: "1",
+                        },
+                      }),
                   },
                 })),
             })

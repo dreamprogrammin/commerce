@@ -388,7 +388,9 @@ const priceDetails = computed(() => {
 
       <!-- ⭐ Рейтинг и отзывы (Marketplace Style) -->
       <div
-        v-if="product.review_count && product.review_count > 0"
+        v-if="
+          product.review_count && product.review_count > 0 && product.avg_rating
+        "
         class="flex items-center gap-1.5 mt-1"
       >
         <!-- ✨ Новая стилизованная иконка -->
@@ -399,7 +401,7 @@ const priceDetails = computed(() => {
 
         <!-- Оценка через запятую -->
         <span class="text-sm font-bold text-foreground leading-none pt-0.5">
-          {{ (product.avg_rating || 5).toFixed(1).replace(".", ",") }}
+          {{ product.avg_rating.toFixed(1).replace(".", ",") }}
         </span>
 
         <!-- Количество отзывов через точку -->
