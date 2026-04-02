@@ -74,7 +74,7 @@ function getStarState(index: number): "full" | "empty" {
         name="gravity-ui:star-fill"
         :class="[
           sizeClass,
-          getStarState(i) === 'full' ? 'opacity-100' : 'opacity-30 grayscale',
+          getStarState(i) === 'full' ? 'text-yellow-400' : 'text-gray-300',
         ]"
       />
     </button>
