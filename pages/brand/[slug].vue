@@ -10,7 +10,6 @@ import {
 } from "@/constants";
 import { carouselContainerVariants } from "@/lib/variants";
 import { useProductsStore } from "@/stores/publicStore/productsStore";
-import { formatRating } from "@/utils/formatRating";
 
 const route = useRoute();
 const supabase = useSupabaseClient();
@@ -401,15 +400,15 @@ useHead({
                         },
                       },
                     },
-                    // Показываем рейтинг только если есть реальные отзывы
-                    ...(Number(product.review_count) > 0 &&
-                      product.avg_rating && {
+                    ...(product.avg_rating &&
+                      product.review_count &&
+                      product.review_count > 0 && {
                         aggregateRating: {
                           "@type": "AggregateRating",
-                          ratingValue: String(product.avg_rating),
-                          reviewCount: String(product.review_count),
-                          bestRating: "5",
-                          worstRating: "1",
+                          ratingValue: product.avg_rating,
+                          reviewCount: product.review_count,
+                          bestRating: 5,
+                          worstRating: 1,
                         },
                       }),
                   },
@@ -494,7 +493,6 @@ useRobotsRule({ index: true, follow: true });
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
-        :brand-stats="brandStats"
       />
     </div>
   </div>

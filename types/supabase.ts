@@ -2610,7 +2610,6 @@ export type Database = {
           p_category_slug: string
           p_country_ids?: string[]
           p_material_ids?: string[]
-          p_numeric_attributes?: Database["public"]["CompositeTypes"]["numeric_attribute_filter"][]
           p_page_number?: number
           p_page_size?: number
           p_piece_count_max?: number
@@ -2623,6 +2622,7 @@ export type Database = {
         }
         Returns: {
           accessory_ids: string[]
+          avg_rating: number
           barcode: string
           bonus_points_award: number
           brand_id: string
@@ -2632,7 +2632,6 @@ export type Database = {
           created_at: string
           description: string
           discount_percentage: number
-          final_price: number
           gender: string
           id: string
           is_accessory: boolean
@@ -2644,6 +2643,7 @@ export type Database = {
           origin_country_id: number
           price: number
           product_images: Json
+          review_count: number
           sales_count: number
           slug: string
           stock_quantity: number
