@@ -386,27 +386,6 @@ const priceDetails = computed(() => {
         </h3>
       </NuxtLink>
 
-      <!-- ⭐ Рейтинг и отзывы (Marketplace Style) -->
-      <div
-        v-if="
-          product.review_count && product.review_count > 0 && product.avg_rating
-        "
-        class="flex items-center gap-1.5 mt-1"
-      >
-        <!-- ✨ Новая стилизованная иконка -->
-        <Icon name="gravity-ui:star-fill" class="w-3.5 h-3.5 shrink-0" />
-
-        <!-- Оценка через запятую -->
-        <span class="text-sm font-bold text-foreground leading-none pt-0.5">
-          {{ product.avg_rating.toFixed(1).replace(".", ",") }}
-        </span>
-
-        <!-- Количество отзывов через точку -->
-        <span class="text-xs text-muted-foreground leading-none pt-0.5">
-          <span class="mx-0.5 opacity-50">·</span>{{ product.review_count }}
-        </span>
-      </div>
-
       <!-- 💰 Цена и бонусы -->
       <div class="space-y-1 mt-auto">
         <div class="flex items-baseline gap-2">
@@ -433,7 +412,30 @@ const priceDetails = computed(() => {
       </div>
 
       <!-- 🛒 КНОПКА ДОБАВЛЕНИЯ В КОРЗИНУ -->
-      <div class="pt-3">
+      <div class="pt-3 space-y-2">
+        <!-- ⭐ Рейтинг и отзывы (Marketplace Style) -->
+        <div
+          v-if="
+            product.review_count &&
+            product.review_count > 0 &&
+            product.avg_rating
+          "
+          class="flex items-center gap-1.5"
+        >
+          <!-- ✨ Новая стилизованная иконка -->
+          <Icon name="gravity-ui:star-fill" class="w-3.5 h-3.5 shrink-0" />
+
+          <!-- Оценка через запятую -->
+          <span class="text-sm font-bold text-foreground leading-none pt-0.5">
+            {{ product.avg_rating.toFixed(1).replace(".", ",") }}
+          </span>
+
+          <!-- Количество отзывов через точку -->
+          <span class="text-xs text-muted-foreground leading-none pt-0.5">
+            <span class="mx-0.5 opacity-50">·</span>{{ product.review_count }}
+          </span>
+        </div>
+
         <ClientOnly>
           <Button
             v-if="!itemInCart"
