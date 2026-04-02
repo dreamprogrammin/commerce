@@ -10,6 +10,7 @@ import {
 } from "@/constants";
 import { carouselContainerVariants } from "@/lib/variants";
 import { useProductsStore } from "@/stores/publicStore/productsStore";
+import { formatRating } from "@/utils/formatRating";
 
 const route = useRoute();
 const supabase = useSupabaseClient();
@@ -493,6 +494,7 @@ useRobotsRule({ index: true, follow: true });
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
+        :brand-stats="brandStats"
       />
     </div>
   </div>

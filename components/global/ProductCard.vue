@@ -8,7 +8,7 @@ import { IMAGE_SIZES } from "@/config/images";
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from "@/constants";
 import { useCartStore } from "@/stores/publicStore/cartStore";
 import { formatPrice } from "@/utils/formatPrice";
-import StarRating from "@/components/product/StarRating.vue";
+import { formatRating } from "@/utils/formatRating";
 
 const props = defineProps<{
   product: BaseProduct;
@@ -386,14 +386,20 @@ const priceDetails = computed(() => {
         </h3>
       </NuxtLink>
 
-      <!-- ⭐ Рейтинг и отзывы -->
+      <!-- ⭐ Рейтинг и отзывы (Marketplace Style) -->
       <div
         v-if="product.review_count && product.review_count > 0"
         class="flex items-center gap-1.5"
       >
-        <StarRating :model-value="product.avg_rating || 5" readonly size="sm" />
+        <Icon
+          name="streamline-stickies-color:star"
+          class="w-4 h-4 flex-shrink-0"
+        />
+        <span class="text-sm font-bold text-foreground">
+          {{ formatRating(product.avg_rating || 5) }}
+        </span>
         <span class="text-xs text-muted-foreground">
-          ({{ product.review_count }})
+          · {{ product.review_count }}
         </span>
       </div>
 

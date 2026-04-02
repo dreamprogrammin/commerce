@@ -16,6 +16,7 @@ import {
   BUCKET_NAME_PRODUCT_LINES,
 } from "@/constants";
 import { carouselContainerVariants } from "@/lib/variants";
+import { formatRating } from "@/utils/formatRating";
 
 const route = useRoute();
 const supabase = useSupabaseClient();
@@ -630,6 +631,32 @@ useRobotsRule({ index: true, follow: true });
                   brand.name
                 }}</span>
               </NuxtLink>
+
+              <!-- Brand Trust Score для линейки -->
+              <div
+                v-if="lineStats && lineStats.total_reviews_count > 0"
+                class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0"
+              >
+                <Icon
+                  name="streamline-stickies-color:star"
+                  class="w-10 h-10 flex-shrink-0"
+                />
+                <div class="space-y-0.5 text-left">
+                  <div class="flex items-center gap-2">
+                    <span class="text-2xl font-bold text-foreground">{{
+                      formatRating(lineStats.average_rating)
+                    }}</span>
+                    <span
+                      class="text-sm font-medium text-muted-foreground uppercase tracking-wider"
+                      >Рейтинг линейки</span
+                    >
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    Сформирован на основе
+                    {{ lineStats.total_reviews_count }} отзывов о товарах
+                  </p>
+                </div>
+              </div>
 
               <!-- Статистика -->
               <div class="flex flex-wrap gap-2 justify-center md:justify-start">

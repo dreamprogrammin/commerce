@@ -1,29 +1,37 @@
 <script setup lang="ts">
-import type { BrandFilterState } from '@/composables/useBrandPageFilters'
-import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
-import { ArrowLeft, ChevronDown, Package, ShieldCheck, SlidersHorizontal } from 'lucide-vue-next'
-import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import type { BrandFilterState } from "@/composables/useBrandPageFilters";
+import type { Brand, IBreadcrumbItem, ProductLine } from "@/types";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Package,
+  ShieldCheck,
+  SlidersHorizontal,
+} from "lucide-vue-next";
+import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from "@/constants";
+import { formatRating } from "@/utils/formatRating";
 
 const props = defineProps<{
-  brand: Brand
-  productLines?: ProductLine[]
-  breadcrumbs: IBreadcrumbItem[]
-  filterState: BrandFilterState
-}>()
+  brand: Brand;
+  productLines?: ProductLine[];
+  breadcrumbs: IBreadcrumbItem[];
+  filterState: BrandFilterState;
+  brandStats?: { average_rating: number; total_reviews_count: number } | null;
+}>();
 
-const fs = props.filterState
-const { getVariantUrl } = useSupabaseStorage()
+const fs = props.filterState;
+const { getVariantUrl } = useSupabaseStorage();
 
-const isSeoExpanded = ref(false)
-const seoContentRef = ref<HTMLElement | null>(null)
-const seoContentHeight = ref(0)
+const isSeoExpanded = ref(false);
+const seoContentRef = ref<HTMLElement | null>(null);
+const seoContentHeight = ref(0);
 
 function toggleSeoExpanded() {
   if (!isSeoExpanded.value && seoContentRef.value) {
-    seoContentHeight.value = seoContentRef.value.scrollHeight
+    seoContentHeight.value = seoContentRef.value.scrollHeight;
   }
-  isSeoExpanded.value = !isSeoExpanded.value
+  isSeoExpanded.value = !isSeoExpanded.value;
 }
 </script>
 
@@ -33,13 +41,19 @@ function toggleSeoExpanded() {
     <Breadcrumbs :items="breadcrumbs" />
 
     <!-- Hero section -->
-    <div class="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background">
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]" />
+    <div
+      class="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background"
+    >
+      <div
+        class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]"
+      />
 
       <div class="relative p-5 md:p-10 lg:p-12">
         <div class="flex flex-col md:flex-row items-center gap-5 md:gap-8">
           <div v-if="brand.logo_url" class="shrink-0">
-            <div class="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white shadow-md ring-1 ring-border overflow-hidden">
+            <div
+              class="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white shadow-md ring-1 ring-border overflow-hidden"
+            >
               <ProgressiveImage
                 :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
                 :alt="`Логотип ${brand.name}`"
@@ -57,6 +71,18 @@ function toggleSeoExpanded() {
               {{ brand.name }}
             </h1>
 
+            <!-- Brand Trust Score -->
+            <div v-if="brandStats && brandStats.total_reviews_count > 0" class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0">
+              <Icon name="streamline-stickies-color:star" class="w-10 h-10 flex-shrink-0" />
+              <div class="space-y-0.5 text-left">
+                <div class="flex items-center gap-2">
+                  <span class="text-2xl font-bold text-foreground">{{ formatRating(brandStats.average_rating) }}</span>
+                  <span class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Рейтинг бренда</span>
+                </div>
+                <p class="text-xs text-muted-foreground">Сформирован на основе {{ brandStats.total_reviews_count }} отзывов о товарах</p>
+              </div>
+            </div>
+
             <div class="flex flex-wrap gap-2 justify-center md:justify-start">
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium">
                 <Package class="w-3.5 h-3.5" />
@@ -68,16 +94,21 @@ function toggleSeoExpanded() {
               </span>
             </div>
           </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Коллекции — карточки с логотипами -->
     <div v-if="productLines && productLines.length > 0">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <h2
+        class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3"
+      >
         Коллекции
       </h2>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+      <div
+        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5"
+      >
         <NuxtLink
           v-for="line in productLines"
           :key="line.id"
@@ -86,21 +117,32 @@ function toggleSeoExpanded() {
         >
           <template v-if="line.logo_url">
             <ProgressiveImage
-              :src="getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm')"
+              :src="
+                getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm')
+              "
               :alt="line.name"
               object-fit="cover"
               placeholder-type="shimmer"
               :use-transform="false"
               class="w-full h-full group-hover:scale-105 transition-transform duration-500"
             />
-            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent px-2.5 pb-2 pt-8">
-              <span class="text-white text-xs md:text-sm font-semibold line-clamp-1 drop-shadow-sm">
+            <div
+              class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent px-2.5 pb-2 pt-8"
+            >
+              <span
+                class="text-white text-xs md:text-sm font-semibold line-clamp-1 drop-shadow-sm"
+              >
                 {{ line.name }}
               </span>
             </div>
           </template>
-          <div v-else class="w-full h-full bg-gradient-to-br from-primary/50 via-primary/30 to-secondary/50 flex items-end p-2.5">
-            <span class="text-white text-xs md:text-sm font-semibold line-clamp-2 drop-shadow-sm">
+          <div
+            v-else
+            class="w-full h-full bg-gradient-to-br from-primary/50 via-primary/30 to-secondary/50 flex items-end p-2.5"
+          >
+            <span
+              class="text-white text-xs md:text-sm font-semibold line-clamp-2 drop-shadow-sm"
+            >
               {{ line.name }}
             </span>
           </div>
@@ -110,9 +152,7 @@ function toggleSeoExpanded() {
 
     <!-- Catalog header + Filter trigger -->
     <div class="flex flex-row justify-between items-center gap-2">
-      <h2 class="text-xl md:text-3xl font-bold">
-        Каталог товаров
-      </h2>
+      <h2 class="text-xl md:text-3xl font-bold">Каталог товаров</h2>
       <div class="flex items-center gap-2">
         <!-- Mobile filter button -->
         <Button
@@ -145,18 +185,28 @@ function toggleSeoExpanded() {
       <main class="flex-1 min-w-0">
         <ProductGridSkeleton v-if="fs.isLoading.value" />
 
-        <ProductGrid v-else-if="fs.products.value.length > 0" :products="fs.products.value" />
+        <ProductGrid
+          v-else-if="fs.products.value.length > 0"
+          :products="fs.products.value"
+        />
 
         <Card v-else class="border-2 border-dashed">
-          <CardContent class="flex flex-col items-center justify-center py-10 md:py-16 text-center px-4">
-            <div class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-muted flex items-center justify-center mb-3 md:mb-4">
+          <CardContent
+            class="flex flex-col items-center justify-center py-10 md:py-16 text-center px-4"
+          >
+            <div
+              class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-muted flex items-center justify-center mb-3 md:mb-4"
+            >
               <Package class="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
             </div>
             <h3 class="text-lg md:text-xl font-semibold mb-2">
               Товаров пока нет
             </h3>
-            <p class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm">
-              К сожалению, товары бренда {{ brand.name }} временно отсутствуют в продаже.
+            <p
+              class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm"
+            >
+              К сожалению, товары бренда {{ brand.name }} временно отсутствуют в
+              продаже.
             </p>
             <NuxtLink to="/catalog/all">
               <Button variant="outline">
@@ -174,10 +224,7 @@ function toggleSeoExpanded() {
 
     <!-- Отзывы о бренде -->
     <div class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
-      <BrandReviewsList
-        :brand-id="brand.id"
-        :brand-name="brand.name"
-      />
+      <BrandReviewsList :brand-id="brand.id" :brand-name="brand.name" />
     </div>
 
     <!-- Описание бренда -->
@@ -187,7 +234,9 @@ function toggleSeoExpanded() {
           class="flex items-center gap-2 text-left w-full group"
           @click="toggleSeoExpanded"
         >
-          <h3 class="text-base md:text-lg font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+          <h3
+            class="text-base md:text-lg font-semibold text-muted-foreground group-hover:text-foreground transition-colors"
+          >
             О бренде {{ brand.name }}
           </h3>
           <ChevronDown
@@ -199,12 +248,19 @@ function toggleSeoExpanded() {
         <div
           ref="seoContentRef"
           class="overflow-hidden transition-all duration-300 ease-in-out"
-          :style="{ maxHeight: isSeoExpanded ? `${seoContentHeight}px` : undefined }"
-          :class="isSeoExpanded ? 'opacity-100' : 'max-h-20 md:max-h-24 opacity-70'"
+          :style="{
+            maxHeight: isSeoExpanded ? `${seoContentHeight}px` : undefined,
+          }"
+          :class="
+            isSeoExpanded ? 'opacity-100' : 'max-h-20 md:max-h-24 opacity-70'
+          "
         >
           <BrandDescription :brand="brand" />
 
-          <div v-if="brand.seo_keywords?.length" class="flex flex-wrap gap-1.5 md:gap-2 mt-3 md:mt-4">
+          <div
+            v-if="brand.seo_keywords?.length"
+            class="flex flex-wrap gap-1.5 md:gap-2 mt-3 md:mt-4"
+          >
             <Badge
               v-for="keyword in brand.seo_keywords"
               :key="keyword"
@@ -221,7 +277,7 @@ function toggleSeoExpanded() {
           class="text-xs md:text-sm text-primary hover:underline"
           @click="toggleSeoExpanded"
         >
-          {{ isSeoExpanded ? 'Свернуть' : 'Читать далее' }}
+          {{ isSeoExpanded ? "Свернуть" : "Читать далее" }}
         </button>
       </div>
     </div>
