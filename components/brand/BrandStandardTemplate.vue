@@ -67,7 +67,9 @@ function toggleSeoExpanded() {
           </div>
 
           <div class="flex-1 text-center md:text-left space-y-3">
-            <h1 class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+            <h1
+              class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground"
+            >
               {{ brand.name }}
             </h1>
 
@@ -76,37 +78,55 @@ function toggleSeoExpanded() {
               v-if="brandStats && brandStats.total_reviews_count > 0"
               class="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm p-3 md:p-4 rounded-2xl border border-border/50 shadow-sm mt-4 transition-all hover:shadow-md group"
             >
-              <div class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform">
+              <div
+                class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform"
+              >
                 <Icon name="streamline-stickies-color:star" class="w-8 h-8" />
               </div>
 
               <div class="flex flex-col justify-center">
                 <div class="flex items-center gap-1.5">
                   <span class="text-xl font-black text-foreground">
-                    {{ brandStats.average_rating.toFixed(1).replace('.', ',') }}
+                    {{ brandStats.average_rating.toFixed(1).replace(".", ",") }}
                   </span>
-                  <span class="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  <span
+                    class="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider"
+                  >
                     Рейтинг бренда
                   </span>
                 </div>
 
                 <p class="text-[11px] text-muted-foreground">
-                  На основе <strong class="text-foreground">{{ brandStats.total_reviews_count }}</strong> отзывов покупателей
+                  На основе
+                  <strong class="text-foreground">{{
+                    brandStats.total_reviews_count
+                  }}</strong>
+                  отзывов покупателей
                 </p>
               </div>
             </div>
 
             <div class="flex flex-wrap gap-2 justify-center md:justify-start">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium">
+              <span
+                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium"
+              >
                 <Package class="w-3.5 h-3.5" />
-                {{ fs.products.value.length }} {{ fs.products.value.length === 1 ? 'товар' : fs.products.value.length < 5 ? 'товара' : 'товаров' }}
+                {{ fs.products.value.length }}
+                {{
+                  fs.products.value.length === 1
+                    ? "товар"
+                    : fs.products.value.length < 5
+                      ? "товара"
+                      : "товаров"
+                }}
               </span>
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium">
+              <span
+                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium"
+              >
                 <ShieldCheck class="w-3.5 h-3.5" />
                 Оригинал
               </span>
             </div>
-          </div>
           </div>
         </div>
       </div>
