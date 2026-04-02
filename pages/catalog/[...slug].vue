@@ -1262,15 +1262,16 @@ useSchemaOrg(
                 },
               },
               // Показываем рейтинг только если есть реальные отзывы
-              ...(Number(product.review_count) > 0 && product.avg_rating && {
-                aggregateRating: {
-                  "@type": "AggregateRating",
-                  ratingValue: product.avg_rating,
-                  reviewCount: product.review_count,
-                  bestRating: 5,
-                  worstRating: 1,
-                },
-              }),
+              ...(Number(product.review_count) > 0 &&
+                product.avg_rating && {
+                  aggregateRating: {
+                    "@type": "AggregateRating",
+                    ratingValue: product.avg_rating,
+                    reviewCount: product.review_count,
+                    bestRating: 5,
+                    worstRating: 1,
+                  },
+                }),
             },
           })),
       });
