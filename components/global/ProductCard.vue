@@ -389,17 +389,22 @@ const priceDetails = computed(() => {
       <!-- ⭐ Рейтинг и отзывы (Marketplace Style) -->
       <div
         v-if="product.review_count && product.review_count > 0"
-        class="flex items-center gap-1.5"
+        class="flex items-center gap-1.5 mt-1"
       >
+        <!-- ✨ Новая стилизованная иконка -->
         <Icon
           name="streamline-stickies-color:star"
-          class="w-4 h-4 flex-shrink-0"
+          class="w-3.5 h-3.5 shrink-0"
         />
-        <span class="text-sm font-bold text-foreground">
-          {{ formatRating(product.avg_rating || 5) }}
+
+        <!-- Оценка через запятую -->
+        <span class="text-sm font-bold text-foreground leading-none pt-0.5">
+          {{ (product.avg_rating || 5).toFixed(1).replace(".", ",") }}
         </span>
-        <span class="text-xs text-muted-foreground">
-          · {{ product.review_count }}
+
+        <!-- Количество отзывов через точку -->
+        <span class="text-xs text-muted-foreground leading-none pt-0.5">
+          <span class="mx-0.5 opacity-50">·</span>{{ product.review_count }}
         </span>
       </div>
 

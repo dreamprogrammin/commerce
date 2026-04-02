@@ -72,14 +72,27 @@ function toggleSeoExpanded() {
             </h1>
 
             <!-- Brand Trust Score -->
-            <div v-if="brandStats && brandStats.total_reviews_count > 0" class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0">
-              <Icon name="streamline-stickies-color:star" class="w-10 h-10 flex-shrink-0" />
-              <div class="space-y-0.5 text-left">
-                <div class="flex items-center gap-2">
-                  <span class="text-2xl font-bold text-foreground">{{ formatRating(brandStats.average_rating) }}</span>
-                  <span class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Рейтинг бренда</span>
+            <div
+              v-if="brandStats && brandStats.total_reviews_count > 0"
+              class="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm p-3 md:p-4 rounded-2xl border border-border/50 shadow-sm mt-4 transition-all hover:shadow-md group"
+            >
+              <div class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform">
+                <Icon name="streamline-stickies-color:star" class="w-8 h-8" />
+              </div>
+
+              <div class="flex flex-col justify-center">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xl font-black text-foreground">
+                    {{ brandStats.average_rating.toFixed(1).replace('.', ',') }}
+                  </span>
+                  <span class="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Рейтинг бренда
+                  </span>
                 </div>
-                <p class="text-xs text-muted-foreground">Сформирован на основе {{ brandStats.total_reviews_count }} отзывов о товарах</p>
+
+                <p class="text-[11px] text-muted-foreground">
+                  На основе <strong class="text-foreground">{{ brandStats.total_reviews_count }}</strong> отзывов покупателей
+                </p>
               </div>
             </div>
 
