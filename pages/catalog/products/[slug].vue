@@ -735,11 +735,13 @@ useSchemaOrg([
     }),
 
     aggregateRating: computed(() => {
+      // ⭐ КРИТИЧНО: Показываем рейтинг для КАЖДОГО товара с отзывами
       if (!product.value?.review_count || product.value.review_count === 0)
         return undefined;
       return {
         "@type": "AggregateRating" as const,
-        ratingValue: String(product.value.avg_rating || 0),
+        // Если avg_rating null/0, но отзыв есть — ставим 5.0 (отзыв мог не пересчитаться)
+        ratingValue: String(product.value.avg_rating || 5),
         reviewCount: String(product.value.review_count),
         bestRating: "5",
         worstRating: "1",
