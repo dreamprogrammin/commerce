@@ -394,10 +394,7 @@ const priceDetails = computed(() => {
         class="flex items-center gap-1.5 mt-1"
       >
         <!-- ✨ Новая стилизованная иконка -->
-        <Icon
-          name="streamline-stickies-color:star"
-          class="w-3.5 h-3.5 shrink-0"
-        />
+        <Icon name="gravity-ui:star-fill" class="w-3.5 h-3.5 shrink-0" />
 
         <!-- Оценка через запятую -->
         <span class="text-sm font-bold text-foreground leading-none pt-0.5">

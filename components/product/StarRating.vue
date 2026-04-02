@@ -71,7 +71,7 @@ function getStarState(index: number): "full" | "empty" {
       @mouseleave="setHover(0)"
     >
       <Icon
-        name="streamline-stickies-color:star"
+        name="gravity-ui:star-fill"
         :class="[
           sizeClass,
           getStarState(i) === 'full' ? 'opacity-100' : 'opacity-30 grayscale',

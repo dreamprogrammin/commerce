@@ -26,7 +26,7 @@
 
 **Изменения:**
 
-- Заменены все стандартные иконки `lucide:star` и `lucide:star-half` на цветную иконку `streamline-stickies-color:star`
+- Заменены все стандартные иконки `lucide:star` и `lucide:star-half` на цветную иконку `gravity-ui:star-fill`
 - Удалена поддержка половинчатых звезд (упрощение для marketplace-стиля)
 - Обновлена логика отображения: полные звезды с opacity 100%, пустые с opacity 30% + grayscale
 
@@ -34,7 +34,7 @@
 
 ```vue
 <Icon
-  name="streamline-stickies-color:star"
+  name="gravity-ui:star-fill"
   :class="[
     sizeClass,
     getStarState(i) === 'full' ? 'opacity-100' : 'opacity-30 grayscale',
@@ -58,7 +58,7 @@
 **Стало:**
 
 ```vue
-<Icon name="streamline-stickies-color:star" class="w-4 h-4 flex-shrink-0" />
+<Icon name="gravity-ui:star-fill" class="w-4 h-4 flex-shrink-0" />
 <span class="text-sm font-bold text-foreground">
   {{ formatRating(product.avg_rating || 5) }}
 </span>
@@ -110,7 +110,7 @@ export function formatRating(rating: number | null | undefined): string {
 <!-- Brand Trust Score -->
 <div v-if="brandStats && brandStats.total_reviews_count > 0"
      class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0">
-  <Icon name="streamline-stickies-color:star" class="w-10 h-10 flex-shrink-0" />
+  <Icon name="gravity-ui:star-fill" class="w-10 h-10 flex-shrink-0" />
   <div class="space-y-0.5 text-left">
     <div class="flex items-center gap-2">
       <span class="text-2xl font-bold text-foreground">{{ formatRating(brandStats.average_rating) }}</span>
@@ -157,7 +157,7 @@ import { formatRating } from "@/utils/formatRating";
 <!-- Brand Trust Score для линейки -->
 <div v-if="lineStats && lineStats.total_reviews_count > 0"
      class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0">
-  <Icon name="streamline-stickies-color:star" class="w-10 h-10 flex-shrink-0" />
+  <Icon name="gravity-ui:star-fill" class="w-10 h-10 flex-shrink-0" />
   <div class="space-y-0.5 text-left">
     <div class="flex items-center gap-2">
       <span class="text-2xl font-bold text-foreground">{{ formatRating(lineStats.average_rating) }}</span>
@@ -222,7 +222,7 @@ grep -B5 -A5 "aggregateRating" pages/brand/[slug].vue
 ### ✅ Критерии приемки
 
 1. **Глобальное обновление иконок** ✓
-   - Все звезды заменены на `streamline-stickies-color:star`
+   - Все звезды заменены на `gravity-ui:star-fill`
    - Применено в: `StarRating.vue`, `ProductCard.vue`, `BrandStandardTemplate.vue`, страницах брендов
 
 2. **Компактный рейтинг в ProductCard.vue** ✓
@@ -249,7 +249,7 @@ grep -B5 -A5 "aggregateRating" pages/brand/[slug].vue
 ### Aesthetics (Эстетика)
 
 - **До:** Стандартные желтые звезды Lucide
-- **После:** Яркие цветные иконки Streamline
+- **После:** Яркие цветные иконки Gravity UI
 - **Результат:** Сайт выглядит более профессионально и "брендово"
 
 ### Trust (Доверие)
@@ -283,7 +283,7 @@ grep -B5 -A5 "aggregateRating" pages/brand/[slug].vue
 
 ### Зависимости
 
-- `streamline-stickies-color:star` - цветная иконка звезды (Nuxt Icon)
+- `gravity-ui:star-fill` - цветная иконка звезды (Nuxt Icon)
 - `get_brand_stats` - RPC функция Supabase (возвращает average_rating, total_reviews_count)
 - `formatRating` - новая утилита в `utils/`
 

@@ -81,7 +81,7 @@ function toggleSeoExpanded() {
               <div
                 class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform"
               >
-                <Icon name="streamline-stickies-color:star" class="w-8 h-8" />
+                <Icon name="gravity-ui:star-fill" class="w-8 h-8" />
               </div>
 
               <div class="flex flex-col justify-center">
