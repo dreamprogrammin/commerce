@@ -294,6 +294,9 @@ export type ProductImageRow =
 export type ProductWithGallery = Omit<ProductRow, "brand_id"> & {
   product_images: ProductImageRow[];
   brands?: SimpleBrand | null;
+  // ⭐ Рейтинги и отзывы для Social Proof
+  avg_rating?: number | null;
+  review_count?: number | null;
 };
 
 export interface CustomFieldSchema {
@@ -442,6 +445,9 @@ export interface BaseProduct {
   brands?: SimpleBrand | null;
   product_line_id?: string | null;
   product_line_name?: string | null;
+  // ⭐ Рейтинги и отзывы для Social Proof
+  avg_rating?: number | null;
+  review_count?: number | null;
 }
 
 export interface SimpleAttributeOption {

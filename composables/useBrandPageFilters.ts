@@ -1,205 +1,219 @@
-import type { Country, IProductFilters, Material, ProductLine, ProductWithGallery, SortByType } from '@/types'
-import { useQuery } from '@tanstack/vue-query'
-import { useProductsStore } from '@/stores/publicStore/productsStore'
+import type {
+  Country,
+  IProductFilters,
+  Material,
+  ProductLine,
+  ProductWithGallery,
+  SortByType,
+} from "@/types";
+import { useQuery } from "@tanstack/vue-query";
+import { useProductsStore } from "@/stores/publicStore/productsStore";
 
-export type BrandPageContext = 'brand' | 'line'
+export type BrandPageContext = "brand" | "line";
 
 interface UseBrandPageFiltersOptions {
-  brandId: Ref<string | undefined>
-  productLineId?: Ref<string | undefined>
-  context: BrandPageContext
-  brandProductLines?: Ref<ProductLine[]>
+  brandId: Ref<string | undefined>;
+  productLineId?: Ref<string | undefined>;
+  context: BrandPageContext;
+  brandProductLines?: Ref<ProductLine[]>;
 }
 
 export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
-  const productsStore = useProductsStore()
+  const productsStore = useProductsStore();
 
   // ── Products state ──
-  const products = shallowRef<ProductWithGallery[]>([])
-  const isLoading = ref(true)
-  const mobileFiltersOpen = ref(false)
+  const products = shallowRef<ProductWithGallery[]>([]);
+  const isLoading = ref(true);
+  const mobileFiltersOpen = ref(false);
 
   // ── Filter state ──
-  const sortBy = ref<SortByType>('newest')
-  const selectedProductLineIds = ref<string[]>([])
-  const selectedMaterialIds = ref<string[]>([])
-  const selectedCountryIds = ref<string[]>([])
-  const priceFilter = ref<[number, number]>([0, 50000])
-  const localPrice = ref<[number, number]>([0, 50000])
+  const sortBy = ref<SortByType>("newest");
+  const selectedProductLineIds = ref<string[]>([]);
+  const selectedMaterialIds = ref<string[]>([]);
+  const selectedCountryIds = ref<string[]>([]);
+  const priceFilter = ref<[number, number]>([0, 50000]);
+  const localPrice = ref<[number, number]>([0, 50000]);
 
   // ── Filter metadata ──
-  const priceRange = ref({ min: 0, max: 50000 })
-  const availableMaterials = ref<Material[]>([])
-  const availableCountries = ref<Country[]>([])
-  let priceRangeInitialized = false
+  const priceRange = ref({ min: 0, max: 50000 });
+  const availableMaterials = ref<Material[]>([]);
+  const availableCountries = ref<Country[]>([]);
+  let priceRangeInitialized = false;
 
   // ── Context-aware visibility ──
-  const hideBrands = true
-  const hideProductLines = computed(() => options.context === 'line')
+  const hideBrands = true;
+  const hideProductLines = computed(() => options.context === "line");
 
   const availableProductLines = computed<ProductLine[]>(() => {
-    if (options.context === 'line')
-      return []
-    return options.brandProductLines?.value || []
-  })
+    if (options.context === "line") return [];
+    return options.brandProductLines?.value || [];
+  });
 
   // ── Build IProductFilters for fetchProducts ──
   const catalogFilters = computed<IProductFilters>(() => {
     const filters: IProductFilters = {
-      categorySlug: 'all',
+      categorySlug: "all",
       brandIds: options.brandId.value ? [options.brandId.value] : undefined,
       sortBy: sortBy.value,
-    }
+    };
 
-    if (options.context === 'line' && options.productLineId?.value) {
-      filters.productLineIds = [options.productLineId.value]
-    }
-    else if (selectedProductLineIds.value.length > 0) {
-      filters.productLineIds = selectedProductLineIds.value
+    if (options.context === "line" && options.productLineId?.value) {
+      filters.productLineIds = [options.productLineId.value];
+    } else if (selectedProductLineIds.value.length > 0) {
+      filters.productLineIds = selectedProductLineIds.value;
     }
 
     if (priceFilter.value[0] > priceRange.value.min) {
-      filters.priceMin = priceFilter.value[0]
+      filters.priceMin = priceFilter.value[0];
     }
     if (priceFilter.value[1] < priceRange.value.max) {
-      filters.priceMax = priceFilter.value[1]
+      filters.priceMax = priceFilter.value[1];
     }
 
     if (selectedMaterialIds.value.length > 0) {
-      filters.materialIds = selectedMaterialIds.value
+      filters.materialIds = selectedMaterialIds.value;
     }
 
     if (selectedCountryIds.value.length > 0) {
-      filters.countryIds = selectedCountryIds.value
+      filters.countryIds = selectedCountryIds.value;
     }
 
-    return filters
-  })
+    return filters;
+  });
 
   // ── TanStack Query для кеширования товаров ──
   const queryKey = computed(() => {
-    const f = catalogFilters.value
+    const f = catalogFilters.value;
     return [
-      'brand-page-products',
+      "brand-page-products",
       options.context,
-      f.brandIds?.join(',') || '',
-      f.productLineIds?.join(',') || '',
+      f.brandIds?.join(",") || "",
+      f.productLineIds?.join(",") || "",
       f.sortBy,
-      f.materialIds?.join(',') || '',
-      f.countryIds?.join(',') || '',
+      f.materialIds?.join(",") || "",
+      f.countryIds?.join(",") || "",
       `${f.priceMin ?? 0}-${f.priceMax ?? 0}`,
-    ]
-  })
+    ];
+  });
 
-  const queryEnabled = computed(() => !!options.brandId.value)
+  const queryEnabled = computed(() => !!options.brandId.value);
 
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const result = await productsStore.fetchProducts(catalogFilters.value, 1, 200)
-      return result.products
+      // ✅ Загружаем товары с рейтингами (avg_rating, review_count)
+      const result = await productsStore.fetchProducts(
+        catalogFilters.value,
+        1,
+        200,
+      );
+      return result.products;
     },
     enabled: queryEnabled,
     staleTime: 2 * 60 * 1000, // 2 минуты — показываем кеш, обновляем в фоне
     gcTime: 10 * 60 * 1000, // 10 минут в памяти
     retry: false,
     refetchOnWindowFocus: true,
-    refetchOnMount: 'always',
+    refetchOnMount: "always",
     refetchOnReconnect: false,
-  })
+  });
 
   // Синхронизируем query → products
-  watch(() => query.data.value, (data) => {
-    if (data) {
-      products.value = data
+  watch(
+    () => query.data.value,
+    (data) => {
+      if (data) {
+        products.value = data;
 
-      // Calculate price range from first load
-      if (!priceRangeInitialized && data.length > 0) {
-        const prices = data.map(p => Number(p.price)).filter(p => p > 0)
-        if (prices.length > 0) {
-          const min = Math.floor(Math.min(...prices) / 100) * 100
-          const max = Math.ceil(Math.max(...prices) / 100) * 100
-          priceRange.value = { min: min || 0, max: max || 50000 }
-          priceFilter.value = [priceRange.value.min, priceRange.value.max]
-          localPrice.value = [priceRange.value.min, priceRange.value.max]
-          priceRangeInitialized = true
+        // Calculate price range from first load
+        if (!priceRangeInitialized && data.length > 0) {
+          const prices = data.map((p) => Number(p.price)).filter((p) => p > 0);
+          if (prices.length > 0) {
+            const min = Math.floor(Math.min(...prices) / 100) * 100;
+            const max = Math.ceil(Math.max(...prices) / 100) * 100;
+            priceRange.value = { min: min || 0, max: max || 50000 };
+            priceFilter.value = [priceRange.value.min, priceRange.value.max];
+            localPrice.value = [priceRange.value.min, priceRange.value.max];
+            priceRangeInitialized = true;
+          }
         }
       }
-    }
-  }, { immediate: true })
+    },
+    { immediate: true },
+  );
 
   // Синхронизируем isLoading
-  watch(() => query.isLoading.value, (val) => {
-    isLoading.value = val
-  }, { immediate: true })
+  watch(
+    () => query.isLoading.value,
+    (val) => {
+      isLoading.value = val;
+    },
+    { immediate: true },
+  );
 
   // Обратная совместимость — вызывается из страниц, но теперь query сам обновляется
   function loadProducts() {
-    query.refetch()
+    query.refetch();
   }
 
   // ── Load filter metadata ──
   async function loadFilterData() {
     await Promise.allSettled([
       productsStore.fetchAllMaterials().then(() => {
-        availableMaterials.value = productsStore.allMaterials
+        availableMaterials.value = productsStore.allMaterials;
       }),
       productsStore.fetchAllCountries().then(() => {
-        availableCountries.value = productsStore.allCountries
+        availableCountries.value = productsStore.allCountries;
       }),
-    ])
+    ]);
   }
 
   // ── Active filter count ──
   const activeFiltersCount = computed(() => {
-    let count = 0
-    if (!hideProductLines.value)
-      count += selectedProductLineIds.value.length
-    count += selectedMaterialIds.value.length
-    count += selectedCountryIds.value.length
+    let count = 0;
+    if (!hideProductLines.value) count += selectedProductLineIds.value.length;
+    count += selectedMaterialIds.value.length;
+    count += selectedCountryIds.value.length;
     if (
-      priceFilter.value[0] > priceRange.value.min
-      || priceFilter.value[1] < priceRange.value.max
+      priceFilter.value[0] > priceRange.value.min ||
+      priceFilter.value[1] < priceRange.value.max
     ) {
-      count++
+      count++;
     }
-    return count
-  })
+    return count;
+  });
 
   // ── Reset ──
   function resetFilters() {
-    selectedProductLineIds.value = []
-    selectedMaterialIds.value = []
-    selectedCountryIds.value = []
-    priceFilter.value = [priceRange.value.min, priceRange.value.max]
-    localPrice.value = [priceRange.value.min, priceRange.value.max]
+    selectedProductLineIds.value = [];
+    selectedMaterialIds.value = [];
+    selectedCountryIds.value = [];
+    priceFilter.value = [priceRange.value.min, priceRange.value.max];
+    localPrice.value = [priceRange.value.min, priceRange.value.max];
   }
 
   // ── Toggle helpers ──
   function toggleProductLine(id: string) {
-    const idx = selectedProductLineIds.value.indexOf(id)
-    if (idx >= 0)
-      selectedProductLineIds.value.splice(idx, 1)
-    else selectedProductLineIds.value.push(id)
+    const idx = selectedProductLineIds.value.indexOf(id);
+    if (idx >= 0) selectedProductLineIds.value.splice(idx, 1);
+    else selectedProductLineIds.value.push(id);
   }
 
   function toggleMaterial(id: string) {
-    const idx = selectedMaterialIds.value.indexOf(id)
-    if (idx >= 0)
-      selectedMaterialIds.value.splice(idx, 1)
-    else selectedMaterialIds.value.push(id)
+    const idx = selectedMaterialIds.value.indexOf(id);
+    if (idx >= 0) selectedMaterialIds.value.splice(idx, 1);
+    else selectedMaterialIds.value.push(id);
   }
 
   function toggleCountry(id: string) {
-    const idx = selectedCountryIds.value.indexOf(id)
-    if (idx >= 0)
-      selectedCountryIds.value.splice(idx, 1)
-    else selectedCountryIds.value.push(id)
+    const idx = selectedCountryIds.value.indexOf(id);
+    if (idx >= 0) selectedCountryIds.value.splice(idx, 1);
+    else selectedCountryIds.value.push(id);
   }
 
   function commitPrice(val: number[]) {
     if (Array.isArray(val) && val.length === 2) {
-      priceFilter.value = val as [number, number]
+      priceFilter.value = val as [number, number];
     }
   }
 
@@ -237,7 +251,7 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
     toggleMaterial,
     toggleCountry,
     commitPrice,
-  }
+  };
 }
 
-export type BrandFilterState = ReturnType<typeof useBrandPageFilters>
+export type BrandFilterState = ReturnType<typeof useBrandPageFilters>;

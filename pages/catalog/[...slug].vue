@@ -1261,6 +1261,17 @@ useSchemaOrg(
                   },
                 },
               },
+              // ⭐ КРИТИЧНО: Показываем рейтинг для КАЖДОГО товара с отзывами
+              ...(Number(product.review_count) > 0 && {
+                aggregateRating: {
+                  "@type": "AggregateRating",
+                  // Если avg_rating null/0, но отзыв есть — ставим 5.0 (отзыв мог не пересчитаться)
+                  ratingValue: product.avg_rating || 5,
+                  reviewCount: product.review_count,
+                  bestRating: 5,
+                  worstRating: 1,
+                },
+              }),
             },
           })),
       });
