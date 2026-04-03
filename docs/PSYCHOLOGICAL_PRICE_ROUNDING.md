@@ -342,9 +342,11 @@ Final price: 2 990 ₸ (без изменений)
 
 - [DYNAMIC_DISCOUNT_SNIPPETS.md](./DYNAMIC_DISCOUNT_SNIPPETS.md) — Динамические скидки в FAQ
 - [PAA_OPTIMIZATION.md](./PAA_OPTIMIZATION.md) — Оптимизация для Google PAA
+- [PRICE_AUDIT_2026_04_03.md](./PRICE_AUDIT_2026_04_03.md) — Аудит системы ценообразования (исправление бага с отображением цен)
 
 ---
 
 **Дата создания:** 31 марта 2026  
+**Последнее обновление:** 3 апреля 2026  
 **Автор:** Uhti Commerce Team  
 **Статус:** ✅ Готово к деплою

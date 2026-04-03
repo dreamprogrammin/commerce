@@ -144,11 +144,11 @@ const priceDetails = computed(() => {
     };
   }
 
-  // 🔥 Используем final_price из базы данных (с психологическим округлением)
-  // Если final_price не задан, рассчитываем вручную
+  // 🔥 ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ: final_price из базы данных (generated column)
+  // База автоматически применяет психологическое округление
   const finalPrice = props.product.final_price
     ? Number(props.product.final_price)
-    : Math.round(originalPrice * (1 - discountPercent / 100));
+    : originalPrice;
 
   return {
     hasDiscount: true,
