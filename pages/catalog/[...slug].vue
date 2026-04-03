@@ -1237,7 +1237,6 @@ useSchemaOrg(
                   shippingDestination: {
                     "@type": "DefinedRegion",
                     addressCountry: "KZ",
-                    addressRegion: "Алматы",
                   },
                   shippingRate: {
                     "@type": "MonetaryAmount",

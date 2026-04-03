@@ -713,7 +713,6 @@ useSchemaOrg([
           shippingDestination: {
             "@type": "DefinedRegion" as const,
             addressCountry: "KZ",
-            addressRegion: "Алматы",
           },
           deliveryTime: {
             "@type": "ShippingDeliveryTime" as const,

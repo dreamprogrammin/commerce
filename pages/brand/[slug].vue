@@ -381,7 +381,6 @@ useHead({
                         shippingDestination: {
                           "@type": "DefinedRegion",
                           addressCountry: "KZ",
-                          addressRegion: "Алматы",
                         },
                         deliveryTime: {
                           "@type": "ShippingDeliveryTime",
