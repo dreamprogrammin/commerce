@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col" style="min-height: 100dvh;">
+  <div class="flex flex-col" style="min-height: 100dvh">
     <!-- Header только на десктопе -->
     <div class="hidden lg:block">
       <CommonHeader />
@@ -10,8 +10,13 @@
       <CommonAppTabBarMobile />
     </div>
 
-    <main class="flex-1 lg:pt-0 pt-[76px] lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+    <main
+      class="flex-1 lg:pt-0 pt-[76px] lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]"
+    >
       <slot />
     </main>
+
+    <!-- Footer -->
+    <CommonFooter />
   </div>
 </template>

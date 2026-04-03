@@ -3,7 +3,7 @@
 </script>
 
 <template>
-  <div class="flex flex-col" style="min-height: 100dvh;">
+  <div class="flex flex-col" style="min-height: 100dvh">
     <!-- Header только на десктопе -->
     <div class="hidden lg:block">
       <CommonHeader />
@@ -16,8 +16,13 @@
     </div>
 
     <!-- Main без padding-top, т.к. mobile header статичный -->
-    <main class="flex-1 pt-[65px] lg:pt-0 lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+    <main
+      class="flex-1 pt-[65px] lg:pt-0 lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]"
+    >
       <slot />
     </main>
+
+    <!-- Footer -->
+    <CommonFooter />
   </div>
 </template>
