@@ -22,25 +22,35 @@ const props = defineProps<Props>()
 
 const supabase = useSupabaseClient()
 const reviews = ref<CategoryReview[]>([])
+const ratingDistributionData = ref<{ stars: number, count: number }[]>([])
 const isLoading = ref(true)
 
-// Загрузка отзывов
+// Загрузка отзывов и распределения оценок
 async function loadReviews() {
   isLoading.value = true
   try {
-    const { data, error } = await supabase.rpc('get_latest_category_reviews', {
-      p_category_id: props.categoryId,
-      p_limit: 5,
-    })
+    const [reviewsResult, distributionResult] = await Promise.all([
+      supabase.rpc('get_latest_category_reviews', {
+        p_category_id: props.categoryId,
+        p_limit: 5,
+      }),
+      supabase.rpc('get_category_rating_distribution', {
+        p_category_id: props.categoryId,
+      }),
+    ])
 
-    if (error)
-      throw error
+    if (reviewsResult.error)
+      throw reviewsResult.error
+    if (distributionResult.error)
+      throw distributionResult.error
 
-    reviews.value = data || []
+    reviews.value = reviewsResult.data || []
+    ratingDistributionData.value = distributionResult.data || []
   }
   catch (error) {
     console.error('Error loading category reviews:', error)
     reviews.value = []
+    ratingDistributionData.value = []
   }
   finally {
     isLoading.value = false
@@ -70,16 +80,21 @@ watch(
   },
 )
 
-// Распределение оценок (моковые данные для визуализации)
+// Распределение оценок (реальные данные из базы)
 const ratingDistribution = computed(() => {
   const total = props.totalReviews
-  return [
-    { stars: 5, count: Math.round(total * 0.6), percentage: 60 },
-    { stars: 4, count: Math.round(total * 0.25), percentage: 25 },
-    { stars: 3, count: Math.round(total * 0.1), percentage: 10 },
-    { stars: 2, count: Math.round(total * 0.03), percentage: 3 },
-    { stars: 1, count: Math.round(total * 0.02), percentage: 2 },
-  ]
+  if (total === 0)
+    return []
+
+  // Создаем массив для всех оценок от 5 до 1
+  const distribution = [5, 4, 3, 2, 1].map((stars) => {
+    const item = ratingDistributionData.value.find(d => d.stars === stars)
+    const count = item?.count || 0
+    const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+    return { stars, count, percentage }
+  })
+
+  return distribution
 })
 </script>
 
