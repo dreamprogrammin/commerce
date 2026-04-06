@@ -20,6 +20,7 @@ import CategoryBrands from '@/components/category/CategoryBrands.vue'
 import CategoryProductLines from '@/components/category/CategoryProductLines.vue'
 import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
 import CategoryRatingBlock from '@/components/category/CategoryRatingBlock.vue'
+import CategoryReviews from '@/components/category/CategoryReviews.vue'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -1984,6 +1985,18 @@ useSchemaOrg(
         v-if="currentCategory"
         :category-id="currentCategory.id"
         :category-name="currentCategory.name"
+      />
+    </ClientOnly>
+
+    <!-- Отзывы категории -->
+    <ClientOnly>
+      <CategoryReviews
+        v-if="currentCategory && categoryStats.reviews > 0"
+        :category-id="currentCategory.id"
+        :category-name="currentCategory.name"
+        :total-reviews="categoryStats.reviews"
+        :average-rating="categoryStats.rating"
+        class="mt-8"
       />
     </ClientOnly>
 
