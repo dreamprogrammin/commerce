@@ -9,6 +9,11 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
 
+// SEO: Закрываем страницу корзины от индексации
+useHead({
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
+})
+
 const cartStore = useCartStore()
 const supabase = useSupabaseClient()
 const { items, subtotal, totalItems, bonusesToAward } = storeToRefs(cartStore)

@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { CheckCircle2, Package, ShoppingCart, Trash2, XCircle } from 'lucide-vue-next'
+import {
+  CheckCircle2,
+  Package,
+  ShoppingCart,
+  Trash2,
+  XCircle,
+} from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 
 import TelegramBanner from '@/components/profile/TelegramBanner.vue'
@@ -7,6 +13,11 @@ import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+
+// SEO: Закрываем страницу успешного заказа от индексации
+useHead({
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -36,7 +47,8 @@ const showCancelDialog = ref(false)
 
 // Загружаем статус заказа
 async function fetchOrderStatus() {
-  if (!isAuthenticated.value) return
+  if (!isAuthenticated.value)
+    return
 
   try {
     const { data, error } = await supabase
@@ -45,9 +57,11 @@ async function fetchOrderStatus() {
       .eq('id', fullOrderId.value)
       .single()
 
-    if (error) throw error
+    if (error)
+      throw error
     orderStatus.value = data.status
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Ошибка загрузки статуса:', err)
   }
 }
@@ -85,7 +99,9 @@ onMounted(async () => {
   <div class="container max-w-2xl mx-auto py-12 px-4">
     <!-- Успешное оформление -->
     <div class="text-center mb-8">
-      <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+      <div
+        class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4"
+      >
         <CheckCircle2 class="w-10 h-10 text-green-600" />
       </div>
       <h1 class="text-2xl md:text-3xl font-bold text-primary mb-2">
@@ -105,7 +121,9 @@ onMounted(async () => {
             <p class="text-sm text-muted-foreground mb-2">
               Номер вашего заказа
             </p>
-            <p class="text-2xl font-mono font-bold bg-muted px-4 py-2 rounded-lg inline-block">
+            <p
+              class="text-2xl font-mono font-bold bg-muted px-4 py-2 rounded-lg inline-block"
+            >
               {{ orderId }}
             </p>
           </div>
@@ -119,11 +137,13 @@ onMounted(async () => {
             <ul class="space-y-2 text-sm text-muted-foreground">
               <li class="flex items-start gap-2">
                 <span class="text-primary mt-0.5">•</span>
-                <span>Наш менеджер скоро свяжется с вами для подтверждения деталей заказа</span>
+                <span>Наш менеджер скоро свяжется с вами для подтверждения деталей
+                  заказа</span>
               </li>
               <li class="flex items-start gap-2">
                 <span class="text-primary mt-0.5">•</span>
-                <span>Мы отправим уведомление о статусе заказа на указанный номер телефона</span>
+                <span>Мы отправим уведомление о статусе заказа на указанный номер
+                  телефона</span>
               </li>
             </ul>
           </div>
@@ -132,7 +152,10 @@ onMounted(async () => {
     </Card>
 
     <!-- Информация о сохраненной корзине для гостей -->
-    <Card v-if="!isAuthenticated && hasCartItems" class="mb-6 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50">
+    <Card
+      v-if="!isAuthenticated && hasCartItems"
+      class="mb-6 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50"
+    >
       <CardHeader>
         <div class="flex items-start gap-3">
           <div class="p-2 bg-blue-100 rounded-full flex-shrink-0">
@@ -143,7 +166,8 @@ onMounted(async () => {
               Корзина сохранена
             </CardTitle>
             <CardDescription class="mt-1">
-              Товары в корзине остались, вы можете оформить еще один заказ или очистить корзину
+              Товары в корзине остались, вы можете оформить еще один заказ или
+              очистить корзину
             </CardDescription>
           </div>
         </div>
@@ -155,14 +179,22 @@ onMounted(async () => {
             Перейти в корзину
           </Button>
         </NuxtLink>
-        <Button variant="ghost" size="icon" class="flex-shrink-0" @click="clearGuestCart">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="flex-shrink-0"
+          @click="clearGuestCart"
+        >
           <Trash2 class="w-4 h-4" />
         </Button>
       </CardContent>
     </Card>
 
     <!-- Блок для авторизованных пользователей -->
-    <Card v-if="isAuthenticated" class="mb-6 border-green-200 bg-gradient-to-br from-green-50 to-green-100/50">
+    <Card
+      v-if="isAuthenticated"
+      class="mb-6 border-green-200 bg-gradient-to-br from-green-50 to-green-100/50"
+    >
       <CardHeader>
         <div class="flex items-start gap-3">
           <div class="p-2 bg-green-100 rounded-full flex-shrink-0">
@@ -220,8 +252,7 @@ onMounted(async () => {
         <AlertDialogHeader>
           <AlertDialogTitle>Отменить заказ?</AlertDialogTitle>
           <AlertDialogDescription>
-            Вы уверены, что хотите отменить заказ №{{ orderId }}?
-            <br><br>
+            Вы уверены, что хотите отменить заказ №{{ orderId }}? <br><br>
             Потраченные бонусы будут возвращены на ваш счёт.
           </AlertDialogDescription>
         </AlertDialogHeader>

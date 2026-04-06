@@ -46,11 +46,7 @@ export default defineNuxtConfig({
       width: 1200,
       height: 630,
     },
-    fonts: [
-      'Inter:400',
-      'Inter:700',
-      'Inter:900',
-    ],
+    fonts: ['Inter:400', 'Inter:700', 'Inter:900'],
   },
 
   schemaOrg: {
@@ -59,7 +55,8 @@ export default defineNuxtConfig({
       name: 'Ухтышка',
       url: 'https://uhti.kz',
       logo: 'https://uhti.kz/logo.png',
-      description: 'Интернет-магазин с широким ассортиментом качественных игрушек.',
+      description:
+        'Интернет-магазин с широким ассортиментом качественных игрушек.',
       address: {
         addressCountry: 'KZ',
         addressLocality: 'Алматы',
@@ -101,12 +98,7 @@ export default defineNuxtConfig({
     groups: [
       {
         userAgent: ['*'],
-        allow: [
-          '/',
-          '/catalog/**',
-          '/brand/**',
-          '/*?brand=*',
-        ],
+        allow: ['/', '/catalog/**', '/brand/**', '/*?brand=*'],
         disallow: [
           '/admin',
           '/confirm',
@@ -159,9 +151,7 @@ export default defineNuxtConfig({
         ],
       },
     ],
-    sitemap: [
-      'https://uhti.kz/sitemap.xml',
-    ],
+    sitemap: ['https://uhti.kz/sitemap.xml'],
   },
 
   nitro: {
@@ -170,7 +160,8 @@ export default defineNuxtConfig({
         proxy: {
           to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**',
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Referer': 'https://gvsdevsvzgcivpphcuai.supabase.co',
@@ -191,24 +182,66 @@ export default defineNuxtConfig({
         },
       },
       // 301 редиректы со старых URL на новые (дубли с одинаковыми заголовками)
-      '/catalog/konstruktory-devochkam': { redirect: { to: '/catalog/constructors-root/konstruktory-devochkam', statusCode: 301 } },
-      '/catalog/bizibordy': { redirect: { to: '/catalog/kiddy/bizibordy', statusCode: 301 } },
-      '/catalog/mashinki': { redirect: { to: '/catalog/boys/mashinki', statusCode: 301 } },
-      '/catalog/tolokar': { redirect: { to: '/catalog/kiddy/tolokar', statusCode: 301 } },
-      '/catalog/batteries': { redirect: { to: '/catalog/accessories/batteries', statusCode: 301 } },
-      '/catalog/kukly-aksessuary': { redirect: { to: '/catalog/girls/kukly/kukly-aksessuary', statusCode: 301 } },
-      '/catalog/boys/cars/metallicheskie-mashinki': { redirect: { to: '/catalog/boys/mashinki/metallicheskie-mashinki', statusCode: 301 } },
-      '/catalog/boys/cars/radioupravlyaemye-mashinki': { redirect: { to: '/catalog/boys/mashinki/radioupravlyaemye-mashinki', statusCode: 301 } },
+      '/catalog/konstruktory-devochkam': {
+        redirect: {
+          to: '/catalog/constructors-root/konstruktory-devochkam',
+          statusCode: 301,
+        },
+      },
+      '/catalog/bizibordy': {
+        redirect: { to: '/catalog/kiddy/bizibordy', statusCode: 301 },
+      },
+      '/catalog/mashinki': {
+        redirect: { to: '/catalog/boys/mashinki', statusCode: 301 },
+      },
+      '/catalog/tolokar': {
+        redirect: { to: '/catalog/kiddy/tolokar', statusCode: 301 },
+      },
+      '/catalog/batteries': {
+        redirect: { to: '/catalog/accessories/batteries', statusCode: 301 },
+      },
+      '/catalog/kukly-aksessuary': {
+        redirect: {
+          to: '/catalog/girls/kukly/kukly-aksessuary',
+          statusCode: 301,
+        },
+      },
+      '/catalog/boys/cars/metallicheskie-mashinki': {
+        redirect: {
+          to: '/catalog/boys/mashinki/metallicheskie-mashinki',
+          statusCode: 301,
+        },
+      },
+      '/catalog/boys/cars/radioupravlyaemye-mashinki': {
+        redirect: {
+          to: '/catalog/boys/mashinki/radioupravlyaemye-mashinki',
+          statusCode: 301,
+        },
+      },
       '/brand/polesie': { redirect: { to: '/brand/polese', statusCode: 301 } },
-      '/brand/MG%20Toys': { redirect: { to: '/brand/mg-toys', statusCode: 301 } },
+      '/brand/MG%20Toys': {
+        redirect: { to: '/brand/mg-toys', statusCode: 301 },
+      },
       '/': { swr: 600 },
       '/catalog': { swr: 1800 },
       '/catalog/products/**': { swr: 300 },
-      '/profile/**': { ssr: false },
-      '/checkout': { ssr: false },
-      '/cart': { ssr: false },
-      '/order/**': { ssr: false },
-      '/auth/magic': { ssr: false },
+      '/profile/**': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
+      '/checkout': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
+      '/cart': { ssr: false, headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+      '/order/**': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
+      '/auth/magic': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
     },
     compressPublicAssets: true,
     minify: true,
@@ -244,11 +277,35 @@ export default defineNuxtConfig({
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
         },
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-        { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png' },
-        { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
-        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
-        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/android-chrome-192x192.png' },
-        { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/android-chrome-512x512.png' },
+        {
+          rel: 'icon',
+          type: 'image/png',
+          sizes: '16x16',
+          href: '/favicon-16x16.png',
+        },
+        {
+          rel: 'icon',
+          type: 'image/png',
+          sizes: '32x32',
+          href: '/favicon-32x32.png',
+        },
+        {
+          rel: 'apple-touch-icon',
+          sizes: '180x180',
+          href: '/apple-touch-icon.png',
+        },
+        {
+          rel: 'icon',
+          type: 'image/png',
+          sizes: '192x192',
+          href: '/android-chrome-192x192.png',
+        },
+        {
+          rel: 'icon',
+          type: 'image/png',
+          sizes: '512x512',
+          href: '/android-chrome-512x512.png',
+        },
         { rel: 'manifest', href: '/site.webmanifest' },
       ],
       meta: [
@@ -257,7 +314,11 @@ export default defineNuxtConfig({
         { name: 'format-detection', content: 'telephone=yes' },
         { name: 'theme-color', content: '#ffffff' },
         { name: 'msapplication-TileColor', content: '#ffffff' },
-        { name: 'robots', content: 'max-image-preview:large, max-snippet:-1, max-video-preview:-1' },
+        {
+          name: 'robots',
+          content:
+            'max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+        },
       ],
     },
   },
