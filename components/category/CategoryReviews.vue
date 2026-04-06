@@ -200,8 +200,14 @@ const ratingDistribution = computed(() => {
             </div>
 
             <!-- Текст отзыва -->
-            <p class="text-sm text-foreground mb-3 line-clamp-3">
+            <p
+              v-if="review.text && review.text.trim()"
+              class="text-sm text-foreground mb-3 line-clamp-3"
+            >
               {{ review.text }}
+            </p>
+            <p v-else class="text-sm text-muted-foreground italic mb-3">
+              Отзыв без комментария
             </p>
 
             <!-- Автор и дата -->
