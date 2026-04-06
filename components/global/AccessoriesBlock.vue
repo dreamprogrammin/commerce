@@ -1,97 +1,133 @@
 <script setup lang="ts">
-import type { AccessoryProduct } from '@/types'
+import type { AccessoryProduct } from "@/types";
 
 const props = defineProps<{
-  accessories: AccessoryProduct[]
-  loading?: boolean
-}>()
+  accessories: AccessoryProduct[];
+  loading?: boolean;
+}>();
 
-const selectedIds = defineModel<string[]>('selectedIds', { default: () => [] })
+const selectedIds = defineModel<string[]>("selectedIds", { default: () => [] });
 
 // Category configuration with explicit Tailwind classes
 const categories = {
-  'batteries': { title: 'Батарейки', icon: 'streamline-emojis:battery', bg: 'bg-amber-50', text: '' },
-  'gift-wrapping': { title: 'Упаковка', icon: 'streamline-emojis:wrapped-gift-1', bg: 'bg-pink-50', text: '' },
-  'other': { title: 'Аксессуары', icon: 'lucide:package', bg: 'bg-blue-50', text: 'text-blue-600' },
-} as const
+  batteries: {
+    title: "Батарейки",
+    icon: "streamline-emojis:battery",
+    bg: "bg-amber-50",
+    text: "",
+  },
+  "gift-wrapping": {
+    title: "Упаковка",
+    icon: "streamline-emojis:wrapped-gift-1",
+    bg: "bg-pink-50",
+    text: "",
+  },
+  other: {
+    title: "Аксессуары",
+    icon: "lucide:package",
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+  },
+} as const;
 
-type CategoryKey = keyof typeof categories
+type CategoryKey = keyof typeof categories;
 
 // Group accessories by category
 const groupedAccessories = computed(() => {
   const groups: Record<CategoryKey, AccessoryProduct[]> = {
-    'batteries': [],
-    'gift-wrapping': [],
-    'other': [],
-  }
+    batteries: [],
+    "gift-wrapping": [],
+    other: [],
+  };
 
   for (const acc of props.accessories) {
-    const slug = acc.categories?.slug
-    if (slug === 'batteries')
-      groups.batteries.push(acc)
-    else if (slug === 'gift-wrapping')
-      groups['gift-wrapping'].push(acc)
-    else groups.other.push(acc)
+    const slug = acc.categories?.slug;
+    if (slug === "batteries") groups.batteries.push(acc);
+    else if (slug === "gift-wrapping") groups["gift-wrapping"].push(acc);
+    else groups.other.push(acc);
   }
 
-  return groups
-})
+  return groups;
+});
 
 // Available categories (non-empty)
 const availableCategories = computed(() =>
-  (Object.keys(categories) as CategoryKey[]).filter(key => groupedAccessories.value[key].length > 0),
-)
+  (Object.keys(categories) as CategoryKey[]).filter(
+    (key) => groupedAccessories.value[key].length > 0,
+  ),
+);
 
 // Selected count per category
 const selectedCount = computed(() => {
-  const counts: Record<CategoryKey, number> = { 'batteries': 0, 'gift-wrapping': 0, 'other': 0 }
+  const counts: Record<CategoryKey, number> = {
+    batteries: 0,
+    "gift-wrapping": 0,
+    other: 0,
+  };
   for (const key of Object.keys(counts) as CategoryKey[]) {
-    counts[key] = groupedAccessories.value[key].filter(acc => selectedIds.value.includes(acc.id)).length
+    counts[key] = groupedAccessories.value[key].filter((acc) =>
+      selectedIds.value.includes(acc.id),
+    ).length;
   }
-  return counts
-})
+  return counts;
+});
 
 // Modal/Drawer state
-const isMobile = ref(false)
-const isOpen = ref(false)
-const activeCategory = ref<CategoryKey | null>(null)
+const isMobile = ref(false);
+const isOpen = ref(false);
+const activeCategory = ref<CategoryKey | null>(null);
 
-const currentConfig = computed(() => activeCategory.value ? categories[activeCategory.value] : null)
-const currentAccessories = computed(() => activeCategory.value ? groupedAccessories.value[activeCategory.value] : [])
+const currentConfig = computed(() =>
+  activeCategory.value ? categories[activeCategory.value] : null,
+);
+const currentAccessories = computed(() =>
+  activeCategory.value ? groupedAccessories.value[activeCategory.value] : [],
+);
 
 onMounted(() => {
-  isMobile.value = window.innerWidth < 1024
-  window.addEventListener('resize', () => { isMobile.value = window.innerWidth < 1024 })
-})
+  isMobile.value = window.innerWidth < 1024;
+  window.addEventListener("resize", () => {
+    isMobile.value = window.innerWidth < 1024;
+  });
+});
 
 function openCategory(key: CategoryKey) {
-  activeCategory.value = key
-  isOpen.value = true
+  activeCategory.value = key;
+  isOpen.value = true;
 }
 
 function toggleAccessory(id: string) {
-  const idx = selectedIds.value.indexOf(id)
-  if (idx === -1)
-    selectedIds.value = [...selectedIds.value, id]
-  else selectedIds.value = selectedIds.value.filter(i => i !== id)
+  const idx = selectedIds.value.indexOf(id);
+  if (idx === -1) selectedIds.value = [...selectedIds.value, id];
+  else selectedIds.value = selectedIds.value.filter((i) => i !== id);
+
+  // Закрываем модалку/drawer после выбора
+  close();
 }
 
 function close() {
-  isOpen.value = false
-  activeCategory.value = null
+  isOpen.value = false;
+  activeCategory.value = null;
 }
 </script>
 
 <template>
-  <div v-if="loading || accessories.length > 0" class="bg-white rounded-xl p-4 shadow-sm border mt-4">
+  <div
+    v-if="loading || accessories.length > 0"
+    class="bg-white rounded-xl p-4 shadow-sm border mt-4"
+  >
     <h3 class="font-bold text-base mb-3 flex items-center gap-2">
-      <Icon name="lucide:plus-circle" class="w-6 h-6 text-primary" mode="svg"/>
+      <Icon name="lucide:plus-circle" class="w-6 h-6 text-primary" mode="svg" />
       С этим покупают
     </h3>
 
     <!-- Skeleton -->
     <div v-if="loading" class="grid grid-cols-1 gap-2">
-      <div v-for="i in 3" :key="i" class="flex items-center p-3 rounded-lg border animate-pulse gap-3">
+      <div
+        v-for="i in 3"
+        :key="i"
+        class="flex items-center p-3 rounded-lg border animate-pulse gap-3"
+      >
         <div class="w-12 h-12 bg-muted rounded-full flex-shrink-0" />
         <div class="flex-1">
           <div class="h-4 bg-muted rounded w-24 mb-1" />
@@ -106,7 +142,11 @@ function close() {
         v-for="key in availableCategories"
         :key="key"
         class="relative flex items-center p-3 rounded-lg border transition-all active:scale-[0.98] gap-3"
-        :class="selectedCount[key] > 0 ? 'border-primary bg-primary/5' : 'hover:border-primary/50'"
+        :class="
+          selectedCount[key] > 0
+            ? 'border-primary bg-primary/5'
+            : 'hover:border-primary/50'
+        "
         @click="openCategory(key)"
       >
         <Badge
@@ -115,8 +155,16 @@ function close() {
         >
           {{ selectedCount[key] }}
         </Badge>
-        <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" :class="categories[key].bg">
-          <Icon :name="categories[key].icon" class="w-8 h-8" :class="categories[key].text" mode="svg"/>
+        <div
+          class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+          :class="categories[key].bg"
+        >
+          <Icon
+            :name="categories[key].icon"
+            class="w-8 h-8"
+            :class="categories[key].text"
+            mode="svg"
+          />
         </div>
         <div class="flex-1 text-left">
           <div class="text-sm font-semibold">
@@ -126,7 +174,10 @@ function close() {
             {{ groupedAccessories[key].length }} товаров
           </div>
         </div>
-        <Icon name="lucide:chevron-right" class="w-5 h-5 text-muted-foreground flex-shrink-0" />
+        <Icon
+          name="lucide:chevron-right"
+          class="w-5 h-5 text-muted-foreground flex-shrink-0"
+        />
       </button>
     </div>
 
@@ -135,7 +186,12 @@ function close() {
       <DialogContent class="max-w-2xl">
         <DialogHeader>
           <DialogTitle v-if="currentConfig" class="flex items-center gap-2">
-            <Icon :name="currentConfig.icon" class="w-7 h-7" :class="currentConfig.text" mode="svg" />
+            <Icon
+              :name="currentConfig.icon"
+              class="w-7 h-7"
+              :class="currentConfig.text"
+              mode="svg"
+            />
             {{ currentConfig.title }}
           </DialogTitle>
           <DialogDescription>Выберите товары для заказа</DialogDescription>
@@ -153,8 +209,16 @@ function close() {
     <Drawer v-else v-model:open="isOpen">
       <DrawerContent class="max-h-[45vh]">
         <DrawerHeader class="text-left pb-2">
-          <DrawerTitle v-if="currentConfig" class="flex items-center gap-2 text-base">
-            <Icon :name="currentConfig.icon" class="w-7 h-7" :class="currentConfig.text" mode="svg"/>
+          <DrawerTitle
+            v-if="currentConfig"
+            class="flex items-center gap-2 text-base"
+          >
+            <Icon
+              :name="currentConfig.icon"
+              class="w-7 h-7"
+              :class="currentConfig.text"
+              mode="svg"
+            />
             {{ currentConfig.title }}
           </DrawerTitle>
         </DrawerHeader>
