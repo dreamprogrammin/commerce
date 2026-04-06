@@ -199,7 +199,7 @@ export interface IProductFilters {
 
 export interface ICheckoutData {
   deliveryMethod: "pickup" | "courier";
-  paymentMethod: string;
+  paymentMethod: "kaspi" | "cash" | "card";
   deliveryAddress?: { line1: string; city: string; postalCode?: string };
   guestInfo?: { name: string; email: string; phone: string };
   promoCode?: string;
