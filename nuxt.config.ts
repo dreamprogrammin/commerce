@@ -197,6 +197,7 @@ export default defineNuxtConfig({
       '/catalog/tolokar': { redirect: { to: '/catalog/kiddy/tolokar', statusCode: 301 } },
       '/catalog/batteries': { redirect: { to: '/catalog/accessories/batteries', statusCode: 301 } },
       '/catalog/kukly-aksessuary': { redirect: { to: '/catalog/girls/kukly/kukly-aksessuary', statusCode: 301 } },
+      '/catalog/boys/cars/metallicheskie-mashinki': { redirect: { to: '/catalog/boys/mashinki/metallicheskie-mashinki', statusCode: 301 } },
       '/catalog/boys/cars/radioupravlyaemye-mashinki': { redirect: { to: '/catalog/boys/mashinki/radioupravlyaemye-mashinki', statusCode: 301 } },
       '/brand/polesie': { redirect: { to: '/brand/polese', statusCode: 301 } },
       '/brand/MG%20Toys': { redirect: { to: '/brand/mg-toys', statusCode: 301 } },
