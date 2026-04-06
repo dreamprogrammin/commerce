@@ -117,7 +117,7 @@ const ratingDistribution = computed(() => {
             <Icon
               v-for="i in 5"
               :key="i"
-              name="streamline-stickies-color:star"
+              name="gravity-ui:star-fill"
               class="w-6 h-6"
               :class="
                 i <= Math.round(Number(averageRating.replace(',', '.')))
@@ -184,7 +184,7 @@ const ratingDistribution = computed(() => {
                 <Icon
                   v-for="i in 5"
                   :key="i"
-                  name="streamline-stickies-color:star"
+                  name="gravity-ui:star-fill"
                   class="w-4 h-4"
                   :class="
                     i <= review.rating ? 'text-yellow-400' : 'text-gray-300'
