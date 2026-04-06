@@ -139,7 +139,13 @@ const ratingDistribution = computed(() => {
             :key="item.stars"
             class="flex items-center gap-2"
           >
-            <span class="text-sm w-8">{{ item.stars }} ★</span>
+            <div class="flex items-center gap-1 w-8">
+              <span class="text-sm">{{ item.stars }}</span>
+              <Icon
+                name="gravity-ui:star-fill"
+                class="w-3 h-3 text-yellow-400"
+              />
+            </div>
             <div
               class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
             >
