@@ -152,17 +152,18 @@ const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
   gcTime: 30 * 60 * 1000,
 })
 
-const { data: productQuestions } = useQuery({
-  queryKey: ['product-questions', computed(() => product.value?.id)],
-  queryFn: async () => {
+const { data: productQuestions } = await useAsyncData(
+  `product-questions-${route.params.slug}`,
+  async () => {
     if (!product.value?.id)
       return []
     return await questionsStore.fetchQuestions(product.value.id)
   },
-  enabled: computed(() => !!product.value?.id),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-})
+  {
+    watch: [() => product.value?.id],
+    server: true,
+  },
+)
 
 const { data: productReviews } = useQuery({
   queryKey: ['product-reviews', computed(() => product.value?.id)],
