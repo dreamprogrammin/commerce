@@ -115,6 +115,11 @@ async function loadSuggestedAccessories() {
           blur_placeholder,
           alt_text,
           display_order
+        ),
+        categories (
+          id,
+          name,
+          slug
         )
       `,
       )
