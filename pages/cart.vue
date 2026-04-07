@@ -771,12 +771,12 @@ const contentPaddingClass = computed(() =>
               <div class="flex justify-between items-center">
                 <span class="font-bold text-lg">К оплате:</span>
                 <div class="flex items-baseline gap-1">
-                  <div class="flex items-baseline text-2xl font-bold text-primary">
+                  <span class="text-2xl font-bold text-primary">
                     <template v-for="(item, index) in priceChars" :key="index">
                       <!-- Space separator -->
-                      <span v-if="item.char === ' '" class="w-1.5" />
+                      <span v-if="item.char === ' '" class="inline-block w-1.5" />
                       <!-- Digit with flip animation -->
-                      <div
+                      <span
                         v-else-if="item.isDigit"
                         :ref="
                           (el) => {
@@ -786,17 +786,17 @@ const contentPaddingClass = computed(() =>
                         "
                         class="digit-column"
                       >
-                        <div class="digit-ribbon">
-                          <div v-for="d in 10" :key="d" class="digit-item">
+                        <span class="digit-ribbon">
+                          <span v-for="d in 10" :key="d" class="digit-item">
                             {{ d - 1 }}
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Other characters (like currency symbol inside formatted string) -->
+                          </span>
+                        </span>
+                      </span>
+                      <!-- Other characters -->
                       <span v-else>{{ item.char }}</span>
                     </template>
-                  </div>
-                  <span class="text-2xl font-bold text-primary">₸</span>
+                    <span>₸</span>
+                  </span>
                 </div>
               </div>
 
