@@ -792,6 +792,8 @@ const contentPaddingClass = computed(() =>
                           </div>
                         </div>
                       </div>
+                      <!-- Other characters (like currency symbol inside formatted string) -->
+                      <span v-else>{{ item.char }}</span>
                     </template>
                   </div>
                   <span class="text-2xl font-bold text-primary ml-0.5">₸</span>
@@ -893,12 +895,11 @@ const contentPaddingClass = computed(() =>
 .digit-column {
   position: relative;
   display: inline-block;
-  width: 1.2em;
-  height: 1.2em;
+  width: 0.65em;
+  height: 1.5em;
   overflow: hidden;
-  line-height: 1.2em;
+  line-height: 1.5em;
   text-align: center;
-  border-radius: 4px;
 }
 
 .digit-ribbon {
@@ -910,8 +911,8 @@ const contentPaddingClass = computed(() =>
 }
 
 .digit-item {
-  height: 1.2em;
-  line-height: 1.2em;
+  height: 1.5em;
+  line-height: 1.5em;
   text-align: center;
 }
 </style>
