@@ -100,9 +100,6 @@ function toggleAccessory(id: string) {
   const idx = selectedIds.value.indexOf(id);
   if (idx === -1) selectedIds.value = [...selectedIds.value, id];
   else selectedIds.value = selectedIds.value.filter((i) => i !== id);
-
-  // Закрываем модалку/drawer после выбора
-  close();
 }
 
 function close() {

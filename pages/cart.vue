@@ -49,6 +49,7 @@ const isLoadingSimilarProducts = ref(false);
 
 // 🔥 Flip animation для итоговой суммы
 const digitColumns = ref<HTMLElement[]>([]);
+const mobileDigitColumns = ref<HTMLElement[]>([]);
 const totalWithAccessories = computed(() => {
   let total = subtotal.value;
   const selected = suggestedAccessories.value.filter((acc) =>
@@ -73,6 +74,7 @@ const priceChars = computed(() => {
 });
 
 useFlipCounter(totalWithAccessories, digitColumns);
+useFlipCounter(subtotal, mobileDigitColumns);
 
 // Загрузка рекомендованных аксессуаров
 async function loadSuggestedAccessories() {
@@ -839,10 +841,22 @@ const contentPaddingClass = computed(() =>
           <div class="flex items-center justify-between gap-3 mb-3">
             <div class="flex flex-col gap-0.5">
               <span class="text-xs text-muted-foreground">Итого</span>
-              <div class="flex items-baseline gap-0.5">
-                <span class="text-2xl font-bold leading-none text-primary">
-                  {{ formatPrice(subtotal) }}
-                </span>
+              <div class="flex items-center gap-0.5">
+                <div class="flex text-2xl font-bold leading-none text-primary">
+                  <template v-for="(item, index) in priceChars" :key="`mobile-${index}`">
+                    <span v-if="item.char === ' '" class="w-1.5" />
+                    <div
+                      v-else-if="item.isDigit"
+                      :ref="(el) => { if (el) mobileDigitColumns[item.digitIndex] = el as HTMLElement; }"
+                      class="digit-column"
+                    >
+                      <div class="digit-ribbon">
+                        <div v-for="d in 10" :key="d" class="digit-item">{{ d - 1 }}</div>
+                      </div>
+                    </div>
+                    <span v-else>{{ item.char }}</span>
+                  </template>
+                </div>
                 <span class="text-xl font-bold text-primary">₸</span>
               </div>
             </div>
