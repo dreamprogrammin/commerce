@@ -793,10 +793,10 @@ const contentPaddingClass = computed(() =>
                         </div>
                       </div>
                       <!-- Other characters (like currency symbol inside formatted string) -->
-                      <span v-else>{{ item.char }}</span>
+                      <span v-else class="inline-block" style="vertical-align: baseline;">{{ item.char }}</span>
                     </template>
                   </div>
-                  <span class="text-2xl font-bold text-primary ml-0.5">₸</span>
+                  <span class="text-2xl font-bold text-primary ml-0.5" style="vertical-align: baseline;">₸</span>
                 </div>
               </div>
 
