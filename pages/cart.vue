@@ -770,7 +770,7 @@ const contentPaddingClass = computed(() =>
             <div class="space-y-2">
               <div class="flex justify-between items-center">
                 <span class="font-bold text-lg">К оплате:</span>
-                <div class="flex items-baseline gap-1">
+                <div class="flex items-center gap-1">
                   <div class="flex text-2xl font-bold text-primary">
                     <template v-for="(item, index) in priceChars" :key="index">
                       <!-- Space separator -->
