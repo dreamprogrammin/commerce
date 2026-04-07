@@ -738,12 +738,16 @@ const contentPaddingClass = computed(() =>
               <!-- Выбранные аксессуары -->
               <div
                 v-if="selectedAccessoryIds.length > 0"
-                class="flex justify-between text-sm text-primary"
+                class="space-y-1"
               >
-                <span>Аксессуары ({{ selectedAccessoryIds.length }})</span>
-                <span
-                  >+{{ formatPrice(totalWithAccessories - subtotal) }} ₸</span
+                <div
+                  v-for="acc in suggestedAccessories.filter(a => selectedAccessoryIds.includes(a.id))"
+                  :key="acc.id"
+                  class="flex justify-between text-sm text-primary"
                 >
+                  <span class="line-clamp-1">{{ acc.name }}</span>
+                  <span class="flex-shrink-0 ml-2">+{{ formatPrice(acc.final_price || acc.price) }} ₸</span>
+                </div>
               </div>
 
               <div class="flex justify-between text-sm">
