@@ -771,7 +771,7 @@ const contentPaddingClass = computed(() =>
               <div class="flex justify-between items-center">
                 <span class="font-bold text-lg">К оплате:</span>
                 <div class="flex items-baseline gap-1">
-                  <div class="flex text-2xl font-bold text-primary">
+                  <div class="flex items-baseline text-2xl font-bold text-primary">
                     <template v-for="(item, index) in priceChars" :key="index">
                       <!-- Space separator -->
                       <span v-if="item.char === ' '" class="w-1.5" />
@@ -793,10 +793,10 @@ const contentPaddingClass = computed(() =>
                         </div>
                       </div>
                       <!-- Other characters (like currency symbol inside formatted string) -->
-                      <span v-else class="inline-block" style="vertical-align: baseline;">{{ item.char }}</span>
+                      <span v-else>{{ item.char }}</span>
                     </template>
                   </div>
-                  <span class="text-2xl font-bold text-primary ml-0.5" style="vertical-align: baseline;">₸</span>
+                  <span class="text-2xl font-bold text-primary">₸</span>
                 </div>
               </div>
 
