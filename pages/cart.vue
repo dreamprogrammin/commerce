@@ -900,6 +900,7 @@ const contentPaddingClass = computed(() =>
   overflow: hidden;
   line-height: 1.5em;
   text-align: center;
+  vertical-align: baseline;
 }
 
 .digit-ribbon {
