@@ -8,10 +8,13 @@ import { formatPrice } from '@/utils/formatPrice'
 const props = defineProps<{
   accessories: AccessoryProduct[]
   selectedIds: string[]
+  cartMode?: boolean
 }>()
 
 const emit = defineEmits<{
   toggle: [id: string]
+  close: []
+  add: [id: string]
 }>()
 
 const { getImageUrl } = useSupabaseStorage()
@@ -52,7 +55,7 @@ function isSelected(id: string) {
             'border-primary ring-2 ring-primary/20 bg-primary/5': isSelected(accessory.id),
             'hover:border-gray-300': !isSelected(accessory.id),
           }"
-          @click="emit('toggle', accessory.id)"
+          @click="cartMode ? emit('add', accessory.id) : emit('toggle', accessory.id)"
         >
           <!-- Image with selection overlay -->
           <div class="relative bg-gray-50 aspect-square overflow-hidden">

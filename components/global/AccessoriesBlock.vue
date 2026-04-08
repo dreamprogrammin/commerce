@@ -4,6 +4,7 @@ import type { AccessoryProduct } from "@/types";
 const props = defineProps<{
   accessories: AccessoryProduct[];
   loading?: boolean;
+  cartMode?: boolean;
 }>();
 
 const selectedIds = defineModel<string[]>("selectedIds", { default: () => [] });
@@ -110,6 +111,7 @@ function close() {
 
 const emit = defineEmits<{
   addToCart: []
+  addItem: [id: string]
 }>();
 </script>
 
@@ -201,8 +203,10 @@ const emit = defineEmits<{
         <AccessoriesCarousel
           :accessories="currentAccessories"
           :selected-ids="selectedIds"
+          :cart-mode="props.cartMode"
           @toggle="toggleAccessory"
           @close="close"
+          @add="(id) => { emit('addItem', id); isOpen = false; activeCategory = null; }"
         />
       </DialogContent>
     </Dialog>
@@ -228,8 +232,10 @@ const emit = defineEmits<{
           <AccessoriesCarousel
             :accessories="currentAccessories"
             :selected-ids="selectedIds"
+            :cart-mode="props.cartMode"
             @toggle="toggleAccessory"
             @close="close"
+            @add="(id) => { emit('addItem', id); isOpen = false; activeCategory = null; }"
           />
         </div>
       </DrawerContent>

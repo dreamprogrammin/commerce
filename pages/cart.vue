@@ -600,7 +600,9 @@ const contentPaddingClass = computed(() =>
           v-model:selected-ids="selectedAccessoryIds"
           :accessories="suggestedAccessories"
           :loading="isLoadingAccessories"
+          cart-mode
           @add-to-cart="addSelectedAccessoriesToCart"
+          @add-item="(id) => addAccessoryToCart(suggestedAccessories.find(a => a.id === id)!)"
         />
 
         <!-- 🔥 Cross-sell: С этим товаром покупают -->
