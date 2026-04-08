@@ -103,10 +103,7 @@ function toggleAccessory(id: string) {
 }
 
 function close() {
-  // Если есть выбранные товары, вызываем событие добавления в корзину
-  if (selectedIds.value.length > 0) {
-    emit('addToCart');
-  }
+  emit('addToCart');
   isOpen.value = false;
   activeCategory.value = null;
 }
