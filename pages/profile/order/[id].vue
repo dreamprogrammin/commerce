@@ -19,6 +19,7 @@ import { BUCKET_NAME_PRODUCT } from "@/constants";
 const route = useRoute();
 const router = useRouter();
 const supabase = useSupabaseClient<Database>();
+const supabaseUser = useSupabaseUser();
 const { getImageUrl } = useSupabaseStorage();
 
 const orderId = route.params.id as string;
@@ -113,7 +114,8 @@ async function fetchUserReviews() {
   const { data } = await supabase
     .from("product_reviews")
     .select("product_id")
-    .in("product_id", productIds);
+    .in("product_id", productIds)
+    .eq("user_id", supabaseUser.value?.id ?? "");
 
   if (data) {
     reviewedProducts.value = new Set(data.map((r) => r.product_id));
