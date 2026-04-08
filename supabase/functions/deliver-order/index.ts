@@ -182,9 +182,7 @@ Deno.serve(async (req) => {
     // Обновляем заказ - устанавливаем статус delivered
     const { error: updateError } = await supabase
       .from(tableName)
-      .update({
-        status: 'delivered'
-      })
+      .update({ status: 'delivered' })
       .eq('id', orderId)
 
     if (updateError) {
@@ -192,13 +190,20 @@ Deno.serve(async (req) => {
       return new Response(
         `❌ ОШИБКА\n\nНе удалось обновить статус заказа:\n${updateError.message}`,
         {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'text/plain; charset=UTF-8'
-          },
+          headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=UTF-8' },
           status: 500
         }
       )
+    }
+
+    // Обрабатываем бонусы (ставим bonuses_activation_date)
+    if (tableName === 'orders') {
+      const { error: bonusError } = await supabase.rpc('process_confirmed_order', { p_order_id: orderId })
+      if (bonusError) {
+        console.error('⚠️ Ошибка process_confirmed_order:', bonusError.message)
+      } else {
+        console.log('✅ Бонусы обработаны')
+      }
     }
 
     console.log('✅ Заказ успешно доставлен')
