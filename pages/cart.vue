@@ -817,7 +817,6 @@ const contentPaddingClass = computed(() =>
                 <Icon name="lucide:plus-circle" class="w-4 h-4 mr-2" />
                 Добавить {{ selectedAccessoryIds.length }} аксессуар(а)
               </Button>
-            </div>
 
             <NuxtLink to="/checkout" class="w-full block">
               <Button size="lg" class="w-full">
