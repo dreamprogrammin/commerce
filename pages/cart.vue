@@ -50,7 +50,17 @@ const isLoadingSimilarProducts = ref(false);
 // 🔥 Flip animation для итоговой суммы
 const digitColumns = ref<HTMLElement[]>([]);
 const mobileDigitColumns = ref<HTMLElement[]>([]);
-const totalWithAccessories = computed(() => subtotal.value);
+const totalWithAccessories = computed(() => {
+  let total = subtotal.value;
+  const selected = suggestedAccessories.value.filter((acc) =>
+    selectedAccessoryIds.value.includes(acc.id),
+  );
+  for (const acc of selected) {
+    const accFinalPrice = acc.final_price || acc.price;
+    total += accFinalPrice;
+  }
+  return total;
+});
 
 const priceChars = computed(() => {
   const formatted = formatPrice(totalWithAccessories.value);
@@ -590,7 +600,6 @@ const contentPaddingClass = computed(() =>
           v-model:selected-ids="selectedAccessoryIds"
           :accessories="suggestedAccessories"
           :loading="isLoadingAccessories"
-          @add-to-cart="addSelectedAccessoriesToCart"
         />
 
         <!-- 🔥 Cross-sell: С этим товаром покупают -->
@@ -733,6 +742,21 @@ const contentPaddingClass = computed(() =>
                 <span>{{ formatPrice(subtotal) }} ₸</span>
               </div>
 
+              <!-- Выбранные аксессуары -->
+              <div
+                v-if="selectedAccessoryIds.length > 0"
+                class="space-y-1"
+              >
+                <div
+                  v-for="acc in suggestedAccessories.filter(a => selectedAccessoryIds.includes(a.id))"
+                  :key="acc.id"
+                  class="flex justify-between text-sm text-primary"
+                >
+                  <span class="line-clamp-1">{{ acc.name }}</span>
+                  <span class="flex-shrink-0 ml-2">+{{ formatPrice(acc.final_price || acc.price) }} ₸</span>
+                </div>
+              </div>
+
               <div class="flex justify-between text-sm">
                 <span class="text-muted-foreground">Доставка</span>
                 <span v-if="hasFreeShipping" class="text-green-600 font-medium"
@@ -777,6 +801,19 @@ const contentPaddingClass = computed(() =>
                   <span class="text-2xl font-bold text-primary currency-symbol">₸</span>
                 </div>
               </div>
+            </div>
+
+              <!-- Кнопка добавления аксессуаров -->
+              <Button
+                v-if="selectedAccessoryIds.length > 0"
+                size="sm"
+                variant="outline"
+                class="w-full"
+                @click="addSelectedAccessoriesToCart"
+              >
+                <Icon name="lucide:plus-circle" class="w-4 h-4 mr-2" />
+                Добавить {{ selectedAccessoryIds.length }} аксессуар(а)
+              </Button>
             </div>
 
             <NuxtLink to="/checkout" class="w-full block">
