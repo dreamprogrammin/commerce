@@ -46,7 +46,6 @@ const slug = computed(() => route.params.slug as string)
 
 const selectedAccessoryIds = ref<string[]>([])
 const isDescriptionExpanded = ref(false)
-const isAccessoriesDrawerOpen = ref(false)
 
 // 🔥 SSR: загружаем категории, продукт и отзывы ПАРАЛЛЕЛЬНО
 if (import.meta.server) {
@@ -874,15 +873,12 @@ watchEffect(() => {
 </script>
 
 <template>
-  <!-- Instagram-style drawer для аксессуаров на мобилке -->
-  <DrawerInstagram v-model="isAccessoriesDrawerOpen" drawer-height="70vh">
-    <template #content>
-      <div class="bg-background">
-        <div :class="`${containerClass} py-4 lg:py-6`">
-          <ClientOnly>
-            <ProductDetailSkeleton v-if="isLoading" />
+  <div class="bg-background">
+    <div :class="`${containerClass} py-4 lg:py-6`">
+      <ClientOnly>
+        <ProductDetailSkeleton v-if="isLoading" />
 
-            <div v-else-if="product">
+        <div v-else-if="product">
           <!-- Breadcrumbs с кнопкой избранного -->
           <div class="flex items-center justify-between mb-4">
             <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
@@ -1203,23 +1199,11 @@ watchEffect(() => {
                 </ClientOnly>
 
                 <!-- Аксессуары (батарейки и подарочная упаковка) -->
-                <div class="hidden lg:block">
-                  <AccessoriesBlock
-                    v-model:selected-ids="selectedAccessoryIds"
-                    :accessories="accessories || []"
-                    :loading="accessoriesLoading"
-                  />
-                </div>
-                
-                <!-- Кнопка открытия аксессуаров на мобилке -->
-                <button
-                  v-if="accessories?.length"
-                  class="lg:hidden w-full py-3 px-4 border rounded-lg flex items-center justify-between hover:bg-muted/50 transition-colors"
-                  @click="isAccessoriesDrawerOpen = true"
-                >
-                  <span class="font-medium">Дополнительные товары</span>
-                  <Icon name="lucide:chevron-up" class="w-5 h-5" />
-                </button>
+                <AccessoriesBlock
+                  v-model:selected-ids="selectedAccessoryIds"
+                  :accessories="accessories || []"
+                  :loading="accessoriesLoading"
+                />
               </div>
             </div>
 
@@ -1684,22 +1668,7 @@ watchEffect(() => {
         </template>
       </ProductCarousel>
     </div>
-          </div>
-        </div>
-      </template>
-      
-      <template #drawer>
-        <div class="px-4 pb-4">
-          <h3 class="text-lg font-bold mb-4">Дополнительные товары</h3>
-          <AccessoriesBlock
-            v-if="product"
-            v-model:selected-ids="selectedAccessoryIds"
-            :accessories="accessories || []"
-            :loading="accessoriesLoading"
-          />
-        </div>
-      </template>
-    </DrawerInstagram>
+  </div>
 </template>
 
 <style scoped>
