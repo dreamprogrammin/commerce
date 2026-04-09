@@ -25,6 +25,7 @@ interface OrderItem {
     id: string
     name: string | null
     price: number | null
+    final_price: number | null
     sku: string | null
     barcode: string | null
   } | null
@@ -38,6 +39,7 @@ interface GuestCheckoutItem {
     id: string
     name: string | null
     price: number | null
+    final_price: number | null
     sku: string | null
     barcode: string | null
   } | null
@@ -63,6 +65,7 @@ interface OrderData {
   bonuses_spent: number
   customer_name: string | null
   customer_phone: string | null
+  comment: string | null
   profile: OrderProfile | null
   order_items: OrderItem[]
 }
@@ -79,6 +82,7 @@ interface GuestCheckoutData {
   guest_email: string | null
   status: string
   source: 'online' | 'offline' | null
+  comment: string | null
   guest_checkout_items: GuestCheckoutItem[]
 }
 
@@ -149,13 +153,13 @@ Deno.serve(async (req) => {
         .from('guest_checkouts')
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
-          delivery_address, guest_name, guest_phone, guest_email, status, source,
+          delivery_address, guest_name, guest_phone, guest_email, status, source, comment,
           guest_checkout_items(
             quantity, 
             product_id,
             price_per_item,
             product:products(
-              id, name, price, sku, barcode
+              id, name, price, final_price, sku, barcode
             )
           )
         `)
@@ -189,6 +193,7 @@ Deno.serve(async (req) => {
           user_id: null,
           bonuses_awarded: 0, // У гостей нет бонусов
           bonuses_spent: 0,   // У гостей нет бонусов
+          comment: guestData.comment,
           profile: null,
           order_items: guestData.guest_checkout_items.map(item => ({
             quantity: item.quantity,
@@ -207,12 +212,12 @@ Deno.serve(async (req) => {
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
-          customer_name, customer_phone,
+          customer_name, customer_phone, comment,
           order_items(
             quantity,
             product_id,
             product:products(
-              id, name, price, sku, barcode
+              id, name, price, final_price, sku, barcode
             )
           )
         `)
@@ -385,7 +390,7 @@ Deno.serve(async (req) => {
       if (!product) return
 
       const productName = escapeMarkdown(product.name) || 'Неизвестный товар'
-      const productPrice = product.price || 0
+      const productPrice = product.final_price || product.price || 0
 
       // Формируем текст с артикулом/штрихкодом
       let itemText = `• ${productName}\n`
@@ -455,6 +460,10 @@ Deno.serve(async (req) => {
       const city = escapeMarkdown(typedOrderData.delivery_address.city)
       const line1 = escapeMarkdown(typedOrderData.delivery_address.line1)
       messageText += `*Адрес:* ${city}, ${line1}\n`
+    }
+
+    if (typedOrderData.comment) {
+      messageText += `*Комментарий:* ${escapeMarkdown(typedOrderData.comment)}\n`
     }
 
     messageText += `\n_Статус: ${typedOrderData.status}_`
