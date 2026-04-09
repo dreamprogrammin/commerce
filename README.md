@@ -79,3 +79,7 @@ Check out the [deployment documentation](https://nuxt.com/docs/getting-started/d
 - [Система контейнеров (Variants)](./docs/VARIANTS.md)
 - [Оптимизация изображений](./docs/IMAGES.md)
 - [Настройка Vue Query для кэширования](./docs/VUE_QUERY_SETUP.md)
+- **[SEO оптимизация изображений - ПОЛНАЯ ДОКУМЕНТАЦИЯ](./docs/IMAGE_SEO_COMPLETE.md)** ⭐
+  - [Быстрый старт (2 минуты)](./docs/IMAGE_SEO_QUICKSTART.md)
+  - [Чеклист внедрения](./docs/IMAGE_SEO_CHECKLIST.md)
+  - [Финальный чеклист](./docs/IMAGE_SEO_FINAL_CHECKLIST.md)

@@ -2,14 +2,19 @@
 import type { ProductImageRow } from '@/types'
 import { X, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useSeoAltText } from '@/composables/useSeoAltText'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const props = defineProps<{
   images: ProductImageRow[]
+  productName?: string
+  brandName?: string
+  lineName?: string
 }>()
 
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const { generateProductImageAlt } = useSeoAltText()
 const { images: imagesRef } = toRefs(props)
 
 const {
@@ -93,6 +98,32 @@ function getImageVariants(imagePath: string) {
     lg: getVariantUrl(BUCKET_NAME_PRODUCT, imagePath, 'lg'),
   }
 }
+
+/**
+ * Получить SEO-оптимизированный alt текст для изображения
+ * Использует alt_text из БД, если есть, иначе генерирует на лету
+ */
+function getImageAlt(image: ProductImageRow, index: number): string {
+  // Если в БД есть качественный alt_text - используем его
+  if (image.alt_text && !image.alt_text.includes('Изображение товара')) {
+    return image.alt_text
+  }
+
+  // Иначе генерируем на лету
+  if (props.productName) {
+    return generateProductImageAlt({
+      productName: props.productName,
+      brandName: props.brandName,
+      lineName: props.lineName,
+      index,
+      totalImages: props.images.length,
+    })
+  }
+
+  // Fallback
+  return `Изображение товара ${index + 1}`
+}
+
 </script>
 
 <template>
@@ -122,7 +153,7 @@ function getImageVariants(imagePath: string) {
               <ProgressiveImage
                 :src="getThumbUrl(image.image_url)"
                 :blur-data-url="image.blur_placeholder"
-                :alt="image.alt_text || `Изображение товара ${index + 1}`"
+                :alt="getImageAlt(image, index)"
                 object-fit="cover"
                 :placeholder-type="image.blur_placeholder ? 'lqip' : 'shimmer'"
               />
@@ -154,7 +185,7 @@ function getImageVariants(imagePath: string) {
                 :src-lg="getImageVariants(image.image_url).lg"
                 sizes="(max-width: 1024px) 100vw, 80vw"
                 :blur-data-url="image.blur_placeholder"
-                :alt="image.alt_text || `Изображение товара ${index + 1}`"
+                :alt="getImageAlt(image, index)"
                 object-fit="contain"
                 :placeholder-type="image.blur_placeholder ? 'lqip' : 'shimmer'"
                 :eager="index === 0"
@@ -222,7 +253,7 @@ function getImageVariants(imagePath: string) {
             >
               <img
                 :src="getFullUrl(image.image_url) || undefined"
-                :alt="image.alt_text || `Изображение товара ${index + 1}`"
+                :alt="getImageAlt(image, index)"
                 class="max-w-full max-h-full object-contain select-none"
                 draggable="false"
               >

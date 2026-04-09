@@ -82,6 +82,29 @@ function getVariantUrls(index: number) {
 }
 
 /**
+ * SEO-оптимизированный alt текст для изображений
+ */
+function getImageAlt(index: number): string {
+  const parts = [props.product.name];
+  
+  if (props.product.brands?.name) {
+    parts.unshift(props.product.brands.name);
+  }
+  
+  if (props.product.product_line_name) {
+    parts.push(props.product.product_line_name);
+  }
+  
+  if (index === 0) {
+    parts.push("купить в Казахстане");
+  } else {
+    parts.push(`фото ${index + 1}`);
+  }
+  
+  return parts.join(" ");
+}
+
+/**
  * Получить URL логотипа бренда
  */
 function getBrandLogoUrl(): string | null {
@@ -200,7 +223,7 @@ const priceDetails = computed(() => {
               :src-md="getVariantUrls(activeImageIndex).md"
               :src-lg="getVariantUrls(activeImageIndex).lg"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              :alt="`${product.name} - фото ${activeImageIndex + 1}`"
+              :alt="getImageAlt(activeImageIndex)"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="lqip"
@@ -239,7 +262,7 @@ const priceDetails = computed(() => {
                     :src-md="getVariantUrls(index).md"
                     :src-lg="getVariantUrls(index).lg"
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    :alt="`${product.name} - фото ${index + 1}`"
+                    :alt="getImageAlt(index)"
                     aspect-ratio="1/1"
                     object-fit="contain"
                     placeholder-type="lqip"
@@ -261,7 +284,7 @@ const priceDetails = computed(() => {
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
-              :alt="`${product.name} - фото 1`"
+              :alt="getImageAlt(0)"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"
@@ -286,7 +309,7 @@ const priceDetails = computed(() => {
             <ProgressiveImage
               v-if="activeImageUrl"
               :src="activeImageUrl"
-              :alt="`${product.name} - фото 1`"
+              :alt="getImageAlt(0)"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"

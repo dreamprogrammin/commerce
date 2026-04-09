@@ -40,6 +40,7 @@ const navLinks = [
   { to: '/admin/products', label: 'Управление товарами' },
   { to: '/admin/brands', label: 'Добавление бренда' },
   { to: '/admin/brand-seo', label: 'SEO: Бренд + Категория' },
+  { to: '/admin/image-seo', label: 'SEO: Alt-тексты изображений' },
   { to: '/admin/attributes', label: 'Управление атрибутами' },
   { to: '/admin/banners', label: 'Управление банерами' },
   { to: '/admin/questions', label: 'Вопросы', badge: () => adminQuestionsStore.unansweredCount },

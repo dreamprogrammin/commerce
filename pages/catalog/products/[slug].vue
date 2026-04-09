@@ -898,6 +898,9 @@ watchEffect(() => {
                     product.product_images && product.product_images.length > 0
                   "
                   :images="product.product_images"
+                  :product-name="product.name"
+                  :brand-name="product.brands?.name"
+                  :line-name="product.product_lines?.name"
                 />
                 <div
                   v-else
