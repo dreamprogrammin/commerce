@@ -874,12 +874,15 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div class="bg-background">
-    <div :class="`${containerClass} py-4 lg:py-6`">
-      <ClientOnly>
-        <ProductDetailSkeleton v-if="isLoading" />
+  <!-- Instagram-style drawer для аксессуаров на мобилке -->
+  <DrawerInstagram v-model="isAccessoriesDrawerOpen" drawer-height="70vh">
+    <template #content>
+      <div class="bg-background">
+        <div :class="`${containerClass} py-4 lg:py-6`">
+          <ClientOnly>
+            <ProductDetailSkeleton v-if="isLoading" />
 
-        <div v-else-if="product">
+            <div v-else-if="product">
           <!-- Breadcrumbs с кнопкой избранного -->
           <div class="flex items-center justify-between mb-4">
             <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
@@ -1681,11 +1684,8 @@ watchEffect(() => {
         </template>
       </ProductCarousel>
     </div>
-
-    <!-- Instagram-style drawer для аксессуаров на мобилке -->
-    <DrawerInstagram v-model="isAccessoriesDrawerOpen" drawer-height="70vh">
-      <template #content>
-        <!-- Основной контент страницы -->
+          </div>
+        </div>
       </template>
       
       <template #drawer>
@@ -1700,7 +1700,6 @@ watchEffect(() => {
         </div>
       </template>
     </DrawerInstagram>
-  </div>
 </template>
 
 <style scoped>
