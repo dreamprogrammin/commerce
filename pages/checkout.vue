@@ -316,6 +316,7 @@ async function placeOrder() {
       : undefined,
     contactPhone: isLoggedIn.value ? formattedPhone : undefined,
     comment: orderForm.value.comment.trim() || undefined,
+    deliveryCost: deliveryCost.value,
   });
 
   // Очищаем промокод после успешного заказа
