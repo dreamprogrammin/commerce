@@ -213,7 +213,7 @@ const emit = defineEmits<{
 
     <!-- Mobile Drawer -->
     <Drawer v-else v-model:open="isOpen">
-      <DrawerContent class="max-h-[45vh]">
+      <DrawerContent class="max-h-[35vh]">
         <DrawerHeader class="text-left pb-2">
           <DrawerTitle
             v-if="currentConfig"
