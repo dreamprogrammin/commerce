@@ -198,11 +198,15 @@ Deno.serve(async (req) => {
 
     // Обрабатываем бонусы (ставим bonuses_activation_date)
     if (tableName === 'orders') {
-      const { error: bonusError } = await supabase.rpc('process_confirmed_order', { p_order_id: orderId })
+      const { error: bonusError } = await supabase
+        .from('orders')
+        .update({ bonuses_activation_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() })
+        .eq('id', orderId)
+        .is('bonuses_activation_date', null)
       if (bonusError) {
-        console.error('⚠️ Ошибка process_confirmed_order:', bonusError.message)
+        console.error('⚠️ Ошибка установки bonuses_activation_date:', bonusError.message)
       } else {
-        console.log('✅ Бонусы обработаны')
+        console.log('✅ bonuses_activation_date установлена')
       }
     }
 
