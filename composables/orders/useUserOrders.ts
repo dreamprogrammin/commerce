@@ -174,9 +174,9 @@ export function useUserOrders() {
     toast(`Статус заказа №${orderNumber} изменён`, {
       description: `Новый статус: ${statusLabel}`,
       action: {
-        label: 'Посмотреть',
+        label: 'Отследить',
         onClick: () => {
-          router.push(`/profile/order/${order.id}`)
+          router.push(`/order/success/${order.id}`)
         },
       },
       duration: 10000,
