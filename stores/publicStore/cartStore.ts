@@ -293,24 +293,50 @@ export const useCartStore = defineStore(
       return serverItems;
     }
 
-    // Merge при логине: локальная корзина приоритетнее
+    // Merge при логине: объединяем локальную и серверную корзины
     async function mergeOnLogin() {
       if (!user.value) return;
 
-      if (items.value.length > 0) {
-        // Локальная корзина не пустая → синхронизируем на сервер
-        await forceSyncToServer();
-      } else {
-        // Локальная корзина пустая → загружаем серверную
-        isMergingFromServer.value = true;
-        try {
-          const serverItems = await loadServerCart();
-          if (serverItems.length > 0) {
-            items.value = serverItems;
+      isMergingFromServer.value = true;
+      try {
+        const serverItems = await loadServerCart();
+
+        if (serverItems.length === 0) {
+          // Серверная корзина пустая → синхронизируем локальную на сервер
+          if (items.value.length > 0) {
+            await forceSyncToServer();
           }
-        } finally {
-          isMergingFromServer.value = false;
+          return;
         }
+
+        if (items.value.length === 0) {
+          // Локальная корзина пустая → загружаем серверную
+          items.value = serverItems;
+          return;
+        }
+
+        // Обе корзины не пустые → мерджим
+        const mergedMap = new Map<string, ICartItem>();
+
+        // Добавляем серверные товары
+        serverItems.forEach((item) => {
+          mergedMap.set(item.product.id, { ...item });
+        });
+
+        // Добавляем/суммируем локальные товары
+        items.value.forEach((localItem) => {
+          const existing = mergedMap.get(localItem.product.id);
+          if (existing) {
+            existing.quantity += localItem.quantity;
+          } else {
+            mergedMap.set(localItem.product.id, { ...localItem });
+          }
+        });
+
+        items.value = Array.from(mergedMap.values());
+        await forceSyncToServer();
+      } finally {
+        isMergingFromServer.value = false;
       }
     }
 
