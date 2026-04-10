@@ -42,27 +42,27 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bg-background border rounded-lg p-6">
-    <h3 class="text-lg font-semibold mb-6">Статус заказа</h3>
+  <div class="bg-background border rounded-lg p-4 md:p-6">
+    <h3 class="text-base md:text-lg font-semibold mb-4 md:mb-6">Статус заказа</h3>
     
-    <Stepper v-model="currentStep" orientation="vertical" class="gap-4">
+    <Stepper v-model="currentStep" orientation="vertical" class="gap-3 md:gap-4">
       <StepperItem v-slot="{ state }" :step="1">
-        <div class="flex items-start gap-4">
+        <div class="flex items-start gap-3">
           <StepperTrigger as-child>
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
+              class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-muted bg-background text-muted-foreground'
               "
             >
-              <Icon name="lucide:file-text" class="w-5 h-5" />
+              <Icon name="lucide:file-text" class="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </StepperTrigger>
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <StepperTitle
-              class="text-base"
+              class="text-sm md:text-base"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'text-foreground font-semibold'
@@ -71,109 +71,109 @@ onMounted(() => {
             >
               Заказ создан
             </StepperTitle>
-            <StepperDescription class="text-sm text-muted-foreground mt-1">
-              Ваш заказ принят в обработку
+            <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
+              Принят в обработку
             </StepperDescription>
           </div>
         </div>
       </StepperItem>
 
-      <StepperSeparator class="ml-5 h-8" />
+      <StepperSeparator class="ml-4 md:ml-5 h-6 md:h-8" />
 
       <StepperItem v-slot="{ state }" :step="2">
-        <div class="flex items-start gap-4">
+        <div class="flex items-start gap-3">
           <StepperTrigger as-child>
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
+              class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-muted bg-background text-muted-foreground'
               "
             >
-              <Icon name="lucide:check-circle" class="w-5 h-5" />
+              <Icon name="lucide:check-circle" class="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </StepperTrigger>
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <StepperTitle
-              class="text-base"
+              class="text-sm md:text-base"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'text-foreground font-semibold'
                   : 'text-muted-foreground'
               "
             >
-              Заказ подтвержден
+              Подтвержден
             </StepperTitle>
-            <StepperDescription class="text-sm text-muted-foreground mt-1">
-              Мы подтвердили ваш заказ и готовим к отправке
+            <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
+              Готовим к отправке
             </StepperDescription>
           </div>
         </div>
       </StepperItem>
 
-      <StepperSeparator class="ml-5 h-8" />
+      <StepperSeparator class="ml-4 md:ml-5 h-6 md:h-8" />
 
       <StepperItem v-slot="{ state }" :step="3">
-        <div class="flex items-start gap-4">
+        <div class="flex items-start gap-3">
           <StepperTrigger as-child>
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
+              class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-muted bg-background text-muted-foreground'
               "
             >
-              <Icon name="lucide:truck" class="w-5 h-5" />
+              <Icon name="lucide:truck" class="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </StepperTrigger>
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <StepperTitle
-              class="text-base"
+              class="text-sm md:text-base"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'text-foreground font-semibold'
                   : 'text-muted-foreground'
               "
             >
-              Заказ отправлен
+              Отправлен
             </StepperTitle>
-            <StepperDescription class="text-sm text-muted-foreground mt-1">
-              Ваш заказ в пути
+            <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
+              В пути
             </StepperDescription>
           </div>
         </div>
       </StepperItem>
 
-      <StepperSeparator class="ml-5 h-8" />
+      <StepperSeparator class="ml-4 md:ml-5 h-6 md:h-8" />
 
       <StepperItem v-slot="{ state }" :step="4">
-        <div class="flex items-start gap-4">
+        <div class="flex items-start gap-3">
           <StepperTrigger as-child>
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
+              class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-muted bg-background text-muted-foreground'
               "
             >
-              <Icon name="lucide:package-check" class="w-5 h-5" />
+              <Icon name="lucide:package-check" class="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </StepperTrigger>
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <StepperTitle
-              class="text-base"
+              class="text-sm md:text-base"
               :class="
                 state === 'completed' || state === 'active'
                   ? 'text-foreground font-semibold'
                   : 'text-muted-foreground'
               "
             >
-              Заказ доставлен
+              Доставлен
             </StepperTitle>
-            <StepperDescription class="text-sm text-muted-foreground mt-1">
+            <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
               Спасибо за покупку!
             </StepperDescription>
           </div>
