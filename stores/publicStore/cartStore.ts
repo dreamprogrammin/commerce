@@ -89,6 +89,8 @@ export const useCartStore = defineStore(
         toast.success(`"${existingItem.product.name}" (+${quantity})`);
         // 🔥 Открываем корзину при добавлении товара
         isCartOpen.value = true;
+        // 🔥 Сбрасываем бонусы при изменении корзины
+        bonusesToSpend.value = 0;
         return;
       }
 
@@ -125,6 +127,8 @@ export const useCartStore = defineStore(
           toast.success(`"${fullProduct.name}" добавлен в корзину!`);
           // 🔥 Открываем корзину при добавлении нового товара
           isCartOpen.value = true;
+          // 🔥 Сбрасываем бонусы при изменении корзины
+          bonusesToSpend.value = 0;
         } else {
           toast.error("Товар не найден");
         }
@@ -139,6 +143,8 @@ export const useCartStore = defineStore(
     function removeItem(productId: string) {
       items.value = items.value.filter((i) => i.product.id !== productId);
       toast.info("Товар удален из корзины");
+      // 🔥 Сбрасываем бонусы при изменении корзины
+      bonusesToSpend.value = 0;
     }
 
     function updateQuantity(productId: string, quantity: number) {
@@ -146,6 +152,8 @@ export const useCartStore = defineStore(
       if (item) {
         if (quantity > 0) {
           item.quantity = quantity;
+          // 🔥 Сбрасываем бонусы при изменении корзины
+          bonusesToSpend.value = 0;
         } else {
           removeItem(productId);
         }
@@ -312,6 +320,8 @@ export const useCartStore = defineStore(
         if (items.value.length === 0) {
           // Локальная корзина пустая → загружаем серверную
           items.value = serverItems;
+          // 🔥 Сбрасываем бонусы при загрузке с сервера
+          bonusesToSpend.value = 0;
           return;
         }
 
@@ -334,6 +344,8 @@ export const useCartStore = defineStore(
         });
 
         items.value = Array.from(mergedMap.values());
+        // 🔥 Сбрасываем бонусы после мерджа
+        bonusesToSpend.value = 0;
         await forceSyncToServer();
       } finally {
         isMergingFromServer.value = false;
