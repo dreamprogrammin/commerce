@@ -62,17 +62,17 @@ BEGIN
     FROM auth.users WHERE id = v_current_user_id;
 
     INSERT INTO public.profiles (
-      id, email, first_name, bonus_balance, bonus_pending_balance, created_at, updated_at
+      id, first_name, active_bonus_balance, pending_bonus_balance, created_at, updated_at
     ) VALUES (
-      v_current_user_id, v_user_email, v_user_name, 0, 0, NOW(), NOW()
+      v_current_user_id, v_user_name, 0, 0, NOW(), NOW()
     );
 
     SELECT * INTO v_user_profile FROM public.profiles WHERE id = v_current_user_id;
   END IF;
 
-  IF p_bonuses_to_spend > v_user_profile.bonus_balance THEN
+  IF p_bonuses_to_spend > v_user_profile.active_bonus_balance THEN
     RAISE EXCEPTION 'Недостаточно бонусов. Доступно: %, запрошено: %',
-      v_user_profile.bonus_balance, p_bonuses_to_spend;
+      v_user_profile.active_bonus_balance, p_bonuses_to_spend;
   END IF;
 
   IF p_promo_code IS NOT NULL AND TRIM(p_promo_code) <> '' THEN
@@ -191,10 +191,10 @@ BEGIN
   END LOOP;
 
   IF p_bonuses_to_spend > 0 THEN
-    v_new_active_balance := v_user_profile.bonus_balance - p_bonuses_to_spend;
+    v_new_active_balance := v_user_profile.active_bonus_balance - p_bonuses_to_spend;
 
     UPDATE public.profiles
-    SET bonus_balance = v_new_active_balance,
+    SET active_bonus_balance = v_new_active_balance,
         updated_at = NOW()
     WHERE id = v_current_user_id;
 
@@ -215,10 +215,10 @@ BEGIN
     );
   END IF;
 
-  v_new_pending_balance := v_user_profile.bonus_pending_balance + v_total_award_bonuses;
+  v_new_pending_balance := v_user_profile.pending_bonus_balance + v_total_award_bonuses;
 
   UPDATE public.profiles
-  SET bonus_pending_balance = v_new_pending_balance,
+  SET pending_bonus_balance = v_new_pending_balance,
       updated_at = NOW()
   WHERE id = v_current_user_id;
 
