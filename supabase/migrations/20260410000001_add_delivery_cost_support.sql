@@ -1,5 +1,6 @@
 -- Обновление функции create_user_order для поддержки delivery_cost
 DROP FUNCTION IF EXISTS public.create_user_order(JSONB, TEXT, TEXT, JSONB, INTEGER, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.create_user_order(JSONB, TEXT, TEXT, JSONB, INTEGER, TEXT, TEXT, TEXT, NUMERIC);
 
 CREATE FUNCTION public.create_user_order(
   p_cart_items       JSONB,
@@ -251,6 +252,7 @@ GRANT EXECUTE ON FUNCTION public.create_user_order(JSONB, TEXT, TEXT, JSONB, INT
 
 -- Обновление функции create_guest_checkout для поддержки delivery_cost
 DROP FUNCTION IF EXISTS public.create_guest_checkout(JSONB, JSONB, TEXT, JSONB, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.create_guest_checkout(JSONB, JSONB, TEXT, JSONB, TEXT, TEXT, NUMERIC);
 
 CREATE FUNCTION public.create_guest_checkout(
   p_cart_items      JSONB,
