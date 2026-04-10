@@ -404,7 +404,6 @@ export const useCartStore = defineStore(
             p_delivery_address: orderData.deliveryAddress,
             p_payment_method: orderData.paymentMethod,
             p_promo_code: orderData.promoCode || null,
-            p_delivery_cost: orderData.deliveryCost || 0,
           });
 
           if (error) throw error;
@@ -426,7 +425,6 @@ export const useCartStore = defineStore(
             p_promo_code: orderData.promoCode || null,
             p_contact_name: orderData.contactName || null,
             p_contact_phone: orderData.contactPhone || null,
-            p_delivery_cost: orderData.deliveryCost || 0,
           });
 
           if (error) throw error;
