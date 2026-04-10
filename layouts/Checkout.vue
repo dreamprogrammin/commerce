@@ -32,18 +32,16 @@ const currentStep = computed(() => {
                 <Icon name="lucide:shopping-cart" class="w-4 h-4 md:w-5 md:h-5" />
               </div>
             </StepperTrigger>
-            <div class="ml-2 hidden sm:block">
-              <StepperTitle
-                class="text-sm"
-                :class="
-                  state === 'completed' || state === 'active'
-                    ? 'text-foreground'
-                    : 'text-muted-foreground'
-                "
-              >
-                Корзина
-              </StepperTitle>
-            </div>
+            <StepperTitle
+              class="ml-2 text-sm hidden sm:block"
+              :class="
+                state === 'completed' || state === 'active'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground'
+              "
+            >
+              Корзина
+            </StepperTitle>
           </StepperItem>
 
           <StepperSeparator class="flex-1 mx-2 md:mx-4" />
@@ -61,18 +59,16 @@ const currentStep = computed(() => {
                 <Icon name="lucide:truck" class="w-4 h-4 md:w-5 md:h-5" />
               </div>
             </StepperTrigger>
-            <div class="ml-2 hidden sm:block">
-              <StepperTitle
-                class="text-sm"
-                :class="
-                  state === 'completed' || state === 'active'
-                    ? 'text-foreground'
-                    : 'text-muted-foreground'
-                "
-              >
-                Оформление
-              </StepperTitle>
-            </div>
+            <StepperTitle
+              class="ml-2 text-sm hidden sm:block"
+              :class="
+                state === 'completed' || state === 'active'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground'
+              "
+            >
+              Оформление
+            </StepperTitle>
           </StepperItem>
 
           <StepperSeparator class="flex-1 mx-2 md:mx-4" />
@@ -90,18 +86,16 @@ const currentStep = computed(() => {
                 <Icon name="lucide:package-check" class="w-4 h-4 md:w-5 md:h-5" />
               </div>
             </StepperTrigger>
-            <div class="ml-2 hidden sm:block">
-              <StepperTitle
-                class="text-sm"
-                :class="
-                  state === 'completed' || state === 'active'
-                    ? 'text-foreground'
-                    : 'text-muted-foreground'
-                "
-              >
-                Готово
-              </StepperTitle>
-            </div>
+            <StepperTitle
+              class="ml-2 text-sm hidden sm:block"
+              :class="
+                state === 'completed' || state === 'active'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground'
+              "
+            >
+              Готово
+            </StepperTitle>
           </StepperItem>
         </Stepper>
       </div>
