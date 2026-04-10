@@ -17,6 +17,13 @@ const statusToStep = {
 
 const currentStep = computed(() => statusToStep[orderStatus.value as keyof typeof statusToStep] || 1)
 
+const steps = [
+  { id: 1, title: 'Заказ создан', description: 'Принят в обработку', icon: 'lucide:file-text' },
+  { id: 2, title: 'Подтвержден', description: 'Готовим к отправке', icon: 'lucide:check-circle' },
+  { id: 3, title: 'Отправлен', description: 'В пути', icon: 'lucide:truck' },
+  { id: 4, title: 'Доставлен', description: 'Спасибо за покупку!', icon: 'lucide:package-check' },
+]
+
 // Подписка на изменения статуса заказа
 onMounted(() => {
   const channel = supabase
@@ -45,124 +52,44 @@ onMounted(() => {
   <div class="bg-background border rounded-lg p-4 md:p-6">
     <h3 class="text-base md:text-lg font-semibold mb-4 md:mb-6">Статус заказа</h3>
     
-    <Stepper v-model="currentStep" orientation="vertical" class="gap-3 md:gap-4">
-      <StepperItem v-slot="{ state }" :step="1">
-        <StepperTrigger as-child>
+    <div class="space-y-4">
+      <div v-for="(step, index) in steps" :key="step.id" class="flex gap-4">
+        <!-- Icon & Line -->
+        <div class="flex flex-col items-center">
           <div
             class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
             :class="
-              state === 'completed' || state === 'active'
+              currentStep >= step.id
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-muted bg-background text-muted-foreground'
             "
           >
-            <Icon name="lucide:file-text" class="w-4 h-4 md:w-5 md:h-5" />
+            <Icon :name="step.icon" class="w-4 h-4 md:w-5 md:h-5" />
           </div>
-        </StepperTrigger>
-        <StepperTitle
-          class="text-sm md:text-base"
-          :class="
-            state === 'completed' || state === 'active'
-              ? 'text-foreground font-semibold'
-              : 'text-muted-foreground'
-          "
-        >
-          Заказ создан
-        </StepperTitle>
-        <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
-          Принят в обработку
-        </StepperDescription>
-      </StepperItem>
-
-      <StepperSeparator />
-
-      <StepperItem v-slot="{ state }" :step="2">
-        <StepperTrigger as-child>
           <div
-            class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
+            v-if="index < steps.length - 1"
+            class="w-0.5 h-12 mt-2"
+            :class="currentStep > step.id ? 'bg-primary' : 'bg-muted'"
+          />
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 pb-4">
+          <h4
+            class="text-sm md:text-base font-semibold"
             :class="
-              state === 'completed' || state === 'active'
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-muted bg-background text-muted-foreground'
+              currentStep >= step.id
+                ? 'text-foreground'
+                : 'text-muted-foreground'
             "
           >
-            <Icon name="lucide:check-circle" class="w-4 h-4 md:w-5 md:h-5" />
-          </div>
-        </StepperTrigger>
-        <StepperTitle
-          class="text-sm md:text-base"
-          :class="
-            state === 'completed' || state === 'active'
-              ? 'text-foreground font-semibold'
-              : 'text-muted-foreground'
-          "
-        >
-          Подтвержден
-        </StepperTitle>
-        <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
-          Готовим к отправке
-        </StepperDescription>
-      </StepperItem>
-
-      <StepperSeparator />
-
-      <StepperItem v-slot="{ state }" :step="3">
-        <StepperTrigger as-child>
-          <div
-            class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
-            :class="
-              state === 'completed' || state === 'active'
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-muted bg-background text-muted-foreground'
-            "
-          >
-            <Icon name="lucide:truck" class="w-4 h-4 md:w-5 md:h-5" />
-          </div>
-        </StepperTrigger>
-        <StepperTitle
-          class="text-sm md:text-base"
-          :class="
-            state === 'completed' || state === 'active'
-              ? 'text-foreground font-semibold'
-              : 'text-muted-foreground'
-          "
-        >
-          Отправлен
-        </StepperTitle>
-        <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
-          В пути
-        </StepperDescription>
-      </StepperItem>
-
-      <StepperSeparator />
-
-      <StepperItem v-slot="{ state }" :step="4">
-        <StepperTrigger as-child>
-          <div
-            class="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border-2 transition-all flex-shrink-0"
-            :class="
-              state === 'completed' || state === 'active'
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-muted bg-background text-muted-foreground'
-            "
-          >
-            <Icon name="lucide:package-check" class="w-4 h-4 md:w-5 md:h-5" />
-          </div>
-        </StepperTrigger>
-        <StepperTitle
-          class="text-sm md:text-base"
-          :class="
-            state === 'completed' || state === 'active'
-              ? 'text-foreground font-semibold'
-              : 'text-muted-foreground'
-          "
-        >
-          Доставлен
-        </StepperTitle>
-        <StepperDescription class="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">
-          Спасибо за покупку!
-        </StepperDescription>
-      </StepperItem>
-    </Stepper>
+            {{ step.title }}
+          </h4>
+          <p class="text-xs md:text-sm text-muted-foreground mt-0.5">
+            {{ step.description }}
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
