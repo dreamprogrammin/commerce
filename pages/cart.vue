@@ -3,6 +3,8 @@ import type { ProductWithImages } from "@/types";
 import { Trash2 } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { toast } from "vue-sonner";
+
+definePageMeta({ layout: "checkout" });
 import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
 import { useFlipCounter } from "@/composables/useFlipCounter";
 import { BUCKET_NAME_PRODUCT } from "@/constants";

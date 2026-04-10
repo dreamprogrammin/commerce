@@ -14,6 +14,8 @@ import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 
+definePageMeta({ layout: 'checkout' })
+
 // SEO: Закрываем страницу успешного заказа от индексации
 useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
@@ -231,6 +233,14 @@ onMounted(async () => {
         </Button>
       </CardContent>
     </Card>
+
+    <!-- ✅ Order Tracker с realtime обновлениями -->
+    <OrderTracker
+      v-if="isAuthenticated && orderStatus"
+      :order-id="fullOrderId"
+      :initial-status="orderStatus"
+      class="mb-6"
+    />
 
     <!-- Telegram баннер -->
     <ClientOnly>

@@ -18,6 +18,8 @@ import { useCartStore } from "@/stores/publicStore/cartStore";
 import { usePromoCodeStore } from "@/stores/publicStore/promoCodeStore";
 import { formatPrice } from "@/utils/formatPrice";
 
+definePageMeta({ layout: "checkout" });
+
 // SEO: Закрываем страницу оформления заказа от индексации
 useHead({
   meta: [{ name: "robots", content: "noindex, nofollow" }],
