@@ -99,6 +99,9 @@ export type Database = {
           image_url: string | null
           is_active: boolean
           placement: string
+          seo_description: string | null
+          seo_keywords: string[] | null
+          seo_title: string | null
           title: string
           updated_at: string
         }
@@ -111,6 +114,9 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           placement?: string
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          seo_title?: string | null
           title: string
           updated_at?: string
         }
@@ -123,6 +129,9 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           placement?: string
+          seo_description?: string | null
+          seo_keywords?: string[] | null
+          seo_title?: string | null
           title?: string
           updated_at?: string
         }
