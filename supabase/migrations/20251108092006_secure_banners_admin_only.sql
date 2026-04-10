@@ -1,12 +1,7 @@
--- Создание бакета для изображений баннеров
+-- Создание бакета для изображений баннеров (если не существует)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'banners',
-  'banners',
-  true, -- публичный доступ к файлам для чтения
-  5242880, -- лимит 5MB на файл
-  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-);
+SELECT 'banners', 'banners', true, 5242880, ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'banners');
 
 -- Политика: Все могут читать файлы из бакета
 CREATE POLICY "Public read access for banners"
