@@ -1,5 +1,5 @@
 -- ============================================
--- STORAGE: Удаление старых политик и бакета
+-- STORAGE: Удаление старых политик
 -- ============================================
 
 DROP POLICY IF EXISTS "Public read access for banners" ON storage.objects;
@@ -11,20 +11,13 @@ DROP POLICY IF EXISTS "Only admins can upload banners" ON storage.objects;
 DROP POLICY IF EXISTS "Only admins can update banners" ON storage.objects;
 DROP POLICY IF EXISTS "Only admins can delete banners" ON storage.objects;
 
-DELETE FROM storage.buckets WHERE id = 'banners';
-
 -- ============================================
--- STORAGE: Создание бакета
+-- STORAGE: Создание бакета (если не существует)
 -- ============================================
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'banners',
-  'banners',
-  true,
-  5242880,
-  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-);
+SELECT 'banners', 'banners', true, 5242880, ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'banners');
 
 -- ============================================
 -- STORAGE: Политики для бакета
