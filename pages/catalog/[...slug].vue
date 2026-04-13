@@ -141,6 +141,7 @@ const numericAttributeRanges = ref<
 const accumulatedProducts = ref<CatalogProduct[]>([])
 const isMobileFiltersOpen = ref(false)
 const isSubcategoriesDrawerOpen = ref(false)
+const isSeoTextExpanded = ref(false)
 
 interface ActiveFilters {
   sortBy: SortByType
@@ -1007,6 +1008,12 @@ const seoText = computed(() => {
 
   const text = currentCategory.value?.seo_text
   return text ? sanitizeHtml(text) : null
+})
+
+const seoBlocks = computed(() => {
+  if (!seoText.value)
+    return []
+  return parseHTMLToBlocks(seoText.value)
 })
 
 const robotsRule = computed(() => {
@@ -1993,6 +2000,13 @@ useSchemaOrg(
         </Transition>
       </div>
     </div>
+
+    <!-- SEO текст категории -->
+    <SEOContentRenderer
+      v-if="seoBlocks.length > 0 && !hasActiveFilters"
+      :blocks="seoBlocks"
+      class="mt-8"
+    />
 
     <!-- FAQ блок для категории -->
     <ClientOnly>
