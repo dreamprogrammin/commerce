@@ -1410,7 +1410,7 @@ useSchemaOrg(
 
     <!-- Блок с картинкой и описанием категории -->
     <div
-      v-if="currentCategory && currentCategory.description"
+      v-if="currentCategory && (currentCategory.description || seoText)"
       class="bg-white dark:bg-card rounded-xl p-4 lg:p-8 mb-6 lg:mb-8 border shadow-sm"
     >
       <!-- Мобильная версия (компактная) -->
@@ -1456,9 +1456,19 @@ useSchemaOrg(
         />
 
         <!-- Описание (обрезанное) -->
-        <p class="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+        <p
+          v-if="currentCategory.description"
+          class="text-sm text-muted-foreground leading-relaxed line-clamp-2"
+        >
           {{ currentCategory.description }}
         </p>
+
+        <!-- SEO текст (HTML) -->
+        <div
+          v-else-if="seoText"
+          class="text-sm text-muted-foreground leading-relaxed line-clamp-2 prose prose-sm max-w-none"
+          v-html="seoText"
+        />
 
         <!-- Компактная статистика -->
         <div class="flex items-center gap-3 text-xs text-muted-foreground">
@@ -1543,6 +1553,13 @@ useSchemaOrg(
           >
             {{ currentCategory.description }}
           </p>
+
+          <!-- SEO текст (HTML) -->
+          <div
+            v-else-if="seoText"
+            class="text-base text-muted-foreground leading-relaxed prose max-w-none"
+            v-html="seoText"
+          />
 
           <!-- Статистика категории -->
           <div class="flex flex-wrap gap-4 pt-2">
