@@ -1011,7 +1011,7 @@ const seoText = computed(() => {
 })
 
 const seoBlocks = computed(() => {
-  if (!seoText.value)
+  if (!seoText.value || import.meta.server)
     return []
   return parseHTMLToBlocks(seoText.value)
 })
@@ -2002,11 +2002,13 @@ useSchemaOrg(
     </div>
 
     <!-- SEO текст категории -->
-    <SEOContentRenderer
-      v-if="seoBlocks.length > 0 && !hasActiveFilters"
-      :blocks="seoBlocks"
-      class="mt-8"
-    />
+    <ClientOnly>
+      <SEOContentRenderer
+        v-if="seoBlocks.length > 0 && !hasActiveFilters"
+        :blocks="seoBlocks"
+        class="mt-8"
+      />
+    </ClientOnly>
 
     <!-- FAQ блок для категории -->
     <ClientOnly>
