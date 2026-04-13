@@ -24,6 +24,7 @@ export const useCartStore = defineStore(
     const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
     const isMergingFromServer = ref(false); // Блокирует sync→server пока грузим данные с сервера
     const isCartOpen = ref(false); // 🔥 Управление состоянием шторки корзины
+    const hasMergedOnLogin = ref(false); // Флаг для предотвращения повторного мерджа
 
     const totalItems = computed(() =>
       items.value.reduce((sum: number, item) => sum + item.quantity, 0),
@@ -303,9 +304,10 @@ export const useCartStore = defineStore(
 
     // Merge при логине: объединяем локальную и серверную корзины
     async function mergeOnLogin() {
-      if (!user.value) return;
+      if (!user.value || hasMergedOnLogin.value) return;
 
       isMergingFromServer.value = true;
+      hasMergedOnLogin.value = true;
       try {
         const serverItems = await loadServerCart();
 
@@ -358,6 +360,7 @@ export const useCartStore = defineStore(
         clearTimeout(syncTimeout.value);
         syncTimeout.value = null;
       }
+      hasMergedOnLogin.value = false; // Сбрасываем флаг при логауте
     }
 
     watch([items, () => items.value.map((i) => i.quantity)], syncToServer, {
