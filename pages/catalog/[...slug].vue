@@ -1001,10 +1001,8 @@ const metaKeywords = computed(() => {
 })
 
 const seoText = computed(() => {
-  if (activeBrand.value) {
-    return categoryBrandSeo.value?.seo_text
-      ? sanitizeHtml(categoryBrandSeo.value.seo_text)
-      : null
+  if (activeBrand.value && categoryBrandSeo.value?.seo_text) {
+    return sanitizeHtml(categoryBrandSeo.value.seo_text)
   }
 
   const text = currentCategory.value?.seo_text
