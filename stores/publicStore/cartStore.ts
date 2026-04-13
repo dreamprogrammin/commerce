@@ -327,25 +327,8 @@ export const useCartStore = defineStore(
           return;
         }
 
-        // Обе корзины не пустые → мерджим
-        const mergedMap = new Map<string, ICartItem>();
-
-        // Добавляем серверные товары
-        serverItems.forEach((item) => {
-          mergedMap.set(item.product.id, { ...item });
-        });
-
-        // Добавляем/суммируем локальные товары
-        items.value.forEach((localItem) => {
-          const existing = mergedMap.get(localItem.product.id);
-          if (existing) {
-            existing.quantity += localItem.quantity;
-          } else {
-            mergedMap.set(localItem.product.id, { ...localItem });
-          }
-        });
-
-        items.value = Array.from(mergedMap.values());
+        // Обе корзины не пустые → берем серверную как источник истины
+        items.value = serverItems;
         // 🔥 Сбрасываем бонусы после мерджа
         bonusesToSpend.value = 0;
         await forceSyncToServer();
