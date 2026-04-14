@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
         const match = url.match(/\/storage\/v1\/object\/(sign|authenticated)\/([^?]+)/)
         if (match) {
           const bucketAndPath = match[2]
-          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketAndPath}`
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketAndPath}_lg.webp`
           console.log(`   🔄 Преобразован signed URL в: ${publicUrl}`)
           return publicUrl
         }
@@ -316,7 +316,7 @@ Deno.serve(async (req) => {
         const match = url.match(/\/storage\/v1\/object\/[^/]+\/(.+)/)
         if (match) {
           const bucketAndPath = match[1].split('?')[0]
-          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketAndPath}`
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketAndPath}_lg.webp`
           console.log(`   🔄 Преобразован URL в: ${publicUrl}`)
           return publicUrl
         }
@@ -324,9 +324,9 @@ Deno.serve(async (req) => {
         return url
       }
       
-      // Если это относительный путь
+      // Если это относительный путь - добавляем _lg.webp
       const cleanPath = url.startsWith('/') ? url.slice(1) : url
-      const publicUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${cleanPath}`
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${cleanPath}_lg.webp`
       console.log(`   🔄 Создан публичный URL: ${publicUrl}`)
       return publicUrl
     }
@@ -533,46 +533,37 @@ Deno.serve(async (req) => {
       console.log(`   Доступных изображений: ${validImages.length}`)
 
       if (validImages.length > 0) {
-        const mediaGroup = validImages.map((item, idx) => ({
-          type: 'photo',
-          media: item.imageUrl,
-          caption: idx === 0 ? messageText : undefined,
-          parse_mode: idx === 0 ? 'Markdown' : undefined
-        }))
-
-        const mediaResponse = await fetch(
-          `https://api.telegram.org/bot${botToken}/sendMediaGroup`,
+        // Отправляем только первое изображение с текстом и кнопками
+        const photoResponse = await fetch(
+          `https://api.telegram.org/bot${botToken}/sendPhoto`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: chatId,
-              media: mediaGroup
+              photo: validImages[0].imageUrl,
+              caption: messageText,
+              parse_mode: 'Markdown',
+              reply_markup: inlineKeyboard
             }),
           }
         )
 
-        if (!mediaResponse.ok) {
-          const errorBody = await mediaResponse.json()
-          console.error('❌ Ошибка отправки медиа-группы:', errorBody)
-          // Fallback на обычное сообщение
+        if (!photoResponse.ok) {
+          const errorBody = await photoResponse.json()
+          console.error('❌ Ошибка отправки фото:', errorBody)
+          // Fallback на текстовое сообщение
           const textResponse = await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
           const textResult = await textResponse.json()
           telegramMessageId = textResult.result?.message_id || null
         } else {
-          console.log('✅ Медиа-группа отправлена')
-          const mediaResult = await mediaResponse.json()
-          console.log(`📊 Медиа-группа: message_id = ${mediaResult.result?.[0]?.message_id}`)
-
-          // Отправляем кнопки отдельным сообщением
-          const buttonsResponse = await sendTextMessage(botToken, chatId, 'Управление заказом:', inlineKeyboard)
-          const buttonsResult = await buttonsResponse.json()
-          // ВАЖНО: Сохраняем message_id от сообщения с кнопками, а не от медиа-группы!
-          telegramMessageId = buttonsResult.result?.message_id || null
-          console.log(`🔘 Сообщение с кнопками: message_id = ${telegramMessageId}`)
+          console.log('✅ Фото с кнопками отправлено')
+          const photoResult = await photoResponse.json()
+          telegramMessageId = photoResult.result?.message_id || null
+          console.log(`📸 message_id = ${telegramMessageId}`)
         }
       } else {
-        console.log('📝 Нет доступных изображений, отправка текстового сообщения')
+        console.log('📝 Нет изображений, отправка текстового сообщения')
         const textResponse = await sendTextMessage(botToken, chatId, messageText, inlineKeyboard)
         const textResult = await textResponse.json()
         telegramMessageId = textResult.result?.message_id || null
