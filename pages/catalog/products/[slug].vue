@@ -26,6 +26,7 @@ import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsS
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
+import { parseHTMLToBlocks } from '@/utils/parseHTMLToBlocks'
 
 const route = useRoute()
 const router = useRouter()
@@ -600,6 +601,11 @@ const robotsRule = computed(() => {
     return { noindex: true, follow: true }
 
   return { index: true, follow: true }
+})
+
+const seoBlocks = computed(() => {
+  if (!product.value?.seo_content) return []
+  return parseHTMLToBlocks(product.value.seo_content)
 })
 
 useRobotsRule(robotsRule)
@@ -1536,6 +1542,10 @@ watchEffect(() => {
             <!-- Вопросы и ответы -->
             <div class="lg:col-span-7">
               <ProductQuestions v-if="product.id" :product-id="product.id" />
+            </div>
+            <!-- SEO контент -->
+            <div v-if="seoBlocks.length" class="lg:col-span-7">
+              <ProductSEOContentRenderer :blocks="seoBlocks" />
             </div>
           </div>
         </div>
