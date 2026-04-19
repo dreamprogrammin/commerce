@@ -17,6 +17,7 @@ import {
 } from "@/constants";
 import { carouselContainerVariants } from "@/lib/variants";
 import { formatRating } from "@/utils/formatRating";
+import { parseHTMLToBlocks } from '@/utils/parseHTMLToBlocks'
 
 const route = useRoute();
 const supabase = useSupabaseClient();
@@ -215,6 +216,26 @@ const ogImageSrc = computed(
   () => lineLogoUrl.value || brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
 );
 
+const seoBlocks = computed(() => {
+  if (!productLine.value?.seo_content) return []
+  return parseHTMLToBlocks(productLine.value.seo_content)
+})
+
+// Извлекаем текст из seo_content для Schema.org
+const seoContentText = computed(() => {
+  if (!seoBlocks.value.length) return ''
+  return seoBlocks.value
+    .map(block => {
+      if (block.type === 'ul') {
+        return block.items.map(item => item.text).join(' ')
+      }
+      return block.text
+    })
+    .filter(Boolean)
+    .join(' ')
+    .substring(0, 300)
+})
+
 defineOgImage({
   url: ogImageSrc.value,
   width: 1200,
@@ -263,7 +284,7 @@ useHead({
               "@id": `${pageUrl.value}#brand`,
               // FIX: чистое название линейки без дублирования
               name: productLine.value.name,
-              description: metaDescription.value,
+              description: seoContentText.value || metaDescription.value,
               url: pageUrl.value,
               // FIX: Hero Image через getVariantUrl(..., 'md')
               ...(lineLogoUrl.value && {
@@ -837,6 +858,11 @@ useRobotsRule({ index: true, follow: true });
             {{ isSeoExpanded ? "Свернуть" : "Читать далее" }}
           </button>
         </div>
+      </div>
+
+      <!-- SEO контент -->
+      <div v-if="seoBlocks.length" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
+        <BrandSEOContentRenderer :blocks="seoBlocks" />
       </div>
     </div>
   </div>

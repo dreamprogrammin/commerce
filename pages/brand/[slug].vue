@@ -11,6 +11,9 @@ import {
 import { carouselContainerVariants } from "@/lib/variants";
 import { useProductsStore } from "@/stores/publicStore/productsStore";
 
+import { formatPrice } from '@/utils/formatPrice'
+import { parseHTMLToBlocks } from '@/utils/parseHTMLToBlocks'
+
 const route = useRoute();
 const supabase = useSupabaseClient();
 const productsStore = useProductsStore();
@@ -184,6 +187,26 @@ const ogImageSrc = computed(
   () => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
 );
 
+const seoBlocks = computed(() => {
+  if (!brand.value?.seo_content) return []
+  return parseHTMLToBlocks(brand.value.seo_content)
+})
+
+// Извлекаем текст из seo_content для Schema.org
+const seoContentText = computed(() => {
+  if (!seoBlocks.value.length) return ''
+  return seoBlocks.value
+    .map(block => {
+      if (block.type === 'ul') {
+        return block.items.map(item => item.text).join(' ')
+      }
+      return block.text
+    })
+    .filter(Boolean)
+    .join(' ')
+    .substring(0, 300)
+})
+
 defineOgImage({
   url: ogImageSrc.value,
   width: 1200,
@@ -229,7 +252,7 @@ useHead({
               "@type": "Brand",
               "@id": `${brandUrl.value}#brand`,
               name: brand.value.name, // FIX: чистое название без дублирования
-              description: metaDescription.value,
+              description: seoContentText.value || metaDescription.value,
               url: brandUrl.value,
               logo: brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
               image: brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
@@ -492,6 +515,7 @@ useRobotsRule({ index: true, follow: true });
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
+        :seo-blocks="seoBlocks"
       />
     </div>
   </div>
