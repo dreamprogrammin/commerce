@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner'
 import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import ProductDescription from '@/components/product/ProductDescription.vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
+import SEOContentRenderer from '@/components/product/SEOContentRenderer.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
 import { useFlipCounter } from '@/composables/useFlipCounter'
@@ -1545,7 +1546,7 @@ watchEffect(() => {
             </div>
             <!-- SEO контент -->
             <div v-if="seoBlocks.length" class="lg:col-span-7">
-              <ProductSEOContentRenderer :blocks="seoBlocks" />
+              <SEOContentRenderer :blocks="seoBlocks" />
             </div>
           </div>
         </div>
