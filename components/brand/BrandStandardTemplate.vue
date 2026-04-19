@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BrandFilterState } from "@/composables/useBrandPageFilters";
 import type { Brand, IBreadcrumbItem, ProductLine } from "@/types";
-import type { SEOBlock } from '~/utils/parseHTMLToBlocks'
+import type { SEOBlock } from '~/utils/parseSEOContent'
 import {
   ArrowLeft,
   ChevronDown,

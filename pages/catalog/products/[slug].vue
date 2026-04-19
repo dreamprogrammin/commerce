@@ -26,7 +26,7 @@ import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsS
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
-import { parseHTMLToBlocks } from '@/utils/parseHTMLToBlocks'
+import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 
 const route = useRoute()
 const router = useRouter()

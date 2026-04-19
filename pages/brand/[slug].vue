@@ -12,7 +12,7 @@ import { carouselContainerVariants } from "@/lib/variants";
 import { useProductsStore } from "@/stores/publicStore/productsStore";
 
 import { formatPrice } from '@/utils/formatPrice'
-import { parseHTMLToBlocks } from '@/utils/parseHTMLToBlocks'
+import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 
 const route = useRoute();
 const supabase = useSupabaseClient();
