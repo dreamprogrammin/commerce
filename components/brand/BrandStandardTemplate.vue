@@ -319,8 +319,5 @@ function toggleSeoExpanded() {
         </button>
       </div>
     </div>
-
-    <!-- SEO контент -->
-    <BrandSEOContentRenderer v-if="seoBlocks?.length" :blocks="seoBlocks" />
   </div>
 </template>

@@ -506,6 +506,15 @@ useRobotsRule({ index: true, follow: true });
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
       />
+
+      <!-- SEO контент -->
+      <ClientOnly>
+        <BrandSEOContentRenderer
+          v-if="seoBlocks.length > 0"
+          :blocks="seoBlocks"
+          class="mt-8"
+        />
+      </ClientOnly>
     </div>
 
     <!-- Стандартный шаблон -->
@@ -517,6 +526,15 @@ useRobotsRule({ index: true, follow: true });
         :filter-state="filterState"
         :seo-blocks="seoBlocks"
       />
+
+      <!-- SEO контент -->
+      <ClientOnly>
+        <BrandSEOContentRenderer
+          v-if="seoBlocks.length > 0"
+          :blocks="seoBlocks"
+          class="mt-8"
+        />
+      </ClientOnly>
     </div>
   </div>
 </template>

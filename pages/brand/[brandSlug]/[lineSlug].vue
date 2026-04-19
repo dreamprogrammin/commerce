@@ -861,9 +861,13 @@ useRobotsRule({ index: true, follow: true });
       </div>
 
       <!-- SEO контент -->
-      <div v-if="seoBlocks.length" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
-        <BrandSEOContentRenderer :blocks="seoBlocks" />
-      </div>
+      <ClientOnly>
+        <BrandSEOContentRenderer
+          v-if="seoBlocks.length > 0"
+          :blocks="seoBlocks"
+          class="mt-6 md:mt-12 border-t pt-4 md:pt-8"
+        />
+      </ClientOnly>
     </div>
   </div>
 </template>
