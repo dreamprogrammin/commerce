@@ -82,6 +82,11 @@ const { data: brand, pending: brandPending } = await useAsyncData(
   },
 );
 
+// 🔥 301 редирект для несуществующего бренда (защита SEO)
+if (!brand.value && !brandPending.value) {
+  throw createError({ statusCode: 404, statusMessage: 'Brand not found', fatal: true })
+}
+
 // ─── 2. Загрузка линейки ────────────────────────────────────────────────────
 const { data: productLine, pending: linePending } = await useAsyncData(
   `product-line-${brandSlug}-${lineSlug}`,
@@ -103,6 +108,11 @@ const { data: productLine, pending: linePending } = await useAsyncData(
   },
   { watch: [brand] },
 );
+
+// 🔥 301 редирект для несуществующей линейки (защита SEO)
+if (brand.value && !productLine.value && !linePending.value) {
+  throw createError({ statusCode: 404, statusMessage: 'Product line not found', fatal: true })
+}
 
 // ─── 3. Smart Sidebar ───────────────────────────────────────────────────────
 const brandId = computed(() => brand.value?.id);

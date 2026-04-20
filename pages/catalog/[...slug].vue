@@ -219,6 +219,13 @@ const currentCategory = computed(() => {
   )
 })
 
+// 🔥 404 для несуществующих категорий (защита SEO)
+watch([currentCategory, () => categoriesStore.allCategories.length], ([category, categoriesLoaded]) => {
+  if (categoriesLoaded > 0 && currentCategorySlug.value !== 'all' && !category) {
+    throw createError({ statusCode: 404, statusMessage: 'Category not found', fatal: true })
+  }
+}, { immediate: true })
+
 const categoryOgImageUrl = computed(() => {
   const imageFilename = currentCategory.value?.image_url
   if (!imageFilename)
@@ -778,6 +785,23 @@ function toggleSubCategory(catId: string) {
   activeFilters.value = {
     ...activeFilters.value,
     subCategoryIds: Array.from(newIds),
+  }
+}
+
+function resetAllFilters() {
+  activeFilters.value = {
+    sortBy: 'popularity',
+    subCategoryIds: [],
+    price: [priceRange.value.min, priceRange.value.max],
+    pieceCount: pieceCountRange.value ? [pieceCountRange.value.min, pieceCountRange.value.max] : null,
+    brandIds: [],
+    productLineIds: [],
+    materialIds: [],
+    countryIds: [],
+    attributes: {},
+    numericAttributes: {},
+  }
+}
   }
 }
 
@@ -1990,12 +2014,25 @@ useSchemaOrg(
               v-else
               class="text-center py-20 text-muted-foreground border-2 border-dashed rounded-lg"
             >
+              <Icon name="lucide:package-open" class="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
               <h3 class="text-2xl font-semibold">
-                Товары не найдены
+                {{ hasActiveFilters ? 'Товары не найдены' : 'Скоро здесь появятся товары' }}
               </h3>
               <p class="mt-2">
-                Попробуйте изменить фильтры или выбрать другую категорию.
+                {{ hasActiveFilters 
+                  ? 'Попробуйте изменить фильтры или выбрать другую категорию.' 
+                  : 'Мы работаем над наполнением этой категории. Загляните позже!' 
+                }}
               </p>
+              <Button
+                v-if="hasActiveFilters"
+                variant="outline"
+                class="mt-4"
+                @click="resetAllFilters"
+              >
+                <Icon name="lucide:x" class="w-4 h-4 mr-2" />
+                Сбросить все фильтры
+              </Button>
             </div>
           </div>
         </Transition>

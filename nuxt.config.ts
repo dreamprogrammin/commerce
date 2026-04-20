@@ -186,6 +186,30 @@ export default defineNuxtConfig({
           statusCode: 301,
         },
       },
+      "/catalog/konstruktory-malchikam": {
+        redirect: {
+          to: "/catalog/constructors-root/konstruktory-malchikam",
+          statusCode: 301,
+        },
+      },
+      "/catalog/kovriki-pazly": {
+        redirect: {
+          to: "/catalog/kiddy/kovriki/kovriki-pazly",
+          statusCode: 301,
+        },
+      },
+      "/catalog/metallicheskie-mashinki": {
+        redirect: {
+          to: "/catalog/boys/mashinki/metallicheskie-mashinki",
+          statusCode: 301,
+        },
+      },
+      "/catalog/katalki": {
+        redirect: {
+          to: "/catalog/kiddy/katalki",
+          statusCode: 301,
+        },
+      },
       "/catalog/bizibordy": {
         redirect: { to: "/catalog/kiddy/bizibordy", statusCode: 301 },
       },

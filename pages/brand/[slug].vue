@@ -56,6 +56,11 @@ const { data: brand, pending: brandPending } = await useAsyncData(
   },
 );
 
+// 🔥 301 редирект для несуществующих брендов (защита SEO)
+if (!brand.value && !brandPending.value) {
+  throw createError({ statusCode: 404, statusMessage: 'Brand not found', fatal: true })
+}
+
 // Загружаем линейки бренда
 const brandProductLines = ref<ProductLine[]>([]);
 
