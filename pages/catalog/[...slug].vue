@@ -802,8 +802,6 @@ function resetAllFilters() {
     numericAttributes: {},
   }
 }
-  }
-}
 
 function updateQueryParams() {
   const query: Record<string, any> = {}
