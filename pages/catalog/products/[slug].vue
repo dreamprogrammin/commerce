@@ -1546,7 +1546,9 @@ watchEffect(() => {
             </div>
             <!-- SEO контент -->
             <div v-if="seoBlocks.length" class="lg:col-span-7">
-              <SEOContentRenderer :blocks="seoBlocks" />
+              <ClientOnly>
+                <SEOContentRenderer :blocks="seoBlocks" />
+              </ClientOnly>
             </div>
           </div>
         </div>
