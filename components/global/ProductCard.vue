@@ -202,6 +202,16 @@ const priceDetails = computed(() => {
         </Badge>
       </div>
 
+      <!-- 🚫 БЕЙДЖ "НЕТ В НАЛИЧИИ" -->
+      <div v-else-if="!product.stock_quantity || product.stock_quantity <= 0" class="absolute top-3 right-3 z-10">
+        <Badge
+          variant="secondary"
+          class="font-bold text-xs px-2.5 py-1 shadow-lg bg-gray-500 text-white"
+        >
+          Нет в наличии
+        </Badge>
+      </div>
+
       <!-- ❤️ КНОПКА ДОБАВЛЕНИЯ В ИЗБРАННОЕ -->
       <div class="absolute top-3 left-3 z-10">
         <ProductWishlistButton
@@ -465,31 +475,26 @@ const priceDetails = computed(() => {
         </div>
 
         <ClientOnly>
-          <Button
-            v-if="!itemInCart"
-            class="w-full h-10 font-semibold"
-            :disabled="!product.stock_quantity || product.stock_quantity <= 0"
-            @click="cartStore.addItem(product as BaseProduct, 1)"
-          >
-            <Icon
-              :name="
-                product.stock_quantity && product.stock_quantity > 0
-                  ? 'lucide:shopping-cart'
-                  : 'lucide:x-circle'
-              "
-              class="w-4 h-4 mr-2"
-            />
-            <span v-if="product.stock_quantity && product.stock_quantity > 0">
+          <template v-if="product.stock_quantity && product.stock_quantity > 0">
+            <Button
+              v-if="!itemInCart"
+              class="w-full h-10 font-semibold"
+              @click="cartStore.addItem(product as BaseProduct, 1)"
+            >
+              <Icon name="lucide:shopping-cart" class="w-4 h-4 mr-2" />
               В корзину
-            </span>
-            <span v-else> Нет в наличии </span>
-          </Button>
+            </Button>
 
-          <QuantitySelector
-            v-else
-            :product="product"
-            :quantity="quantityInCart"
-          />
+            <QuantitySelector
+              v-else
+              :product="product"
+              :quantity="quantityInCart"
+            />
+          </template>
+
+          <template v-else>
+            <StockAlertButton :product-id="product.id" size="sm" />
+          </template>
 
           <template #fallback>
             <Button class="w-full h-10" disabled>

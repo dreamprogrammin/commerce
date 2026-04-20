@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SEOBlock } from '~/utils/parseSEOContent'
+import type { SEOBlock } from '@/utils/parseSEOContent.ts'
 
 const props = defineProps<{
   blocks: SEOBlock[]
