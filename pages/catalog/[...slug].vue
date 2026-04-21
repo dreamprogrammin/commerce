@@ -219,13 +219,6 @@ const currentCategory = computed(() => {
   )
 })
 
-// 🔥 404 для несуществующих категорий (защита SEO)
-watch([currentCategory, () => categoriesStore.allCategories.length], ([category, categoriesLoaded]) => {
-  if (categoriesLoaded > 0 && currentCategorySlug.value !== 'all' && !category) {
-    throw createError({ statusCode: 404, statusMessage: 'Category not found', fatal: true })
-  }
-}, { immediate: true })
-
 const categoryOgImageUrl = computed(() => {
   const imageFilename = currentCategory.value?.image_url
   if (!imageFilename)
