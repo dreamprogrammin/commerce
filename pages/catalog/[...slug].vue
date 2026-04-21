@@ -224,11 +224,6 @@ const currentCategory = computed(() => {
   )
 })
 
-// 🔥 404 для несуществующих категорий (защита SEO)
-if (import.meta.server && categoriesStore.allCategories.length > 0 && currentCategorySlug.value !== 'all' && !currentCategory.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Category not found', fatal: true })
-}
-
 const categoryOgImageUrl = computed(() => {
   const imageFilename = currentCategory.value?.image_url
   if (!imageFilename)
