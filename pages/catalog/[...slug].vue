@@ -43,11 +43,6 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
-// Загружаем категории если ещё не загружены
-if (!categoriesStore.allCategories.length) {
-  await categoriesStore.fetchAllCategories()
-}
-
 const priceValidUntil = new Date(
   new Date().setFullYear(new Date().getFullYear() + 1),
 )
