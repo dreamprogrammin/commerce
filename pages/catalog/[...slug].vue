@@ -44,9 +44,12 @@ const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
 // Загружаем категории если ещё не загружены
-if (!categoriesStore.allCategories.length) {
-  await categoriesStore.fetchAllCategories()
-}
+await useAsyncData('categories-init', async () => {
+  if (!categoriesStore.allCategories.length) {
+    await categoriesStore.fetchAllCategories()
+  }
+  return true
+})
 
 const priceValidUntil = new Date(
   new Date().setFullYear(new Date().getFullYear() + 1),
