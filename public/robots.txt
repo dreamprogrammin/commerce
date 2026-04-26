@@ -1,0 +1,17 @@
+# robots.txt для uhti.kz
+
+User-agent: *
+Allow: /
+
+# Блокируем служебные пути
+Disallow: /admin
+Disallow: /api
+Disallow: /_nuxt
+Disallow: /__nuxt
+
+# Блокируем wildcard паттерны (не должны индексироваться)
+Disallow: /**/
+Disallow: /catalog/**
+
+# Sitemap
+Sitemap: https://uhti.kz/sitemap.xml
