@@ -180,12 +180,6 @@ export default defineNuxtConfig({
         },
       },
       // 301 редиректы со старых URL на новые (дубли с одинаковыми заголовками)
-      "/catalog/**": {
-        redirect: {
-          to: "/catalog",
-          statusCode: 301,
-        },
-      },
       "/catalog/constructors/**": {
         redirect: {
           to: "/catalog/constructors-root/**",
