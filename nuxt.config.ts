@@ -234,6 +234,36 @@ export default defineNuxtConfig({
           statusCode: 301,
         },
       },
+      "/catalog/kukly": {
+        redirect: {
+          to: "/catalog/girls/kukly",
+          statusCode: 301,
+        },
+      },
+      "/catalog/kovriki": {
+        redirect: {
+          to: "/catalog/kiddy/kovriki",
+          statusCode: 301,
+        },
+      },
+      "/catalog/radioupravlyaemye-mashinki": {
+        redirect: {
+          to: "/catalog/boys/mashinki/radioupravlyaemye-mashinki",
+          statusCode: 301,
+        },
+      },
+      "/catalog/rolevye-i-syuzhetnye-nabory": {
+        redirect: {
+          to: "/catalog/boys/rolevye-i-syuzhetnye-nabory",
+          statusCode: 301,
+        },
+      },
+      "/catalog/babies/katalki": {
+        redirect: {
+          to: "/catalog/kiddy/katalki",
+          statusCode: 301,
+        },
+      },
       "/catalog/boys/cars/metallicheskie-mashinki": {
         redirect: {
           to: "/catalog/boys/mashinki/metallicheskie-mashinki",
