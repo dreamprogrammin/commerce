@@ -5,13 +5,19 @@ Allow: /
 
 # Блокируем служебные пути
 Disallow: /admin
+Disallow: /admin/*
 Disallow: /api
+Disallow: /api/*
 Disallow: /_nuxt
 Disallow: /__nuxt
+Disallow: /notifications
+Disallow: /profile
+Disallow: /cart
+Disallow: /checkout
 
 # Блокируем wildcard паттерны (не должны индексироваться)
 Disallow: /**/
-Disallow: /catalog/**
+Disallow: /brand/**
 
 # Sitemap
 Sitemap: https://uhti.kz/sitemap.xml
