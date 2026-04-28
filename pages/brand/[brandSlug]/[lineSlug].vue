@@ -227,8 +227,8 @@ const ogImageSrc = computed(
 );
 
 const seoBlocks = computed(() => {
-  if (!productLine.value?.seo_content) return []
-  return parseHTMLToBlocks(productLine.value.seo_content)
+  if (!productLine.value?.description) return []
+  return parseHTMLToBlocks(productLine.value.description)
 })
 
 // Извлекаем текст из seo_content для Schema.org
