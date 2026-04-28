@@ -3,6 +3,11 @@
 User-agent: *
 Allow: /
 
+# Разрешаем важные страницы
+Allow: /search
+Allow: /catalog
+Allow: /brand
+
 # Блокируем служебные пути
 Disallow: /admin
 Disallow: /admin/*
@@ -10,10 +15,22 @@ Disallow: /api
 Disallow: /api/*
 Disallow: /_nuxt
 Disallow: /__nuxt
+
+# Блокируем личный кабинет и оформление заказа
 Disallow: /notifications
 Disallow: /profile
+Disallow: /profile/*
 Disallow: /cart
 Disallow: /checkout
+Disallow: /order
+
+# Блокируем авторизацию
+Disallow: /auth
+Disallow: /auth/*
+Disallow: /register
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
 
 # Блокируем wildcard паттерны (не должны индексироваться)
 Disallow: /**/
