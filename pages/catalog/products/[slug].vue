@@ -622,7 +622,8 @@ const productImages = computed(() => {
     return ['https://uhti.kz/og-default.jpg']
   return product.value.product_images.map(
     (img: ProductImageRow) =>
-      `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${img.image_url}`,
+      getVariantUrl(BUCKET_NAME_PRODUCT, img.image_url, 'lg') || 
+      `https://uhti.kz/og-default.jpg`,
   )
 })
 
