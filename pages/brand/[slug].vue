@@ -443,6 +443,80 @@ useHead({
             })
           : "{}",
     },
+
+    // FAQPage Schema
+    {
+      type: "application/ld+json",
+      innerHTML: () =>
+        brand.value
+          ? JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              mainEntity: [
+                {
+                  "@type": "Question",
+                  name: `Где купить товары бренда ${brand.value.name} в Казахстане?`,
+                  acceptedAnswer: {
+                    "@type": "Answer",
+                    text: `Оригинальные товары бренда ${brand.value.name} можно купить в интернет-магазине ${siteName} с доставкой по всему Казахстану. Мы предлагаем широкий ассортимент продукции с гарантией качества.`,
+                  },
+                },
+                {
+                  "@type": "Question",
+                  name: `Как быстро доставляют товары ${brand.value.name}?`,
+                  acceptedAnswer: {
+                    "@type": "Answer",
+                    text: "Доставка по Алматы осуществляется в течение 1-3 дней. По другим городам Казахстана срок доставки составляет 3-7 дней в зависимости от региона.",
+                  },
+                },
+                {
+                  "@type": "Question",
+                  name: `Какая гарантия на товары ${brand.value.name}?`,
+                  acceptedAnswer: {
+                    "@type": "Answer",
+                    text: `Все товары бренда ${brand.value.name} в нашем магазине оригинальные и имеют официальную гарантию производителя. Возврат и обмен возможен в течение 14 дней.`,
+                  },
+                },
+              ],
+            })
+          : "{}",
+    },
+
+    // Article Schema
+    {
+      type: "application/ld+json",
+      innerHTML: () =>
+        brand.value
+          ? JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Article",
+              headline: `${brand.value.name} - Обзор бренда и каталог товаров`,
+              description: metaDescription.value,
+              image: brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+              author: {
+                "@type": "Organization",
+                name: siteName,
+                url: siteUrl,
+              },
+              publisher: {
+                "@type": "Organization",
+                name: siteName,
+                url: siteUrl,
+                logo: {
+                  "@type": "ImageObject",
+                  url: `${siteUrl}/logo.png`,
+                },
+              },
+              datePublished: brand.value.created_at || new Date().toISOString(),
+              dateModified: brand.value.updated_at || brand.value.created_at || new Date().toISOString(),
+              mainEntityOfPage: {
+                "@type": "WebPage",
+                "@id": brandUrl.value,
+              },
+              articleBody: seoContentText.value || metaDescription.value,
+            })
+          : "{}",
+    },
   ],
 });
 
