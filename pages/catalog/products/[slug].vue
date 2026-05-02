@@ -1563,12 +1563,6 @@ watchEffect(() => {
             <div class="lg:col-span-7">
               <ProductQuestions v-if="product.id" :product-id="product.id" />
             </div>
-            <!-- SEO контент -->
-            <div v-if="seoBlocks.length" class="lg:col-span-7">
-              <ClientOnly>
-                <SEOContentRenderer :blocks="seoBlocks" />
-              </ClientOnly>
-            </div>
           </div>
         </div>
 
@@ -1662,6 +1656,15 @@ watchEffect(() => {
           </div>
         </div>
       </div>
+    </ClientOnly>
+
+    <!-- SEO контент товара -->
+    <ClientOnly>
+      <SEOContentRenderer
+        v-if="seoBlocks.length > 0"
+        :blocks="seoBlocks"
+        :class="`${containerClass} mt-8 lg:mt-12`"
+      />
     </ClientOnly>
 
     <!-- ✅ Похожие товары с независимой загрузкой -->
