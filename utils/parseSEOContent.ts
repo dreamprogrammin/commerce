@@ -19,43 +19,55 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
   if (!html?.trim()) return []
 
   const blocks: SEOBlock[] = []
+  
+  // Нормализуем HTML - убираем лишние переносы между тегами
+  const normalized = html.replace(/>\s+</g, '><')
 
-  // SSR-совместимый парсинг через регулярные выражения
-  const tagRegex = /<(h2|h3|p|ul)([^>]*)>([\s\S]*?)<\/\1>/gi
+  // Парсим каждый тип тега отдельно
+  const h2Regex = /<h2([^>]*)>(.*?)<\/h2>/gi
+  const h3Regex = /<h3([^>]*)>(.*?)<\/h3>/gi
+  const pRegex = /<p([^>]*)>(.*?)<\/p>/gi
+  const ulRegex = /<ul([^>]*)>(.*?)<\/ul>/gi
+
+  // Собираем все теги с их позициями для правильного порядка
+  const allMatches: Array<{ index: number; block: SEOBlock }> = []
+
+  // H2
   let match: RegExpExecArray | null
-
-  while ((match = tagRegex.exec(html)) !== null) {
-    const [, tag, attrs, content] = match
-    const tagLower = tag.toLowerCase() as SEOBlockType
-
-    // Извлекаем data-icon из атрибутов
-    const iconMatch = attrs.match(/data-icon=["']([^"']+)["']/)
-    const icon = iconMatch ? iconMatch[1] : undefined
-
-    if (tagLower === 'h2' || tagLower === 'h3') {
-      const text = content.replace(/<[^>]*>/g, '').trim()
-      if (text) blocks.push({ type: tagLower, text, icon })
-    }
-    else if (tagLower === 'p') {
-      const text = content.replace(/<[^>]*>/g, '').trim()
-      if (text) blocks.push({ type: 'p', text })
-    }
-    else if (tagLower === 'ul') {
-      const items: SEOBlock['items'] = []
-      const liRegex = /<li([^>]*)>([\s\S]*?)<\/li>/gi
-      let liMatch: RegExpExecArray | null
-
-      while ((liMatch = liRegex.exec(content)) !== null) {
-        const [, liAttrs, liContent] = liMatch
-        const liIconMatch = liAttrs.match(/data-icon=["']([^"']+)["']/)
-        const liIcon = liIconMatch ? liIconMatch[1] : undefined
-        const text = liContent.replace(/<[^>]*>/g, '').trim()
-        if (text) items.push({ text, icon: liIcon })
-      }
-
-      if (items.length) blocks.push({ type: 'ul', items })
-    }
+  while ((match = h2Regex.exec(normalized)) !== null) {
+    const iconMatch = match[1].match(/data-icon=["']([^"']+)["']/)
+    const text = match[2].replace(/<[^>]*>/g, '').trim()
+    if (text) allMatches.push({ index: match.index, block: { type: 'h2', text, icon: iconMatch?.[1] } })
   }
 
-  return blocks
+  // H3
+  while ((match = h3Regex.exec(normalized)) !== null) {
+    const iconMatch = match[1].match(/data-icon=["']([^"']+)["']/)
+    const text = match[2].replace(/<[^>]*>/g, '').trim()
+    if (text) allMatches.push({ index: match.index, block: { type: 'h3', text, icon: iconMatch?.[1] } })
+  }
+
+  // P
+  while ((match = pRegex.exec(normalized)) !== null) {
+    const text = match[2].replace(/<[^>]*>/g, '').trim()
+    if (text) allMatches.push({ index: match.index, block: { type: 'p', text } })
+  }
+
+  // UL
+  while ((match = ulRegex.exec(normalized)) !== null) {
+    const items: SEOBlock['items'] = []
+    const liRegex = /<li([^>]*)>(.*?)<\/li>/gi
+    let liMatch: RegExpExecArray | null
+    
+    while ((liMatch = liRegex.exec(match[2])) !== null) {
+      const liIconMatch = liMatch[1].match(/data-icon=["']([^"']+)["']/)
+      const text = liMatch[2].replace(/<[^>]*>/g, '').trim()
+      if (text) items.push({ text, icon: liIconMatch?.[1] })
+    }
+    
+    if (items.length) allMatches.push({ index: match.index, block: { type: 'ul', items } })
+  }
+
+  // Сортируем по позиции в исходном HTML
+  return allMatches.sort((a, b) => a.index - b.index).map(m => m.block)
 }
