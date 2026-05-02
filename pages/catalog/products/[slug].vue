@@ -1253,6 +1253,7 @@ watchEffect(() => {
               <SEOContentRenderer
                 v-if="seoBlocks.length > 0"
                 :blocks="seoBlocks"
+                :collapsible="true"
                 class="mb-6"
               />
 
