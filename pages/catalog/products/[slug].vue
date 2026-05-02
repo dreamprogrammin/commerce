@@ -1249,11 +1249,11 @@ watchEffect(() => {
                 {{ product.name }}
               </h3>
 
-              <!-- Краткое описание с возможностью раскрытия -->
-              <ProductDescription
-                :product="product"
-                :is-expanded="isDescriptionExpanded"
-                @toggle-expand="isDescriptionExpanded = !isDescriptionExpanded"
+              <!-- SEO контент товара -->
+              <SEOContentRenderer
+                v-if="seoBlocks.length > 0"
+                :blocks="seoBlocks"
+                class="mb-6"
               />
 
               <!-- Таблица характеристик с пунктирными линиями -->
@@ -1656,15 +1656,6 @@ watchEffect(() => {
           </div>
         </div>
       </div>
-    </ClientOnly>
-
-    <!-- SEO контент товара -->
-    <ClientOnly>
-      <SEOContentRenderer
-        v-if="seoBlocks.length > 0"
-        :blocks="seoBlocks"
-        :class="`${containerClass} mt-8 lg:mt-12`"
-      />
     </ClientOnly>
 
     <!-- ✅ Похожие товары с независимой загрузкой -->
