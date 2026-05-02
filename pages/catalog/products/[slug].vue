@@ -605,8 +605,10 @@ const robotsRule = computed(() => {
 })
 
 const seoBlocks = computed(() => {
-  if (!product.value?.seo_content) return []
-  return parseHTMLToBlocks(product.value.seo_content)
+  // Приоритет: seo_content, затем description
+  const content = product.value?.seo_content || product.value?.description
+  if (!content) return []
+  return parseHTMLToBlocks(content)
 })
 
 // Извлекаем текст из seo_content для Schema.org description
