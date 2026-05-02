@@ -609,6 +609,22 @@ const seoBlocks = computed(() => {
   return parseHTMLToBlocks(product.value.seo_content)
 })
 
+// Извлекаем текст из seo_content для Schema.org description
+const seoContentText = computed(() => {
+  if (!seoBlocks.value.length) return metaDescription.value
+  
+  return seoBlocks.value
+    .map(block => {
+      if (block.type === 'ul') {
+        return block.items.map(item => item.text).join(' ')
+      }
+      return block.text
+    })
+    .filter(Boolean)
+    .join(' ')
+    .substring(0, 500) // Google рекомендует до 500 символов
+})
+
 useRobotsRule(robotsRule)
 
 const ogImageUrl = computed(() => {
@@ -698,7 +714,7 @@ useSchemaOrg([
   defineProduct({
     // 🔥 Отдаем чистое название товара для робота (без "Купить в Ухтышка")
     name: computed(() => product.value?.name || ''),
-    description: metaDescription,
+    description: seoContentText,
     image: productImages,
 
     // ✅ 1. Артикул (есть всегда)
