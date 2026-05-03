@@ -510,40 +510,54 @@ defineExpose({ closeAllPopups });
           </NavigationMenuItem>
         </template>
 
-        <!-- Основные категории -->
-        <template v-for="rootItem in menuTree" :key="rootItem.id">
-          <NavigationMenuItem :value="rootItem.slug">
-            <template v-if="rootItem.children && rootItem.children.length > 0">
-              <NuxtLink :to="rootItem.href" as-child>
-                <NavigationMenuTrigger
-                  :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-4 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl`"
-                  @click="handleLinkClick"
-                >
-                  {{ rootItem.name }}
-                </NavigationMenuTrigger>
-              </NuxtLink>
+        <!-- Единое меню "Каталог" со всеми категориями -->
+        <NavigationMenuItem value="catalog">
+          <NavigationMenuTrigger
+            :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-4 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl`"
+          >
+            <Icon name="lucide:layout-grid" class="w-4 h-4 mr-2" />
+            Каталог
+          </NavigationMenuTrigger>
 
-              <NavigationMenuContent>
+          <NavigationMenuContent>
+            <div
+              class="min-w-screen max-h-[70vh] bg-white dark:bg-gray-900 overflow-y-auto"
+            >
+              <div :class="containerClass" class="py-8">
+                <!-- Корневые категории как секции -->
                 <div
-                  class="min-w-screen h-[45vh] bg-white dark:bg-gray-900 overflow-y-auto"
+                  v-for="rootItem in menuTree"
+                  :key="rootItem.id"
+                  class="mb-8 last:mb-0"
                 >
+                  <!-- Заголовок корневой категории -->
+                  <NuxtLink
+                    :to="rootItem.href"
+                    class="inline-flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-4 px-2"
+                    @click="handleLinkClick"
+                  >
+                    {{ rootItem.name }}
+                    <Icon name="lucide:arrow-right" class="w-4 h-4" />
+                  </NuxtLink>
+
+                  <!-- Подкатегории в сетке -->
                   <ul
-                    :class="containerClass"
-                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 py-12"
+                    v-if="rootItem.children && rootItem.children.length > 0"
+                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
                   >
                     <li
                       v-for="childItem in rootItem.children"
                       :key="childItem.id"
-                      class="space-y-3"
+                      class="space-y-2"
                     >
                       <NuxtLink
                         :to="childItem.href"
-                        class="group block select-none rounded-xl p-4 leading-none no-underline outline-none transition-all duration-200 hover:shadow-lg border border-gray-200 dark:border-gray-800 hover:border-blue-400 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        class="group block select-none rounded-lg p-3 leading-none no-underline outline-none transition-all duration-200 hover:shadow-md border border-gray-200 dark:border-gray-800 hover:border-blue-400 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
                         @click="handleLinkClick"
                       >
                         <div
                           v-if="childItem.image_url"
-                          class="mb-3 overflow-hidden dark:border-gray-800 dark:bg-gray-800 rounded-lg aspect-square w-16"
+                          class="mb-2 overflow-hidden rounded-md aspect-square w-12"
                         >
                           <ProgressiveImage
                             :src="getCategoryImageUrl(childItem.image_url)"
@@ -556,16 +570,18 @@ defineExpose({ closeAllPopups });
                           />
                         </div>
                         <div
-                          class="text-sm font-bold leading-tight text-gray-900 dark:text-gray-100 mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                          class="text-sm font-semibold leading-tight text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
                         >
                           {{ childItem.name }}
                         </div>
                       </NuxtLink>
+
+                      <!-- Подкатегории 3-го уровня -->
                       <ul
                         v-if="
                           childItem.children && childItem.children.length > 0
                         "
-                        class="ml-2 space-y-1 list-none"
+                        class="ml-1 space-y-0.5 list-none"
                       >
                         <li
                           v-for="grandChildItem in childItem.children"
@@ -573,7 +589,7 @@ defineExpose({ closeAllPopups });
                         >
                           <NuxtLink
                             :to="grandChildItem.href"
-                            class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                            class="block select-none py-1 px-2 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
                             @click="handleLinkClick"
                           >
                             {{ grandChildItem.name }}
@@ -581,14 +597,14 @@ defineExpose({ closeAllPopups });
                         </li>
                       </ul>
 
-                      <!-- Бренды 3-го уровня -->
+                      <!-- Бренды -->
                       <div
                         v-if="
                           childItem.brandsLoaded &&
                           childItem.brands &&
                           childItem.brands.length > 0
                         "
-                        class="ml-2 mt-1"
+                        class="ml-1"
                       >
                         <div
                           v-if="
@@ -596,11 +612,11 @@ defineExpose({ closeAllPopups });
                           "
                           class="border-t border-gray-100 dark:border-gray-800 my-1"
                         />
-                        <ul class="space-y-1 list-none">
+                        <ul class="space-y-0.5 list-none">
                           <li v-for="brand in childItem.brands" :key="brand.id">
                             <NuxtLink
                               :to="`${childItem.href}?brand=${brand.slug}`"
-                              class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                              class="block select-none py-1 px-2 text-xs leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
                               @click="handleLinkClick"
                             >
                               {{ rootItem.name }} {{ brand.name }}
@@ -608,69 +624,13 @@ defineExpose({ closeAllPopups });
                           </li>
                         </ul>
                       </div>
-                      <div
-                        v-else-if="
-                          categoriesStore.brandsLoading &&
-                          !childItem.brandsLoaded
-                        "
-                        class="ml-2 mt-2 space-y-2 px-3"
-                      >
-                        <div
-                          v-for="n in 3"
-                          :key="n"
-                          class="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                        />
-                      </div>
                     </li>
                   </ul>
-                  <div
-                    v-if="
-                      rootItem.children.length === 0 &&
-                      !categoriesStore.isLoading
-                    "
-                    class="py-20 text-center"
-                  >
-                    <div class="inline-flex flex-col items-center gap-3">
-                      <div
-                        class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center"
-                      >
-                        <Icon
-                          name="lucide:package-open"
-                          class="w-8 h-8 text-gray-400"
-                        />
-                      </div>
-                      <p
-                        class="text-sm text-gray-500 dark:text-gray-400 font-medium"
-                      >
-                        Скоро здесь появятся подкатегории
-                      </p>
-                    </div>
-                  </div>
-                  <div
-                    v-if="categoriesStore.isLoading"
-                    class="py-20 text-center"
-                  >
-                    <div
-                      class="inline-flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 font-medium"
-                    >
-                      <div
-                        class="h-5 w-5 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500"
-                      />
-                      Загрузка категорий
-                    </div>
-                  </div>
                 </div>
-              </NavigationMenuContent>
-            </template>
-            <NuxtLink
-              v-else
-              :to="rootItem.href"
-              :class="`${navigationMenuTriggerStyle()} font-semibold text-sm bg-white/15 hover:bg-white/25 transition-all duration-200 rounded-xl text-white border border-white/10 hover:border-white/20 px-5 h-11 backdrop-blur-sm shadow-lg hover:shadow-xl`"
-            >
-              {{ rootItem.name }}
-            </NuxtLink>
-          </NavigationMenuItem>
-        </template>
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
       </NavigationMenuList>
     </NavigationMenu>
   </div>
