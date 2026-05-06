@@ -292,6 +292,10 @@ export default defineNuxtConfig({
         ssr: false,
         headers: { "X-Robots-Tag": "noindex, nofollow" },
       },
+      "/notifications": {
+        ssr: false,
+        headers: { "X-Robots-Tag": "noindex, nofollow" },
+      },
       "/checkout": {
         ssr: false,
         headers: { "X-Robots-Tag": "noindex, nofollow" },
