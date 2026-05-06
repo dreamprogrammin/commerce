@@ -17,16 +17,24 @@ const emit = defineEmits<{
   add: [id: string]
 }>()
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 function getAccessoryImageUrl(imageUrl: string | null) {
   if (!imageUrl)
     return null
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm')
 }
 
 function isSelected(id: string) {
   return props.selectedIds.includes(id)
+}
+
+function cleanDescription(html: string | null): string {
+  if (!html) return ''
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 </script>
 
@@ -96,7 +104,7 @@ function isSelected(id: string) {
             </h3>
 
             <p v-if="accessory.description" class="text-xs text-muted-foreground line-clamp-2 mb-3">
-              {{ accessory.description }}
+              {{ cleanDescription(accessory.description) }}
             </p>
 
             <div class="mt-auto space-y-2">
