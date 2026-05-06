@@ -881,6 +881,9 @@ useSchemaOrg([
         'url': `https://uhti.kz/catalog/products/${sim.slug}`,
       }))
     }),
+
+    // 🔥 Дополнительные свойства товара (атрибуты) для Google Merchant
+    additionalProperty: schemaAdditionalProperties,
   }),
 ])
 
