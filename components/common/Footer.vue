@@ -1,9 +1,24 @@
 <script setup lang="ts">
 import { formatPrice } from '@/utils/formatPrice'
+import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
 const currentYear = new Date().getFullYear()
-const { data: popularCategories } = usePopularCategories(6)
+
+// Используем существующий store для популярных категорий
+const popularCategoriesStore = usePopularCategoriesStore()
 const { data: popularProducts } = usePopularProducts(5)
+
+// Загружаем категории при монтировании
+onMounted(() => {
+  if (popularCategoriesStore.popularCategories.length === 0) {
+    popularCategoriesStore.fetchPopularCategories()
+  }
+})
+
+// Берём первые 6 категорий для футера
+const footerCategories = computed(() => 
+  popularCategoriesStore.popularCategories.slice(0, 6)
+)
 </script>
 
 <template>
@@ -39,8 +54,8 @@ const { data: popularProducts } = usePopularProducts(5)
           <h3 class="font-semibold text-lg mb-4">
             Популярные категории
           </h3>
-          <ul v-if="popularCategories?.length" class="space-y-2 text-sm">
-            <li v-for="category in popularCategories" :key="category.id">
+          <ul v-if="footerCategories.length" class="space-y-2 text-sm">
+            <li v-for="category in footerCategories" :key="category.id">
               <NuxtLink
                 :to="`/catalog/${category.slug}`"
                 class="text-muted-foreground hover:text-foreground transition-colors"
