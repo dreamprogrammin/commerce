@@ -979,14 +979,18 @@ const metaTitle = computed(() => {
       = catName.toLowerCase() === brandName.toLowerCase()
         ? catName
         : `${catName} ${brandName}`
-    return `Купить ${prefix} в Алматы | Ухтышка`
+    
+    // Добавляем цену в title
+    const priceText = minPrice.value ? ` — от ${formatPrice(minPrice.value)} ₸` : ''
+    return `${prefix}${priceText} | Ухтышка`
   }
 
   if (selectedSingleLine.value) {
     const brandName = selectedSingleBrand.value?.name || ''
     const lineName = selectedSingleLine.value.name
     const prefix = brandName ? `${brandName} ${lineName}` : lineName
-    return `Купить ${prefix} в Алматы | Ухтышка`
+    const priceText = minPrice.value ? ` — от ${formatPrice(minPrice.value)} ₸` : ''
+    return `${prefix}${priceText} | Ухтышка`
   }
 
   if (hasActiveFilters.value) {

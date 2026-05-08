@@ -399,11 +399,34 @@ const canonicalUrl = computed(() =>
 const metaTitle = computed(() => {
   if (!product.value)
     return 'Товар | Ухтышка'
+  
+  // Если есть ручной meta_title — используем его
   if (product.value.meta_title)
     return product.value.meta_title
   if (product.value.seo_title)
     return product.value.seo_title
-  return `${product.value.name} - Купить в интернет-магазине | Ухтышка`
+  
+  // Генерируем умный title: [Товар] [свойство] — от [цена] ₸ | Uhti.kz
+  const parts = []
+  
+  // 1. Название товара
+  let name = product.value.name
+  
+  // 2. Добавляем ключевое свойство (материал)
+  if (product.value.materials?.name) {
+    name += ` ${product.value.materials.name.toLowerCase()}`
+  }
+  
+  parts.push(name)
+  
+  // 3. Цена
+  const price = product.value.final_price || product.value.price
+  parts.push(`от ${formatPrice(price)} ₸`)
+  
+  // 4. Бренд
+  parts.push('Uhti.kz')
+  
+  return parts.join(' — ')
 })
 
 const ageRangeText = computed(() => {
@@ -438,19 +461,41 @@ const audienceText = computed(() => {
 const metaDescription = computed(() => {
   if (!product.value)
     return ''
+  
+  // Если есть ручной meta_description — используем его
   if (product.value.meta_description)
     return product.value.meta_description
   if (product.value.seo_description)
     return product.value.seo_description
-  const parts = [
-    audienceText.value
-      ? `${product.value.name} ${audienceText.value}`
-      : product.value.name,
-    `Цена: ${formatPrice(product.value.price)} ₸`,
-    product.value.stock_quantity > 0 ? 'В наличии' : 'Под заказ',
-    'Доставка по Казахстану',
-  ]
-  return `${parts.join('. ')}.`
+  
+  // Генерируем умное description: [Товар] [польза]. [Преимущество]. ⭐ [рейтинг]. [Доставка]. От [цена] ₸
+  const parts = []
+  
+  // 1. Название + аудитория
+  if (audienceText.value) {
+    parts.push(`${product.value.name} ${audienceText.value}`)
+  } else {
+    parts.push(product.value.name)
+  }
+  
+  // 2. Социальное доказательство (рейтинг)
+  if (product.value.review_count > 0) {
+    parts.push(`⭐ ${product.value.avg_rating?.toFixed(1)} (${product.value.review_count} ${product.value.review_count === 1 ? 'отзыв' : product.value.review_count < 5 ? 'отзыва' : 'отзывов'})`)
+  }
+  
+  // 3. Наличие
+  if (product.value.stock_quantity > 0) {
+    parts.push('В наличии')
+  }
+  
+  // 4. Доставка
+  parts.push('Доставка по Алматы за 1 день')
+  
+  // 5. Цена
+  const price = product.value.final_price || product.value.price
+  parts.push(`От ${formatPrice(price)} ₸`)
+  
+  return parts.join('. ') + '.'
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
