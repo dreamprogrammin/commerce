@@ -1438,133 +1438,41 @@ useSchemaOrg(
       v-if="currentCategory && (currentCategory.description || seoText)"
       class="bg-white dark:bg-card rounded-xl p-4 lg:p-8 mb-6 lg:mb-8 border shadow-sm"
     >
-      <!-- Мобильная версия (компактная) -->
-      <div class="lg:hidden space-y-3">
-        <!-- Заголовок и картинка в одну строку -->
-        <div class="flex items-start gap-3">
-          <!-- Компактная картинка -->
-          <div
-            v-if="currentCategory.image_url"
-            class="shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center"
-          >
-            <ProgressiveImage
-              :src="
-                getVariantUrl(
-                  BUCKET_NAME_CATEGORY,
-                  currentCategory.image_url,
-                  'md',
-                )
-              "
-              :alt="currentCategory.name"
-              object-fit="contain"
-              placeholder-type="lqip"
-              :blur-data-url="currentCategory.blur_placeholder || undefined"
-              :eager="true"
-              class="w-full h-full"
-            />
-          </div>
+      <!-- ЕДИНСТВЕННЫЙ H1 ДЛЯ SEO И ЛЮДЕЙ -->
+      <h1
+        class="text-xl md:text-3xl font-bold mb-4 transition-opacity duration-200"
+        :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'"
+      >
+        {{ title }}
+      </h1>
 
-          <!-- Заголовок (только мобильная версия) -->
-          <h1
-            class="text-xl font-bold flex-1 leading-tight lg:hidden transition-opacity duration-200"
-            :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'"
-          >
-            {{ title }}
-          </h1>
-        </div>
-
-        <!-- Рейтинг категории (мобильная) -->
-        <CategoryRatingBlock
-          v-if="showCategoryRating"
-          :avg-rating="categoryRatingData!.avg_rating"
-          :total-reviews="categoryRatingData!.total_reviews"
-        />
-
-        <!-- Описание (обрезанное) -->
-        <p
-          v-if="currentCategory.description"
-          class="text-sm text-muted-foreground leading-relaxed line-clamp-2"
-        >
-          {{ currentCategory.description }}
-        </p>
-
-        <!-- SEO текст (HTML) -->
+      <!-- Универсальный контейнер: на мобилках flex-col, на десктопе flex-row -->
+      <div class="flex flex-col lg:flex-row gap-4 lg:gap-6 items-start">
+        <!-- Картинка (один блок для всех устройств) -->
         <div
-          v-else-if="seoText"
-          class="text-sm text-muted-foreground leading-relaxed line-clamp-2 prose prose-sm max-w-none"
-          v-html="seoText"
-        />
-
-        <!-- Компактная статистика -->
-        <div class="flex items-center gap-3 text-xs text-muted-foreground">
-          <ClientOnly>
-            <div class="flex items-center gap-1.5">
-              <Icon name="lucide:package" class="w-3.5 h-3.5 text-blue-500" />
-              <span>{{ displayedProducts.length }}</span>
-            </div>
-          </ClientOnly>
-          <ClientOnly>
-            <div
-              v-if="availableBrands.length > 0"
-              class="flex items-center gap-1.5"
-            >
-              <Icon name="lucide:award" class="w-3.5 h-3.5 text-purple-500" />
-              <span>{{ availableBrands.length }}</span>
-            </div>
-          </ClientOnly>
-          <ClientOnly>
-            <div
-              v-if="priceRange.min > 0 || priceRange.max < 50000"
-              class="flex items-center gap-1.5"
-            >
-              <Icon name="lucide:tag" class="w-3.5 h-3.5 text-green-500" />
-              <span>от
-                {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }}
-                ₸</span>
-            </div>
-          </ClientOnly>
-        </div>
-      </div>
-
-      <!-- Десктопная версия (оригинальная) -->
-      <div class="hidden lg:grid grid-cols-12 gap-6 items-start">
-        <!-- Картинка категории слева -->
-        <div v-if="currentCategory.image_url" class="col-span-3">
-          <div
-            class="w-full max-w-[220px] h-[160px] rounded-lg overflow-hidden shadow-md bg-gray-50 dark:bg-gray-900 flex items-center justify-center"
-          >
-            <ProgressiveImage
-              :src="
-                getVariantUrl(
-                  BUCKET_NAME_CATEGORY,
-                  currentCategory.image_url,
-                  'md',
-                )
-              "
-              :alt="currentCategory.name"
-              object-fit="contain"
-              placeholder-type="lqip"
-              :blur-data-url="currentCategory.blur_placeholder || undefined"
-              :eager="true"
-              class="w-full h-full"
-            />
-          </div>
-        </div>
-
-        <!-- Текстовый блок справа -->
-        <div
-          :class="currentCategory.image_url ? 'col-span-9' : 'col-span-12'"
-          class="space-y-4"
+          v-if="currentCategory.image_url"
+          class="shrink-0 w-16 h-16 lg:w-[220px] lg:h-[160px] rounded-lg overflow-hidden shadow-sm lg:shadow-md bg-gray-50 dark:bg-gray-900 flex items-center justify-center"
         >
-          <!-- Заголовок (только десктопная версия) -->
-          <h1
-            class="hidden lg:block text-2xl md:text-3xl font-bold min-h-[4.5rem] transition-opacity duration-200"
-            :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'"
-          >
-            {{ title }}
-          </h1>
+          <ProgressiveImage
+            :src="
+              getVariantUrl(
+                BUCKET_NAME_CATEGORY,
+                currentCategory.image_url,
+                'md',
+              )
+            "
+            :alt="currentCategory.name"
+            object-fit="contain"
+            placeholder-type="lqip"
+            :blur-data-url="currentCategory.blur_placeholder || undefined"
+            :eager="true"
+            class="w-full h-full"
+          />
+        </div>
 
-          <!-- Рейтинг категории (десктоп) -->
+        <!-- Текстовый блок и статистика -->
+        <div class="flex-1 space-y-3 lg:space-y-4 w-full">
+          <!-- Рейтинг категории -->
           <CategoryRatingBlock
             v-if="showCategoryRating"
             :avg-rating="categoryRatingData!.avg_rating"
@@ -1574,7 +1482,7 @@ useSchemaOrg(
           <!-- Описание категории из БД -->
           <p
             v-if="currentCategory.description"
-            class="text-base text-muted-foreground leading-relaxed"
+            class="text-sm lg:text-base text-muted-foreground leading-relaxed line-clamp-2 lg:line-clamp-none"
           >
             {{ currentCategory.description }}
           </p>
@@ -1582,38 +1490,34 @@ useSchemaOrg(
           <!-- SEO текст (HTML) -->
           <div
             v-else-if="seoText"
-            class="text-base text-muted-foreground leading-relaxed prose max-w-none"
+            class="text-sm lg:text-base text-muted-foreground leading-relaxed line-clamp-2 lg:line-clamp-none prose prose-sm lg:prose max-w-none"
             v-html="seoText"
           />
 
           <!-- Статистика категории -->
-          <div class="flex flex-wrap gap-4 pt-2">
+          <div class="flex flex-wrap items-center gap-3 lg:gap-4 pt-2 text-xs lg:text-sm text-muted-foreground">
             <ClientOnly>
-              <div
-                class="flex items-center gap-2 text-sm text-muted-foreground"
-              >
-                <Icon name="lucide:package" class="w-4 h-4 text-blue-500" />
-                <span>{{ displayedProducts.length }} товаров</span>
+              <div class="flex items-center gap-1.5 lg:gap-2">
+                <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
+                <span>{{ displayedProducts.length }} <span class="hidden lg:inline">товаров</span></span>
               </div>
             </ClientOnly>
             <ClientOnly>
               <div
                 v-if="availableBrands.length > 0"
-                class="flex items-center gap-2 text-sm text-muted-foreground"
+                class="flex items-center gap-1.5 lg:gap-2"
               >
-                <Icon name="lucide:award" class="w-4 h-4 text-purple-500" />
-                <span>{{ availableBrands.length }} брендов</span>
+                <Icon name="lucide:award" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-500" />
+                <span>{{ availableBrands.length }} <span class="hidden lg:inline">брендов</span></span>
               </div>
             </ClientOnly>
             <ClientOnly>
               <div
                 v-if="priceRange.min > 0 || priceRange.max < 50000"
-                class="flex items-center gap-2 text-sm text-muted-foreground"
+                class="flex items-center gap-1.5 lg:gap-2"
               >
-                <Icon name="lucide:tag" class="w-4 h-4 text-green-500" />
-                <span>от
-                  {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }}
-                  ₸</span>
+                <Icon name="lucide:tag" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-green-500" />
+                <span>от {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }} ₸</span>
               </div>
             </ClientOnly>
           </div>
