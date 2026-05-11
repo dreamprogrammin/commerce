@@ -96,7 +96,7 @@ export default defineNuxtConfig({
     groups: [
       {
         userAgent: ["*"],
-        allow: ["/", "/catalog/**", "/brand/**", "/*?brand=*"],
+        allow: ["/", "/catalog/**", "/brand/**"],
         disallow: [
           "/admin",
           "/confirm",
@@ -111,7 +111,9 @@ export default defineNuxtConfig({
           "/notifications",
           "/auth",
           "/api/**",
-          "/*?*",
+          "/**/",
+          "/__nuxt",
+          "/_nuxt",
         ],
       },
       // Yandex-специфичная конфигурация для очистки параметров фильтров
