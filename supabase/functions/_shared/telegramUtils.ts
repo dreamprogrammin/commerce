@@ -63,7 +63,6 @@ export async function updateTelegramMessage(
     const body: any = {
       chat_id: chatId,
       message_id: parseInt(messageId),
-      text: newText,
       parse_mode: parseMode,
     }
 
@@ -75,9 +74,11 @@ export async function updateTelegramMessage(
       console.log('⚠️ Кнопки НЕ переданы!')
     }
 
-    console.log('📤 Отправляем в Telegram API:', JSON.stringify(body))
+    // Сначала пробуем editMessageText (для обычных текстовых сообщений)
+    body.text = newText
+    console.log('📤 Пробуем editMessageText:', JSON.stringify(body))
 
-    const response = await fetch(
+    let response = await fetch(
       `https://api.telegram.org/bot${botToken}/editMessageText`,
       {
         method: 'POST',
@@ -86,10 +87,31 @@ export async function updateTelegramMessage(
       }
     )
 
-    const result = await response.json()
+    let result = await response.json()
+
+    // Если ошибка "there is no text in the message to edit" - пробуем editMessageCaption
+    if (!response.ok && result.description?.includes('there is no text in the message to edit')) {
+      console.log('⚠️ Сообщение содержит медиа, пробуем editMessageCaption...')
+      
+      delete body.text
+      body.caption = newText
+      
+      response = await fetch(
+        `https://api.telegram.org/bot${botToken}/editMessageCaption`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      )
+      
+      result = await response.json()
+    }
 
     if (!response.ok) {
       console.error('❌ Ошибка обновления Telegram сообщения:', result)
+      // Не фейлим весь процесс из-за ошибки обновления Telegram
+      console.log('⚠️ Не удалось обновить Telegram:', result.description)
       return {
         success: false,
         error: result.description || 'Unknown error'
