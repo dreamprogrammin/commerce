@@ -7,7 +7,7 @@ import {
   XCircle,
 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import  from 'canvas-confetti'
+import confetti from 'canvas-confetti'
 
 import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
