@@ -101,10 +101,10 @@ onMounted(async () => {
   
   // Вибрация при старте
   if (navigator.vibrate) {
-    navigator.vibrate(200)
+    navigator.vibrate(1000)
   }
 
-  const duration = 3000
+  const duration = 1000
   const end = Date.now() + duration
 
   const frame = () => {
