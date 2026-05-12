@@ -29,6 +29,7 @@ const authStore = useAuthStore();
 const cartStore = useCartStore();
 const profileStore = useProfileStore();
 const promoCodeStore = usePromoCodeStore();
+const { triggerHaptic } = useHaptic();
 
 const { user, isLoggedIn } = storeToRefs(authStore);
 const { bonusBalance } = storeToRefs(profileStore);
@@ -320,6 +321,9 @@ async function placeOrder() {
     comment: orderForm.value.comment.trim() || undefined,
     deliveryCost: deliveryCost.value,
   });
+
+  // Вибрация при успешном оформлении заказа
+  triggerHaptic('success');
 
   // Очищаем промокод после успешного заказа
   promoCodeStore.clearCode();

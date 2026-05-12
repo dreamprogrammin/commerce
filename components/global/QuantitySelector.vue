@@ -8,6 +8,7 @@ const props = defineProps<{
 }>()
 const isOpen = ref(false)
 const cartStore = useCartStore()
+const { triggerHaptic } = useHaptic()
 
 // ✅ Медиа-запрос инициализируем на клиенте чтобы избежать hydration mismatch
 const isDesktop = ref(false)
@@ -58,6 +59,7 @@ function updateQuantity(newQuantity: number | string) {
   const finalQuantity = Math.min(numQuantity, maxAvailableQuantity.value)
   if (finalQuantity > 0) {
     cartStore.updateQuantity(props.product.id, finalQuantity)
+    triggerHaptic('light')
   }
   else {
     cartStore.removeItem(props.product.id)
