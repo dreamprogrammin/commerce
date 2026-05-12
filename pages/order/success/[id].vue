@@ -104,7 +104,7 @@ onMounted(async () => {
     navigator.vibrate([100, 50, 100])
   }
 
-  const duration = 100
+  const duration = 500
   const end = Date.now() + duration
 
   const frame = () => {
