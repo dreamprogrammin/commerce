@@ -96,12 +96,39 @@ onMounted(async () => {
     await fetchOrderStatus()
   }
 
-  // 🎉 Party Confetti - мощный эффект со всех сторон!
-  confetti({
-    particleCount: 100,
-    spread: 70,
-    origin: { y: 0.6 }
-  })
+  // 🎉 Party Confetti - мощный салют из углов экрана
+  const colors = ['#3b82f6', '#facc15', '#ef4444', '#10b981']
+  
+  // Вибрация при старте
+  if (navigator.vibrate) {
+    navigator.vibrate([100, 50, 100])
+  }
+
+  const duration = 3000
+  const end = Date.now() + duration
+
+  const frame = () => {
+    if (Date.now() > end) return
+
+    confetti({
+      particleCount: 2,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 1 },
+      colors
+    })
+    confetti({
+      particleCount: 2,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 1 },
+      colors
+    })
+
+    requestAnimationFrame(frame)
+  }
+
+  frame()
 })
 </script>
 
