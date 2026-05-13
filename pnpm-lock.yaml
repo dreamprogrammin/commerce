@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@lottiefiles/dotlottie-vue':
+        specifier: ^0.11.13
+        version: 0.11.13(vue@3.5.32(typescript@5.9.3))
       '@nuxt/fonts':
         specifier: ^0.12.1
         version: 0.12.1(db0@0.3.4)(ioredis@5.10.1)(magicast@0.5.2)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))
@@ -992,6 +995,14 @@ packages:
 
   '@kwsites/promise-deferred@1.1.1':
     resolution: {integrity: sha512-GaHYm+c0O9MjZRu0ongGBRbinu8gVAMd2UZjji6jVmqKtZluZnptXGWhz1E8j8D2HJ3f/yMxKAUC0b+57wncIw==}
+
+  '@lottiefiles/dotlottie-vue@0.11.13':
+    resolution: {integrity: sha512-89e1QJYxF+TcFSX5RzNYUWfH3jv7sAVRnYp0zSG9vmw1cCDudTSttDxJ4lMT9ZINT0nl8SX/zBwoKGLpj1gtCA==}
+    peerDependencies:
+      vue: ^3.3.4
+
+  '@lottiefiles/dotlottie-web@0.72.1':
+    resolution: {integrity: sha512-TPHCTQHw4oZBiIi/JPd6CtjPzsazpyRVUloO7kA5khF6IX/sCIfBa8l/Tav333pskO6gFMtlnfRPwEOatMZS/A==}
 
   '@mapbox/node-pre-gyp@2.0.3':
     resolution: {integrity: sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg==}
@@ -7858,6 +7869,13 @@ snapshots:
       - supports-color
 
   '@kwsites/promise-deferred@1.1.1': {}
+
+  '@lottiefiles/dotlottie-vue@0.11.13(vue@3.5.32(typescript@5.9.3))':
+    dependencies:
+      '@lottiefiles/dotlottie-web': 0.72.1
+      vue: 3.5.32(typescript@5.9.3)
+
+  '@lottiefiles/dotlottie-web@0.72.1': {}
 
   '@mapbox/node-pre-gyp@2.0.3':
     dependencies:

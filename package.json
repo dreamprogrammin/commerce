@@ -22,6 +22,7 @@
     "seo:generate": "npx tsx scripts/generate-alt-texts.ts"
   },
   "dependencies": {
+    "@lottiefiles/dotlottie-vue": "^0.11.13",
     "@nuxt/fonts": "^0.12.1",
     "@nuxt/icon": "2.1.0",
     "@nuxt/image": "^1.11.0",
