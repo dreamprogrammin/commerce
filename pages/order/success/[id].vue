@@ -14,6 +14,7 @@ import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import OrderTrackerLottie from "@/components/order/OrderTrackerLottie.vue"
 
 definePageMeta({ layout: 'checkout' })
 

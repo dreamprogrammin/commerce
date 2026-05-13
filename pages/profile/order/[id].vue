@@ -15,6 +15,7 @@ import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
 import { useUserOrders } from "@/composables/orders/useUserOrders";
 import { IMAGE_SIZES } from "@/config/images";
 import { BUCKET_NAME_PRODUCT } from "@/constants";
+import OrderTrackerLottie from "@/components/order/OrderTrackerLottie.vue"
 
 const route = useRoute();
 const router = useRouter();
@@ -294,6 +295,15 @@ useHead({
 
     <!-- Содержимое -->
     <div v-else-if="order" class="space-y-6">
+      <!-- ✅ Lottie Animation Tracker -->
+      <Card>
+        <CardContent class="p-0">
+          <OrderTrackerLottie
+            :status="order.status as 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'"
+          />
+        </CardContent>
+      </Card>
+
       <!-- Заголовок -->
       <div class="flex items-start justify-between">
         <div>
