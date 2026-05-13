@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import animNew from '@/assets/animations/new.json'
-import animConfirmed from '@/assets/animations/confirmed.json'
-import animShipped from '@/assets/animations/shipped.json'
-import animDelivered from '@/assets/animations/delivered.json'
-import animCancelled from '@/assets/animations/cancelled.json'
+import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
 
 type OrderStatus = 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
 
@@ -11,14 +7,17 @@ const props = defineProps<{
   status: OrderStatus
 }>()
 
-const currentAnimation = computed(() => {
+const animationSrc = computed(() => {
+  const fallbackUrl = 'https://lottie.host/embed/d6e965dc-2035-4975-a09b-8e43c239c4fd/KghlvZ7TS1.lottie'
+  
   const animations = {
-    new: animNew,
-    confirmed: animConfirmed,
-    shipped: animShipped,
-    delivered: animDelivered,
-    cancelled: animCancelled
+    new: fallbackUrl,
+    confirmed: fallbackUrl,
+    shipped: fallbackUrl,
+    delivered: fallbackUrl,
+    cancelled: fallbackUrl
   }
+  
   return animations[props.status]
 })
 
@@ -60,14 +59,14 @@ const progressSteps = computed(() => {
   <div class="flex flex-col items-center space-y-6 py-8">
     <!-- Lottie Animation -->
     <ClientOnly>
-      <Vue3Lottie
-        :animation-data="currentAnimation"
-        :width="250"
-        :height="250"
+      <DotLottieVue
+        :src="animationSrc"
+        :autoplay="true"
         :loop="true"
+        style="width: 250px; height: 250px;"
       />
       <template #fallback>
-        <div class="w-[250px] h-[250px] bg-muted animate-pulse rounded-lg" />
+        <div class="w-[250px] h-[250px] bg-muted animate-pulse rounded-full" />
       </template>
     </ClientOnly>
 

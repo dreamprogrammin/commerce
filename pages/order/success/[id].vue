@@ -269,12 +269,12 @@ onMounted(async () => {
       </CardContent>
     </Card>
 
-    <!-- ✅ Lottie Animation Tracker (временно отключен до добавления анимаций) -->
-    <!-- <OrderTrackerLottie
+    <!-- ✅ Lottie Animation Tracker -->
+    <OrderTrackerLottie
       v-if="isAuthenticated && orderStatus"
       :status="orderStatus as 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'"
       class="mb-6"
-    /> -->
+    />
 
     <!-- ✅ Order Tracker с realtime обновлениями -->
     <OrderTracker
