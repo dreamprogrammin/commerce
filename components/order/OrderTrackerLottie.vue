@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
 
-type OrderStatus = 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+type OrderStatus = 'new' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
 
 const props = defineProps<{
   status: OrderStatus
@@ -10,42 +10,46 @@ const props = defineProps<{
 const BASE_URL = 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/animations/'
 
 const animationSrc = computed(() => {
-  const fileNames = {
+  const fileNames: Record<OrderStatus, string> = {
     new: 'Order.lottie',
     confirmed: 'Order.lottie',
+    processing: 'delivery-truck.lottie',
     shipped: 'delivery-truck.lottie',
     delivered: 'Order.lottie',
     cancelled: 'Order.lottie'
   }
   
-  return BASE_URL + fileNames[props.status]
+  const fileName = fileNames[props.status] || 'Order.lottie'
+  return BASE_URL + fileName
 })
 
 const statusTitle = computed(() => {
-  const titles = {
+  const titles: Record<OrderStatus, string> = {
     new: 'Заказ принят',
     confirmed: 'Заказ подтвержден',
+    processing: 'Заказ в пути',
     shipped: 'Заказ в пути',
     delivered: 'Заказ доставлен',
     cancelled: 'Заказ отменен'
   }
-  return titles[props.status]
+  return titles[props.status] || 'Заказ'
 })
 
 const statusDescription = computed(() => {
-  const descriptions = {
+  const descriptions: Record<OrderStatus, string> = {
     new: 'Мы получили ваш заказ и начинаем его обработку',
     confirmed: 'Заказ подтвержден и готовится к отправке',
+    processing: 'Курьер уже мчит к вам!',
     shipped: 'Курьер уже мчит к вам!',
     delivered: 'Заказ успешно доставлен',
     cancelled: 'Заказ был отменен'
   }
-  return descriptions[props.status]
+  return descriptions[props.status] || ''
 })
 
 const progressSteps = computed(() => {
-  const steps = ['new', 'confirmed', 'shipped', 'delivered']
-  const currentIndex = steps.indexOf(props.status)
+  const steps = ['new', 'confirmed', 'processing', 'delivered']
+  const currentIndex = steps.indexOf(props.status === 'shipped' ? 'processing' : props.status)
   
   if (props.status === 'cancelled') {
     return steps.map(() => false)
