@@ -13,7 +13,7 @@ const animationSrc = computed(() => {
   const fileNames = {
     new: 'Order.lottie',
     confirmed: 'Order.lottie',
-    shipped: 'Order.lottie',
+    shipped: 'delivery-truck.lottie',
     delivered: 'Order.lottie',
     cancelled: 'Order.lottie'
   }
@@ -25,7 +25,7 @@ const statusTitle = computed(() => {
   const titles = {
     new: 'Заказ принят',
     confirmed: 'Заказ подтвержден',
-    shipped: 'Заказ передан курьеру',
+    shipped: 'Заказ в пути',
     delivered: 'Заказ доставлен',
     cancelled: 'Заказ отменен'
   }
@@ -36,7 +36,7 @@ const statusDescription = computed(() => {
   const descriptions = {
     new: 'Мы получили ваш заказ и начинаем его обработку',
     confirmed: 'Заказ подтвержден и готовится к отправке',
-    shipped: 'Заказ собран и передан курьеру',
+    shipped: 'Курьер уже мчит к вам!',
     delivered: 'Заказ успешно доставлен',
     cancelled: 'Заказ был отменен'
   }
