@@ -7,18 +7,18 @@ const props = defineProps<{
   status: OrderStatus
 }>()
 
+const BASE_URL = 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/animations/'
+
 const animationSrc = computed(() => {
-  const fallbackUrl = 'https://lottie.host/embed/d6e965dc-2035-4975-a09b-8e43c239c4fd/KghlvZ7TS1.lottie'
-  
-  const animations = {
-    new: fallbackUrl,
-    confirmed: fallbackUrl,
-    shipped: fallbackUrl,
-    delivered: fallbackUrl,
-    cancelled: fallbackUrl
+  const fileNames = {
+    new: 'Order.lottie',
+    confirmed: 'Order.lottie',
+    shipped: 'Order.lottie',
+    delivered: 'Order.lottie',
+    cancelled: 'Order.lottie'
   }
   
-  return animations[props.status]
+  return BASE_URL + fileNames[props.status]
 })
 
 const statusTitle = computed(() => {
@@ -63,6 +63,7 @@ const progressSteps = computed(() => {
         :src="animationSrc"
         :autoplay="true"
         :loop="true"
+        :speed="1"
         style="width: 250px; height: 250px;"
       />
       <template #fallback>
