@@ -179,6 +179,19 @@ Deno.serve(async (req) => {
       )
     }
 
+    if (orderData.status !== 'shipped') {
+      return new Response(
+        '❌ ОШИБКА\n\nЗаказ должен быть передан курьеру перед отметкой о доставке',
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'text/plain; charset=UTF-8'
+          },
+          status: 400
+        }
+      )
+    }
+
     // Обновляем заказ - устанавливаем статус delivered
     const { error: updateError } = await supabase
       .from(tableName)

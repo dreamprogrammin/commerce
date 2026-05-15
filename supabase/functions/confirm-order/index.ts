@@ -197,13 +197,13 @@ Deno.serve(async (req) => {
         const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
         const tableUrlParam = `&table=${tableName}`
 
-        const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${orderId}${tableUrlParam}${secretParam}`
+        const shipUrl = `${supabaseUrl}/functions/v1/ship-order?order_id=${orderId}${tableUrlParam}${secretParam}`
         const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableUrlParam}${secretParam}`
 
         const newButtons = {
           inline_keyboard: [
             [
-              { text: '✅ Доставлен', url: deliveredUrl }
+              { text: '🚚 Передать курьеру', url: shipUrl }
             ],
             [
               { text: '❌ Отменить', url: cancelUrl }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
 
-type OrderStatus = 'new' | 'confirmed' | 'processing' | 'delivered' | 'cancelled'
+type OrderStatus = 'new' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
 
 const props = defineProps<{
   status: OrderStatus
@@ -9,20 +9,21 @@ const props = defineProps<{
 
 const BASE_URL = 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/animations/'
 
-const STEPS: OrderStatus[] = ['new', 'confirmed', 'processing', 'delivered']
+const STEPS: OrderStatus[] = ['new', 'confirmed', 'processing', 'shipped', 'delivered']
 
 const isCancelled = computed(() => props.status === 'cancelled')
 
 const animationSrc = computed(() =>
-  BASE_URL + (props.status === 'processing' ? 'delivery-truck.lottie' : 'Order.lottie')
+  BASE_URL + (props.status === 'processing' || props.status === 'shipped' ? 'delivery-truck.lottie' : 'Order.lottie')
 )
 
 const statusInfo: Record<OrderStatus, { title: string; description: string }> = {
-  new:        { title: 'Заказ принят',        description: 'Мы получили ваш заказ и начинаем его обработку' },
-  confirmed:  { title: 'Заказ подтверждён',   description: 'Заказ подтверждён и готовится к отправке' },
-  processing: { title: 'Заказ в пути',        description: 'Курьер уже мчит к вам!' },
-  delivered:  { title: 'Заказ доставлен',     description: 'Заказ успешно доставлен' },
-  cancelled:  { title: 'Заказ отменён',       description: 'Заказ был отменён' },
+  new:        { title: 'Заказ принят',          description: 'Мы получили ваш заказ и начинаем его обработку' },
+  confirmed:  { title: 'Заказ подтверждён',     description: 'Заказ подтверждён и готовится к отправке' },
+  processing: { title: 'Заказ комплектуется',   description: 'Собираем ваш заказ и передаём курьеру' },
+  shipped:    { title: 'Заказ в пути',          description: 'Курьер уже мчит к вам!' },
+  delivered:  { title: 'Заказ доставлен',       description: 'Заказ успешно доставлен' },
+  cancelled:  { title: 'Заказ отменён',         description: 'Заказ был отменён' },
 }
 
 const progressSteps = computed(() => {
@@ -64,6 +65,7 @@ const progressSteps = computed(() => {
       <div v-if="!isCancelled" class="flex justify-between mt-2 text-xs text-muted-foreground">
         <span>Принят</span>
         <span>Подтверждён</span>
+        <span>Комплектуется</span>
         <span>В пути</span>
         <span>Доставлен</span>
       </div>
