@@ -376,6 +376,12 @@ verify_jwt = false
 import_map = "./functions/deliver-order/deno.json"
 entrypoint = "./functions/deliver-order/index.ts"
 
+[functions.ship-order]
+enabled = true
+verify_jwt = false
+import_map = "./functions/ship-order/deno.json"
+entrypoint = "./functions/ship-order/index.ts"
+
 [functions.image-transformer]
 enabled = true
 verify_jwt = true
