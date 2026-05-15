@@ -13,9 +13,13 @@ const STEPS: OrderStatus[] = ['new', 'confirmed', 'processing', 'shipped', 'deli
 
 const isCancelled = computed(() => props.status === 'cancelled')
 
-const animationSrc = computed(() =>
-  BASE_URL + (props.status === 'processing' || props.status === 'shipped' ? 'delivery-truck.lottie' : 'Order.lottie')
-)
+const animationSrc = computed(() => {
+  if (props.status === 'confirmed') return BASE_URL + 'Success.lottie'
+  if (props.status === 'processing') return BASE_URL + 'box.lottie'
+  if (props.status === 'shipped') return BASE_URL + 'delivery-truck.lottie'
+  if (props.status === 'delivered') return BASE_URL + 'delivery.lottie'
+  return BASE_URL + 'Order.lottie'
+})
 
 const statusInfo: Record<OrderStatus, { title: string; description: string }> = {
   new:        { title: 'Заказ принят',          description: 'Мы получили ваш заказ и начинаем его обработку' },
