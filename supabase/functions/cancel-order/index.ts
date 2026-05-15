@@ -146,6 +146,31 @@ Deno.serve(async (req) => {
 
     console.log('✅ Заказ успешно отменен:', data)
 
+    // Уведомляем клиента об отмене (если есть telegram_chat_id)
+    if (tableName === 'orders' && orderData?.user_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('telegram_chat_id')
+        .eq('id', orderData.user_id)
+        .single()
+
+      if (profile?.telegram_chat_id) {
+        console.log(`📱 Уведомление клиенту об отмене: ${profile.telegram_chat_id}`)
+        await fetch(`${supabaseUrl}/functions/v1/send-user-telegram`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            chat_id: profile.telegram_chat_id,
+            title: '❌ Ваш заказ отменён',
+            body: `Заказ №${orderId.slice(-6)} был отменён.\n\n${orderData.bonuses_spent && orderData.bonuses_spent > 0 ? `Бонусы (${orderData.bonuses_spent}) возвращены на ваш счёт.` : ''}`,
+          }),
+        })
+      }
+    }
+
     // Обновляем Telegram сообщение, если есть telegram_message_id
     if (orderData?.telegram_message_id) {
       const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
