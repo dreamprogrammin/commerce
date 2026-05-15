@@ -240,7 +240,18 @@ Deno.serve(async (req) => {
         ]
       }
     } else if (record.status === 'confirmed') {
-      // Подтверждён → показываем [Доставлен] [Отменить]
+      // Подтверждён → показываем [Передать курьеру] [Отменить]
+      const shipUrl = `${supabaseUrl}/functions/v1/ship-order?order_id=${record.id}${tableParam}${secretParam}`
+      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
+
+      buttons = {
+        inline_keyboard: [
+          [{ text: '🚚 Передать курьеру', url: shipUrl }],
+          [{ text: '❌ Отменить', url: cancelUrl }]
+        ]
+      }
+    } else if (record.status === 'shipped') {
+      // В пути → показываем [Доставлен] [Отменить]
       const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${record.id}${tableParam}${secretParam}`
       const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
 
