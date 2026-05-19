@@ -21,8 +21,8 @@ BEGIN
     b.name as brand_name,
     b.slug as brand_slug,
     COUNT(p.id) as products_count,
-    MIN(p.price) as min_price,
-    MAX(p.price) as max_price
+    MIN(p.final_price) as min_price,
+    MAX(p.final_price) as max_price
   FROM categories c
   CROSS JOIN brands b
   INNER JOIN products p ON p.category_id = c.id AND p.brand_id = b.id

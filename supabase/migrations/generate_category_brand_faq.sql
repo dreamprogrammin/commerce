@@ -17,8 +17,8 @@ BEGIN
     c.name,
     b.name,
     COUNT(p.id),
-    MIN(p.price),
-    MAX(p.price)
+    MIN(p.final_price),
+    MAX(p.final_price)
   INTO 
     v_category_name,
     v_brand_name,

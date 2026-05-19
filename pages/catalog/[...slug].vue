@@ -1037,8 +1037,11 @@ const robotsRule = computed(() => {
     return { index: true, follow: true }
   }
 
+  // Считаем фильтры БЕЗ учета бренда (если бренд один и без SEO-текста)
+  const filtersCountWithoutBrand = activeFiltersCount.value - (activeFilters.value.brandIds.length > 0 ? activeFilters.value.brandIds.length : 0)
+  
   if (
-    activeFiltersCount.value > 0
+    filtersCountWithoutBrand > 0
     || activeFilters.value.sortBy !== 'popularity'
   ) {
     return { noindex: true, follow: true }
