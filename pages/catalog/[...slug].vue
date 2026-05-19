@@ -327,19 +327,13 @@ const activeFiltersCount = computed(() => {
 
 const canonicalUrl = computed(() => {
   const baseUrl = 'https://uhti.kz'
-  let basePath: string
+  const basePath = currentCategory.value?.canonical_url 
+    || currentCategory.value?.href 
+    || route.path
 
-  if (currentCategory.value?.canonical_url) {
-    basePath = currentCategory.value.canonical_url
-  }
-  else if (currentCategory.value?.href) {
-    basePath = currentCategory.value.href
-  }
-  else {
-    basePath = route.path
-  }
+  const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
 
-  if (activeBrandSlug.value) {
+  if (hasUniqueSeoContent) {
     return `${baseUrl}${basePath}?brand=${activeBrandSlug.value}`
   }
 
@@ -1037,15 +1031,19 @@ const seoBlocks = computed(() => {
 })
 
 const robotsRule = computed(() => {
-  if (activeBrandSlug.value && activeFilters.value.brandIds.length === 1) {
+  const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
+
+  if (hasUniqueSeoContent) {
     return { index: true, follow: true }
   }
+
   if (
     activeFiltersCount.value > 0
     || activeFilters.value.sortBy !== 'popularity'
   ) {
     return { noindex: true, follow: true }
   }
+
   return { index: true, follow: true }
 })
 
