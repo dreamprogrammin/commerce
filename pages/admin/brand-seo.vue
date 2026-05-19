@@ -2,6 +2,7 @@
 import type { Database } from '@/types/supabase'
 import { Plus, Save, Search, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import { useSeoTemplates } from '@/composables/useSeoTemplates'
 
 definePageMeta({ layout: 'admin' })
 

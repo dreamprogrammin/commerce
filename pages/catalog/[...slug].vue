@@ -439,8 +439,6 @@ function getSortByFromQuery(
   return 'popularity'
 }
 
-const supabase = useSupabaseClient()
-
 async function loadFilterData(slug: string) {
   if (abortController.value) {
     abortController.value.abort()
