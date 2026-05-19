@@ -40,10 +40,62 @@ const form = ref({
 })
 
 const isSaving = ref(false)
+const isGenerating = ref(false)
+const isGeneratingFaq = ref(false)
+const { generateSeoForAllCategoryBrands } = useSeoTemplates()
 
 onMounted(async () => {
   await Promise.all([loadEntries(), loadCategories(), loadBrands()])
 })
+
+async function handleGenerateFaq() {
+  if (!confirm('Автоматически создать FAQ для всех существующих SEO-текстов категория+бренд?')) {
+    return
+  }
+
+  isGeneratingFaq.value = true
+  try {
+    const { data, error } = await supabase.rpc('generate_faq_for_all_category_brands')
+    
+    if (error) throw error
+    
+    const totalFaq = data?.reduce((sum: number, item: any) => sum + item.faq_count, 0) || 0
+    toast.success(`Создано ${totalFaq} FAQ для ${data?.length || 0} комбинаций`, {
+      description: 'FAQ успешно сгенерированы',
+    })
+  }
+  catch (error: any) {
+    toast.error('Ошибка генерации FAQ', { description: error.message })
+  }
+  finally {
+    isGeneratingFaq.value = false
+  }
+}
+
+async function handleAutoGenerate() {
+  if (!confirm('Автоматически создать SEO-тексты для всех комбинаций категория+бренд (где ≥3 товаров)? Существующие записи не будут изменены.')) {
+    return
+  }
+
+  isGenerating.value = true
+  try {
+    const results = await generateSeoForAllCategoryBrands({ dryRun: false })
+    
+    if (results) {
+      const newCount = results.length
+      toast.success(`Создано ${newCount} SEO-текстов`, {
+        description: 'Автогенерация завершена успешно',
+      })
+      await loadEntries()
+    }
+  }
+  catch (error: any) {
+    toast.error('Ошибка автогенерации', { description: error.message })
+  }
+  finally {
+    isGenerating.value = false
+  }
+}
 
 async function loadEntries() {
   isLoading.value = true
@@ -210,10 +262,26 @@ const previewUrl = computed(() => {
           Управление SEO-текстами для связки бренд+категория (Brand Landing Pages)
         </p>
       </div>
-      <Button @click="openNewDialog">
-        <Plus class="w-4 h-4 mr-2" />
-        Добавить
-      </Button>
+      <div class="flex gap-2">
+        <Button variant="outline" @click="handleGenerateFaq" :disabled="isGeneratingFaq">
+          <svg v-if="isGeneratingFaq" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {{ isGeneratingFaq ? 'Генерация FAQ...' : '❓ Генерация FAQ' }}
+        </Button>
+        <Button variant="outline" @click="handleAutoGenerate" :disabled="isGenerating">
+          <svg v-if="isGenerating" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {{ isGenerating ? 'Генерация...' : '🤖 Автогенерация' }}
+        </Button>
+        <Button @click="openNewDialog">
+          <Plus class="w-4 h-4 mr-2" />
+          Добавить
+        </Button>
+      </div>
     </div>
 
     <!-- Поиск -->
