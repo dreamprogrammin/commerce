@@ -117,7 +117,10 @@ export function useSeoTemplates() {
 
         if (!existing) {
           // Создаем новую запись
-          await supabase.from('category_brand_seo').insert(seoData)
+          const { error: insertError } = await supabase.from('category_brand_seo').insert(seoData)
+          if (insertError) {
+            console.error(`Error inserting SEO for ${combo.category_name} + ${combo.brand_name}:`, insertError)
+          }
         }
       }
 

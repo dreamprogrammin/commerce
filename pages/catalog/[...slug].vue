@@ -37,6 +37,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 // --- 1. Инициализация ---
 const route = useRoute()
 const router = useRouter()
+const supabase = useSupabaseClient()
 const categoriesStore = useCategoriesStore()
 const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
@@ -1082,7 +1083,7 @@ if (import.meta.client && _filterPayload.value) {
 }
 
 const { data: categoryQuestions } = await useAsyncData(
-  `catalog-faq-${currentCategorySlug.value}`,
+  `catalog-faq-${currentCategorySlug.value}-${activeBrandSlug.value || 'all'}`,
   async () => {
     const category = categoriesStore.allCategories.find(
       c => c.slug === currentCategorySlug.value,
@@ -1091,6 +1092,25 @@ const { data: categoryQuestions } = await useAsyncData(
       return []
 
     try {
+      // Если есть бренд с SEO-контентом, загружаем специальные вопросы
+      if (activeBrandSlug.value && categoryBrandSeo.value) {
+        const { data } = await supabase
+          .from('category_brand_questions')
+          .select('*')
+          .eq('category_id', category.id)
+          .eq('brand_id', categoryBrandSeo.value.brand_id)
+          .order('created_at', { ascending: true })
+        
+        if (data && data.length > 0) {
+          return data.map(q => ({
+            id: q.id,
+            question: q.question_text,
+            answer: q.answer_text,
+          }))
+        }
+      }
+      
+      // Иначе загружаем обычные вопросы категории
       return await categoryQuestionsStore.fetchQuestions(category.id)
     }
     catch (error) {
@@ -1099,7 +1119,7 @@ const { data: categoryQuestions } = await useAsyncData(
     }
   },
   {
-    watch: [currentCategorySlug],
+    watch: [currentCategorySlug, activeBrandSlug],
     server: true,
   },
 )

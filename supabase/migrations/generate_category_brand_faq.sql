@@ -1,3 +1,32 @@
+-- Создание таблицы вопросов для комбинаций категория + бренд
+CREATE TABLE IF NOT EXISTS public.category_brand_questions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category_id UUID NOT NULL REFERENCES public.categories(id) ON DELETE CASCADE,
+    brand_id UUID NOT NULL REFERENCES public.brands(id) ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    answer_text TEXT NOT NULL,
+    is_auto_generated BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    UNIQUE(category_id, brand_id, question_text)
+);
+
+-- Индексы
+CREATE INDEX IF NOT EXISTS idx_category_brand_questions_category ON public.category_brand_questions(category_id);
+CREATE INDEX IF NOT EXISTS idx_category_brand_questions_brand ON public.category_brand_questions(brand_id);
+CREATE INDEX IF NOT EXISTS idx_category_brand_questions_combo ON public.category_brand_questions(category_id, brand_id);
+
+-- RLS
+ALTER TABLE public.category_brand_questions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable read access for all users"
+ON public.category_brand_questions FOR SELECT
+USING (true);
+
+CREATE POLICY "Enable write for admins"
+ON public.category_brand_questions FOR ALL
+USING (public.is_admin());
+
 -- Функция для автогенерации FAQ для комбинаций категория + бренд
 CREATE OR REPLACE FUNCTION generate_category_brand_faq(
   p_category_id uuid,
@@ -58,19 +87,18 @@ BEGIN
     )
   );
 
-  -- Сохраняем FAQ в таблицу questions
-  INSERT INTO questions (entity_type, entity_id, question, answer, source, is_active)
+  -- Сохраняем FAQ в таблицу category_brand_questions
+  INSERT INTO category_brand_questions (category_id, brand_id, question_text, answer_text, is_auto_generated)
   SELECT 
-    'category_brand',
-    p_category_id || '_' || p_brand_id,
+    p_category_id,
+    p_brand_id,
     (faq->>'question')::text,
     (faq->>'answer')::text,
-    'auto_generated',
     true
   FROM jsonb_array_elements(v_faq) AS faq
-  ON CONFLICT (entity_type, entity_id, question) 
+  ON CONFLICT (category_id, brand_id, question_text) 
   DO UPDATE SET 
-    answer = EXCLUDED.answer,
+    answer_text = EXCLUDED.answer_text,
     updated_at = now();
 
   RETURN v_faq;
