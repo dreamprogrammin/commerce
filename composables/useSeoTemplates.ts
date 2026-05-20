@@ -120,29 +120,47 @@ export function useSeoTemplates() {
       }
 
       if (!dryRun) {
-        // Проверяем, есть ли уже запись
-        const { data: existing } = await supabase
-          .from('category_brand_seo')
-          .select('id')
-          .eq('category_id', combo.category_id)
-          .eq('brand_id', combo.brand_id)
-          .single()
-
-        if (existing && overwrite) {
-          // Обновляем существующую запись
-          const { error: updateError } = await supabase
+        if (overwrite) {
+          // Принудительная перезапись всех полей (опасная операция)
+          const { data: existing } = await supabase
             .from('category_brand_seo')
-            .update(seoData)
-            .eq('id', existing.id)
-          if (updateError) {
-            console.error(`Error updating SEO for ${combo.category_name} + ${combo.brand_name}:`, updateError)
+            .select('id')
+            .eq('category_id', combo.category_id)
+            .eq('brand_id', combo.brand_id)
+            .single()
+
+          if (existing) {
+            const { error: updateError } = await supabase
+              .from('category_brand_seo')
+              .update(seoData)
+              .eq('id', existing.id)
+            if (updateError) {
+              console.error(`Error updating SEO for ${combo.category_name} + ${combo.brand_name}:`, updateError)
+            }
+          }
+          else {
+            const { error: insertError } = await supabase.from('category_brand_seo').insert(seoData)
+            if (insertError) {
+              console.error(`Error inserting SEO for ${combo.category_name} + ${combo.brand_name}:`, insertError)
+            }
           }
         }
-        else if (!existing) {
-          // Создаем новую запись
-          const { error: insertError } = await supabase.from('category_brand_seo').insert(seoData)
-          if (insertError) {
-            console.error(`Error inserting SEO for ${combo.category_name} + ${combo.brand_name}:`, insertError)
+        else {
+          // Безопасный upsert через RPC (защищает уникальные тексты)
+          const { data: result, error: rpcError } = await supabase.rpc('safe_upsert_category_brand_seo', {
+            p_category_id: combo.category_id,
+            p_brand_id: combo.brand_id,
+            p_seo_h1: seoData.seo_h1,
+            p_seo_title: seoData.seo_title,
+            p_seo_description: seoData.seo_description,
+            p_seo_text: seoData.seo_text,
+          })
+
+          if (rpcError) {
+            console.error(`Error upserting SEO for ${combo.category_name} + ${combo.brand_name}:`, rpcError)
+          }
+          else if (result?.protected) {
+            console.log(`Protected: ${combo.category_name} + ${combo.brand_name}`)
           }
         }
       }

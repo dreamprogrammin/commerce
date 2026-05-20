@@ -2818,6 +2818,17 @@ export type Database = {
         Args: { p_code: string; p_order_amount: number }
         Returns: Json
       }
+      safe_upsert_category_brand_seo: {
+        Args: {
+          p_category_id: string
+          p_brand_id: string
+          p_seo_h1: string
+          p_seo_title: string
+          p_seo_description: string
+          p_seo_text: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

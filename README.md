@@ -86,3 +86,4 @@ Check out the [deployment documentation](https://nuxt.com/docs/getting-started/d
 - **[🤖 Автоматизация SEO для категорий + бренды](./docs/SEO_AUTOMATION.md)** 🚀
   - [Быстрый старт (2 минуты)](./docs/SEO_AUTOMATION_QUICKSTART.md)
   - **[📋 Полный Changelog - Что сделано](./docs/SEO_BRAND_AUTOMATION_CHANGELOG.md)** ✨
+  - **[🛡️ Защита уникальных SEO-текстов](./docs/SEO_TEXT_PROTECTION.md)** 🔒
