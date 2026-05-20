@@ -1409,11 +1409,11 @@ useSchemaOrg(
         '@type': 'FAQPage',
         'mainEntity': faqQuestions.value.map(q => ({
           '@type': 'Question',
-          'name': q.question_text,
+          'name': q.question,
           'acceptedAnswer': {
             '@type': 'Answer',
             // Удаляем HTML-теги для Schema.org, но сохраняем структуру текста
-            'text': (q.answer_text || 'Ответ скоро будет добавлен.')
+            'text': (q.answer || 'Ответ скоро будет добавлен.')
               .replace(/<strong>/g, '')
               .replace(/<\/strong>/g, '')
               .replace(/<ul>/g, '\n')
