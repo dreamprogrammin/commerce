@@ -103,7 +103,7 @@
     "puppeteer": "^24.34.0",
     "simple-git-hooks": "^2.13.1",
     "storybook": "^10.1.10",
-    "supabase": "^2.64.2",
+    "supabase": "^2.100.1",
     "typescript": "^5.9.2",
     "vitest": "^4.0.16"
   },
