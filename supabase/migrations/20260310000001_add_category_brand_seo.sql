@@ -47,6 +47,7 @@ CREATE OR REPLACE FUNCTION get_category_brand_seo(
   p_brand_slug TEXT
 )
 RETURNS TABLE (
+  brand_id UUID,
   seo_h1 TEXT,
   seo_title TEXT,
   seo_description TEXT,
@@ -58,6 +59,7 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT
+    cbs.brand_id,
     cbs.seo_h1,
     cbs.seo_title,
     cbs.seo_description,

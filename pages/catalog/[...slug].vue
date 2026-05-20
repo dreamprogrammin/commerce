@@ -77,6 +77,7 @@ const activeBrandSlug = computed(() => {
 })
 
 const categoryBrandSeo = ref<{
+  brand_id: string
   seo_h1: string | null
   seo_title: string | null
   seo_description: string | null
