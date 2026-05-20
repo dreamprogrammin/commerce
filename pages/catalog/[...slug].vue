@@ -1400,38 +1400,6 @@ useSchemaOrg(
       })
     }
 
-    // 4. FAQPage — без фильтров ИЛИ на Brand Landing (?brand=X)
-    if (
-      faqQuestions.value.length > 0
-      && (!hasActiveFilters.value || activeBrand.value)
-    ) {
-      schemas.push({
-        '@type': 'FAQPage',
-        'mainEntity': faqQuestions.value.map(q => ({
-          '@type': 'Question',
-          'name': q.question,
-          'acceptedAnswer': {
-            '@type': 'Answer',
-            // Удаляем HTML-теги для Schema.org, но сохраняем структуру текста
-            'text': (q.answer || 'Ответ скоро будет добавлен.')
-              .replace(/<strong>/g, '')
-              .replace(/<\/strong>/g, '')
-              .replace(/<ul>/g, '\n')
-              .replace(/<\/ul>/g, '')
-              .replace(/<li>/g, '• ')
-              .replace(/<\/li>/g, '\n')
-              .replace(/<a[^>]*>/g, '')
-              .replace(/<\/a>/g, '')
-              .replace(/<br\s*\/?>/g, '\n')
-              .replace(/<p>/g, '')
-              .replace(/<\/p>/g, '\n')
-              .replace(/\n{2,}/g, '\n')
-              .trim(),
-          },
-        })),
-      })
-    }
-
     return schemas
   }),
 )
