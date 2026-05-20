@@ -25,8 +25,14 @@ BEGIN
     COUNT(p.id) as products_count,
     MIN(p.final_price) as min_price,
     MAX(p.final_price) as max_price,
-    ROUND(AVG(p.avg_rating), 1) as avg_rating,
-    SUM(p.review_count) as total_reviews
+    ROUND(
+      COALESCE(
+        SUM(p.avg_rating * p.review_count)::numeric / NULLIF(SUM(p.review_count), 0),
+        0
+      ),
+      1
+    ) as avg_rating,
+    COALESCE(SUM(p.review_count), 0) as total_reviews
   FROM categories c
   CROSS JOIN brands b
   INNER JOIN products p ON p.category_id = c.id AND p.brand_id = b.id
