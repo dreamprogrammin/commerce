@@ -1092,12 +1092,20 @@ const { data: categoryQuestions } = await useAsyncData(
     try {
       // Если есть бренд с SEO-контентом, загружаем специальные вопросы
       if (activeBrandSlug.value && categoryBrandSeo.value) {
-        const { data } = await supabase
+        console.log('[FAQ DEBUG] Loading brand FAQ:', {
+          category_id: category.id,
+          brand_id: categoryBrandSeo.value.brand_id,
+          brand_slug: activeBrandSlug.value,
+        })
+        
+        const { data, error } = await supabase
           .from('category_brand_questions')
           .select('*')
           .eq('category_id', category.id)
           .eq('brand_id', categoryBrandSeo.value.brand_id)
           .order('created_at', { ascending: true })
+        
+        console.log('[FAQ DEBUG] Brand FAQ result:', { data, error, count: data?.length })
         
         if (data && data.length > 0) {
           return data.map(q => ({
@@ -1106,6 +1114,12 @@ const { data: categoryQuestions } = await useAsyncData(
             answer: q.answer_text,
           }))
         }
+      }
+      else {
+        console.log('[FAQ DEBUG] No brand SEO:', {
+          activeBrandSlug: activeBrandSlug.value,
+          hasCategoryBrandSeo: !!categoryBrandSeo.value,
+        })
       }
       
       // Иначе загружаем обычные вопросы категории
