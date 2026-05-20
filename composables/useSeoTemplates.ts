@@ -9,6 +9,8 @@ interface SeoTemplateData {
   minPrice: number
   maxPrice: number
   city?: string
+  rating?: number
+  reviewsCount?: number
 }
 
 export function useSeoTemplates() {
@@ -50,10 +52,28 @@ export function useSeoTemplates() {
   }
 
   /**
-   * Генерирует Description для страницы категория + бренд
+   * Генерирует Description для страницы категория + бренд (гибридный сниппет)
    */
   function generateBrandCategoryDescription(data: SeoTemplateData): string {
-    return `${data.categoryName} ${data.brandName} в Алматы ⭐ ${data.productsCount} моделей от ${data.minPrice.toLocaleString('ru-KZ')} ₸ ✓ Оригинальная продукция ✓ Доставка 1 день ✓ Гарантия качества`
+    const city = data.city || 'Алматы'
+    const parts = []
+    
+    // Эмоциональная фраза + бренд
+    parts.push(`${data.categoryName} ${data.brandName} в Ухтышке`)
+    
+    // Цена
+    parts.push(`💰 Цены от ${data.minPrice.toLocaleString('ru-KZ')} ₸`)
+    
+    // Рейтинг и отзывы (если есть)
+    if (data.rating && data.reviewsCount && data.reviewsCount > 0) {
+      parts.push(`⭐ Рейтинг: ${data.rating.toFixed(1)} (${data.reviewsCount} отз)`)
+    }
+    
+    // Доставка и призыв
+    parts.push(`Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы прямо сейчас!`)
+    
+    const result = parts.join('. ')
+    return result.length > 180 ? `${result.substring(0, 177)}...` : result
   }
 
   /**
