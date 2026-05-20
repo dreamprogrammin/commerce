@@ -84,3 +84,5 @@ Check out the [deployment documentation](https://nuxt.com/docs/getting-started/d
   - [Чеклист внедрения](./docs/IMAGE_SEO_CHECKLIST.md)
   - [Финальный чеклист](./docs/IMAGE_SEO_FINAL_CHECKLIST.md)
 - **[🤖 Автоматизация SEO для категорий + бренды](./docs/SEO_AUTOMATION.md)** 🚀
+  - [Быстрый старт (2 минуты)](./docs/SEO_AUTOMATION_QUICKSTART.md)
+  - **[📋 Полный Changelog - Что сделано](./docs/SEO_BRAND_AUTOMATION_CHANGELOG.md)** ✨
