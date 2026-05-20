@@ -20,7 +20,19 @@ export function useSeoTemplates() {
   function generateBrandCategorySeoText(data: SeoTemplateData): string {
     const city = data.city || 'Алматы'
     
-    return `Ухтышка — это крупнейший интернет-магазин в ${city}, где можно купить оригинальные ${data.categoryName.toLowerCase()} ${data.brandName}. В нашем ассортименте представлено ${data.productsCount} моделей по цене от ${data.minPrice.toLocaleString('ru-KZ')} до ${data.maxPrice.toLocaleString('ru-KZ')} ₸. В отличие от Kaspi или Ozon, мы проверяем каждый товар ${data.brandName} перед отправкой и гарантируем оригинальность. Доставка ${data.categoryName.toLowerCase()} ${data.brandName} по ${city} — 1 день!`
+    const templates = [
+      `Ухтышка — это официальный интернет-магазин в ${city}, где можно купить оригинальные ${data.categoryName.toLowerCase()} ${data.brandName}. Мы не крупная сеть, а уютный локальный сервис с собственным складом в мкр. Шапагат. Благодаря этому наши цены часто выгоднее, чем на Kaspi. В ассортименте ${data.productsCount} моделей от ${data.minPrice.toLocaleString('ru-KZ')} ₸. Вы можете заказать доставку ${data.brandName} день-в-день или забрать товар самовывозом.`,
+      
+      `В Ухтышке представлен широкий выбор ${data.categoryName.toLowerCase()} ${data.brandName} — ${data.productsCount} моделей по цене от ${data.minPrice.toLocaleString('ru-KZ')} до ${data.maxPrice.toLocaleString('ru-KZ')} ₸. Мы работаем как локальный сервис со складом в мкр. Шапагат (${city}), поэтому можем предложить цены выгоднее Kaspi и доставку день-в-день. Заказывайте ${data.brandName} с самовывозом или курьерской доставкой!`,
+      
+      `Ищете ${data.categoryName.toLowerCase()} ${data.brandName} в ${city}? Ухтышка — уютный локальный магазин с собственным складом в мкр. Шапагат. У нас ${data.productsCount} моделей ${data.brandName} от ${data.minPrice.toLocaleString('ru-KZ')} ₸. Проверяйте цены — мы часто выгоднее Kaspi! Доставка день-в-день или самовывоз в удобное время.`,
+      
+      `Ухтышка предлагает оригинальные ${data.categoryName.toLowerCase()} ${data.brandName} с доставкой по ${city}. Это не сетевой магазин, а локальный сервис со складом в мкр. Шапагат — поэтому цены конкурентные (часто ниже Kaspi). В наличии ${data.productsCount} моделей от ${data.minPrice.toLocaleString('ru-KZ')} до ${data.maxPrice.toLocaleString('ru-KZ')} ₸. Заказывайте с доставкой день-в-день!`,
+    ]
+    
+    // Детерминированный выбор шаблона на основе хеша brand_id + category_id
+    const hash = (data.brandSlug + data.categorySlug).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    return templates[hash % templates.length]
   }
 
   /**
