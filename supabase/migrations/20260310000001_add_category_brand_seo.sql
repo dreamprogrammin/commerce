@@ -51,7 +51,11 @@ RETURNS TABLE (
   seo_h1 TEXT,
   seo_title TEXT,
   seo_description TEXT,
-  seo_text TEXT
+  seo_text TEXT,
+  products_count BIGINT,
+  min_price NUMERIC,
+  avg_rating NUMERIC,
+  total_reviews BIGINT
 )
 LANGUAGE plpgsql
 STABLE
@@ -63,12 +67,24 @@ BEGIN
     cbs.seo_h1,
     cbs.seo_title,
     cbs.seo_description,
-    cbs.seo_text
+    cbs.seo_text,
+    COUNT(p.id) as products_count,
+    MIN(p.final_price) as min_price,
+    ROUND(
+      COALESCE(
+        SUM(p.avg_rating * p.review_count)::numeric / NULLIF(SUM(p.review_count), 0),
+        0
+      ),
+      1
+    ) as avg_rating,
+    COALESCE(SUM(p.review_count), 0) as total_reviews
   FROM category_brand_seo cbs
   JOIN categories c ON c.id = cbs.category_id
   JOIN brands b ON b.id = cbs.brand_id
+  LEFT JOIN products p ON p.category_id = c.id AND p.brand_id = b.id AND p.is_active = true
   WHERE c.slug = p_category_slug
     AND b.slug = p_brand_slug
+  GROUP BY cbs.brand_id, cbs.seo_h1, cbs.seo_title, cbs.seo_description, cbs.seo_text
   LIMIT 1;
 END;
 $$;

@@ -27,6 +27,7 @@ import SEOContentRenderer from '@/components/category/SEOContentRenderer.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
+import { useSeoTemplates } from '@/composables/useSeoTemplates'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -43,6 +44,7 @@ const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
+const { generateBrandCategoryDescription } = useSeoTemplates()
 
 const priceValidUntil = new Date(
   new Date().setFullYear(new Date().getFullYear() + 1),
@@ -906,60 +908,73 @@ const categoryStats = computed(() => {
 })
 
 const metaDescription = computed(() => {
-  // Базовый текст в зависимости от контекста
-  let baseText = ''
-
-  if (activeBrand.value) {
-    if (categoryBrandSeo.value?.seo_description) {
-      baseText = categoryBrandSeo.value.seo_description
+  // Если есть бренд и SEO-данные из БД
+  if (activeBrand.value && categoryBrandSeo.value) {
+    // Если есть ручной description - используем его
+    if (categoryBrandSeo.value.seo_description) {
+      return categoryBrandSeo.value.seo_description
     }
-    else {
-      const catName = (categoryName.value || '').toLowerCase()
-      const brandName = activeBrand.value.name
-      const productName
-        = catName === brandName.toLowerCase()
-          ? brandName
-          : `${catName} ${brandName}`
-      baseText = `В каталоге Ухтышка вы можете купить ${productName}. Большой выбор, гарантия оригинала, доставка по Алматы.`
+    
+    // Иначе автогенерируем с реальными данными
+    return generateBrandCategoryDescription({
+      brandName: activeBrand.value.name,
+      brandSlug: activeBrand.value.slug,
+      categoryName: categoryName.value,
+      categorySlug: currentCategorySlug.value,
+      productsCount: categoryBrandSeo.value.products_count || displayedProducts.value.length,
+      minPrice: categoryBrandSeo.value.min_price || minPrice.value || 0,
+      maxPrice: categoryBrandSeo.value.min_price || 0,
+      rating: categoryBrandSeo.value.avg_rating || undefined,
+      reviewsCount: categoryBrandSeo.value.total_reviews || undefined,
+    })
+  }
+
+  // Если есть ручной meta_description — используем его с дополнениями
+  if (currentCategory.value?.meta_description) {
+    const cleanText = currentCategory.value.meta_description.replace(/<[^>]*>/g, '').trim()
+    
+    // Добавляем динамические триггеры
+    const parts = [cleanText]
+    
+    if (minPrice.value) {
+      parts.push(`💰 От ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`)
     }
-  }
-  else if (selectedSingleLine.value) {
-    const brandName = selectedSingleBrand.value?.name || ''
-    const lineName = selectedSingleLine.value.name
-    const prefix = brandName ? `${brandName} ${lineName}` : lineName
-    baseText = `${prefix} — широкий ассортимент в интернет-магазине Ухтышка. Быстрая доставка в Алматы и по Казахстану.`
-  }
-  else if (hasActiveFilters.value) {
-    baseText = `Результаты фильтрации для категории "${categoryName.value}". Широкий выбор товаров.`
-  }
-  else if (currentCategory.value?.meta_description) {
-    baseText = currentCategory.value.meta_description
-  }
-  else if (categoryDescription.value) {
-    baseText = categoryDescription.value
-  }
-  else {
-    baseText = `${categoryName.value} купить в интернет-магазине Ухтышка ✔️ Большой выбор, доставка по Алматы и Казахстану`
+    
+    if (categoryStats.value.reviews > 0) {
+      parts.push(`⭐ ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`)
+    }
+    
+    const result = parts.join('. ')
+    return result.length > 180 ? `${result.substring(0, 177)}...` : result
   }
 
-  // Очищаем от HTML-тегов
-  const cleanText = baseText.replace(/<[^>]*>/g, '').trim()
-
-  // Добавляем динамические данные (цена и рейтинг)
-  const pricePart = minPrice.value
-    ? ` 💰 От ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸.`
-    : ''
-
-  const ratingPart
-    = categoryStats.value.reviews > 0
-      ? ` ⭐ Рейтинг: ${categoryStats.value.rating} (${categoryStats.value.reviews} отз).`
-      : ''
-
-  // Склеиваем и обрезаем до безопасной длины (200 символов для Google)
-  const finalSnippet = `${cleanText}${pricePart}${ratingPart}`
-  return finalSnippet.length > 200
-    ? `${finalSnippet.substring(0, 197)}...`
-    : finalSnippet
+  // Генерируем гибридный сниппет
+  const catName = categoryName.value
+  const productsCount = displayedProducts.value.length
+  
+  // Эмоциональная фраза + социальное доказательство
+  let snippet = `${catName} в Ухтышке`
+  
+  // Добавляем количество товаров
+  if (productsCount > 0) {
+    snippet += `. В каталоге ${productsCount} ${productsCount === 1 ? 'модель' : productsCount < 5 ? 'модели' : 'моделей'}`
+  }
+  
+  // Цена
+  if (minPrice.value) {
+    snippet += `. 💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`
+  }
+  
+  // Рейтинг
+  if (categoryStats.value.reviews > 0) {
+    snippet += `. ⭐ Рейтинг: ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`
+  }
+  
+  // Гарантии и призыв
+  snippet += '. Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!'
+  
+  // Обрезаем до 180 символов
+  return snippet.length > 180 ? `${snippet.substring(0, 177)}...` : snippet
 })
 
 const metaTitle = computed(() => {
