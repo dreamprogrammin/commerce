@@ -85,8 +85,9 @@ export function useSeoTemplates() {
   /**
    * Массовая генерация SEO для всех комбинаций категория + бренд
    */
-  async function generateSeoForAllCategoryBrands(options?: { dryRun?: boolean }) {
+  async function generateSeoForAllCategoryBrands(options?: { dryRun?: boolean; overwrite?: boolean }) {
     const dryRun = options?.dryRun ?? true
+    const overwrite = options?.overwrite ?? false
 
     // Получаем все комбинации категория + бренд с товарами
     const { data: combinations, error } = await supabase.rpc('get_category_brand_combinations')
@@ -127,7 +128,17 @@ export function useSeoTemplates() {
           .eq('brand_id', combo.brand_id)
           .single()
 
-        if (!existing) {
+        if (existing && overwrite) {
+          // Обновляем существующую запись
+          const { error: updateError } = await supabase
+            .from('category_brand_seo')
+            .update(seoData)
+            .eq('id', existing.id)
+          if (updateError) {
+            console.error(`Error updating SEO for ${combo.category_name} + ${combo.brand_name}:`, updateError)
+          }
+        }
+        else if (!existing) {
           // Создаем новую запись
           const { error: insertError } = await supabase.from('category_brand_seo').insert(seoData)
           if (insertError) {

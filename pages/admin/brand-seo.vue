@@ -98,6 +98,30 @@ async function handleAutoGenerate() {
   }
 }
 
+async function handleRegenerateAll() {
+  if (!confirm('⚠️ ВНИМАНИЕ: Это перезапишет ВСЕ существующие SEO-тексты новыми шаблонами. Продолжить?')) {
+    return
+  }
+
+  isGenerating.value = true
+  try {
+    const results = await generateSeoForAllCategoryBrands({ dryRun: false, overwrite: true })
+    
+    if (results) {
+      toast.success(`Обновлено ${results.length} SEO-текстов`, {
+        description: 'Регенерация завершена успешно',
+      })
+      await loadEntries()
+    }
+  }
+  catch (error: any) {
+    toast.error('Ошибка регенерации', { description: error.message })
+  }
+  finally {
+    isGenerating.value = false
+  }
+}
+
 async function loadEntries() {
   isLoading.value = true
   try {
@@ -277,6 +301,13 @@ const previewUrl = computed(() => {
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
           {{ isGenerating ? 'Генерация...' : '🤖 Автогенерация' }}
+        </Button>
+        <Button variant="destructive" @click="handleRegenerateAll" :disabled="isGenerating">
+          <svg v-if="isGenerating" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {{ isGenerating ? 'Генерация...' : '🔄 Перезаписать все' }}
         </Button>
         <Button @click="openNewDialog">
           <Plus class="w-4 h-4 mr-2" />
