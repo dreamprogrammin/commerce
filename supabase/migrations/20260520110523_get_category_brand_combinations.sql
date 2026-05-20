@@ -9,7 +9,9 @@ RETURNS TABLE (
   brand_slug text,
   products_count bigint,
   min_price numeric,
-  max_price numeric
+  max_price numeric,
+  avg_rating numeric,
+  total_reviews bigint
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -22,7 +24,9 @@ BEGIN
     b.slug as brand_slug,
     COUNT(p.id) as products_count,
     MIN(p.final_price) as min_price,
-    MAX(p.final_price) as max_price
+    MAX(p.final_price) as max_price,
+    ROUND(AVG(p.avg_rating), 1) as avg_rating,
+    SUM(p.review_count) as total_reviews
   FROM categories c
   CROSS JOIN brands b
   INNER JOIN products p ON p.category_id = c.id AND p.brand_id = b.id

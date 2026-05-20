@@ -128,6 +128,8 @@ export function useSeoTemplates() {
         productsCount: combo.products_count,
         minPrice: combo.min_price,
         maxPrice: combo.max_price,
+        rating: combo.avg_rating,
+        reviewsCount: combo.total_reviews,
       }
 
       const seoData = {
