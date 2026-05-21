@@ -64,16 +64,18 @@ export function useSeoTemplates() {
     // Цена
     parts.push(`💰 Цены от ${data.minPrice.toLocaleString('ru-KZ')} ₸`)
     
-    // Рейтинг и отзывы (если есть)
+    // Рейтинг и отзывы с динамическими звездами (если есть)
     if (data.rating && data.reviewsCount && data.reviewsCount > 0) {
-      parts.push(`⭐ Рейтинг: ${data.rating.toFixed(1)} (${data.reviewsCount} отз)`)
+      const starCount = Math.round(data.rating)
+      const starEmojis = '⭐'.repeat(starCount)
+      parts.push(`${starEmojis} ${data.rating.toFixed(1).replace('.', ',')} (${data.reviewsCount} отз)`)
     }
     
     // Доставка и призыв
-    parts.push(`Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы прямо сейчас!`)
+    parts.push(`Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы!`)
     
     const result = parts.join('. ')
-    return result.length > 180 ? `${result.substring(0, 177)}...` : result
+    return result.length > 165 ? `${result.substring(0, 162)}...` : result
   }
 
   /**

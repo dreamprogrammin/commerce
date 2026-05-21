@@ -931,21 +931,35 @@ const metaDescription = computed(() => {
 
   // Если есть ручной meta_description — используем его с дополнениями
   if (currentCategory.value?.meta_description) {
-    const cleanText = currentCategory.value.meta_description.replace(/<[^>]*>/g, '').trim()
+    // 1. Очищаем HTML-теги
+    let cleanText = currentCategory.value.meta_description.replace(/<[^>]*>/g, '').trim()
     
-    // Добавляем динамические триггеры
+    // 2. Избегаем двойных точек: если исходный текст заканчивается на точку, временно убираем её
+    if (cleanText.endsWith('.')) {
+      cleanText = cleanText.slice(0, -1)
+    }
+    
     const parts = [cleanText]
     
+    // Добавляем цену
     if (minPrice.value) {
       parts.push(`💰 От ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`)
     }
     
+    // Добавляем отзывы и динамические звезды
     if (categoryStats.value.reviews > 0) {
-      parts.push(`⭐ ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`)
+      const ratingValue = parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
+      // Округляем рейтинг до ближайшего целого и повторяем символ звезды
+      const starCount = Math.round(ratingValue)
+      const starEmojis = '⭐'.repeat(starCount)
+      
+      parts.push(`${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`)
     }
     
     const result = parts.join('. ')
-    return result.length > 180 ? `${result.substring(0, 177)}...` : result
+    
+    // 3. Лимит длины 165 символов (оптимально для Google и Яндекс)
+    return result.length > 165 ? `${result.substring(0, 162)}...` : result
   }
 
   // Генерируем гибридный сниппет
@@ -965,16 +979,20 @@ const metaDescription = computed(() => {
     snippet += `. 💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`
   }
   
-  // Рейтинг
+  // Рейтинг с динамическими звездами
   if (categoryStats.value.reviews > 0) {
-    snippet += `. ⭐ Рейтинг: ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`
+    const ratingValue = parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
+    const starCount = Math.round(ratingValue)
+    const starEmojis = '⭐'.repeat(starCount)
+    
+    snippet += `. ${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`
   }
   
   // Гарантии и призыв
   snippet += '. Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!'
   
-  // Обрезаем до 180 символов
-  return snippet.length > 180 ? `${snippet.substring(0, 177)}...` : snippet
+  // Обрезаем до 165 символов
+  return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
 })
 
 const metaTitle = computed(() => {
