@@ -946,31 +946,41 @@ const metaDescription = computed(() => {
     // 1. Очищаем HTML-теги
     let cleanText = currentCategory.value.meta_description.replace(/<[^>]*>/g, '').trim()
     
-    // 2. Избегаем двойных точек: если исходный текст заканчивается на точку, временно убираем её
+    // 2. Сжимаем до 70-80 символов для гибридного сниппета
+    const maxBaseLength = 80
+    if (cleanText.length > maxBaseLength) {
+      // Обрезаем по последнему пробелу или точке
+      const cutPoint = cleanText.lastIndexOf(' ', maxBaseLength)
+      cleanText = cutPoint > 50 ? cleanText.substring(0, cutPoint) : cleanText.substring(0, maxBaseLength)
+    }
+    
+    // 3. Избегаем двойных точек: если исходный текст заканчивается на точку, временно убираем её
     if (cleanText.endsWith('.')) {
       cleanText = cleanText.slice(0, -1)
     }
     
     const parts = [cleanText]
     
-    // Добавляем цену
+    // Добавляем цену (коммерческий триггер)
     if (minPrice.value) {
-      parts.push(`💰 От ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`)
+      parts.push(`💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`)
     }
     
-    // Добавляем отзывы и динамические звезды
+    // Добавляем отзывы и динамические звезды (социальное доказательство)
     if (categoryStats.value.reviews > 0) {
       const ratingValue = parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
-      // Округляем рейтинг до ближайшего целого и повторяем символ звезды
       const starCount = Math.round(ratingValue)
       const starEmojis = '⭐'.repeat(starCount)
       
       parts.push(`${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`)
     }
     
+    // Добавляем призыв к действию
+    parts.push('Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!')
+    
     const result = parts.join('. ')
     
-    // 3. Лимит длины 165 символов (оптимально для Google и Яндекс)
+    // 4. Лимит длины 165 символов (оптимально для Google и Яндекс)
     return result.length > 165 ? `${result.substring(0, 162)}...` : result
   }
 
