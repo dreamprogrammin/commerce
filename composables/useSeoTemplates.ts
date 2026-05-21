@@ -62,13 +62,13 @@ export function useSeoTemplates() {
   }): string {
     const city = data.city || 'Алматы'
     
-    // Формируем список брендов в скобках
+    // Формируем список брендов в скобках (максимум 3)
     const brandsText = data.topBrands.length > 0 
-      ? ` (${data.topBrands.join(', ')})` 
+      ? ` (${data.topBrands.slice(0, 3).join(', ')})` 
       : ''
     
-    // Гибридный сниппет с брендами
-    const snippet = `Купить ${data.categoryName.toLowerCase()}${brandsText} в интернет-магазине «Ухтышка». 💰 Цены от ${data.minPrice.toLocaleString('ru-KZ')} ₸. Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы!`
+    // Компактный формат для укладки в 165 символов
+    const snippet = `${data.categoryName}${brandsText} в Ухтышке. 💰 От ${data.minPrice.toLocaleString('ru-KZ')} ₸. Быстрая доставка по ${city} за 1 день. Заказывайте!`
     
     // Обрезаем до 165 символов
     return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
