@@ -1139,22 +1139,24 @@ const robotsRule = computed(() => {
   return { index: true, follow: true }
 })
 
-// --- 5. Загрузка данных ---
+// --- 5. Загрузка данных (ПАРАЛЛЕЛЬНО для ускорения) ---
 
-await useAsyncData(
-  `catalog-meta-${currentCategorySlug.value}`,
-  () => categoriesStore.fetchCategoryData(),
-  { watch: [currentCategorySlug] },
-)
-
-const { data: _filterPayload } = await useAsyncData(
-  `catalog-filters-${currentCategorySlug.value}`,
-  () => loadFilterData(currentCategorySlug.value),
-  {
-    watch: [currentCategorySlug],
-    server: true,
-  },
-)
+// Загружаем критичные данные параллельно
+const [_categoriesData, _filterPayload] = await Promise.all([
+  useAsyncData(
+    `catalog-meta-${currentCategorySlug.value}`,
+    () => categoriesStore.fetchCategoryData(),
+    { watch: [currentCategorySlug] },
+  ),
+  useAsyncData(
+    `catalog-filters-${currentCategorySlug.value}`,
+    () => loadFilterData(currentCategorySlug.value),
+    {
+      watch: [currentCategorySlug],
+      server: true,
+    },
+  ),
+])
 
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
@@ -1170,6 +1172,7 @@ if (import.meta.client && _filterPayload.value) {
   isLoadingFilters.value = false
 }
 
+// FAQ и рейтинг загружаем ПОСЛЕ первого рендера (не блокируют LCP)
 const { data: categoryQuestions } = await useAsyncData(
   `catalog-faq-${currentCategorySlug.value}-${activeBrandSlug.value || 'all'}`,
   async () => {
@@ -1208,7 +1211,8 @@ const { data: categoryQuestions } = await useAsyncData(
   },
   {
     watch: [currentCategorySlug, activeBrandSlug],
-    server: true,
+    server: false, // Загружаем только на клиенте, не блокируем SSR
+    lazy: true, // Ленивая загрузка
   },
 )
 
@@ -1244,6 +1248,9 @@ const { data: categoryRatingData } = useQuery({
   ),
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
+  // Отложенная загрузка - не блокирует первый рендер
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
 })
 
 const showCategoryRating = computed(
@@ -1311,11 +1318,25 @@ useBreadcrumbSchema(
   ),
 )
 
-// ─── useHead: только meta keywords + canonical, без JSON-LD ─────────────────
-useHead(() => ({
-  meta: [{ name: 'keywords', content: metaKeywords.value || '' }],
-  link: [{ rel: 'canonical', href: canonicalUrl.value }],
-}))
+// ─── useHead: meta keywords + canonical + preload критичных ресурсов ──────────
+useHead(() => {
+  const links: any[] = [{ rel: 'canonical', href: canonicalUrl.value }]
+  
+  // Preload критичного изображения категории для ускорения LCP
+  if (categoryOgImageUrl.value) {
+    links.push({
+      rel: 'preload',
+      as: 'image',
+      href: categoryOgImageUrl.value,
+      fetchpriority: 'high',
+    })
+  }
+  
+  return {
+    meta: [{ name: 'keywords', content: metaKeywords.value || '' }],
+    link: links,
+  }
+})
 
 // ─── useSchemaOrg: все JSON-LD схемы — гарантированный SSR ──────────────────
 useSchemaOrg(
