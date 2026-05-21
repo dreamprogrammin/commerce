@@ -1139,10 +1139,10 @@ const robotsRule = computed(() => {
   return { index: true, follow: true }
 })
 
-// --- 5. Загрузка данных (ПАРАЛЛЕЛЬНО для ускорения) ---
+// --- 5. Загрузка данных ---
 
-// Загружаем критичные данные параллельно
-await Promise.all([
+// Загружаем категории и фильтры параллельно
+const [{ data: _categoriesData }, { data: _filterPayload }] = await Promise.all([
   useAsyncData(
     `catalog-meta-${currentCategorySlug.value}`,
     () => categoriesStore.fetchCategoryData(),
@@ -1155,24 +1155,24 @@ await Promise.all([
       watch: [currentCategorySlug],
       server: true,
     },
-  ).then(({ data }) => {
-    if (import.meta.client && data.value) {
-      availableBrands.value = data.value.brands
-      availableProductLines.value = data.value.productLines
-      availableFilters.value = data.value.filters
-      availableMaterials.value = data.value.materials
-      availableCountries.value = data.value.countries
-      priceRange.value = data.value.priceRange
-      pieceCountRange.value = data.value.pieceCountRange
-      numericAttributeRanges.value = data.value.numericRanges
-      activeFilters.value = data.value.activeFilters
-      categoryBrandSeo.value = data.value.categoryBrandSeo
-      isLoadingFilters.value = false
-    }
-  }),
+  ),
 ])
 
-// FAQ и рейтинг загружаем ПОСЛЕ первого рендера (не блокируют LCP)
+if (import.meta.client && _filterPayload.value) {
+  availableBrands.value = _filterPayload.value.brands
+  availableProductLines.value = _filterPayload.value.productLines
+  availableFilters.value = _filterPayload.value.filters
+  availableMaterials.value = _filterPayload.value.materials
+  availableCountries.value = _filterPayload.value.countries
+  priceRange.value = _filterPayload.value.priceRange
+  pieceCountRange.value = _filterPayload.value.pieceCountRange
+  numericAttributeRanges.value = _filterPayload.value.numericRanges
+  activeFilters.value = _filterPayload.value.activeFilters
+  categoryBrandSeo.value = _filterPayload.value.categoryBrandSeo
+  isLoadingFilters.value = false
+}
+
+// FAQ загружаем обычным способом
 const { data: categoryQuestions } = await useAsyncData(
   `catalog-faq-${currentCategorySlug.value}-${activeBrandSlug.value || 'all'}`,
   async () => {
@@ -1211,8 +1211,7 @@ const { data: categoryQuestions } = await useAsyncData(
   },
   {
     watch: [currentCategorySlug, activeBrandSlug],
-    server: false, // Загружаем только на клиенте, не блокируем SSR
-    lazy: true, // Ленивая загрузка
+    server: true,
   },
 )
 
@@ -1248,9 +1247,6 @@ const { data: categoryRatingData } = useQuery({
   ),
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  // Отложенная загрузка - не блокирует первый рендер
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
 })
 
 const showCategoryRating = computed(
