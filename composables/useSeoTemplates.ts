@@ -52,6 +52,29 @@ export function useSeoTemplates() {
   }
 
   /**
+   * Генерирует Description для категории с топ-брендами
+   */
+  function generateCategoryDescription(data: {
+    categoryName: string
+    topBrands: string[] // Топ-3 бренда
+    minPrice: number
+    city?: string
+  }): string {
+    const city = data.city || 'Алматы'
+    
+    // Формируем список брендов в скобках
+    const brandsText = data.topBrands.length > 0 
+      ? ` (${data.topBrands.join(', ')})` 
+      : ''
+    
+    // Гибридный сниппет с брендами
+    const snippet = `Купить ${data.categoryName.toLowerCase()}${brandsText} в интернет-магазине «Ухтышка». 💰 Цены от ${data.minPrice.toLocaleString('ru-KZ')} ₸. Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы!`
+    
+    // Обрезаем до 165 символов
+    return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
+  }
+
+  /**
    * Генерирует Description для страницы категория + бренд (гибридный сниппет)
    */
   function generateBrandCategoryDescription(data: SeoTemplateData): string {
@@ -200,6 +223,7 @@ export function useSeoTemplates() {
   }
 
   return {
+    generateCategoryDescription,
     generateBrandCategorySeoText,
     generateBrandCategoryH1,
     generateBrandCategoryTitle,

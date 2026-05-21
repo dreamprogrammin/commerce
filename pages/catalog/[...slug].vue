@@ -44,7 +44,7 @@ const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
-const { generateBrandCategoryDescription } = useSeoTemplates()
+const { generateBrandCategoryDescription, generateCategoryDescription } = useSeoTemplates()
 
 const priceValidUntil = new Date(
   new Date().setFullYear(new Date().getFullYear() + 1),
@@ -907,6 +907,18 @@ const categoryStats = computed(() => {
   }
 })
 
+// 3. Топ-3 бренда по количеству товаров в категории
+const topBrands = computed(() => {
+  if (!availableBrands.value || availableBrands.value.length === 0) return []
+  
+  // Сортируем бренды по количеству товаров и берем топ-3
+  return availableBrands.value
+    .slice()
+    .sort((a, b) => (b.products_count || 0) - (a.products_count || 0))
+    .slice(0, 3)
+    .map(b => b.name)
+})
+
 const metaDescription = computed(() => {
   // Если есть бренд и SEO-данные из БД
   if (activeBrand.value && categoryBrandSeo.value) {
@@ -962,7 +974,17 @@ const metaDescription = computed(() => {
     return result.length > 165 ? `${result.substring(0, 162)}...` : result
   }
 
-  // Генерируем гибридный сниппет
+  // Генерируем гибридный сниппет с топ-брендами (БЕЗ фильтров)
+  if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
+    return generateCategoryDescription({
+      categoryName: categoryName.value,
+      topBrands: topBrands.value,
+      minPrice: minPrice.value,
+      city: 'Алматы',
+    })
+  }
+
+  // Фоллбэк: простой сниппет без брендов
   const catName = categoryName.value
   const productsCount = displayedProducts.value.length
   
