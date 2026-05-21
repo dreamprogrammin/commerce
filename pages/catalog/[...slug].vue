@@ -1142,7 +1142,7 @@ const robotsRule = computed(() => {
 // --- 5. Загрузка данных (ПАРАЛЛЕЛЬНО для ускорения) ---
 
 // Загружаем критичные данные параллельно
-const [_categoriesData, _filterPayload] = await Promise.all([
+await Promise.all([
   useAsyncData(
     `catalog-meta-${currentCategorySlug.value}`,
     () => categoriesStore.fetchCategoryData(),
@@ -1155,22 +1155,22 @@ const [_categoriesData, _filterPayload] = await Promise.all([
       watch: [currentCategorySlug],
       server: true,
     },
-  ),
+  ).then(({ data }) => {
+    if (import.meta.client && data.value) {
+      availableBrands.value = data.value.brands
+      availableProductLines.value = data.value.productLines
+      availableFilters.value = data.value.filters
+      availableMaterials.value = data.value.materials
+      availableCountries.value = data.value.countries
+      priceRange.value = data.value.priceRange
+      pieceCountRange.value = data.value.pieceCountRange
+      numericAttributeRanges.value = data.value.numericRanges
+      activeFilters.value = data.value.activeFilters
+      categoryBrandSeo.value = data.value.categoryBrandSeo
+      isLoadingFilters.value = false
+    }
+  }),
 ])
-
-if (import.meta.client && _filterPayload.value) {
-  availableBrands.value = _filterPayload.value.brands
-  availableProductLines.value = _filterPayload.value.productLines
-  availableFilters.value = _filterPayload.value.filters
-  availableMaterials.value = _filterPayload.value.materials
-  availableCountries.value = _filterPayload.value.countries
-  priceRange.value = _filterPayload.value.priceRange
-  pieceCountRange.value = _filterPayload.value.pieceCountRange
-  numericAttributeRanges.value = _filterPayload.value.numericRanges
-  activeFilters.value = _filterPayload.value.activeFilters
-  categoryBrandSeo.value = _filterPayload.value.categoryBrandSeo
-  isLoadingFilters.value = false
-}
 
 // FAQ и рейтинг загружаем ПОСЛЕ первого рендера (не блокируют LCP)
 const { data: categoryQuestions } = await useAsyncData(
