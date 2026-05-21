@@ -946,7 +946,26 @@ const metaDescription = computed(() => {
     // 1. Очищаем HTML-теги
     let cleanText = currentCategory.value.meta_description.replace(/<[^>]*>/g, '').trim()
     
-    // 2. Сжимаем до 70-80 символов для гибридного сниппета
+    // 2. Проверяем, упоминаются ли бренды в тексте
+    const hasBrandMentions = topBrands.value.some(brand => 
+      cleanText.toLowerCase().includes(brand.toLowerCase())
+    )
+    
+    // 3. Если брендов нет в тексте, добавляем их в скобках после первого предложения
+    if (!hasBrandMentions && topBrands.value.length > 0) {
+      const firstSentenceEnd = cleanText.search(/[.!?]\s/)
+      if (firstSentenceEnd > 0 && firstSentenceEnd < 60) {
+        // Вставляем бренды после первого предложения
+        const firstPart = cleanText.substring(0, firstSentenceEnd + 1)
+        const brandsText = ` (${topBrands.value.join(', ')})`
+        cleanText = firstPart + brandsText + cleanText.substring(firstSentenceEnd + 1)
+      } else {
+        // Добавляем бренды в конец первой части
+        cleanText = cleanText.substring(0, 50) + ` (${topBrands.value.join(', ')})`
+      }
+    }
+    
+    // 4. Сжимаем до 70-80 символов для гибридного сниппета
     const maxBaseLength = 80
     if (cleanText.length > maxBaseLength) {
       // Обрезаем по последнему пробелу или точке
@@ -954,7 +973,7 @@ const metaDescription = computed(() => {
       cleanText = cutPoint > 50 ? cleanText.substring(0, cutPoint) : cleanText.substring(0, maxBaseLength)
     }
     
-    // 3. Избегаем двойных точек: если исходный текст заканчивается на точку, временно убираем её
+    // 5. Избегаем двойных точек: если исходный текст заканчивается на точку, временно убираем её
     if (cleanText.endsWith('.')) {
       cleanText = cleanText.slice(0, -1)
     }
@@ -980,7 +999,7 @@ const metaDescription = computed(() => {
     
     const result = parts.join('. ')
     
-    // 4. Лимит длины 165 символов (оптимально для Google и Яндекс)
+    // 6. Лимит длины 165 символов (оптимально для Google и Яндекс)
     return result.length > 165 ? `${result.substring(0, 162)}...` : result
   }
 
