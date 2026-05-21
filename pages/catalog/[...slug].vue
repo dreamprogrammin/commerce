@@ -1005,11 +1005,17 @@ const metaDescription = computed(() => {
 
   // Генерируем гибридный сниппет с топ-брендами (БЕЗ фильтров)
   if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
+    const ratingValue = categoryStats.value.reviews > 0 
+      ? parseFloat(categoryStats.value.rating.replace(',', '.'))
+      : undefined
+    
     return generateCategoryDescription({
       categoryName: categoryName.value,
       topBrands: topBrands.value,
       minPrice: minPrice.value,
       city: 'Алматы',
+      rating: ratingValue,
+      reviewsCount: categoryStats.value.reviews > 0 ? categoryStats.value.reviews : undefined,
     })
   }
 

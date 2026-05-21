@@ -59,16 +59,35 @@ export function useSeoTemplates() {
     topBrands: string[] // Топ-3 бренда
     minPrice: number
     city?: string
+    rating?: number
+    reviewsCount?: number
   }): string {
     const city = data.city || 'Алматы'
     
-    // Формируем список брендов в скобках (максимум 3)
+    // Формируем список брендов через middot (максимум 3)
     const brandsText = data.topBrands.length > 0 
-      ? ` (${data.topBrands.slice(0, 3).join(', ')})` 
+      ? ` ${data.topBrands.slice(0, 3).join(' · ')}` 
       : ''
     
-    // Компактный формат для укладки в 165 символов
-    const snippet = `${data.categoryName}${brandsText} в Ухтышке. 💰 От ${data.minPrice.toLocaleString('ru-KZ')} ₸. Быстрая доставка по ${city} за 1 день. Заказывайте!`
+    const parts = []
+    
+    // Категория + бренды
+    parts.push(`${data.categoryName}${brandsText} в Ухтышке`)
+    
+    // Цена
+    parts.push(`💰 От ${data.minPrice.toLocaleString('ru-KZ')} ₸`)
+    
+    // Рейтинг (если есть)
+    if (data.rating && data.reviewsCount && data.reviewsCount > 0) {
+      const starCount = Math.round(data.rating)
+      const starEmojis = '⭐'.repeat(starCount)
+      parts.push(`${starEmojis} ${data.rating.toFixed(1).replace('.', ',')} (${data.reviewsCount} отз)`)
+    }
+    
+    // Доставка
+    parts.push(`Доставка ${city} за 1 день`)
+    
+    const snippet = parts.join('. ')
     
     // Обрезаем до 165 символов
     return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
