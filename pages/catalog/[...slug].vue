@@ -1322,8 +1322,9 @@ useBreadcrumbSchema(
 useHead(() => {
   const links: any[] = [{ rel: 'canonical', href: canonicalUrl.value }]
   
-  // Preload критичного изображения категории для ускорения LCP
-  if (categoryOgImageUrl.value) {
+  // Preload критичного изображения категории ТОЛЬКО если оно будет показано
+  // (есть описание или SEO-текст, и изображение существует)
+  if (categoryOgImageUrl.value && (currentCategory.value?.description || seoText.value)) {
     links.push({
       rel: 'preload',
       as: 'image',
