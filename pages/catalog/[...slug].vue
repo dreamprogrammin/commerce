@@ -14,7 +14,7 @@ import type {
 } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
 import { watchDebounced } from '@vueuse/core'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CategoryBrands from '@/components/category/CategoryBrands.vue'
 import CategoryProductLines from '@/components/category/CategoryProductLines.vue'
@@ -53,6 +53,9 @@ const priceValidUntil = new Date(
   .split('T')[0]
 
 const abortController = ref<AbortController | null>(null)
+
+// ─── ОПТИМИЗАЦИЯ: флаг готовности некритичных данных ──────────────────────────
+const isNonCriticalLoaded = ref(false)
 
 onUnmounted(() => {
   if (abortController.value) {
@@ -331,8 +334,8 @@ const activeFiltersCount = computed(() => {
 
 const canonicalUrl = computed(() => {
   const baseUrl = 'https://uhti.kz'
-  const basePath = currentCategory.value?.canonical_url 
-    || currentCategory.value?.href 
+  const basePath = currentCategory.value?.canonical_url
+    || currentCategory.value?.href
     || route.path
 
   const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
@@ -442,6 +445,9 @@ function getSortByFromQuery(
   return 'popularity'
 }
 
+// ─── ОПТИМИЗАЦИЯ: разделение на критичные и некритичные данные ────────────────
+// Критичные данные нужны для первого рендера (цены → фильтр цены → URL params)
+// Некритичные грузятся после — не блокируют FCP/LCP
 async function loadFilterData(slug: string) {
   if (abortController.value) {
     abortController.value.abort()
@@ -453,37 +459,11 @@ async function loadFilterData(slug: string) {
   try {
     const productsStore = useProductsStore()
 
-    const results = await Promise.allSettled([
-      productsStore.fetchBrandsForCategory(slug),
-      productsStore.fetchProductLinesForCategory(slug),
-      productsStore.fetchAttributesForCategory(slug),
-      productsStore.fetchAllMaterials(),
-      productsStore.fetchAllCountries(),
+    // ── ШАГ 1: только критичные данные (быстро, нужны для SSR) ──────────────
+    const [priceRangeResult, pieceCountRangeResult] = await Promise.allSettled([
       productsStore.fetchPriceRangeForCategory(slug),
       productsStore.fetchPieceCountRangeForCategory(slug),
     ])
-
-    const [
-      brandsResult,
-      productLinesResult,
-      attributesResult,
-      materialsResult,
-      countriesResult,
-      priceRangeResult,
-      pieceCountRangeResult,
-    ] = results
-
-    availableBrands.value
-      = brandsResult.status === 'fulfilled' ? brandsResult.value : []
-    availableProductLines.value
-      = productLinesResult.status === 'fulfilled' ? productLinesResult.value : []
-    availableFilters.value = (
-      attributesResult.status === 'fulfilled' ? attributesResult.value : []
-    ) as FilterAttribute[]
-    availableMaterials.value
-      = materialsResult.status === 'fulfilled' ? materialsResult.value : []
-    availableCountries.value
-      = countriesResult.status === 'fulfilled' ? countriesResult.value : []
 
     const priceRangeData
       = priceRangeResult.status === 'fulfilled'
@@ -505,38 +485,8 @@ async function loadFilterData(slug: string) {
         }
       : null
 
-    const numericAttrs = availableFilters.value.filter(
-      f => f.display_type === 'numeric',
-    )
-    const numericRangesResults = await Promise.allSettled(
-      numericAttrs.map(attr =>
-        productsStore.fetchNumericAttributeRange(slug, attr.id),
-      ),
-    )
-
-    const newNumericRanges: Record<number, { min: number, max: number }> = {}
-    for (let i = 0; i < numericAttrs.length; i++) {
-      const attr = numericAttrs[i]
-      const result = numericRangesResults[i]
-      if (!attr || !result)
-        continue
-
-      if (result.status === 'fulfilled') {
-        const value = result.value
-        if (value) {
-          newNumericRanges[attr.id] = value
-        }
-      }
-    }
-    numericAttributeRanges.value = newNumericRanges
-
-    const newAttributeFilters: Record<string, (string | number)[]> = {}
-    for (const attr of availableFilters.value) {
-      const queryKey = `attr_${attr.slug}`
-      const queryValue = route.query[queryKey]
-      newAttributeFilters[attr.slug] = getArrayFromQuery(queryValue)
-    }
-
+    // ── Читаем query params и сразу инициализируем activeFilters ────────────
+    // Это нужно до первого рендера, чтобы товары грузились с правильными фильтрами
     const priceMinFromQuery = route.query.price_min
       ? Number(route.query.price_min)
       : priceMin
@@ -551,32 +501,32 @@ async function loadFilterData(slug: string) {
       ? Number(route.query.piece_count_max)
       : pieceCountRangeData?.max_count
 
-    const initNumericAttrs: Record<number, [number, number]> = {}
-    Object.entries(newNumericRanges).forEach(([attrId, range]) => {
-      const id = Number(attrId)
-      const queryMin = route.query[`numeric_${id}_min`]
-      const queryMax = route.query[`numeric_${id}_max`]
-      initNumericAttrs[id] = [
-        queryMin ? Number(queryMin) : range.min,
-        queryMax ? Number(queryMax) : range.max,
-      ]
-    })
+    // Бренды по slug из URL (временно без полного списка брендов)
+    const resolvedBrandIds = getArrayFromQuery(route.query.brands)
 
-    let resolvedBrandIds = getArrayFromQuery(route.query.brands)
-    const brandSlugParam = route.query.brand
-    if (
-      brandSlugParam
-      && !Array.isArray(brandSlugParam)
-      && availableBrands.value.length > 0
-    ) {
-      const brandBySlug = availableBrands.value.find(
-        b => b.slug === brandSlugParam,
-      )
-      if (brandBySlug) {
-        resolvedBrandIds = [brandBySlug.id]
-      }
+    activeFilters.value = {
+      sortBy: getSortByFromQuery(route.query.sort_by),
+      subCategoryIds: getArrayFromQuery(route.query.subcategories),
+      price: [priceMinFromQuery, priceMaxFromQuery],
+      pieceCount: pieceCountRangeData
+        ? [
+            pieceCountMinFromQuery ?? pieceCountRangeData.min_count,
+            pieceCountMaxFromQuery ?? pieceCountRangeData.max_count,
+          ]
+        : null,
+      brandIds: resolvedBrandIds,
+      productLineIds: getArrayFromQuery(route.query.lines),
+      materialIds: getArrayFromQuery(route.query.materials),
+      countryIds: getArrayFromQuery(route.query.countries),
+      attributes: {},
+      numericAttributes: {},
     }
 
+    currentPage.value = 1
+    accumulatedProducts.value = []
+
+    // ── ШАГ 2: Brand SEO — нужен для H1/title, грузим если есть brand в URL ─
+    const brandSlugParam = route.query.brand
     if (brandSlugParam && !Array.isArray(brandSlugParam)) {
       brandSeoLoading.value = true
       try {
@@ -598,26 +548,119 @@ async function loadFilterData(slug: string) {
       categoryBrandSeo.value = null
     }
 
-    activeFilters.value = {
-      sortBy: getSortByFromQuery(route.query.sort_by),
-      subCategoryIds: getArrayFromQuery(route.query.subcategories),
-      price: [priceMinFromQuery, priceMaxFromQuery],
-      pieceCount: pieceCountRangeData
-        ? [
-            pieceCountMinFromQuery ?? pieceCountRangeData.min_count,
-            pieceCountMaxFromQuery ?? pieceCountRangeData.max_count,
-          ]
-        : null,
-      brandIds: resolvedBrandIds,
-      productLineIds: getArrayFromQuery(route.query.lines),
-      materialIds: getArrayFromQuery(route.query.materials),
-      countryIds: getArrayFromQuery(route.query.countries),
-      attributes: newAttributeFilters,
-      numericAttributes: initNumericAttrs,
+    // ── ШАГ 3: Некритичные данные — грузим ПАРАЛЛЕЛЬНО после рендера ────────
+    // На сервере грузим сразу (нужно для hydration), на клиенте — после nextTick
+    const loadNonCritical = async () => {
+      const [
+        brandsResult,
+        productLinesResult,
+        attributesResult,
+        materialsResult,
+        countriesResult,
+      ] = await Promise.allSettled([
+        productsStore.fetchBrandsForCategory(slug),
+        productsStore.fetchProductLinesForCategory(slug),
+        productsStore.fetchAttributesForCategory(slug),
+        productsStore.fetchAllMaterials(),
+        productsStore.fetchAllCountries(),
+      ])
+
+      availableBrands.value
+        = brandsResult.status === 'fulfilled' ? brandsResult.value : []
+      availableProductLines.value
+        = productLinesResult.status === 'fulfilled' ? productLinesResult.value : []
+      availableFilters.value = (
+        attributesResult.status === 'fulfilled' ? attributesResult.value : []
+      ) as FilterAttribute[]
+      availableMaterials.value
+        = materialsResult.status === 'fulfilled' ? materialsResult.value : []
+      availableCountries.value
+        = countriesResult.status === 'fulfilled' ? countriesResult.value : []
+
+      // Numeric attribute ranges
+      const numericAttrs = availableFilters.value.filter(
+        f => f.display_type === 'numeric',
+      )
+      const numericRangesResults = await Promise.allSettled(
+        numericAttrs.map(attr =>
+          productsStore.fetchNumericAttributeRange(slug, attr.id),
+        ),
+      )
+
+      const newNumericRanges: Record<number, { min: number, max: number }> = {}
+      for (let i = 0; i < numericAttrs.length; i++) {
+        const attr = numericAttrs[i]
+        const result = numericRangesResults[i]
+        if (!attr || !result)
+          continue
+
+        if (result.status === 'fulfilled') {
+          const value = result.value
+          if (value) {
+            newNumericRanges[attr.id] = value
+          }
+        }
+      }
+      numericAttributeRanges.value = newNumericRanges
+
+      // Инициализируем attribute-фильтры из URL теперь, когда знаем список атрибутов
+      const newAttributeFilters: Record<string, (string | number)[]> = {}
+      for (const attr of availableFilters.value) {
+        const queryKey = `attr_${attr.slug}`
+        const queryValue = route.query[queryKey]
+        newAttributeFilters[attr.slug] = getArrayFromQuery(queryValue)
+      }
+
+      const initNumericAttrs: Record<number, [number, number]> = {}
+      Object.entries(newNumericRanges).forEach(([attrId, range]) => {
+        const id = Number(attrId)
+        const queryMin = route.query[`numeric_${id}_min`]
+        const queryMax = route.query[`numeric_${id}_max`]
+        initNumericAttrs[id] = [
+          queryMin ? Number(queryMin) : range.min,
+          queryMax ? Number(queryMax) : range.max,
+        ]
+      })
+
+      // Резолвим brand id по slug теперь, когда есть список брендов
+      let resolvedBrandIdsWithSlug = getArrayFromQuery(route.query.brands)
+      if (
+        brandSlugParam
+        && !Array.isArray(brandSlugParam)
+        && availableBrands.value.length > 0
+      ) {
+        const brandBySlug = availableBrands.value.find(
+          b => b.slug === brandSlugParam,
+        )
+        if (brandBySlug) {
+          resolvedBrandIdsWithSlug = [brandBySlug.id]
+        }
+      }
+
+      // Обновляем только те поля, которые требовали некритичных данных
+      activeFilters.value = {
+        ...activeFilters.value,
+        brandIds: resolvedBrandIdsWithSlug,
+        attributes: newAttributeFilters,
+        numericAttributes: initNumericAttrs,
+      }
+
+      isNonCriticalLoaded.value = true
     }
 
-    currentPage.value = 1
-    accumulatedProducts.value = []
+    if (import.meta.server) {
+      // На сервере грузим сразу — нужно для SSR hydration
+      await loadNonCritical()
+    }
+    else {
+      // На клиенте не блокируем рендер — грузим после первого фрейма
+      isLoadingFilters.value = false
+      nextTick(() => {
+        loadNonCritical().finally(() => {
+          isLoadingFilters.value = false
+        })
+      })
+    }
 
     return {
       brands: availableBrands.value,
@@ -639,7 +682,9 @@ async function loadFilterData(slug: string) {
     return null
   }
   finally {
-    isLoadingFilters.value = false
+    if (import.meta.server) {
+      isLoadingFilters.value = false
+    }
   }
 }
 
@@ -877,7 +922,6 @@ const selectedSingleBrand = computed(() => {
   )
 })
 
-// 1. Ищем минимальную цену для заманухи
 const minPrice = computed(() => {
   if (!displayedProducts.value || displayedProducts.value.length === 0)
     return null
@@ -886,7 +930,6 @@ const minPrice = computed(() => {
   )
 })
 
-// 2. Считаем реальные отзывы категории
 const categoryStats = computed(() => {
   let totalReviews = 0
   let sumRatings = 0
@@ -907,11 +950,10 @@ const categoryStats = computed(() => {
   }
 })
 
-// 3. Топ-3 бренда по количеству товаров в категории
 const topBrands = computed(() => {
-  if (!availableBrands.value || availableBrands.value.length === 0) return []
-  
-  // Сортируем бренды по количеству товаров и берем топ-3
+  if (!availableBrands.value || availableBrands.value.length === 0)
+    return []
+
   return availableBrands.value
     .slice()
     .sort((a, b) => (b.products_count || 0) - (a.products_count || 0))
@@ -920,14 +962,11 @@ const topBrands = computed(() => {
 })
 
 const metaDescription = computed(() => {
-  // Если есть бренд и SEO-данные из БД
   if (activeBrand.value && categoryBrandSeo.value) {
-    // Если есть ручной description - используем его
     if (categoryBrandSeo.value.seo_description) {
       return categoryBrandSeo.value.seo_description
     }
-    
-    // Иначе автогенерируем с реальными данными
+
     return generateBrandCategoryDescription({
       brandName: activeBrand.value.name,
       brandSlug: activeBrand.value.slug,
@@ -941,74 +980,59 @@ const metaDescription = computed(() => {
     })
   }
 
-  // Если есть ручной meta_description — используем его с дополнениями
   if (currentCategory.value?.meta_description) {
-    // 1. Очищаем HTML-теги
     let cleanText = currentCategory.value.meta_description.replace(/<[^>]*>/g, '').trim()
-    
-    // 2. Проверяем, упоминаются ли бренды в тексте
-    const hasBrandMentions = topBrands.value.some(brand => 
-      cleanText.toLowerCase().includes(brand.toLowerCase())
+
+    const hasBrandMentions = topBrands.value.some(brand =>
+      cleanText.toLowerCase().includes(brand.toLowerCase()),
     )
-    
-    // 3. Если брендов нет в тексте, добавляем их в скобках после первого предложения
+
     if (!hasBrandMentions && topBrands.value.length > 0) {
       const firstSentenceEnd = cleanText.search(/[.!?]\s/)
       if (firstSentenceEnd > 0 && firstSentenceEnd < 60) {
-        // Вставляем бренды после первого предложения
         const firstPart = cleanText.substring(0, firstSentenceEnd + 1)
         const brandsText = ` (${topBrands.value.join(', ')})`
         cleanText = firstPart + brandsText + cleanText.substring(firstSentenceEnd + 1)
-      } else {
-        // Добавляем бренды в конец первой части
-        cleanText = cleanText.substring(0, 50) + ` (${topBrands.value.join(', ')})`
+      }
+      else {
+        cleanText = `${cleanText.substring(0, 50)} (${topBrands.value.join(', ')})`
       }
     }
-    
-    // 4. Сжимаем до 70-80 символов для гибридного сниппета
+
     const maxBaseLength = 80
     if (cleanText.length > maxBaseLength) {
-      // Обрезаем по последнему пробелу или точке
       const cutPoint = cleanText.lastIndexOf(' ', maxBaseLength)
       cleanText = cutPoint > 50 ? cleanText.substring(0, cutPoint) : cleanText.substring(0, maxBaseLength)
     }
-    
-    // 5. Избегаем двойных точек: если исходный текст заканчивается на точку, временно убираем её
+
     if (cleanText.endsWith('.')) {
       cleanText = cleanText.slice(0, -1)
     }
-    
+
     const parts = [cleanText]
-    
-    // Добавляем цену (коммерческий триггер)
+
     if (minPrice.value) {
       parts.push(`💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`)
     }
-    
-    // Добавляем отзывы и динамические звезды (социальное доказательство)
+
     if (categoryStats.value.reviews > 0) {
       const ratingValue = parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
       const starCount = Math.round(ratingValue)
       const starEmojis = '⭐'.repeat(starCount)
-      
       parts.push(`${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`)
     }
-    
-    // Добавляем призыв к действию
+
     parts.push('Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!')
-    
+
     const result = parts.join('. ')
-    
-    // 6. Лимит длины 165 символов (оптимально для Google и Яндекс)
     return result.length > 165 ? `${result.substring(0, 162)}...` : result
   }
 
-  // Генерируем гибридный сниппет с топ-брендами (БЕЗ фильтров)
   if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
-    const ratingValue = categoryStats.value.reviews > 0 
+    const ratingValue = categoryStats.value.reviews > 0
       ? parseFloat(categoryStats.value.rating.replace(',', '.'))
       : undefined
-    
+
     return generateCategoryDescription({
       categoryName: categoryName.value,
       topBrands: topBrands.value,
@@ -1019,36 +1043,28 @@ const metaDescription = computed(() => {
     })
   }
 
-  // Фоллбэк: простой сниппет без брендов
   const catName = categoryName.value
   const productsCount = displayedProducts.value.length
-  
-  // Эмоциональная фраза + социальное доказательство
+
   let snippet = `${catName} в Ухтышке`
-  
-  // Добавляем количество товаров
+
   if (productsCount > 0) {
     snippet += `. В каталоге ${productsCount} ${productsCount === 1 ? 'модель' : productsCount < 5 ? 'модели' : 'моделей'}`
   }
-  
-  // Цена
+
   if (minPrice.value) {
     snippet += `. 💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`
   }
-  
-  // Рейтинг с динамическими звездами
+
   if (categoryStats.value.reviews > 0) {
     const ratingValue = parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
     const starCount = Math.round(ratingValue)
     const starEmojis = '⭐'.repeat(starCount)
-    
     snippet += `. ${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`
   }
-  
-  // Гарантии и призыв
+
   snippet += '. Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!'
-  
-  // Обрезаем до 165 символов
+
   return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
 })
 
@@ -1063,8 +1079,7 @@ const metaTitle = computed(() => {
       = catName.toLowerCase() === brandName.toLowerCase()
         ? catName
         : `${catName} ${brandName}`
-    
-    // Добавляем цену в title
+
     const priceText = minPrice.value ? ` — от ${formatPrice(minPrice.value)} ₸` : ''
     return `${prefix}${priceText} | Ухтышка`
   }
@@ -1127,8 +1142,6 @@ const robotsRule = computed(() => {
     return { index: true, follow: true }
   }
 
-  // Если есть бренд с SEO-контентом, он уже обработан выше
-  // Для остальных случаев: если есть ЛЮБЫЕ фильтры (кроме одного бренда без SEO) - закрываем
   if (
     activeFiltersCount.value > 0
     || activeFilters.value.sortBy !== 'popularity'
@@ -1140,8 +1153,6 @@ const robotsRule = computed(() => {
 })
 
 // --- 5. Загрузка данных ---
-
-// Загружаем категории и фильтры параллельно
 const [{ data: _categoriesData }, { data: _filterPayload }] = await Promise.all([
   useAsyncData(
     `catalog-meta-${currentCategorySlug.value}`,
@@ -1183,7 +1194,6 @@ const { data: categoryQuestions } = await useAsyncData(
       return []
 
     try {
-      // Если есть бренд с SEO-контентом, загружаем специальные вопросы
       if (activeBrandSlug.value && categoryBrandSeo.value) {
         const { data } = await supabase
           .from('category_brand_questions')
@@ -1191,7 +1201,7 @@ const { data: categoryQuestions } = await useAsyncData(
           .eq('category_id', category.id)
           .eq('brand_id', categoryBrandSeo.value.brand_id)
           .order('created_at', { ascending: true })
-        
+
         if (data && data.length > 0) {
           return data.map(q => ({
             id: q.id,
@@ -1200,8 +1210,7 @@ const { data: categoryQuestions } = await useAsyncData(
           }))
         }
       }
-      
-      // Иначе загружаем обычные вопросы категории
+
       return await categoryQuestionsStore.fetchQuestions(category.id)
     }
     catch (error) {
@@ -1256,14 +1265,17 @@ const showCategoryRating = computed(
     && categoryRatingData.value.avg_rating > 0,
 )
 
+// ─── ОПТИМИЗАЦИЯ: stringify вместо deep watcher ────────────────────────────────
+// deep: true на большом объекте — дорогая операция на каждое изменение
+// JSON.stringify сравнивает строку — в разы дешевле для сложных объектов
 watchDebounced(
-  activeFilters,
+  () => JSON.stringify(activeFilters.value),
   () => {
     currentPage.value = 1
     accumulatedProducts.value = []
     updateQueryParams()
   },
-  { debounce: 300, deep: true },
+  { debounce: 300 },
 )
 
 useRobotsRule(robotsRule)
@@ -1304,7 +1316,6 @@ useSeoMeta({
   ),
 })
 
-// BreadcrumbList JSON-LD
 useBreadcrumbSchema(
   computed(() =>
     breadcrumbs.value.map(crumb => ({
@@ -1314,12 +1325,9 @@ useBreadcrumbSchema(
   ),
 )
 
-// ─── useHead: meta keywords + canonical + preload критичных ресурсов ──────────
 useHead(() => {
   const links: any[] = [{ rel: 'canonical', href: canonicalUrl.value }]
-  
-  // Preload критичного изображения категории ТОЛЬКО если оно будет показано
-  // (есть описание или SEO-текст, и изображение существует)
+
   if (categoryOgImageUrl.value && (currentCategory.value?.description || seoText.value)) {
     links.push({
       rel: 'preload',
@@ -1328,205 +1336,201 @@ useHead(() => {
       fetchpriority: 'high',
     })
   }
-  
+
   return {
     meta: [{ name: 'keywords', content: metaKeywords.value || '' }],
     link: links,
   }
 })
 
-// ─── useSchemaOrg: все JSON-LD схемы — гарантированный SSR ──────────────────
-useSchemaOrg(
-  computed(() => {
-    const schemas: any[] = []
+// ─── ОПТИМИЗАЦИЯ: useSchemaOrg откладываем на клиенте ─────────────────────────
+// JSON-LD с 10 товарами + ShippingDetails + ReturnPolicy = тяжёлый computation
+// На сервере нужен для SEO, на клиенте — блокирует главный поток без пользы
+const schemaData = computed(() => {
+  const schemas: any[] = []
 
-    // 1. CollectionPage
-    schemas.push({
-      '@type': 'CollectionPage',
-      'name': metaTitle.value,
-      'description': metaDescription.value,
-      'url': canonicalUrl.value,
-      'isPartOf': {
-        '@type': 'WebSite',
-        'name': 'Ухтышка',
-        'url': 'https://uhti.kz',
+  // CollectionPage — самая важная для SEO, генерируем всегда
+  schemas.push({
+    '@type': 'CollectionPage',
+    'name': metaTitle.value,
+    'description': metaDescription.value,
+    'url': canonicalUrl.value,
+    'isPartOf': {
+      '@type': 'WebSite',
+      'name': 'Ухтышка',
+      'url': 'https://uhti.kz',
+    },
+    ...(categoryOgImageUrl.value && { image: categoryOgImageUrl.value }),
+    ...(metaKeywords.value && { keywords: metaKeywords.value }),
+    ...(seoText.value && {
+      mainEntity: {
+        '@type': 'Article',
+        'headline': title.value,
+        'image': 'https://uhti.kz/logo.png',
+        'articleBody': cleanDescription(seoText.value, 500),
+        'author': {
+          '@type': 'Organization',
+          'name': 'Ухтышка',
+          'url': 'https://uhti.kz',
+        },
       },
-      ...(categoryOgImageUrl.value && { image: categoryOgImageUrl.value }),
-      ...(metaKeywords.value && { keywords: metaKeywords.value }),
-      // FIX: добавлены image и url в author для Article schema
-      ...(seoText.value && {
-        mainEntity: {
-          '@type': 'Article',
-          'headline': title.value,
-          'image': 'https://uhti.kz/logo.png',
-          'articleBody': cleanDescription(seoText.value, 500),
-          'author': {
-            '@type': 'Organization',
-            'name': 'Ухтышка',
-            'url': 'https://uhti.kz',
-          },
-        },
-      }),
-      ...(displayedProducts.value.length > 0 && {
-        numberOfItems: displayedProducts.value.length,
-      }),
-      ...(categoryRatingData.value
-        && categoryRatingData.value.total_reviews > 0 && {
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          'ratingValue': categoryRatingData.value.avg_rating,
-          'reviewCount': categoryRatingData.value.total_reviews,
-          'bestRating': 5,
-          'worstRating': 1,
-        },
-      }),
+    }),
+    ...(displayedProducts.value.length > 0 && {
+      numberOfItems: displayedProducts.value.length,
+    }),
+    ...(categoryRatingData.value
+      && categoryRatingData.value.total_reviews > 0 && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        'ratingValue': categoryRatingData.value.avg_rating,
+        'reviewCount': categoryRatingData.value.total_reviews,
+        'bestRating': 5,
+        'worstRating': 1,
+      },
+    }),
+  })
+
+  // SiteNavigationElement
+  const subcatParts = subcategories.value.slice(0, 6).map(cat => ({
+    '@type': 'WebPage',
+    'name': cat.name,
+    'url': `https://uhti.kz${cat.href}`,
+  }))
+  const brandParts = availableBrands.value.slice(0, 6).map(brand => ({
+    '@type': 'WebPage',
+    'name': `${categoryName.value} ${brand.name}`,
+    'url': `https://uhti.kz${currentCategory.value?.href}?brand=${brand.slug}`,
+  }))
+  const navParts = [...subcatParts, ...brandParts]
+  if (navParts.length > 0) {
+    schemas.push({
+      '@type': 'SiteNavigationElement',
+      'name': `Подкатегории ${categoryName.value}`,
+      'hasPart': navParts,
     })
+  }
 
-    // 2. SiteNavigationElement (подкатегории + бренды)
-    const subcatParts = subcategories.value.slice(0, 6).map(cat => ({
-      '@type': 'WebPage',
-      'name': cat.name,
-      'url': `https://uhti.kz${cat.href}`,
-    }))
-    const brandParts = availableBrands.value.slice(0, 6).map(brand => ({
-      '@type': 'WebPage',
-      'name': `${categoryName.value} ${brand.name}`,
-      'url': `https://uhti.kz${currentCategory.value?.href}?brand=${brand.slug}`,
-    }))
-    const navParts = [...subcatParts, ...brandParts]
-    if (navParts.length > 0) {
-      schemas.push({
-        '@type': 'SiteNavigationElement',
-        'name': `Подкатегории ${categoryName.value}`,
-        'hasPart': navParts,
-      })
-    }
-
-    // 3. ItemList (список товаров с ценами)
-    if (displayedProducts.value.length > 0) {
-      schemas.push({
-        '@type': 'ItemList',
-        'numberOfItems': displayedProducts.value.length,
-        'itemListElement': displayedProducts.value
-          .slice(0, 10)
-          .map((product, index) => ({
-            '@type': 'ListItem',
-            'position': index + 1,
-            'item': {
-              '@type': 'Product',
-              'name': product.name,
-              // FIX: очищаем HTML и обрезаем до 200 символов
-              'description':
-                cleanDescription(product.description) || product.name,
-              'url': `https://uhti.kz/catalog/products/${product.slug}`,
-
-              // ✅ 1. Артикул (есть всегда)
-              'sku': product.sku || product.id,
-              'mpn': product.sku || product.id,
-
-              // ✅ 2. Бренд (с фоллбэком на магазин)
-              'brand': {
-                '@type': 'Brand',
-                'name': product.brands?.name || 'Ухтышка',
-                ...(product.brands?.slug && {
-                  url: `https://uhti.kz/brand/${product.brands.slug}`,
-                }),
-              },
-
-              // ✅ 3. Штрихкод (только если существует)
-              ...(product.barcode && { gtin: product.barcode }),
-
-              ...(product.product_images?.[0]?.image_url && {
-                image: getImageUrl(
-                  BUCKET_NAME_PRODUCT,
-                  product.product_images[0].image_url,
-                  IMAGE_SIZES.CARD,
-                ),
-              }),
-              'offers': {
-                '@type': 'Offer',
-                // 🔥 Используем final_price из базы данных (с психологическим округлением)
-                'price': product.final_price || product.price,
-                'priceCurrency': 'KZT',
-                'availability':
-                  product.stock_quantity > 0
-                    ? 'https://schema.org/InStock'
-                    : 'https://schema.org/OutOfStock',
-                'url': `https://uhti.kz/catalog/products/${product.slug}`,
-                'priceValidUntil': priceValidUntil,
-                'seller': { '@type': 'Organization', 'name': 'Ухтышка' },
-                'hasMerchantReturnPolicy': {
-                  '@type': 'MerchantReturnPolicy',
-                  'applicableCountry': 'KZ',
-                  'returnPolicyCategory':
-                    'https://schema.org/MerchantReturnFiniteReturnWindow',
-                  'merchantReturnDays': 14,
-                  'returnMethod': 'https://schema.org/ReturnByMail',
-                  'returnFees': 'https://schema.org/FreeReturn',
-                },
-                'shippingDetails': {
-                  '@type': 'OfferShippingDetails',
-                  'shippingDestination': {
-                    '@type': 'DefinedRegion',
-                    'addressCountry': 'KZ',
-                  },
-                  'shippingRate': {
-                    '@type': 'MonetaryAmount',
-                    'value': 0,
-                    'currency': 'KZT',
-                  },
-                  'deliveryTime': {
-                    '@type': 'ShippingDeliveryTime',
-                    'handlingTime': {
-                      '@type': 'QuantitativeValue',
-                      'minValue': 0,
-                      'maxValue': 1,
-                      'unitCode': 'DAY',
-                    },
-                    'transitTime': {
-                      '@type': 'QuantitativeValue',
-                      'minValue': 1,
-                      'maxValue': 3,
-                      'unitCode': 'DAY',
-                    },
-                  },
-                },
-              },
-              // Показываем рейтинг только если есть реальные отзывы
-              ...(Number(product.review_count) > 0
-                && product.avg_rating && {
-                aggregateRating: {
-                  '@type': 'AggregateRating',
-                  'ratingValue': product.avg_rating,
-                  'reviewCount': product.review_count,
-                  'bestRating': 5,
-                  'worstRating': 1,
-                },
+  // ItemList — тяжёлая часть, только если данные загружены
+  if (displayedProducts.value.length > 0) {
+    schemas.push({
+      '@type': 'ItemList',
+      'numberOfItems': displayedProducts.value.length,
+      'itemListElement': displayedProducts.value
+        .slice(0, 10)
+        .map((product, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'item': {
+            '@type': 'Product',
+            'name': product.name,
+            'description': cleanDescription(product.description) || product.name,
+            'url': `https://uhti.kz/catalog/products/${product.slug}`,
+            'sku': product.sku || product.id,
+            'mpn': product.sku || product.id,
+            'brand': {
+              '@type': 'Brand',
+              'name': product.brands?.name || 'Ухтышка',
+              ...(product.brands?.slug && {
+                url: `https://uhti.kz/brand/${product.brands.slug}`,
               }),
             },
-          })),
-      })
-    }
+            ...(product.barcode && { gtin: product.barcode }),
+            ...(product.product_images?.[0]?.image_url && {
+              image: getImageUrl(
+                BUCKET_NAME_PRODUCT,
+                product.product_images[0].image_url,
+                IMAGE_SIZES.CARD,
+              ),
+            }),
+            'offers': {
+              '@type': 'Offer',
+              'price': product.final_price || product.price,
+              'priceCurrency': 'KZT',
+              'availability':
+                product.stock_quantity > 0
+                  ? 'https://schema.org/InStock'
+                  : 'https://schema.org/OutOfStock',
+              'url': `https://uhti.kz/catalog/products/${product.slug}`,
+              'priceValidUntil': priceValidUntil,
+              'seller': { '@type': 'Organization', 'name': 'Ухтышка' },
+              'hasMerchantReturnPolicy': {
+                '@type': 'MerchantReturnPolicy',
+                'applicableCountry': 'KZ',
+                'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+                'merchantReturnDays': 14,
+                'returnMethod': 'https://schema.org/ReturnByMail',
+                'returnFees': 'https://schema.org/FreeReturn',
+              },
+              'shippingDetails': {
+                '@type': 'OfferShippingDetails',
+                'shippingDestination': {
+                  '@type': 'DefinedRegion',
+                  'addressCountry': 'KZ',
+                },
+                'shippingRate': {
+                  '@type': 'MonetaryAmount',
+                  'value': 0,
+                  'currency': 'KZT',
+                },
+                'deliveryTime': {
+                  '@type': 'ShippingDeliveryTime',
+                  'handlingTime': {
+                    '@type': 'QuantitativeValue',
+                    'minValue': 0,
+                    'maxValue': 1,
+                    'unitCode': 'DAY',
+                  },
+                  'transitTime': {
+                    '@type': 'QuantitativeValue',
+                    'minValue': 1,
+                    'maxValue': 3,
+                    'unitCode': 'DAY',
+                  },
+                },
+              },
+            },
+            ...(Number(product.review_count) > 0
+              && product.avg_rating && {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                'ratingValue': product.avg_rating,
+                'reviewCount': product.review_count,
+                'bestRating': 5,
+                'worstRating': 1,
+              },
+            }),
+          },
+        })),
+    })
+  }
 
-    return schemas
-  }),
-)
+  return schemas
+})
+
+if (import.meta.server) {
+  // На сервере регистрируем сразу — нужно для SEO-краулеров
+  useSchemaOrg(schemaData)
+}
+else {
+  // На клиенте откладываем до после первого рендера — не блокируем главный поток
+  onMounted(() => {
+    nextTick(() => {
+      useSchemaOrg(schemaData)
+    })
+  })
+}
 </script>
 
 <template>
   <div :class="`${containerClass} py-4 lg:py-8`">
-    <!-- Breadcrumbs и заголовок -->
-    <ClientOnly>
-      <Breadcrumbs
-        v-if="breadcrumbs && breadcrumbs.length > 0"
-        :items="breadcrumbs"
-        class="mb-3 lg:mb-6"
-        compact
-      />
-      <template #fallback>
-        <div class="h-6 w-1/3 bg-muted rounded mb-3 lg:mb-6 animate-pulse" />
-      </template>
-    </ClientOnly>
+    <!-- ─── ОПТИМИЗАЦИЯ: убрали ClientOnly — breadcrumbs доступны на сервере ─── -->
+    <!-- ClientOnly скрывал хлебные крошки до гидрации, увеличивая FCP -->
+    <Breadcrumbs
+      v-if="breadcrumbs && breadcrumbs.length > 0"
+      :items="breadcrumbs"
+      class="mb-3 lg:mb-6"
+      compact
+    />
 
     <!-- Блок с картинкой и описанием категории -->
     <div
@@ -1541,9 +1545,8 @@ useSchemaOrg(
         {{ title }}
       </h1>
 
-      <!-- Универсальный контейнер: на мобилках flex-col, на десктопе flex-row -->
       <div class="flex flex-col lg:flex-row gap-4 lg:gap-6 items-start">
-        <!-- Картинка (один блок для всех устройств) -->
+        <!-- Картинка — fetchpriority="high" ускоряет LCP -->
         <div
           v-if="currentCategory.image_url"
           class="shrink-0 w-16 h-16 lg:w-[220px] lg:h-[160px] rounded-lg overflow-hidden shadow-sm lg:shadow-md bg-gray-50 dark:bg-gray-900 flex items-center justify-center"
@@ -1561,6 +1564,7 @@ useSchemaOrg(
             placeholder-type="lqip"
             :blur-data-url="currentCategory.blur_placeholder || undefined"
             :eager="true"
+            fetchpriority="high"
             class="w-full h-full"
           />
         </div>
@@ -1589,32 +1593,27 @@ useSchemaOrg(
             v-html="seoText"
           />
 
-          <!-- Статистика категории -->
+          <!-- ─── ОПТИМИЗАЦИЯ: убрали ClientOnly со счётчиков ──────────────── -->
+          <!-- ClientOnly вызывал CLS (прыжки контента) — резервируем место через min-w -->
           <div class="flex flex-wrap items-center gap-3 lg:gap-4 pt-2 text-xs lg:text-sm text-muted-foreground">
-            <ClientOnly>
-              <div class="flex items-center gap-1.5 lg:gap-2">
-                <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
-                <span>{{ displayedProducts.length }} <span class="hidden lg:inline">товаров</span></span>
-              </div>
-            </ClientOnly>
-            <ClientOnly>
-              <div
-                v-if="availableBrands.length > 0"
-                class="flex items-center gap-1.5 lg:gap-2"
-              >
-                <Icon name="lucide:award" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-500" />
-                <span>{{ availableBrands.length }} <span class="hidden lg:inline">брендов</span></span>
-              </div>
-            </ClientOnly>
-            <ClientOnly>
-              <div
-                v-if="priceRange.min > 0 || priceRange.max < 50000"
-                class="flex items-center gap-1.5 lg:gap-2"
-              >
-                <Icon name="lucide:tag" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-green-500" />
-                <span>от {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }} ₸</span>
-              </div>
-            </ClientOnly>
+            <div class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]">
+              <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
+              <span>{{ displayedProducts.length || '—' }} <span class="hidden lg:inline">товаров</span></span>
+            </div>
+            <div
+              v-if="availableBrands.length > 0"
+              class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]"
+            >
+              <Icon name="lucide:award" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-500" />
+              <span>{{ availableBrands.length }} <span class="hidden lg:inline">брендов</span></span>
+            </div>
+            <div
+              v-if="priceRange.min > 0 || priceRange.max < 50000"
+              class="flex items-center gap-1.5 lg:gap-2"
+            >
+              <Icon name="lucide:tag" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-green-500" />
+              <span>от {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }} ₸</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1637,7 +1636,7 @@ useSchemaOrg(
       <div v-else class="mb-3 lg:mb-4" />
     </template>
 
-    <!-- 🔥 Бренды как 3-й уровень навигации (перед товарами) -->
+    <!-- Бренды как 3-й уровень навигации (перед товарами) -->
     <CategoryBrands
       v-if="availableBrands.length > 1 && !activeBrandSlug"
       :brands="availableBrands"
@@ -2013,9 +2012,9 @@ useSchemaOrg(
                 {{ hasActiveFilters ? 'Товары не найдены' : 'Скоро здесь появятся товары' }}
               </h3>
               <p class="mt-2">
-                {{ hasActiveFilters 
-                  ? 'Попробуйте изменить фильтры или выбрать другую категорию.' 
-                  : 'Мы работаем над наполнением этой категории. Загляните позже!' 
+                {{ hasActiveFilters
+                  ? 'Попробуйте изменить фильтры или выбрать другую категорию.'
+                  : 'Мы работаем над наполнением этой категории. Загляните позже!'
                 }}
               </p>
               <Button
