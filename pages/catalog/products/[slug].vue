@@ -49,83 +49,31 @@ const slug = computed(() => route.params.slug as string)
 const selectedAccessoryIds = ref<string[]>([])
 const isDescriptionExpanded = ref(false)
 
-// 🔥 SSR: загружаем категории, продукт и отзывы ПАРАЛЛЕЛЬНО
-if (import.meta.server) {
-  let initialProduct = null
-  let initialReviews = null
-  let ssrFetchFailed = false
-
-  try {
-    const [_categories, product] = await Promise.all([
-      !categoriesStore.allCategories.length
-        ? categoriesStore.fetchCategoryData().catch(() => null)
-        : Promise.resolve(null),
-      productsStore.fetchProductBySlug(slug.value),
-    ])
-    initialProduct = product
-
-    // Загружаем отзывы для Schema.org
-    if (initialProduct?.id) {
-      initialReviews = await reviewsStore
-        .fetchReviews(initialProduct.id)
-        .catch(() => [])
-    }
+// 🔥 SSR: загружаем категории и продукт через useAsyncData
+await useAsyncData('product-categories', async () => {
+  if (!categoriesStore.allCategories.length) {
+    await categoriesStore.fetchCategoryData()
   }
-  catch {
-    ssrFetchFailed = true
-  }
-
-  if (!initialProduct && !ssrFetchFailed) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'Товар не найден',
-      fatal: true,
-    })
-  }
-
-  if (initialProduct) {
-    queryClient.setQueryData(['product', slug.value], initialProduct)
-  }
-
-  if (initialReviews) {
-    queryClient.setQueryData(
-      ['product-reviews', initialProduct.id],
-      initialReviews,
-    )
-  }
-}
+  return true
+})
 
 const {
   data: product,
-  isLoading: isProductLoading,
-  isError: isProductError,
-} = useQuery({
-  queryKey: ['product', slug],
-  queryFn: async () => {
-    const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
-    if (!fetchedProduct)
-      throw new Error('Товар не найден')
-    return fetchedProduct
-  },
-  staleTime: 2 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  retry: 2,
-  refetchOnMount: 'always',
-  refetchOnWindowFocus: true,
-  initialData: import.meta.server
-    ? queryClient.getQueryData(['product', slug.value])
-    : undefined,
-})
-
-watch([isProductError, product], ([error, prod]) => {
-  if (error || (!isProductLoading.value && !prod)) {
+  error: productError,
+} = await useAsyncData(`product-${slug.value}`, async () => {
+  const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
+  if (!fetchedProduct) {
     throw createError({
       statusCode: 404,
       statusMessage: 'Товар не найден',
       fatal: true,
     })
   }
+  return fetchedProduct
 })
+
+const isProductLoading = ref(false)
+const isProductError = computed(() => !!productError.value)
 
 const { data: accessories, isLoading: accessoriesLoading } = useQuery({
   queryKey: ['product-accessories', computed(() => product.value?.id)],

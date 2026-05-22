@@ -157,6 +157,17 @@ function getCategoryImageUrl(category: CategoryRow): string | null {
   return getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, variant)
 }
 
+function getCategoryImageVariants(category: CategoryRow) {
+  if (!category.image_url) {
+    return { sm: null, md: null, lg: null }
+  }
+  return {
+    sm: getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'sm'),
+    md: getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'md'),
+    lg: getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'lg'),
+  }
+}
+
 // Безопасное получение blur placeholder
 function getCategoryBlurUrl(category: CategoryRow): string | null {
   const blur = category.blur_placeholder
@@ -275,6 +286,9 @@ function getCategoryColor(index: number): string {
             >
               <ProgressiveImage
                 :src="getCategoryImageUrl(category)"
+                :src-sm="getCategoryImageVariants(category).sm"
+                :src-md="getCategoryImageVariants(category).md"
+                :src-lg="getCategoryImageVariants(category).lg"
                 :alt="category.name"
                 :blur-data-url="getCategoryBlurUrl(category)"
                 aspect-ratio="square"

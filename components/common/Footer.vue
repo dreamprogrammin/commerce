@@ -1,24 +1,32 @@
 <script setup lang="ts">
 import { formatPrice } from '@/utils/formatPrice'
-import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
 
 const currentYear = new Date().getFullYear()
+const supabase = useSupabaseClient()
 
-// Используем существующий store для популярных категорий
-const popularCategoriesStore = usePopularCategoriesStore()
-const { data: popularProducts } = usePopularProducts(5)
-
-// Загружаем категории при монтировании
-onMounted(() => {
-  if (popularCategoriesStore.popularCategories.length === 0) {
-    popularCategoriesStore.fetchPopularCategories()
-  }
+// Загружаем данные напрямую на сервере
+const { data: footerCategories } = await useAsyncData('footer-categories', async () => {
+  const { data } = await supabase
+    .from('categories')
+    .select('id, name, slug, href')
+    .eq('is_featured', true)
+    .order('display_order', { ascending: true })
+    .limit(6)
+  
+  return data || []
 })
 
-// Берём первые 6 категорий для футера
-const footerCategories = computed(() => 
-  popularCategoriesStore.popularCategories.slice(0, 6)
-)
+const { data: popularProducts } = await useAsyncData('footer-popular-products', async () => {
+  const { data } = await supabase
+    .from('products')
+    .select('id, name, slug, price, final_price')
+    .eq('is_active', true)
+    .gt('stock_quantity', 0)
+    .order('created_at', { ascending: false })
+    .limit(5)
+  
+  return data || []
+})
 </script>
 
 <template>
@@ -54,19 +62,21 @@ const footerCategories = computed(() =>
           <h3 class="font-semibold text-lg mb-4">
             Популярные категории
           </h3>
-          <ul v-if="footerCategories.length" class="space-y-2 text-sm">
+          <ul v-if="footerCategories?.length" class="space-y-2 text-sm">
             <li v-for="category in footerCategories" :key="category.id">
               <NuxtLink
-                :to="`/catalog/${category.slug}`"
+                :to="category.href || `/catalog/${category.slug}`"
                 class="text-muted-foreground hover:text-foreground transition-colors"
               >
                 {{ category.name }}
               </NuxtLink>
             </li>
           </ul>
-          <div v-else class="space-y-2">
-            <div v-for="i in 4" :key="i" class="h-4 bg-muted rounded animate-pulse w-3/4" />
-          </div>
+          <ul v-else class="space-y-2 text-sm">
+            <li v-for="i in 4" :key="`skeleton-${i}`">
+              <div class="h-4 bg-muted rounded animate-pulse w-3/4" />
+            </li>
+          </ul>
         </div>
 
         <!-- Популярные товары -->
@@ -87,9 +97,11 @@ const footerCategories = computed(() =>
               </NuxtLink>
             </li>
           </ul>
-          <div v-else class="space-y-2">
-            <div v-for="i in 4" :key="i" class="h-4 bg-muted rounded animate-pulse w-3/4" />
-          </div>
+          <ul v-else class="space-y-2 text-sm">
+            <li v-for="i in 4" :key="`skeleton-${i}`">
+              <div class="h-4 bg-muted rounded animate-pulse w-3/4" />
+            </li>
+          </ul>
         </div>
 
         <!-- Покупателям -->
@@ -106,26 +118,18 @@ const footerCategories = computed(() =>
             </li>
             <li>
               <NuxtLink
-                to="/returns"
+                to="/cart"
                 class="text-muted-foreground hover:text-foreground transition-colors"
               >
-                Возврат и обмен
+                Корзина
               </NuxtLink>
             </li>
             <li>
               <NuxtLink
-                to="/profile/orders"
+                to="/profile/favorites"
                 class="text-muted-foreground hover:text-foreground transition-colors"
               >
-                Мои заказы
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink
-                to="/profile/bonuses"
-                class="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Бонусная программа
+                Избранное
               </NuxtLink>
             </li>
           </ul>

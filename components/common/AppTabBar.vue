@@ -164,6 +164,17 @@ function getCategoryImageUrl(imageUrl: string | null): string | null {
   return getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, "sm");
 }
 
+function getCategoryImageVariants(imageUrl: string | null) {
+  if (!imageUrl) {
+    return { sm: null, md: null, lg: null }
+  }
+  return {
+    sm: getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, 'sm'),
+    md: getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, 'md'),
+    lg: getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, 'lg'),
+  }
+}
+
 // Функция для закрытия меню после клика по ссылке
 function handleLinkClick() {
   activeMenuValue.value = undefined;
@@ -547,6 +558,9 @@ defineExpose({ closeAllPopups });
                         >
                           <ProgressiveImage
                             :src="getCategoryImageUrl(childItem.image_url)"
+                            :src-sm="getCategoryImageVariants(childItem.image_url).sm"
+                            :src-md="getCategoryImageVariants(childItem.image_url).md"
+                            :src-lg="getCategoryImageVariants(childItem.image_url).lg"
                             :alt="childItem.name"
                             aspect-ratio="square"
                             object-fit="cover"

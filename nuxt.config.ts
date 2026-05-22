@@ -154,6 +154,10 @@ export default defineNuxtConfig({
     sitemap: ["https://uhti.kz/sitemap.xml"],
   },
 
+  experimental: {
+    payloadExtraction: false,
+  },
+
   nitro: {
     routeRules: {
       "/api/image-proxy/**": {

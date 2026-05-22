@@ -14,6 +14,17 @@ const props = defineProps<{
 
 // Используем композабл для работы с изображениями
 const { getVariantUrl } = useSupabaseStorage()
+
+const imageVariants = computed(() => {
+  if (!props.category.image_url) {
+    return { sm: null, md: null, lg: null }
+  }
+  return {
+    sm: getVariantUrl(BUCKET_NAME_CATEGORY, props.category.image_url, 'sm'),
+    md: getVariantUrl(BUCKET_NAME_CATEGORY, props.category.image_url, 'md'),
+    lg: getVariantUrl(BUCKET_NAME_CATEGORY, props.category.image_url, 'lg'),
+  }
+})
 </script>
 
 <template>
@@ -30,6 +41,9 @@ const { getVariantUrl } = useSupabaseStorage()
         <div class="w-full max-w-sm rounded-lg overflow-hidden shadow-md">
           <ProgressiveImage
             :src="getVariantUrl(BUCKET_NAME_CATEGORY, category.image_url, 'md')"
+            :src-sm="imageVariants.sm"
+            :src-md="imageVariants.md"
+            :src-lg="imageVariants.lg"
             :alt="category.name"
             aspect-ratio="square"
             object-fit="cover"

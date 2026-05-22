@@ -62,11 +62,13 @@ function openLoginModal() {
           <div
             class="p-2 md:p-2.5 bg-gray-100 dark:bg-gray-800 md:bg-white/10 hover:bg-gray-200 dark:hover:bg-gray-700 md:hover:bg-white/20 rounded-xl transition-all group-hover:scale-105 active:scale-95 backdrop-blur-sm md:border md:border-white/10 md:hover:border-white/20 md:shadow-lg"
           >
-            <Icon
-              name="line-md:heart"
-              class="size-5 md:size-7 text-primary md:text-white"
-              mode="svg"
-            />
+            <ClientOnly>
+              <Icon
+                name="line-md:heart"
+                class="size-5 md:size-7 text-primary md:text-white"
+                mode="svg"
+              />
+            </ClientOnly>
           </div>
           <ClientOnly>
             <Transition

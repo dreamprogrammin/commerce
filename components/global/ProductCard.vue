@@ -8,6 +8,7 @@ import { IMAGE_SIZES } from "@/config/images";
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from "@/constants";
 import { useCartStore } from "@/stores/publicStore/cartStore";
 import { formatPrice } from "@/utils/formatPrice";
+import StockAlertButton from "@/components/product/StockAlertButton.vue";
 
 const props = defineProps<{
   product: BaseProduct;
@@ -233,7 +234,7 @@ const priceDetails = computed(() => {
               :src-sm="getVariantUrls(activeImageIndex).sm"
               :src-md="getVariantUrls(activeImageIndex).md"
               :src-lg="getVariantUrls(activeImageIndex).lg"
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              sizes="(max-width: 767px) 400px, (max-width: 1024px) 33vw, 25vw"
               :alt="getImageAlt(activeImageIndex)"
               aspect-ratio="1/1"
               object-fit="contain"
@@ -272,7 +273,7 @@ const priceDetails = computed(() => {
                     :src-sm="getVariantUrls(index).sm"
                     :src-md="getVariantUrls(index).md"
                     :src-lg="getVariantUrls(index).lg"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    sizes="(max-width: 767px) 400px, (max-width: 1024px) 33vw, 25vw"
                     :alt="getImageAlt(index)"
                     aspect-ratio="1/1"
                     object-fit="contain"
