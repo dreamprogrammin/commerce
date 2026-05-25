@@ -330,7 +330,7 @@ const { data: brandsData } = useQuery<Brand[]>({
 })
 
 const brandsForSchema = computed(() => brandsData.value || [])
-const topBrands = brandsForSchema
+const topBrands = computed(() => brandsForSchema.value || [])
 
 // ---------------------------------------------------------------------------
 // Вычисляемые флаги для условного рендера карусельных блоков.
