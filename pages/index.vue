@@ -790,6 +790,9 @@ useRobotsRule({ index: true, follow: true })
                   {{ brand.name }}
                 </NuxtLink>
               </div>
+              <template #fallback>
+                <div class="h-0" />
+              </template>
             </ClientOnly>
           </div>
         </div>
