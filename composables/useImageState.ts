@@ -9,10 +9,10 @@ export interface ProgressiveImageOptions {
 /**
  * 🖼️ Композебл для прогрессивной загрузки изображений
  *
- * ИСПРАВЛЕНО:
- * ✅ НЕ устанавливаем src напрямую — браузер сам выбирает из srcset
- * ✅ debouncedReady для задержки показа при быстром переключении (карусель)
+ * УПРОЩЕННАЯ ВЕРСИЯ:
  * ✅ Lazy loading через Intersection Observer
+ * ✅ Debounce для быстрого переключения
+ * ✅ Preloading для eager изображений
  * ✅ Браузерное кеширование
  */
 export function useImageState(
@@ -31,14 +31,6 @@ export function useImageState(
   const isLoaded = ref(false)
   const isError = ref(false)
   const shouldLoad = ref(eager)
-
-  /**
-   * debouncedReady — становится true с задержкой 150ms после смены URL.
-   * Используется в шаблоне для скрытия старого изображения пока новое грузится.
-   * Это позволяет избежать мигания при быстром переключении (карусель).
-   * НЕ управляет src напрямую — браузер сам выбирает размер из srcset.
-   */
-  const debouncedReady = ref(eager)
 
   // ⏱️ Debounce таймер
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -62,13 +54,6 @@ export function useImageState(
 
   /**
    * 🔄 Обработка смены URL с debounce
-   *
-   * ВАЖНО: мы НЕ устанавливаем imageRef.value.src напрямую.
-   * Прямая установка src переопределяет выбор браузера из srcset,
-   * из-за чего всегда загружался lg вместо sm на мобилке.
-   *
-   * Вместо этого мы управляем только debouncedReady — флагом видимости,
-   * а браузер сам выбирает нужный размер из srcset на основе sizes/экрана.
    */
   function handleUrlChange(newUrl: string | null | undefined) {
     if (debounceTimer) {
@@ -80,17 +65,15 @@ export function useImageState(
       return
     }
 
-    // Сбрасываем состояние — показываем плейсхолдер
+    // Сбрасываем состояние для нового изображения
     isLoaded.value = false
     isError.value = false
-    debouncedReady.value = false
 
-    // 🎯 Debounce 150ms — оптимально для карусели.
-    // После задержки разрешаем показ нового изображения.
-    // src/srcset уже реактивно обновлены во Vue-шаблоне,
-    // браузер сам выберет правильный вариант из srcset.
+    // 🎯 Debounce 150ms (оптимально для карусели)
     debounceTimer = setTimeout(() => {
-      debouncedReady.value = true
+      if (imageRef.value && newUrl) {
+        imageRef.value.src = newUrl
+      }
     }, 150)
   }
 
@@ -115,7 +98,6 @@ export function useImageState(
   function resetState() {
     isLoaded.value = false
     isError.value = false
-    debouncedReady.value = false
   }
 
   /**
@@ -151,7 +133,6 @@ export function useImageState(
     nextTick(() => {
       if (eager) {
         shouldLoad.value = true
-        debouncedReady.value = true
       }
       else {
         initializeObserver()
@@ -189,7 +170,6 @@ export function useImageState(
     isLoaded,
     isError,
     shouldLoad,
-    debouncedReady, // 🆕 используй в шаблоне вместо прямого управления src
     onLoad,
     onError,
     resetState,

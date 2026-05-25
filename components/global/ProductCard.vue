@@ -236,11 +236,11 @@ const priceDetails = computed(() => {
             class="block h-full p-4"
           >
             <ProgressiveImage
-              :src="activeImageUrl"
-              :src-sm="getVariantUrls(activeImageIndex).sm"
+              :src="getVariantUrls(activeImageIndex).sm"
+              :src-mobile="getVariantUrls(activeImageIndex).sm"
+              :src-mobile-sm="getVariantUrls(activeImageIndex).sm"
+              :src-sm="getVariantUrls(activeImageIndex).md"
               :src-md="getVariantUrls(activeImageIndex).md"
-              :src-lg="getVariantUrls(activeImageIndex).lg"
-              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
               :alt="getImageAlt(activeImageIndex)"
               aspect-ratio="1/1"
               object-fit="contain"
@@ -275,11 +275,11 @@ const priceDetails = computed(() => {
                   class="block h-full aspect-square p-4"
                 >
                   <ProgressiveImage
-                    :src="getImageUrlByIndex(index)"
-                    :src-sm="getVariantUrls(index).sm"
+                    :src="getVariantUrls(index).sm"
+                    :src-mobile="getVariantUrls(index).sm"
+                    :src-mobile-sm="getVariantUrls(index).sm"
+                    :src-sm="getVariantUrls(index).md"
                     :src-md="getVariantUrls(index).md"
-                    :src-lg="getVariantUrls(index).lg"
-                    sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     :alt="getImageAlt(index)"
                     aspect-ratio="1/1"
                     object-fit="contain"
@@ -300,8 +300,12 @@ const priceDetails = computed(() => {
             class="block h-full p-4"
           >
             <ProgressiveImage
-              v-if="activeImageUrl"
-              :src="activeImageUrl"
+              v-if="getVariantUrls(0).sm"
+              :src="getVariantUrls(0).sm"
+              :src-mobile="getVariantUrls(0).sm"
+              :src-mobile-sm="getVariantUrls(0).sm"
+              :src-sm="getVariantUrls(0).md"
+              :src-md="getVariantUrls(0).md"
               :alt="getImageAlt(0)"
               aspect-ratio="1/1"
               object-fit="contain"
@@ -325,8 +329,12 @@ const priceDetails = computed(() => {
             class="block h-full p-4"
           >
             <ProgressiveImage
-              v-if="activeImageUrl"
-              :src="activeImageUrl"
+              v-if="getVariantUrls(0).sm"
+              :src="getVariantUrls(0).sm"
+              :src-mobile="getVariantUrls(0).sm"
+              :src-mobile-sm="getVariantUrls(0).sm"
+              :src-sm="getVariantUrls(0).md"
+              :src-md="getVariantUrls(0).md"
               :alt="getImageAlt(0)"
               aspect-ratio="1/1"
               object-fit="contain"
