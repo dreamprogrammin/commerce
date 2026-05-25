@@ -29,10 +29,26 @@ onMounted(() => {
 const emblaMobileApi = ref<CarouselApi>()
 const mobileSelectedIndex = ref(0)
 
+/**
+ * 🔑 Индексы слайдов, которые уже были показаны.
+ * Изначально только [0] — первый слайд грузится сразу.
+ * При свайпе добавляем текущий + следующий (предзагрузка на 1 вперёд).
+ */
+const visitedSlideIndexes = ref<Set<number>>(new Set([0]))
+
 function onMobileSelect() {
   if (!emblaMobileApi.value)
     return
-  mobileSelectedIndex.value = emblaMobileApi.value.selectedScrollSnap()
+  const index = emblaMobileApi.value.selectedScrollSnap()
+  mobileSelectedIndex.value = index
+
+  visitedSlideIndexes.value.add(index)
+
+  // Предзагружаем следующий слайд
+  const nextIndex = index + 1
+  if (nextIndex < (props.product.product_images?.length ?? 0)) {
+    visitedSlideIndexes.value.add(nextIndex)
+  }
 }
 
 watch(emblaMobileApi, (api) => {
@@ -236,12 +252,11 @@ const priceDetails = computed(() => {
             class="block h-full p-4"
           >
             <ProgressiveImage
-              :src="getVariantUrls(activeImageIndex).sm"
-              :src-mobile="getVariantUrls(activeImageIndex).sm"
-              :src-mobile-sm="getVariantUrls(activeImageIndex).sm"
-              :src-sm="getVariantUrls(activeImageIndex).lg"
-              :src-md="getVariantUrls(activeImageIndex).lg"
+              :src="activeImageUrl"
+              :src-sm="getVariantUrls(activeImageIndex).sm"
+              :src-md="getVariantUrls(activeImageIndex).md"
               :src-lg="getVariantUrls(activeImageIndex).lg"
+              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
               :alt="getImageAlt(activeImageIndex)"
               aspect-ratio="1/1"
               object-fit="contain"
@@ -249,6 +264,7 @@ const priceDetails = computed(() => {
               :blur-data-url="
                 product.product_images?.[activeImageIndex]?.blur_placeholder
               "
+              eager
               zoom-on-hover
             />
           </NuxtLink>
@@ -274,19 +290,34 @@ const priceDetails = computed(() => {
                   :to="`/catalog/products/${product.slug}`"
                   class="block h-full aspect-square p-4"
                 >
+                  <!--
+                    🔑 ЛЕНИВАЯ ЗАГРУЗКА КАРУСЕЛИ:
+                    Рендерим ProgressiveImage только для посещённых слайдов.
+                    visitedSlideIndexes изначально = [0], при свайпе добавляем
+                    текущий + следующий индекс.
+                    Непосещённые слайды — лёгкий скелетон без сетевых запросов.
+                  -->
                   <ProgressiveImage
-                    :src="getVariantUrls(index).sm"
-                    :src-mobile="getVariantUrls(index).sm"
-                    :src-mobile-sm="getVariantUrls(index).sm"
-                    :src-sm="getVariantUrls(index).lg"
-                    :src-md="getVariantUrls(index).lg"
+                    v-if="visitedSlideIndexes.has(index)"
+                    :src="getImageUrlByIndex(index)"
+                    :src-sm="getVariantUrls(index).sm"
+                    :src-md="getVariantUrls(index).md"
                     :src-lg="getVariantUrls(index).lg"
+                    sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     :alt="getImageAlt(index)"
                     aspect-ratio="1/1"
                     object-fit="contain"
                     placeholder-type="lqip"
                     :blur-data-url="image.blur_placeholder"
+                    :eager="index === 0"
                     zoom-on-hover
+                  />
+
+                  <!-- Скелетон для ещё не посещённых слайдов -->
+                  <div
+                    v-else
+                    class="w-full h-full bg-muted animate-pulse rounded-lg"
+                    aria-hidden="true"
                   />
                 </NuxtLink>
               </CarouselItem>
@@ -300,17 +331,17 @@ const priceDetails = computed(() => {
             class="block h-full p-4"
           >
             <ProgressiveImage
-              v-if="getVariantUrls(0).sm"
-              :src="getVariantUrls(0).sm"
-              :src-mobile="getVariantUrls(0).sm"
-              :src-mobile-sm="getVariantUrls(0).sm"
-              :src-sm="getVariantUrls(0).lg"
-              :src-md="getVariantUrls(0).lg"
+              v-if="activeImageUrl"
+              :src="activeImageUrl"
+              :src-sm="getVariantUrls(0).sm"
+              :src-md="getVariantUrls(0).md"
               :src-lg="getVariantUrls(0).lg"
+              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
               :alt="getImageAlt(0)"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"
+              eager
               zoom-on-hover
             />
             <div
@@ -329,17 +360,17 @@ const priceDetails = computed(() => {
             class="block h-full p-4"
           >
             <ProgressiveImage
-              v-if="getVariantUrls(0).sm"
-              :src="getVariantUrls(0).sm"
-              :src-mobile="getVariantUrls(0).sm"
-              :src-mobile-sm="getVariantUrls(0).sm"
-              :src-sm="getVariantUrls(0).lg"
-              :src-md="getVariantUrls(0).lg"
+              v-if="activeImageUrl"
+              :src="activeImageUrl"
+              :src-sm="getVariantUrls(0).sm"
+              :src-md="getVariantUrls(0).md"
               :src-lg="getVariantUrls(0).lg"
+              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
               :alt="getImageAlt(0)"
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"
+              eager
               zoom-on-hover
             />
             <div
