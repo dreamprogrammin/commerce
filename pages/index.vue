@@ -615,10 +615,12 @@ useRobotsRule({ index: true, follow: true })
          SSR рендерит статический HTML → IntersectionObserver следит за ним →
          гидрирует при появлении во вьюпорте. -->
     <div :class="desktopContainedClass">
-      <HomeBrandsCarousel
-        v-if="topBrands && topBrands.length > 0"
-        :brands="topBrands"
-      />
+      <ClientOnly>
+        <HomeBrandsCarousel
+          v-if="topBrands && topBrands.length > 0"
+          :brands="topBrands"
+        />
+      </ClientOnly>
     </div>
 
     <!-- ✅ Баннеры (без изменений — уже было корректно) -->
