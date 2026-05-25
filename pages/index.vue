@@ -81,10 +81,6 @@ onMounted(() => {
 //      Решение: ClientOnly + обычный компонент.
 //
 // Применяем LazyHydration только к компонентам без client-only зависимостей:
-const LazyHydrationBrandsCarousel = defineLazyHydrationComponent(
-  'visible',
-  () => import('@/components/home/BrandsCarousel.vue'),
-)
 const LazyHydrationBanners = defineLazyHydrationComponent(
   'visible',
   () => import('@/components/home/Banners.vue'),
@@ -619,11 +615,9 @@ useRobotsRule({ index: true, follow: true })
          SSR рендерит статический HTML → IntersectionObserver следит за ним →
          гидрирует при появлении во вьюпорте. -->
     <div :class="desktopContainedClass">
-      <LazyHydrationBrandsCarousel
+      <HomeBrandsCarousel
         v-if="topBrands && topBrands.length > 0"
         :brands="topBrands"
-        :hydrate-on-visible="{ rootMargin: '100px' }"
-        @hydrated="logHydration('BrandsCarousel', 'visible rootMargin:100px')"
       />
     </div>
 
