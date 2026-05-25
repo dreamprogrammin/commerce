@@ -46,23 +46,34 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const { getImageUrl } = useSupabaseStorage()
-const imageUrl = toRef(props, 'src')
+
+/**
+ * 🔑 ИСПРАВЛЕНИЕ: передаём в useImageState наименьший доступный вариант (srcSm),
+ * а не оригинальный src. Это нужно только для отслеживания смены изображения
+ * (чтобы сбросить isLoaded и показать плейсхолдер), но НЕ для установки src напрямую.
+ *
+ * Браузер сам выбирает нужный размер из srcset на основе sizes и ширины экрана.
+ */
+const trackingUrl = computed(() => props.srcSm ?? props.src)
+
 const {
   imageRef,
   isLoaded,
   isError,
   shouldLoad,
+  debouncedReady,
   onLoad,
   onError,
-} = useImageState(imageUrl, { eager: props.eager })
+} = useImageState(trackingUrl, { eager: props.eager })
 
 const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
 
 /**
- * Оптимизированный URL (кешированный, стабильный)
+ * Оптимизированный URL для <img src> — используется как fallback,
+ * когда нет srcset (например, одиночное изображение без вариантов).
  */
 const optimizedImageUrl = computed(() => {
-  if (!shouldLoad.value || !imageUrl.value) {
+  if (!shouldLoad.value || !props.src) {
     return undefined
   }
 
@@ -76,17 +87,16 @@ const optimizedImageUrl = computed(() => {
     })
   }
 
-  return imageUrl.value
+  return props.src
 })
 
 /**
- * Fallback URL для <img src> - используем sm если есть srcset
+ * Fallback src для <img> — предпочитаем sm для экономии трафика.
+ * Браузер всё равно выберет лучший вариант из srcset если он есть.
  */
 const fallbackImageUrl = computed(() => {
-  // Если есть srcset, используем sm как fallback
-  if (props.srcSm) {
+  if (props.srcSm)
     return props.srcSm
-  }
   return optimizedImageUrl.value
 })
 
@@ -141,7 +151,6 @@ const srcsetValue = computed(() => {
     const autoSrcset: string[] = []
     const baseSrc = optimizedImageUrl.value
 
-    // Заменяем размер в URL
     if (baseSrc.includes('/sm/')) {
       autoSrcset.push(`${baseSrc} 400w`)
       autoSrcset.push(`${baseSrc.replace('/sm/', '/md/')} 800w`)
@@ -165,7 +174,7 @@ const srcsetValue = computed(() => {
   return undefined
 })
 
-// Art Direction — мобильный srcset (640w / 1280w, соответствует IMAGE_VARIANTS_WIDE)
+// Art Direction — мобильный srcset
 const mobileSrcsetValue = computed(() => {
   const parts: string[] = []
   if (props.srcMobileSm)
@@ -177,7 +186,7 @@ const mobileSrcsetValue = computed(() => {
   return parts.length > 0 ? parts.join(', ') : undefined
 })
 
-// LQIP — используем мобильный блюр на узких экранах, если он передан
+// LQIP — мобильный blur на узких экранах
 const isMobileScreen = useMediaQuery('(max-width: 767px)')
 const currentBlurUrl = computed(() => {
   if (isMobileScreen.value && props.blurDataUrlMobile)
@@ -191,22 +200,13 @@ const resolvedFetchpriority = computed(() => {
   return props.eager ? 'high' : 'auto'
 })
 
-// Автоматический sizes на основе ширины изображения
 const autoSizes = computed(() => {
   if (props.sizes)
     return props.sizes
-
-  // Если указана ширина, используем её
-  if (props.width) {
+  if (props.width)
     return `${props.width}px`
-  }
-
-  // Для маленьких изображений (иконки, аватары)
-  if (aspectRatioClass.value === 'aspect-square') {
+  if (aspectRatioClass.value === 'aspect-square')
     return '(max-width: 767px) 400px, (max-width: 1024px) 33vw, 25vw'
-  }
-
-  // По умолчанию — адаптивно
   return '(max-width: 767px) 100vw, (max-width: 1024px) 50vw, 33vw'
 })
 
@@ -228,37 +228,32 @@ const isDev = computed(() => import.meta.env.DEV)
         'bg-muted': placeholderType === 'color',
       }"
     >
-      <!-- 🎨 LQIP - Blur Preview (как на Medium.com) -->
+      <!-- 🎨 LQIP - Blur Preview -->
       <div
         v-if="placeholderType === 'lqip' && currentBlurUrl"
         class="absolute inset-0"
       >
-        <!-- Крошечное blur изображение -->
         <img
           :src="currentBlurUrl"
           :alt="alt"
           class="w-full h-full object-cover blur-2xl scale-110 opacity-60"
           aria-hidden="true"
         >
-        <!-- Overlay для красоты -->
         <div class="absolute inset-0 bg-gradient-to-br from-transparent via-black/5 to-black/10" />
       </div>
 
-      <!-- Fallback если нет blurDataUrl -->
       <div
         v-else-if="placeholderType === 'lqip'"
         class="absolute inset-0 bg-gradient-to-br animate-pulse"
         :class="placeholderColor"
       />
 
-      <!-- Shimmer градиент -->
       <div
         v-if="placeholderType === 'shimmer'"
         class="absolute inset-0 bg-gradient-to-br"
         :class="placeholderColor"
       />
 
-      <!-- Blur эффект с паттерном -->
       <div
         v-if="placeholderType === 'blur'"
         class="absolute inset-0 flex items-center justify-center"
@@ -273,7 +268,6 @@ const isDev = computed(() => import.meta.env.DEV)
         </svg>
       </div>
 
-      <!-- Маленький спиннер (только для LQIP и blur) -->
       <div
         v-if="placeholderType === 'lqip' || placeholderType === 'blur'"
         class="absolute inset-0 flex items-center justify-center"
@@ -281,7 +275,6 @@ const isDev = computed(() => import.meta.env.DEV)
         <div class="w-6 h-6 border-2 border-white/40 border-t-white/80 rounded-full animate-spin" />
       </div>
 
-      <!-- Обычный спиннер для shimmer/color -->
       <div
         v-if="placeholderType === 'shimmer' || placeholderType === 'color'"
         class="absolute inset-0 flex items-center justify-center"
@@ -289,7 +282,6 @@ const isDev = computed(() => import.meta.env.DEV)
         <div class="w-10 h-10 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />
       </div>
 
-      <!-- Индикатор режима (только в dev) -->
       <div
         v-if="isDev"
         class="absolute bottom-2 left-2 text-[10px] bg-black/60 text-white px-2 py-1 rounded font-mono backdrop-blur-sm"
@@ -301,8 +293,15 @@ const isDev = computed(() => import.meta.env.DEV)
     </div>
 
     <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ -->
+    <!--
+      🔑 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ:
+      - src/srcset управляются ТОЛЬКО через Vue-реактивность (computed props)
+      - useImageState больше НЕ устанавливает imageRef.src напрямую
+      - Браузер сам выбирает нужный размер из srcset (sm=400w на мобилке)
+      - debouncedReady управляет opacity для плавного появления после debounce
+    -->
     <picture>
-      <!-- 📱 Art Direction: мобильный вариант (показывается при media-запросе) -->
+      <!-- 📱 Art Direction: мобильный вариант -->
       <source
         v-if="mobileSrcsetValue"
         :media="mobileBreakpoint"
@@ -333,7 +332,10 @@ const isDev = computed(() => import.meta.env.DEV)
         :height="height || undefined"
         class="w-full h-full"
         :class="[
-          isLoaded ? 'opacity-100' : 'opacity-0',
+          // 🔑 Показываем изображение только когда:
+          // 1. isLoaded — изображение загружено
+          // 2. debouncedReady — прошёл debounce (не мелькаем при быстром переключении)
+          (isLoaded && debouncedReady) ? 'opacity-100' : 'opacity-0',
           objectFitClass,
           objectPositionClass,
           zoomOnHover ? 'hover:scale-105' : '',
@@ -363,7 +365,6 @@ const isDev = computed(() => import.meta.env.DEV)
         <circle cx="8.5" cy="8.5" r="1.5" />
         <polyline points="21 15 16 10 5 21" />
       </svg>
-
       <span class="text-xs text-center px-2 opacity-60">
         Не загрузилось
       </span>
