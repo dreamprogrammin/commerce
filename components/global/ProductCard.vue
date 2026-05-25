@@ -249,7 +249,6 @@ const priceDetails = computed(() => {
               :blur-data-url="
                 product.product_images?.[activeImageIndex]?.blur_placeholder
               "
-              eager
               zoom-on-hover
             />
           </NuxtLink>
@@ -287,7 +286,6 @@ const priceDetails = computed(() => {
                     object-fit="contain"
                     placeholder-type="lqip"
                     :blur-data-url="image.blur_placeholder"
-                    eager
                     zoom-on-hover
                   />
                 </NuxtLink>
@@ -313,7 +311,6 @@ const priceDetails = computed(() => {
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"
-              eager
               zoom-on-hover
             />
             <div
@@ -343,7 +340,6 @@ const priceDetails = computed(() => {
               aspect-ratio="1/1"
               object-fit="contain"
               placeholder-type="shimmer"
-              eager
               zoom-on-hover
             />
             <div

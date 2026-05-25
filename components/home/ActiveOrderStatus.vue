@@ -259,7 +259,6 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
                       object-fit="contain"
                       placeholder-type="lqip"
                       aspect-ratio="square"
-                      eager
                       class="w-full h-full"
                     />
                     <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
