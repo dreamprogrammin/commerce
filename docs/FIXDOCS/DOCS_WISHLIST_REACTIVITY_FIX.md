@@ -8,11 +8,13 @@
 ## Симптомы
 
 ### Фикс 1 (2026-02-28)
+
 - При клике на иконку сердечка на карточке товара кнопка не меняла визуальное состояние
 - Товар реально добавлялся в БД, но закрашенное сердечко появлялось только после перехода на страницу «Избранное» и обратно
 - Неавторизованный пользователь видел только `toast`, без открытия модального окна входа
 
 ### Фикс 2 (2026-03-01) — Глобальная инициализация + ошибка 23505
+
 - При первом заходе в каталог сердечки уже добавленных товаров не закрашены — `wishlistProductIds` пуст
 - При клике на «пустое» сердечко уже избранного товара: `23505 duplicate key value violates unique constraint "wishlist_pkey"`
 - Сердечки корректно отображались только после физического посещения `/profile/wishlist`
@@ -28,6 +30,7 @@
 **Файл:** `stores/publicStore/wishlistStore.ts`
 
 Старый код:
+
 1. Выполнял запрос к Supabase (INSERT / DELETE)
 2. Только после успешного ответа вызывал `await fetchWishlistProducts()`
 3. `fetchWishlistProducts()` делал ещё один запрос к БД для получения актуального списка
@@ -75,18 +78,21 @@ async function toggleWishlist(productId, productName) {
   if (isCurrentlyInWishlist) {
     wishlistProductIds.value = wishlistProductIds.value.filter(id => id !== productId)
     wishlistProducts.value = wishlistProducts.value.filter(p => p.id !== productId)
-  } else {
+  }
+  else {
     wishlistProductIds.value = [...wishlistProductIds.value, productId]
   }
 
   try {
     // 2. Отправляем запрос к серверу
     // ... DB operation ...
-  } catch (error) {
+  }
+  catch (error) {
     // 3. При ошибке — откатываем (Rollback)
     if (isCurrentlyInWishlist) {
       wishlistProductIds.value = [...wishlistProductIds.value, productId]
-    } else {
+    }
+    else {
       wishlistProductIds.value = wishlistProductIds.value.filter(id => id !== productId)
       wishlistProducts.value = wishlistProducts.value.filter(p => p.id !== productId)
     }
@@ -137,6 +143,7 @@ isProductInWishlist: computed(() => (id: string) => wishlistProductIds.value.inc
 ```
 
 В компоненте:
+
 ```typescript
 const isWishlisted = computed(() => wishlistStore.isProductInWishlist(props.productId))
 ```
@@ -173,14 +180,17 @@ if (error && error.code !== '23505') throw error  // ← 23505 = уже доба
 
 ```typescript
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+
 const wishlistStore = useWishlistStore()
 
 const supabaseUser = useSupabaseUser()
 watch(supabaseUser, (newUser) => {
-  if (!import.meta.client) return
+  if (!import.meta.client)
+    return
   if (newUser) {
     wishlistStore.fetchWishlistIds() // загружаем ID при логине
-  } else {
+  }
+  else {
     wishlistStore.wishlistProductIds = [] // очищаем при выходе
   }
 }, { immediate: true }) // immediate: true — срабатывает сразу при монтировании
@@ -192,22 +202,22 @@ watch(supabaseUser, (newUser) => {
 
 ## Критерии приёмки (проверка)
 
-| # | Сценарий | Ожидаемое поведение |
-|---|----------|---------------------|
-| 1 | Клик на сердечко у авторизованного пользователя | Иконка меняется **мгновенно**, запрос уходит фоном |
-| 2 | Клик на сердечко при отсутствии интернета | Иконка мгновенно меняется, затем откатывается назад + Toast с ошибкой |
-| 3 | Переход из главной в каталог после добавления | Товар уже отображается с закрашенным сердечком (единый стейт в `wishlistProductIds`) |
-| 4 | Клик на сердечко у неавторизованного пользователя | Открывается модальное окно входа |
-| 5 | Первый заход в каталог авторизованным пользователем | Сердечки на уже избранных товарах закрашены сразу |
-| 6 | Повторный клик на избранный товар из другой вкладки | Нет ошибки 23505, UI корректно обновляется |
-| 7 | Выход из аккаунта | `wishlistProductIds` очищается, все сердечки пустые |
+| #   | Сценарий                                            | Ожидаемое поведение                                                                  |
+| --- | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1   | Клик на сердечко у авторизованного пользователя     | Иконка меняется **мгновенно**, запрос уходит фоном                                   |
+| 2   | Клик на сердечко при отсутствии интернета           | Иконка мгновенно меняется, затем откатывается назад + Toast с ошибкой                |
+| 3   | Переход из главной в каталог после добавления       | Товар уже отображается с закрашенным сердечком (единый стейт в `wishlistProductIds`) |
+| 4   | Клик на сердечко у неавторизованного пользователя   | Открывается модальное окно входа                                                     |
+| 5   | Первый заход в каталог авторизованным пользователем | Сердечки на уже избранных товарах закрашены сразу                                    |
+| 6   | Повторный клик на избранный товар из другой вкладки | Нет ошибки 23505, UI корректно обновляется                                           |
+| 7   | Выход из аккаунта                                   | `wishlistProductIds` очищается, все сердечки пустые                                  |
 
 ---
 
 ## Изменённые файлы
 
-| Файл | Тип изменения |
-|------|---------------|
-| `stores/publicStore/wishlistStore.ts` | Optimistic update + rollback в `toggleWishlist`, удалён вызов `fetchWishlistProducts()` после toggle; добавлен `fetchWishlistIds()`; игнорирование ошибки `23505` при INSERT |
-| `components/product/WishlistButton.vue` | Заменён `toast.info()` на `modalStore.openLoginModal()` для неавторизованных пользователей |
-| `app.vue` | Добавлен глобальный `watch(supabaseUser)` с `{ immediate: true }` для вызова `fetchWishlistIds()` при логине и очистки при выходе |
+| Файл                                    | Тип изменения                                                                                                                                                                |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stores/publicStore/wishlistStore.ts`   | Optimistic update + rollback в `toggleWishlist`, удалён вызов `fetchWishlistProducts()` после toggle; добавлен `fetchWishlistIds()`; игнорирование ошибки `23505` при INSERT |
+| `components/product/WishlistButton.vue` | Заменён `toast.info()` на `modalStore.openLoginModal()` для неавторизованных пользователей                                                                                   |
+| `app.vue`                               | Добавлен глобальный `watch(supabaseUser)` с `{ immediate: true }` для вызова `fetchWishlistIds()` при логине и очистки при выходе                                            |

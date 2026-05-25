@@ -57,9 +57,10 @@ async function handleGenerateFaq() {
   isGeneratingFaq.value = true
   try {
     const { data, error } = await supabase.rpc('generate_faq_for_all_category_brands')
-    
-    if (error) throw error
-    
+
+    if (error)
+      throw error
+
     const totalFaq = data?.reduce((sum: number, item: any) => sum + item.faq_count, 0) || 0
     toast.success(`Создано ${totalFaq} FAQ для ${data?.length || 0} комбинаций`, {
       description: 'FAQ успешно сгенерированы',
@@ -81,7 +82,7 @@ async function handleAutoGenerate() {
   isGenerating.value = true
   try {
     const results = await generateSeoForAllCategoryBrands({ dryRun: false })
-    
+
     if (results) {
       const newCount = results.length
       toast.success(`Создано ${newCount} SEO-текстов`, {
@@ -106,7 +107,7 @@ async function handleRegenerateAll() {
   isGenerating.value = true
   try {
     const results = await generateSeoForAllCategoryBrands({ dryRun: false, overwrite: true })
-    
+
     if (results) {
       toast.success(`Обновлено ${results.length} SEO-текстов`, {
         description: 'Регенерация завершена успешно',
@@ -134,7 +135,8 @@ async function loadEntries() {
       `)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error)
+      throw error
 
     entries.value = (data || []).map((e: any) => ({
       ...e,
@@ -227,14 +229,16 @@ async function handleSave() {
         .from('category_brand_seo')
         .update(payload)
         .eq('id', editingEntry.value.id)
-      if (error) throw error
+      if (error)
+        throw error
       toast.success('SEO-текст обновлён')
     }
     else {
       const { error } = await supabase
         .from('category_brand_seo')
         .insert(payload)
-      if (error) throw error
+      if (error)
+        throw error
       toast.success('SEO-текст создан')
     }
 
@@ -255,7 +259,8 @@ async function handleDelete(entry: CategoryBrandSeoEntry) {
       .from('category_brand_seo')
       .delete()
       .eq('id', entry.id)
-    if (error) throw error
+    if (error)
+      throw error
     toast.success('Удалено')
     await loadEntries()
   }
@@ -288,24 +293,24 @@ const previewUrl = computed(() => {
         </p>
       </div>
       <div class="flex gap-2">
-        <Button variant="outline" @click="handleGenerateFaq" :disabled="isGeneratingFaq">
+        <Button variant="outline" :disabled="isGeneratingFaq" @click="handleGenerateFaq">
           <svg v-if="isGeneratingFaq" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
           {{ isGeneratingFaq ? 'Генерация FAQ...' : '❓ Генерация FAQ' }}
         </Button>
-        <Button variant="outline" @click="handleAutoGenerate" :disabled="isGenerating">
+        <Button variant="outline" :disabled="isGenerating" @click="handleAutoGenerate">
           <svg v-if="isGenerating" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
           {{ isGenerating ? 'Генерация...' : '🤖 Автогенерация' }}
         </Button>
-        <Button variant="destructive" @click="handleRegenerateAll" :disabled="isGenerating">
+        <Button variant="destructive" :disabled="isGenerating" @click="handleRegenerateAll">
           <svg v-if="isGenerating" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
           {{ isGenerating ? 'Генерация...' : '🔄 Перезаписать все' }}
         </Button>

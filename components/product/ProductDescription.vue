@@ -14,7 +14,8 @@ const emit = defineEmits<{
 
 // Проверяем, нужна ли кнопка "Читать далее"
 const needsExpand = computed(() => {
-  if (!props.product.description) return false
+  if (!props.product.description)
+    return false
   // Убираем HTML теги для подсчета длины текста
   const plainText = props.product.description.replace(/<[^>]*>/g, '').trim()
   return plainText.length > 300

@@ -7,7 +7,7 @@ const props = withDefaults(defineProps<{
   productId: string
   size?: 'sm' | 'lg'
 }>(), {
-  size: 'lg'
+  size: 'lg',
 })
 
 const stockAlertsStore = useStockAlertsStore()

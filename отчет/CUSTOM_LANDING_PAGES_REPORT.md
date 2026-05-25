@@ -26,9 +26,9 @@
 
 ```typescript
 interface BrandPageLayout {
-  heroBanner: string | null       // базовый путь в bucket banners
-  heroBannerBlur: string | null   // base64 LQIP placeholder
-  featuredLineIds: string[]       // UUID избранных линеек
+  heroBanner: string | null // базовый путь в bucket banners
+  heroBannerBlur: string | null // base64 LQIP placeholder
+  featuredLineIds: string[] // UUID избранных линеек
 }
 ```
 
@@ -54,6 +54,7 @@ interface BrandPageLayout {
 - Emit обновлён для передачи `bannerFile`
 
 **Файлы также обновлены:**
+
 - `pages/admin/brands/[id].vue` — передача `bannerFile` в `updateBrand()`
 - `pages/admin/brands/new.vue` — передача `bannerFile` в `createBrand()`
 
@@ -64,6 +65,7 @@ interface BrandPageLayout {
 **Файл:** `components/brand/BrandStandardTemplate.vue`
 
 Извлечён стандартный шаблон страницы бренда из `pages/brand/[slug].vue`:
+
 - Hero-секция с градиентом и логотипом
 - Статистика (количество товаров, гарантия оригинала)
 - Сетка линеек (`BrandProductLinesGrid`)
@@ -75,6 +77,7 @@ interface BrandPageLayout {
 **Файл:** `components/brand/BrandCustomTemplate.vue`
 
 Кастомный шаблон для VIP-брендов:
+
 - Полноширинный hero-баннер с `<picture>` (sm/md/lg варианты) и LQIP blur placeholder
 - Overlay с логотипом бренда и H1 поверх баннера
 - Секция избранных линеек — крупные карточки (1-3 колонки) с описаниями
@@ -126,17 +129,17 @@ interface BrandPageLayout {
 
 ## Файлы
 
-| Действие | Файл |
-|----------|------|
-| СОЗДАН | `supabase/migrations/20260308000001_add_custom_brand_pages.sql` |
-| ИЗМЕНЁН | `types/type.ts` |
-| ИЗМЕНЁН | `stores/adminStore/adminBrandsStore.ts` |
-| ИЗМЕНЁН | `components/admin/brands/BrandForm.vue` |
-| ИЗМЕНЁН | `pages/admin/brands/[id].vue` |
-| ИЗМЕНЁН | `pages/admin/brands/new.vue` |
-| СОЗДАН | `components/brand/BrandStandardTemplate.vue` |
-| СОЗДАН | `components/brand/BrandCustomTemplate.vue` |
-| ИЗМЕНЁН | `pages/brand/[slug].vue` |
+| Действие | Файл                                                            |
+| -------- | --------------------------------------------------------------- |
+| СОЗДАН   | `supabase/migrations/20260308000001_add_custom_brand_pages.sql` |
+| ИЗМЕНЁН  | `types/type.ts`                                                 |
+| ИЗМЕНЁН  | `stores/adminStore/adminBrandsStore.ts`                         |
+| ИЗМЕНЁН  | `components/admin/brands/BrandForm.vue`                         |
+| ИЗМЕНЁН  | `pages/admin/brands/[id].vue`                                   |
+| ИЗМЕНЁН  | `pages/admin/brands/new.vue`                                    |
+| СОЗДАН   | `components/brand/BrandStandardTemplate.vue`                    |
+| СОЗДАН   | `components/brand/BrandCustomTemplate.vue`                      |
+| ИЗМЕНЁН  | `pages/brand/[slug].vue`                                        |
 
 ---
 

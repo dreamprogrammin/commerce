@@ -104,5 +104,5 @@ https://search.google.com/test/rich-results?url=https://uhti.kz/catalog/boys/mas
 
 ---
 
-**Дата создания:** 31 марта 2026  
+**Дата создания:** 31 марта 2026
 **Статус:** Готово к запуску

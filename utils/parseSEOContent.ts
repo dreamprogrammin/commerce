@@ -16,10 +16,11 @@ export interface SEOBlock {
  * SSR-совместимая версия (работает на сервере и клиенте).
  */
 export function parseHTMLToBlocks(html: string): SEOBlock[] {
-  if (!html?.trim()) return []
+  if (!html?.trim())
+    return []
 
   const blocks: SEOBlock[] = []
-  
+
   // Нормализуем HTML - убираем лишние переносы между тегами
   const normalized = html.replace(/>\s+</g, '><')
 
@@ -30,27 +31,30 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
   const ulRegex = /<ul([^>]*)>(.*?)<\/ul>/gi
 
   // Собираем все теги с их позициями для правильного порядка
-  const allMatches: Array<{ index: number; block: SEOBlock }> = []
+  const allMatches: Array<{ index: number, block: SEOBlock }> = []
 
   // H2
   let match: RegExpExecArray | null
   while ((match = h2Regex.exec(normalized)) !== null) {
     const iconMatch = match[1].match(/data-icon=["']([^"']+)["']/)
     const text = match[2].replace(/<[^>]*>/g, '').trim()
-    if (text) allMatches.push({ index: match.index, block: { type: 'h2', text, icon: iconMatch?.[1] } })
+    if (text)
+      allMatches.push({ index: match.index, block: { type: 'h2', text, icon: iconMatch?.[1] } })
   }
 
   // H3
   while ((match = h3Regex.exec(normalized)) !== null) {
     const iconMatch = match[1].match(/data-icon=["']([^"']+)["']/)
     const text = match[2].replace(/<[^>]*>/g, '').trim()
-    if (text) allMatches.push({ index: match.index, block: { type: 'h3', text, icon: iconMatch?.[1] } })
+    if (text)
+      allMatches.push({ index: match.index, block: { type: 'h3', text, icon: iconMatch?.[1] } })
   }
 
   // P
   while ((match = pRegex.exec(normalized)) !== null) {
     const text = match[2].replace(/<[^>]*>/g, '').trim()
-    if (text) allMatches.push({ index: match.index, block: { type: 'p', text } })
+    if (text)
+      allMatches.push({ index: match.index, block: { type: 'p', text } })
   }
 
   // UL
@@ -58,14 +62,16 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
     const items: SEOBlock['items'] = []
     const liRegex = /<li([^>]*)>(.*?)<\/li>/gi
     let liMatch: RegExpExecArray | null
-    
+
     while ((liMatch = liRegex.exec(match[2])) !== null) {
       const liIconMatch = liMatch[1].match(/data-icon=["']([^"']+)["']/)
       const text = liMatch[2].replace(/<[^>]*>/g, '').trim()
-      if (text) items.push({ text, icon: liIconMatch?.[1] })
+      if (text)
+        items.push({ text, icon: liIconMatch?.[1] })
     }
-    
-    if (items.length) allMatches.push({ index: match.index, block: { type: 'ul', items } })
+
+    if (items.length)
+      allMatches.push({ index: match.index, block: { type: 'ul', items } })
   }
 
   // Сортируем по позиции в исходном HTML

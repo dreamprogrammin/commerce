@@ -2,9 +2,9 @@
 
 > **Современный интернет-магазин игрушек с продвинутой системой лояльности**
 >
-> **Сайт:** https://uhti.kz  
-> **Регион:** Казахстан (Алматы)  
-> **Дата создания:** 2025  
+> **Сайт:** https://uhti.kz
+> **Регион:** Казахстан (Алматы)
+> **Дата создания:** 2025
 > **Последнее обновление:** 31 марта 2026
 
 ---
@@ -477,7 +477,7 @@ Level 2: TanStack Query (Продукты)
 **Определение устройства:**
 
 ```typescript
-const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 ```
 
 ### 4. Telegram-управление заказами
@@ -700,6 +700,6 @@ routeRules: {
 
 ---
 
-**Дата создания:** 31 марта 2026  
-**Версия:** 1.0  
+**Дата создания:** 31 марта 2026
+**Версия:** 1.0
 **Автор:** Uhti Commerce Team

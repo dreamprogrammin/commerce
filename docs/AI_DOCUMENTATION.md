@@ -1,7 +1,7 @@
 # 🤖 Документация проекта для ИИ-ассистентов
 
-> **Версия:** 1.0  
-> **Дата:** 21 мая 2026  
+> **Версия:** 1.0
+> **Дата:** 21 мая 2026
 > **Проект:** Uhti Commerce Platform (uhti.kz)
 
 ---
@@ -34,6 +34,7 @@
 ### Ключевые функции
 
 **Для покупателей:**
+
 - Каталог с многоуровневой фильтрацией (категории, бренды, цена, материалы, страны, динамические атрибуты)
 - Персонализированные рекомендации на основе профилей детей
 - Двухуровневая система бонусов (активные + отложенные на 14 дней)
@@ -43,6 +44,7 @@
 - История заказов с отслеживанием статуса
 
 **Для администраторов:**
+
 - Полноценная админ-панель для управления каталогом
 - Управление продуктами с мультизагрузкой изображений
 - Telegram-интеграция для управления заказами
@@ -137,12 +139,14 @@
 ### 1. Двойная архитектура заказов
 
 **Зарегистрированные пользователи** (`orders`):
+
 - Привязка к `user_id`
 - Система бонусов (списание/начисление)
 - Welcome bonus 1000 при первом заказе
 - Отложенная активация бонусов (14 дней)
 
 **Гостевые заказы** (`guest_checkouts`):
+
 - Без привязки к пользователю
 - Контакты: `guest_name`, `guest_email`, `guest_phone`
 - БЕЗ операций с бонусами
@@ -151,10 +155,12 @@
 ### 2. Система бонусов
 
 **Два типа баланса:**
+
 - `active_bonus_balance` - доступны для списания
 - `pending_bonus_balance` - активация через 14 дней
 
 **Жизненный цикл:**
+
 ```
 Заказ создан → bonuses_awarded вычислены
               ↓
@@ -171,6 +177,7 @@
 ### 3. Персонализированные рекомендации
 
 **Алгоритм:**
+
 1. **Анонимы** → Случайные популярные товары
 2. **С профилями детей** → Фильтр по возрасту + полу
 3. **С историей заказов** → Товары из той же категории
@@ -181,6 +188,7 @@
 **Проблема:** Разные категории требуют разных характеристик
 
 **Решение:**
+
 ```
 Категория "Куклы":
 ├─ Высота куклы (range)
@@ -194,6 +202,7 @@
 ```
 
 **Реализация:**
+
 - `category_attributes` - привязка атрибутов к категориям
 - `product_attribute_values` - значения для продуктов
 - Автоматическая фильтрация в каталоге
@@ -203,6 +212,7 @@
 **Проблема:** Медленная загрузка изображений
 
 **Решение:**
+
 - При загрузке генерируется Base64 LQIP (~500 байт)
 - Сохраняется в `blur_placeholder` колонке
 - Мгновенное отображение blur-эффекта
@@ -213,6 +223,7 @@
 ### 6. Двухуровневое кеширование
 
 **Level 1: Pinia Store (Метаданные)**
+
 - Бренды по категориям
 - Атрибуты по категориям
 - Материалы, страны (глобально)
@@ -220,6 +231,7 @@
 - **Lifetime:** До закрытия вкладки
 
 **Level 2: TanStack Query (Продукты)**
+
 - Списки продуктов с фильтрами
 - **Stale time:** 5 минут
 - **GC time:** 10 минут
@@ -258,6 +270,7 @@ supabase gen types typescript --local > types/supabase.ts
 ### Структура компонентов
 
 **Props Definition:**
+
 ```typescript
 // Вариант 1: Interface
 interface Props {
@@ -273,16 +286,19 @@ const props = withDefaults(defineProps<Props>(), {
 ```
 
 **Loading States:**
+
 ```vue
 <div v-if="isLoading">
   <Skeleton class="h-5 w-3/4" />
 </div>
+
 <div v-else>
   {{ content }}
 </div>
 ```
 
 **Device Detection:**
+
 ```typescript
 const isTouchDevice = ref(false)
 onMounted(() => {
@@ -293,16 +309,19 @@ onMounted(() => {
 ### Работа с Pinia Stores
 
 **Паттерн Loading States:**
+
 ```typescript
 isLoading.value = true
 try {
   // async operation
-} finally {
+}
+finally {
   isLoading.value = false
 }
 ```
 
 **Паттерн Error Handling:**
+
 ```typescript
 catch (error: any) {
   toast.error('User message', { description: error.message })
@@ -310,6 +329,7 @@ catch (error: any) {
 ```
 
 **Паттерн Optimistic Updates:**
+
 ```typescript
 const originalData = [...items.value]
 items.value = items.value.filter(...)
@@ -327,6 +347,7 @@ try {
 ### Основные таблицы
 
 **Каталог:**
+
 - `products` - Товары (название, цена, остатки, бонусы)
 - `product_images` - Галерея изображений с LQIP
 - `categories` - Иерархические категории
@@ -336,17 +357,20 @@ try {
 - `countries` - Страны производства
 
 **Заказы:**
+
 - `orders` - Заказы зарегистрированных (с бонусами)
 - `guest_checkouts` - Гостевые заказы (без бонусов)
 - `order_items` / `guest_checkout_items` - Товары в заказах
 
 **Пользователи:**
+
 - `profiles` - Профили пользователей
 - `children` - Профили детей для рекомендаций
 - `wishlist` - Список желаний
 - `bonus_transactions` - История транзакций бонусов
 
 **Маркетинг:**
+
 - `banners` - Рекламные баннеры
 - `slides` - Карусель главной страницы
 - `category_brand_seo` - SEO-тексты для комбинаций категория+бренд
@@ -354,6 +378,7 @@ try {
 ### Ключевые RPC функции
 
 **Каталог:**
+
 ```sql
 get_filtered_products(
   p_category_slug TEXT,
@@ -371,6 +396,7 @@ get_filtered_products(
 ```
 
 **Заказы:**
+
 ```sql
 create_user_order(
   p_cart_items JSONB,
@@ -395,6 +421,7 @@ cancel_order(
 ```
 
 **Рекомендации:**
+
 ```sql
 get_personalized_recommendations(
   p_user_id UUID,
@@ -403,6 +430,7 @@ get_personalized_recommendations(
 ```
 
 **Бонусы:**
+
 ```sql
 activate_pending_bonuses() RETURNS TEXT
 -- Запускается pg_cron ежедневно в 2:00 AM UTC
@@ -413,6 +441,7 @@ activate_pending_bonuses() RETURNS TEXT
 **Все таблицы** имеют RLS enabled:
 
 **Категории политик:**
+
 1. **Public read** - данные каталога
 2. **User-scoped** - заказы, wishlist, дети
 3. **Admin-only** - операции управления
@@ -425,6 +454,7 @@ activate_pending_bonuses() RETURNS TEXT
 ### SSR и кеширование
 
 **Nuxt Route Rules:**
+
 ```typescript
 routeRules: {
   '/': { swr: 600 },                    // 10 мин
@@ -445,11 +475,13 @@ routeRules: {
 ### Оптимизация изображений
 
 **Стратегия:**
+
 1. **Загрузка:** Автосжатие + генерация LQIP
 2. **Отдача:** WebP формат, responsive breakpoints, lazy loading
 3. **Трансформация:** Edge Function `image-transformer`
 
 **Результат:**
+
 - Размер изображений: -70%
 - LCP < 2.5s
 - CLS < 0.1
@@ -457,15 +489,18 @@ routeRules: {
 ### SEO для изображений
 
 **Формула alt-текстов:**
+
 ```
 [Бренд] + [Название товара] + [Серия] + [Контекст]
 ```
 
 **Примеры:**
+
 - ✅ `LEGO Конструктор Железный Человек Marvel купить в Казахстане`
 - ✅ `Barbie Кукла Принцесса Disney вид сбоку`
 
 **Composable:**
+
 ```typescript
 const { generateProductImageAlt } = useSeoAltText()
 
@@ -483,16 +518,19 @@ const altText = generateProductImageAlt({
 **Цель:** Перехватывать запросы типа "где купить CADA в Алматы"
 
 **Функции:**
+
 - `get_category_brand_combinations()` - все комбинации с товарами
 - `generate_category_brand_faq()` - генерация FAQ
 - `safe_upsert_category_brand_seo()` - защита уникальных текстов
 
 **Защита уникальных текстов:**
 Текст защищён, если:
+
 - Длина > 300 символов ИЛИ
 - Содержит HTML-теги (`<h1>`, `<div>`, `<ul>`, `<strong>`)
 
 **Использование:**
+
 1. Открыть `/admin/brand-seo`
 2. Нажать "🤖 Автогенерация"
 3. Нажать "❓ Генерация FAQ"
@@ -539,10 +577,12 @@ const altText = generateProductImageAlt({
 ### Git Workflow
 
 **Pre-commit Hooks:**
+
 - ESLint auto-fix
 - Prettier formatting
 
 **Commit Guidelines:**
+
 - NEVER изменять существующие миграции
 - Регенерировать типы после изменений схемы
 - Тестировать с разными ролями
@@ -553,10 +593,12 @@ const altText = generateProductImageAlt({
 ## 📚 Связанная документация
 
 **Полная техническая документация:**
+
 - [PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md) - Полная архитектура (73KB)
 - [OVERVIEW.md](./OVERVIEW.md) - Обзор проекта для бизнеса
 
 **Специализированная документация:**
+
 - [IMAGE_SEO_COMPLETE.md](./IMAGE_SEO_COMPLETE.md) - SEO оптимизация изображений
 - [SEO_AUTOMATION.md](./SEO_AUTOMATION.md) - Автоматизация SEO для категорий
 - [SEO_TEXT_PROTECTION.md](./SEO_TEXT_PROTECTION.md) - Защита уникальных текстов
@@ -565,10 +607,11 @@ const altText = generateProductImageAlt({
 - [IMAGES.md](./IMAGES.md) - Оптимизация изображений
 
 **Инструкции для разработки:**
+
 - [CLAUDE.md](../CLAUDE.md) - Инструкции для Claude AI
 
 ---
 
-**Дата создания:** 21 мая 2026  
-**Версия:** 1.0  
+**Дата создания:** 21 мая 2026
+**Версия:** 1.0
 **Автор:** Uhti Commerce Team

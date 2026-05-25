@@ -23,7 +23,7 @@
 ```typescript
 // stores/publicStore/exampleStore.ts
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 
 export const useExampleStore = defineStore('example', () => {
   // State
@@ -39,7 +39,7 @@ export const useExampleStore = defineStore('example', () => {
   async function fetchItems() {
     isLoading.value = true
     error.value = null
-    
+
     try {
       const supabase = useSupabaseClient<Database>()
       const { data, error: fetchError } = await supabase
@@ -47,19 +47,22 @@ export const useExampleStore = defineStore('example', () => {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (fetchError) throw fetchError
+      if (fetchError)
+        throw fetchError
       items.value = data || []
-    } catch (err: any) {
+    }
+    catch (err: any) {
       error.value = err.message
       toast.error('Ошибка загрузки', { description: err.message })
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
   }
 
   async function addItem(item: NewItem) {
     isLoading.value = true
-    
+
     try {
       const supabase = useSupabaseClient<Database>()
       const { data, error: insertError } = await supabase
@@ -68,14 +71,17 @@ export const useExampleStore = defineStore('example', () => {
         .select()
         .single()
 
-      if (insertError) throw insertError
-      
+      if (insertError)
+        throw insertError
+
       items.value.unshift(data)
       toast.success('Товар добавлен')
-    } catch (err: any) {
+    }
+    catch (err: any) {
       toast.error('Ошибка добавления', { description: err.message })
       throw err
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
   }
@@ -122,7 +128,8 @@ onMounted(async () => {
 async function handleAdd() {
   try {
     await exampleStore.addItem({ name: 'New Item' })
-  } catch (error) {
+  }
+  catch (error) {
     // Error already handled in store
   }
 }
@@ -133,19 +140,21 @@ async function handleAdd() {
     <div v-if="isLoading">
       <Skeleton class="h-10 w-full" />
     </div>
-    
+
     <div v-else-if="exampleStore.hasItems">
       <p>Всего товаров: {{ itemCount }}</p>
       <div v-for="item in items" :key="item.id">
         {{ item.name }}
       </div>
     </div>
-    
+
     <div v-else>
       <p>Нет товаров</p>
     </div>
-    
-    <Button @click="handleAdd">Добавить</Button>
+
+    <Button @click="handleAdd">
+      Добавить
+    </Button>
   </div>
 </template>
 ```
@@ -308,26 +317,28 @@ const props = withDefaults(defineProps<Props>(), {
   variant: 'default'
 })
 
+const emit = defineEmits<Emits>()
+
 interface Emits {
   (e: 'click'): void
   (e: 'update:modelValue', value: string): void
 }
 
-const emit = defineEmits<Emits>()
-
-const handleClick = () => {
+function handleClick() {
   emit('click')
 }
 </script>
 
 <template>
-  <div :class="['component', `variant-${variant}`]">
+  <div class="component" :class="[`variant-${variant}`]">
     <h2>{{ title }}</h2>
-    <p v-if="description">{{ description }}</p>
-    
+    <p v-if="description">
+      {{ description }}
+    </p>
+
     <Skeleton v-if="isLoading" class="h-10 w-full" />
     <slot v-else />
-    
+
     <Button @click="handleClick">
       Действие
     </Button>
@@ -353,9 +364,9 @@ const handleClick = () => {
 
 ```vue
 <script setup lang="ts">
-import { z } from 'zod'
-import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
+import { useForm } from 'vee-validate'
+import { z } from 'zod'
 
 const schema = z.object({
   name: z.string().min(3, 'Минимум 3 символа'),
@@ -378,7 +389,8 @@ const onSubmit = form.handleSubmit(async (values) => {
     await submitData(values)
     toast.success('Данные сохранены')
     form.resetForm()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     toast.error('Ошибка', { description: error.message })
   }
 })
@@ -436,12 +448,15 @@ export function useExample() {
         .from('table')
         .select('*')
 
-      if (fetchError) throw fetchError
+      if (fetchError)
+        throw fetchError
       data.value = result || []
-    } catch (err: any) {
+    }
+    catch (err: any) {
       error.value = err
       toast.error('Ошибка загрузки', { description: err.message })
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
   }
@@ -459,7 +474,7 @@ export function useExample() {
 
 ```typescript
 // composables/useProducts.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 
 export function useProducts() {
   const supabase = useSupabaseClient<Database>()
@@ -474,7 +489,8 @@ export function useProducts() {
         .select('*')
         .eq('is_active', true)
 
-      if (error) throw error
+      if (error)
+        throw error
       return data
     },
     staleTime: 5 * 60 * 1000, // 5 минут
@@ -490,7 +506,8 @@ export function useProducts() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error)
+        throw error
       return data
     },
     onSuccess: () => {
@@ -537,7 +554,7 @@ SECURITY DEFINER
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         p.id,
         p.name,
         p.price,
@@ -552,7 +569,7 @@ END;
 $$;
 
 -- Комментарий для документации
-COMMENT ON FUNCTION public.get_example_data IS 
+COMMENT ON FUNCTION public.get_example_data IS
 'Получает товары по категории с именем категории';
 ```
 
@@ -571,11 +588,11 @@ BEGIN
     SELECT p.*
     FROM products p
     WHERE (
-        p_brand_ids IS NULL 
+        p_brand_ids IS NULL
         OR p.brand_id = ANY(p_brand_ids)
     )
     AND (
-        p_material_ids IS NULL 
+        p_material_ids IS NULL
         OR p.material_id = ANY(p_material_ids)
     );
 END;
@@ -672,7 +689,8 @@ serve(async (req) => {
         status: 200,
       },
     )
-  } catch (error) {
+  }
+  catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
       {
@@ -729,7 +747,8 @@ serve(async (req) => {
       JSON.stringify({ success: true, message_id: data.result.message_id }),
       { headers: { 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  }
+  catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -747,7 +766,7 @@ serve(async (req) => {
 ```typescript
 async function addProduct(productData: NewProduct) {
   const supabase = useSupabaseClient<Database>()
-  
+
   // 1. Загрузка изображений
   const imageUrls: string[] = []
   for (const file of productData.images) {
@@ -755,8 +774,9 @@ async function addProduct(productData: NewProduct) {
     const { data, error } = await supabase.storage
       .from('product-images')
       .upload(fileName, file)
-    
-    if (error) throw error
+
+    if (error)
+      throw error
     imageUrls.push(fileName)
   }
 
@@ -773,7 +793,8 @@ async function addProduct(productData: NewProduct) {
     .select()
     .single()
 
-  if (productError) throw productError
+  if (productError)
+    throw productError
 
   // 3. Добавление изображений
   const imageInserts = imageUrls.map((url, index) => ({
@@ -786,7 +807,8 @@ async function addProduct(productData: NewProduct) {
     .from('product_images')
     .insert(imageInserts)
 
-  if (imagesError) throw imagesError
+  if (imagesError)
+    throw imagesError
 
   return product
 }
@@ -812,7 +834,8 @@ async function createOrder(cartItems: CartItem[], bonusesToSpend: number) {
       p_delivery_address: JSON.stringify(deliveryAddress),
       p_payment_method: paymentMethod
     })
-  } else {
+  }
+  else {
     // Заказ зарегистрированного пользователя
     return await supabase.rpc('create_user_order', {
       p_cart_items: JSON.stringify(cartItems),
@@ -845,12 +868,13 @@ async function filterProducts(filters: CatalogFilters) {
     p_country_ids: filters.countryIds || []
   })
 
-  if (error) throw error
+  if (error)
+    throw error
   return data
 }
 ```
 
 ---
 
-**Дата создания:** 21 мая 2026  
+**Дата создания:** 21 мая 2026
 **Версия:** 1.0

@@ -1,6 +1,6 @@
 /**
  * API endpoint для генерации alt-текстов
- * 
+ *
  * Вызов: POST /api/generate-alt-texts
  */
 
@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
-  
+
   // Используем service role key для обхода RLS
   const supabaseUrl = config.public.supabase?.url
   const supabaseKey = config.supabaseServiceKey || config.public.supabase?.key
@@ -16,30 +16,36 @@ export default defineEventHandler(async (event) => {
   if (!supabaseUrl || !supabaseKey) {
     throw createError({
       statusCode: 500,
-      message: 'Missing Supabase credentials'
+      message: 'Missing Supabase credentials',
     })
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
-    }
+      persistSession: false,
+    },
   })
 
   // Генерация alt-текстов
   function generateAlt(product: any, index: number, total: number): string {
     const parts = []
-    if (product.brands?.name) parts.push(product.brands.name)
+    if (product.brands?.name)
+      parts.push(product.brands.name)
     parts.push(product.name)
-    if (product.product_lines?.name) parts.push(product.product_lines.name)
-    
-    if (index === 0) parts.push('купить в Казахстане')
-    else if (index === 1 && total > 1) parts.push('вид сбоку')
-    else if (index === 2 && total > 2) parts.push('детальное фото')
-    else if (index === total - 1 && total > 3) parts.push('в упаковке')
+    if (product.product_lines?.name)
+      parts.push(product.product_lines.name)
+
+    if (index === 0)
+      parts.push('купить в Казахстане')
+    else if (index === 1 && total > 1)
+      parts.push('вид сбоку')
+    else if (index === 2 && total > 2)
+      parts.push('детальное фото')
+    else if (index === total - 1 && total > 3)
+      parts.push('в упаковке')
     else parts.push(`фото ${index + 1}`)
-    
+
     return parts.join(' ')
   }
 
@@ -58,7 +64,7 @@ export default defineEventHandler(async (event) => {
   if (error) {
     throw createError({
       statusCode: 500,
-      message: error.message
+      message: error.message,
     })
   }
 
@@ -68,10 +74,10 @@ export default defineEventHandler(async (event) => {
   // Обновление alt-текстов
   for (const product of products || []) {
     const images = product.product_images || []
-    
+
     for (let i = 0; i < images.length; i++) {
       const image = images[i]
-      
+
       // Пропускаем если уже есть качественный alt
       if (image.alt_text && !image.alt_text.includes('Изображение товара')) {
         skipped++
@@ -87,7 +93,8 @@ export default defineEventHandler(async (event) => {
 
       if (updateError) {
         console.error(`Error updating image ${image.id}:`, updateError)
-      } else {
+      }
+      else {
         updated++
       }
     }
@@ -97,6 +104,6 @@ export default defineEventHandler(async (event) => {
     success: true,
     updated,
     skipped,
-    total: updated + skipped
+    total: updated + skipped,
   }
 })

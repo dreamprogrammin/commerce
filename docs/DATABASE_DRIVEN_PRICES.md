@@ -1,6 +1,6 @@
 # 🎯 Database-Driven Prices - Единый источник истины для цен
 
-> **Дата реализации:** 31 марта 2026  
+> **Дата реализации:** 31 марта 2026
 > **Цель:** Исключить расхождение цен между базой данных и фронтендом
 
 ---
@@ -13,10 +13,10 @@
 
 ```typescript
 // База данных (SQL)
-final_price = ROUND((price * (100 - discount)) / 100); // = 15 302 ₸
+final_price = ROUND((price * (100 - discount)) / 100) // = 15 302 ₸
 
 // Фронтенд (TypeScript)
-finalPrice = Math.round(price * (1 - discount / 100)); // = 15 302 ₸
+finalPrice = Math.round(price * (1 - discount / 100)) // = 15 302 ₸
 
 // После добавления психологического округления:
 // База данных: 15 290 ₸
@@ -128,28 +128,28 @@ FROM public.products p
 
 ```typescript
 export interface BaseProduct {
-  id: string;
-  name: string;
-  slug: string;
-  price: number;
-  final_price: number; // 🔥 ДОБАВЛЕНО: обязательное поле
-  discount_percentage?: number | null;
+  id: string
+  name: string
+  slug: string
+  price: number
+  final_price: number // 🔥 ДОБАВЛЕНО: обязательное поле
+  discount_percentage?: number | null
   // ...
 }
 
 export type ProductWithImages = ProductRow & {
-  product_images: ProductImageRow[];
-  final_price: number; // 🔥 ДОБАВЛЕНО
-};
+  product_images: ProductImageRow[]
+  final_price: number // 🔥 ДОБАВЛЕНО
+}
 
 export interface CatalogProduct extends Omit<
   FilteredProductRpcResponse,
-  "product_images"
+  'product_images'
 > {
   product_images: {
     /* ... */
-  }[];
-  final_price: number; // 🔥 ДОБАВЛЕНО
+  }[]
+  final_price: number // 🔥 ДОБАВЛЕНО
 }
 ```
 
@@ -167,10 +167,10 @@ const subtotal = computed(() =>
     const priceData = formatPriceWithDiscount(
       Number(item.product.price),
       item.product.discount_percentage,
-    );
-    return sum + priceData.finalNumber * item.quantity;
+    )
+    return sum + priceData.finalNumber * item.quantity
   }, 0),
-);
+)
 ```
 
 **После:**
@@ -179,9 +179,9 @@ const subtotal = computed(() =>
 const subtotal = computed(() =>
   items.value.reduce((sum: number, item) => {
     // 🔥 Используем final_price из базы данных
-    return sum + item.product.final_price * item.quantity;
+    return sum + item.product.final_price * item.quantity
   }, 0),
-);
+)
 ```
 
 ---
@@ -193,14 +193,14 @@ const subtotal = computed(() =>
 ```typescript
 const finalPrice = p.discount_percentage
   ? Math.round((Number(p.price) * (100 - p.discount_percentage)) / 100)
-  : Math.round(Number(p.price));
+  : Math.round(Number(p.price))
 ```
 
 **После:**
 
 ```typescript
 // 🔥 Используем final_price из базы данных
-const finalPrice = p.final_price || Math.round(Number(p.price));
+const finalPrice = p.final_price || Math.round(Number(p.price))
 ```
 
 ---
@@ -270,14 +270,14 @@ UPDATE products SET price = 20000 WHERE id = 'xxx';
 // В каждом компоненте:
 const finalPrice = product.discount_percentage
   ? Math.round(price * (1 - discount / 100))
-  : price;
+  : price
 ```
 
 **После:**
 
 ```typescript
 // Просто используем готовое значение:
-const finalPrice = product.final_price;
+const finalPrice = product.final_price
 ```
 
 ### 4. Защита от ошибок
@@ -321,9 +321,9 @@ const subtotal = items.reduce((sum, item) => {
     ? Math.round(
         item.product.price * (1 - item.product.discount_percentage / 100),
       )
-    : item.product.price;
-  return sum + finalPrice * item.quantity;
-}, 0);
+    : item.product.price
+  return sum + finalPrice * item.quantity
+}, 0)
 ```
 
 **После:**
@@ -331,8 +331,8 @@ const subtotal = items.reduce((sum, item) => {
 ```typescript
 // Используем готовое значение из БД
 const subtotal = items.reduce((sum, item) => {
-  return sum + item.product.final_price * item.quantity;
-}, 0);
+  return sum + item.product.final_price * item.quantity
+}, 0)
 ```
 
 ---
@@ -439,9 +439,9 @@ id | name | price | discount_percentage | final_price
 
 ```typescript
 // В консоли браузера
-const cartStore = useCartStore();
-console.log(cartStore.items[0].product.final_price); // Должно быть число
-console.log(cartStore.subtotal); // Должна быть правильная сумма
+const cartStore = useCartStore()
+console.log(cartStore.items[0].product.final_price) // Должно быть число
+console.log(cartStore.subtotal) // Должна быть правильная сумма
 ```
 
 ---
@@ -556,7 +556,7 @@ curl -s "https://uhti.kz/catalog/products/lego-batman" | grep -A 10 '"@type":"Of
 Если по какой-то причине `final_price` отсутствует (старые данные), используем fallback:
 
 ```typescript
-const finalPrice = product.final_price || product.price;
+const finalPrice = product.final_price || product.price
 ```
 
 ### 2. Не использовать formatPriceWithDiscount
@@ -566,10 +566,10 @@ const finalPrice = product.final_price || product.price;
 const priceData = formatPriceWithDiscount(
   product.price,
   product.discount_percentage,
-);
+)
 
 // ✅ ПРАВИЛЬНО
-const finalPrice = product.final_price;
+const finalPrice = product.final_price
 ```
 
 ### 3. Регенерация типов после миграции
@@ -605,7 +605,7 @@ supabase gen types typescript --project-id YOUR_PROJECT_ID > types/supabase.ts
 import {
   calculateBonusPoints,
   calculateFinalPrice,
-} from "@/utils/bonusCalculator";
+} from '@/utils/bonusCalculator'
 ```
 
 #### 2. Computed для цены со скидкой
@@ -613,14 +613,14 @@ import {
 ```typescript
 // Строки 754-762
 const discountedPrice = computed(() => {
-  const price = formData.value.price || 0;
-  const discount = formData.value.discount_percentage || 0;
+  const price = formData.value.price || 0
+  const discount = formData.value.discount_percentage || 0
   if (discount > 0 && price > 0) {
     // Используем функцию психологического округления
-    return calculateFinalPrice(price, discount);
+    return calculateFinalPrice(price, discount)
   }
-  return null;
-});
+  return null
+})
 ```
 
 #### 3. Автоматический расчёт бонусов
@@ -635,18 +635,18 @@ watch(
   ],
   ([price, discount, percent]) => {
     if (
-      formData.value &&
-      typeof price === "number" &&
-      typeof percent === "number"
+      formData.value
+      && typeof price === 'number'
+      && typeof percent === 'number'
     ) {
       formData.value.bonus_points_award = calculateBonusPoints(
         price,
         discount || 0,
         percent,
-      );
+      )
     }
   },
-);
+)
 ```
 
 #### 4. Калькуляция расходов и прибыли
@@ -654,23 +654,24 @@ watch(
 ```typescript
 // Строки 824-855
 const priceBreakdown = computed(() => {
-  const price = formData.value.price || 0;
-  if (!price) return null;
+  const price = formData.value.price || 0
+  if (!price)
+    return null
 
-  const discount = formData.value.discount_percentage || 0;
+  const discount = formData.value.discount_percentage || 0
   // 🔥 Используем функцию психологического округления для цены продажи
-  const sellingPrice =
-    discount > 0 ? calculateFinalPrice(price, discount) : price;
-  const discountAmount = price - sellingPrice;
-  const costPrice = formData.value.cost_price || 0;
-  const tax = Math.round(sellingPrice * TAX_RATE);
-  const acquiring = Math.round((sellingPrice * acquiringRate.value) / 100);
-  const bonusPoints = formData.value.bonus_points_award || 0;
-  const totalExpenses = costPrice + tax + acquiring;
-  const netProfitBeforeBonus = sellingPrice - totalExpenses;
-  const netProfit = netProfitBeforeBonus - bonusPoints;
-  const netMargin =
-    sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0;
+  const sellingPrice
+    = discount > 0 ? calculateFinalPrice(price, discount) : price
+  const discountAmount = price - sellingPrice
+  const costPrice = formData.value.cost_price || 0
+  const tax = Math.round(sellingPrice * TAX_RATE)
+  const acquiring = Math.round((sellingPrice * acquiringRate.value) / 100)
+  const bonusPoints = formData.value.bonus_points_award || 0
+  const totalExpenses = costPrice + tax + acquiring
+  const netProfitBeforeBonus = sellingPrice - totalExpenses
+  const netProfit = netProfitBeforeBonus - bonusPoints
+  const netMargin
+    = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0
 
   return {
     price,
@@ -683,8 +684,8 @@ const priceBreakdown = computed(() => {
     totalExpenses,
     netProfit,
     netMargin,
-  };
-});
+  }
+})
 ```
 
 #### 5. UI: Отображение цены со скидкой
@@ -755,12 +756,14 @@ const priceBreakdown = computed(() => {
         -{{ formatPrice(priceBreakdown.costPrice) }} ₸
       </span>
     </div>
+
     <div class="flex justify-between">
       <span class="text-muted-foreground">ИПН (4%):</span>
       <span class="font-medium text-destructive">
         -{{ formatPrice(priceBreakdown.tax) }} ₸
       </span>
     </div>
+
     <div class="flex justify-between">
       <span class="text-muted-foreground">
         Эквайринг ({{ acquiringRate }}%):
@@ -769,6 +772,7 @@ const priceBreakdown = computed(() => {
         -{{ formatPrice(priceBreakdown.acquiring) }} ₸
       </span>
     </div>
+
     <div v-if="priceBreakdown.bonusPoints > 0" class="flex justify-between">
       <span class="text-muted-foreground">
         Бонусы клиенту ({{ selectedBonusPercent }}%):
@@ -1024,8 +1028,7 @@ WHERE slug = 'lego-dc-batman-vs-joker';
 ```html
 <div class="product-card">
   <span class="old-price">61 990 ₸</span>
-  <span class="final-price">55 690 ₸</span> ← Совпадает!
-  <span class="bonus">+2 784 бонусов</span> ← Совпадает!
+  <span class="final-price">55 690 ₸</span> ← Совпадает! <span class="bonus">+2 784 бонусов</span> ← Совпадает!
 </div>
 ```
 
@@ -1040,9 +1043,9 @@ WHERE slug = 'lego-dc-batman-vs-joker';
 ```typescript
 export function roundToMarketingPrice(price: number): number {
   if (price < 500) {
-    return Math.floor(price / 10) * 10;
+    return Math.floor(price / 10) * 10
   }
-  return Math.floor(price / 100) * 100 - 10;
+  return Math.floor(price / 100) * 100 - 10
 }
 ```
 
@@ -1075,7 +1078,7 @@ END
 
 ---
 
-**Дата создания:** 31 марта 2026, 11:30 UTC  
-**Дата обновления:** 31 марта 2026, 11:51 UTC  
-**Автор:** Uhti Commerce Team  
+**Дата создания:** 31 марта 2026, 11:30 UTC
+**Дата обновления:** 31 марта 2026, 11:51 UTC
+**Автор:** Uhti Commerce Team
 **Статус:** ✅ Реализовано и задокументировано

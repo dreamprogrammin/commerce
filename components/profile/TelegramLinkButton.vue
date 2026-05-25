@@ -22,7 +22,8 @@ const BOT_USERNAME = 'babyShopOfficialStoreKz_bot'
 const isLinked = computed(() => !!profile.value?.telegram_chat_id)
 
 async function prepareLink() {
-  if (!user.value) return
+  if (!user.value)
+    return
 
   isPreparing.value = true
   telegramUrl.value = null

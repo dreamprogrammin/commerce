@@ -1,187 +1,193 @@
 <script setup lang="ts">
-import type { CarouselApi } from "../ui/carousel";
-import type { BaseProduct } from "@/types";
-import { computed, ref } from "vue";
-import { Button } from "@/components/ui/button";
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { IMAGE_SIZES } from "@/config/images";
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from "@/constants";
-import { useCartStore } from "@/stores/publicStore/cartStore";
-import { formatPrice } from "@/utils/formatPrice";
-import StockAlertButton from "@/components/product/StockAlertButton.vue";
+import type { CarouselApi } from '../ui/carousel'
+import type { BaseProduct } from '@/types'
+import { computed, ref } from 'vue'
+import StockAlertButton from '@/components/product/StockAlertButton.vue'
+import { Button } from '@/components/ui/button'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+import { formatPrice } from '@/utils/formatPrice'
 
 const props = defineProps<{
-  product: BaseProduct;
-}>();
+  product: BaseProduct
+}>()
 
-const cartStore = useCartStore();
-const { getImageUrl, getVariantUrl } = useSupabaseStorage();
-const { triggerHaptic } = useHaptic();
+const cartStore = useCartStore()
+const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const { triggerHaptic } = useHaptic()
 
 // --- DEVICE DETECTION ---
-const isTouchDevice = ref(false);
+const isTouchDevice = ref(false)
 onMounted(() => {
-  isTouchDevice.value =
-    "ontouchstart" in window || navigator.maxTouchPoints > 0;
-});
+  isTouchDevice.value
+    = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+})
 
 // --- CAROUSEL STATE (для мобилы) ---
-const emblaMobileApi = ref<CarouselApi>();
-const mobileSelectedIndex = ref(0);
+const emblaMobileApi = ref<CarouselApi>()
+const mobileSelectedIndex = ref(0)
 
 function onMobileSelect() {
-  if (!emblaMobileApi.value) return;
-  mobileSelectedIndex.value = emblaMobileApi.value.selectedScrollSnap();
+  if (!emblaMobileApi.value)
+    return
+  mobileSelectedIndex.value = emblaMobileApi.value.selectedScrollSnap()
 }
 
 watch(emblaMobileApi, (api) => {
   if (api) {
-    onMobileSelect();
-    api.on("select", onMobileSelect);
-    api.on("reInit", onMobileSelect);
+    onMobileSelect()
+    api.on('select', onMobileSelect)
+    api.on('reInit', onMobileSelect)
   }
-});
+})
 
 // --- CART STATE ---
 const itemInCart = computed(() => {
-  return cartStore.items.find((item) => item.product.id === props.product.id);
-});
+  return cartStore.items.find(item => item.product.id === props.product.id)
+})
 
 const quantityInCart = computed(() => {
-  return itemInCart.value ? itemInCart.value.quantity : 0;
-});
+  return itemInCart.value ? itemInCart.value.quantity : 0
+})
 
 // --- IMAGE STATE ---
-const activeImageIndex = ref(0);
+const activeImageIndex = ref(0)
 
 const hasMultipleImages = computed(
   () =>
-    Array.isArray(props.product.product_images) &&
-    props.product.product_images.length > 1,
-);
+    Array.isArray(props.product.product_images)
+    && props.product.product_images.length > 1,
+)
 
 /**
  * Получить URL изображения по индексу
  */
 function getImageUrlByIndex(index: number): string | null {
-  const imageUrl = props.product.product_images?.[index]?.image_url;
-  if (!imageUrl) return null;
+  const imageUrl = props.product.product_images?.[index]?.image_url
+  if (!imageUrl)
+    return null
 
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD);
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
 }
 
 /**
  * Получить URL вариантов изображения (sm/md/lg) для srcset
  */
 function getVariantUrls(index: number) {
-  const imageUrl = props.product.product_images?.[index]?.image_url;
-  if (!imageUrl) return {};
+  const imageUrl = props.product.product_images?.[index]?.image_url
+  if (!imageUrl)
+    return {}
   return {
-    sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, "sm"),
-    md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, "md"),
-    lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, "lg"),
-  };
+    sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm'),
+    md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'md'),
+    lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'lg'),
+  }
 }
 
 /**
  * SEO-оптимизированный alt текст для изображений
  */
 function getImageAlt(index: number): string {
-  const parts = [props.product.name];
-  
+  const parts = [props.product.name]
+
   if (props.product.brands?.name) {
-    parts.unshift(props.product.brands.name);
+    parts.unshift(props.product.brands.name)
   }
-  
+
   if (props.product.product_line_name) {
-    parts.push(props.product.product_line_name);
+    parts.push(props.product.product_line_name)
   }
-  
+
   if (index === 0) {
-    parts.push("купить в Казахстане");
-  } else {
-    parts.push(`фото ${index + 1}`);
+    parts.push('купить в Казахстане')
   }
-  
-  return parts.join(" ");
+  else {
+    parts.push(`фото ${index + 1}`)
+  }
+
+  return parts.join(' ')
 }
 
 /**
  * Получить URL логотипа бренда
  */
 function getBrandLogoUrl(): string | null {
-  const logoUrl = props.product.brands?.logo_url;
-  if (!logoUrl) return null;
+  const logoUrl = props.product.brands?.logo_url
+  if (!logoUrl)
+    return null
 
-  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, "sm");
+  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 }
 
 /**
  * Активное изображение для десктопа (наведение мышью)
  */
 const activeImageUrl = computed(() => {
-  return getImageUrlByIndex(activeImageIndex.value);
-});
+  return getImageUrlByIndex(activeImageIndex.value)
+})
 
 // --- MOUSE INTERACTION (только для десктопа) ---
 function handleMouseMove(event: MouseEvent) {
   if (
-    !hasMultipleImages.value ||
-    isTouchDevice.value ||
-    !props.product.product_images
+    !hasMultipleImages.value
+    || isTouchDevice.value
+    || !props.product.product_images
   ) {
-    return;
+    return
   }
 
-  const target = event.currentTarget as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const width = rect.width;
+  const target = event.currentTarget as HTMLElement
+  const rect = target.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const width = rect.width
 
-  if (width === 0) return;
+  if (width === 0)
+    return
 
-  const segmentWidth = width / props.product.product_images.length;
+  const segmentWidth = width / props.product.product_images.length
   const newIndex = Math.min(
     Math.floor(x / segmentWidth),
     props.product.product_images.length - 1,
-  );
+  )
 
   if (newIndex !== activeImageIndex.value) {
-    activeImageIndex.value = newIndex;
+    activeImageIndex.value = newIndex
   }
 }
 
 function handleMouseLeave() {
-  activeImageIndex.value = 0;
+  activeImageIndex.value = 0
 }
 
 // --- PRICE CALCULATION ---
 const priceDetails = computed(() => {
-  const originalPrice = Number(props.product.price);
-  const discountPercent = Number(props.product.discount_percentage);
+  const originalPrice = Number(props.product.price)
+  const discountPercent = Number(props.product.discount_percentage)
 
-  const hasDiscount = discountPercent > 0 && discountPercent <= 100;
+  const hasDiscount = discountPercent > 0 && discountPercent <= 100
 
   if (!hasDiscount) {
     return {
       hasDiscount: false,
       finalPrice: originalPrice,
-    };
+    }
   }
 
   // 🔥 ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ: final_price из базы данных (generated column)
   // База автоматически применяет психологическое округление
   const finalPrice = props.product.final_price
     ? Number(props.product.final_price)
-    : originalPrice;
+    : originalPrice
 
   return {
     hasDiscount: true,
     finalPrice,
     originalPrice,
     percent: Math.round(discountPercent),
-  };
-});
+  }
+})
 </script>
 
 <template>
@@ -453,9 +459,9 @@ const priceDetails = computed(() => {
         <!-- ⭐ Рейтинг и отзывы (Marketplace Style) -->
         <div
           v-if="
-            product.review_count &&
-            product.review_count > 0 &&
-            product.avg_rating
+            product.review_count
+              && product.review_count > 0
+              && product.avg_rating
           "
           class="flex items-center gap-1.5"
         >

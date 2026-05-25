@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProductImageRow } from '@/types'
-import { X, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSeoAltText } from '@/composables/useSeoAltText'
 import { IMAGE_SIZES } from '@/config/images'
@@ -71,9 +71,12 @@ function onInitLightbox(api: any) {
 
 // Навигация клавишами в лайтбоксе
 function onLightboxKeydown(e: KeyboardEvent) {
-  if (!lightboxApi.value) return
-  if (e.key === 'ArrowLeft') lightboxApi.value.scrollPrev()
-  if (e.key === 'ArrowRight') lightboxApi.value.scrollNext()
+  if (!lightboxApi.value)
+    return
+  if (e.key === 'ArrowLeft')
+    lightboxApi.value.scrollPrev()
+  if (e.key === 'ArrowRight')
+    lightboxApi.value.scrollNext()
 }
 
 function getThumbUrl(imagePath: string) {
@@ -123,7 +126,6 @@ function getImageAlt(image: ProductImageRow, index: number): string {
   // Fallback
   return `Изображение товара ${index + 1}`
 }
-
 </script>
 
 <template>

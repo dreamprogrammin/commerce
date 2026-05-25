@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid token' })
   }
 
-  const config = useRuntimeConfig()                          // ← так читаем конфиг
+  const config = useRuntimeConfig() // ← так читаем конфиг
 
   console.log('[magic] config keys:', {
     hasUrl: !!process.env.SUPABASE_URL,
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   })
 
   const supabaseUrl = process.env.SUPABASE_URL || ''
-  const supabaseServiceKey = config.supabaseServiceRoleKey  // ← не process.env напрямую
+  const supabaseServiceKey = config.supabaseServiceRoleKey // ← не process.env напрямую
 
   if (!supabaseUrl || !supabaseServiceKey) {
     throw createError({ statusCode: 500, statusMessage: 'Server configuration error' })

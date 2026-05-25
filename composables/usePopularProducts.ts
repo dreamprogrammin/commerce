@@ -14,7 +14,8 @@ export function usePopularProducts(limit = 5) {
         .order('created_at', { ascending: false })
         .limit(limit)
 
-      if (error) throw error
+      if (error)
+        throw error
       return data || []
     },
     staleTime: 60 * 60 * 1000, // 1 час

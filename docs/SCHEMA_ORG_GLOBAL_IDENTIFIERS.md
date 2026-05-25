@@ -1,8 +1,8 @@
 # Schema.org: Устранение предупреждений "Missing Global Identifiers"
 
-**Дата:** 2026-04-01  
-**Приоритет:** ⭐️ Medium-High (Быстрая победа)  
-**Story Points:** 2  
+**Дата:** 2026-04-01
+**Приоритет:** ⭐️ Medium-High (Быстрая победа)
+**Story Points:** 2
 **Статус:** ✅ Завершено
 
 ## 📖 Проблема
@@ -64,7 +64,7 @@ item: {
 
 ```typescript
 defineProduct({
-  name: computed(() => product.value?.name || ""),
+  name: computed(() => product.value?.name || ''),
   description: metaDescription,
   image: productImages,
 
@@ -78,13 +78,13 @@ defineProduct({
   brand: computed(() => {
     // Логика с фоллбэком на "Ухтышка" уже была реализована
     return {
-      "@type": "Brand" as const,
-      name: brandName.value || "Ухтышка",
+      '@type': 'Brand' as const,
+      'name': brandName.value || 'Ухтышка',
       // ...
-    };
+    }
   }),
   // ...
-});
+})
 ```
 
 ## 🔍 Логика Фолбэков (Graceful Fallback)
@@ -215,6 +215,6 @@ http://localhost:3000/catalog/girls
 
 ---
 
-**Автор:** OpenCode AI  
-**Дата создания:** 2026-04-01  
+**Автор:** OpenCode AI
+**Дата создания:** 2026-04-01
 **Последнее обновление:** 2026-04-01

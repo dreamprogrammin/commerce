@@ -50,8 +50,8 @@ avg = SUM(product.avg_rating * product.review_count) / SUM(product.review_count)
 ```typescript
 const { data: categoryRatingData } = useQuery({
   queryKey: ['category-rating', currentCategoryId],
-  staleTime: 5 * 60 * 1000,   // 5 минут — данные считаются свежими
-  gcTime: 10 * 60 * 1000,     // 10 минут — хранение в памяти
+  staleTime: 5 * 60 * 1000, // 5 минут — данные считаются свежими
+  gcTime: 10 * 60 * 1000, // 10 минут — хранение в памяти
   enabled: computed(() => !!currentCategoryId.value && slug !== 'all'),
 })
 ```
@@ -79,11 +79,11 @@ const { data: categoryRatingData } = useQuery({
 
 ## Изменённые файлы
 
-| Файл | Изменение |
-|------|-----------|
-| `supabase/migrations/20260311000001_recursive_category_aggregate_rating.sql` | Новая миграция — рекурсивная RPC |
-| `components/category/CategoryRatingBlock.vue` | Новый компонент — блок рейтинга |
-| `pages/catalog/[...slug].vue` | Интеграция компонента + замена useAsyncData на useQuery |
+| Файл                                                                         | Изменение                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `supabase/migrations/20260311000001_recursive_category_aggregate_rating.sql` | Новая миграция — рекурсивная RPC                        |
+| `components/category/CategoryRatingBlock.vue`                                | Новый компонент — блок рейтинга                         |
+| `pages/catalog/[...slug].vue`                                                | Интеграция компонента + замена useAsyncData на useQuery |
 
 ## Как протестировать
 

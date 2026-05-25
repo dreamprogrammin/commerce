@@ -1,6 +1,6 @@
 # Подтверждение: Система ценообразования работает правильно
 
-**Дата проверки:** 2026-04-03  
+**Дата проверки:** 2026-04-03
 **Статус:** ✅ Архитектура корректна
 
 ---
@@ -131,37 +131,38 @@ v_net_profit := v_gross_profit - v_tax - v_commission;  -- ✅ Чистая пр
 
 ```typescript
 const discountedPrice = computed(() => {
-  const price = formData.value.price || 0;
-  const discount = formData.value.discount_percentage || 0;
+  const price = formData.value.price || 0
+  const discount = formData.value.discount_percentage || 0
   if (discount > 0 && price > 0) {
     // Используем функцию психологического округления
-    return calculateFinalPrice(price, discount); // ✅ Округленная цена
+    return calculateFinalPrice(price, discount) // ✅ Округленная цена
   }
-  return null;
-});
+  return null
+})
 ```
 
 **Строка 824-855:**
 
 ```typescript
 const priceBreakdown = computed(() => {
-  const price = formData.value.price || 0;
-  if (!price) return null;
+  const price = formData.value.price || 0
+  if (!price)
+    return null
 
-  const discount = formData.value.discount_percentage || 0;
+  const discount = formData.value.discount_percentage || 0
   // Используем функцию психологического округления для цены продажи
-  const sellingPrice =
-    discount > 0 ? calculateFinalPrice(price, discount) : price; // ✅ Округленная
-  const discountAmount = price - sellingPrice;
-  const costPrice = formData.value.cost_price || 0;
-  const tax = Math.round(sellingPrice * TAX_RATE); // ✅ От округленной
-  const acquiring = Math.round((sellingPrice * acquiringRate.value) / 100); // ✅ От округленной
-  const bonusPoints = formData.value.bonus_points_award || 0;
-  const totalExpenses = costPrice + tax + acquiring;
-  const netProfitBeforeBonus = sellingPrice - totalExpenses; // ✅ От округленной
-  const netProfit = netProfitBeforeBonus - bonusPoints; // ✅ Чистая прибыль от округленной
-  const netMargin =
-    sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0;
+  const sellingPrice
+    = discount > 0 ? calculateFinalPrice(price, discount) : price // ✅ Округленная
+  const discountAmount = price - sellingPrice
+  const costPrice = formData.value.cost_price || 0
+  const tax = Math.round(sellingPrice * TAX_RATE) // ✅ От округленной
+  const acquiring = Math.round((sellingPrice * acquiringRate.value) / 100) // ✅ От округленной
+  const bonusPoints = formData.value.bonus_points_award || 0
+  const totalExpenses = costPrice + tax + acquiring
+  const netProfitBeforeBonus = sellingPrice - totalExpenses // ✅ От округленной
+  const netProfit = netProfitBeforeBonus - bonusPoints // ✅ Чистая прибыль от округленной
+  const netMargin
+    = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0
 
   return {
     price,
@@ -174,8 +175,8 @@ const priceBreakdown = computed(() => {
     totalExpenses,
     netProfit, // ✅ Чистая прибыль от округленной цены
     netMargin,
-  };
-});
+  }
+})
 ```
 
 **Вывод:** ✅ Калькулятор прибыли в админке использует `calculateFinalPrice()` для получения округленной цены, и все расчеты (налог, эквайринг, чистая прибыль) делаются от этой округленной цены.
@@ -259,6 +260,6 @@ const priceBreakdown = computed(() => {
 
 ---
 
-**Дата:** 2026-04-03  
-**Статус:** ✅ Подтверждено - система работает правильно  
+**Дата:** 2026-04-03
+**Статус:** ✅ Подтверждено - система работает правильно
 **Автор:** Uhti Commerce Team

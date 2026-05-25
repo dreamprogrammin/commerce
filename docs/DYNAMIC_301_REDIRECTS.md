@@ -2,14 +2,16 @@
 
 ## 📖 Проблема
 
-После сброса базы данных часть брендов (`/brand/[slug]`) и категорий (`/catalog/[...slug]`) навсегда исчезли из каталога. 
+После сброса базы данных часть брендов (`/brand/[slug]`) и категорий (`/catalog/[...slug]`) навсегда исчезли из каталога.
 
 **До внедрения:**
+
 - Переход на несуществующий бренд/категорию → HTTP 200 OK + заглушка "Не найдено"
 - Google Search Console → ошибка **Soft 404** (страница выглядит как 404, но отдает 200)
 - Результат: **Потеря SEO-веса** и пессимизация сайта
 
 **После внедрения:**
+
 - Переход на несуществующий бренд/категорию → HTTP 301 Moved Permanently
 - Google Search Console → статус "Страница с переадресацией" (норма)
 - Результат: **SEO-вес передается** на новую страницу, трафик сохраняется
@@ -23,6 +25,7 @@
 **Файл:** `pages/brand/[slug].vue`
 
 **Логика:**
+
 ```typescript
 // После загрузки данных о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(...)
@@ -34,6 +37,7 @@ if (!brand.value && !brandPending.value) {
 ```
 
 **Примеры:**
+
 - `/brand/cada` (удален) → 301 → `/brands`
 - `/brand/old-brand` (удален) → 301 → `/brands`
 
@@ -44,6 +48,7 @@ if (!brand.value && !brandPending.value) {
 **Файл:** `pages/catalog/[...slug].vue`
 
 **Логика:**
+
 ```typescript
 // После загрузки категорий
 await useAsyncData('catalog-meta-...', () => categoriesStore.fetchCategoryData())
@@ -55,6 +60,7 @@ if (currentCategorySlug.value !== 'all' && !currentCategory.value && categoriesS
 ```
 
 **Примеры:**
+
 - `/catalog/spinners` (удален) → 301 → `/catalog`
 - `/catalog/old-category` (удален) → 301 → `/catalog`
 
@@ -65,6 +71,7 @@ if (currentCategorySlug.value !== 'all' && !currentCategory.value && categoriesS
 **Файл:** `pages/brand/[brandSlug]/[lineSlug].vue`
 
 **Логика:**
+
 ```typescript
 // После загрузки бренда
 const { data: brand, pending: brandPending } = await useAsyncData(...)
@@ -84,6 +91,7 @@ if (brand.value && !productLine.value && !linePending.value) {
 ```
 
 **Примеры:**
+
 - `/brand/nonexistent/marvel` → 301 → `/brands` (бренд не найден)
 - `/brand/lego/nonexistent-line` → 301 → `/brand/lego` (линейка не найдена)
 
@@ -92,6 +100,7 @@ if (brand.value && !productLine.value && !linePending.value) {
 ## 🎯 Преимущества
 
 ### До внедрения:
+
 ```
 GET /brand/cada
 ← 200 OK
@@ -102,6 +111,7 @@ GET /brand/cada
 ```
 
 ### После внедрения:
+
 ```
 GET /brand/cada
 ← 301 Moved Permanently
@@ -116,11 +126,13 @@ GET /brand/cada
 ## 📊 Ожидаемые результаты
 
 ### Краткосрочные (1-2 недели):
+
 - ✅ Исчезновение ошибок "Soft 404" в Google Search Console
 - ✅ Появление статуса "Страница с переадресацией" (норма)
 - ✅ Сохранение трафика с битых ссылок
 
 ### Долгосрочные (1-3 месяца):
+
 - ✅ Передача SEO-веса со старых страниц на новые
 - ✅ Сохранение позиций в поиске
 - ✅ Рост авторитета домена (Domain Authority)
@@ -130,6 +142,7 @@ GET /brand/cada
 ## 🧪 Как проверить
 
 ### 1. Проверка редиректа бренда:
+
 ```bash
 curl -I https://uhti.kz/brand/nonexistent-brand
 # Ожидаемый результат:
@@ -138,6 +151,7 @@ curl -I https://uhti.kz/brand/nonexistent-brand
 ```
 
 ### 2. Проверка редиректа категории:
+
 ```bash
 curl -I https://uhti.kz/catalog/nonexistent-category
 # Ожидаемый результат:
@@ -146,6 +160,7 @@ curl -I https://uhti.kz/catalog/nonexistent-category
 ```
 
 ### 3. Проверка в браузере:
+
 1. Откройте DevTools → Network
 2. Перейдите на несуществующий бренд/категорию
 3. Проверьте статус: должен быть **301** (не 200)
@@ -184,13 +199,13 @@ curl -I https://uhti.kz/catalog/nonexistent-category
 nitro: {
   routeRules: {
     // Конкретный бренд → конкретная замена
-    '/brand/cada': { 
-      redirect: { to: '/brand/lego', statusCode: 301 } 
+    '/brand/cada': {
+      redirect: { to: '/brand/lego', statusCode: 301 }
     },
-    
+
     // Конкретная категория → родительская категория
-    '/catalog/boys/old-toys': { 
-      redirect: { to: '/catalog/boys', statusCode: 301 } 
+    '/catalog/boys/old-toys': {
+      redirect: { to: '/catalog/boys', statusCode: 301 }
     },
   }
 }
@@ -211,17 +226,20 @@ nitro: {
 ## 🎓 Итог
 
 ✅ **Реализовано:**
+
 - Автоматический 301 редирект для несуществующих брендов → `/brands`
 - Автоматический 301 редирект для несуществующих категорий → `/catalog`
 - Автоматический 301 редирект для несуществующих линеек → `/brand/[brandSlug]`
 - Защита от Soft 404 и потери SEO-веса
 
 ✅ **Результат:**
+
 - Сохранение трафика с битых ссылок
 - Передача SEO-веса на активные страницы
 - Улучшение показателей в Google Search Console
 
 ✅ **Дополнительно:**
+
 - Для особых случаев используйте `nuxt.config.ts`
 - Мониторьте результаты в Google Search Console
 - Восстанавливайте категории/бренды/линейки с сохранением старых slug

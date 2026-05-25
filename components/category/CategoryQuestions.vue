@@ -1,41 +1,43 @@
 <script setup lang="ts">
-import { useQuery } from "@tanstack/vue-query";
-import { useCategoryQuestionsStore } from "@/stores/publicStore/categoryQuestionsStore";
+import { useQuery } from '@tanstack/vue-query'
+import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 
 const props = defineProps<{
-  categoryId: string;
-  categoryName?: string;
-}>();
+  categoryId: string
+  categoryName?: string
+}>()
 
-const questionsStore = useCategoryQuestionsStore();
+const questionsStore = useCategoryQuestionsStore()
 
 const { data: questions, isLoading } = useQuery({
-  queryKey: ["category-questions", () => props.categoryId],
+  queryKey: ['category-questions', () => props.categoryId],
   queryFn: () => questionsStore.fetchQuestions(props.categoryId),
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-});
+})
 
 const displayedQuestions = computed(() => {
-  if (!questions.value) return [];
-  return questions.value;
-});
+  if (!questions.value)
+    return []
+  return questions.value
+})
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return new Date(dateStr).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 function sanitizeAndRenderHTML(html: string | null): string {
-  if (!html) return "";
-  const tempDiv = document.createElement("div");
-  tempDiv.innerHTML = html;
-  const scripts = tempDiv.querySelectorAll("script, style");
-  scripts.forEach((s) => s.remove());
-  return tempDiv.innerHTML;
+  if (!html)
+    return ''
+  const tempDiv = document.createElement('div')
+  tempDiv.innerHTML = html
+  const scripts = tempDiv.querySelectorAll('script, style')
+  scripts.forEach(s => s.remove())
+  return tempDiv.innerHTML
 }
 </script>
 
@@ -45,7 +47,9 @@ function sanitizeAndRenderHTML(html: string | null): string {
     class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border mt-6 lg:mt-8"
   >
     <div class="mb-6">
-      <h2 class="text-2xl font-bold mb-2">Часто задаваемые вопросы</h2>
+      <h2 class="text-2xl font-bold mb-2">
+        Часто задаваемые вопросы
+      </h2>
       <p class="text-muted-foreground text-sm">
         Ответы на популярные вопросы о категории {{ categoryName || "игрушек" }}
       </p>

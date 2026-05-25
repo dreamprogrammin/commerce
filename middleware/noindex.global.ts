@@ -20,11 +20,11 @@ export default defineNuxtRouteMiddleware((to) => {
 
   // Проверяем wildcard паттерны
   const noindexPatterns = [
-    /^\/\*\*\//,  // /**/ 
-    /\/\*\*$/,    // /brand/**
-    /\/api\//,    // /api/*
-    /\/admin\//,  // /admin/*
-    /\/auth\//,   // /auth/*
+    /^\/\*\*\//, // /**/
+    /\/\*\*$/, // /brand/**
+    /\/api\//, // /api/*
+    /\/admin\//, // /admin/*
+    /\/auth\//, // /auth/*
     /\/profile\//, // /profile/*
   ]
 
@@ -32,15 +32,15 @@ export default defineNuxtRouteMiddleware((to) => {
 
   // Проверяем точные совпадения
   const shouldNoindex = noindexPaths.some(p => path.startsWith(p))
-  
+
   // Проверяем паттерны
   const matchesPattern = noindexPatterns.some(pattern => pattern.test(path))
 
   if (shouldNoindex || matchesPattern) {
     useHead({
       meta: [
-        { name: 'robots', content: 'noindex, nofollow' }
-      ]
+        { name: 'robots', content: 'noindex, nofollow' },
+      ],
     })
   }
 })

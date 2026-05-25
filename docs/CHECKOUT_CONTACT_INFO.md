@@ -14,18 +14,21 @@
 ### ШАГ 1: Миграция `20260227000002_checkout_contact_info.sql`
 
 **Таблица `orders`** — добавлены колонки:
+
 ```sql
 customer_name  TEXT  -- имя получателя из формы чекаута
 customer_phone TEXT  -- телефон получателя из формы чекаута
 ```
 
 **RPC `create_user_order`** — новые параметры (с DEFAULT NULL для обратной совместимости):
+
 ```sql
 p_contact_name  TEXT DEFAULT NULL
 p_contact_phone TEXT DEFAULT NULL
 ```
 
 Логика внутри функции:
+
 - Контакты сохраняются прямо в строку заказа (`customer_name`, `customer_phone`)
 - `profiles.phone` обновляется **только если** он `NULL` или пустой
 - `profiles.first_name` обновляется **только если** он `NULL` или `'Гость'`
@@ -33,21 +36,24 @@ p_contact_phone TEXT DEFAULT NULL
 ### ШАГ 2: Frontend
 
 **`types/type.ts`** — расширен `ICheckoutData`:
+
 ```typescript
 export interface ICheckoutData {
   // ...
-  contactName?: string   // имя из формы чекаута
-  contactPhone?: string  // телефон из формы чекаута
+  contactName?: string // имя из формы чекаута
+  contactPhone?: string // телефон из формы чекаута
 }
 ```
 
 **`stores/publicStore/cartStore.ts`** — передача в RPC:
+
 ```typescript
 p_contact_name: orderData.contactName || null,
 p_contact_phone: orderData.contactPhone || null,
 ```
 
 **`pages/checkout.vue`** — передача из формы:
+
 ```typescript
 await cartStore.checkout({
   // ...
@@ -76,6 +82,7 @@ await cartStore.checkout({
 ## После применения
 
 Применить миграцию на production:
+
 ```bash
 supabase db push
 ```

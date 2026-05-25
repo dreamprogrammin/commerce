@@ -66,7 +66,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
   )
 
   const maxBonusesToSpend = computed(() => {
-    if (!customer.value) return 0
+    if (!customer.value)
+      return 0
     return Math.min(customer.value.active_bonus_balance, cartTotal.value)
   })
 
@@ -88,7 +89,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
         p_query: query.trim(),
       })
 
-      if (error) throw error
+      if (error)
+        throw error
       searchResults.value = (data as PosProduct[]) ?? []
     }
     catch (err) {
@@ -113,7 +115,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
         p_phone: phone.trim(),
       })
 
-      if (error) throw error
+      if (error)
+        throw error
 
       if (data && (data as PosCustomer[]).length > 0) {
         customer.value = (data as PosCustomer[])[0]
@@ -168,7 +171,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
 
   function updateQuantity(productId: string, qty: number) {
     const item = cart.value.find(i => i.product.id === productId)
-    if (!item) return
+    if (!item)
+      return
 
     if (qty <= 0) {
       removeFromCart(productId)
@@ -213,7 +217,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
         p_bonuses_to_spend: bonusesToSpend.value,
       })
 
-      if (error) throw error
+      if (error)
+        throw error
 
       const result = data as OfflineSaleResult
       lastSaleResult.value = result

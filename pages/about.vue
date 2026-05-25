@@ -1,23 +1,25 @@
 <script setup lang="ts">
 // BreadcrumbList JSON-LD
-useBreadcrumbSchema([{ name: "О нас" }]);
+useBreadcrumbSchema([{ name: 'О нас' }])
 
 useHead({
-  title: "О нас — uhti.kz",
+  title: 'О нас — uhti.kz',
   meta: [
     {
-      name: "description",
+      name: 'description',
       content:
-        "Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.",
+        'Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.',
     },
-    { name: "robots", content: "index, follow" },
+    { name: 'robots', content: 'index, follow' },
   ],
-});
+})
 </script>
 
 <template>
   <div class="mx-auto max-w-3xl px-4 py-10">
-    <h1 class="mb-8 text-3xl font-bold">О нас</h1>
+    <h1 class="mb-8 text-3xl font-bold">
+      О нас
+    </h1>
 
     <div class="prose prose-sm max-w-none space-y-6 text-foreground">
       <!-- Введение -->
@@ -36,7 +38,9 @@ useHead({
 
       <!-- Наша миссия -->
       <section>
-        <h2 class="text-xl font-semibold">Наша миссия</h2>
+        <h2 class="text-xl font-semibold">
+          Наша миссия
+        </h2>
         <p>
           Мы верим, что игра — это не просто развлечение, а важная часть
           развития ребёнка. Наша миссия — предоставить родителям доступ к
@@ -47,7 +51,9 @@ useHead({
 
       <!-- Почему выбирают нас -->
       <section>
-        <h2 class="text-xl font-semibold">Почему выбирают нас</h2>
+        <h2 class="text-xl font-semibold">
+          Почему выбирают нас
+        </h2>
         <ul class="list-disc space-y-2 pl-6">
           <li>
             <strong>Широкий ассортимент:</strong> Более 1000 наименований
@@ -80,7 +86,9 @@ useHead({
 
       <!-- Наш ассортимент -->
       <section>
-        <h2 class="text-xl font-semibold">Наш ассортимент</h2>
+        <h2 class="text-xl font-semibold">
+          Наш ассортимент
+        </h2>
         <p>В нашем каталоге вы найдёте:</p>
         <ul class="list-disc space-y-1 pl-6">
           <li>Конструкторы (LEGO, CADA, Qman и другие)</li>
@@ -101,7 +109,9 @@ useHead({
 
       <!-- Как мы работаем -->
       <section>
-        <h2 class="text-xl font-semibold">Как мы работаем</h2>
+        <h2 class="text-xl font-semibold">
+          Как мы работаем
+        </h2>
         <ol class="list-decimal space-y-2 pl-6">
           <li>
             <strong>Выбирайте товары:</strong> Просматривайте каталог,
@@ -129,7 +139,9 @@ useHead({
 
       <!-- Наши ценности -->
       <section>
-        <h2 class="text-xl font-semibold">Наши ценности</h2>
+        <h2 class="text-xl font-semibold">
+          Наши ценности
+        </h2>
         <ul class="list-disc space-y-2 pl-6">
           <li>
             <strong>Забота о детях:</strong> Мы тщательно отбираем игрушки,
@@ -153,7 +165,9 @@ useHead({
 
       <!-- Контакты -->
       <section>
-        <h2 class="text-xl font-semibold">Контакты</h2>
+        <h2 class="text-xl font-semibold">
+          Контакты
+        </h2>
         <p>Мы всегда рады вашим вопросам и предложениям!</p>
         <ul class="space-y-2">
           <li>
@@ -177,7 +191,9 @@ useHead({
 
       <!-- Присоединяйтесь к нам -->
       <section class="rounded-lg bg-primary/5 p-6">
-        <h2 class="text-xl font-semibold">Присоединяйтесь к нам!</h2>
+        <h2 class="text-xl font-semibold">
+          Присоединяйтесь к нам!
+        </h2>
         <p>
           Зарегистрируйтесь на сайте, чтобы получать бонусы за покупки,
           персональные рекомендации и первыми узнавать о новинках и акциях.

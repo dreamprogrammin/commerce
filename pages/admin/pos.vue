@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core'
 import type { OfflineSaleResult, PosProduct } from '@/stores/adminStore/adminPosStore'
+import { useDebounceFn } from '@vueuse/core'
 import { useAdminPosStore } from '@/stores/adminStore/adminPosStore'
 
 definePageMeta({
@@ -61,7 +61,7 @@ async function handleCompleteSale() {
 }
 
 function formatPrice(price: number) {
-  return new Intl.NumberFormat('ru-RU').format(price) + ' ₸'
+  return `${new Intl.NumberFormat('ru-RU').format(price)} ₸`
 }
 
 function getImageUrl(product: PosProduct): string | null {
@@ -106,7 +106,9 @@ function getImageUrl(product: PosProduct): string | null {
           class="flex h-full flex-col items-center justify-center text-muted-foreground"
         >
           <Icon name="lucide:scan-barcode" class="mb-3 h-12 w-12 opacity-30" />
-          <p class="text-sm">Введите название товара или отсканируйте штрихкод</p>
+          <p class="text-sm">
+            Введите название товара или отсканируйте штрихкод
+          </p>
         </div>
 
         <div
@@ -114,7 +116,9 @@ function getImageUrl(product: PosProduct): string | null {
           class="flex h-full flex-col items-center justify-center text-muted-foreground"
         >
           <Icon name="lucide:package-x" class="mb-3 h-12 w-12 opacity-30" />
-          <p class="text-sm">Товары не найдены</p>
+          <p class="text-sm">
+            Товары не найдены
+          </p>
         </div>
 
         <!-- Сетка товаров -->
@@ -135,7 +139,7 @@ function getImageUrl(product: PosProduct): string | null {
                 :src="getImageUrl(product)!"
                 :alt="product.name"
                 class="h-full w-full object-cover"
-              />
+              >
               <div
                 v-else
                 class="flex h-full items-center justify-center"
@@ -202,7 +206,9 @@ function getImageUrl(product: PosProduct): string | null {
           class="flex flex-1 flex-col items-center justify-center text-muted-foreground"
         >
           <Icon name="lucide:shopping-cart" class="mb-3 h-10 w-10 opacity-30" />
-          <p class="text-sm">Добавьте товары из списка слева</p>
+          <p class="text-sm">
+            Добавьте товары из списка слева
+          </p>
         </div>
 
         <!-- Позиции корзины -->
@@ -219,7 +225,7 @@ function getImageUrl(product: PosProduct): string | null {
                 :src="getImageUrl(item.product)!"
                 :alt="item.product.name"
                 class="h-full w-full object-cover"
-              />
+              >
               <div v-else class="flex h-full items-center justify-center">
                 <Icon name="lucide:image" class="h-4 w-4 text-muted-foreground/30" />
               </div>
@@ -227,7 +233,9 @@ function getImageUrl(product: PosProduct): string | null {
 
             <!-- Название и цена -->
             <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-medium">{{ item.product.name }}</p>
+              <p class="truncate text-sm font-medium">
+                {{ item.product.name }}
+              </p>
               <p class="text-xs text-muted-foreground">
                 {{ formatPrice(item.product.price) }} / шт.
               </p>
@@ -276,7 +284,6 @@ function getImageUrl(product: PosProduct): string | null {
 
       <!-- Нижняя панель: Клиент + Оплата + Итог -->
       <div class="shrink-0 border-t bg-muted/30 p-4 space-y-4">
-
         <!-- Поиск клиента -->
         <div class="space-y-2">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -288,7 +295,9 @@ function getImageUrl(product: PosProduct): string | null {
             class="flex items-center justify-between rounded-lg border bg-background px-3 py-2"
           >
             <div>
-              <p class="text-sm font-medium">{{ store.getCustomerName(customer) }}</p>
+              <p class="text-sm font-medium">
+                {{ store.getCustomerName(customer) }}
+              </p>
               <p class="text-xs text-muted-foreground">
                 Бонусы: <span class="font-medium text-amber-500">{{ customer.active_bonus_balance }}</span>
               </p>

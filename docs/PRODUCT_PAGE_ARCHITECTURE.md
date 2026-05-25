@@ -9,18 +9,20 @@
 ## Структура данных
 
 ### SSR-загрузка (серверная)
+
 ```typescript
 if (import.meta.server) {
   // Параллельная загрузка:
   // 1. Категории (если не загружены)
   // 2. Продукт по slug
   // 3. Отзывы для Schema.org
-  
+
   // Предзаполнение queryClient для гидратации
 }
 ```
 
 ### Клиентские запросы (Vue Query)
+
 - **product** — основной товар (staleTime: 2 мин)
 - **accessories** — аксессуары (батарейки, упаковка)
 - **similarProducts** — похожие товары из категории
@@ -32,27 +34,30 @@ if (import.meta.server) {
 ## Computed-свойства
 
 ### Цены и скидки
+
 ```typescript
 mainProductPrice // final_price из БД (с психологическим округлением)
-totalPrice       // основной товар + выбранные аксессуары
-totalBonuses     // бонусные баллы за комплект
+totalPrice // основной товар + выбранные аксессуары
+totalBonuses // бонусные баллы за комплект
 ```
 
 ### SEO-метаданные
+
 ```typescript
-metaTitle        // Приоритет: meta_title → seo_title → автогенерация
-metaDescription  // Приоритет: meta_description → seo_description → автогенерация
-metaKeywords     // Автогенерация из атрибутов товара
-audienceText     // "для девочек от 3 до 5 лет"
-seoBlocks        // Парсинг product.seo_content через parseHTMLToBlocks
+metaTitle // Приоритет: meta_title → seo_title → автогенерация
+metaDescription // Приоритет: meta_description → seo_description → автогенерация
+metaKeywords // Автогенерация из атрибутов товара
+audienceText // "для девочек от 3 до 5 лет"
+seoBlocks // Парсинг product.seo_content через parseHTMLToBlocks
 ```
 
 ### Навигация
+
 ```typescript
-breadcrumbs      // Хлебные крошки из категорий + товар
-brandLink        // /brand/{slug}
-productLineLink  // /brand/{brand_slug}/{line_slug}
-categoryLink     // /catalog/{slug}
+breadcrumbs // Хлебные крошки из категорий + товар
+brandLink // /brand/{slug}
+productLineLink // /brand/{brand_slug}/{line_slug}
+categoryLink // /catalog/{slug}
 ```
 
 ---
@@ -60,12 +65,14 @@ categoryLink     // /catalog/{slug}
 ## SEO-оптимизация
 
 ### Meta-теги (useSeoMeta)
+
 - title, description
 - Open Graph (og:image, og:title, og:description)
 - Twitter Card
 - robots (noindex только для is_active=false)
 
 ### Schema.org разметка
+
 1. **Product** (useSchemaOrg + defineProduct)
    - sku, mpn, gtin (штрихкод)
    - brand (с поддержкой product_line как parentOrganization)
@@ -80,6 +87,7 @@ categoryLink     // /catalog/{slug}
    - Генерируется из productQuestions с очисткой HTML
 
 ### Robots-правила
+
 ```typescript
 // noindex ТОЛЬКО если is_active === false
 // Товары без остатка (stock_quantity === 0) индексируются
@@ -90,6 +98,7 @@ categoryLink     // /catalog/{slug}
 ## UI-компоненты
 
 ### Десктоп (lg+)
+
 ```
 ┌─────────────────┬──────────────┐
 │   Галерея (7)   │  Sticky (5)  │
@@ -110,6 +119,7 @@ categoryLink     // /catalog/{slug}
 ```
 
 ### Мобильный
+
 - Sticky-панель внизу экрана (glass-эффект)
 - Анимация при скролле (поднимается над навбаром)
 - Flip-counter для цены
@@ -119,23 +129,31 @@ categoryLink     // /catalog/{slug}
 ## Ключевые фичи
 
 ### 1. Flip Counter (анимация цены)
+
 ```typescript
 useFlipCounter(totalPrice, digitColumns)
 // Плавная анимация смены цифр при выборе аксессуаров
 ```
 
 ### 2. Аксессуары
+
 - Автовыбор товаров, уже добавленных в корзину
 - Пересчет итоговой цены и бонусов
 - Плашка-расшифровка комплекта
 
 ### 3. Sticky-панель (мобильный)
+
 ```css
-.sticky-above-nav { transform: translateY(-68px); }
-.sticky-at-bottom { transform: translateY(0); }
+.sticky-above-nav {
+  transform: translateY(-68px);
+}
+.sticky-at-bottom {
+  transform: translateY(0);
+}
 ```
 
 ### 4. Prefetch похожих товаров
+
 ```typescript
 @mouseenter-product="prefetchProduct"
 // Предзагрузка при наведении на карточку
@@ -146,6 +164,7 @@ useFlipCounter(totalPrice, digitColumns)
 ## Интеграция с Store
 
 ### Используемые Store
+
 - **productsStore** — fetchProductBySlug, fetchSimilarProducts
 - **cartStore** — addItem, items (проверка наличия в корзине)
 - **categoriesStore** — getBreadcrumbs, allCategories
@@ -157,6 +176,7 @@ useFlipCounter(totalPrice, digitColumns)
 ## Производительность
 
 ### Кэширование (Vue Query)
+
 ```typescript
 product:          staleTime: 2 мин,  gcTime: 10 мин
 accessories:      staleTime: 10 мин, gcTime: 30 мин
@@ -165,6 +185,7 @@ reviews:          staleTime: 5 мин,  gcTime: 10 мин
 ```
 
 ### SSR-оптимизация
+
 - Параллельная загрузка данных
 - Предзаполнение queryClient
 - Гидратация без повторных запросов

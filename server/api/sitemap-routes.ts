@@ -171,12 +171,15 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       brandLandings.forEach((item: any) => {
         const category = item.categories
         const brand = item.brands
-        if (!category || !brand) return
+        if (!category || !brand)
+          return
         // Brand landing только для категорий второго уровня (имеющих родителя)
-        if (!category.parent_id) return
+        if (!category.parent_id)
+          return
         const categoryPath = category.href || `/catalog/${category.slug}`
         const key = `${categoryPath}|${brand.slug}`
-        if (seen.has(key)) return
+        if (seen.has(key))
+          return
         seen.add(key)
         sitemapRoutes.push({
           loc: `${categoryPath}?brand=${brand.slug}`,

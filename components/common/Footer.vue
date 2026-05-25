@@ -12,7 +12,7 @@ const { data: footerCategories } = await useAsyncData('footer-categories', async
     .eq('is_featured', true)
     .order('display_order', { ascending: true })
     .limit(6)
-  
+
   return data || []
 })
 
@@ -24,7 +24,7 @@ const { data: popularProducts } = await useAsyncData('footer-popular-products', 
     .gt('stock_quantity', 0)
     .order('created_at', { ascending: false })
     .limit(5)
-  
+
   return data || []
 })
 </script>
@@ -106,7 +106,9 @@ const { data: popularProducts } = await useAsyncData('footer-popular-products', 
 
         <!-- Покупателям -->
         <div>
-          <h3 class="font-semibold text-lg mb-4">Покупателям</h3>
+          <h3 class="font-semibold text-lg mb-4">
+            Покупателям
+          </h3>
           <ul class="space-y-2 text-sm">
             <li>
               <NuxtLink
@@ -137,7 +139,9 @@ const { data: popularProducts } = await useAsyncData('footer-popular-products', 
 
         <!-- Информация -->
         <div>
-          <h3 class="font-semibold text-lg mb-4">Информация</h3>
+          <h3 class="font-semibold text-lg mb-4">
+            Информация
+          </h3>
           <ul class="space-y-2 text-sm">
             <li>
               <NuxtLink
@@ -168,7 +172,9 @@ const { data: popularProducts } = await useAsyncData('footer-popular-products', 
 
         <!-- Контакты -->
         <div>
-          <h3 class="font-semibold text-lg mb-4">Контакты</h3>
+          <h3 class="font-semibold text-lg mb-4">
+            Контакты
+          </h3>
           <div class="space-y-2 text-sm text-muted-foreground">
             <p>г. Алматы, Казахстан</p>
             <p>мкр. Шапагат, ул. Амангельды</p>

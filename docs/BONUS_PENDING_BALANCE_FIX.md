@@ -15,12 +15,12 @@
 
 ## Новый дизайн потока бонусов
 
-| Событие | pending_bonus_balance | active_bonus_balance |
-|---------|-----------------------|----------------------|
-| Заказ создан (`create_user_order`) | **+bonuses_awarded** ← новое | без изменений |
-| Заказ подтверждён (`process_confirmed_order`) | без изменений ← убрано | +welcome_bonus (только первый заказ) |
-| 14 дней прошло (`activate_pending_bonuses`) | −bonuses_awarded | +bonuses_awarded |
-| Заказ отменён (`cancel_order`) | **−bonuses_awarded** ← всегда | +bonuses_spent (если были потрачены) |
+| Событие                                       | pending_bonus_balance         | active_bonus_balance                 |
+| --------------------------------------------- | ----------------------------- | ------------------------------------ |
+| Заказ создан (`create_user_order`)            | **+bonuses_awarded** ← новое  | без изменений                        |
+| Заказ подтверждён (`process_confirmed_order`) | без изменений ← убрано        | +welcome_bonus (только первый заказ) |
+| 14 дней прошло (`activate_pending_bonuses`)   | −bonuses_awarded              | +bonuses_awarded                     |
+| Заказ отменён (`cancel_order`)                | **−bonuses_awarded** ← всегда | +bonuses_spent (если были потрачены) |
 
 ---
 
@@ -42,6 +42,7 @@ INTO v_new_active_balance, v_new_pending_balance;
 ### 2. `process_confirmed_order` — убран UPDATE pending_bonus_balance
 
 До фикса:
+
 ```sql
 -- ❌ Двойное добавление: уже было в create_user_order
 UPDATE profiles SET pending_bonus_balance = pending_bonus_balance + bonuses_awarded
@@ -52,6 +53,7 @@ UPDATE profiles SET pending_bonus_balance = pending_bonus_balance + bonuses_awar
 ### 3. `cancel_order` — pending вычитается ВСЕГДА
 
 До фикса:
+
 ```sql
 -- ❌ Только если заказ был подтверждён (bonuses_activation_date IS NOT NULL)
 IF v_bonuses_activation_date IS NOT NULL THEN
@@ -60,6 +62,7 @@ END IF;
 ```
 
 После фикса:
+
 ```sql
 -- ✅ Всегда, т.к. pending был добавлен при create_user_order
 pending -= bonuses_awarded  -- безусловно
@@ -111,10 +114,10 @@ FROM orders WHERE order_id = orders.id
 
 ### Два сценария входа через TG-ссылку
 
-| Сценарий | Auth Event | До фикса | После фикса |
-|----------|-----------|----------|-------------|
-| Первый вход / новая сессия | `SIGNED_IN` | ✅ Рефреш | ✅ Рефреш |
-| Уже залогинен, открыл ссылку | `INITIAL_SESSION` | ❌ Кеш (стейл) | ✅ Рефреш |
+| Сценарий                     | Auth Event        | До фикса       | После фикса |
+| ---------------------------- | ----------------- | -------------- | ----------- |
+| Первый вход / новая сессия   | `SIGNED_IN`       | ✅ Рефреш      | ✅ Рефреш   |
+| Уже залогинен, открыл ссылку | `INITIAL_SESSION` | ❌ Кеш (стейл) | ✅ Рефреш   |
 
 ### Исправление (`app.vue`)
 
@@ -129,7 +132,7 @@ supabase.auth.onAuthStateChange((event) => {
 // После:
 supabase.auth.onAuthStateChange((event, session) => {
   if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-    profileStore.loadProfile(true, false, true)  // force=true, silent=true
+    profileStore.loadProfile(true, false, true) // force=true, silent=true
   }
 })
 ```
@@ -152,11 +155,11 @@ supabase.auth.onAuthStateChange((event, session) => {
 
 ### Параметры `loadProfile(force, waitForCreation, silent)`
 
-| Параметр | Значение | Эффект |
-|----------|---------|--------|
-| `force = true` | Игнорирует кеш | Всегда идёт в БД |
-| `waitForCreation = false` | Не ждёт создания профиля | Быстрый путь для уже существующих |
-| `silent = true` | Не ставит `isLoading = true` | Нет скелетона, нет мигания |
+| Параметр                  | Значение                     | Эффект                            |
+| ------------------------- | ---------------------------- | --------------------------------- |
+| `force = true`            | Игнорирует кеш               | Всегда идёт в БД                  |
+| `waitForCreation = false` | Не ждёт создания профиля     | Быстрый путь для уже существующих |
+| `silent = true`           | Не ставит `isLoading = true` | Нет скелетона, нет мигания        |
 
 ---
 

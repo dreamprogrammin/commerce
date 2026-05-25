@@ -1,115 +1,116 @@
 <script setup lang="ts">
-import type { ProductWithImages } from "@/types";
-import { Trash2 } from "lucide-vue-next";
-import { storeToRefs } from "pinia";
-import { toast } from "vue-sonner";
+import type { ProductWithImages } from '@/types'
+import { Trash2 } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
+import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useFlipCounter } from '@/composables/useFlipCounter'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { carouselContainerVariants } from '@/lib/variants'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+import { formatPrice } from '@/utils/formatPrice'
 
-definePageMeta({ layout: "checkout" });
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { useFlipCounter } from "@/composables/useFlipCounter";
-import { BUCKET_NAME_PRODUCT } from "@/constants";
-import { carouselContainerVariants } from "@/lib/variants";
-import { useCartStore } from "@/stores/publicStore/cartStore";
-import { formatPrice } from "@/utils/formatPrice";
+definePageMeta({ layout: 'checkout' })
 
 // SEO: Закрываем страницу корзины от индексации
 useHead({
-  meta: [{ name: "robots", content: "noindex, nofollow" }],
-});
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
+})
 
-const cartStore = useCartStore();
-const supabase = useSupabaseClient();
-const { items, subtotal, totalItems, bonusesToAward } = storeToRefs(cartStore);
-const { getVariantUrl } = useSupabaseStorage();
+const cartStore = useCartStore()
+const supabase = useSupabaseClient()
+const { items, subtotal, totalItems, bonusesToAward } = storeToRefs(cartStore)
+const { getVariantUrl } = useSupabaseStorage()
 
 // 🔥 Константа порога бесплатной доставки
-const FREE_SHIPPING_THRESHOLD = 15000;
+const FREE_SHIPPING_THRESHOLD = 15000
 
 // Прогресс бесплатной доставки
 const shippingProgress = computed(() => {
-  const progress = (subtotal.value / FREE_SHIPPING_THRESHOLD) * 100;
-  return Math.min(progress, 100);
-});
+  const progress = (subtotal.value / FREE_SHIPPING_THRESHOLD) * 100
+  return Math.min(progress, 100)
+})
 
 const remainingForFreeShipping = computed(() => {
-  const remaining = FREE_SHIPPING_THRESHOLD - subtotal.value;
-  return remaining > 0 ? remaining : 0;
-});
+  const remaining = FREE_SHIPPING_THRESHOLD - subtotal.value
+  return remaining > 0 ? remaining : 0
+})
 
 const hasFreeShipping = computed(
   () => subtotal.value >= FREE_SHIPPING_THRESHOLD,
-);
+)
 
 // 🔥 Cross-sell: Рекомендованные аксессуары
-const suggestedAccessories = ref<ProductWithImages[]>([]);
-const isLoadingAccessories = ref(false);
-const selectedAccessoryIds = ref<string[]>([]);
+const suggestedAccessories = ref<ProductWithImages[]>([])
+const isLoadingAccessories = ref(false)
+const selectedAccessoryIds = ref<string[]>([])
 
 // 🔥 Cross-sell: Похожие товары ("С этим товаром покупают")
-const similarProducts = ref<ProductWithImages[]>([]);
-const isLoadingSimilarProducts = ref(false);
+const similarProducts = ref<ProductWithImages[]>([])
+const isLoadingSimilarProducts = ref(false)
 
 // 🔥 Flip animation для итоговой суммы
-const digitColumns = ref<HTMLElement[]>([]);
-const mobileDigitColumns = ref<HTMLElement[]>([]);
+const digitColumns = ref<HTMLElement[]>([])
+const mobileDigitColumns = ref<HTMLElement[]>([])
 const totalWithAccessories = computed(() => {
-  let total = subtotal.value;
-  const selected = suggestedAccessories.value.filter((acc) =>
+  let total = subtotal.value
+  const selected = suggestedAccessories.value.filter(acc =>
     selectedAccessoryIds.value.includes(acc.id),
-  );
+  )
   for (const acc of selected) {
-    const accFinalPrice = acc.final_price || acc.price;
-    total += accFinalPrice;
+    const accFinalPrice = acc.final_price || acc.price
+    total += accFinalPrice
   }
-  return total;
-});
+  return total
+})
 
 const priceChars = computed(() => {
-  const formatted = formatPrice(totalWithAccessories.value);
-  let digitIndex = 0;
-  return formatted.split("").map((char) => {
-    const isDigit = !Number.isNaN(Number(char)) && char !== " ";
-    const result = { char, isDigit, digitIndex: isDigit ? digitIndex : -1 };
-    if (isDigit) digitIndex++;
-    return result;
-  });
-});
+  const formatted = formatPrice(totalWithAccessories.value)
+  let digitIndex = 0
+  return formatted.split('').map((char) => {
+    const isDigit = !Number.isNaN(Number(char)) && char !== ' '
+    const result = { char, isDigit, digitIndex: isDigit ? digitIndex : -1 }
+    if (isDigit)
+      digitIndex++
+    return result
+  })
+})
 
-useFlipCounter(totalWithAccessories, digitColumns);
-useFlipCounter(subtotal, mobileDigitColumns);
+useFlipCounter(totalWithAccessories, digitColumns)
+useFlipCounter(subtotal, mobileDigitColumns)
 
 // Загрузка рекомендованных аксессуаров
 async function loadSuggestedAccessories() {
   if (items.value.length === 0) {
-    suggestedAccessories.value = [];
-    return;
+    suggestedAccessories.value = []
+    return
   }
 
-  isLoadingAccessories.value = true;
+  isLoadingAccessories.value = true
   try {
     // Собираем все accessory_ids из товаров в корзине
-    const allAccessoryIds = new Set<string>();
-    const cartProductIds = new Set(items.value.map((item) => item.product.id));
+    const allAccessoryIds = new Set<string>()
+    const cartProductIds = new Set(items.value.map(item => item.product.id))
 
     for (const item of items.value) {
       if (item.product.accessory_ids?.length) {
         item.product.accessory_ids.forEach((id) => {
           // Добавляем только если этого товара еще нет в корзине
           if (!cartProductIds.has(id)) {
-            allAccessoryIds.add(id);
+            allAccessoryIds.add(id)
           }
-        });
+        })
       }
     }
 
     if (allAccessoryIds.size === 0) {
-      suggestedAccessories.value = [];
-      return;
+      suggestedAccessories.value = []
+      return
     }
 
     // Загружаем аксессуары (максимум 3)
     const { data, error } = await supabase
-      .from("products")
+      .from('products')
       .select(
         `
         *,
@@ -127,50 +128,52 @@ async function loadSuggestedAccessories() {
         )
       `,
       )
-      .in("id", Array.from(allAccessoryIds).slice(0, 3))
-      .eq("is_active", true)
-      .order("display_order", {
-        foreignTable: "product_images",
+      .in('id', Array.from(allAccessoryIds).slice(0, 3))
+      .eq('is_active', true)
+      .order('display_order', {
+        foreignTable: 'product_images',
         ascending: true,
-      });
+      })
 
     if (!error && data) {
-      suggestedAccessories.value = data as ProductWithImages[];
+      suggestedAccessories.value = data as ProductWithImages[]
     }
-  } catch (e) {
-    console.error("Error loading suggested accessories:", e);
-  } finally {
-    isLoadingAccessories.value = false;
+  }
+  catch (e) {
+    console.error('Error loading suggested accessories:', e)
+  }
+  finally {
+    isLoadingAccessories.value = false
   }
 }
 
 // Загрузка похожих товаров
 async function loadSimilarProducts() {
   if (items.value.length === 0) {
-    similarProducts.value = [];
-    return;
+    similarProducts.value = []
+    return
   }
 
-  isLoadingSimilarProducts.value = true;
+  isLoadingSimilarProducts.value = true
   try {
-    const cartProductIds = new Set(items.value.map((item) => item.product.id));
+    const cartProductIds = new Set(items.value.map(item => item.product.id))
 
     // Собираем категории товаров в корзине
-    const categoryIds = new Set<string>();
+    const categoryIds = new Set<string>()
     items.value.forEach((item) => {
       if (item.product.category_id) {
-        categoryIds.add(item.product.category_id);
+        categoryIds.add(item.product.category_id)
       }
-    });
+    })
 
     if (categoryIds.size === 0) {
-      similarProducts.value = [];
-      return;
+      similarProducts.value = []
+      return
     }
 
     // Загружаем похожие товары из тех же категорий (максимум 6)
     const { data, error } = await supabase
-      .from("products")
+      .from('products')
       .select(
         `
         *,
@@ -189,24 +192,26 @@ async function loadSimilarProducts() {
         )
       `,
       )
-      .in("category_id", Array.from(categoryIds))
-      .not("id", "in", `(${Array.from(cartProductIds).join(",")})`)
-      .eq("is_active", true)
-      .gt("stock_quantity", 0)
-      .order("created_at", { ascending: false })
+      .in('category_id', Array.from(categoryIds))
+      .not('id', 'in', `(${Array.from(cartProductIds).join(',')})`)
+      .eq('is_active', true)
+      .gt('stock_quantity', 0)
+      .order('created_at', { ascending: false })
       .limit(6)
-      .order("display_order", {
-        foreignTable: "product_images",
+      .order('display_order', {
+        foreignTable: 'product_images',
         ascending: true,
-      });
+      })
 
     if (!error && data) {
-      similarProducts.value = data as ProductWithImages[];
+      similarProducts.value = data as ProductWithImages[]
     }
-  } catch (e) {
-    console.error("Error loading similar products:", e);
-  } finally {
-    isLoadingSimilarProducts.value = false;
+  }
+  catch (e) {
+    console.error('Error loading similar products:', e)
+  }
+  finally {
+    isLoadingSimilarProducts.value = false
   }
 }
 
@@ -214,108 +219,115 @@ async function loadSimilarProducts() {
 watch(
   () => items.value,
   () => {
-    loadSuggestedAccessories();
-    loadSimilarProducts();
+    loadSuggestedAccessories()
+    loadSimilarProducts()
   },
   {
     deep: true,
     immediate: true,
   },
-);
+)
 
 // Получить URL изображения товара
-function getProductImageUrl(product: any, variant: "sm" | "md" = "sm") {
-  if (!product.product_images?.[0]?.image_url) return null;
+function getProductImageUrl(product: any, variant: 'sm' | 'md' = 'sm') {
+  if (!product.product_images?.[0]?.image_url)
+    return null
   return getVariantUrl(
     BUCKET_NAME_PRODUCT,
     product.product_images[0].image_url,
     variant,
-  );
+  )
 }
 
 // Добавить аксессуар в корзину
 async function addAccessoryToCart(accessory: ProductWithImages) {
-  await cartStore.addItem(accessory, 1);
-  toast.success("Товар добавлен в корзину");
+  await cartStore.addItem(accessory, 1)
+  toast.success('Товар добавлен в корзину')
 }
 
 // Добавить выбранные аксессуары в корзину
 async function addSelectedAccessoriesToCart() {
-  const selected = suggestedAccessories.value.filter((acc) =>
+  const selected = suggestedAccessories.value.filter(acc =>
     selectedAccessoryIds.value.includes(acc.id),
-  );
+  )
 
-  if (selected.length === 0) return;
+  if (selected.length === 0)
+    return
 
   for (const acc of selected) {
-    if (!cartStore.items.find((item) => item.product.id === acc.id)) {
-      await cartStore.addItem(acc, 1);
+    if (!cartStore.items.find(item => item.product.id === acc.id)) {
+      await cartStore.addItem(acc, 1)
     }
   }
 
   toast.success(
     selected.length === 1
-      ? "Аксессуар добавлен в корзину"
+      ? 'Аксессуар добавлен в корзину'
       : `${selected.length} аксессуара добавлено в корзину`,
-  );
+  )
 
   // Очищаем выбор
-  selectedAccessoryIds.value = [];
+  selectedAccessoryIds.value = []
 }
 
 // Показать тостер о прогрессе доставки при изменении суммы
-let previousSubtotal = subtotal.value;
+let previousSubtotal = subtotal.value
 watch(subtotal, (newSubtotal) => {
   if (newSubtotal > previousSubtotal && newSubtotal < FREE_SHIPPING_THRESHOLD) {
-    const remaining = FREE_SHIPPING_THRESHOLD - newSubtotal;
+    const remaining = FREE_SHIPPING_THRESHOLD - newSubtotal
     toast.info(`До бесплатной доставки осталось ${formatPrice(remaining)} ₸`, {
-      description: "🚚 Добавьте ещё товаров для бесплатной доставки",
+      description: '🚚 Добавьте ещё товаров для бесплатной доставки',
       duration: 3000,
-    });
-  } else if (
-    newSubtotal >= FREE_SHIPPING_THRESHOLD &&
-    previousSubtotal < FREE_SHIPPING_THRESHOLD
-  ) {
-    toast.success("🎉 Поздравляем! Доставка бесплатная!", {
-      description: "Вы получили бесплатную доставку",
-      duration: 5000,
-    });
+    })
   }
-  previousSubtotal = newSubtotal;
-});
+  else if (
+    newSubtotal >= FREE_SHIPPING_THRESHOLD
+    && previousSubtotal < FREE_SHIPPING_THRESHOLD
+  ) {
+    toast.success('🎉 Поздравляем! Доставка бесплатная!', {
+      description: 'Вы получили бесплатную доставку',
+      duration: 5000,
+    })
+  }
+  previousSubtotal = newSubtotal
+})
 
-const containerClass = carouselContainerVariants({ contained: "always" });
+const containerClass = carouselContainerVariants({ contained: 'always' })
 
 // Scroll-aware visibility для sticky bar
-const isNavVisible = ref(true);
-let lastScrollY = 0;
+const isNavVisible = ref(true)
+let lastScrollY = 0
 
 function handleScroll() {
-  const currentScrollY = window.scrollY;
+  const currentScrollY = window.scrollY
   if (currentScrollY < 60) {
-    isNavVisible.value = true;
-  } else if (currentScrollY > lastScrollY) {
-    isNavVisible.value = false;
-  } else {
-    isNavVisible.value = true;
+    isNavVisible.value = true
   }
-  lastScrollY = currentScrollY;
+  else if (currentScrollY > lastScrollY) {
+    isNavVisible.value = false
+  }
+  else {
+    isNavVisible.value = true
+  }
+  lastScrollY = currentScrollY
 }
 
 onMounted(() =>
-  window.addEventListener("scroll", handleScroll, { passive: true }),
-);
-onUnmounted(() => window.removeEventListener("scroll", handleScroll));
+  window.addEventListener('scroll', handleScroll, { passive: true }),
+)
+onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 
 // Добавляем padding-bottom для мобильной версии, чтобы контент не перекрывался sticky bar
 const contentPaddingClass = computed(() =>
-  items.value.length > 0 ? "pb-32 lg:pb-0" : "",
-);
+  items.value.length > 0 ? 'pb-32 lg:pb-0' : '',
+)
 </script>
 
 <template>
   <div :class="`${containerClass} py-6 sm:py-12 ${contentPaddingClass}`">
-    <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-8">Ваша корзина</h1>
+    <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-8">
+      Ваша корзина
+    </h1>
 
     <!-- Пустая корзина -->
     <div
@@ -326,12 +338,16 @@ const contentPaddingClass = computed(() =>
         name="lucide:shopping-cart"
         class="w-16 h-16 text-muted-foreground/50 mb-4 mx-auto"
       />
-      <h3 class="text-lg font-semibold mb-2">Корзина пуста</h3>
+      <h3 class="text-lg font-semibold mb-2">
+        Корзина пуста
+      </h3>
       <p class="text-sm text-muted-foreground mb-4">
         Добавьте товары, чтобы начать покупки
       </p>
       <NuxtLink to="/catalog">
-        <Button size="lg"> Начать покупки </Button>
+        <Button size="lg">
+          Начать покупки
+        </Button>
       </NuxtLink>
     </div>
 
@@ -440,8 +456,8 @@ const contentPaddingClass = computed(() =>
                 <p class="font-bold text-base text-primary">
                   {{
                     formatPrice(
-                      (item.product.final_price || item.product.price) *
-                        item.quantity,
+                      (item.product.final_price || item.product.price)
+                        * item.quantity,
                     )
                   }}
                   ₸
@@ -562,8 +578,7 @@ const contentPaddingClass = computed(() =>
                 </Button>
                 <span
                   class="font-semibold text-base min-w-[2.5rem] text-center"
-                  >{{ item.quantity }}</span
-                >
+                >{{ item.quantity }}</span>
                 <Button
                   variant="outline"
                   size="icon"
@@ -578,8 +593,8 @@ const contentPaddingClass = computed(() =>
               <p class="font-bold text-lg w-32 text-right text-primary">
                 {{
                   formatPrice(
-                    (item.product.final_price || item.product.price) *
-                      item.quantity,
+                    (item.product.final_price || item.product.price)
+                      * item.quantity,
                   )
                 }}
                 ₸
@@ -652,8 +667,8 @@ const contentPaddingClass = computed(() =>
                     <!-- Бейдж скидки -->
                     <div
                       v-if="
-                        product.discount_percentage &&
-                        product.discount_percentage > 0
+                        product.discount_percentage
+                          && product.discount_percentage > 0
                       "
                       class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded"
                     >
@@ -689,8 +704,8 @@ const contentPaddingClass = computed(() =>
                         </p>
                         <p
                           v-if="
-                            product.discount_percentage &&
-                            product.discount_percentage > 0
+                            product.discount_percentage
+                              && product.discount_percentage > 0
                           "
                           class="text-xs text-muted-foreground line-through"
                         >
@@ -701,8 +716,8 @@ const contentPaddingClass = computed(() =>
                       <!-- Бонусы -->
                       <div
                         v-if="
-                          product.bonus_points_award &&
-                          product.bonus_points_award > 0
+                          product.bonus_points_award
+                            && product.bonus_points_award > 0
                         "
                         class="flex items-center gap-1 text-xs text-orange-600"
                       >
@@ -722,7 +737,9 @@ const contentPaddingClass = computed(() =>
       <aside class="lg:col-span-1 lg:sticky lg:top-24 space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle class="text-xl"> Итого </CardTitle>
+            <CardTitle class="text-xl">
+              Итого
+            </CardTitle>
           </CardHeader>
           <CardContent class="space-y-4">
             <!-- Бонусы -->
@@ -741,9 +758,7 @@ const contentPaddingClass = computed(() =>
             <!-- Расчёты -->
             <div class="space-y-2">
               <div class="flex justify-between text-sm">
-                <span class="text-muted-foreground"
-                  >Товары ({{ totalItems }})</span
-                >
+                <span class="text-muted-foreground">Товары ({{ totalItems }})</span>
                 <span>{{ formatPrice(subtotal) }} ₸</span>
               </div>
 
@@ -764,9 +779,7 @@ const contentPaddingClass = computed(() =>
 
               <div class="flex justify-between text-sm">
                 <span class="text-muted-foreground">Доставка</span>
-                <span v-if="hasFreeShipping" class="text-green-600 font-medium"
-                  >Бесплатно</span
-                >
+                <span v-if="hasFreeShipping" class="text-green-600 font-medium">Бесплатно</span>
                 <span v-else>Рассчитается при оформлении</span>
               </div>
             </div>
@@ -808,17 +821,17 @@ const contentPaddingClass = computed(() =>
               </div>
             </div>
 
-              <!-- Кнопка добавления аксессуаров -->
-              <Button
-                v-if="selectedAccessoryIds.length > 0"
-                size="sm"
-                variant="outline"
-                class="w-full"
-                @click="addSelectedAccessoriesToCart"
-              >
-                <Icon name="lucide:plus-circle" class="w-4 h-4 mr-2" />
-                Добавить {{ selectedAccessoryIds.length }} аксессуар(а)
-              </Button>
+            <!-- Кнопка добавления аксессуаров -->
+            <Button
+              v-if="selectedAccessoryIds.length > 0"
+              size="sm"
+              variant="outline"
+              class="w-full"
+              @click="addSelectedAccessoriesToCart"
+            >
+              <Icon name="lucide:plus-circle" class="w-4 h-4 mr-2" />
+              Добавить {{ selectedAccessoryIds.length }} аксессуар(а)
+            </Button>
 
             <NuxtLink to="/checkout" class="w-full block">
               <Button size="lg" class="w-full">
@@ -828,7 +841,9 @@ const contentPaddingClass = computed(() =>
             </NuxtLink>
 
             <Button size="lg" variant="outline" class="w-full" as-child>
-              <NuxtLink to="/catalog"> Продолжить покупки </NuxtLink>
+              <NuxtLink to="/catalog">
+                Продолжить покупки
+              </NuxtLink>
             </Button>
           </CardContent>
         </Card>
@@ -856,7 +871,9 @@ const contentPaddingClass = computed(() =>
                       class="digit-column"
                     >
                       <div class="digit-ribbon">
-                        <div v-for="d in 10" :key="d" class="digit-item">{{ d - 1 }}</div>
+                        <div v-for="d in 10" :key="d" class="digit-item">
+                          {{ d - 1 }}
+                        </div>
                       </div>
                     </div>
                     <span v-else>{{ item.char }}</span>
@@ -866,8 +883,12 @@ const contentPaddingClass = computed(() =>
               </div>
             </div>
             <div class="text-right">
-              <p class="text-xs text-muted-foreground">Товары</p>
-              <p class="text-sm font-semibold">{{ totalItems }} шт.</p>
+              <p class="text-xs text-muted-foreground">
+                Товары
+              </p>
+              <p class="text-sm font-semibold">
+                {{ totalItems }} шт.
+              </p>
             </div>
           </div>
           <NuxtLink to="/checkout" class="w-full block">

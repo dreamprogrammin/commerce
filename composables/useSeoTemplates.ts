@@ -21,17 +21,17 @@ export function useSeoTemplates() {
    */
   function generateBrandCategorySeoText(data: SeoTemplateData): string {
     const city = data.city || 'Алматы'
-    
+
     const templates = [
       `Ухтышка — это официальный интернет-магазин в ${city}, где можно купить оригинальные ${data.categoryName.toLowerCase()} ${data.brandName}. Мы не крупная сеть, а уютный локальный сервис с собственным складом в мкр. Шапагат. Благодаря этому наши цены часто выгоднее, чем на Kaspi. В ассортименте ${data.productsCount} моделей от ${data.minPrice.toLocaleString('ru-KZ')} ₸. Вы можете заказать доставку ${data.brandName} день-в-день или забрать товар самовывозом.`,
-      
+
       `В Ухтышке представлен широкий выбор ${data.categoryName.toLowerCase()} ${data.brandName} — ${data.productsCount} моделей по цене от ${data.minPrice.toLocaleString('ru-KZ')} до ${data.maxPrice.toLocaleString('ru-KZ')} ₸. Мы работаем как локальный сервис со складом в мкр. Шапагат (${city}), поэтому можем предложить цены выгоднее Kaspi и доставку день-в-день. Заказывайте ${data.brandName} с самовывозом или курьерской доставкой!`,
-      
+
       `Ищете ${data.categoryName.toLowerCase()} ${data.brandName} в ${city}? Ухтышка — уютный локальный магазин с собственным складом в мкр. Шапагат. У нас ${data.productsCount} моделей ${data.brandName} от ${data.minPrice.toLocaleString('ru-KZ')} ₸. Проверяйте цены — мы часто выгоднее Kaspi! Доставка день-в-день или самовывоз в удобное время.`,
-      
+
       `Ухтышка предлагает оригинальные ${data.categoryName.toLowerCase()} ${data.brandName} с доставкой по ${city}. Это не сетевой магазин, а локальный сервис со складом в мкр. Шапагат — поэтому цены конкурентные (часто ниже Kaspi). В наличии ${data.productsCount} моделей от ${data.minPrice.toLocaleString('ru-KZ')} до ${data.maxPrice.toLocaleString('ru-KZ')} ₸. Заказывайте с доставкой день-в-день!`,
     ]
-    
+
     // Детерминированный выбор шаблона на основе хеша brand_id + category_id
     const hash = (data.brandSlug + data.categorySlug).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
     return templates[hash % templates.length]
@@ -63,32 +63,32 @@ export function useSeoTemplates() {
     reviewsCount?: number
   }): string {
     const city = data.city || 'Алматы'
-    
+
     // Формируем список брендов через middot (максимум 3)
-    const brandsText = data.topBrands.length > 0 
-      ? ` ${data.topBrands.slice(0, 3).join(' · ')}` 
+    const brandsText = data.topBrands.length > 0
+      ? ` ${data.topBrands.slice(0, 3).join(' · ')}`
       : ''
-    
+
     const parts = []
-    
+
     // Категория + бренды
     parts.push(`${data.categoryName}${brandsText} в Ухтышке`)
-    
+
     // Цена
     parts.push(`💰 От ${data.minPrice.toLocaleString('ru-KZ')} ₸`)
-    
+
     // Рейтинг (если есть)
     if (data.rating && data.reviewsCount && data.reviewsCount > 0) {
       const starCount = Math.round(data.rating)
       const starEmojis = '⭐'.repeat(starCount)
       parts.push(`${starEmojis} ${data.rating.toFixed(1).replace('.', ',')} (${data.reviewsCount} отз)`)
     }
-    
+
     // Доставка
     parts.push(`Доставка ${city} за 1 день`)
-    
+
     const snippet = parts.join('. ')
-    
+
     // Обрезаем до 165 символов
     return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
   }
@@ -99,23 +99,23 @@ export function useSeoTemplates() {
   function generateBrandCategoryDescription(data: SeoTemplateData): string {
     const city = data.city || 'Алматы'
     const parts = []
-    
+
     // Эмоциональная фраза + бренд
     parts.push(`${data.categoryName} ${data.brandName} в Ухтышке`)
-    
+
     // Цена
     parts.push(`💰 Цены от ${data.minPrice.toLocaleString('ru-KZ')} ₸`)
-    
+
     // Рейтинг и отзывы с динамическими звездами (если есть)
     if (data.rating && data.reviewsCount && data.reviewsCount > 0) {
       const starCount = Math.round(data.rating)
       const starEmojis = '⭐'.repeat(starCount)
       parts.push(`${starEmojis} ${data.rating.toFixed(1).replace('.', ',')} (${data.reviewsCount} отз)`)
     }
-    
+
     // Доставка и призыв
     parts.push(`Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы!`)
-    
+
     const result = parts.join('. ')
     return result.length > 165 ? `${result.substring(0, 162)}...` : result
   }
@@ -125,7 +125,7 @@ export function useSeoTemplates() {
    */
   function generateBrandCategoryFaq(data: SeoTemplateData) {
     const city = data.city || 'Алматы'
-    
+
     return [
       {
         question: `Где купить ${data.categoryName.toLowerCase()} ${data.brandName} в ${city}?`,
@@ -149,7 +149,7 @@ export function useSeoTemplates() {
   /**
    * Массовая генерация SEO для всех комбинаций категория + бренд
    */
-  async function generateSeoForAllCategoryBrands(options?: { dryRun?: boolean; overwrite?: boolean }) {
+  async function generateSeoForAllCategoryBrands(options?: { dryRun?: boolean, overwrite?: boolean }) {
     const dryRun = options?.dryRun ?? true
     const overwrite = options?.overwrite ?? false
 

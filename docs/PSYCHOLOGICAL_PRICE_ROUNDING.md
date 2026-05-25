@@ -1,6 +1,6 @@
 # 🎯 Психологическое округление цен (Стандарт "90 тенге")
 
-> **Дата реализации:** 31 марта 2026  
+> **Дата реализации:** 31 марта 2026
 > **Цель:** Повысить визуальную привлекательность цен и доверие покупателей
 
 ---
@@ -98,15 +98,16 @@ WHERE is_active = true AND final_price > 0;
 
 ```typescript
 export function roundToMarketingPrice(price: number): number {
-  if (price <= 0) return 0;
+  if (price <= 0)
+    return 0
 
   // Для товаров дешевле 500 ₸: округляем до 10 (без -10)
   if (price < 500) {
-    return Math.floor(price / 10) * 10;
+    return Math.floor(price / 10) * 10
   }
 
   // Для товаров от 500 ₸: округляем до сотен и вычитаем 10
-  return Math.floor(price / 100) * 100 - 10;
+  return Math.floor(price / 100) * 100 - 10
 }
 ```
 
@@ -117,10 +118,11 @@ export function calculateFinalPrice(
   price: number,
   discountPercentage: number,
 ): number {
-  if (price <= 0) return 0;
-  const discount = discountPercentage > 0 ? discountPercentage : 0;
-  const priceWithDiscount = (price * (100 - discount)) / 100;
-  return roundToMarketingPrice(priceWithDiscount);
+  if (price <= 0)
+    return 0
+  const discount = discountPercentage > 0 ? discountPercentage : 0
+  const priceWithDiscount = (price * (100 - discount)) / 100
+  return roundToMarketingPrice(priceWithDiscount)
 }
 ```
 
@@ -132,17 +134,18 @@ export function calculateBonusPoints(
   discountPercentage: number,
   bonusPercent: number,
 ): number {
-  if (price <= 0 || bonusPercent <= 0) return 0;
-  const discount = discountPercentage > 0 ? discountPercentage : 0;
+  if (price <= 0 || bonusPercent <= 0)
+    return 0
+  const discount = discountPercentage > 0 ? discountPercentage : 0
 
   // Сначала применяем скидку
-  const priceWithDiscount = (price * (100 - discount)) / 100;
+  const priceWithDiscount = (price * (100 - discount)) / 100
 
   // Затем применяем психологическое округление
-  const finalPrice = roundToMarketingPrice(priceWithDiscount);
+  const finalPrice = roundToMarketingPrice(priceWithDiscount)
 
   // Рассчитываем бонусы от округленной цены
-  return Math.round((finalPrice * bonusPercent) / 100);
+  return Math.round((finalPrice * bonusPercent) / 100)
 }
 ```
 
@@ -154,29 +157,30 @@ export function calculateBonusPoints(
 
 ```typescript
 const discountedPrice = computed(() => {
-  const price = formData.value.price || 0;
-  const discount = formData.value.discount_percentage || 0;
+  const price = formData.value.price || 0
+  const discount = formData.value.discount_percentage || 0
   if (discount > 0 && price > 0) {
     // Используем функцию психологического округления
-    return calculateFinalPrice(price, discount);
+    return calculateFinalPrice(price, discount)
   }
-  return null;
-});
+  return null
+})
 ```
 
 **Обновлен калькулятор прибыли:**
 
 ```typescript
 const priceBreakdown = computed(() => {
-  const price = formData.value.price || 0;
-  if (!price) return null;
+  const price = formData.value.price || 0
+  if (!price)
+    return null
 
-  const discount = formData.value.discount_percentage || 0;
+  const discount = formData.value.discount_percentage || 0
   // Используем функцию психологического округления для цены продажи
-  const sellingPrice =
-    discount > 0 ? calculateFinalPrice(price, discount) : price;
+  const sellingPrice
+    = discount > 0 ? calculateFinalPrice(price, discount) : price
   // ... остальная логика
-});
+})
 ```
 
 **Результат:** Админ при вводе скидки сразу видит итоговую "красивую" цену, которую увидит клиент.
@@ -346,7 +350,7 @@ Final price: 2 990 ₸ (без изменений)
 
 ---
 
-**Дата создания:** 31 марта 2026  
-**Последнее обновление:** 3 апреля 2026  
-**Автор:** Uhti Commerce Team  
+**Дата создания:** 31 марта 2026
+**Последнее обновление:** 3 апреля 2026
+**Автор:** Uhti Commerce Team
 **Статус:** ✅ Готово к деплою

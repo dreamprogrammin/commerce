@@ -21,7 +21,8 @@ const telegramUrl = ref<string | null>(null)
 const isPreparing = ref(false)
 
 async function prepareLink() {
-  if (!user.value) return
+  if (!user.value)
+    return
 
   isPreparing.value = true
   telegramUrl.value = null

@@ -3,12 +3,14 @@
 ## 🐛 Проблема
 
 **Ошибка:**
+
 ```
-new row for relation "bonus_transactions" violates check constraint 
+new row for relation "bonus_transactions" violates check constraint
 "bonus_transactions_transaction_type_check"
 ```
 
 **Когда возникает:**
+
 - При отмене заказа со статусом `delivered` (передан курьеру)
 - Функция `cancel_order` пытается создать транзакцию с типом `rollback_earned`
 - Но constraint не знает об этом типе
@@ -28,6 +30,7 @@ new row for relation "bonus_transactions" violates check constraint
    - `manual` - ручное начисление
 
 2. **Обновлён constraint:**
+
 ```sql
 CHECK (transaction_type IN (
   'earned',
@@ -50,28 +53,28 @@ CHECK (transaction_type IN (
 
 ## 📊 Типы транзакций
 
-| Тип | Описание |
-|-----|----------|
-| `earned` | Начислено за покупку |
-| `spent` | Потрачено при оплате |
-| `welcome` | Приветственные бонусы |
-| `refund_spent` | Возврат потраченных бонусов |
-| `refund_earned` | Возврат начисленных бонусов |
+| Тип               | Описание                             |
+| ----------------- | ------------------------------------ |
+| `earned`          | Начислено за покупку                 |
+| `spent`           | Потрачено при оплате                 |
+| `welcome`         | Приветственные бонусы                |
+| `refund_spent`    | Возврат потраченных бонусов          |
+| `refund_earned`   | Возврат начисленных бонусов          |
 | `rollback_earned` | Откат начисленных бонусов при отмене |
-| `activation` | Активация ожидающих бонусов |
-| `pending` | Ожидающие бонусы |
-| `review` | Бонусы за отзыв |
-| `birthday` | Бонусы на день рождения |
-| `expiration` | Сгорание бонусов |
-| `promo` | Промо-бонусы |
-| `manual` | Ручное начисление |
+| `activation`      | Активация ожидающих бонусов          |
+| `pending`         | Ожидающие бонусы                     |
+| `review`          | Бонусы за отзыв                      |
+| `birthday`        | Бонусы на день рождения              |
+| `expiration`      | Сгорание бонусов                     |
+| `promo`           | Промо-бонусы                         |
+| `manual`          | Ручное начисление                    |
 
 ---
 
 ## 🎯 Результат
 
-✅ **Теперь можно отменять заказы со статусом `delivered`**  
-✅ **Бонусы корректно откатываются**  
+✅ **Теперь можно отменять заказы со статусом `delivered`**
+✅ **Бонусы корректно откатываются**
 ✅ **Нет ошибок constraint**
 
 ---

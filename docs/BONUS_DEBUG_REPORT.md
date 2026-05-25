@@ -15,12 +15,12 @@
 **Файл**: `supabase/migrations/20260303000002_fix_earned_bonus_transactions.sql`
 **Статус миграции**: ✅ Развёрнута на prod
 
-| Проверка | Статус |
-|----------|--------|
-| COALESCE для NULL `bonus_points_award` | ✅ OK |
-| INSERT earned стоит ДО RETURN | ✅ OK |
-| SECURITY DEFINER обходит RLS | ✅ OK |
-| `bonus_points_award` на товарах | ✅ OK (все товары имеют значения) |
+| Проверка                               | Статус                            |
+| -------------------------------------- | --------------------------------- |
+| COALESCE для NULL `bonus_points_award` | ✅ OK                             |
+| INSERT earned стоит ДО RETURN          | ✅ OK                             |
+| SECURITY DEFINER обходит RLS           | ✅ OK                             |
+| `bonus_points_award` на товарах        | ✅ OK (все товары имеют значения) |
 
 ---
 
@@ -45,6 +45,7 @@
 **Файл**: `supabase/migrations/20260207000002_fix_cancel_order_guest_checkout.sql`
 
 **Симптомы** (подтверждено данными пользователя `f540508e-...`):
+
 - **8 заказов**, ВСЕ в статусе `cancelled`
 - **8 earned транзакций** всё ещё `status = 'pending'`
 - `pending_bonus_balance = 7600` — фантомный баланс от отменённых заказов
@@ -52,13 +53,14 @@
 
 **Три бага в `cancel_order`**:
 
-| # | Баг | Последствие |
-|---|-----|------------|
-| 1 | Earned транзакции НЕ помечаются `cancelled` | Пользователь видит pending бонусы за отменённые заказы |
-| 2 | `pending_bonus_balance` НЕ уменьшается | Фантомный баланс 7600 ₸ у этого пользователя |
-| 3 | `transaction_type = 'refund'` вместо `'refund_spent'` | Нарушение CHECK constraint — INSERT фейлится |
+| #   | Баг                                                   | Последствие                                            |
+| --- | ----------------------------------------------------- | ------------------------------------------------------ |
+| 1   | Earned транзакции НЕ помечаются `cancelled`           | Пользователь видит pending бонусы за отменённые заказы |
+| 2   | `pending_bonus_balance` НЕ уменьшается                | Фантомный баланс 7600 ₸ у этого пользователя           |
+| 3   | `transaction_type = 'refund'` вместо `'refund_spent'` | Нарушение CHECK constraint — INSERT фейлится           |
 
 **Код, вызывающий проблему** (строки 104-113 старой версии):
+
 ```sql
 INSERT INTO public.bonus_transactions (
   ...
@@ -106,18 +108,18 @@ INSERT INTO public.bonus_transactions (
 
 ## 6. Итоговая таблица
 
-| Слой | Компонент | До фикса | После фикса |
-|------|-----------|----------|-------------|
-| SQL | `create_user_order` | ✅ OK | ✅ OK |
-| SQL | `cancel_order` — earned бонусы | ❌ НЕ обрабатывает | ✅ Откатывает + cancelled |
-| SQL | `cancel_order` — refund type | ❌ `'refund'` (невалидный) | ✅ `'refund_spent'` |
-| SQL | `cancel_order` — pending_balance | ❌ НЕ уменьшает | ✅ Уменьшает |
-| SQL | `process_confirmed_order` — activation_date | ❌ Не проставляет | ✅ Проставляет |
-| SQL | Бэкфилл старых заказов | ❌ Нет earned записей | ✅ Вставлены |
-| SQL | Фантомный pending_balance | ❌ 7600 у пользователя | ✅ Пересчитан |
-| RPC | `get_bonus_history` | ✅ OK | ✅ OK |
-| Vue | Отображение pending | ✅ OK | ✅ OK |
-| Data | `bonus_points_award` на товарах | ✅ OK (все заполнены) | ✅ OK |
+| Слой | Компонент                                   | До фикса                   | После фикса               |
+| ---- | ------------------------------------------- | -------------------------- | ------------------------- |
+| SQL  | `create_user_order`                         | ✅ OK                      | ✅ OK                     |
+| SQL  | `cancel_order` — earned бонусы              | ❌ НЕ обрабатывает         | ✅ Откатывает + cancelled |
+| SQL  | `cancel_order` — refund type                | ❌ `'refund'` (невалидный) | ✅ `'refund_spent'`       |
+| SQL  | `cancel_order` — pending_balance            | ❌ НЕ уменьшает            | ✅ Уменьшает              |
+| SQL  | `process_confirmed_order` — activation_date | ❌ Не проставляет          | ✅ Проставляет            |
+| SQL  | Бэкфилл старых заказов                      | ❌ Нет earned записей      | ✅ Вставлены              |
+| SQL  | Фантомный pending_balance                   | ❌ 7600 у пользователя     | ✅ Пересчитан             |
+| RPC  | `get_bonus_history`                         | ✅ OK                      | ✅ OK                     |
+| Vue  | Отображение pending                         | ✅ OK                      | ✅ OK                     |
+| Data | `bonus_points_award` на товарах             | ✅ OK (все заполнены)      | ✅ OK                     |
 
 ---
 

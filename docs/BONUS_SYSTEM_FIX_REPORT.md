@@ -8,6 +8,7 @@
 ## 1. Проверка бэкенда
 
 ### RPC `create_user_order`
+
 **Статус:** Корректен
 
 - Вставляет `earned` транзакцию в `bonus_transactions` со статусом `pending`
@@ -15,6 +16,7 @@
 - Описание: "Бонусы за покупку (активируются через 14 дней после подтверждения)"
 
 ### RPC `get_bonus_history`
+
 **Статус:** Корректен
 
 - Запрос **без фильтров по типу** — возвращает ВСЕ транзакции
@@ -22,23 +24,28 @@
 - Пагинация: `p_limit` / `p_offset`
 
 ### Триггер `award_bonus_for_review`
+
 **Статус:** Исправлен (была проблема)
 
 **Проблема:** Не заполнялись поля `balance_after`, `pending_balance_after`, `status`. Дефолтные значения: `0`, `0`, `'completed'`. Из-за этого:
+
 - В колонке "Баланс после" всегда отображался `0 ₸`
 - Статус показывался как "Завершено" вместо "Ожидает активации"
 
 **Решение:** Создана миграция `20260304000001_fix_review_bonus_trigger.sql`:
+
 - `balance_after` = текущий `active_bonus_balance` пользователя
 - `pending_balance_after` = текущий `pending_bonus_balance` + 500
 - `status` = `'pending'` (бонусы за отзыв тоже ждут 14 дней)
 
 ### Триггер `grant_welcome_bonus_on_first_order`
+
 **Статус:** Корректен, но НЕ создаёт запись в `bonus_transactions`
 
 **Примечание:** Приветственный бонус логируется только при вызове `process_confirmed_order()`. Это ожидаемое поведение — бонус фиксируется при подтверждении заказа администратором.
 
 ### Функция `activate_pending_bonuses`
+
 **Статус:** Корректна
 
 - Запускается ежедневно в 2:00 AM UTC (pg_cron)
@@ -50,6 +57,7 @@
 ## 2. Проверка фронтенда
 
 ### Запрос истории бонусов
+
 **Статус:** Корректен
 
 - Вызывает `supabase.rpc('get_bonus_history')` без дополнительных фильтров
@@ -57,32 +65,33 @@
 
 ### Найденные проблемы и исправления
 
-| # | Файл | Проблема | Исправление |
-|---|------|----------|-------------|
-| 1 | `pages/profile/index.vue:421` | Ссылка `/profile/bonus` (404) | Исправлена на `/profile/bonuses` |
-| 2 | `pages/profile/index.vue` | Тип `review` отсутствовал в локализации | Добавлены все 9 типов транзакций |
-| 3 | `pages/profile/index.vue` | Неполные иконки и цвета для типов | Добавлены `review`, `activation`, `birthday`, `expiration` |
-| 4 | `pages/profile/bonuses/index.vue` | Тип `review` отсутствовал в `getTransactionIcon` | Добавлена иконка `MessageSquare` |
-| 5 | `pages/profile/bonuses/index.vue` | Тип `review` отсутствовал в `getTransactionColor` | Добавлен зелёный цвет |
-| 6 | `pages/profile/bonuses/index.vue` | Тип `review` отсутствовал в `getTransactionName` | Добавлено "Бонусы за отзыв" |
-| 7 | `pages/profile/bonuses/index.vue` | "Баланс после" = `0 ₸` для всех | Скрывается если оба баланса = 0, показывается "—" |
+| #   | Файл                              | Проблема                                          | Исправление                                                |
+| --- | --------------------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| 1   | `pages/profile/index.vue:421`     | Ссылка `/profile/bonus` (404)                     | Исправлена на `/profile/bonuses`                           |
+| 2   | `pages/profile/index.vue`         | Тип `review` отсутствовал в локализации           | Добавлены все 9 типов транзакций                           |
+| 3   | `pages/profile/index.vue`         | Неполные иконки и цвета для типов                 | Добавлены `review`, `activation`, `birthday`, `expiration` |
+| 4   | `pages/profile/bonuses/index.vue` | Тип `review` отсутствовал в `getTransactionIcon`  | Добавлена иконка `MessageSquare`                           |
+| 5   | `pages/profile/bonuses/index.vue` | Тип `review` отсутствовал в `getTransactionColor` | Добавлен зелёный цвет                                      |
+| 6   | `pages/profile/bonuses/index.vue` | Тип `review` отсутствовал в `getTransactionName`  | Добавлено "Бонусы за отзыв"                                |
+| 7   | `pages/profile/bonuses/index.vue` | "Баланс после" = `0 ₸` для всех                   | Скрывается если оба баланса = 0, показывается "—"          |
 
 ---
 
 ## 3. Реактивность и авто-синхронизация
 
 ### Проблема
+
 Пользователю приходилось перезаходить в аккаунт, чтобы увидеть обновлённые бонусы.
 
 ### Исправления
 
-| Событие | Файл | Что добавлено |
-|---------|------|--------------|
-| **Вход (SIGNED_IN)** | `app.vue` | `supabase.auth.onAuthStateChange` → `profileStore.loadProfile(true, true, true)` |
-| **Выход (SIGNED_OUT)** | `app.vue` | `profileStore.clearProfile()` |
-| **После заказа** | `stores/publicStore/cartStore.ts` | `loadProfile(true)` → `loadProfile(true, false, true)` (silent mode) |
-| **После отзыва (Dialog)** | `components/product/ReviewFormDialog.vue` | Добавлен `profileStore.loadProfile(true, false, true)` |
-| **После отзыва (Inline)** | `components/product/ProductReviews.vue` | Добавлен `profileStore.loadProfile(true, false, true)` |
+| Событие                   | Файл                                      | Что добавлено                                                                    |
+| ------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------- |
+| **Вход (SIGNED_IN)**      | `app.vue`                                 | `supabase.auth.onAuthStateChange` → `profileStore.loadProfile(true, true, true)` |
+| **Выход (SIGNED_OUT)**    | `app.vue`                                 | `profileStore.clearProfile()`                                                    |
+| **После заказа**          | `stores/publicStore/cartStore.ts`         | `loadProfile(true)` → `loadProfile(true, false, true)` (silent mode)             |
+| **После отзыва (Dialog)** | `components/product/ReviewFormDialog.vue` | Добавлен `profileStore.loadProfile(true, false, true)`                           |
+| **После отзыва (Inline)** | `components/product/ProductReviews.vue`   | Добавлен `profileStore.loadProfile(true, false, true)`                           |
 
 **Флаг `silent: true`** — обновляет данные в фоне без показа скелетона/лоадера.
 
@@ -92,23 +101,25 @@
 
 ### Локализация типов транзакций
 
-| Ключ БД | Отображение в UI |
-|---------|-----------------|
-| `earned` | Начислено за покупку |
-| `spent` | Списание за заказ |
-| `welcome` | Приветственные бонусы |
-| `review` | Бонусы за отзыв |
-| `refund_spent` | Возврат бонусов |
-| `refund_earned` | Отмена начисления |
-| `activation` | Активация бонусов |
-| `birthday` | Бонусы ко дню рождения |
-| `expiration` | Сгорело бонусов |
+| Ключ БД         | Отображение в UI       |
+| --------------- | ---------------------- |
+| `earned`        | Начислено за покупку   |
+| `spent`         | Списание за заказ      |
+| `welcome`       | Приветственные бонусы  |
+| `review`        | Бонусы за отзыв        |
+| `refund_spent`  | Возврат бонусов        |
+| `refund_earned` | Отмена начисления      |
+| `activation`    | Активация бонусов      |
+| `birthday`      | Бонусы ко дню рождения |
+| `expiration`    | Сгорело бонусов        |
 
 ### Колонка "Баланс после"
+
 - Если `balance_after = 0` И `pending_balance_after = 0` → показывается `—` (прочерк)
 - Если есть значения → отображается как раньше с суммой в ожидании
 
 ### Сортировка
+
 - Уже корректна: `ORDER BY created_at DESC` в SQL функции `get_bonus_history`
 - Новые транзакции всегда первые в списке
 
@@ -117,6 +128,7 @@
 ## 5. Список изменённых файлов
 
 ### Фронтенд
+
 1. `app.vue` — добавлен `onAuthStateChange` listener
 2. `pages/profile/index.vue` — фикс ссылки + локализация всех типов
 3. `pages/profile/bonuses/index.vue` — добавлен тип `review`, улучшен показ баланса
@@ -125,6 +137,7 @@
 6. `components/product/ProductReviews.vue` — profile reload после инлайн-отзыва
 
 ### Бэкенд (SQL)
+
 7. `supabase/migrations/20260304000001_fix_review_bonus_trigger.sql` — фикс триггера бонусов за отзыв
 
 ---
@@ -134,6 +147,7 @@
 **Описание проблемы:** В виджете "Ожидают активации" показывается 2000 ₸, в истории 4 записи по 500 ₸ (review), но "Доступные" = 0 и нет записей `earned`.
 
 **Объяснение:**
+
 - 4 x 500 ₸ = 2000 ₸ в `pending_bonus_balance` — это бонусы за отзывы
 - Записи типа `earned` появляются **при создании заказа** в функции `create_user_order`
 - Бонусы из `pending` переходят в `active` через `activate_pending_bonuses()` (14 дней)

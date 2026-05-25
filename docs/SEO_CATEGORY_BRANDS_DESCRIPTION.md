@@ -1,11 +1,12 @@
 # Автогенерация Meta Description с топ-брендами
 
-**Дата:** 2026-05-21  
+**Дата:** 2026-05-21
 **Версия:** 1.3.0
 
 ## 🎯 Цель
 
 Создать информативные и привлекательные meta description для категорий, которые:
+
 - Содержат высокочастотные ключевые слова
 - Упоминают топ-3 бренда в скобках
 - Привлекают целевой трафик по брендовым запросам
@@ -42,15 +43,15 @@ function generateCategoryDescription(data: {
   city?: string
 }): string {
   const city = data.city || 'Алматы'
-  
+
   // Формируем список брендов в скобках
-  const brandsText = data.topBrands.length > 0 
-    ? ` (${data.topBrands.join(', ')})` 
+  const brandsText = data.topBrands.length > 0
+    ? ` (${data.topBrands.join(', ')})`
     : ''
-  
+
   // Гибридный сниппет с брендами
   const snippet = `Купить ${data.categoryName.toLowerCase()}${brandsText} в интернет-магазине «Ухтышка». 💰 Цены от ${data.minPrice.toLocaleString('ru-KZ')} ₸. Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы!`
-  
+
   // Обрезаем до 165 символов
   return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
 }
@@ -63,8 +64,9 @@ function generateCategoryDescription(data: {
 ```typescript
 // Топ-3 бренда по количеству товаров в категории
 const topBrands = computed(() => {
-  if (!availableBrands.value || availableBrands.value.length === 0) return []
-  
+  if (!availableBrands.value || availableBrands.value.length === 0)
+    return []
+
   // Сортируем бренды по количеству товаров и берем топ-3
   return availableBrands.value
     .slice()
@@ -95,16 +97,19 @@ if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
 ### 1. SEO-оптимизация
 
 ✅ **Высокочастотные ключевые слова:**
+
 - "купить куклы для девочек"
 - "интернет-магазин"
 - "Алматы"
 
 ✅ **Брендовые запросы:**
+
 - "Barbie куклы"
 - "L.O.L. Surprise купить"
 - "Defa игрушки"
 
 ✅ **Коммерческие триггеры:**
+
 - Цена (💰 от 2 990 ₸)
 - Доставка (за 1 день)
 - Призыв к действию (Заказывайте!)
@@ -112,11 +117,13 @@ if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
 ### 2. Привлекательность для пользователей
 
 ✅ **Информативность:**
+
 - Сразу видно, какие бренды есть в категории
 - Понятна минимальная цена
 - Указаны условия доставки
 
 ✅ **Визуальная привлекательность:**
+
 - Эмодзи (💰) привлекают внимание
 - Структурированный текст легко читается
 - Конкретные цифры вызывают доверие
@@ -126,11 +133,13 @@ if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
 По сравнению с конкурентами:
 
 **Конкурент (обычный сниппет):**
+
 ```
 Куклы для девочек - купить в интернет-магазине с доставкой по Алматы. Большой выбор игрушек по выгодным ценам.
 ```
 
 **Ухтышка (оптимизированный сниппет):**
+
 ```
 Купить куклы для девочек (Barbie, L.O.L. Surprise, Defa) в интернет-магазине «Ухтышка». 💰 Цены от 2 990 ₸. Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!
 ```
@@ -181,9 +190,9 @@ if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
 ### Условия активации:
 
 ```typescript
-!hasActiveFilters.value && // Нет активных фильтров
-minPrice.value && // Есть минимальная цена
-topBrands.value.length > 0 // Есть бренды в категории
+!hasActiveFilters.value // Нет активных фильтров
+&& minPrice.value // Есть минимальная цена
+&& topBrands.value.length > 0 // Есть бренды в категории
 ```
 
 ### Формирование топ-брендов:
@@ -227,6 +236,7 @@ availableBrands.value
 ### Автоматическая работа
 
 Просто откройте любую категорию без фильтров:
+
 - `/catalog/konstruktory` → автоматически добавятся топ-3 бренда
 - `/catalog/kukly` → автоматически добавятся топ-3 бренда
 - `/catalog/mashiny` → автоматически добавятся топ-3 бренды
@@ -234,7 +244,10 @@ availableBrands.value
 ### Проверка в DevTools
 
 ```html
-<meta name="description" content="Купить конструкторы (LEGO, CADA, Sluban) в интернет-магазине «Ухтышка». 💰 Цены от 1 990 ₸. Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!">
+<meta
+  name="description"
+  content="Купить конструкторы (LEGO, CADA, Sluban) в интернет-магазине «Ухтышка». 💰 Цены от 1 990 ₸. Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!"
+/>
 ```
 
 ## 📚 Связанные документы
@@ -246,6 +259,7 @@ availableBrands.value
 ## ✅ Итог
 
 Теперь каждая категория автоматически получает оптимизированный meta description с упоминанием топ-брендов, что:
+
 - Улучшает SEO-позиции
 - Увеличивает CTR в поиске
 - Привлекает целевой трафик

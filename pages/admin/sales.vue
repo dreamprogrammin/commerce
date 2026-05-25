@@ -101,14 +101,14 @@ function fmtDate(dateStr: string): string {
 }
 
 function fmtReceiptDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ru-RU', {
+  return `${new Date(dateStr).toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }) + ' ' + new Date(dateStr).toLocaleTimeString('ru-RU', {
+  })} ${new Date(dateStr).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
-  })
+  })}`
 }
 
 function shortId(id: string): string {
@@ -126,8 +126,9 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Отменён',
 }
 
-const statusVariant = (status: string) => {
-  if (status === 'cancelled') return 'destructive' as const
+function statusVariant(status: string) {
+  if (status === 'cancelled')
+    return 'destructive' as const
   return 'outline' as const
 }
 
@@ -447,7 +448,7 @@ const sourceLabels: Record<string, string> = {
             <div class="mt-2 space-y-2">
               <div v-for="(item, i) in receiptData.items" :key="i">
                 <p class="break-words">
-                  {{ item.product_name.length > 28 ? item.product_name.substring(0, 28) + '..' : item.product_name }}
+                  {{ item.product_name.length > 28 ? `${item.product_name.substring(0, 28)}..` : item.product_name }}
                 </p>
                 <div class="flex justify-between">
                   <span class="text-muted-foreground pl-2">{{ item.quantity }} x {{ fmt(item.price_per_item) }}</span>
@@ -510,7 +511,9 @@ const sourceLabels: Record<string, string> = {
             </p>
             <div class="text-center mt-2 space-y-1">
               <p>Спасибо за покупку!</p>
-              <p class="text-muted-foreground">uhti.kz</p>
+              <p class="text-muted-foreground">
+                uhti.kz
+              </p>
             </div>
             <p class="text-sm font-bold mt-2">
               ═══════════════════════════
@@ -557,7 +560,7 @@ const sourceLabels: Record<string, string> = {
   }
 
   /* Убираем тени и обводки диалога */
-  [role="dialog"] {
+  [role='dialog'] {
     box-shadow: none !important;
     border: none !important;
   }

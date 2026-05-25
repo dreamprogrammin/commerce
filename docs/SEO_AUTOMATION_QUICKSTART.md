@@ -26,6 +26,7 @@ supabase db push
 ## ✅ Результат
 
 Теперь все страницы вида `/catalog/{category}?brand={brand}` имеют:
+
 - ✅ Уникальный SEO-текст
 - ✅ 4 FAQ с ключевыми запросами
 - ✅ Открыты для индексации Google
@@ -34,11 +35,13 @@ supabase db push
 ## 🎯 Проверка
 
 Откройте любую страницу, например:
+
 ```
 http://localhost:3000/catalog/constructors-root/konstruktory-malchikam?brand=cada
 ```
 
 Должны увидеть:
+
 - H1: "Конструкторы CADA — купить в Алматы"
 - SEO-текст внизу страницы
 - FAQ с вопросами про CADA
@@ -46,6 +49,7 @@ http://localhost:3000/catalog/constructors-root/konstruktory-malchikam?brand=cad
 ## 📊 Мониторинг
 
 Через 2-4 недели проверьте:
+
 1. Google Search Console → индексация страниц с `?brand=`
 2. ChatGPT → спросите "где купить {ваш_бренд} в Алматы"
 

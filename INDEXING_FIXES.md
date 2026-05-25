@@ -1,7 +1,7 @@
 # Google Search Console Indexing Issues - Analysis & Fixes
 
-**Date**: 2026-04-06  
-**Affected URLs**: 5 pages total  
+**Date**: 2026-04-06
+**Affected URLs**: 5 pages total
 **Status**: Multiple issues (crawled but not indexed, redirects)
 
 ---
@@ -288,7 +288,7 @@ curl "https://search.google.com/test/rich-results?url=https://uhti.kz/catalog/pr
 
 ```typescript
 // In product page
-const recentlyViewed = useRecentlyViewedProducts();
+const recentlyViewed = useRecentlyViewedProducts()
 ```
 
 ### Priority 4: Monitor Crawl Stats
@@ -340,19 +340,18 @@ After deploying fixes:
 
 ### Current Product Page Configuration
 
-**SSR**: Enabled ✅  
-**Route Rule**: `swr: 3600` (updated)  
-**Cache-Control**: `public, max-age=3600, stale-while-revalidate=86400` (updated)  
-**Robots**: `index, follow` ✅  
-**Sitemap**: Included ✅  
+**SSR**: Enabled ✅
+**Route Rule**: `swr: 3600` (updated)
+**Cache-Control**: `public, max-age=3600, stale-while-revalidate=86400` (updated)
+**Robots**: `index, follow` ✅
+**Sitemap**: Included ✅
 **Canonical**: `https://uhti.kz/catalog/products/{slug}` ✅
 
 ### Meta Tags (Example Product)
 
 ```html
 <title>
-  Кукла-русалка Mermaze Mermaidz - модная русалка с хвостом, меняющим цвет, 28
-  см - Купить в интернет-магазине | Ухтышка
+  Кукла-русалка Mermaze Mermaidz - модная русалка с хвостом, меняющим цвет, 28 см - Купить в интернет-магазине | Ухтышка
 </title>
 <meta
   name="description"

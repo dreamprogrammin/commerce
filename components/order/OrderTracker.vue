@@ -38,7 +38,7 @@ onMounted(() => {
       },
       (payload) => {
         orderStatus.value = payload.new.status
-      }
+      },
     )
     .subscribe()
 
@@ -50,8 +50,10 @@ onMounted(() => {
 
 <template>
   <div class="bg-background border rounded-lg p-4 md:p-6">
-    <h3 class="text-base md:text-lg font-semibold mb-4 md:mb-6">Статус заказа</h3>
-    
+    <h3 class="text-base md:text-lg font-semibold mb-4 md:mb-6">
+      Статус заказа
+    </h3>
+
     <div class="space-y-4">
       <div v-for="(step, index) in steps" :key="step.id" class="flex gap-4">
         <!-- Icon & Line -->

@@ -1,71 +1,71 @@
 <script setup lang="ts">
-import { useCartStore } from "@/stores/publicStore/cartStore";
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { BUCKET_NAME_PRODUCT } from "@/constants";
-import { formatPrice } from "@/utils/formatPrice";
-import type { ProductWithImages } from "@/types";
+import type { ProductWithImages } from '@/types'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+import { formatPrice } from '@/utils/formatPrice'
 
-const cartStore = useCartStore();
-const router = useRouter();
-const supabase = useSupabaseClient();
-const { getVariantUrl } = useSupabaseStorage();
+const cartStore = useCartStore()
+const router = useRouter()
+const supabase = useSupabaseClient()
+const { getVariantUrl } = useSupabaseStorage()
 
 // 🔥 Константа порога бесплатной доставки
-const FREE_SHIPPING_THRESHOLD = 15000;
+const FREE_SHIPPING_THRESHOLD = 15000
 
 // Прогресс бесплатной доставки
 const shippingProgress = computed(() => {
-  const progress = (cartStore.subtotal / FREE_SHIPPING_THRESHOLD) * 100;
-  return Math.min(progress, 100);
-});
+  const progress = (cartStore.subtotal / FREE_SHIPPING_THRESHOLD) * 100
+  return Math.min(progress, 100)
+})
 
 const remainingForFreeShipping = computed(() => {
-  const remaining = FREE_SHIPPING_THRESHOLD - cartStore.subtotal;
-  return remaining > 0 ? remaining : 0;
-});
+  const remaining = FREE_SHIPPING_THRESHOLD - cartStore.subtotal
+  return remaining > 0 ? remaining : 0
+})
 
 const hasFreeShipping = computed(
   () => cartStore.subtotal >= FREE_SHIPPING_THRESHOLD,
-);
+)
 
 // 🔥 Cross-sell: Рекомендованные аксессуары
-const suggestedAccessories = ref<ProductWithImages[]>([]);
-const isLoadingAccessories = ref(false);
+const suggestedAccessories = ref<ProductWithImages[]>([])
+const isLoadingAccessories = ref(false)
 
 // Загрузка рекомендованных аксессуаров
 async function loadSuggestedAccessories() {
   if (cartStore.items.length === 0) {
-    suggestedAccessories.value = [];
-    return;
+    suggestedAccessories.value = []
+    return
   }
 
-  isLoadingAccessories.value = true;
+  isLoadingAccessories.value = true
   try {
     // Собираем все accessory_ids из товаров в корзине
-    const allAccessoryIds = new Set<string>();
+    const allAccessoryIds = new Set<string>()
     const cartProductIds = new Set(
-      cartStore.items.map((item) => item.product.id),
-    );
+      cartStore.items.map(item => item.product.id),
+    )
 
     for (const item of cartStore.items) {
       if (item.product.accessory_ids?.length) {
         item.product.accessory_ids.forEach((id) => {
           // Добавляем только если этого товара еще нет в корзине
           if (!cartProductIds.has(id)) {
-            allAccessoryIds.add(id);
+            allAccessoryIds.add(id)
           }
-        });
+        })
       }
     }
 
     if (allAccessoryIds.size === 0) {
-      suggestedAccessories.value = [];
-      return;
+      suggestedAccessories.value = []
+      return
     }
 
     // Загружаем аксессуары (максимум 3)
     const { data, error } = await supabase
-      .from("products")
+      .from('products')
       .select(
         `
         *,
@@ -78,20 +78,22 @@ async function loadSuggestedAccessories() {
         )
       `,
       )
-      .in("id", Array.from(allAccessoryIds).slice(0, 3))
-      .eq("is_active", true)
-      .order("display_order", {
-        foreignTable: "product_images",
+      .in('id', Array.from(allAccessoryIds).slice(0, 3))
+      .eq('is_active', true)
+      .order('display_order', {
+        foreignTable: 'product_images',
         ascending: true,
-      });
+      })
 
     if (!error && data) {
-      suggestedAccessories.value = data as ProductWithImages[];
+      suggestedAccessories.value = data as ProductWithImages[]
     }
-  } catch (e) {
-    console.error("Error loading suggested accessories:", e);
-  } finally {
-    isLoadingAccessories.value = false;
+  }
+  catch (e) {
+    console.error('Error loading suggested accessories:', e)
+  }
+  finally {
+    isLoadingAccessories.value = false
   }
 }
 
@@ -99,32 +101,33 @@ async function loadSuggestedAccessories() {
 watch(() => cartStore.items, loadSuggestedAccessories, {
   deep: true,
   immediate: true,
-});
+})
 
 // Закрыть корзину
 function closeCart() {
-  cartStore.isCartOpen = false;
+  cartStore.isCartOpen = false
 }
 
 // Перейти к оформлению
 function goToCheckout() {
-  closeCart();
-  router.push("/checkout");
+  closeCart()
+  router.push('/checkout')
 }
 
 // Получить URL изображения товара
 function getProductImageUrl(product: any) {
-  if (!product.product_images?.[0]?.image_url) return null;
+  if (!product.product_images?.[0]?.image_url)
+    return null
   return getVariantUrl(
     BUCKET_NAME_PRODUCT,
     product.product_images[0].image_url,
-    "sm",
-  );
+    'sm',
+  )
 }
 
 // Добавить аксессуар в корзину
 async function addAccessoryToCart(accessory: ProductWithImages) {
-  await cartStore.addItem(accessory.id, 1);
+  await cartStore.addItem(accessory.id, 1)
 }
 </script>
 
@@ -181,11 +184,15 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
             name="lucide:shopping-cart"
             class="w-16 h-16 text-muted-foreground/50 mb-4"
           />
-          <h3 class="text-lg font-semibold mb-2">Корзина пуста</h3>
+          <h3 class="text-lg font-semibold mb-2">
+            Корзина пуста
+          </h3>
           <p class="text-sm text-muted-foreground mb-4">
             Добавьте товары, чтобы начать покупки
           </p>
-          <Button @click="closeCart"> Продолжить покупки </Button>
+          <Button @click="closeCart">
+            Продолжить покупки
+          </Button>
         </div>
 
         <div v-else class="space-y-4 py-4">
@@ -319,7 +326,9 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
 
               <!-- Информация -->
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium line-clamp-1">{{ acc.name }}</p>
+                <p class="text-sm font-medium line-clamp-1">
+                  {{ acc.name }}
+                </p>
                 <p class="text-xs text-muted-foreground">
                   {{ formatPrice(acc.price) }} ₸
                 </p>
@@ -344,33 +353,25 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
           class="flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-600 rounded-lg text-sm"
         >
           <Icon name="lucide:gift" class="w-4 h-4" />
-          <span
-            >За этот заказ вы получите
-            <strong>+{{ cartStore.bonusesToAward }} бонусов</strong> 🎁</span
-          >
+          <span>За этот заказ вы получите
+            <strong>+{{ cartStore.bonusesToAward }} бонусов</strong> 🎁</span>
         </div>
 
         <!-- Итого -->
         <div class="space-y-2">
           <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground"
-              >Товары ({{ cartStore.totalItems }})</span
-            >
+            <span class="text-muted-foreground">Товары ({{ cartStore.totalItems }})</span>
             <span>{{ formatPrice(cartStore.subtotal) }} ₸</span>
           </div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-muted-foreground">Доставка</span>
-            <span v-if="hasFreeShipping" class="text-green-600 font-medium"
-              >Бесплатно</span
-            >
+            <span v-if="hasFreeShipping" class="text-green-600 font-medium">Бесплатно</span>
             <span v-else>Рассчитается при оформлении</span>
           </div>
           <Separator />
           <div class="flex items-center justify-between text-lg font-bold">
             <span>Итого</span>
-            <span class="text-primary"
-              >{{ formatPrice(cartStore.total) }} ₸</span
-            >
+            <span class="text-primary">{{ formatPrice(cartStore.total) }} ₸</span>
           </div>
         </div>
 

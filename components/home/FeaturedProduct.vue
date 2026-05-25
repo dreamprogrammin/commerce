@@ -1,61 +1,63 @@
 <script setup lang="ts">
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { BUCKET_NAME_PRODUCT } from "@/constants";
-import { useProductsStore } from "@/stores/publicStore/productsStore";
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useProductsStore } from '@/stores/publicStore/productsStore'
 
-const productStore = useProductsStore();
-const { getVariantUrl } = useSupabaseStorage();
+const productStore = useProductsStore()
+const { getVariantUrl } = useSupabaseStorage()
 
 const { data: products, pending: isLoading } = useAsyncData(
-  "featured-products",
+  'featured-products',
   () => productStore.fetchFeaturedProducts(),
   {
     lazy: true,
     // ✅ Используем getCachedData для использования кеша
     getCachedData(key) {
-      const data = useNuxtData(key);
-      return data.data.value;
+      const data = useNuxtData(key)
+      return data.data.value
     },
   },
-);
+)
 
 // ✅ Показываем skeleton только если идёт загрузка И данных нет
-const showSkeleton = computed(() => isLoading.value && !products.value);
+const showSkeleton = computed(() => isLoading.value && !products.value)
 
-const currentSlide = ref(0);
-const emblaApi = ref<any>(null);
+const currentSlide = ref(0)
+const emblaApi = ref<any>(null)
 
 function onCarouselInit(api: any) {
-  emblaApi.value = api;
+  emblaApi.value = api
   if (api) {
-    currentSlide.value = api.selectedScrollSnap();
-    api.on("select", () => {
-      currentSlide.value = api.selectedScrollSnap();
-    });
+    currentSlide.value = api.selectedScrollSnap()
+    api.on('select', () => {
+      currentSlide.value = api.selectedScrollSnap()
+    })
   }
 }
 
 const productsList = computed(() => {
-  if (!products.value) return [];
-  return Array.isArray(products.value) ? products.value : [products.value];
-});
+  if (!products.value)
+    return []
+  return Array.isArray(products.value) ? products.value : [products.value]
+})
 
 function getMainImage(product: any) {
-  return product?.product_images?.[0] ?? null;
+  return product?.product_images?.[0] ?? null
 }
 
-function getMainImageVariant(product: any, variant: "sm" | "md" | "lg") {
-  const img = getMainImage(product);
-  if (!img?.image_url) return null;
-  return getVariantUrl(BUCKET_NAME_PRODUCT, img.image_url, variant);
+function getMainImageVariant(product: any, variant: 'sm' | 'md' | 'lg') {
+  const img = getMainImage(product)
+  if (!img?.image_url)
+    return null
+  return getVariantUrl(BUCKET_NAME_PRODUCT, img.image_url, variant)
 }
 
 function formatPrice(price: number) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: "KZT",
+  return new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency: 'KZT',
     minimumFractionDigits: 0,
-  }).format(price);
+  }).format(price)
 }
 </script>
 
@@ -125,9 +127,7 @@ function formatPrice(price: number) {
                     name="lucide:timer"
                     class="w-3 h-3 text-red-600 dark:text-red-400"
                   />
-                  <span class="text-xs font-bold text-red-600 dark:text-red-400"
-                    >23:59</span
-                  >
+                  <span class="text-xs font-bold text-red-600 dark:text-red-400">23:59</span>
                 </div>
               </div>
 

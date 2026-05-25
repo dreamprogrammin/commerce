@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { AccessoryProduct } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { formatPrice } from '@/utils/formatPrice'
 
@@ -30,7 +29,8 @@ function isSelected(id: string) {
 }
 
 function cleanDescription(html: string | null): string {
-  if (!html) return ''
+  if (!html)
+    return ''
   return html
     .replace(/<[^>]*>/g, '')
     .replace(/\s+/g, ' ')

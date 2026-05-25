@@ -13,15 +13,16 @@
  * ВАЖНО: Должна совпадать с SQL формулой в products.final_price
  */
 export function roundToMarketingPrice(price: number): number {
-  if (price <= 0) return 0;
+  if (price <= 0)
+    return 0
 
   // Для товаров дешевле 500 ₸: округляем до 10 (без -10)
   if (price < 500) {
-    return Math.floor(price / 10) * 10;
+    return Math.floor(price / 10) * 10
   }
 
   // Для товаров от 500 ₸: округляем до сотен и вычитаем 10
-  return Math.floor(price / 100) * 100 - 10;
+  return Math.floor(price / 100) * 100 - 10
 }
 
 /**
@@ -34,17 +35,18 @@ export function calculateBonusPoints(
   discountPercentage: number,
   bonusPercent: number,
 ): number {
-  if (price <= 0 || bonusPercent <= 0) return 0;
-  const discount = discountPercentage > 0 ? discountPercentage : 0;
+  if (price <= 0 || bonusPercent <= 0)
+    return 0
+  const discount = discountPercentage > 0 ? discountPercentage : 0
 
   // Сначала применяем скидку
-  const priceWithDiscount = (price * (100 - discount)) / 100;
+  const priceWithDiscount = (price * (100 - discount)) / 100
 
   // Затем применяем психологическое округление
-  const finalPrice = roundToMarketingPrice(priceWithDiscount);
+  const finalPrice = roundToMarketingPrice(priceWithDiscount)
 
   // Рассчитываем бонусы от округленной цены
-  return Math.round((finalPrice * bonusPercent) / 100);
+  return Math.round((finalPrice * bonusPercent) / 100)
 }
 
 /**
@@ -54,8 +56,9 @@ export function calculateFinalPrice(
   price: number,
   discountPercentage: number,
 ): number {
-  if (price <= 0) return 0;
-  const discount = discountPercentage > 0 ? discountPercentage : 0;
-  const priceWithDiscount = (price * (100 - discount)) / 100;
-  return roundToMarketingPrice(priceWithDiscount);
+  if (price <= 0)
+    return 0
+  const discount = discountPercentage > 0 ? discountPercentage : 0
+  const priceWithDiscount = (price * (100 - discount)) / 100
+  return roundToMarketingPrice(priceWithDiscount)
 }

@@ -89,7 +89,7 @@ FROM public.products p
 ```typescript
 const finalPrice = props.product.final_price
   ? Number(props.product.final_price)
-  : Math.round(originalPrice * (1 - discountPercent / 100)); // ❌ Расчет на фронте
+  : Math.round(originalPrice * (1 - discountPercent / 100)) // ❌ Расчет на фронте
 ```
 
 **Стало (правильно):**
@@ -97,7 +97,7 @@ const finalPrice = props.product.final_price
 ```typescript
 const finalPrice = props.product.final_price
   ? Number(props.product.final_price)
-  : originalPrice; // ✅ Просто берем из базы
+  : originalPrice // ✅ Просто берем из базы
 ```
 
 ### 2. Добавление `final_price` в RPC функцию
@@ -273,6 +273,6 @@ WHERE discount_percentage > 0;
 
 ---
 
-**Дата аудита:** 2026-04-03  
-**Статус:** ✅ Исправлено  
+**Дата аудита:** 2026-04-03
+**Статус:** ✅ Исправлено
 **Автор:** Uhti Commerce Team

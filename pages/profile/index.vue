@@ -1,14 +1,14 @@
 <script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query'
 import { ArrowDownCircle, ArrowRight, ArrowUpCircle, Cake, Clock, Gift, Heart, MessageSquare, Package, ShoppingBag, Star, Timer, User } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { useQuery } from '@tanstack/vue-query'
+import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
-import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 
 // --- Stores ---
 const authStore = useAuthStore()

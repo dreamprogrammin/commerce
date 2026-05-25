@@ -1,23 +1,25 @@
 <script setup lang="ts">
 // BreadcrumbList JSON-LD
-useBreadcrumbSchema([{ name: "Условия использования" }]);
+useBreadcrumbSchema([{ name: 'Условия использования' }])
 
 useHead({
-  title: "Условия использования — uhti.kz",
+  title: 'Условия использования — uhti.kz',
   meta: [
     {
-      name: "description",
+      name: 'description',
       content:
-        "Условия использования интернет-магазина uhti.kz. Правила покупки, доставки и возврата товаров.",
+        'Условия использования интернет-магазина uhti.kz. Правила покупки, доставки и возврата товаров.',
     },
-    { name: "robots", content: "index, follow" },
+    { name: 'robots', content: 'index, follow' },
   ],
-});
+})
 </script>
 
 <template>
   <div class="mx-auto max-w-3xl px-4 py-10">
-    <h1 class="mb-8 text-3xl font-bold">Условия использования</h1>
+    <h1 class="mb-8 text-3xl font-bold">
+      Условия использования
+    </h1>
     <p class="mb-6 text-sm text-muted-foreground">
       Дата последнего обновления: 6 апреля 2026 г.
     </p>
@@ -25,7 +27,9 @@ useHead({
     <div class="prose prose-sm max-w-none space-y-6 text-foreground">
       <!-- 1. Общие положения -->
       <section>
-        <h2 class="text-xl font-semibold">1. Общие положения</h2>
+        <h2 class="text-xl font-semibold">
+          1. Общие положения
+        </h2>
         <p>
           Настоящие Условия использования (далее — «Условия») регулируют
           отношения между интернет-магазином
@@ -44,7 +48,9 @@ useHead({
 
       <!-- 2. Регистрация и учетная запись -->
       <section>
-        <h2 class="text-xl font-semibold">2. Регистрация и учетная запись</h2>
+        <h2 class="text-xl font-semibold">
+          2. Регистрация и учетная запись
+        </h2>
         <p>Для оформления заказа Пользователь может:</p>
         <ul class="list-disc space-y-1 pl-6">
           <li>Зарегистрироваться через Google OAuth</li>
@@ -62,7 +68,9 @@ useHead({
 
       <!-- 3. Оформление заказа -->
       <section>
-        <h2 class="text-xl font-semibold">3. Оформление заказа</h2>
+        <h2 class="text-xl font-semibold">
+          3. Оформление заказа
+        </h2>
         <p>
           Оформляя заказ, Пользователь подтверждает своё намерение приобрести
           выбранные товары на условиях, указанных на Сайте.
@@ -81,7 +89,9 @@ useHead({
 
       <!-- 4. Цены и оплата -->
       <section>
-        <h2 class="text-xl font-semibold">4. Цены и оплата</h2>
+        <h2 class="text-xl font-semibold">
+          4. Цены и оплата
+        </h2>
         <p>
           Все цены на Сайте указаны в казахстанских тенге (₸) и включают НДС
           (при наличии).
@@ -100,7 +110,9 @@ useHead({
 
       <!-- 5. Доставка -->
       <section>
-        <h2 class="text-xl font-semibold">5. Доставка</h2>
+        <h2 class="text-xl font-semibold">
+          5. Доставка
+        </h2>
         <p>
           Магазин осуществляет доставку по городу Алматы и другим регионам
           Казахстана.
@@ -122,7 +134,9 @@ useHead({
 
       <!-- 6. Возврат и обмен -->
       <section>
-        <h2 class="text-xl font-semibold">6. Возврат и обмен</h2>
+        <h2 class="text-xl font-semibold">
+          6. Возврат и обмен
+        </h2>
         <p>
           Пользователь имеет право вернуть или обменять товар надлежащего
           качества в течение 14 дней с момента получения.
@@ -136,14 +150,16 @@ useHead({
         <p>
           Подробнее о возврате и обмене читайте на странице
           <NuxtLink to="/returns" class="text-primary hover:underline">
-            Возврат и обмен </NuxtLink
-          >.
+            Возврат и обмен
+          </NuxtLink>.
         </p>
       </section>
 
       <!-- 7. Бонусная программа -->
       <section>
-        <h2 class="text-xl font-semibold">7. Бонусная программа</h2>
+        <h2 class="text-xl font-semibold">
+          7. Бонусная программа
+        </h2>
         <p>
           Магазин предоставляет зарегистрированным Пользователям возможность
           участвовать в бонусной программе.
@@ -162,7 +178,9 @@ useHead({
 
       <!-- 8. Интеллектуальная собственность -->
       <section>
-        <h2 class="text-xl font-semibold">8. Интеллектуальная собственность</h2>
+        <h2 class="text-xl font-semibold">
+          8. Интеллектуальная собственность
+        </h2>
         <p>
           Все материалы Сайта (тексты, изображения, логотипы, дизайн) являются
           интеллектуальной собственностью Магазина или используются на законных
@@ -176,7 +194,9 @@ useHead({
 
       <!-- 9. Ограничение ответственности -->
       <section>
-        <h2 class="text-xl font-semibold">9. Ограничение ответственности</h2>
+        <h2 class="text-xl font-semibold">
+          9. Ограничение ответственности
+        </h2>
         <p>Магазин не несёт ответственности за:</p>
         <ul class="list-disc space-y-1 pl-6">
           <li>Временную недоступность Сайта по техническим причинам</li>
@@ -191,19 +211,23 @@ useHead({
 
       <!-- 10. Персональные данные -->
       <section>
-        <h2 class="text-xl font-semibold">10. Персональные данные</h2>
+        <h2 class="text-xl font-semibold">
+          10. Персональные данные
+        </h2>
         <p>
           Обработка персональных данных Пользователей осуществляется в
           соответствии с
           <NuxtLink to="/privacy-policy" class="text-primary hover:underline">
-            Политикой конфиденциальности </NuxtLink
-          >.
+            Политикой конфиденциальности
+          </NuxtLink>.
         </p>
       </section>
 
       <!-- 11. Контактная информация -->
       <section>
-        <h2 class="text-xl font-semibold">11. Контактная информация</h2>
+        <h2 class="text-xl font-semibold">
+          11. Контактная информация
+        </h2>
         <p>
           По всем вопросам, связанным с использованием Сайта, Пользователь может
           обратиться:
@@ -217,7 +241,9 @@ useHead({
 
       <!-- 12. Заключительные положения -->
       <section>
-        <h2 class="text-xl font-semibold">12. Заключительные положения</h2>
+        <h2 class="text-xl font-semibold">
+          12. Заключительные положения
+        </h2>
         <p>
           Настоящие Условия составлены в соответствии с законодательством
           Республики Казахстан.

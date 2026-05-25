@@ -49,15 +49,15 @@ export const IMAGE_OPTIMIZATION_ENABLED = false // ⚠️ Оптимизация
 
 #### Методы
 
-| Метод                 | Описание                                        | Использование                  |
-| --------------------- | ----------------------------------------------- | ------------------------------ |
-| `getPublicUrl()`      | Возвращает оригинальный URL                     | Когда нужен оригинал           |
-| `getOptimizedUrl()`   | Всегда оптимизирует (игнорирует флаг)           | Принудительная оптимизация     |
-| `getImageUrl()`       | Умная функция с учетом флага                    | Legacy — старые изображения    |
-| `getVariantUrl()`     | **Рекомендуется!** URL варианта (sm/md/lg)      | Товары, бренды, категории      |
-| `getVariantUrlWide()` | URL широкого варианта (sm/md/lg)                | Баннеры, слайды                |
-| `uploadFile()`        | Загрузка файла в бакет                          | Админ-панель, формы            |
-| `removeFile()`        | Удаление файла из бакета                        | Удаление изображений           |
+| Метод                 | Описание                                   | Использование               |
+| --------------------- | ------------------------------------------ | --------------------------- |
+| `getPublicUrl()`      | Возвращает оригинальный URL                | Когда нужен оригинал        |
+| `getOptimizedUrl()`   | Всегда оптимизирует (игнорирует флаг)      | Принудительная оптимизация  |
+| `getImageUrl()`       | Умная функция с учетом флага               | Legacy — старые изображения |
+| `getVariantUrl()`     | **Рекомендуется!** URL варианта (sm/md/lg) | Товары, бренды, категории   |
+| `getVariantUrlWide()` | URL широкого варианта (sm/md/lg)           | Баннеры, слайды             |
+| `uploadFile()`        | Загрузка файла в бакет                     | Админ-панель, формы         |
+| `removeFile()`        | Удаление файла из бакета                   | Удаление изображений        |
 
 ---
 
@@ -753,22 +753,24 @@ export default defineNuxtPlugin(() => {
 
 При загрузке товара генерируются **3 варианта** каждого изображения:
 
-| Вариант | Размер | Качество | maxSizeMB | Суффикс | Использование |
-|---------|--------|----------|-----------|---------|---------------|
-| `sm` | 400px | 75% | 0.05 (50KB) | `_sm` | Карточки на мобильных |
-| `md` | 800px | 80% | 0.15 (150KB) | `_md` | Карточки на десктопе, галерея |
-| `lg` | 1440px | 90% | 0.8 (800KB) | `_lg` | Lightbox, зум |
+| Вариант | Размер | Качество | maxSizeMB    | Суффикс | Использование                 |
+| ------- | ------ | -------- | ------------ | ------- | ----------------------------- |
+| `sm`    | 400px  | 75%      | 0.05 (50KB)  | `_sm`   | Карточки на мобильных         |
+| `md`    | 800px  | 80%      | 0.15 (150KB) | `_md`   | Карточки на десктопе, галерея |
+| `lg`    | 1440px | 90%      | 0.8 (800KB)  | `_lg`   | Lightbox, зум                 |
 
 Браузер автоматически выбирает оптимальный размер через HTML `srcset`.
 
 ### Хранение в БД
 
 **Новые изображения:** `product_images.image_url` хранит **базовый путь без расширения**:
+
 ```
 products/abc-123/uhti-product-name-def456
 ```
 
 В Supabase Storage лежат 3 файла:
+
 ```
 products/abc-123/uhti-product-name-def456_sm.webp  (~20-50KB)
 products/abc-123/uhti-product-name-def456_md.webp  (~100-150KB)
@@ -787,7 +789,7 @@ export const IMAGE_VARIANTS = {
   lg: { maxWidthOrHeight: 1440, quality: 0.90, suffix: '_lg' },
 } as const
 
-export type ImageVariant = keyof typeof IMAGE_VARIANTS  // 'sm' | 'md' | 'lg'
+export type ImageVariant = keyof typeof IMAGE_VARIANTS // 'sm' | 'md' | 'lg'
 ```
 
 ### API
@@ -846,31 +848,33 @@ const result = await generateImageVariants(file)
 
 #### Пропсы ProgressiveImage
 
-| Проп | Тип | По умолчанию | Описание |
-|------|-----|--------------|----------|
-| `src` | `string\|null` | — | Основной URL изображения |
-| `alt` | `string` | — | **Обязателен.** Осмысленный текст (не "Миниатюра") |
-| `srcSm` / `srcMd` / `srcLg` | `string\|null` | — | Варианты для srcset |
-| `sizes` | `string` | — | HTML `sizes` атрибут |
-| `width` | `number` | — | Фиксированная ширина — предотвращает CLS |
-| `height` | `number` | — | Фиксированная высота — предотвращает CLS |
-| `fetchpriority` | `'high'\|'low'\|'auto'` | `'auto'` | Приоритет загрузки (LCP-оптимизация) |
-| `zoomOnHover` | `boolean` | `false` | Эффект увеличения при наведении (`hover:scale-105`) |
-| `eager` | `boolean` | `false` | Загружать немедленно (без IntersectionObserver) |
-| `blurDataUrl` | `string\|null` | — | LQIP base64 данные |
-| `aspectRatio` | `'square'\|'video'\|..` | `'square'` | Пропорции контейнера |
-| `objectFit` | `'cover'\|'contain'\|'fill'` | `'cover'` | CSS object-fit |
-| `placeholderType` | `'lqip'\|'shimmer'\|...` | `'lqip'` | Тип плейсхолдера |
+| Проп                        | Тип                          | По умолчанию | Описание                                            |
+| --------------------------- | ---------------------------- | ------------ | --------------------------------------------------- |
+| `src`                       | `string\|null`               | —            | Основной URL изображения                            |
+| `alt`                       | `string`                     | —            | **Обязателен.** Осмысленный текст (не "Миниатюра")  |
+| `srcSm` / `srcMd` / `srcLg` | `string\|null`               | —            | Варианты для srcset                                 |
+| `sizes`                     | `string`                     | —            | HTML `sizes` атрибут                                |
+| `width`                     | `number`                     | —            | Фиксированная ширина — предотвращает CLS            |
+| `height`                    | `number`                     | —            | Фиксированная высота — предотвращает CLS            |
+| `fetchpriority`             | `'high'\|'low'\|'auto'`      | `'auto'`     | Приоритет загрузки (LCP-оптимизация)                |
+| `zoomOnHover`               | `boolean`                    | `false`      | Эффект увеличения при наведении (`hover:scale-105`) |
+| `eager`                     | `boolean`                    | `false`      | Загружать немедленно (без IntersectionObserver)     |
+| `blurDataUrl`               | `string\|null`               | —            | LQIP base64 данные                                  |
+| `aspectRatio`               | `'square'\|'video'\|..`      | `'square'`   | Пропорции контейнера                                |
+| `objectFit`                 | `'cover'\|'contain'\|'fill'` | `'cover'`    | CSS object-fit                                      |
+| `placeholderType`           | `'lqip'\|'shimmer'\|...`     | `'lqip'`     | Тип плейсхолдера                                    |
 
 #### Правила для alt атрибута
 
 ```vue
 <!-- ❌ НЕ используйте заглушки -->
 <ProgressiveImage alt="Миниатюра товара" />
+
 <ProgressiveImage alt="Изображение" />
 
 <!-- ✅ Используйте осмысленный текст -->
 <ProgressiveImage :alt="`${product.name} - фото ${index + 1}`" />
+
 <ProgressiveImage :alt="image.alt_text || `Изображение товара ${index + 1}`" />
 ```
 
@@ -888,11 +892,11 @@ const result = await generateImageVariants(file)
 
 #### ProductGallery (контекстные варианты)
 
-| Контекст | Вариант | Почему |
-|----------|---------|--------|
-| Миниатюры (120px) | `sm` (400px) | Достаточно для мелких превью |
-| Основное изображение | `md` (800px) | Оптимально для ~600px контейнера |
-| Lightbox (fullscreen) | `lg` (1440px) | HD-качество для зума |
+| Контекст              | Вариант       | Почему                           |
+| --------------------- | ------------- | -------------------------------- |
+| Миниатюры (120px)     | `sm` (400px)  | Достаточно для мелких превью     |
+| Основное изображение  | `md` (800px)  | Оптимально для ~600px контейнера |
+| Lightbox (fullscreen) | `lg` (1440px) | HD-качество для зума             |
 
 ### Обратная совместимость
 
@@ -922,10 +926,10 @@ const result = await generateImageVariants(file)
 
 Каждый слайд на главной странице имеет **два изображения**:
 
-| Поле | Пропорции | Назначение |
-|------|-----------|------------|
-| `image_url` | 21:9 | Десктопная версия (широкий баннер) |
-| `image_url_mobile` | 3:2 | Мобильная версия (компактная) |
+| Поле               | Пропорции | Назначение                         |
+| ------------------ | --------- | ---------------------------------- |
+| `image_url`        | 21:9      | Десктопная версия (широкий баннер) |
+| `image_url_mobile` | 3:2       | Мобильная версия (компактная)      |
 
 Оба изображения генерируются в 3 широких варианта через `IMAGE_VARIANTS_WIDE` (640/1280/1920px).
 
@@ -958,6 +962,7 @@ const result = await generateImageVariants(file)
 ### Именование файлов (ID-based)
 
 Файлы слайдов именуются по UUID записи (не по заголовку):
+
 - Desktop: `slide-{slideId}` → `slide-{slideId}_sm.webp`, `_md.webp`, `_lg.webp`
 - Mobile: `slide-mobile-{slideId}` → `slide-mobile-{slideId}_sm.webp`, `_md.webp`, `_lg.webp`
 
@@ -977,12 +982,12 @@ slides-images/
 
 ### Хранение в БД (`slides`)
 
-| Поле | Значение | Описание |
-|------|----------|----------|
-| `image_url` | `slide-a1b2c3d4` | Базовый путь desktop (без суффикса) |
-| `blur_placeholder` | `data:image/webp;base64,...` | LQIP для desktop |
-| `image_url_mobile` | `slide-mobile-a1b2c3d4` | Базовый путь mobile (без суффикса), `null` если не загружено |
-| `blur_placeholder_mobile` | `data:image/webp;base64,...` | LQIP для mobile |
+| Поле                      | Значение                     | Описание                                                     |
+| ------------------------- | ---------------------------- | ------------------------------------------------------------ |
+| `image_url`               | `slide-a1b2c3d4`             | Базовый путь desktop (без суффикса)                          |
+| `blur_placeholder`        | `data:image/webp;base64,...` | LQIP для desktop                                             |
+| `image_url_mobile`        | `slide-mobile-a1b2c3d4`      | Базовый путь mobile (без суффикса), `null` если не загружено |
+| `blur_placeholder_mobile` | `data:image/webp;base64,...` | LQIP для mobile                                              |
 
 ### Art Direction (`AppCarousel.vue`)
 
@@ -1010,12 +1015,12 @@ slides-images/
 
 ### Файлы
 
-| Файл | Роль |
-|------|------|
-| `components/admin/slides/ SlidesForm.vue` | UI формы с двумя input[file] |
-| `composables/admin/useSlideForm.ts` | Логика загрузки, валидации, сохранения |
-| `composables/admin/useAdminSlides.ts` | Список слайдов + удаление с очисткой Storage |
-| `components/common/AppCarousel.vue` | Карусель на главной (desktop/mobile switching) |
+| Файл                                      | Роль                                           |
+| ----------------------------------------- | ---------------------------------------------- |
+| `components/admin/slides/ SlidesForm.vue` | UI формы с двумя input[file]                   |
+| `composables/admin/useSlideForm.ts`       | Логика загрузки, валидации, сохранения         |
+| `composables/admin/useAdminSlides.ts`     | Список слайдов + удаление с очисткой Storage   |
+| `components/common/AppCarousel.vue`       | Карусель на главной (desktop/mobile switching) |
 
 ---
 
@@ -1026,23 +1031,25 @@ slides-images/
 Система адаптивных изображений распространена на **все сущности** проекта.
 
 **Новые конфигурации:**
+
 - `IMAGE_VARIANTS_WIDE` — широкие варианты (640/1280/1920px) для баннеров и слайдов
 - `generateImageVariantsWide()` — генерация широких вариантов
 - `getVariantUrlWide()` — URL-хелпер для широких вариантов
 
 **Stores — загрузка 3 вариантов при создании/обновлении:**
 
-| Store | Бакет | Тип вариантов |
-|-------|-------|---------------|
-| `adminProductsStore` | product-images | Standard (400/800/1440px) |
-| `adminBrandsStore` | brand-logos | Standard |
-| `adminBrandsStore` (hero banner) | banners | Wide (640/1280/1920px) |
-| `adminProductLinesStore` | product-line-logos | Standard |
-| `adminCategoriesStore` | category-images | Standard |
-| `useSlideForm` | slides-images | Wide (640/1280/1920px) |
-| `useBannerForm` | banners | Wide |
+| Store                            | Бакет              | Тип вариантов             |
+| -------------------------------- | ------------------ | ------------------------- |
+| `adminProductsStore`             | product-images     | Standard (400/800/1440px) |
+| `adminBrandsStore`               | brand-logos        | Standard                  |
+| `adminBrandsStore` (hero banner) | banners            | Wide (640/1280/1920px)    |
+| `adminProductLinesStore`         | product-line-logos | Standard                  |
+| `adminCategoriesStore`           | category-images    | Standard                  |
+| `useSlideForm`                   | slides-images      | Wide (640/1280/1920px)    |
+| `useBannerForm`                  | banners            | Wide                      |
 
 **Удаление всех вариантов при удалении сущности:**
+
 - `adminBrandsStore.deleteBrand()` — удаляет 3 файла логотипа
 - `adminBrandsStore.updateBrand()` — удаляет старый hero-баннер (Wide) при замене
 - `adminProductLinesStore.deleteProductLine()` — удаляет 3 файла
@@ -1051,6 +1058,7 @@ slides-images/
 - `useAdminBanners.handleDelete()` — **исправлен баг**: ранее файлы не удалялись из Storage
 
 **Фронтенд — все компоненты используют `getVariantUrl`/`getVariantUrlWide`:**
+
 - Категории: `PopularCategories`, `AppTabBar`, `CategoryDescription`, каталог
 - Бренды: `BrandsCarousel`, `ProductCard` (лого), `/brands`, `/brand/[slug]`
 - Линейки: `CategoryProductLines`, `/brand/[brandSlug]/[lineSlug]`
@@ -1059,6 +1067,7 @@ slides-images/
 - Кастомные страницы брендов: `BrandCustomTemplate.vue` → `getVariantUrlWide('sm'/'md'/'lg')`
 
 **Админ-панель — превью через варианты:**
+
 - `BrandForm`, `ProductLineForm`, `RecursiveMenuItemFormNode` → `getVariantUrl('sm')`
 - `BrandForm` (hero banner preview) → `getVariantUrlWide('sm')`
 - `SlidesForm`, `BannerForm` → `getVariantUrlWide('sm'/'lg')`
@@ -1127,35 +1136,36 @@ slides-images/
 ```
 
 **v4.1.0 (все сущности):** Все сущности используют варианты:
+
 - Бренды, линейки, категории → `generateImageVariants()` (Standard: 400/800/1440px)
 - Слайды, баннеры → `generateImageVariantsWide()` (Wide: 640/1280/1920px)
 
 ### Параметры сжатия (стандартные варианты)
 
 | Вариант | maxSizeMB | maxWidthOrHeight | quality | Типичный размер |
-|---------|-----------|------------------|---------|----------------|
-| `sm` | 0.05 | 400px | 75% | 20-50 KB |
-| `md` | 0.15 | 800px | 80% | 80-150 KB |
-| `lg` | 0.8 | 1440px | 90% | 300-800 KB |
-| LQIP | 0.002 | 20px | — | ~0.5 KB |
+| ------- | --------- | ---------------- | ------- | --------------- |
+| `sm`    | 0.05      | 400px            | 75%     | 20-50 KB        |
+| `md`    | 0.15      | 800px            | 80%     | 80-150 KB       |
+| `lg`    | 0.8       | 1440px           | 90%     | 300-800 KB      |
+| LQIP    | 0.002     | 20px             | —       | ~0.5 KB         |
 
 ### Параметры сжатия (широкие варианты — баннеры/слайды)
 
 | Вариант | maxSizeMB | maxWidthOrHeight | quality | Типичный размер |
-|---------|-----------|------------------|---------|----------------|
-| `sm` | 0.1 | 640px | 75% | 50-100 KB |
-| `md` | 0.3 | 1280px | 80% | 150-300 KB |
-| `lg` | 1.0 | 1920px | 90% | 400-1000 KB |
+| ------- | --------- | ---------------- | ------- | --------------- |
+| `sm`    | 0.1       | 640px            | 75%     | 50-100 KB       |
+| `md`    | 0.3       | 1280px           | 80%     | 150-300 KB      |
+| `lg`    | 1.0       | 1920px           | 90%     | 400-1000 KB     |
 
 ### Параметры сжатия (одиночное, legacy)
 
-| Параметр | Значение | Описание |
-|----------|----------|----------|
-| `maxSizeMB` | 0.8 | Максимум 800KB (HD-качество) |
-| `maxWidthOrHeight` | 1440 | Максимум 1440px по длинной стороне |
-| `initialQuality` | 0.85 | Начальное качество 85% |
-| `fileType` | `image/webp` | Всегда конвертируем в WebP |
-| LQIP `maxWidthOrHeight` | 20 | Blur placeholder 20px |
+| Параметр                | Значение     | Описание                           |
+| ----------------------- | ------------ | ---------------------------------- |
+| `maxSizeMB`             | 0.8          | Максимум 800KB (HD-качество)       |
+| `maxWidthOrHeight`      | 1440         | Максимум 1440px по длинной стороне |
+| `initialQuality`        | 0.85         | Начальное качество 85%             |
+| `fileType`              | `image/webp` | Всегда конвертируем в WebP         |
+| LQIP `maxWidthOrHeight` | 20           | Blur placeholder 20px              |
 
 ### Файлы задействованные в клиентской оптимизации
 

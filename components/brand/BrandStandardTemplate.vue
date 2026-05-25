@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { BrandFilterState } from "@/composables/useBrandPageFilters";
-import type { Brand, IBreadcrumbItem, ProductLine } from "@/types";
+import type { BrandFilterState } from '@/composables/useBrandPageFilters'
+import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
 import type { SEOBlock } from '~/utils/parseSEOContent'
 import {
   ArrowLeft,
@@ -8,32 +8,31 @@ import {
   Package,
   ShieldCheck,
   SlidersHorizontal,
-} from "lucide-vue-next";
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from "@/constants";
-import { formatRating } from "@/utils/formatRating";
+} from 'lucide-vue-next'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 
 const props = defineProps<{
-  brand: Brand;
-  productLines?: ProductLine[];
-  breadcrumbs: IBreadcrumbItem[];
-  filterState: BrandFilterState;
-  brandStats?: { average_rating: number; total_reviews_count: number } | null;
-  seoBlocks?: SEOBlock[];
-}>();
+  brand: Brand
+  productLines?: ProductLine[]
+  breadcrumbs: IBreadcrumbItem[]
+  filterState: BrandFilterState
+  brandStats?: { average_rating: number, total_reviews_count: number } | null
+  seoBlocks?: SEOBlock[]
+}>()
 
-const fs = props.filterState;
-const { getVariantUrl } = useSupabaseStorage();
+const fs = props.filterState
+const { getVariantUrl } = useSupabaseStorage()
 
-const isSeoExpanded = ref(false);
-const seoContentRef = ref<HTMLElement | null>(null);
-const seoContentHeight = ref(0);
+const isSeoExpanded = ref(false)
+const seoContentRef = ref<HTMLElement | null>(null)
+const seoContentHeight = ref(0)
 
 function toggleSeoExpanded() {
   if (!isSeoExpanded.value && seoContentRef.value) {
-    seoContentHeight.value = seoContentRef.value.scrollHeight;
+    seoContentHeight.value = seoContentRef.value.scrollHeight
   }
-  isSeoExpanded.value = !isSeoExpanded.value;
+  isSeoExpanded.value = !isSeoExpanded.value
 }
 </script>
 
@@ -190,7 +189,9 @@ function toggleSeoExpanded() {
 
     <!-- Catalog header + Filter trigger -->
     <div class="flex flex-row justify-between items-center gap-2">
-      <h2 class="text-xl md:text-3xl font-bold">Каталог товаров</h2>
+      <h2 class="text-xl md:text-3xl font-bold">
+        Каталог товаров
+      </h2>
       <div class="flex items-center gap-2">
         <!-- Mobile filter button -->
         <Button

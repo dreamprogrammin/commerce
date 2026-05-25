@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import confetti from 'canvas-confetti'
 import {
   CheckCircle2,
   Package,
@@ -7,14 +8,13 @@ import {
   XCircle,
 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import confetti from 'canvas-confetti'
 
+import OrderTrackerLottie from '@/components/order/OrderTrackerLottie.vue'
 import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
-import OrderTrackerLottie from "@/components/order/OrderTrackerLottie.vue"
 
 definePageMeta({ layout: 'checkout' })
 
@@ -99,7 +99,7 @@ onMounted(async () => {
 
   // 🎉 Party Confetti - мощный салют из углов экрана
   const colors = ['#3b82f6', '#facc15', '#ef4444', '#10b981']
-  
+
   // Вибрация при старте
   if (navigator.vibrate) {
     navigator.vibrate([100, 50, 100])
@@ -109,21 +109,22 @@ onMounted(async () => {
   const end = Date.now() + duration
 
   const frame = () => {
-    if (Date.now() > end) return
+    if (Date.now() > end)
+      return
 
     confetti({
       particleCount: 2,
       angle: 60,
       spread: 55,
       origin: { x: 0, y: 1 },
-      colors
+      colors,
     })
     confetti({
       particleCount: 2,
       angle: 120,
       spread: 55,
       origin: { x: 1, y: 1 },
-      colors
+      colors,
     })
 
     requestAnimationFrame(frame)

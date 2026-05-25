@@ -11,6 +11,7 @@
 ### Страница бренда (`/brand/[slug]`)
 
 **Было:**
+
 - `ItemList` ограничен 10 товарами (`slice(0, 10)`)
 - Без поля `name`
 - Цена только `price` (без учёта `final_price`)
@@ -18,6 +19,7 @@
 - Без `url` в `Offer`
 
 **Стало:**
+
 - Все товары бренда включены (без лимита)
 - `name`: «Товары бренда {BrandName}»
 - Цена: `final_price ?? price` — всегда актуальная
@@ -31,11 +33,13 @@
 ### Страница линейки (`/brand/[brandSlug]/[lineSlug]`)
 
 **Было:**
+
 - `ItemList` внутри `CollectionPage.mainEntity`, ограничен 10 товарами
 - Без `name`, `description`, `sku`, `aggregateRating`
 - `brand` — только `@id` без `name`
 
 **Стало:**
+
 - Все товары линейки (без лимита)
 - `name`: «Товары {LineName} от {BrandName}»
 - Те же улучшения по полям что и на странице бренда
@@ -92,6 +96,7 @@
 ## Реактивность
 
 JSON-LD обновляется автоматически при:
+
 - Смене сортировки (по цене, новизне, популярности) — `position` пересчитывается
 - Применении фильтров — список товаров обновляется
 - Загрузке новых данных — цены и наличие всегда актуальны
@@ -102,10 +107,10 @@ JSON-LD обновляется автоматически при:
 
 ## Изменённые файлы
 
-| Файл | Изменение |
-|------|-----------|
-| `pages/brand/[slug].vue` | Обновлён ItemList: без лимита, `final_price`, `description`, `sku`, `aggregateRating`, `name` |
-| `pages/brand/[brandSlug]/[lineSlug].vue` | Обновлён ItemList в CollectionPage.mainEntity: аналогичные улучшения |
+| Файл                                     | Изменение                                                                                     |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `pages/brand/[slug].vue`                 | Обновлён ItemList: без лимита, `final_price`, `description`, `sku`, `aggregateRating`, `name` |
+| `pages/brand/[brandSlug]/[lineSlug].vue` | Обновлён ItemList в CollectionPage.mainEntity: аналогичные улучшения                          |
 
 ---
 

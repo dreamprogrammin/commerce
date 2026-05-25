@@ -14,24 +14,29 @@ const STEPS: OrderStatus[] = ['new', 'confirmed', 'processing', 'shipped', 'deli
 const isCancelled = computed(() => props.status === 'cancelled')
 
 const animationSrc = computed(() => {
-  if (props.status === 'confirmed') return BASE_URL + 'Success.lottie'
-  if (props.status === 'processing') return BASE_URL + 'box.lottie'
-  if (props.status === 'shipped') return BASE_URL + 'delivery-truck.lottie'
-  if (props.status === 'delivered') return BASE_URL + 'delivery.lottie'
-  return BASE_URL + 'Order.lottie'
+  if (props.status === 'confirmed')
+    return `${BASE_URL}Success.lottie`
+  if (props.status === 'processing')
+    return `${BASE_URL}box.lottie`
+  if (props.status === 'shipped')
+    return `${BASE_URL}delivery-truck.lottie`
+  if (props.status === 'delivered')
+    return `${BASE_URL}delivery.lottie`
+  return `${BASE_URL}Order.lottie`
 })
 
-const statusInfo: Record<OrderStatus, { title: string; description: string }> = {
-  new:        { title: 'Заказ принят',          description: 'Мы получили ваш заказ и начинаем его обработку' },
-  confirmed:  { title: 'Заказ подтверждён',     description: 'Заказ подтверждён и готовится к отправке' },
-  processing: { title: 'Заказ комплектуется',   description: 'Собираем ваш заказ и передаём курьеру' },
-  shipped:    { title: 'Заказ в пути',          description: 'Курьер уже мчит к вам!' },
-  delivered:  { title: 'Заказ доставлен',       description: 'Заказ успешно доставлен' },
-  cancelled:  { title: 'Заказ отменён',         description: 'Заказ был отменён' },
+const statusInfo: Record<OrderStatus, { title: string, description: string }> = {
+  new: { title: 'Заказ принят', description: 'Мы получили ваш заказ и начинаем его обработку' },
+  confirmed: { title: 'Заказ подтверждён', description: 'Заказ подтверждён и готовится к отправке' },
+  processing: { title: 'Заказ комплектуется', description: 'Собираем ваш заказ и передаём курьеру' },
+  shipped: { title: 'Заказ в пути', description: 'Курьер уже мчит к вам!' },
+  delivered: { title: 'Заказ доставлен', description: 'Заказ успешно доставлен' },
+  cancelled: { title: 'Заказ отменён', description: 'Заказ был отменён' },
 }
 
 const progressSteps = computed(() => {
-  if (isCancelled.value) return STEPS.map(() => false)
+  if (isCancelled.value)
+    return STEPS.map(() => false)
   const idx = STEPS.indexOf(props.status)
   return STEPS.map((_, i) => i <= idx)
 })
@@ -53,8 +58,12 @@ const progressSteps = computed(() => {
     </ClientOnly>
 
     <div class="text-center space-y-2">
-      <h3 class="text-2xl font-bold text-foreground">{{ statusInfo[status].title }}</h3>
-      <p class="text-muted-foreground">{{ statusInfo[status].description }}</p>
+      <h3 class="text-2xl font-bold text-foreground">
+        {{ statusInfo[status].title }}
+      </h3>
+      <p class="text-muted-foreground">
+        {{ statusInfo[status].description }}
+      </p>
     </div>
 
     <div class="w-full max-w-md">

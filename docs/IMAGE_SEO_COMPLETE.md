@@ -15,18 +15,23 @@
 ## Проблема и решение
 
 ### Проблема
+
 Изображения товаров не индексируются в Google Images из-за отсутствия или плохого качества alt-текстов:
+
 - ❌ `alt="Изображение товара 1"`
 - ❌ `alt="Image"`
 - ❌ `alt=""`
 
 ### Решение
+
 SEO-оптимизированные alt-тексты по формуле:
+
 ```
 [Бренд] + [Название товара] + [Серия] + [Контекст]
 ```
 
 **Примеры:**
+
 - ✅ `LEGO Конструктор Железный Человек Marvel купить в Казахстане`
 - ✅ `Barbie Кукла Принцесса Disney вид сбоку`
 - ✅ `Hot Wheels Трек Мертвая петля детальное фото`
@@ -38,6 +43,7 @@ SEO-оптимизированные alt-тексты по формуле:
 ### 📁 Создано 7 файлов
 
 #### 1. `composables/useSeoAltText.ts`
+
 Composable для генерации SEO-оптимизированных alt-текстов.
 
 ```typescript
@@ -54,6 +60,7 @@ const altText = generateProductImageAlt({
 ```
 
 #### 2. `scripts/generate-alt-texts.ts`
+
 Скрипт для массового обновления alt-текстов в БД.
 
 ```bash
@@ -61,6 +68,7 @@ npm run seo:generate
 ```
 
 #### 3. `scripts/audit-alt-texts.ts`
+
 Скрипт для аудита качества alt-текстов.
 
 ```bash
@@ -68,6 +76,7 @@ npm run seo:audit
 ```
 
 #### 4-7. Документация
+
 - `docs/IMAGE_SEO.md` - полная документация
 - `docs/IMAGE_SEO_QUICKSTART.md` - быстрый старт
 - `docs/IMAGE_SEO_CHECKLIST.md` - чеклист внедрения
@@ -76,31 +85,34 @@ npm run seo:audit
 ### 🔧 Обновлено 5 файлов
 
 #### 1. `components/global/ProductCard.vue`
+
 Добавлена функция `getImageAlt()` для генерации alt-текстов в карточках товаров.
 
 ```typescript
 function getImageAlt(index: number): string {
   const parts = [props.product.name]
-  
+
   if (props.product.brands?.name) {
     parts.unshift(props.product.brands.name)
   }
-  
+
   if (props.product.product_line_name) {
     parts.push(props.product.product_line_name)
   }
-  
+
   if (index === 0) {
-    parts.push("купить в Казахстане")
-  } else {
+    parts.push('купить в Казахстане')
+  }
+  else {
     parts.push(`фото ${index + 1}`)
   }
-  
-  return parts.join(" ")
+
+  return parts.join(' ')
 }
 ```
 
 #### 2. `components/global/ProductGallery.vue`
+
 Добавлены props и функция для умной генерации alt-текстов.
 
 ```vue
@@ -113,14 +125,17 @@ function getImageAlt(index: number): string {
 ```
 
 Приоритет alt-текстов:
+
 1. `alt_text` из БД (если качественный)
 2. Генерация на лету через composable
 3. Fallback: "Изображение товара N"
 
 #### 3. `pages/catalog/products/[slug].vue`
+
 Передача данных в ProductGallery.
 
 #### 4. `package.json`
+
 Добавлены npm скрипты:
 
 ```json
@@ -133,6 +148,7 @@ function getImageAlt(index: number): string {
 ```
 
 #### 5. `README.md`
+
 Добавлены ссылки на документацию.
 
 ---
@@ -144,14 +160,18 @@ function getImageAlt(index: number): string {
 ```typescript
 // Контекст зависит от позиции изображения:
 if (index === 0) {
-  context = 'купить в Казахстане'  // Локальное SEO
-} else if (index === 1 && totalImages > 1) {
+  context = 'купить в Казахстане' // Локальное SEO
+}
+else if (index === 1 && totalImages > 1) {
   context = 'вид сбоку'
-} else if (index === 2 && totalImages > 2) {
+}
+else if (index === 2 && totalImages > 2) {
   context = 'детальное фото'
-} else if (index === totalImages - 1 && totalImages > 3) {
+}
+else if (index === totalImages - 1 && totalImages > 3) {
   context = 'в упаковке'
-} else {
+}
+else {
   context = `фото ${index + 1}`
 }
 ```
@@ -189,12 +209,14 @@ if (index === 0) {
 3. Дождись завершения (увидишь статистику)
 
 **Преимущества:**
+
 - ✅ Не нужно запускать скрипты локально
 - ✅ Работает прямо в браузере
 - ✅ Показывает статистику в реальном времени
 - ✅ Можно запускать когда угодно
 
 **Скриншот:**
+
 ```
 ┌─────────────────────────────────────────┐
 │ Генерация Alt-текстов для изображений   │
@@ -229,6 +251,7 @@ npm run seo:audit
 ```
 
 **Ожидаемый результат:**
+
 ```
 📊 Статистика alt текстов:
 
@@ -245,6 +268,7 @@ npm run seo:generate
 ```
 
 **Ожидаемый результат:**
+
 ```
 ✅ Обновлено: 150 изображений
 ⏭️  Пропущено: 0 изображений
@@ -258,6 +282,7 @@ npm run seo:audit
 ```
 
 **Ожидаемый результат:**
+
 ```
 📊 Статистика alt текстов:
 
@@ -377,11 +402,11 @@ SUPABASE_KEY=eyJxxx...
 
 ### Ожидаемые результаты
 
-| Период | Результат |
-|--------|-----------|
-| **2-3 недели** | Изображения начнут индексироваться в Google Images<br>Первые переходы из поиска по картинкам |
-| **1-2 месяца** | Рост трафика из Google Images на 10-20%<br>Увеличение конверсии |
-| **3-6 месяцев** | Рост трафика из Google Images на 20-40%<br>Стабильный поток бесплатного целевого трафика |
+| Период          | Результат                                                                                    |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| **2-3 недели**  | Изображения начнут индексироваться в Google Images<br>Первые переходы из поиска по картинкам |
+| **1-2 месяца**  | Рост трафика из Google Images на 10-20%<br>Увеличение конверсии                              |
+| **3-6 месяцев** | Рост трафика из Google Images на 20-40%<br>Стабильный поток бесплатного целевого трафика     |
 
 ### Внутренний аудит
 
@@ -400,6 +425,7 @@ npm run seo:audit
 **Причина:** Supabase не запущен локально.
 
 **Решение:**
+
 ```bash
 supabase start
 ```
@@ -411,6 +437,7 @@ supabase start
 **Причина:** Отсутствуют связи в БД.
 
 **Решение:** Проверь, что в БД есть:
+
 - `products.brand_id` → `brands.id`
 - `products.product_line_id` → `product_lines.id`
 
@@ -419,6 +446,7 @@ supabase start
 **Причина:** Props не передаются в компонент.
 
 **Решение:** Проверь передачу props:
+
 ```vue
 <ProductGallery
   :product-name="product.name"
@@ -432,6 +460,7 @@ supabase start
 **Причина:** Неправильные имена переменных.
 
 **Решение:** Используй один из вариантов:
+
 ```bash
 # .env
 SUPABASE_URL=...
@@ -464,7 +493,8 @@ const locale = useI18n().locale.value
 
 if (locale === 'kk') {
   context = 'Қазақстаннан сатып алу'
-} else {
+}
+else {
   context = 'купить в Казахстане'
 }
 ```
@@ -533,12 +563,14 @@ npm run build
 ## Поддержка
 
 ### Документация
+
 - [IMAGE_SEO.md](./IMAGE_SEO.md) - полная документация
 - [IMAGE_SEO_QUICKSTART.md](./IMAGE_SEO_QUICKSTART.md) - быстрый старт
 - [IMAGE_SEO_CHECKLIST.md](./IMAGE_SEO_CHECKLIST.md) - чеклист внедрения
 - [IMAGE_SEO_FINAL_CHECKLIST.md](./IMAGE_SEO_FINAL_CHECKLIST.md) - финальный чеклист
 
 ### Файлы
+
 - `composables/useSeoAltText.ts` - composable
 - `scripts/generate-alt-texts.ts` - скрипт генерации
 - `scripts/audit-alt-texts.ts` - скрипт аудита
@@ -551,5 +583,5 @@ npm run build
 
 Твои изображения теперь работают на тебя в Google Images!
 
-**Создано:** 2026-04-09  
+**Создано:** 2026-04-09
 **Версия:** 1.0

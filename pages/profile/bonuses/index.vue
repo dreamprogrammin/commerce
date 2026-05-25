@@ -293,70 +293,70 @@ onMounted(() => {
 
           <!-- Десктопная таблица транзакций -->
           <div class="hidden md:block rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Дата</TableHead>
-                <TableHead>Операция</TableHead>
-                <TableHead class="text-right">
-                  Сумма
-                </TableHead>
-                <TableHead>Статус</TableHead>
-                <TableHead class="text-right">
-                  Баланс после
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="transaction in transactions" :key="transaction.id">
-                <TableCell class="font-medium">
-                  {{ formatDate(transaction.created_at) }}
-                </TableCell>
-                <TableCell>
-                  <div class="flex items-center gap-2">
-                    <component
-                      :is="getTransactionIcon(transaction.transaction_type)"
-                      class="h-4 w-4" :class="[getTransactionColor(transaction.transaction_type)]"
-                    />
-                    <div>
-                      <div class="font-medium">
-                        {{ getTransactionName(transaction.transaction_type) }}
-                      </div>
-                      <div v-if="transaction.description" class="text-sm text-muted-foreground">
-                        {{ transaction.description }}
-                      </div>
-                      <div v-if="transaction.activation_date && transaction.status === 'pending'" class="text-sm text-muted-foreground">
-                        Активация: {{ formatActivationDate(transaction.activation_date) }}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Дата</TableHead>
+                  <TableHead>Операция</TableHead>
+                  <TableHead class="text-right">
+                    Сумма
+                  </TableHead>
+                  <TableHead>Статус</TableHead>
+                  <TableHead class="text-right">
+                    Баланс после
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="transaction in transactions" :key="transaction.id">
+                  <TableCell class="font-medium">
+                    {{ formatDate(transaction.created_at) }}
+                  </TableCell>
+                  <TableCell>
+                    <div class="flex items-center gap-2">
+                      <component
+                        :is="getTransactionIcon(transaction.transaction_type)"
+                        class="h-4 w-4" :class="[getTransactionColor(transaction.transaction_type)]"
+                      />
+                      <div>
+                        <div class="font-medium">
+                          {{ getTransactionName(transaction.transaction_type) }}
+                        </div>
+                        <div v-if="transaction.description" class="text-sm text-muted-foreground">
+                          {{ transaction.description }}
+                        </div>
+                        <div v-if="transaction.activation_date && transaction.status === 'pending'" class="text-sm text-muted-foreground">
+                          Активация: {{ formatActivationDate(transaction.activation_date) }}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell class="text-right">
-                  <span
-                    class="font-semibold" :class="[
-                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600',
-                    ]"
-                  >
-                    {{ transaction.amount > 0 ? '+' : '' }}{{ transaction.amount.toLocaleString('ru-RU') }} ₸
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="getStatusVariant(transaction.status)">
-                    {{ getStatusName(transaction.status) }}
-                  </Badge>
-                </TableCell>
-                <TableCell class="text-right">
-                  <div v-if="transaction.balance_after > 0 || transaction.pending_balance_after > 0" class="flex flex-col items-end">
-                    <span class="font-medium">{{ transaction.balance_after.toLocaleString('ru-RU') }} ₸</span>
-                    <span v-if="transaction.pending_balance_after > 0" class="text-sm text-muted-foreground">
-                      (+{{ transaction.pending_balance_after.toLocaleString('ru-RU') }} в ожидании)
+                  </TableCell>
+                  <TableCell class="text-right">
+                    <span
+                      class="font-semibold" :class="[
+                        transaction.amount > 0 ? 'text-green-600' : 'text-red-600',
+                      ]"
+                    >
+                      {{ transaction.amount > 0 ? '+' : '' }}{{ transaction.amount.toLocaleString('ru-RU') }} ₸
                     </span>
-                  </div>
-                  <span v-else class="text-muted-foreground">—</span>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+                  </TableCell>
+                  <TableCell>
+                    <Badge :variant="getStatusVariant(transaction.status)">
+                      {{ getStatusName(transaction.status) }}
+                    </Badge>
+                  </TableCell>
+                  <TableCell class="text-right">
+                    <div v-if="transaction.balance_after > 0 || transaction.pending_balance_after > 0" class="flex flex-col items-end">
+                      <span class="font-medium">{{ transaction.balance_after.toLocaleString('ru-RU') }} ₸</span>
+                      <span v-if="transaction.pending_balance_after > 0" class="text-sm text-muted-foreground">
+                        (+{{ transaction.pending_balance_after.toLocaleString('ru-RU') }} в ожидании)
+                      </span>
+                    </div>
+                    <span v-else class="text-muted-foreground">—</span>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
           </div>
         </template>
       </CardContent>

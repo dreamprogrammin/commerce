@@ -2,11 +2,12 @@
 
 ## 📊 Проблема из Google Search Console
 
-**Статус:** Заблокировано в файле robots.txt  
-**Дата:** 06.05.2026 - 09.05.2026  
+**Статус:** Заблокировано в файле robots.txt
+**Дата:** 06.05.2026 - 09.05.2026
 **Найдено:** 4 страницы
 
 ### Проблемные URL:
+
 ```
 https://uhti.kz/__nuxt       - служебная директория Nuxt
 https://uhti.kz/**/          - wildcard паттерн
@@ -27,6 +28,7 @@ Google пытается индексировать служебные стран
 ### 1. Обновлён `public/robots.txt`
 
 **Убрано:**
+
 ```
 Allow: /search
 Allow: /catalog
@@ -41,12 +43,13 @@ Disallow: /brand/**  ❌ Конфликт!
 ### 2. Обновлён `nuxt.config.ts`
 
 **Добавлено в disallow:**
+
 ```typescript
 disallow: [
   // ... существующие ...
-  "/**/",      // wildcard паттерны
-  "/__nuxt",   // служебная директория
-  "/_nuxt",    // служебная директория
+  '/**/', // wildcard паттерны
+  '/__nuxt', // служебная директория
+  '/_nuxt', // служебная директория
 ]
 ```
 
@@ -89,11 +92,13 @@ Sitemap: https://uhti.kz/sitemap.xml
 ## 🧪 Проверка
 
 ### 1. Проверь robots.txt онлайн:
+
 ```
 https://uhti.kz/robots.txt
 ```
 
 ### 2. Проверь в Google Search Console:
+
 1. **Настройки** → **Проверка robots.txt**
 2. Введи проблемные URL:
    - `https://uhti.kz/__nuxt`
@@ -102,6 +107,7 @@ https://uhti.kz/robots.txt
 3. Все должны быть **заблокированы** ✅
 
 ### 3. Проверь через curl:
+
 ```bash
 curl https://uhti.kz/robots.txt
 ```
@@ -111,6 +117,7 @@ curl https://uhti.kz/robots.txt
 ## 📈 Ожидаемый результат
 
 **Через 1-2 недели:**
+
 - ✅ Google пересканирует robots.txt
 - ✅ Ошибки "Заблокировано в robots.txt" останутся (это нормально!)
 - ✅ Но количество не будет расти

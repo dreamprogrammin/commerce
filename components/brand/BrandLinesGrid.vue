@@ -201,7 +201,9 @@ function getLineLink(lineSlug: string): string {
 
       <!-- Пустой поиск -->
       <div v-if="filteredLines.length === 0 && searchQuery" class="py-10 text-center">
-        <p class="text-sm text-muted-foreground/70">Ничего не найдено</p>
+        <p class="text-sm text-muted-foreground/70">
+          Ничего не найдено
+        </p>
       </div>
     </div>
 

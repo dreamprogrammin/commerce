@@ -8,9 +8,8 @@ import type {
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { toast } from 'vue-sonner'
 import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
-import ProductDescription from '@/components/product/ProductDescription.vue'
-import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import SEOContentRenderer from '@/components/product/SEOContentRenderer.vue'
+import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
 import { useFlipCounter } from '@/composables/useFlipCounter'
@@ -347,33 +346,33 @@ const canonicalUrl = computed(() =>
 const metaTitle = computed(() => {
   if (!product.value)
     return 'Товар | Ухтышка'
-  
+
   // Если есть ручной meta_title — используем его
   if (product.value.meta_title)
     return product.value.meta_title
   if (product.value.seo_title)
     return product.value.seo_title
-  
+
   // Генерируем умный title: [Товар] [свойство] — от [цена] ₸ | Uhti.kz
   const parts = []
-  
+
   // 1. Название товара
   let name = product.value.name
-  
+
   // 2. Добавляем ключевое свойство (материал)
   if (product.value.materials?.name) {
     name += ` ${product.value.materials.name.toLowerCase()}`
   }
-  
+
   parts.push(name)
-  
+
   // 3. Цена
   const price = product.value.final_price || product.value.price
   parts.push(`от ${formatPrice(price)} ₸`)
-  
+
   // 4. Бренд
   parts.push('Uhti.kz')
-  
+
   return parts.join(' — ')
 })
 
@@ -409,41 +408,42 @@ const audienceText = computed(() => {
 const metaDescription = computed(() => {
   if (!product.value)
     return ''
-  
+
   // Если есть ручной meta_description — используем его
   if (product.value.meta_description)
     return product.value.meta_description
   if (product.value.seo_description)
     return product.value.seo_description
-  
+
   // Генерируем умное description: [Товар] [польза]. [Преимущество]. ⭐ [рейтинг]. [Доставка]. От [цена] ₸
   const parts = []
-  
+
   // 1. Название + аудитория
   if (audienceText.value) {
     parts.push(`${product.value.name} ${audienceText.value}`)
-  } else {
+  }
+  else {
     parts.push(product.value.name)
   }
-  
+
   // 2. Социальное доказательство (рейтинг)
   if (product.value.review_count > 0) {
     parts.push(`⭐ ${product.value.avg_rating?.toFixed(1)} (${product.value.review_count} ${product.value.review_count === 1 ? 'отзыв' : product.value.review_count < 5 ? 'отзыва' : 'отзывов'})`)
   }
-  
+
   // 3. Наличие
   if (product.value.stock_quantity > 0) {
     parts.push('В наличии')
   }
-  
+
   // 4. Доставка
   parts.push('Доставка по Алматы за 1 день')
-  
+
   // 5. Цена
   const price = product.value.final_price || product.value.price
   parts.push(`От ${formatPrice(price)} ₸`)
-  
-  return parts.join('. ') + '.'
+
+  return `${parts.join('. ')}.`
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
@@ -600,16 +600,18 @@ const robotsRule = computed(() => {
 const seoBlocks = computed(() => {
   // Приоритет: seo_content, затем description
   const content = product.value?.seo_content || product.value?.description
-  if (!content) return []
+  if (!content)
+    return []
   return parseHTMLToBlocks(content)
 })
 
 // Извлекаем текст из seo_content для Schema.org description
 const seoContentText = computed(() => {
-  if (!seoBlocks.value.length) return metaDescription.value
-  
+  if (!seoBlocks.value.length)
+    return metaDescription.value
+
   return seoBlocks.value
-    .map(block => {
+    .map((block) => {
       if (block.type === 'ul') {
         return block.items.map(item => item.text).join(' ')
       }
@@ -633,8 +635,8 @@ const productImages = computed(() => {
     return ['https://uhti.kz/og-default.jpg']
   return product.value.product_images.map(
     (img: ProductImageRow) =>
-      getVariantUrl(BUCKET_NAME_PRODUCT, img.image_url, 'lg') || 
-      `https://uhti.kz/og-default.jpg`,
+      getVariantUrl(BUCKET_NAME_PRODUCT, img.image_url, 'lg')
+      || `https://uhti.kz/og-default.jpg`,
   )
 })
 

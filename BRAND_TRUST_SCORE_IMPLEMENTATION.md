@@ -1,8 +1,8 @@
 # Отчет: Внедрение Brand Trust Score и рестайлинг рейтингов
 
-**Дата:** 2026-04-02  
-**Приоритет:** 🔥 High  
-**Story Points:** 3  
+**Дата:** 2026-04-02
+**Приоритет:** 🔥 High
+**Story Points:** 3
 **Статус:** ✅ Завершено
 
 ---
@@ -50,6 +50,7 @@
 
 ```vue
 <StarRating :model-value="product.avg_rating || 5" readonly size="sm" />
+
 <span class="text-xs text-muted-foreground">
   ({{ product.review_count }})
 </span>
@@ -59,9 +60,11 @@
 
 ```vue
 <Icon name="gravity-ui:star-fill" class="w-4 h-4 flex-shrink-0" />
+
 <span class="text-sm font-bold text-foreground">
   {{ formatRating(product.avg_rating || 5) }}
 </span>
+
 <span class="text-xs text-muted-foreground">
   · {{ product.review_count }}
 </span>
@@ -87,8 +90,9 @@
  * @returns Отформатированная строка (например, "4,8")
  */
 export function formatRating(rating: number | null | undefined): string {
-  if (!rating) return "0,0";
-  return rating.toFixed(1).replace(".", ",");
+  if (!rating)
+    return '0,0'
+  return rating.toFixed(1).replace('.', ',')
 }
 ```
 
@@ -109,14 +113,18 @@ export function formatRating(rating: number | null | undefined): string {
 ```vue
 <!-- Brand Trust Score -->
 <div v-if="brandStats && brandStats.total_reviews_count > 0"
-     class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0">
+     class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0"
+>
   <Icon name="gravity-ui:star-fill" class="w-10 h-10 flex-shrink-0" />
   <div class="space-y-0.5 text-left">
     <div class="flex items-center gap-2">
       <span class="text-2xl font-bold text-foreground">{{ formatRating(brandStats.average_rating) }}</span>
       <span class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Рейтинг бренда</span>
     </div>
-    <p class="text-xs text-muted-foreground">Сформирован на основе {{ brandStats.total_reviews_count }} отзывов о товарах</p>
+
+    <p class="text-xs text-muted-foreground">
+Сформирован на основе {{ brandStats.total_reviews_count }} отзывов о товарах
+</p>
   </div>
 </div>
 ```
@@ -156,14 +164,18 @@ import { formatRating } from "@/utils/formatRating";
 ```vue
 <!-- Brand Trust Score для линейки -->
 <div v-if="lineStats && lineStats.total_reviews_count > 0"
-     class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0">
+     class="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50 max-w-md mx-auto md:mx-0"
+>
   <Icon name="gravity-ui:star-fill" class="w-10 h-10 flex-shrink-0" />
   <div class="space-y-0.5 text-left">
     <div class="flex items-center gap-2">
       <span class="text-2xl font-bold text-foreground">{{ formatRating(lineStats.average_rating) }}</span>
       <span class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Рейтинг линейки</span>
     </div>
-    <p class="text-xs text-muted-foreground">Сформирован на основе {{ lineStats.total_reviews_count }} отзывов о товарах</p>
+
+    <p class="text-xs text-muted-foreground">
+Сформирован на основе {{ lineStats.total_reviews_count }} отзывов о товарах
+</p>
   </div>
 </div>
 ```
@@ -382,6 +394,6 @@ grep -n "aggregateRating" pages/catalog/[...slug].vue
 
 ---
 
-**Автор:** OpenCode AI  
-**Дата завершения:** 2026-04-02  
+**Автор:** OpenCode AI
+**Дата завершения:** 2026-04-02
 **Время выполнения:** ~45 минут

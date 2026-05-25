@@ -44,12 +44,14 @@ supabase db execute --file restore_missing.sql
 ## ✅ Что будет добавлено:
 
 ### Бренды (15+):
+
 - LEGO, Mattel, LOL Surprise, BOWA, Sluban, CADA
 - MG Toys, Play Smart, Feelo, Gudi, Shantou Yisheng
 - FiveStar Toys, My Little Home, MokaToys, Eva Puzzle
 - Huanger, Koala Diary, Mermaze, RC Toys, Hola Toys, Polese
 
 ### Категории (40+):
+
 - **Корневые:** boys, girls, kiddy, babies, constructors-root, accessories, etc.
 - **Уровень 1:** mashinki, kukly, bizibordy, tolokar, katalki, etc.
 - **Уровень 2:** radioupravlyaemye-mashinki, kukly-aksessuary, bizikub, etc.
@@ -107,17 +109,20 @@ curl -I https://uhti.kz/brand/mattel
 ## 🆘 Если что-то пошло не так:
 
 ### Ошибка "duplicate key value violates unique constraint"
+
 Это нормально! Значит категория/бренд уже существует. Скрипт пропустит её.
 
 ### Ошибка "relation does not exist"
+
 Проверь, что ты подключен к правильной базе данных.
 
 ### Категория не открывается после добавления
+
 1. Проверь `is_active = true` в базе
 2. Перезапусти dev сервер: `npm run dev`
 3. Очисти кеш: Ctrl+Shift+R в браузере
 
 ---
 
-**Время выполнения:** 2-5 минут  
+**Время выполнения:** 2-5 минут
 **Приоритет:** 🔥 КРИТИЧНО

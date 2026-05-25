@@ -35,7 +35,8 @@ const isOpen = computed({
 })
 
 async function prepareLink() {
-  if (!user.value) return
+  if (!user.value)
+    return
 
   isPreparing.value = true
   telegramUrl.value = null

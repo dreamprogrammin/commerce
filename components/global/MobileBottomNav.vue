@@ -19,9 +19,11 @@ function handleScroll() {
   const currentScrollY = window.scrollY
   if (currentScrollY < 60) {
     isVisible.value = true
-  } else if (currentScrollY > lastScrollY) {
+  }
+  else if (currentScrollY > lastScrollY) {
     isVisible.value = false
-  } else {
+  }
+  else {
     isVisible.value = true
   }
   lastScrollY = currentScrollY
@@ -43,14 +45,15 @@ const navItems: NavItem[] = [
 ]
 
 function isActive(path: string) {
-  if (path === '/') return route.path === '/'
+  if (path === '/')
+    return route.path === '/'
   return route.path.startsWith(path)
 }
 
 const isCartActive = computed(() => route.path.startsWith('/cart'))
 
 // Pill скользит только по 3 пунктам (0%, 33.33%, 66.66%)
-const activeIndex = computed(() => navItems.findIndex((item) => isActive(item.path)))
+const activeIndex = computed(() => navItems.findIndex(item => isActive(item.path)))
 
 const cartItemsCount = computed(() =>
   cartStore.items.reduce((total, item) => total + item.quantity, 0),

@@ -49,14 +49,13 @@ const {
 #### Вариант 1: Автоматическая оптимизация (реализовано ✅)
 
 Утилита `utils/imageOptimizer.ts` использует `browser-image-compression`:
+
 - `maxSizeMB: 0.15` → файл ≤150KB
 - `maxWidthOrHeight: 1200` → изображение ≤1200px
 - `fileType: 'image/webp'` → конвертация в WebP
 - Параллельная генерация LQIP (20px blur placeholder)
 
 Пример реализации (устаревший Canvas API, заменён):
-
-
 
 \`\`\`typescript
 export async function optimizeImageBeforeUpload(

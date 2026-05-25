@@ -4,96 +4,189 @@ import type {
   CategoryRow,
   ProductWithGallery,
   RecommendedProduct,
-} from "@/types";
-import { toRaw } from "vue";
-import { useQuery } from "@tanstack/vue-query";
-import { useSlides } from "@/composables/slides/useSlides";
-import { carouselContainerVariants } from "@/lib/variants";
-import { useAuthStore } from "@/stores/auth";
-import { usePersonalizationStore } from "@/stores/core/personalizationStore";
-import { useProfileStore } from "@/stores/core/profileStore";
-import { usePopularCategoriesStore } from "@/stores/publicStore/popularCategoriesStore";
-import { useProductsStore } from "@/stores/publicStore/productsStore";
-import { useRecommendationsStore } from "@/stores/publicStore/recommendationsStore";
-import { useWishlistStore } from "@/stores/publicStore/wishlistStore";
+} from '@/types'
+import { useQuery } from '@tanstack/vue-query'
+import { useSlides } from '@/composables/slides/useSlides'
+import { carouselContainerVariants } from '@/lib/variants'
+import { useAuthStore } from '@/stores/auth'
+import { usePersonalizationStore } from '@/stores/core/personalizationStore'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
+import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
+import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
-const authStore = useAuthStore();
-const profileStore = useProfileStore();
-const recommendationsStore = useRecommendationsStore();
-const personalizationStore = usePersonalizationStore();
-const productsStore = useProductsStore();
-const wishlistStore = useWishlistStore();
-const popularCategoriesStore = usePopularCategoriesStore();
-const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides();
+// ---------------------------------------------------------------------------
+// 🔬 DEV HYDRATION LOGGER
+// Удали этот блок (или HYDRATION_DEBUG = false) перед деплоем в продакшн
+// ---------------------------------------------------------------------------
+const HYDRATION_DEBUG = true
 
-const { isLoggedIn, user } = storeToRefs(authStore);
-const { isAdmin } = storeToRefs(profileStore);
-const { trigger: personalizationTrigger } = storeToRefs(personalizationStore);
+function logHydration(componentName: string, strategy: string) {
+  if (!HYDRATION_DEBUG || !import.meta.client)
+    return
+  const time = performance.now().toFixed(0)
+  console.log(
+    `%c💧 [HYDRATED] %c${componentName}%c | strategy: ${strategy} | t=${time}ms`,
+    'color: #22c55e; font-weight: bold',
+    'color: #60a5fa; font-weight: bold',
+    'color: #94a3b8',
+  )
+}
+
+function logHydrationSkip(componentName: string, reason: string) {
+  if (!HYDRATION_DEBUG || !import.meta.client)
+    return
+  console.log(
+    `%c⏭️  [SKIPPED]  %c${componentName}%c | reason: ${reason}`,
+    'color: #f59e0b; font-weight: bold',
+    'color: #60a5fa; font-weight: bold',
+    'color: #94a3b8',
+  )
+}
+
+if (import.meta.client && HYDRATION_DEBUG) {
+  console.groupCollapsed('%c🏠 Home Page — Hydration Debug', 'color: #a78bfa; font-weight: bold; font-size: 13px')
+  console.log('%c[lazy/visible]  — SSR рендерит HTML, клиент гидрирует при входе во вьюпорт (@hydrated).', 'color: #94a3b8')
+  console.log('%c[ClientOnly]    — SSR рендерит #fallback, клиент монтирует с нуля (onMounted лог).', 'color: #94a3b8')
+  console.log('%c⚠️  ClientOnly нужен когда SSR и клиент рендерят РАЗНЫЙ контент (данные client-only).', 'color: #f59e0b')
+  console.groupEnd()
+}
+
+// Логируем монтирование ClientOnly-блоков (у них нет @hydrated — они монтируются, а не гидрируются)
+onMounted(() => {
+  if (!HYDRATION_DEBUG)
+    return
+  const t = performance.now().toFixed(0)
+  console.log(
+    `%c🟡 [CLIENT MOUNTED] %cCarousels block (ClientOnly)%c | t=${t}ms | popular=${popularProducts.value.length} newest=${newestProducts.value.length} recommended=${recommendedProducts.value.length} wishlist=${wishlistProducts.value.length}`,
+    'color: #f59e0b; font-weight: bold',
+    'color: #60a5fa; font-weight: bold',
+    'color: #94a3b8',
+  )
+})
+// ---------------------------------------------------------------------------
+
+// ⚡ Lazy hydration компоненты со стратегией "visible"
+//
+// Правило применения:
+//   ✅ LazyHydration — компонент рендерится на SSR И на клиенте одинаково.
+//      SSR → статический HTML → клиент гидрирует при входе во вьюпорт.
+//
+//   ❌ LazyHydration + ClientOnly — антипаттерн: SSR не рендерит компонент,
+//      IntersectionObserver наблюдать не за чем, @hydrated никогда не сработает.
+//
+//   ❌ LazyHydration для client-only данных — вызывает hydration mismatch:
+//      SSR рендерит скелетон (данные не пришли), клиент ожидает карусель (данные уже есть).
+//      Решение: ClientOnly + обычный компонент.
+//
+// Применяем LazyHydration только к компонентам без client-only зависимостей:
+const LazyHydrationBrandsCarousel = defineLazyHydrationComponent(
+  'visible',
+  () => import('@/components/home/BrandsCarousel.vue'),
+)
+const LazyHydrationBanners = defineLazyHydrationComponent(
+  'visible',
+  () => import('@/components/home/Banners.vue'),
+)
+const LazyHydrationBonusCard = defineLazyHydrationComponent(
+  'visible',
+  () => import('@/components/home/BonusProgramCard.vue'),
+)
+const LazyHydrationFeaturedProduct = defineLazyHydrationComponent(
+  'visible',
+  () => import('@/components/home/FeaturedProduct.vue'),
+)
+// ProductsCarousel намеренно НЕ LazyHydration — данные client-only (server:false),
+// поэтому обёрнут в ClientOnly в шаблоне.
+const LazyHydrationGuestPromo = defineLazyHydrationComponent(
+  'visible',
+  () => import('@/components/home/GuestRegistrationPromo.vue'),
+)
+
+const authStore = useAuthStore()
+const profileStore = useProfileStore()
+const recommendationsStore = useRecommendationsStore()
+const personalizationStore = usePersonalizationStore()
+const productsStore = useProductsStore()
+const wishlistStore = useWishlistStore()
+const popularCategoriesStore = usePopularCategoriesStore()
+const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
+
+const { isLoggedIn, user } = storeToRefs(authStore)
+const { isAdmin } = storeToRefs(profileStore)
+const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
 
 definePageMeta({
-  layout: "home",
-});
+  layout: 'home',
+})
 
-const nuxtApp = useNuxtApp();
-// Кеш useAsyncData: при клиентской навигации отдаёт данные мгновенно из payload
-const getCachedData = (key: string) =>
-  nuxtApp.payload.data[key] || nuxtApp.static.data[key];
+const nuxtApp = useNuxtApp()
+function getCachedData(key: string) {
+  return nuxtApp.payload.data[key] || nuxtApp.static.data[key]
+}
 
-const alwaysContainedClass = carouselContainerVariants({ contained: "always" });
+const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
 const desktopContainedClass = carouselContainerVariants({
-  contained: "desktop",
-});
+  contained: 'desktop',
+})
 
-// 🔧 Упрощенный тип для TanStack Query (избегаем глубокой инстанциации)
-type HomePersonalData = {
-  recommended: RecommendedProduct[];
-  wishlist: ProductWithGallery[];
-};
+interface HomePersonalData {
+  recommended: RecommendedProduct[]
+  wishlist: ProductWithGallery[]
+}
 
-// ✅ SSR prefetch — все запросы ПАРАЛЛЕЛЬНО через один useAsyncData
-const supabase = useSupabaseClient();
-
+// ✅ SSR prefetch — только критичные данные первого экрана (категории)
 const { data: ssrData } = await useAsyncData(
-  "home-ssr-all",
+  'home-ssr-critical',
   async () => {
-    // Все запросы запускаются одновременно
-    const [recommended, popular, newest, _categories, brands] =
-      await Promise.all([
-        recommendationsStore.fetchRecommendations().catch(() => []),
-        productsStore.fetchPopularProducts(10).catch(() => []),
-        productsStore.fetchNewestProducts(10).catch(() => []),
-        popularCategoriesStore.fetchPopularCategories().catch(() => null),
-        supabase
-          .from("brands")
-          .select(
-            "id, name, slug, logo_url, description, seo_description, seo_keywords",
-          )
-          .order("name", { ascending: true })
-          .limit(20)
-          .then(({ data }) => data || [])
-          .catch(() => []),
-      ]);
+    await popularCategoriesStore.fetchPopularCategories()
+    return {
+      categories: popularCategoriesStore.popularCategories || [],
+    }
+  },
+  { server: true, lazy: false, getCachedData },
+)
+
+const supabase = useSupabaseClient()
+
+const { data: clientData } = await useAsyncData(
+  'home-client-data',
+  async () => {
+    const [recommended, popular, newest, brands] = await Promise.all([
+      recommendationsStore.fetchRecommendations().catch(() => []),
+      productsStore.fetchPopularProducts(10).catch(() => []),
+      productsStore.fetchNewestProducts(10).catch(() => []),
+      supabase
+        .from('brands')
+        .select(
+          'id, name, slug, logo_url, description, seo_description, seo_keywords',
+        )
+        .order('name', { ascending: true })
+        .limit(20)
+        .then(({ data }) => data || [])
+        .catch(() => []),
+    ])
 
     return {
       recommended: recommended || [],
       popular: popular || [],
       newest: newest || [],
-      categories: popularCategoriesStore.popularCategories || [],
       brands: brands as Brand[],
-    };
+    }
   },
-  { server: true, lazy: false, getCachedData },
-);
+  { server: false, lazy: true, getCachedData },
+)
 
-// TanStack Query с SSR данными — рекомендации
+// TanStack Query — рекомендации
 const recommendationsQueryKey = computed(() => [
-  "home-recommendations",
+  'home-recommendations',
   user.value?.id,
   personalizationTrigger.value,
   isLoggedIn.value,
-]);
+])
 
-// @ts-expect-error - Type instantiation depth issue with TanStack Query + Supabase complex types. Functionally correct.
+// @ts-expect-error - Type instantiation depth issue with TanStack Query + Supabase complex types.
 const {
   data: mainPersonalData,
   isLoading: isLoadingRecommendations,
@@ -101,67 +194,66 @@ const {
 } = useQuery<HomePersonalData>({
   queryKey: recommendationsQueryKey,
   queryFn: async (): Promise<HomePersonalData> => {
-    const recommended = await recommendationsStore.fetchRecommendations();
-    let wishlist: ProductWithGallery[] = [];
+    const recommended = await recommendationsStore.fetchRecommendations()
+    let wishlist: ProductWithGallery[] = []
 
     if (isLoggedIn.value) {
-      await wishlistStore.fetchWishlistProducts();
+      await wishlistStore.fetchWishlistProducts()
       wishlist = JSON.parse(
         JSON.stringify(wishlistStore.wishlistProducts),
-      ) as ProductWithGallery[];
+      ) as ProductWithGallery[]
     }
 
     return {
       recommended: recommended || [],
       wishlist: wishlist || [],
-    };
+    }
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 15 * 60 * 1000,
-  initialData: ssrData.value
+  initialData: () => clientData.value
     ? {
-        recommended: ssrData.value.recommended as RecommendedProduct[],
+        recommended: clientData.value.recommended as RecommendedProduct[],
         wishlist: [] as ProductWithGallery[],
       }
     : undefined,
-  initialDataUpdatedAt: ssrData.value ? Date.now() : 0,
   refetchOnMount: true,
   refetchOnWindowFocus: false,
-});
+})
 
 const recommendedProducts = computed<RecommendedProduct[]>(
   () => mainPersonalData.value?.recommended || [],
-);
+)
 const wishlistProducts = computed<ProductWithGallery[]>(
   () => mainPersonalData.value?.wishlist || [],
-);
+)
 
 const showRecommendationsSkeleton = computed(
   () =>
-    (isLoadingRecommendations.value || isFetchingRecommendations.value) &&
-    (!mainPersonalData.value ||
-      (mainPersonalData.value.recommended.length === 0 &&
-        mainPersonalData.value.wishlist.length === 0)),
-);
+    (isLoadingRecommendations.value || isFetchingRecommendations.value)
+    && (!mainPersonalData.value
+      || (mainPersonalData.value.recommended.length === 0
+        && mainPersonalData.value.wishlist.length === 0)),
+)
 
 // TanStack Query — популярные товары
 const popularQuery = useQuery<ProductWithGallery[]>({
-  queryKey: ["home-popular"],
+  queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
   staleTime: 5 * 60 * 1000,
   gcTime: 15 * 60 * 1000,
-  initialData: (ssrData.value?.popular as ProductWithGallery[]) || undefined,
+  initialData: () => (clientData.value?.popular as ProductWithGallery[]) || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
-});
+})
 
-const popularProductsData = popularQuery.data;
-const isLoadingPopular = popularQuery.isLoading;
-const isFetchingPopular = popularQuery.isFetching;
+const popularProductsData = popularQuery.data
+const isLoadingPopular = popularQuery.isLoading
+const isFetchingPopular = popularQuery.isFetching
 
 const popularProducts = computed<ProductWithGallery[]>(
   () => popularProductsData.value || [],
-);
+)
 
 // TanStack Query — новинки
 const {
@@ -169,105 +261,129 @@ const {
   isLoading: isLoadingNewest,
   isFetching: isFetchingNewest,
 } = useQuery<ProductWithGallery[]>({
-  queryKey: ["home-newest"],
+  queryKey: ['home-newest'],
   queryFn: () => productsStore.fetchNewestProducts(10),
   staleTime: 5 * 60 * 1000,
   gcTime: 15 * 60 * 1000,
-  initialData: (ssrData.value?.newest as ProductWithGallery[]) || undefined,
+  initialData: () => (clientData.value?.newest as ProductWithGallery[]) || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
-});
+})
 
 const newestProducts = computed<ProductWithGallery[]>(
   () => newestProductsData.value || [],
-);
+)
 
 const showPopularSkeleton = computed(
   () =>
-    (isLoadingPopular.value || isFetchingPopular.value) &&
-    !popularProductsData.value,
-);
+    (isLoadingPopular.value || isFetchingPopular.value)
+    && !popularProductsData.value,
+)
 
 const showNewestSkeleton = computed(
   () =>
-    (isLoadingNewest.value || isFetchingNewest.value) &&
-    !newestProductsData.value,
-);
+    (isLoadingNewest.value || isFetchingNewest.value)
+    && !newestProductsData.value,
+)
 
 const isLoadingMainBlock = computed(
   () => showRecommendationsSkeleton.value || showPopularSkeleton.value,
-);
+)
 
 // TanStack Query — категории (SEO schema)
 const { data: categoriesData } = useQuery<CategoryRow[]>({
-  queryKey: ["home-categories-schema"],
+  queryKey: ['home-categories-schema'],
   queryFn: async () => {
-    await popularCategoriesStore.fetchPopularCategories();
-    return popularCategoriesStore.popularCategories;
+    await popularCategoriesStore.fetchPopularCategories()
+    return popularCategoriesStore.popularCategories
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  initialData: (ssrData.value?.categories as CategoryRow[]) || undefined,
+  initialData: () => (ssrData.value?.categories as CategoryRow[]) || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
-});
+})
 
-const popularCategoriesForSchema = computed(() => categoriesData.value || []);
+const popularCategoriesForSchema = computed(() => categoriesData.value || [])
 
-// TanStack Query — бренды (для SEO schema + карусель)
+// TanStack Query — бренды
 const { data: brandsData } = useQuery<Brand[]>({
-  queryKey: ["home-brands-schema"],
+  queryKey: ['home-brands-schema'],
   queryFn: async () => {
     const { data, error } = await supabase
-      .from("brands")
+      .from('brands')
       .select(
-        "id, name, slug, logo_url, description, seo_description, seo_keywords",
+        'id, name, slug, logo_url, description, seo_description, seo_keywords',
       )
-      .order("name", { ascending: true })
-      .limit(20);
+      .order('name', { ascending: true })
+      .limit(20)
 
-    if (error) throw error;
-    return data || [];
+    if (error)
+      throw error
+    return data || []
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  initialData: ssrData.value?.brands || undefined,
+  initialData: () => clientData.value?.brands || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
-});
+})
 
-const brandsForSchema = computed(() => brandsData.value || []);
-// Используем те же данные для карусели брендов (убран дубликат запроса)
-const topBrands = brandsForSchema;
+const brandsForSchema = computed(() => brandsData.value || [])
+const topBrands = brandsForSchema
+
+// ---------------------------------------------------------------------------
+// Вычисляемые флаги для условного рендера карусельных блоков.
+// ВАЖНО: v-if снаружи LazyHydration — компонент либо есть в DOM (и будет
+// гидрирован по стратегии), либо его нет вовсе. Это корректно.
+// ---------------------------------------------------------------------------
+const showWishlistCarousel = computed(
+  () => isLoggedIn.value && wishlistProducts.value.length > 0,
+)
+const showRecommendedCarousel = computed(
+  () => recommendedProducts.value && recommendedProducts.value.length > 0,
+)
+const showPopularFallbackCarousel = computed(
+  () =>
+    !showRecommendedCarousel.value
+    && popularProducts.value
+    && popularProducts.value.length > 0,
+)
+const showNewestCarousel = computed(
+  () => newestProducts.value && newestProducts.value.length > 0,
+)
+
+// ---------------------------------------------------------------------------
+// Скелетоны для карусельных блоков.
+// ИСПРАВЛЕНО: вместо ClientOnly + template#fallback используем серверный рендер
+// скелетона через v-if/v-else прямо в шаблоне. Скелетон виден на SSR и во
+// время загрузки данных, LazyHydration-карусель появляется когда данные готовы.
+// ---------------------------------------------------------------------------
 
 // SEO
-const siteUrl = "https://uhti.kz";
-const siteName = "Ухтышка";
-const metaTitle = `Купить детские игрушки в Алматы | ${siteName}`;
-const metaDescription = `Интернет-магазин детских игрушек ${siteName} в Алматы ⭐ Развивающие игры, конструкторы, куклы, машинки ✓ Официальные бренды ✓ Доставка по Алматы ✓ Бонусная программа ✓ Гарантия качества`;
+const siteUrl = 'https://uhti.kz'
+const siteName = 'Ухтышка'
+const metaTitle = `Купить детские игрушки в Алматы | ${siteName}`
+const metaDescription = `Интернет-магазин детских игрушек ${siteName} в Алматы ⭐ Развивающие игры, конструкторы, куклы, машинки ✓ Официальные бренды ✓ Доставка по Алматы ✓ Бонусная программа ✓ Гарантия качества`
 
-// Динамические keywords с брендами
 const keywords = computed(() => {
   const baseKeywords = [
-    "детские игрушки Алматы",
-    "купить игрушки Алматы",
-    "интернет магазин игрушек",
-    "игрушки для детей",
-    "развивающие игрушки",
-    "конструкторы для детей",
-    "куклы",
-    "машинки",
-    "мягкие игрушки",
-    "настольные игры",
-  ];
+    'детские игрушки Алматы',
+    'купить игрушки Алматы',
+    'интернет магазин игрушек',
+    'игрушки для детей',
+    'развивающие игрушки',
+    'конструкторы для детей',
+    'куклы',
+    'машинки',
+    'мягкие игрушки',
+    'настольные игры',
+  ]
+  const topBrands = brandsForSchema.value.slice(0, 5).map(b => b.name)
+  return [...baseKeywords, ...topBrands].join(', ')
+})
 
-  // Добавляем топ-5 брендов в keywords
-  const topBrands = brandsForSchema.value.slice(0, 5).map((b) => b.name);
-
-  return [...baseKeywords, ...topBrands].join(", ");
-});
-
-const ogImageUrl = `${siteUrl}/og-home-toys.jpeg`;
+const ogImageUrl = `${siteUrl}/og-home-toys.jpeg`
 
 useSeoMeta({
   title: metaTitle,
@@ -275,174 +391,173 @@ useSeoMeta({
   ogTitle: metaTitle,
   ogDescription: metaDescription,
   ogUrl: siteUrl,
-  ogType: "website",
+  ogType: 'website',
   ogSiteName: siteName,
-  ogLocale: "ru_RU",
-  ogLocaleAlternate: "kk_KZ",
+  ogLocale: 'ru_RU',
+  ogLocaleAlternate: 'kk_KZ',
   ogImage: ogImageUrl,
-  ogImageWidth: "1200",
-  ogImageHeight: "630",
+  ogImageWidth: '1200',
+  ogImageHeight: '630',
   ogImageAlt: `${siteName} - Детские игрушки`,
-  twitterCard: "summary_large_image",
-  twitterSite: "@uhtikz",
-  twitterCreator: "@uhtikz",
+  twitterCard: 'summary_large_image',
+  twitterSite: '@uhtikz',
+  twitterCreator: '@uhtikz',
   twitterTitle: metaTitle,
   twitterDescription: metaDescription,
   twitterImage: ogImageUrl,
   twitterImageAlt: `${siteName} - Детские игрушки`,
   robots:
-    "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
-});
+    'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+})
 
 const storeSchema = computed(() => ({
-  "@context": "https://schema.org",
-  "@type": "Store",
-  "@id": `${siteUrl}/#store`,
-  name: `${siteName} - Магазин детских игрушек`,
-  url: siteUrl,
-  image: ogImageUrl,
-  description: metaDescription,
-  telephone: "+7-702-537-94-73",
-  priceRange: "₸₸",
-  paymentAccepted: ["Наличные", "Карты", "Каспи"],
-  currenciesAccepted: "KZT",
-  openingHours: "Mo-Su 09:00-21:00",
-  address: {
-    "@type": "PostalAddress",
-    addressCountry: "KZ",
-    addressLocality: "Алматы",
-    streetAddress: "мкр. Шапагат, ул. Амангельды",
-    postalCode: "050058",
+  '@context': 'https://schema.org',
+  '@type': 'Store',
+  '@id': `${siteUrl}/#store`,
+  'name': `${siteName} - Магазин детских игрушек`,
+  'url': siteUrl,
+  'image': ogImageUrl,
+  'description': metaDescription,
+  'telephone': '+7-702-537-94-73',
+  'priceRange': '₸₸',
+  'paymentAccepted': ['Наличные', 'Карты', 'Каспи'],
+  'currenciesAccepted': 'KZT',
+  'openingHours': 'Mo-Su 09:00-21:00',
+  'address': {
+    '@type': 'PostalAddress',
+    'addressCountry': 'KZ',
+    'addressLocality': 'Алматы',
+    'streetAddress': 'мкр. Шапагат, ул. Амангельды',
+    'postalCode': '050058',
   },
-  geo: {
-    "@type": "GeoCoordinates",
-    latitude: 43.222,
-    longitude: 76.8512,
+  'geo': {
+    '@type': 'GeoCoordinates',
+    'latitude': 43.222,
+    'longitude': 76.8512,
   },
-  areaServed: {
-    "@type": "City",
-    name: "Алматы",
-    containedInPlace: {
-      "@type": "Country",
-      name: "Kazakhstan",
+  'areaServed': {
+    '@type': 'City',
+    'name': 'Алматы',
+    'containedInPlace': {
+      '@type': 'Country',
+      'name': 'Kazakhstan',
     },
   },
-  hasOfferCatalog:
+  'hasOfferCatalog':
     popularCategoriesForSchema.value.length > 0
       ? {
-          "@type": "OfferCatalog",
-          name: "Каталог детских игрушек",
-          itemListElement: popularCategoriesForSchema.value.map(
+          '@type': 'OfferCatalog',
+          'name': 'Каталог детских игрушек',
+          'itemListElement': popularCategoriesForSchema.value.map(
             (cat, index) => ({
-              "@type": "OfferCatalog",
-              name: cat.name,
-              url: `${siteUrl}${cat.href}`,
-              position: index + 1,
+              '@type': 'OfferCatalog',
+              'name': cat.name,
+              'url': `${siteUrl}${cat.href}`,
+              'position': index + 1,
             }),
           ),
         }
       : undefined,
-}));
+}))
 
 const categoriesListSchema = computed(() => ({
-  "@context": "https://schema.org",
-  "@type": "ItemList",
-  name: "Популярные категории игрушек",
-  description: "Основные категории детских игрушек в магазине Ухтышка",
-  numberOfItems: popularCategoriesForSchema.value.length,
-  itemListElement: popularCategoriesForSchema.value.map((cat, index) => ({
-    "@type": "ListItem",
-    position: index + 1,
-    item: {
-      "@type": "WebPage",
-      "@id": `${siteUrl}${cat.href}`,
-      name: cat.name,
-      url: `${siteUrl}${cat.href}`,
-      description:
-        cat.description ||
-        cat.seo_title ||
-        `Купить ${cat.name.toLowerCase()} в интернет-магазине Ухтышка. Широкий выбор, доставка по Казахстану.`,
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  'name': 'Популярные категории игрушек',
+  'description': 'Основные категории детских игрушек в магазине Ухтышка',
+  'numberOfItems': popularCategoriesForSchema.value.length,
+  'itemListElement': popularCategoriesForSchema.value.map((cat, index) => ({
+    '@type': 'ListItem',
+    'position': index + 1,
+    'item': {
+      '@type': 'WebPage',
+      '@id': `${siteUrl}${cat.href}`,
+      'name': cat.name,
+      'url': `${siteUrl}${cat.href}`,
+      'description':
+        cat.description
+        || cat.seo_title
+        || `Купить ${cat.name.toLowerCase()} в интернет-магазине Ухтышка. Широкий выбор, доставка по Казахстану.`,
     },
   })),
-}));
+}))
 
-// Collection Page schema для главной страницы с товарами
 const collectionPageSchema = computed(() => ({
-  "@context": "https://schema.org",
-  "@type": "CollectionPage",
-  "@id": `${siteUrl}/#collectionpage`,
-  url: siteUrl,
-  name: metaTitle,
-  description: metaDescription,
-  isPartOf: { "@id": `${siteUrl}/#website` },
-  about: {
-    "@type": "ItemList",
-    name: "Категории детских игрушек",
-    numberOfItems: popularCategoriesForSchema.value.length,
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  '@id': `${siteUrl}/#collectionpage`,
+  'url': siteUrl,
+  'name': metaTitle,
+  'description': metaDescription,
+  'isPartOf': { '@id': `${siteUrl}/#website` },
+  'about': {
+    '@type': 'ItemList',
+    'name': 'Категории детских игрушек',
+    'numberOfItems': popularCategoriesForSchema.value.length,
   },
-}));
+}))
 
 useHead(() => ({
   meta: [
     {
-      name: "keywords",
-      content: keywords.value || "",
+      name: 'keywords',
+      content: keywords.value || '',
     },
   ],
-  link: [{ rel: "canonical", href: siteUrl }],
+  link: [{ rel: 'canonical', href: siteUrl }],
   script: [
     {
-      type: "application/ld+json",
+      type: 'application/ld+json',
       innerHTML: JSON.stringify(storeSchema.value),
     },
     {
-      type: "application/ld+json",
+      type: 'application/ld+json',
       innerHTML: JSON.stringify(categoriesListSchema.value),
     },
     {
-      type: "application/ld+json",
+      type: 'application/ld+json',
       innerHTML: JSON.stringify(collectionPageSchema.value),
     },
   ],
-}));
+}))
 
 useSchemaOrg([
   {
-    "@type": "BreadcrumbList",
-    "@id": `${siteUrl}/#breadcrumb`,
-    itemListElement: [
+    '@type': 'BreadcrumbList',
+    '@id': `${siteUrl}/#breadcrumb`,
+    'itemListElement': [
       {
-        "@type": "ListItem",
-        position: 1,
-        name: "Главная",
-        item: siteUrl,
+        '@type': 'ListItem',
+        'position': 1,
+        'name': 'Главная',
+        'item': siteUrl,
       },
     ],
   },
   {
-    "@type": "WebPage",
-    "@id": `${siteUrl}/#webpage`,
-    url: siteUrl,
-    name: metaTitle,
-    description: metaDescription,
-    inLanguage: "ru-KZ",
-    isPartOf: { "@id": `${siteUrl}/#website` },
-    about: { "@id": `${siteUrl}/#organization` },
-    primaryImageOfPage: { "@type": "ImageObject", url: ogImageUrl },
-    breadcrumb: { "@id": `${siteUrl}/#breadcrumb` },
-    speakable: {
-      "@type": "SpeakableSpecification",
-      cssSelector: ["h1", "h2", ".prose"],
+    '@type': 'WebPage',
+    '@id': `${siteUrl}/#webpage`,
+    'url': siteUrl,
+    'name': metaTitle,
+    'description': metaDescription,
+    'inLanguage': 'ru-KZ',
+    'isPartOf': { '@id': `${siteUrl}/#website` },
+    'about': { '@id': `${siteUrl}/#organization` },
+    'primaryImageOfPage': { '@type': 'ImageObject', 'url': ogImageUrl },
+    'breadcrumb': { '@id': `${siteUrl}/#breadcrumb` },
+    'speakable': {
+      '@type': 'SpeakableSpecification',
+      'cssSelector': ['h1', 'h2', '.prose'],
     },
   },
-]);
+])
 
-useRobotsRule({ index: true, follow: true });
+useRobotsRule({ index: true, follow: true })
 </script>
 
 <template>
   <div>
-    <!-- ✅ Скрытый SEO-текст - строго одна строка без переносов -->
+    <!-- ✅ Скрытый SEO-текст -->
     <div class="sr-only">
       <h1>{{ siteName }} - Интернет-магазин детских игрушек в Казахстане</h1>
       <p>
@@ -455,6 +570,10 @@ useRobotsRule({ index: true, follow: true });
     <!-- Статус активного заказа -->
     <div :class="alwaysContainedClass" class="py-4">
       <ClientOnly>
+        <!--
+          ClientOnly здесь оправдан: блок зависит от auth-стора,
+          который не доступен на SSR, и не является LazyHydration-компонентом.
+        -->
         <div v-if="isLoggedIn">
           <div
             v-if="isAdmin"
@@ -470,13 +589,12 @@ useRobotsRule({ index: true, follow: true });
           <HomeActiveOrderStatus v-else />
         </div>
         <template #fallback>
-          <!-- Пустой div той же высоты для предотвращения layout shift -->
           <div class="h-0" />
         </template>
       </ClientOnly>
     </div>
 
-    <!-- ✅ Слайдер в ClientOnly -->
+    <!-- ✅ Слайдер в ClientOnly (нет SSR-данных, нужна клиентская логика) -->
     <ClientOnly>
       <CommonAppCarousel
         :is-loading="isLoadingSlides"
@@ -484,7 +602,6 @@ useRobotsRule({ index: true, follow: true });
         :slides="slides || []"
       />
       <template #fallback>
-        <!-- Простой скелетон без условной логики -->
         <div :class="carouselContainerVariants({ contained: 'desktop' })">
           <div class="py-4">
             <div class="p-1">
@@ -497,113 +614,136 @@ useRobotsRule({ index: true, follow: true });
       </template>
     </ClientOnly>
 
-    <!-- Карусель брендов (стиль Instagram Stories) -->
+    <!-- ✅ Карусель брендов
+         ИСПРАВЛЕНО: убрана ClientOnly-обёртка.
+         SSR рендерит статический HTML → IntersectionObserver следит за ним →
+         гидрирует при появлении во вьюпорте. -->
     <div :class="desktopContainedClass">
-      <HomeBrandsCarousel
+      <LazyHydrationBrandsCarousel
         v-if="topBrands && topBrands.length > 0"
         :brands="topBrands"
+        :hydrate-on-visible="{ rootMargin: '100px' }"
+        @hydrated="logHydration('BrandsCarousel', 'visible rootMargin:100px')"
       />
     </div>
 
-    <!-- Баннеры -->
+    <!-- ✅ Баннеры (без изменений — уже было корректно) -->
     <div :class="alwaysContainedClass">
-      <HomeBanners />
+      <LazyHydrationBanners
+        :hydrate-on-visible="{ rootMargin: '100px' }"
+        @hydrated="logHydration('Banners', 'visible rootMargin:100px')"
+      />
     </div>
 
-    <!-- Популярные категории - без ClientOnly -->
+    <!-- Популярные категории -->
     <div :class="desktopContainedClass">
       <HomePopularCategories />
     </div>
 
-    <!-- Карточки бонусов -->
+    <!-- Карточки бонусов (без изменений — уже было корректно) -->
     <div :class="alwaysContainedClass" class="py-8 md:py-12">
       <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-start mb-8">
         Акции и бонусы
       </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-        <HomeBonusProgramCard />
-        <HomeFeaturedProduct />
+        <LazyHydrationBonusCard
+          :hydrate-on-visible="{ rootMargin: '50px' }"
+          @hydrated="logHydration('BonusCard', 'visible rootMargin:50px')"
+        />
+        <LazyHydrationFeaturedProduct
+          :hydrate-on-visible="{ rootMargin: '50px' }"
+          @hydrated="logHydration('FeaturedProduct', 'visible rootMargin:50px')"
+        />
       </div>
     </div>
 
-    <!-- Карусели товаров -->
-    <ClientOnly>
-      <div
-        v-if="isLoadingMainBlock"
-        :class="alwaysContainedClass"
-        class="py-8 md:py-12"
-      >
-        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-        <ProductCarouselSkeleton />
-      </div>
-      <template v-else>
-        <!-- Избранное (только для залогиненных) -->
-        <HomeProductsCarousel
-          v-if="isLoggedIn && wishlistProducts.length > 0"
-          :is-loading="isFetchingRecommendations"
-          :products="wishlistProducts"
-          title="Ваше избранное"
-          see-all-link="/profile/wishlist"
-          class="mt-16 pt-8 border-t"
-        />
+    <!--
+      ✅ Карусели товаров — ClientOnly + обычные (не LazyHydration) компоненты.
 
-        <!-- Рекомендации ИЛИ Популярные товары -->
-        <HomeProductsCarousel
-          v-if="recommendedProducts && recommendedProducts.length > 0"
-          :is-loading="isFetchingRecommendations"
-          :products="recommendedProducts"
-          title="Вам может понравиться"
-          see-all-link="/catalog/all?recommended=true"
-          :class="{
-            'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0,
-          }"
-        />
-        <HomeProductsCarousel
-          v-else-if="popularProducts && popularProducts.length > 0"
-          :is-loading="isFetchingPopular"
-          :products="popularProducts"
-          title="Популярные товары"
-          see-all-link="/catalog/all?sort_by=popularity"
-          :class="{
-            'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0,
-          }"
-        />
-      </template>
-      <template #fallback>
-        <div :class="alwaysContainedClass" class="py-8 md:py-12">
+      ПОЧЕМУ так, а не LazyHydration без ClientOnly:
+      Данные каруселей загружаются с server:false (только на клиенте).
+      На SSR isLoadingMainBlock=true → рендерится скелетон.
+      На клиенте к моменту гидрации данные уже пришли → isLoadingMainBlock=false → ожидается карусель.
+      Результат: SSR-разметка (скелетон) ≠ клиентский vdom (карусель) → hydration mismatch.
+
+      ClientOnly решает это: SSR рендерит #fallback-скелетон вне дерева гидрации,
+      клиент монтирует карусель с нуля — никакого сравнения SSR↔client не происходит.
+
+      LazyHydration имеет смысл только когда SSR и клиент рендерят ОДНО И ТО ЖЕ.
+      Здесь это невозможно, т.к. данные клиентские.
+    -->
+    <div :class="alwaysContainedClass" class="py-8 md:py-12">
+      <ClientOnly>
+        <template v-if="isLoadingMainBlock">
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
-        </div>
-      </template>
-    </ClientOnly>
+        </template>
+        <template v-else>
+          <!-- Избранное (только для залогиненных) -->
+          <HomeProductsCarousel
+            v-if="showWishlistCarousel"
+            :is-loading="isFetchingRecommendations"
+            :products="wishlistProducts"
+            title="Ваше избранное"
+            see-all-link="/profile/wishlist"
+            class="mt-16 pt-8 border-t"
+          />
 
-    <!-- Новые поступления -->
-    <ClientOnly>
-      <div
-        v-if="showNewestSkeleton"
-        :class="alwaysContainedClass"
-        class="py-8 md:py-12"
-      >
-        <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-        <ProductCarouselSkeleton />
-      </div>
-      <HomeProductsCarousel
-        v-else-if="newestProducts && newestProducts.length > 0"
-        :is-loading="isFetchingNewest"
-        :products="newestProducts"
-        title="Новые поступления"
-        see-all-link="/catalog/all?sort_by=newest"
-        class="pt-4 border-t"
-      />
-      <template #fallback>
-        <div :class="alwaysContainedClass" class="py-8 md:py-12">
+          <!-- Рекомендации ИЛИ Популярные товары -->
+          <HomeProductsCarousel
+            v-if="showRecommendedCarousel"
+            :is-loading="isFetchingRecommendations"
+            :products="recommendedProducts"
+            title="Вам может понравиться"
+            see-all-link="/catalog/all?recommended=true"
+            :class="{
+              'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0,
+            }"
+          />
+          <HomeProductsCarousel
+            v-else-if="showPopularFallbackCarousel"
+            :is-loading="isFetchingPopular"
+            :products="popularProducts"
+            title="Популярные товары"
+            see-all-link="/catalog/all?sort_by=popularity"
+            :class="{
+              'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0,
+            }"
+          />
+        </template>
+        <!-- SSR fallback: статичный скелетон, не участвует в гидрации -->
+        <template #fallback>
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
-        </div>
-      </template>
-    </ClientOnly>
+        </template>
+      </ClientOnly>
+    </div>
 
-    <!-- ✅ SEO-блок - весь текст в одну строку без переносов -->
+    <!--
+      ✅ Новые поступления — та же логика: данные client-only → ClientOnly-обёртка.
+    -->
+    <div :class="alwaysContainedClass" class="py-8 md:py-12">
+      <ClientOnly>
+        <template v-if="showNewestSkeleton">
+          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
+          <ProductCarouselSkeleton />
+        </template>
+        <HomeProductsCarousel
+          v-else-if="showNewestCarousel"
+          :is-loading="isFetchingNewest"
+          :products="newestProducts"
+          title="Новые поступления"
+          see-all-link="/catalog/all?sort_by=newest"
+          class="pt-4 border-t"
+        />
+        <template #fallback>
+          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
+          <ProductCarouselSkeleton />
+        </template>
+      </ClientOnly>
+    </div>
+
+    <!-- SEO-блок -->
     <div :class="alwaysContainedClass" class="py-12 md:py-16 border-t">
       <div class="prose prose-lg max-w-none">
         <h2 class="text-2xl md:text-3xl font-bold mb-6">
@@ -636,6 +776,10 @@ useRobotsRule({ index: true, follow: true });
               каталоге представлены только оригинальные товары от проверенных
               брендов с гарантией качества.
             </p>
+            <!--
+              ClientOnly здесь оправдан: это чисто клиентский интерактивный
+              список брендов, не является LazyHydration-компонентом.
+            -->
             <ClientOnly>
               <div
                 v-if="brandsForSchema.length > 0"
@@ -663,29 +807,21 @@ useRobotsRule({ index: true, follow: true });
                 name="lucide:map-pin"
                 class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
               />
-              <span
-                ><strong>Доставка по Алматы</strong> - быстрая и удобная</span
-              >
+              <span><strong>Доставка по Алматы</strong> - быстрая и удобная</span>
             </li>
             <li class="flex items-start gap-2">
               <Icon
                 name="lucide:gift"
                 class="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5"
               />
-              <span
-                ><strong>Бонусная программа</strong> - накапливайте баллы за
-                покупки</span
-              >
+              <span><strong>Бонусная программа</strong> - накапливайте баллы за покупки</span>
             </li>
             <li class="flex items-start gap-2">
               <Icon
                 name="lucide:shield-check"
                 class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
               />
-              <span
-                ><strong>Гарантия качества</strong> - только сертифицированные
-                товары</span
-              >
+              <span><strong>Гарантия качества</strong> - только сертифицированные товары</span>
             </li>
             <li class="flex items-start gap-2">
               <Icon
@@ -702,7 +838,9 @@ useRobotsRule({ index: true, follow: true });
                 class="w-6 h-6 text-primary flex-shrink-0"
               />
               <div>
-                <p class="text-sm text-muted-foreground">Свяжитесь с нами:</p>
+                <p class="text-sm text-muted-foreground">
+                  Свяжитесь с нами:
+                </p>
                 <a
                   href="tel:+77771243843"
                   class="text-lg font-semibold text-foreground hover:text-primary transition-colors"
@@ -716,13 +854,16 @@ useRobotsRule({ index: true, follow: true });
       </div>
     </div>
 
-    <!-- Промо регистрации -->
-    <ClientOnly>
-      <HomeGuestRegistrationPromo />
-      <template #fallback>
-        <!-- Пустой div для предотвращения layout shift -->
-        <div class="h-0" />
-      </template>
-    </ClientOnly>
+    <!--
+      ✅ Промо регистрации
+      ИСПРАВЛЕНО: убрана ClientOnly-обёртка.
+      Компонент рендерится на SSR → гидрируется при входе во вьюпорт.
+      Если компонент использует auth-данные внутри, он обработает это сам
+      через onMounted или watch после гидрации.
+    -->
+    <LazyHydrationGuestPromo
+      :hydrate-on-visible="{ rootMargin: '100px' }"
+      @hydrated="logHydration('GuestPromo', 'visible rootMargin:100px')"
+    />
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search } from "lucide-vue-next";
+import { Search } from 'lucide-vue-next'
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -7,20 +7,20 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { IMAGE_SIZES } from "@/config/images";
-import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from "@/constants";
-import { carouselContainerVariants } from "@/lib/variants";
-import { useCategoriesStore } from "@/stores/publicStore/categoriesStore";
-import { HeaderOverlayKey } from "@/types/app";
+} from '@/components/ui/navigation-menu'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants'
+import { carouselContainerVariants } from '@/lib/variants'
+import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { HeaderOverlayKey } from '@/types/app'
 
-const headerOverlay = inject(HeaderOverlayKey);
+const headerOverlay = inject(HeaderOverlayKey)
 
-const containerClass = carouselContainerVariants({ contained: "always" });
+const containerClass = carouselContainerVariants({ contained: 'always' })
 
-const activeMenuValue = ref<string | undefined>();
-const isSearchOpen = ref(false);
+const activeMenuValue = ref<string | undefined>()
+const isSearchOpen = ref(false)
 
 // Поиск товаров
 const {
@@ -36,132 +36,135 @@ const {
   selectSuggestion,
   removeHistoryItem,
   clearSearchHistory,
-} = useProductSearch();
+} = useProductSearch()
 
-const { getImageUrl: getSupabaseImageUrl, getVariantUrl } =
-  useSupabaseStorage();
+const { getImageUrl: getSupabaseImageUrl, getVariantUrl }
+  = useSupabaseStorage()
 
 // Живой поиск при вводе
 watch(searchQuery, (newQuery) => {
   if (newQuery.trim().length >= 4) {
-    debouncedSearch(newQuery);
-  } else {
-    searchResults.value = [];
+    debouncedSearch(newQuery)
   }
-});
+  else {
+    searchResults.value = []
+  }
+})
 
 // Очистка при закрытии
 watch(isSearchOpen, (isOpen) => {
   if (isOpen !== undefined && activeMenuValue.value) {
-    activeMenuValue.value = undefined;
+    activeMenuValue.value = undefined
   }
   if (!isOpen) {
-    searchQuery.value = "";
-    searchResults.value = [];
+    searchQuery.value = ''
+    searchResults.value = []
   }
-});
+})
 
 function handleSearch() {
-  performSearch();
-  isSearchOpen.value = false;
+  performSearch()
+  isSearchOpen.value = false
 }
 
 function handleSelectSuggestion(suggestion: string) {
-  selectSuggestion(suggestion);
-  isSearchOpen.value = false;
+  selectSuggestion(suggestion)
+  isSearchOpen.value = false
 }
 
 function handleRemoveHistory(text: string, event: Event) {
-  event.stopPropagation();
-  removeHistoryItem(text);
+  event.stopPropagation()
+  removeHistoryItem(text)
 }
 
 function getProductImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl) return null;
+  if (!imageUrl)
+    return null
   return getSupabaseImageUrl(BUCKET_NAME_PRODUCT, imageUrl, {
     width: IMAGE_SIZES.THUMBNAIL.width,
     height: IMAGE_SIZES.THUMBNAIL.height,
     quality: 80,
-    format: "webp",
-    resize: "cover",
-  });
+    format: 'webp',
+    resize: 'cover',
+  })
 }
 
 function formatPrice(
   price: number,
   discount?: number,
   finalPrice?: number,
-): { original: string; final: string; hasDiscount: boolean } {
-  const original = price.toLocaleString("ru-RU");
-  const hasDiscount = !!discount && discount > 0;
+): { original: string, final: string, hasDiscount: boolean } {
+  const original = price.toLocaleString('ru-RU')
+  const hasDiscount = !!discount && discount > 0
   // 🔥 Используем final_price из базы данных (с психологическим округлением)
   const final = finalPrice
-    ? finalPrice.toLocaleString("ru-RU")
+    ? finalPrice.toLocaleString('ru-RU')
     : hasDiscount
-      ? (price * (1 - discount / 100)).toLocaleString("ru-RU")
-      : original;
+      ? (price * (1 - discount / 100)).toLocaleString('ru-RU')
+      : original
 
-  return { original, final, hasDiscount };
+  return { original, final, hasDiscount }
 }
 
-const categoriesStore = useCategoriesStore();
+const categoriesStore = useCategoriesStore()
 
-const menuTree = computed(() => categoriesStore.menuTree);
-const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems);
+const menuTree = computed(() => categoriesStore.menuTree)
+const additionalMenuItems = computed(() => categoriesStore.additionalMenuItems)
 
-useAsyncData("category-data", () => categoriesStore.fetchCategoryData());
-useAsyncData("additional-menu-items", () =>
-  categoriesStore.fetchAdditionalMenuItems(),
-);
+useAsyncData('category-data', () => categoriesStore.fetchCategoryData())
+useAsyncData('additional-menu-items', () =>
+  categoriesStore.fetchAdditionalMenuItems())
 
 // Загружаем бренды для меню после загрузки категорий (client-only)
 watch(
   () => menuTree.value.length,
   (len) => {
     if (len > 0) {
-      categoriesStore.loadBrandsForMenuCategories();
+      categoriesStore.loadBrandsForMenuCategories()
     }
   },
   { immediate: true },
-);
+)
 
 const isAnyPopupOpenInTabBar = computed(
   () => !!activeMenuValue.value || isSearchOpen.value,
-);
+)
 
 watch(isAnyPopupOpenInTabBar, (isOpen) => {
   if (isOpen) {
-    headerOverlay?.showOverlay();
-  } else {
+    headerOverlay?.showOverlay()
+  }
+  else {
     setTimeout(() => {
       if (!activeMenuValue.value && !isSearchOpen.value) {
-        headerOverlay?.hideOverlay();
+        headerOverlay?.hideOverlay()
       }
-    }, 50);
+    }, 50)
   }
-});
+})
 
 // Закрываем поиск при открытии меню
 watch(activeMenuValue, (newValue) => {
   if (newValue !== undefined && isSearchOpen.value) {
-    isSearchOpen.value = false;
+    isSearchOpen.value = false
   }
-});
+})
 
 onUnmounted(() => {
   if (isAnyPopupOpenInTabBar.value) {
-    headerOverlay?.hideOverlay();
+    headerOverlay?.hideOverlay()
   }
-});
+})
 
 function closeAllPopups() {
-  activeMenuValue.value = undefined;
-  isSearchOpen.value = false;
+  activeMenuValue.value = undefined
+  isSearchOpen.value = false
 }
 
 function getCategoryImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl) return null;
-  return getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, "sm");
+  if (!imageUrl)
+    return null
+  return getVariantUrl(BUCKET_NAME_CATEGORY, imageUrl, 'sm')
 }
 
 function getCategoryImageVariants(imageUrl: string | null) {
@@ -177,10 +180,10 @@ function getCategoryImageVariants(imageUrl: string | null) {
 
 // Функция для закрытия меню после клика по ссылке
 function handleLinkClick() {
-  activeMenuValue.value = undefined;
+  activeMenuValue.value = undefined
 }
 
-defineExpose({ closeAllPopups });
+defineExpose({ closeAllPopups })
 </script>
 
 <template>
@@ -598,9 +601,9 @@ defineExpose({ closeAllPopups });
                       <!-- Бренды 3-го уровня -->
                       <div
                         v-if="
-                          childItem.brandsLoaded &&
-                          childItem.brands &&
-                          childItem.brands.length > 0
+                          childItem.brandsLoaded
+                            && childItem.brands
+                            && childItem.brands.length > 0
                         "
                         class="ml-2 mt-1"
                       >
@@ -624,8 +627,8 @@ defineExpose({ closeAllPopups });
                       </div>
                       <div
                         v-else-if="
-                          categoriesStore.brandsLoading &&
-                          !childItem.brandsLoaded
+                          categoriesStore.brandsLoading
+                            && !childItem.brandsLoaded
                         "
                         class="ml-2 mt-2 space-y-2 px-3"
                       >
@@ -639,8 +642,8 @@ defineExpose({ closeAllPopups });
                   </ul>
                   <div
                     v-if="
-                      rootItem.children.length === 0 &&
-                      !categoriesStore.isLoading
+                      rootItem.children.length === 0
+                        && !categoriesStore.isLoading
                     "
                     class="py-20 text-center"
                   >

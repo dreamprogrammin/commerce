@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RefreshCw, Image, CheckCircle2, AlertCircle } from 'lucide-vue-next'
+import { AlertCircle, CheckCircle2, Image, RefreshCw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 definePageMeta({ layout: 'admin' })
@@ -9,36 +9,39 @@ const stats = ref({
   total: 0,
   updated: 0,
   skipped: 0,
-  errors: 0
+  errors: 0,
 })
 
 async function generateAltTexts() {
-  if (isGenerating.value) return
-  
+  if (isGenerating.value)
+    return
+
   isGenerating.value = true
   stats.value = { total: 0, updated: 0, skipped: 0, errors: 0 }
-  
+
   try {
     const response = await $fetch('/api/generate-alt-texts', {
-      method: 'POST'
+      method: 'POST',
     })
-    
+
     stats.value = {
       total: response.total,
       updated: response.updated,
       skipped: response.skipped,
-      errors: 0
+      errors: 0,
     }
-    
+
     toast.success('Alt-тексты обновлены', {
-      description: `Обновлено: ${response.updated}, Пропущено: ${response.skipped}`
+      description: `Обновлено: ${response.updated}, Пропущено: ${response.skipped}`,
     })
-  } catch (error: any) {
+  }
+  catch (error: any) {
     toast.error('Ошибка генерации', {
-      description: error.message || 'Не удалось сгенерировать alt-тексты'
+      description: error.message || 'Не удалось сгенерировать alt-тексты',
     })
     stats.value.errors = 1
-  } finally {
+  }
+  finally {
     isGenerating.value = false
   }
 }
@@ -47,7 +50,9 @@ async function generateAltTexts() {
 <template>
   <div class="p-6 max-w-4xl mx-auto">
     <div class="mb-6">
-      <h1 class="text-2xl font-bold mb-2">Генерация Alt-текстов для изображений</h1>
+      <h1 class="text-2xl font-bold mb-2">
+        Генерация Alt-текстов для изображений
+      </h1>
       <p class="text-muted-foreground">
         Автоматическая генерация SEO-оптимизированных alt-текстов для всех изображений товаров
       </p>
@@ -72,12 +77,12 @@ async function generateAltTexts() {
     <!-- Кнопка генерации -->
     <div class="bg-white border rounded-lg p-6 mb-6">
       <Button
-        @click="generateAltTexts"
         :disabled="isGenerating"
         size="lg"
         class="w-full"
+        @click="generateAltTexts"
       >
-        <RefreshCw :class="['w-5 h-5 mr-2', isGenerating && 'animate-spin']" />
+        <RefreshCw class="w-5 h-5 mr-2" :class="[isGenerating && 'animate-spin']" />
         {{ isGenerating ? 'Генерация...' : 'Сгенерировать Alt-тексты' }}
       </Button>
     </div>
@@ -89,7 +94,9 @@ async function generateAltTexts() {
           <CheckCircle2 class="w-5 h-5 text-green-600" />
           <span class="font-semibold">Обновлено</span>
         </div>
-        <p class="text-3xl font-bold text-green-600">{{ stats.updated }}</p>
+        <p class="text-3xl font-bold text-green-600">
+          {{ stats.updated }}
+        </p>
       </div>
 
       <div class="bg-white border rounded-lg p-4">
@@ -97,8 +104,12 @@ async function generateAltTexts() {
           <Image class="w-5 h-5 text-blue-600" />
           <span class="font-semibold">Пропущено</span>
         </div>
-        <p class="text-3xl font-bold text-blue-600">{{ stats.skipped }}</p>
-        <p class="text-xs text-muted-foreground mt-1">Уже есть качественные alt-тексты</p>
+        <p class="text-3xl font-bold text-blue-600">
+          {{ stats.skipped }}
+        </p>
+        <p class="text-xs text-muted-foreground mt-1">
+          Уже есть качественные alt-тексты
+        </p>
       </div>
 
       <div class="bg-white border rounded-lg p-4">
@@ -106,13 +117,17 @@ async function generateAltTexts() {
           <AlertCircle class="w-5 h-5 text-orange-600" />
           <span class="font-semibold">Всего</span>
         </div>
-        <p class="text-3xl font-bold">{{ stats.total }}</p>
+        <p class="text-3xl font-bold">
+          {{ stats.total }}
+        </p>
       </div>
     </div>
 
     <!-- Примеры -->
     <div class="bg-white border rounded-lg p-6 mt-6">
-      <h3 class="font-semibold mb-4">Примеры сгенерированных alt-текстов</h3>
+      <h3 class="font-semibold mb-4">
+        Примеры сгенерированных alt-текстов
+      </h3>
       <div class="space-y-2 text-sm">
         <div class="flex items-start gap-2">
           <CheckCircle2 class="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />

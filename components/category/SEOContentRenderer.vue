@@ -16,7 +16,6 @@ const DEFAULT_LI_ICON = 'lucide:check-circle'
   >
     <div class="space-y-1">
       <template v-for="(block, index) in blocks" :key="index">
-
         <!-- H2 -->
         <h2
           v-if="block.type === 'h2'"
@@ -71,7 +70,6 @@ const DEFAULT_LI_ICON = 'lucide:check-circle'
             <span>{{ item.text }}</span>
           </li>
         </ul>
-
       </template>
     </div>
   </div>

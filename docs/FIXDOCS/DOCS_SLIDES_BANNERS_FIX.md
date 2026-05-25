@@ -3,6 +3,7 @@
 ## Проблемы
 
 ### 1. Слайды зависают на blur (LQIP не пропадает)
+
 **Симптом**: Слайды в карусели показывают размытый placeholder вечно, даже после загрузки изображения.
 
 **Root Cause**: В `AppCarousel.vue` свойство `_loaded` создавалось как plain-поле на объекте внутри `computed`. Vue не отслеживает мутации plain-полей — `@load="slide._loaded = true"` меняет значение, но `v-if="!slide._loaded"` не реагирует.
@@ -10,6 +11,7 @@
 **Fix**: Заменён `_loaded` на `reactive(new Set<string>())` — `loadedSlideIds`. При `@load` вызывается `onSlideImageLoaded(slide.id)`, Vue корректно отслеживает `loadedSlideIds.has(slide.id)`.
 
 ### 2. Баннеры показывают "Не загрузилось"
+
 **Симптом**: Баннеры на главной странице отображают ошибку broken image.
 
 **Root Cause**: `Banners.vue` использовал хардкоженый `'banners'` вместо `BUCKET_NAME_BANNERS` и не имел fallback при построении URL.
@@ -17,6 +19,7 @@
 **Fix**: Импортирована константа `BUCKET_NAME_BANNERS`. Добавлен fallback: `getVariantUrlWide(...) || getPublicUrl(...)` для совместимости со старыми изображениями без variant-суффиксов.
 
 ### 3. Утечка файлов в Storage при удалении/замене изображений
+
 **Симптом**: При обновлении слайда/баннера или удалении изображения без замены старые файлы (`_sm.webp`, `_md.webp`, `_lg.webp`) оставались в bucket.
 
 **Root Cause**: В `useSlideForm.ts` и `useBannerForm.ts` удаление старых файлов происходило ТОЛЬКО при загрузке нового изображения. Если пользователь просто удалял изображение (без замены), Storage не чистился.
@@ -24,6 +27,7 @@
 **Fix**: Добавлен `else if` блок — если `formData.image_url` стал `null` но `imageToDelete` содержит старый путь, вызывается `removeFile()`.
 
 ### 4. Stale blur_data_url в useBannerForm.ts
+
 **Симптом**: При загрузке нового изображения баннера blur placeholder мог не обновиться.
 
 **Root Cause**: Переменная `blurDataUrl` захватывалась в начале `handleSubmit` через `const`, а обновление `formData.value.blur_data_url` ниже по коду не влияло на уже захваченное значение.
@@ -43,15 +47,15 @@ export function isLegacyImagePath(url: string): boolean
 
 ## Изменённые файлы
 
-| Файл | Что изменено |
-|------|-------------|
-| `utils/storageVariants.ts` | **NEW** — shared utility для построения путей вариантов |
-| `components/common/AppCarousel.vue` | `_loaded` → `reactive Set`, корректная реактивность blur overlay |
-| `components/home/Banners.vue` | `BUCKET_NAME_BANNERS` + fallback URL |
-| `composables/admin/useSlideForm.ts` | Storage cleanup при удалении без замены + shared utility |
-| `composables/admin/useBannerForm.ts` | Fix stale blur + storage cleanup + shared utility |
-| `composables/admin/useAdminSlides.ts` | Shared utility вместо дублированной `_getVariantPaths` |
-| `composables/admin/useAdminBanners.ts` | Shared utility вместо дублированной `_getVariantPaths` |
+| Файл                                   | Что изменено                                                     |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| `utils/storageVariants.ts`             | **NEW** — shared utility для построения путей вариантов          |
+| `components/common/AppCarousel.vue`    | `_loaded` → `reactive Set`, корректная реактивность blur overlay |
+| `components/home/Banners.vue`          | `BUCKET_NAME_BANNERS` + fallback URL                             |
+| `composables/admin/useSlideForm.ts`    | Storage cleanup при удалении без замены + shared utility         |
+| `composables/admin/useBannerForm.ts`   | Fix stale blur + storage cleanup + shared utility                |
+| `composables/admin/useAdminSlides.ts`  | Shared utility вместо дублированной `_getVariantPaths`           |
+| `composables/admin/useAdminBanners.ts` | Shared utility вместо дублированной `_getVariantPaths`           |
 
 ## Ключевой паттерн: реактивное отслеживание загрузки изображений
 

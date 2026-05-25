@@ -560,7 +560,6 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
               </button>
             </div>
           </template>
-
         </div>
 
         <!-- 5.5. ЧИСЛОВЫЕ АТРИБУТЫ (слайдеры) -->

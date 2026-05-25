@@ -50,6 +50,7 @@ persistQueryClient({
 ### ✅ Автоматически сохраняется в localStorage:
 
 **Публичные данные** (всегда):
+
 - Слайды главной страницы (`global-slides`)
 - Популярные категории (`home-popular-categories`)
 - Рекомендации (`home-recommendations`)
@@ -59,6 +60,7 @@ persistQueryClient({
 - Каталог товаров (`catalog-products`)
 
 **Приватные данные** (только с флагом `meta: { allowCache: true }`):
+
 - ✅ Последние заказы (`user-orders-recent`) - страница `/profile/index.vue`
 - ✅ Последнее избранное (`user-wishlist-recent`) - страница `/profile/index.vue`
 - ✅ Последние бонусы (`user-bonus-recent`) - страница `/profile/index.vue`
@@ -155,12 +157,12 @@ const { data: allOrders } = useQuery({
 
 ### Где использовать allowCache:
 
-| Страница | Query | allowCache | Причина |
-|----------|-------|------------|---------|
-| `/profile` (dashboard) | `user-orders-recent` (3 шт) | ✅ YES | Быстрая загрузка preview |
-| `/profile` (dashboard) | `user-wishlist-recent` (4 шт) | ✅ YES | Быстрая загрузка preview |
-| `/profile/order` (список) | `user-orders-full` | ❌ NO | Свежие данные важнее |
-| `/profile/bonus` (история) | `user-bonus-history` | ❌ NO | Финансовые данные всегда свежие |
+| Страница                   | Query                         | allowCache | Причина                         |
+| -------------------------- | ----------------------------- | ---------- | ------------------------------- |
+| `/profile` (dashboard)     | `user-orders-recent` (3 шт)   | ✅ YES     | Быстрая загрузка preview        |
+| `/profile` (dashboard)     | `user-wishlist-recent` (4 шт) | ✅ YES     | Быстрая загрузка preview        |
+| `/profile/order` (список)  | `user-orders-full`            | ❌ NO      | Свежие данные важнее            |
+| `/profile/bonus` (история) | `user-bonus-history`          | ❌ NO      | Финансовые данные всегда свежие |
 
 ## Обновление кеша
 

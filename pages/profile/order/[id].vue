@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { UserOrder } from "@/composables/orders/useUserOrders";
-import type { Database } from "@/types";
+import type { UserOrder } from '@/composables/orders/useUserOrders'
+import type { Database } from '@/types'
 import {
   Calendar,
   CreditCard,
@@ -9,21 +9,21 @@ import {
   MessageSquarePlus,
   Package,
   XCircle,
-} from "lucide-vue-next";
-import ReviewFormDialog from "@/components/product/ReviewFormDialog.vue";
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { useUserOrders } from "@/composables/orders/useUserOrders";
-import { IMAGE_SIZES } from "@/config/images";
-import { BUCKET_NAME_PRODUCT } from "@/constants";
-import OrderTrackerLottie from "@/components/order/OrderTrackerLottie.vue"
+} from 'lucide-vue-next'
+import OrderTrackerLottie from '@/components/order/OrderTrackerLottie.vue'
+import ReviewFormDialog from '@/components/product/ReviewFormDialog.vue'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { IMAGE_SIZES } from '@/config/images'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 
-const route = useRoute();
-const router = useRouter();
-const supabase = useSupabaseClient<Database>();
-const supabaseUser = useSupabaseUser();
-const { getImageUrl } = useSupabaseStorage();
+const route = useRoute()
+const router = useRouter()
+const supabase = useSupabaseClient<Database>()
+const supabaseUser = useSupabaseUser()
+const { getImageUrl } = useSupabaseStorage()
 
-const orderId = route.params.id as string;
+const orderId = route.params.id as string
 
 const {
   getStatusColor,
@@ -31,30 +31,30 @@ const {
   subscribeToOrderUpdates,
   cancelOrder,
   canCancelOrder,
-} = useUserOrders();
+} = useUserOrders()
 
 // Состояние для отмены
-const isCancelling = ref(false);
-const showCancelDialog = ref(false);
+const isCancelling = ref(false)
+const showCancelDialog = ref(false)
 
 // Состояние для отзывов
-const reviewDialogOpen = ref(false);
-const reviewProductId = ref("");
-const reviewProductName = ref("");
-const reviewedProducts = ref<Set<string>>(new Set());
+const reviewDialogOpen = ref(false)
+const reviewProductId = ref('')
+const reviewProductName = ref('')
+const reviewedProducts = ref<Set<string>>(new Set())
 
 // Загрузка заказа
-const order = ref<UserOrder | null>(null);
-const isLoading = ref(true);
-const error = ref<string | null>(null);
+const order = ref<UserOrder | null>(null)
+const isLoading = ref(true)
+const error = ref<string | null>(null)
 
 async function fetchOrder() {
-  isLoading.value = true;
-  error.value = null;
+  isLoading.value = true
+  error.value = null
 
   try {
     const { data, error: fetchError } = await supabase
-      .from("orders")
+      .from('orders')
       .select(
         `
         id,
@@ -81,192 +81,207 @@ async function fetchOrder() {
         )
       `,
       )
-      .eq("id", orderId)
-      .single();
+      .eq('id', orderId)
+      .single()
 
-    if (fetchError) throw fetchError;
+    if (fetchError)
+      throw fetchError
 
-    order.value = data as UserOrder;
-  } catch (err: any) {
-    console.error("Ошибка загрузки заказа:", err);
-    error.value = err.message;
+    order.value = data as UserOrder
+  }
+  catch (err: any) {
+    console.error('Ошибка загрузки заказа:', err)
+    error.value = err.message
 
     // Если заказ не найден, редирект на список заказов
-    if (err.code === "PGRST116") {
+    if (err.code === 'PGRST116') {
       setTimeout(() => {
-        router.push("/profile/order");
-      }, 2000);
+        router.push('/profile/order')
+      }, 2000)
     }
-  } finally {
-    isLoading.value = false;
+  }
+  finally {
+    isLoading.value = false
   }
 }
 
 // Загрузить существующие отзывы пользователя по товарам заказа
 async function fetchUserReviews() {
-  if (!order.value) return;
+  if (!order.value)
+    return
 
   const productIds = order.value.order_items
-    .map((item) => item.product?.id)
-    .filter(Boolean) as string[];
+    .map(item => item.product?.id)
+    .filter(Boolean) as string[]
 
-  if (!productIds.length) return;
+  if (!productIds.length)
+    return
 
   const { data } = await supabase
-    .from("product_reviews")
-    .select("product_id")
-    .in("product_id", productIds)
-    .eq("user_id", supabaseUser.value?.id ?? "");
+    .from('product_reviews')
+    .select('product_id')
+    .in('product_id', productIds)
+    .eq('user_id', supabaseUser.value?.id ?? '')
 
   if (data) {
-    reviewedProducts.value = new Set(data.map((r) => r.product_id));
+    reviewedProducts.value = new Set(data.map(r => r.product_id))
   }
 }
 
 function openReviewDialog(productId: string, productName: string) {
-  reviewProductId.value = productId;
-  reviewProductName.value = productName;
-  reviewDialogOpen.value = true;
+  reviewProductId.value = productId
+  reviewProductName.value = productName
+  reviewDialogOpen.value = true
 }
 
 function onReviewSubmitted() {
-  reviewedProducts.value.add(reviewProductId.value);
+  reviewedProducts.value.add(reviewProductId.value)
 }
 
 // ✅ Подписка на обновления конкретного заказа в realtime
-let channel: any = null;
+let channel: any = null
 
 onMounted(async () => {
-  await fetchOrder();
-  await fetchUserReviews();
+  await fetchOrder()
+  await fetchUserReviews()
 
   // ✅ Подписываемся на изменения КОНКРЕТНОГО заказа
   channel = supabase
     .channel(`order:${orderId}`)
     .on(
-      "postgres_changes",
+      'postgres_changes',
       {
-        event: "UPDATE",
-        schema: "public",
-        table: "orders",
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
         filter: `id=eq.${orderId}`,
       },
       async (payload) => {
-        console.log("🔄 Realtime: статус заказа изменён", payload);
+        console.log('🔄 Realtime: статус заказа изменён', payload)
 
         // ✅ Обновляем локальный order.value
         if (order.value) {
-          const updatedFields = payload.new as Partial<typeof order.value>;
+          const updatedFields = payload.new as Partial<typeof order.value>
 
           // Обновляем только изменённые поля, сохраняя order_items
           order.value = {
             ...order.value,
             ...updatedFields,
-          };
+          }
 
           // Показываем уведомление если изменился статус
           if (payload.old.status !== payload.new.status) {
-            const statusLabel = getStatusLabel(payload.new.status);
-            console.log(`📢 Статус изменён на: ${statusLabel}`);
+            const statusLabel = getStatusLabel(payload.new.status)
+            console.log(`📢 Статус изменён на: ${statusLabel}`)
           }
         }
       },
     )
-    .subscribe();
+    .subscribe()
 
-  console.log("✅ Подписка на realtime обновления заказа активирована");
-});
+  console.log('✅ Подписка на realtime обновления заказа активирована')
+})
 
 onUnmounted(() => {
   if (channel) {
-    console.log("🔌 Отписка от realtime");
-    channel.unsubscribe();
+    console.log('🔌 Отписка от realtime')
+    channel.unsubscribe()
   }
-});
+})
 
 // Форматирование адреса доставки
 function formatAddress(address: any) {
-  if (!address) return "Не указан";
-  if (typeof address === "string") return address;
+  if (!address)
+    return 'Не указан'
+  if (typeof address === 'string')
+    return address
 
-  const parts = [];
-  if (address.city) parts.push(address.city);
-  if (address.street) parts.push(address.street);
-  if (address.building) parts.push(`д. ${address.building}`);
-  if (address.apartment) parts.push(`кв. ${address.apartment}`);
+  const parts = []
+  if (address.city)
+    parts.push(address.city)
+  if (address.street)
+    parts.push(address.street)
+  if (address.building)
+    parts.push(`д. ${address.building}`)
+  if (address.apartment)
+    parts.push(`кв. ${address.apartment}`)
 
-  return parts.length > 0 ? parts.join(", ") : "Не указан";
+  return parts.length > 0 ? parts.join(', ') : 'Не указан'
 }
 
 // Метод доставки
 const deliveryMethodLabel = computed(() => {
-  if (!order.value) return "";
+  if (!order.value)
+    return ''
 
-  const method = order.value.delivery_method;
+  const method = order.value.delivery_method
   switch (method) {
-    case "delivery":
-      return "Доставка курьером";
-    case "pickup":
-      return "Самовывоз";
+    case 'delivery':
+      return 'Доставка курьером'
+    case 'pickup':
+      return 'Самовывоз'
     default:
-      return method;
+      return method
   }
-});
+})
 
 // Метод оплаты
 const paymentMethodLabel = computed(() => {
-  if (!order.value?.payment_method) return "Не указан";
+  if (!order.value?.payment_method)
+    return 'Не указан'
 
-  const method = order.value.payment_method;
+  const method = order.value.payment_method
   switch (method) {
-    case "cash":
-      return "Наличными";
-    case "card":
-      return "Картой";
-    case "kaspi":
-      return "Каспи";
+    case 'cash':
+      return 'Наличными'
+    case 'card':
+      return 'Картой'
+    case 'kaspi':
+      return 'Каспи'
     default:
-      return method;
+      return method
   }
-});
+})
 
 // Обработчик отмены заказа
 async function handleCancelOrder() {
-  if (!order.value) return;
+  if (!order.value)
+    return
 
-  isCancelling.value = true;
-  const result = await cancelOrder(order.value.id);
+  isCancelling.value = true
+  const result = await cancelOrder(order.value.id)
 
   if (result.success) {
     // Обновляем локальный order
-    await fetchOrder();
-    showCancelDialog.value = false;
+    await fetchOrder()
+    showCancelDialog.value = false
   }
 
-  isCancelling.value = false;
+  isCancelling.value = false
 }
 
 // Получить URL изображения товара
 function getProductImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl) return null;
-  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL);
+  if (!imageUrl)
+    return null
+  return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.THUMBNAIL)
 }
 
 // Проверка что заказ доставлен
 const isDelivered = computed(() => {
   return (
-    order.value?.status === "delivered" || order.value?.status === "completed"
-  );
-});
+    order.value?.status === 'delivered' || order.value?.status === 'completed'
+  )
+})
 
 // Мета
 definePageMeta({
-  layout: "profile",
-});
+  layout: 'profile',
+})
 
 useHead({
   title: `Заказ №${orderId.slice(-6)}`,
-});
+})
 </script>
 
 <template>
@@ -284,7 +299,9 @@ useHead({
         name="lucide:alert-circle"
         class="w-16 h-16 text-destructive mx-auto"
       />
-      <h2 class="text-xl font-semibold">Заказ не найден</h2>
+      <h2 class="text-xl font-semibold">
+        Заказ не найден
+      </h2>
       <p class="text-muted-foreground">
         {{ error }}
       </p>
@@ -337,7 +354,9 @@ useHead({
             <div class="flex items-start gap-3">
               <Package class="w-5 h-5 text-muted-foreground mt-0.5" />
               <div class="flex-1">
-                <p class="text-sm font-medium">Способ доставки</p>
+                <p class="text-sm font-medium">
+                  Способ доставки
+                </p>
                 <p class="text-sm text-muted-foreground">
                   {{ deliveryMethodLabel }}
                 </p>
@@ -351,7 +370,9 @@ useHead({
             >
               <MapPin class="w-5 h-5 text-muted-foreground mt-0.5" />
               <div class="flex-1">
-                <p class="text-sm font-medium">Адрес доставки</p>
+                <p class="text-sm font-medium">
+                  Адрес доставки
+                </p>
                 <p class="text-sm text-muted-foreground">
                   {{ formatAddress(order.delivery_address) }}
                 </p>
@@ -362,7 +383,9 @@ useHead({
             <div class="flex items-start gap-3">
               <CreditCard class="w-5 h-5 text-muted-foreground mt-0.5" />
               <div class="flex-1">
-                <p class="text-sm font-medium">Способ оплаты</p>
+                <p class="text-sm font-medium">
+                  Способ оплаты
+                </p>
                 <p class="text-sm text-muted-foreground">
                   {{ paymentMethodLabel }}
                 </p>
@@ -398,9 +421,7 @@ useHead({
                   <Gift class="w-4 h-4" />
                   <span>Списано бонусов</span>
                 </div>
-                <span class="font-medium text-orange-600"
-                  >-{{ order.bonuses_spent }}</span
-                >
+                <span class="font-medium text-orange-600">-{{ order.bonuses_spent }}</span>
               </div>
               <div
                 v-if="order.bonuses_awarded > 0"
@@ -410,9 +431,7 @@ useHead({
                   <Gift class="w-4 h-4" />
                   <span>Начислено бонусов</span>
                 </div>
-                <span class="font-medium text-green-600"
-                  >+{{ order.bonuses_awarded }}</span
-                >
+                <span class="font-medium text-green-600">+{{ order.bonuses_awarded }}</span>
               </div>
             </div>
           </CardContent>
@@ -437,8 +456,8 @@ useHead({
               >
                 <ProgressiveImage
                   v-if="
-                    item.product.product_images?.[0] &&
-                    getProductImageUrl(item.product.product_images[0].image_url)
+                    item.product.product_images?.[0]
+                      && getProductImageUrl(item.product.product_images[0].image_url)
                   "
                   :src="
                     getProductImageUrl(item.product.product_images[0].image_url)
@@ -506,8 +525,8 @@ useHead({
                 <p class="font-semibold">
                   {{
                     (
-                      (item.product.final_price || item.product.price) *
-                      item.quantity
+                      (item.product.final_price || item.product.price)
+                      * item.quantity
                     ).toLocaleString("ru-RU")
                   }}
                   ₸
@@ -544,7 +563,7 @@ useHead({
           <AlertDialogTitle>Отменить заказ?</AlertDialogTitle>
           <AlertDialogDescription>
             Вы уверены, что хотите отменить заказ №{{ orderId.slice(-6) }}?
-            <br /><br />
+            <br><br>
             Потраченные бонусы будут возвращены на ваш счёт.
           </AlertDialogDescription>
         </AlertDialogHeader>

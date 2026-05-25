@@ -5,6 +5,7 @@
 При нажатии на кнопку "Подписаться" / "Подключить Telegram" пользователь оставался на странице — перехода в Telegram не происходило. Особенно часто воспроизводилось на iOS, Android и в In-App браузерах (Instagram, WhatsApp и т.д.).
 
 ### Симптомы:
+
 - Клик на кнопку ничего не открывает
 - Toast о перенаправлении показывается, но Telegram не открывается
 - Проблема стабильно воспроизводится на мобильных устройствах
@@ -64,6 +65,7 @@ prepareLink() (async, фоновая задача)
 ### 1. `components/common/TelegramSubscribeDialog.vue`
 
 **Что изменено:**
+
 - Убраны `isLoading` и функция `subscribe()`
 - Добавлены `telegramUrl: ref<string|null>` и `isPreparing: ref<boolean>`
 - Добавлена функция `prepareLink()` — генерирует code + сохраняет в БД
@@ -73,20 +75,26 @@ prepareLink() (async, фоновая задача)
 - Добавлена `handleSubscribeClick()` — показывает toast и закрывает модал (sync)
 
 **Ключевые изменения в шаблоне:**
+
 ```html
 <!-- Было -->
-<Button :disabled="isLoading" @click="subscribe">...</Button>
+<button :disabled="isLoading" @click="subscribe">...</button>
 
 <!-- Стало -->
-<Button v-if="telegramUrl" as="a" :href="telegramUrl"
-        target="_blank" rel="noopener noreferrer"
-        @click="handleSubscribeClick">
+<button
+  v-if="telegramUrl"
+  as="a"
+  :href="telegramUrl"
+  target="_blank"
+  rel="noopener noreferrer"
+  @click="handleSubscribeClick"
+>
   Подписаться в Telegram
-</Button>
-<Button v-else disabled>
+</button>
+<button v-else disabled>
   <Icon name="line-md:loading-twotone-loop" />
   Загрузка...
-</Button>
+</button>
 ```
 
 ---
@@ -100,6 +108,7 @@ prepareLink() (async, фоновая задача)
 ### 3. `components/profile/TelegramLinkButton.vue`
 
 **Что изменено:**
+
 - Убраны `isLinking` и функция `linkTelegram()`
 - Добавлены `telegramUrl`, `isPreparing`
 - Добавлена `prepareLink()` и вызов в `onMounted()` (если пользователь авторизован и Telegram не привязан)
@@ -111,6 +120,7 @@ prepareLink() (async, фоновая задача)
 ### 4. `components/profile/TelegramBanner.vue`
 
 **Что изменено:**
+
 - Убраны `isLinking` и функция `linkTelegram()`
 - Добавлены `telegramUrl`, `isPreparing`
 - `prepareLink()` вызывается в `onMounted()`
@@ -138,21 +148,21 @@ prepareLink() (async, фоновая задача)
 
 ## UX поведение после фикса
 
-| Состояние | UI | Действие |
-|---|---|---|
-| Компонент монтируется / модал открывается | Кнопка `disabled` + спиннер "Загрузка..." | Фоновый запрос к Supabase |
-| URL готов (~200–400 мс) | Активная кнопка-ссылка | Нативный переход в Telegram |
-| Ошибка генерации | Toast с ошибкой, кнопка `disabled` | Пользователь видит причину |
+| Состояние                                 | UI                                        | Действие                    |
+| ----------------------------------------- | ----------------------------------------- | --------------------------- |
+| Компонент монтируется / модал открывается | Кнопка `disabled` + спиннер "Загрузка..." | Фоновый запрос к Supabase   |
+| URL готов (~200–400 мс)                   | Активная кнопка-ссылка                    | Нативный переход в Telegram |
+| Ошибка генерации                          | Toast с ошибкой, кнопка `disabled`        | Пользователь видит причину  |
 
 ## Таблица: было / стало
 
-| | До | После |
-|---|---|---|
-| Тип кнопки | `<button @click="subscribe">` | `<a href="t.me/..." target="_blank">` |
-| Генерация токена | В момент клика (async) | При открытии UI (фон) |
-| `window.open()` | Вызывается после await | Не вызывается совсем |
-| Блокировка на iOS/Android | Да | Нет |
-| Состояние загрузки | `isLoading` на кнопке | `isPreparing` до показа ссылки |
+|                           | До                            | После                                 |
+| ------------------------- | ----------------------------- | ------------------------------------- |
+| Тип кнопки                | `<button @click="subscribe">` | `<a href="t.me/..." target="_blank">` |
+| Генерация токена          | В момент клика (async)        | При открытии UI (фон)                 |
+| `window.open()`           | Вызывается после await        | Не вызывается совсем                  |
+| Блокировка на iOS/Android | Да                            | Нет                                   |
+| Состояние загрузки        | `isLoading` на кнопке         | `isPreparing` до показа ссылки        |
 
 ## Потенциальные проблемы
 

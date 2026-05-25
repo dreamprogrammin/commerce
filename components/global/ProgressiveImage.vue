@@ -132,34 +132,36 @@ const srcsetValue = computed(() => {
     parts.push(`${props.srcMd} 800w`)
   if (props.srcLg)
     parts.push(`${props.srcLg} 1440w`)
-  
+
   if (parts.length > 0)
     return parts.join(', ')
-  
+
   // Автоматическая генерация: если src содержит /variants/, генерируем все размеры
   if (optimizedImageUrl.value && optimizedImageUrl.value.includes('/variants/')) {
     const autoSrcset: string[] = []
     const baseSrc = optimizedImageUrl.value
-    
+
     // Заменяем размер в URL
     if (baseSrc.includes('/sm/')) {
       autoSrcset.push(`${baseSrc} 400w`)
       autoSrcset.push(`${baseSrc.replace('/sm/', '/md/')} 800w`)
       autoSrcset.push(`${baseSrc.replace('/sm/', '/lg/')} 1440w`)
-    } else if (baseSrc.includes('/md/')) {
+    }
+    else if (baseSrc.includes('/md/')) {
       autoSrcset.push(`${baseSrc.replace('/md/', '/sm/')} 400w`)
       autoSrcset.push(`${baseSrc} 800w`)
       autoSrcset.push(`${baseSrc.replace('/md/', '/lg/')} 1440w`)
-    } else if (baseSrc.includes('/lg/')) {
+    }
+    else if (baseSrc.includes('/lg/')) {
       autoSrcset.push(`${baseSrc.replace('/lg/', '/sm/')} 400w`)
       autoSrcset.push(`${baseSrc.replace('/lg/', '/md/')} 800w`)
       autoSrcset.push(`${baseSrc} 1440w`)
     }
-    
+
     if (autoSrcset.length > 0)
       return autoSrcset.join(', ')
   }
-  
+
   return undefined
 })
 
@@ -193,17 +195,17 @@ const resolvedFetchpriority = computed(() => {
 const autoSizes = computed(() => {
   if (props.sizes)
     return props.sizes
-  
+
   // Если указана ширина, используем её
   if (props.width) {
     return `${props.width}px`
   }
-  
+
   // Для маленьких изображений (иконки, аватары)
   if (aspectRatioClass.value === 'aspect-square') {
     return '(max-width: 767px) 400px, (max-width: 1024px) 33vw, 25vw'
   }
-  
+
   // По умолчанию — адаптивно
   return '(max-width: 767px) 100vw, (max-width: 1024px) 50vw, 33vw'
 })

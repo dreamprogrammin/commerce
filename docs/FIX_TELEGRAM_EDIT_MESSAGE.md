@@ -3,6 +3,7 @@
 ## 🐛 Проблема
 
 **Ошибка:**
+
 ```
 Bad Request: there is no text in the message to edit
 ```
@@ -34,10 +35,10 @@ let response = await fetch(
 // Если ошибка "there is no text" - пробуем editMessageCaption
 if (!response.ok && result.description?.includes('there is no text in the message to edit')) {
   console.log('⚠️ Сообщение содержит медиа, пробуем editMessageCaption...')
-  
+
   delete body.text
   body.caption = newText
-  
+
   response = await fetch(
     `https://api.telegram.org/bot${botToken}/editMessageCaption`,
     { ... }
@@ -50,6 +51,7 @@ if (!response.ok && result.description?.includes('there is no text in the messag
 ## 📊 Результат
 
 ✅ **Теперь работает для:**
+
 - Обычных текстовых сообщений (editMessageText)
 - Сообщений с фото/видео (editMessageCaption)
 - Сообщений с кнопками (inline_keyboard)
@@ -77,6 +79,7 @@ supabase functions deploy --no-verify-jwt
 ```
 
 Обновлены функции:
+
 - `assign-order-to-admin`
 - `cancel-order`
 - `confirm-order`

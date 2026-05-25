@@ -1,95 +1,96 @@
-import type { Database } from "@/types";
-import { defineStore } from "pinia";
-import { toast } from "vue-sonner";
-import { useAuthStore } from "../core/useAuthStore";
+import type { Database } from '@/types'
+import { defineStore } from 'pinia'
+import { toast } from 'vue-sonner'
+import { useAuthStore } from '../core/useAuthStore'
 
 export interface CategoryQuestion {
-  id: string;
-  category_id: string;
-  user_id: string | null;
-  question_text: string;
-  answer_text: string | null;
-  answered_at: string | null;
-  is_auto_generated: boolean;
-  priority_order: number;
-  created_at: string;
+  id: string
+  category_id: string
+  user_id: string | null
+  question_text: string
+  answer_text: string | null
+  answered_at: string | null
+  is_auto_generated: boolean
+  priority_order: number
+  created_at: string
   profiles: {
-    first_name: string | null;
-    last_name: string | null;
-  } | null;
+    first_name: string | null
+    last_name: string | null
+  } | null
 }
 
 export const useCategoryQuestionsStore = defineStore(
-  "categoryQuestionsStore",
+  'categoryQuestionsStore',
   () => {
-    const supabase = useSupabaseClient<Database>();
-    const authStore = useAuthStore();
+    const supabase = useSupabaseClient<Database>()
+    const authStore = useAuthStore()
 
-    const questions = ref<CategoryQuestion[]>([]);
-    const isLoading = ref(false);
+    const questions = ref<CategoryQuestion[]>([])
+    const isLoading = ref(false)
 
     async function fetchQuestions(
       categoryId: string,
     ): Promise<CategoryQuestion[]> {
       const { data, error } = await supabase
-        .from("category_questions")
+        .from('category_questions')
         .select(
-          "id, category_id, user_id, question_text, answer_text, answered_at, is_auto_generated, priority_order, created_at, profiles(first_name, last_name)",
+          'id, category_id, user_id, question_text, answer_text, answered_at, is_auto_generated, priority_order, created_at, profiles(first_name, last_name)',
         )
-        .eq("category_id", categoryId)
-        .order("priority_order", { ascending: true })
-        .order("created_at", { ascending: false });
+        .eq('category_id', categoryId)
+        .order('priority_order', { ascending: true })
+        .order('created_at', { ascending: false })
 
-      if (error) throw error;
-      questions.value = (data as unknown as CategoryQuestion[]) || [];
-      return questions.value;
+      if (error)
+        throw error
+      questions.value = (data as unknown as CategoryQuestion[]) || []
+      return questions.value
     }
 
     async function askQuestion(categoryId: string, text: string) {
       if (!authStore.isLoggedIn || !authStore.user?.id) {
-        toast.info("Пожалуйста, авторизуйтесь, чтобы задать вопрос.");
-        return null;
+        toast.info('Пожалуйста, авторизуйтесь, чтобы задать вопрос.')
+        return null
       }
 
       const { data, error } = await supabase
-        .from("category_questions")
+        .from('category_questions')
         .insert({
           category_id: categoryId,
           user_id: authStore.user.id,
           question_text: text.trim(),
         })
         .select(
-          "id, category_id, user_id, question_text, answer_text, answered_at, is_auto_generated, created_at, profiles(first_name, last_name)",
+          'id, category_id, user_id, question_text, answer_text, answered_at, is_auto_generated, created_at, profiles(first_name, last_name)',
         )
-        .single();
+        .single()
 
       if (error) {
-        toast.error("Ошибка при отправке вопроса", {
+        toast.error('Ошибка при отправке вопроса', {
           description: error.message,
-        });
-        return null;
+        })
+        return null
       }
 
-      toast.success("Ваш вопрос отправлен!");
-      return data as unknown as CategoryQuestion;
+      toast.success('Ваш вопрос отправлен!')
+      return data as unknown as CategoryQuestion
     }
 
     async function deleteQuestion(questionId: string) {
       const { error } = await supabase
-        .from("category_questions")
+        .from('category_questions')
         .delete()
-        .eq("id", questionId);
+        .eq('id', questionId)
 
       if (error) {
-        toast.error("Ошибка при удалении вопроса", {
+        toast.error('Ошибка при удалении вопроса', {
           description: error.message,
-        });
-        return false;
+        })
+        return false
       }
 
-      questions.value = questions.value.filter((q) => q.id !== questionId);
-      toast.success("Вопрос удалён");
-      return true;
+      questions.value = questions.value.filter(q => q.id !== questionId)
+      toast.success('Вопрос удалён')
+      return true
     }
 
     return {
@@ -98,6 +99,6 @@ export const useCategoryQuestionsStore = defineStore(
       fetchQuestions,
       askQuestion,
       deleteQuestion,
-    };
+    }
   },
-);
+)

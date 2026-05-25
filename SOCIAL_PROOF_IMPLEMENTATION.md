@@ -1,8 +1,8 @@
 # Отчет: Активация Social Proof (Звезды и Рейтинги)
 
-**Дата:** 2026-04-02  
-**Приоритет:** 🔥 High  
-**Story Points:** 3  
+**Дата:** 2026-04-02
+**Приоритет:** 🔥 High
+**Story Points:** 3
 **Статус:** ✅ Завершено
 
 ---
@@ -31,17 +31,17 @@
 export interface BaseProduct {
   // ... существующие поля
   // ⭐ Рейтинги и отзывы для Social Proof
-  avg_rating?: number | null;
-  review_count?: number | null;
+  avg_rating?: number | null
+  review_count?: number | null
 }
 
-export type ProductWithGallery = Omit<ProductRow, "brand_id"> & {
-  product_images: ProductImageRow[];
-  brands?: SimpleBrand | null;
+export type ProductWithGallery = Omit<ProductRow, 'brand_id'> & {
+  product_images: ProductImageRow[]
+  brands?: SimpleBrand | null
   // ⭐ Рейтинги и отзывы для Social Proof
-  avg_rating?: number | null;
-  review_count?: number | null;
-};
+  avg_rating?: number | null
+  review_count?: number | null
+}
 ```
 
 **Результат:** TypeScript теперь знает о полях `avg_rating` и `review_count` во всех компонентах.
@@ -122,7 +122,7 @@ export type ProductWithGallery = Omit<ProductRow, "brand_id"> & {
 #### 3.1 Импорт компонента
 
 ```typescript
-import StarRating from "@/components/product/StarRating.vue";
+import StarRating from '@/components/product/StarRating.vue'
 ```
 
 #### 3.2 Добавлен блок рейтинга
@@ -168,11 +168,11 @@ const query = useQuery({
       catalogFilters.value,
       1,
       200,
-    );
-    return result.products;
+    )
+    return result.products
   },
   // ...
-});
+})
 ```
 
 **Результат:** Явно указано, что `fetchProducts` возвращает товары с рейтингами.
@@ -311,6 +311,6 @@ pnpm dev
 
 ---
 
-**Автор:** OpenCode AI  
-**Дата завершения:** 2026-04-02  
+**Автор:** OpenCode AI
+**Дата завершения:** 2026-04-02
 **Время выполнения:** ~30 минут

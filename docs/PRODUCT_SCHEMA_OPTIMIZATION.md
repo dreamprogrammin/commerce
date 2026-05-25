@@ -1,6 +1,6 @@
 # 🚀 SEO Schema.org Optimization - Product Pages
 
-> **Дата реализации:** 31 марта 2026  
+> **Дата реализации:** 31 марта 2026
 > **Цель:** Прокачка Schema.org для глубокой индексации и Rich Snippets
 
 ---
@@ -35,25 +35,27 @@ useSchemaOrg([
 
     // 🔥 Связывание с аксессуарами
     isAccessoryOrSparePartFor: computed(() => {
-      if (!accessories.value?.length) return undefined;
-      return accessories.value.map((acc) => ({
-        "@type": "Product" as const,
-        name: acc.name,
-        url: `https://uhti.kz/catalog/products/${acc.slug}`,
-      }));
+      if (!accessories.value?.length)
+        return undefined
+      return accessories.value.map(acc => ({
+        '@type': 'Product' as const,
+        'name': acc.name,
+        'url': `https://uhti.kz/catalog/products/${acc.slug}`,
+      }))
     }),
 
     // 🔥 Связывание с похожими товарами
     isSimilarTo: computed(() => {
-      if (!similarProducts.value?.length) return undefined;
-      return similarProducts.value.slice(0, 5).map((sim) => ({
-        "@type": "Product" as const,
-        name: sim.name,
-        url: `https://uhti.kz/catalog/products/${sim.slug}`,
-      }));
+      if (!similarProducts.value?.length)
+        return undefined
+      return similarProducts.value.slice(0, 5).map(sim => ({
+        '@type': 'Product' as const,
+        'name': sim.name,
+        'url': `https://uhti.kz/catalog/products/${sim.slug}`,
+      }))
     }),
   }),
-]);
+])
 ```
 
 ### Результат
@@ -96,7 +98,7 @@ useSchemaOrg([
 ```typescript
 // ❌ ОПАСНО!
 if (!product.value.description && product.value.stock_quantity === 0)
-  return { noindex: true, follow: true };
+  return { noindex: true, follow: true }
 ```
 
 Если товар временно распродан, мы кидали ему `noindex`. Google выбрасывал страницу из индекса. Когда товар возвращался на склад, требовались **недели** для восстановления позиций (позиция 18 → позиция 100).
@@ -109,16 +111,18 @@ if (!product.value.description && product.value.stock_quantity === 0)
 
 ```typescript
 const robotsRule = computed(() => {
-  if (!product.value) return { noindex: true, nofollow: true };
+  if (!product.value)
+    return { noindex: true, nofollow: true }
 
   // 🔥 Убираем условие noindex при stock_quantity === 0
   // Товар не в наличии должен индексироваться, чтобы люди переходили
   // и видели "Сообщить о поступлении" или покупали аналоги.
   // noindex ставим ТОЛЬКО если товар явно отключен админом
-  if (product.value.is_active === false) return { noindex: true, follow: true };
+  if (product.value.is_active === false)
+    return { noindex: true, follow: true }
 
-  return { index: true, follow: true };
-});
+  return { index: true, follow: true }
+})
 ```
 
 ### Результат
@@ -368,9 +372,7 @@ https://uhti.kz/catalog/products/lego-city-police
 ```html
 <h1>
   <span>Конструктор LEGO City Полицейский участок</span>
-  <span class="text-sm font-medium text-muted-foreground/70">
-    Игрушка для мальчиков от 5 до 8 лет от LEGO
-  </span>
+  <span class="text-sm font-medium text-muted-foreground/70"> Игрушка для мальчиков от 5 до 8 лет от LEGO </span>
 </h1>
 ```
 
@@ -436,6 +438,6 @@ curl -s https://uhti.kz/catalog/products/lego-city-police | grep -A 50 '"@type":
 
 ---
 
-**Дата создания:** 31 марта 2026  
-**Автор:** Uhti Commerce Team  
+**Дата создания:** 31 марта 2026
+**Автор:** Uhti Commerce Team
 **Статус:** ✅ Реализовано и готово к деплою

@@ -3,11 +3,13 @@
 ## Компоненты
 
 ### BrandSEOContentRenderer
+
 `components/brand/SEOContentRenderer.vue`
 
 Рендерит структурированный SEO-контент из поля `seo_content` для страниц брендов и линеек.
 
 **Поддерживаемые блоки:**
+
 - `h2` — заголовки с иконками
 - `h3` — подзаголовки с иконками
 - `p` — параграфы
@@ -23,15 +25,17 @@
 import { parseHTMLToBlocks } from '@/utils/parseHTMLToBlocks'
 
 const seoBlocks = computed(() => {
-  if (!brand.value?.seo_content) return []
+  if (!brand.value?.seo_content)
+    return []
   return parseHTMLToBlocks(brand.value.seo_content)
 })
 
 // Извлечение текста для Schema.org
 const seoContentText = computed(() => {
-  if (!seoBlocks.value.length) return ''
+  if (!seoBlocks.value.length)
+    return ''
   return seoBlocks.value
-    .map(block => {
+    .map((block) => {
       if (block.type === 'ul') {
         return block.items.map(item => item.text).join(' ')
       }
@@ -44,6 +48,7 @@ const seoContentText = computed(() => {
 ```
 
 **Передача в template:**
+
 ```vue
 <BrandStandardTemplate
   :brand="brand"
@@ -52,6 +57,7 @@ const seoContentText = computed(() => {
 ```
 
 **Schema.org:**
+
 ```typescript
 {
   "@type": "Brand",
@@ -68,7 +74,8 @@ const seoContentText = computed(() => {
 
 ```typescript
 const seoBlocks = computed(() => {
-  if (!productLine.value?.seo_content) return []
+  if (!productLine.value?.seo_content)
+    return []
   return parseHTMLToBlocks(productLine.value.seo_content)
 })
 
@@ -78,6 +85,7 @@ const seoContentText = computed(() => {
 ```
 
 **Рендер в template:**
+
 ```vue
 <div v-if="seoBlocks.length" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
   <BrandSEOContentRenderer :blocks="seoBlocks" />
@@ -120,10 +128,10 @@ const seoContentText = computed(() => {
 
 ## Преимущества для SEO
 
-✅ **Структурированный контент** — Google индексирует заголовки, списки, параграфы  
-✅ **Schema.org Brand** — текст из `seo_content` попадает в `description`  
-✅ **Семантическая разметка** — связь бренда и линеек через `subOrganization`  
-✅ **Визуальное оформление** — иконки, отступы, адаптивность  
+✅ **Структурированный контент** — Google индексирует заголовки, списки, параграфы
+✅ **Schema.org Brand** — текст из `seo_content` попадает в `description`
+✅ **Семантическая разметка** — связь бренда и линеек через `subOrganization`
+✅ **Визуальное оформление** — иконки, отступы, адаптивность
 
 ---
 
@@ -144,6 +152,7 @@ const seoContentText = computed(() => {
 ```
 
 **Результат:**
+
 - Рендерится как красивый блок с иконками
 - Текст попадает в Schema.org `Brand.description`
 - Google индексирует структурированный контент

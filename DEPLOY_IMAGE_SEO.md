@@ -13,6 +13,7 @@ Value: <твой service role key>
 ```
 
 **Где найти service role key:**
+
 1. Открой [Supabase Dashboard](https://supabase.com/dashboard)
 2. Выбери свой проект
 3. Settings → API
@@ -49,6 +50,7 @@ curl -X POST https://your-site.com/api/generate-alt-texts
 ## Что произойдет:
 
 ✅ Все изображения товаров получат SEO-оптимизированные alt-тексты:
+
 - `LEGO Конструктор Железный Человек Marvel купить в Казахстане`
 - `Barbie Кукла Принцесса Disney вид сбоку`
 - `Hot Wheels Трек Мертвая петля детальное фото`
@@ -62,13 +64,15 @@ curl -X POST https://your-site.com/api/generate-alt-texts
 ## Проверка
 
 После генерации проверь любую страницу товара:
+
 1. Открой DevTools (F12)
 2. Elements → найди `<img>` теги
 3. Проверь атрибут `alt`
 
 Должно быть:
+
 ```html
-<img alt="LEGO Конструктор Железный Человек Marvel купить в Казахстане">
+<img alt="LEGO Конструктор Железный Человек Marvel купить в Казахстане" />
 ```
 
 ---

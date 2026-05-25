@@ -21,9 +21,9 @@ import CategoryProductLines from '@/components/category/CategoryProductLines.vue
 import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
 import CategoryRatingBlock from '@/components/category/CategoryRatingBlock.vue'
 import CategoryReviews from '@/components/category/CategoryReviews.vue'
+import SEOContentRenderer from '@/components/category/SEOContentRenderer.vue'
 import DynamicFilters from '@/components/global/DynamicFilters.vue'
 import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
-import SEOContentRenderer from '@/components/category/SEOContentRenderer.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
@@ -1016,7 +1016,7 @@ const metaDescription = computed(() => {
     }
 
     if (categoryStats.value.reviews > 0) {
-      const ratingValue = parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
+      const ratingValue = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
       const starCount = Math.round(ratingValue)
       const starEmojis = '⭐'.repeat(starCount)
       parts.push(`${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`)
@@ -1030,7 +1030,7 @@ const metaDescription = computed(() => {
 
   if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
     const ratingValue = categoryStats.value.reviews > 0
-      ? parseFloat(categoryStats.value.rating.replace(',', '.'))
+      ? Number.parseFloat(categoryStats.value.rating.replace(',', '.'))
       : undefined
 
     return generateCategoryDescription({
@@ -1057,7 +1057,7 @@ const metaDescription = computed(() => {
   }
 
   if (categoryStats.value.reviews > 0) {
-    const ratingValue = parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
+    const ratingValue = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
     const starCount = Math.round(ratingValue)
     const starEmojis = '⭐'.repeat(starCount)
     snippet += `. ${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`

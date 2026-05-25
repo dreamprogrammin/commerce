@@ -15,6 +15,7 @@
 ```
 
 **Примеры:**
+
 - `LEGO Конструктор Железный Человек Marvel купить в Казахстане` (первое фото)
 - `LEGO Конструктор Железный Человек Marvel вид сбоку` (второе фото)
 - `LEGO Конструктор Железный Человек Marvel детальное фото` (третье фото)
@@ -42,10 +43,12 @@ const altText = generateProductImageAlt({
 ### 2. Обновлены компоненты
 
 #### ProductCard (`components/global/ProductCard.vue`)
+
 - Добавлена функция `getImageAlt()` для генерации alt-текстов
 - Alt-тексты включают бренд, название, серию и контекст
 
 #### ProductGallery (`components/global/ProductGallery.vue`)
+
 - Использует `alt_text` из БД, если заполнен
 - Генерирует на лету, если не заполнен
 - Работает для миниатюр, основных изображений и lightbox
@@ -110,13 +113,15 @@ npx tsx scripts/generate-alt-texts.ts
 ## Результат
 
 ### До
+
 ```html
-<img src="product.jpg" alt="Изображение товара 1">
+<img src="product.jpg" alt="Изображение товара 1" />
 ```
 
 ### После
+
 ```html
-<img src="product.jpg" alt="LEGO Конструктор Железный Человек Marvel купить в Казахстане">
+<img src="product.jpg" alt="LEGO Конструктор Железный Человек Marvel купить в Казахстане" />
 ```
 
 ## Почему это работает
@@ -129,6 +134,7 @@ npx tsx scripts/generate-alt-texts.ts
 ## Дальнейшие улучшения
 
 1. **Добавить категорию в alt-текст**
+
    ```typescript
    // Пример: "LEGO Конструктор Железный Человек Marvel для детей 6+ купить"
    ```
@@ -145,11 +151,13 @@ npx tsx scripts/generate-alt-texts.ts
 ## Мониторинг результатов
 
 ### Google Search Console
+
 1. Перейди в **Performance** → **Search results**
 2. Фильтр: **Search type** → **Image**
 3. Смотри рост impressions и clicks
 
 ### Ожидаемый результат
+
 - Рост трафика из Google Images на 20-40% за 2-3 месяца
 - Увеличение конверсии из-за более целевой аудитории
 

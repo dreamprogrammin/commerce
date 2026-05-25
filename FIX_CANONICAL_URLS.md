@@ -90,25 +90,27 @@ curl -s "https://uhti.kz/catalog/babies/katalki" | grep -oP '<link[^>]*rel="cano
 
 ```typescript
 const canonicalUrl = computed(() => {
-  const baseUrl = "https://uhti.kz";
-  let basePath: string;
+  const baseUrl = 'https://uhti.kz'
+  let basePath: string
 
   // Если canonical_url пустой (NULL), используем href
   if (currentCategory.value?.canonical_url) {
-    basePath = currentCategory.value.canonical_url;
-  } else if (currentCategory.value?.href) {
-    basePath = currentCategory.value.href; // ✅ Правильный путь
-  } else {
-    basePath = route.path;
+    basePath = currentCategory.value.canonical_url
+  }
+  else if (currentCategory.value?.href) {
+    basePath = currentCategory.value.href // ✅ Правильный путь
+  }
+  else {
+    basePath = route.path
   }
 
   // Для brand landing добавляем ?brand=slug
   if (activeBrandSlug.value) {
-    return `${baseUrl}${basePath}?brand=${activeBrandSlug.value}`;
+    return `${baseUrl}${basePath}?brand=${activeBrandSlug.value}`
   }
 
-  return `${baseUrl}${basePath}`;
-});
+  return `${baseUrl}${basePath}`
+})
 ```
 
 ## Ожидаемый результат
@@ -124,5 +126,5 @@ const canonicalUrl = computed(() => {
 
 ---
 
-**Дата создания:** 31 марта 2026  
+**Дата создания:** 31 марта 2026
 **Статус:** Готово к применению

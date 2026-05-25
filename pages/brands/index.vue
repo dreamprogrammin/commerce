@@ -78,13 +78,15 @@ useSchemaOrg([
 
 // Получить URL логотипа бренда
 function getBrandLogoUrl(logoUrl: string | null) {
-  if (!logoUrl) return null
+  if (!logoUrl)
+    return null
   return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
 }
 
 // Группировка брендов по первой букве
 const groupedBrands = computed(() => {
-  if (!brands.value) return {}
+  if (!brands.value)
+    return {}
 
   const groups: Record<string, Brand[]> = {}
 

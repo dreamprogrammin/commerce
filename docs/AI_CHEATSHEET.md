@@ -49,10 +49,10 @@ commerce/
 
 ### Двойная архитектура заказов
 
-| Тип | Таблица | Бонусы | User ID |
-|-----|---------|--------|---------|
-| **Зарегистрированные** | `orders` | ✅ Да | ✅ Да |
-| **Гостевые** | `guest_checkouts` | ❌ Нет | ❌ Нет |
+| Тип                    | Таблица           | Бонусы | User ID |
+| ---------------------- | ----------------- | ------ | ------- |
+| **Зарегистрированные** | `orders`          | ✅ Да  | ✅ Да   |
+| **Гостевые**           | `guest_checkouts` | ❌ Нет | ❌ Нет  |
 
 ### Система бонусов
 
@@ -97,7 +97,9 @@ const emit = defineEmits<{
 <template>
   <div>
     <Skeleton v-if="isLoading" />
-    <div v-else>{{ title }}</div>
+    <div v-else>
+      {{ title }}
+    </div>
   </div>
 </template>
 ```
@@ -141,7 +143,8 @@ export const useExampleStore = defineStore('example', () => {
     try {
       const { data } = await supabase.from('items').select('*')
       items.value = data || []
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
   }
@@ -176,6 +179,7 @@ $$;
 ## 🗄️ Основные таблицы
 
 ### Каталог
+
 - `products` - Товары
 - `product_images` - Галерея с LQIP
 - `categories` - Иерархические категории
@@ -183,11 +187,13 @@ $$;
 - `attributes` - Динамические атрибуты
 
 ### Заказы
+
 - `orders` - Зарегистрированные (с бонусами)
 - `guest_checkouts` - Гостевые (без бонусов)
 - `order_items` - Товары в заказах
 
 ### Пользователи
+
 - `profiles` - Профили (с балансом бонусов)
 - `children` - Профили детей
 - `wishlist` - Список желаний
@@ -315,5 +321,5 @@ Deploy:    Vercel (SSR)
 
 ---
 
-**Дата создания:** 21 мая 2026  
+**Дата создания:** 21 мая 2026
 **Версия:** 1.0

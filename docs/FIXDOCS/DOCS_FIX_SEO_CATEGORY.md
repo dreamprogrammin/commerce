@@ -9,15 +9,16 @@
 
 Google Rich Results Test показывал только 2 элемента вместо 5:
 
-| Элемент | Статус до исправления |
-|---|---|
+| Элемент          | Статус до исправления   |
+| ---------------- | ----------------------- |
 | Строки навигации | ✅ Обнаружен без ошибок |
-| Организация | ✅ Обнаружен без ошибок |
-| Product | ❌ Не обнаружен |
-| ItemList | ❌ Не обнаружен |
-| FAQPage | ❌ Не обнаружен |
+| Организация      | ✅ Обнаружен без ошибок |
+| Product          | ❌ Не обнаружен         |
+| ItemList         | ❌ Не обнаружен         |
+| FAQPage          | ❌ Не обнаружен         |
 
 **Страницы с проблемой:**
+
 - Товар: `/catalog/products/[slug]`
 - Категория: `/catalog/constructors-root/konstruktory-malchikam?brand=lego`
 
@@ -55,8 +56,8 @@ useHead(() => ({
     type: 'application/ld+json',
     children: JSON.stringify({
       '@type': 'Product',
-      'name': metaTitle.value,       // = "Товар | Ухтышка" если нет данных
-      'offers': { 'price': product.value?.price || 0 }  // = 0
+      'name': metaTitle.value, // = "Товар | Ухтышка" если нет данных
+      'offers': { price: product.value?.price || 0 } // = 0
     })
   }]
 }))
@@ -82,7 +83,8 @@ useHead(() => {
 
 ```ts
 const productJsonLd = computed(() => {
-  if (!product.value) return null  // никогда не строим пустую схему
+  if (!product.value)
+    return null // никогда не строим пустую схему
 
   const finalPrice = p.discount_percentage
     ? Math.round(Number(p.price) * (100 - p.discount_percentage) / 100)
@@ -131,7 +133,7 @@ if (import.meta.server) {
   const { data: ssrData } = useAsyncData(
     ssrKey.value,
     () => queryFn(),
-    { server: true },  // ← дожидаемся на сервере
+    { server: true }, // ← дожидаемся на сервере
   )
 
   if (ssrData.value) {
@@ -178,6 +180,7 @@ if (faqQuestions.value.length > 0 && (!hasActiveFilters.value || activeBrand.val
 ```
 
 Теперь FAQPage показывается:
+
 - На обычных страницах категории без фильтров — как раньше
 - На Brand Landing (`?brand=lego`) — **новое**, даже если фильтр бренда активен
 
@@ -230,11 +233,11 @@ useHead(() => ({
 
 ## 4. Итог по файлам
 
-| Файл | Изменения |
-|---|---|
+| Файл                                | Изменения                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
 | `pages/catalog/products/[slug].vue` | Guard в `useHead`; `productJsonLd` в `computed`; Product schema через `useSchemaOrg` |
-| `composables/useCatalogQuery.ts` | SSR prefetch через `useAsyncData` + `queryClient.setQueryData` |
-| `pages/catalog/[...slug].vue` | FAQPage с `activeBrand`; все схемы перенесены в `useSchemaOrg` |
+| `composables/useCatalogQuery.ts`    | SSR prefetch через `useAsyncData` + `queryClient.setQueryData`                       |
+| `pages/catalog/[...slug].vue`       | FAQPage с `activeBrand`; все схемы перенесены в `useSchemaOrg`                       |
 
 ---
 
@@ -242,13 +245,13 @@ useHead(() => ({
 
 Google Rich Results Test после деплоя:
 
-| Элемент | Статус после исправления |
-|---|---|
-| Строки навигации | ✅ Обнаружен без ошибок |
-| Организация | ✅ Обнаружен без ошибок |
-| Product | ✅ Обнаружен на страницах товаров |
-| ItemList | ✅ Обнаружен на страницах категорий |
-| FAQPage | ✅ Обнаружен на категориях и Brand Landing |
+| Элемент          | Статус после исправления                   |
+| ---------------- | ------------------------------------------ |
+| Строки навигации | ✅ Обнаружен без ошибок                    |
+| Организация      | ✅ Обнаружен без ошибок                    |
+| Product          | ✅ Обнаружен на страницах товаров          |
+| ItemList         | ✅ Обнаружен на страницах категорий        |
+| FAQPage          | ✅ Обнаружен на категориях и Brand Landing |
 
 ### Как проверить
 

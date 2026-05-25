@@ -58,7 +58,8 @@ export const useProfileStore = defineStore('profileStore', () => {
     // ✅ Создаем промис для текущей загрузки
     loadingPromise = (async () => {
       // silent=true — фоновый refetch, не трогаем isLoading чтобы не мигал UI
-      if (!silent) isLoading.value = true
+      if (!silent)
+        isLoading.value = true
 
       try {
         // Пробуем загрузить профиль
@@ -159,7 +160,8 @@ export const useProfileStore = defineStore('profileStore', () => {
       }
       finally {
         // ✅ КРИТИЧНО: ВСЕГДА снимаем загрузку и очищаем промис
-        if (!silent) isLoading.value = false
+        if (!silent)
+          isLoading.value = false
         loadingPromise = null
       }
     })()
@@ -172,7 +174,8 @@ export const useProfileStore = defineStore('profileStore', () => {
    */
   async function updateProfile(updates: ProfileUpdate, { silent = false } = {}) {
     if (!user.value) {
-      if (!silent) toast.error('Для обновления профиля необходимо войти в систему.')
+      if (!silent)
+        toast.error('Для обновления профиля необходимо войти в систему.')
       return false
     }
 
@@ -190,7 +193,8 @@ export const useProfileStore = defineStore('profileStore', () => {
         throw error
 
       profile.value = data
-      if (!silent) toast.success('Профиль успешно обновлен!')
+      if (!silent)
+        toast.success('Профиль успешно обновлен!')
       return true
     }
     catch (error: any) {
@@ -212,7 +216,8 @@ export const useProfileStore = defineStore('profileStore', () => {
    * Вызывается автоматически при загрузке профиля
    */
   async function activatePendingBonuses() {
-    if (!user.value) return
+    if (!user.value)
+      return
 
     try {
       const { data, error } = await supabase.rpc('activate_my_pending_bonuses')

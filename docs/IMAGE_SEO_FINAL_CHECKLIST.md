@@ -3,16 +3,19 @@
 ## Что исправлено
 
 ### 1. ✅ Скрипты работают
+
 - Добавлена загрузка .env файла
 - Поддержка обоих вариантов переменных: `SUPABASE_URL` и `NUXT_PUBLIC_SUPABASE_URL`
 - Используется `npx tsx` (не требует установки)
 
 ### 2. ✅ Компоненты проверены
+
 - `ProductCard.vue` - правильно использует `product.brands?.name` и `product.product_line_name`
 - `ProductGallery.vue` - корректно получает props из страницы товара
 - `[slug].vue` - передает все необходимые данные
 
 ### 3. ✅ Типы данных совпадают
+
 - `BaseProduct` содержит все нужные поля
 - `product.brands?.name` - доступен
 - `product.product_line_name` - доступен
@@ -37,6 +40,7 @@ npm run seo:audit
 ```
 
 Ожидаемый результат:
+
 ```
 📊 Статистика alt текстов:
 
@@ -56,6 +60,7 @@ npm run seo:generate
 ```
 
 Ожидаемый результат:
+
 ```
 ✅ Обновлено: 150 изображений
 ⏭️  Пропущено: 0 изображений
@@ -82,8 +87,9 @@ npm run dev
 4. Проверь, что alt содержит: `[Бренд] [Название] [Серия] [Контекст]`
 
 Пример:
+
 ```html
-<img alt="LEGO Конструктор Железный Человек Marvel купить в Казахстане">
+<img alt="LEGO Конструктор Железный Человек Marvel купить в Казахстане" />
 ```
 
 ### Шаг 6: Деплой
@@ -102,15 +108,20 @@ npm run build
 ## Возможные проблемы
 
 ### Проблема: "ECONNREFUSED 127.0.0.1:54321"
+
 **Решение:** Запусти Supabase локально или используй продакшн URL в .env
 
 ### Проблема: Alt-тексты не генерируются
+
 **Решение:** Проверь, что в БД есть связи:
+
 - `products.brands` (brand_id → brands.id)
 - `products.product_lines` (product_line_id → product_lines.id)
 
 ### Проблема: Alt-тексты пустые в браузере
+
 **Решение:** Проверь, что props передаются в ProductGallery:
+
 ```vue
 <ProductGallery
   :product-name="product.name"

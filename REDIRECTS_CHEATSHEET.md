@@ -3,6 +3,7 @@
 ## ✅ Что сделано
 
 ### 1. Бренды (`pages/brand/[slug].vue`)
+
 ```typescript
 // Если бренд не найден → 301 на /brands
 if (!brand.value && !brandPending.value) {
@@ -11,6 +12,7 @@ if (!brand.value && !brandPending.value) {
 ```
 
 ### 2. Категории (`pages/catalog/[...slug].vue`)
+
 ```typescript
 // Если категория не найдена → 301 на /catalog
 if (currentCategorySlug.value !== 'all' && !currentCategory.value && categoriesStore.allCategories.length > 0) {
@@ -19,6 +21,7 @@ if (currentCategorySlug.value !== 'all' && !currentCategory.value && categoriesS
 ```
 
 ### 3. Линейки бренда (`pages/brand/[brandSlug]/[lineSlug].vue`)
+
 ```typescript
 // Если бренд не найден → 301 на /brands
 if (!brand.value && !brandPending.value) {
@@ -36,6 +39,7 @@ if (brand.value && !productLine.value && !linePending.value) {
 ## 🧪 Как проверить
 
 ### Вариант 1: Командная строка
+
 ```bash
 # Проверка бренда
 curl -I https://uhti.kz/brand/nonexistent-brand
@@ -51,11 +55,13 @@ curl -I https://uhti.kz/catalog/nonexistent-category
 ```
 
 ### Вариант 2: Автоматический скрипт
+
 ```bash
 ./test_redirects.sh
 ```
 
 ### Вариант 3: Браузер
+
 1. Откройте DevTools → Network
 2. Перейдите на несуществующий бренд/категорию
 3. Проверьте статус: **301** (не 200!)
@@ -65,11 +71,13 @@ curl -I https://uhti.kz/catalog/nonexistent-category
 ## 📊 Результаты
 
 ### До внедрения:
+
 - ❌ HTTP 200 + "Не найдено"
 - ❌ Soft 404 в Google Search Console
 - ❌ Потеря SEO-веса
 
 ### После внедрения:
+
 - ✅ HTTP 301 → новая страница
 - ✅ "Страница с переадресацией" (норма)
 - ✅ SEO-вес передается
@@ -79,6 +87,7 @@ curl -I https://uhti.kz/catalog/nonexistent-category
 ## 🔧 Дополнительно
 
 ### Ручные редиректы (nuxt.config.ts):
+
 ```typescript
 nitro: {
   routeRules: {

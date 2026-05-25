@@ -38,8 +38,8 @@
 
 ```typescript
 // Было (без округления):
-const priceMin = priceRangeData.min_price  // → 9561.3
-const priceMax = priceRangeData.max_price  // → 49999.7
+const priceMin = priceRangeData.min_price // → 9561.3
+const priceMax = priceRangeData.max_price // → 49999.7
 priceRange.value = { min: priceMin, max: priceMax }
 ```
 
@@ -128,13 +128,13 @@ WHERE cq.category_id = c.id
 
 ## Критерии приёмки
 
-| # | Сценарий | Ожидаемое поведение |
-|---|----------|---------------------|
-| 1 | Страница категории → Schema.org source | FAQ-ответ не содержит числа товаров, только статичный текст |
-| 2 | Слайдер цен при загрузке страницы | Показывает целые числа: `9 000 ₸ — 50 000 ₸` |
-| 3 | Перемещение бегунка слайдера | Показывает `9 561 ₸` (пробел, не запятая) |
-| 4 | Мобильный фильтр | То же форматирование |
-| 5 | Slider не "прыгает" при инициализации | min/max — целые числа, step=100 делит их без остатка |
+| #   | Сценарий                               | Ожидаемое поведение                                         |
+| --- | -------------------------------------- | ----------------------------------------------------------- |
+| 1   | Страница категории → Schema.org source | FAQ-ответ не содержит числа товаров, только статичный текст |
+| 2   | Слайдер цен при загрузке страницы      | Показывает целые числа: `9 000 ₸ — 50 000 ₸`                |
+| 3   | Перемещение бегунка слайдера           | Показывает `9 561 ₸` (пробел, не запятая)                   |
+| 4   | Мобильный фильтр                       | То же форматирование                                        |
+| 5   | Slider не "прыгает" при инициализации  | min/max — целые числа, step=100 делит их без остатка        |
 
 ---
 
@@ -147,9 +147,9 @@ WHERE cq.category_id = c.id
 
 ## Изменённые файлы
 
-| Файл | Тип изменения |
-|------|---------------|
-| `pages/catalog/[...slug].vue` | `Math.floor`/`Math.ceil` + `Number()` для priceMin/priceMax |
-| `components/global/DynamicFilters.vue` | `Intl.NumberFormat('ru-RU')` вместо `.toLocaleString()` |
-| `components/global/DynamicFiltersMobile.vue` | `Intl.NumberFormat('ru-RU')` вместо `.toLocaleString()` |
+| Файл                                                                  | Тип изменения                                                    |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `pages/catalog/[...slug].vue`                                         | `Math.floor`/`Math.ceil` + `Number()` для priceMin/priceMax      |
+| `components/global/DynamicFilters.vue`                                | `Intl.NumberFormat('ru-RU')` вместо `.toLocaleString()`          |
+| `components/global/DynamicFiltersMobile.vue`                          | `Intl.NumberFormat('ru-RU')` вместо `.toLocaleString()`          |
 | `supabase/migrations/20260301000003_fix_faq_static_product_count.sql` | Новая миграция: статичный текст в FAQ, UPDATE существующих строк |

@@ -7,11 +7,11 @@
  */
 export function formatPrice(price: number): string {
   // Округляем до целого
-  const rounded = Math.round(price);
+  const rounded = Math.round(price)
 
   // Используем регулярку для добавления пробелов между тысячами
   // Это работает одинаково на сервере и клиенте
-  return rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
 /**
@@ -29,20 +29,20 @@ export function formatPriceWithDiscount(
   price: number,
   discountPercent?: number | null,
 ): {
-  original: string;
-  final: string;
-  finalNumber: number;
-  hasDiscount: boolean;
+  original: string
+  final: string
+  finalNumber: number
+  hasDiscount: boolean
 } {
-  const hasDiscount = !!discountPercent && discountPercent > 0;
+  const hasDiscount = !!discountPercent && discountPercent > 0
   const finalNumber = hasDiscount
     ? Math.round(price * (1 - discountPercent / 100))
-    : Math.round(price);
+    : Math.round(price)
 
   return {
     original: formatPrice(price),
     final: formatPrice(finalNumber),
     finalNumber,
     hasDiscount,
-  };
+  }
 }

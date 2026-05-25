@@ -27,10 +27,10 @@ const REVIEW_SELECT = '..., profiles!product_reviews_profile_id_fkey(first_name,
 
 ### Почему колонка отсутствовала
 
-| Миграция | Описание | Результат |
-|----------|----------|-----------|
-| `20250804104226__initialize_project.sql` | Создаёт `profiles` с `first_name, last_name, phone, role, ...` | Без `avatar_url` |
-| `20260203054051_master_schema_consolidation.sql` | `CREATE TABLE IF NOT EXISTS profiles (...avatar_url TEXT...)` | **Игнорируется** — таблица уже существует |
+| Миграция                                               | Описание                                                               | Результат                                   |
+| ------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------- |
+| `20250804104226__initialize_project.sql`               | Создаёт `profiles` с `first_name, last_name, phone, role, ...`         | Без `avatar_url`                            |
+| `20260203054051_master_schema_consolidation.sql`       | `CREATE TABLE IF NOT EXISTS profiles (...avatar_url TEXT...)`          | **Игнорируется** — таблица уже существует   |
 | `20260227000001_fix_google_oauth_profile_creation.sql` | Пересоздаёт `handle_new_user()`, но не добавляет `avatar_url` в INSERT | `avatar_url` не сохраняется при регистрации |
 
 `CREATE TABLE IF NOT EXISTS` **не добавляет новые колонки в существующую таблицу** — это DDL-ловушка. Нужен явный `ALTER TABLE ... ADD COLUMN`.
@@ -44,27 +44,33 @@ const REVIEW_SELECT = '..., profiles!product_reviews_profile_id_fkey(first_name,
 ### Новая миграция: `20260301000001_add_avatar_url_to_profiles.sql`
 
 #### Шаг 1 — Добавление колонки
+
 ```sql
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 ```
 
 #### Шаг 2 — Обновление `handle_new_user()`
+
 Google OAuth передаёт URL аватарки в `raw_user_meta_data` как `avatar_url` или `picture`:
+
 ```sql
 v_avatar_url := COALESCE(
   NULLIF(TRIM(NEW.raw_user_meta_data->>'avatar_url'), ''),
   NULLIF(TRIM(NEW.raw_user_meta_data->>'picture'),    '')
 );
 ```
+
 При регистрации через Google — аватарка сразу сохраняется в `profiles`.
 
 `ON CONFLICT (id) DO UPDATE SET avatar_url = ...` — обновляет аватарку при повторном входе, если она изменилась.
 
 #### Шаг 3 — Обновление `ensure_profile_exists()` (client-side fallback)
+
 Та же логика извлечения `avatar_url` из `raw_user_meta_data` + дополнительная проверка: если профиль уже есть, но `avatar_url IS NULL` — пробует заполнить из `auth.users`.
 
 #### Шаг 4 — Бэкфилл существующих пользователей
+
 ```sql
 UPDATE public.profiles p
 SET avatar_url = COALESCE(
@@ -74,9 +80,11 @@ SET avatar_url = COALESCE(
 FROM auth.users u
 WHERE p.id = u.id AND p.avatar_url IS NULL AND ...
 ```
+
 Заполняет `avatar_url` для всех уже существующих пользователей без потери данных.
 
 #### Шаг 5 — Перезагрузка схемы PostgREST
+
 ```sql
 NOTIFY pgrst, 'reload schema';
 ```
@@ -111,13 +119,13 @@ first_name: string | null
 
 ## Критерии приёмки
 
-| # | Сценарий | Ожидаемое поведение |
-|---|----------|---------------------|
-| 1 | Открытие страницы товара с отзывами | Отзывы загружаются без ошибки 42703 |
-| 2 | Авторизация через Google | Аватарка из Google-аккаунта сохраняется в `profiles.avatar_url` |
-| 3 | Отзыв от Google-пользователя | Рядом с отзывом отображается круглая аватарка из Google |
-| 4 | Отзыв от пользователя без аватарки | Отображается иконка-заглушка (`lucide:user`) |
-| 5 | Существующие пользователи | После применения миграции их аватарки заполняются автоматически |
+| #   | Сценарий                            | Ожидаемое поведение                                             |
+| --- | ----------------------------------- | --------------------------------------------------------------- |
+| 1   | Открытие страницы товара с отзывами | Отзывы загружаются без ошибки 42703                             |
+| 2   | Авторизация через Google            | Аватарка из Google-аккаунта сохраняется в `profiles.avatar_url` |
+| 3   | Отзыв от Google-пользователя        | Рядом с отзывом отображается круглая аватарка из Google         |
+| 4   | Отзыв от пользователя без аватарки  | Отображается иконка-заглушка (`lucide:user`)                    |
+| 5   | Существующие пользователи           | После применения миграции их аватарки заполняются автоматически |
 
 ---
 
@@ -131,7 +139,7 @@ first_name: string | null
 
 ## Изменённые файлы
 
-| Файл | Тип изменения |
-|------|---------------|
-| `supabase/migrations/20260301000001_add_avatar_url_to_profiles.sql` | Новая миграция: ADD COLUMN, обновление триггеров, бэкфилл |
-| `types/supabase.ts` | Добавлен `avatar_url: string \| null` в profiles Row/Insert/Update |
+| Файл                                                                | Тип изменения                                                      |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `supabase/migrations/20260301000001_add_avatar_url_to_profiles.sql` | Новая миграция: ADD COLUMN, обновление триггеров, бэкфилл          |
+| `types/supabase.ts`                                                 | Добавлен `avatar_url: string \| null` в profiles Row/Insert/Update |

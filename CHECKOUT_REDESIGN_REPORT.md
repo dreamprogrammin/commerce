@@ -1,8 +1,8 @@
 # Отчет: Редизайн Чекаута — Динамическая доставка, Оплата и Sticky-кнопка
 
-**Дата:** 06.04.2026  
-**Приоритет:** 🔥🔥🔥 БЛОКЕР (Критично для продаж)  
-**Story Points:** 5  
+**Дата:** 06.04.2026
+**Приоритет:** 🔥🔥🔥 БЛОКЕР (Критично для продаж)
+**Story Points:** 5
 **Статус:** ✅ ВЫПОЛНЕНО
 
 ---
@@ -132,8 +132,8 @@
 ### Константы доставки
 
 ```typescript
-const FREE_SHIPPING_THRESHOLD = 15000; // Порог бесплатной доставки
-const COURIER_COST = 1000; // Стоимость курьерской доставки
+const FREE_SHIPPING_THRESHOLD = 15000 // Порог бесплатной доставки
+const COURIER_COST = 1000 // Стоимость курьерской доставки
 ```
 
 ### Computed свойства
@@ -141,28 +141,29 @@ const COURIER_COST = 1000; // Стоимость курьерской доста
 ```typescript
 // Расчет стоимости доставки
 const deliveryCost = computed(() => {
-  if (orderForm.value.deliveryMethod === "pickup") return 0;
-  return subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : 1000;
-});
+  if (orderForm.value.deliveryMethod === 'pickup')
+    return 0
+  return subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : 1000
+})
 
 // Итоговая сумма с доставкой
 const totalWithDelivery = computed(() => {
-  return total.value + deliveryCost.value;
-});
+  return total.value + deliveryCost.value
+})
 ```
 
 ### Структура orderForm
 
 ```typescript
 const orderForm = ref({
-  name: "",
-  phone: "",
-  email: "",
-  deliveryMethod: "pickup" as "pickup" | "courier",
-  paymentMethod: "kaspi_transfer" as "kaspi_transfer" | "cash", // ✅ Выбор оплаты
-  address: { city: "Алматы", line1: "" },
-  comment: "", // ✅ Комментарий курьеру
-});
+  name: '',
+  phone: '',
+  email: '',
+  deliveryMethod: 'pickup' as 'pickup' | 'courier',
+  paymentMethod: 'kaspi_transfer' as 'kaspi_transfer' | 'cash', // ✅ Выбор оплаты
+  address: { city: 'Алматы', line1: '' },
+  comment: '', // ✅ Комментарий курьеру
+})
 ```
 
 ---

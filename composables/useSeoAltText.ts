@@ -1,6 +1,6 @@
 /**
  * Генерация SEO-оптимизированных alt текстов для изображений товаров
- * 
+ *
  * Формат: [Бренд] [Название товара] [Серия] [Контекст]
  * Пример: "LEGO Конструктор Железный Человек Marvel купить в Казахстане"
  */
@@ -38,16 +38,20 @@ export function useSeoAltText() {
     if (index === 0) {
       // Первое фото - самое важное для SEO
       parts.push('купить в Казахстане')
-    } else if (index === 1 && totalImages > 1) {
+    }
+    else if (index === 1 && totalImages > 1) {
       // Второе фото - обычно показывает товар с другого ракурса
       parts.push('вид сбоку')
-    } else if (index === 2 && totalImages > 2) {
+    }
+    else if (index === 2 && totalImages > 2) {
       // Третье фото - детали
       parts.push('детальное фото')
-    } else if (index === totalImages - 1 && totalImages > 3) {
+    }
+    else if (index === totalImages - 1 && totalImages > 3) {
       // Последнее фото - упаковка или комплектация
       parts.push('в упаковке')
-    } else {
+    }
+    else {
       // Остальные фото
       parts.push(`фото ${index + 1}`)
     }

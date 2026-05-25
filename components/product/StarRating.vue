@@ -1,52 +1,53 @@
 <script setup lang="ts">
 const props = withDefaults(
   defineProps<{
-    modelValue?: number;
-    readonly?: boolean;
-    size?: "sm" | "md" | "lg";
-    count?: number;
+    modelValue?: number
+    readonly?: boolean
+    size?: 'sm' | 'md' | 'lg'
+    count?: number
   }>(),
   {
     modelValue: 0,
     readonly: false,
-    size: "md",
+    size: 'md',
     count: 5,
   },
-);
+)
 
 const emit = defineEmits<{
-  "update:modelValue": [value: number];
-}>();
+  'update:modelValue': [value: number]
+}>()
 
-const hoverValue = ref(0);
+const hoverValue = ref(0)
 
 const sizeClass = computed(() => {
   switch (props.size) {
-    case "sm":
-      return "w-4 h-4";
-    case "lg":
-      return "w-7 h-7";
+    case 'sm':
+      return 'w-4 h-4'
+    case 'lg':
+      return 'w-7 h-7'
     default:
-      return "w-5 h-5";
+      return 'w-5 h-5'
   }
-});
+})
 
 function setRating(value: number) {
   if (!props.readonly) {
-    emit("update:modelValue", value);
+    emit('update:modelValue', value)
   }
 }
 
 function setHover(value: number) {
   if (!props.readonly) {
-    hoverValue.value = value;
+    hoverValue.value = value
   }
 }
 
-function getStarState(index: number): "full" | "empty" {
-  const value = hoverValue.value || props.modelValue;
-  if (index <= Math.floor(value)) return "full";
-  return "empty";
+function getStarState(index: number): 'full' | 'empty' {
+  const value = hoverValue.value || props.modelValue
+  if (index <= Math.floor(value))
+    return 'full'
+  return 'empty'
 }
 </script>
 

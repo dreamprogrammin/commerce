@@ -14,6 +14,7 @@
 ### Баг 2: Двойной вызов `mergeOnLogin()`
 
 **Проблема:** `mergeOnLogin()` вызывался дважды при логине:
+
 1. В `app.vue` — через `watch(supabaseUser)` с `immediate: true`
 2. В `plugins/auth-init.client.ts` — через `onAuthStateChange('SIGNED_IN')`
 
@@ -36,18 +37,21 @@ Race condition между двумя вызовами мог привести к
 ## Что НЕ является багом (работает корректно)
 
 ### Sync flow
+
 - `syncToServer()` — debounced 500ms, вызывается watch-ером на `items`
 - `forceSyncToServer()` — сохраняет `{ product_id, quantity }[]` в JSONB + `total_amount` + сбрасывает `reminder_*_sent` флаги
 - `loadServerCart()` — загружает JSONB, делает JOIN с `products` для полных данных + сортировка по `display_order`
 - `mergeOnLogin()` — если локальная корзина есть → sync на сервер; если пустая → загрузить с сервера
 
 ### Abandoned cart cron
+
 - `check_abandoned_carts()` — запускается каждые 30 минут через `pg_cron`
 - 1ч напоминание: товары из корзины + фото + magic link
 - 24ч напоминание: + cross-sell аксессуары + промокод `TG5-XXXXX` (5%, 2 часа)
 - Фильтрация: `jsonb_array_length(items) > 0` + нет заказов после `updated_at`
 
 ### Edge Function `send-user-telegram`
+
 - `verify_jwt = false` в `config.toml` — не требует Authorization
 - Поддержка: одно фото, медиа-группа, fallback на текст
 - Обработка блокировки бота (403)
@@ -57,6 +61,7 @@ Race condition между двумя вызовами мог привести к
 ### 1. Verify JWT на продакшне
 
 `config.toml` — локальная конфигурация. На Supabase Dashboard проверить:
+
 - Edge Functions → `send-user-telegram` → JWT Verification → должен быть **OFF**
 - Если ON — включить `--no-verify-jwt` при деплое:
 
@@ -67,6 +72,7 @@ supabase functions deploy send-user-telegram --no-verify-jwt
 ### 2. pg_cron активен?
 
 Проверить в Supabase Dashboard → Database → Extensions:
+
 - `pg_cron` должен быть включён
 - Проверить задачи:
 
@@ -104,7 +110,7 @@ SELECT public.check_abandoned_carts();
 
 ## Изменённые файлы
 
-| Файл | Изменения |
-|---|---|
+| Файл                              | Изменения                                                     |
+| --------------------------------- | ------------------------------------------------------------- |
 | `stores/publicStore/cartStore.ts` | Флаг `isMergingFromServer`, error handling, async `clearCart` |
-| `app.vue` | Убран дублирующий вызов `mergeOnLogin()` |
+| `app.vue`                         | Убран дублирующий вызов `mergeOnLogin()`                      |

@@ -5,6 +5,7 @@
 После успешной привязки Telegram (пользователь перешёл в бот → нажал «Старт» → бот записал `telegram_chat_id` в таблицу `profiles`) — кнопка «Подключить Telegram» на странице настроек оставалась активной. Пользователь не видел что привязка произошла и мог попытаться привязать повторно.
 
 ### Симптомы:
+
 - Кнопка «Подключить Telegram» не меняется на «Отключить» после возврата из Telegram
 - `TelegramBanner.vue` продолжает показываться даже после успешной привязки
 - Пользователь вынужден вручную обновлять страницу (`F5`) чтобы увидеть актуальное состояние
@@ -27,6 +28,7 @@ Telegram Bot
 ### Механизм: Window Visibility Change + Silent Background Refetch
 
 Использован `visibilitychange` event — браузерное событие, которое срабатывает когда:
+
 - Пользователь переключается между вкладками
 - Пользователь возвращается из другого приложения (Telegram → браузер)
 - Устройство выходит из режима сна
@@ -82,16 +84,19 @@ async function loadProfile(force = false, waitForCreation = false, silent = fals
 ```
 
 **Логика `silent`:**
+
 ```typescript
 loadingPromise = (async () => {
   // silent=true — фоновый refetch, не трогаем isLoading чтобы не мигал UI
-  if (!silent) isLoading.value = true
+  if (!silent)
+    isLoading.value = true
 
   try {
     // ... запрос к Supabase ...
   }
   finally {
-    if (!silent) isLoading.value = false
+    if (!silent)
+      isLoading.value = false
     loadingPromise = null
   }
 })()
@@ -104,6 +109,7 @@ loadingPromise = (async () => {
 ### 2. `components/profile/TelegramLinkButton.vue`
 
 **Что добавлено:**
+
 - Импорт `useEventListener` из `@vueuse/core`
 - Слушатель `visibilitychange` — триггерит фоновый refetch при возврате в браузер
 
@@ -122,14 +128,17 @@ if (import.meta.client) {
 ```
 
 **Условия срабатывания:**
+
 - `!document.hidden` — пользователь вернулся на вкладку (а не ушёл с неё)
 - `user.value` — пользователь авторизован
 - `!isLinked.value` — Telegram ещё не привязан (бессмысленно рефрешить если уже привязан)
 
 **Реактивность (уже была):**
+
 ```typescript
 const isLinked = computed(() => !!profile.value?.telegram_chat_id)
 ```
+
 `isLinked` автоматически пересчитывается после обновления `profile.value` — Vue reactivity делает всё остальное, перерисовка произойдёт сама.
 
 ---
@@ -144,10 +153,10 @@ const isLinked = computed(() => !!profile.value?.telegram_chat_id)
 
 ### Почему `visibilitychange`, а не `focus`?
 
-| Событие | Desktop | iOS Safari | Android Chrome | In-App |
-|---|---|---|---|---|
-| `window focus` | ✅ | ⚠️ Не всегда | ⚠️ Не всегда | ❌ |
-| `document visibilitychange` | ✅ | ✅ | ✅ | ✅ |
+| Событие                     | Desktop | iOS Safari   | Android Chrome | In-App |
+| --------------------------- | ------- | ------------ | -------------- | ------ |
+| `window focus`              | ✅      | ⚠️ Не всегда | ⚠️ Не всегда   | ❌     |
+| `document visibilitychange` | ✅      | ✅           | ✅             | ✅     |
 
 `visibilitychange` — стандарт W3C, работает на всех платформах. `focus` на мобильных может не сработать при переключении между приложениями (особенно в iOS).
 
@@ -183,11 +192,11 @@ const isLinked = computed(() => !!profile.value?.telegram_chat_id)
 
 ### Состояния кнопки:
 
-| Состояние `profile.telegram_chat_id` | UI |
-|---|---|
-| `null` (не привязан) | `<a href="t.me/...">Подключить Telegram</a>` |
-| Генерируется токен | `<button disabled>Загрузка...</button>` |
-| `'123456...'` (привязан) | `<button @click="unlink">Отключить</button>` |
+| Состояние `profile.telegram_chat_id` | UI                                           |
+| ------------------------------------ | -------------------------------------------- |
+| `null` (не привязан)                 | `<a href="t.me/...">Подключить Telegram</a>` |
+| Генерируется токен                   | `<button disabled>Загрузка...</button>`      |
+| `'123456...'` (привязан)             | `<button @click="unlink">Отключить</button>` |
 
 ---
 

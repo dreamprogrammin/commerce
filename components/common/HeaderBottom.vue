@@ -1,37 +1,38 @@
 <script setup lang="ts">
-import { storeToRefs } from "pinia";
-import { useProfileStore } from "@/stores/core/profileStore";
-import { useAuthStore } from "@/stores/core/useAuthStore";
-import { useModalStore } from "@/stores/modal/useModalStore";
-import { useCartStore } from "@/stores/publicStore/cartStore";
-import { useWishlistStore } from "@/stores/publicStore/wishlistStore";
+import { storeToRefs } from 'pinia'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { useAuthStore } from '@/stores/core/useAuthStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
-const authStore = useAuthStore();
-const profileStore = useProfileStore();
-const wishlistStore = useWishlistStore();
-const cartStore = useCartStore();
-const modalStore = useModalStore();
+const authStore = useAuthStore()
+const profileStore = useProfileStore()
+const wishlistStore = useWishlistStore()
+const cartStore = useCartStore()
+const modalStore = useModalStore()
 
-const { user, isLoggedIn: isAuth } = storeToRefs(authStore);
+const { user, isLoggedIn: isAuth } = storeToRefs(authStore)
 const {
   fullName,
   bonusBalance,
   isLoggedIn: isProfileLoaded,
-} = storeToRefs(profileStore);
+} = storeToRefs(profileStore)
 
-const wishlistCount = computed(() => wishlistStore.wishlistProductIds.length);
-const cartCount = computed(() => cartStore.items.length);
-const userInitial = computed(() => fullName.value?.charAt(0) || "П");
+const wishlistCount = computed(() => wishlistStore.wishlistProductIds.length)
+const cartCount = computed(() => cartStore.items.length)
+const userInitial = computed(() => fullName.value?.charAt(0) || 'П')
 
 // Форматирование бонусов для отображения
 const formattedBonus = computed(() => {
-  if (!isProfileLoaded.value || bonusBalance.value === 0) return "0";
-  return bonusBalance.value.toLocaleString("ru-KZ");
-});
+  if (!isProfileLoaded.value || bonusBalance.value === 0)
+    return '0'
+  return bonusBalance.value.toLocaleString('ru-KZ')
+})
 
 // ✅ Функция открытия модального окна логина
 function openLoginModal() {
-  modalStore.openLoginModal();
+  modalStore.openLoginModal()
 }
 </script>
 
@@ -136,12 +137,8 @@ function openLoginModal() {
               />
             </div>
             <div class="flex flex-col items-start">
-              <span class="text-[10px] text-white/60 leading-none mb-0.5"
-                >Бонусы</span
-              >
-              <span class="text-sm font-bold text-white leading-none"
-                >{{ formattedBonus }} ₸</span
-              >
+              <span class="text-[10px] text-white/60 leading-none mb-0.5">Бонусы</span>
+              <span class="text-sm font-bold text-white leading-none">{{ formattedBonus }} ₸</span>
             </div>
           </NuxtLink>
         </ClientOnly>

@@ -1,23 +1,24 @@
 /**
  * Скрипт для генерации и обновления alt текстов для всех изображений товаров
- * 
+ *
  * Запуск: npm run seo:generate
  */
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
 // Загружаем переменные окружения из .env
 try {
   const envFile = readFileSync(join(process.cwd(), '.env'), 'utf-8')
-  envFile.split('\n').forEach(line => {
+  envFile.split('\n').forEach((line) => {
     const [key, ...valueParts] = line.split('=')
     if (key && valueParts.length) {
       process.env[key.trim()] = valueParts.join('=').trim()
     }
   })
-} catch (e) {
+}
+catch (e) {
   // .env файл не найден, используем существующие переменные окружения
 }
 
@@ -33,8 +34,8 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: false,
-    persistSession: false
-  }
+    persistSession: false,
+  },
 })
 
 interface ProductWithImages {
@@ -60,19 +61,25 @@ function generateAltText(
 ): string {
   const parts: string[] = []
 
-  if (brandName) parts.push(brandName)
+  if (brandName)
+    parts.push(brandName)
   parts.push(productName)
-  if (lineName) parts.push(lineName)
+  if (lineName)
+    parts.push(lineName)
 
   if (index === 0) {
     parts.push('купить в Казахстане')
-  } else if (index === 1 && totalImages > 1) {
+  }
+  else if (index === 1 && totalImages > 1) {
     parts.push('вид сбоку')
-  } else if (index === 2 && totalImages > 2) {
+  }
+  else if (index === 2 && totalImages > 2) {
     parts.push('детальное фото')
-  } else if (index === totalImages - 1 && totalImages > 3) {
+  }
+  else if (index === totalImages - 1 && totalImages > 3) {
     parts.push('в упаковке')
-  } else {
+  }
+  else {
     parts.push(`фото ${index + 1}`)
   }
 
@@ -158,7 +165,8 @@ async function updateAltTexts() {
           updateError,
         )
         errorCount++
-      } else {
+      }
+      else {
         updatedCount++
         console.log(`✅ ${product.slug} [${i + 1}/${totalImages}]: "${newAltText}"`)
       }

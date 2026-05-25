@@ -36,8 +36,10 @@ interface CategoryUpsertPayload {
 
 // Хелпер для нормализации полей-массивов (строка -> массив)
 function normalizeArrayField(value: any): string[] | null {
-  if (!value) return null
-  if (Array.isArray(value)) return value
+  if (!value)
+    return null
+  if (Array.isArray(value))
+    return value
   if (typeof value === 'string') {
     // Разбиваем строку по запятым и очищаем
     const items = value.split(',').map(s => s.trim()).filter(s => s.length > 0)

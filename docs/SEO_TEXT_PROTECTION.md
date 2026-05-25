@@ -50,6 +50,7 @@ safe_upsert_category_brand_seo(
 ```
 
 **Возвращает:**
+
 ```json
 {
   "action": "updated_partial" | "updated_full" | "inserted",

@@ -1,132 +1,136 @@
 <script setup lang="ts">
-import { useQuery, useQueryClient } from "@tanstack/vue-query";
-import { useAuthStore } from "@/stores/auth";
-import { useProfileStore } from "@/stores/core/profileStore";
-import { useModalStore } from "@/stores/modal/useModalStore";
-import { useReviewsStore } from "@/stores/publicStore/reviewsStore";
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
+import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import {
   optimizeImageBeforeUpload,
   shouldOptimizeImage,
-} from "@/utils/imageOptimizer";
-import ReviewCard from "./ReviewCard.vue";
-import StarRating from "./StarRating.vue";
+} from '@/utils/imageOptimizer'
+import ReviewCard from './ReviewCard.vue'
+import StarRating from './StarRating.vue'
 
 const props = defineProps<{
-  productId: string;
-  avgRating?: number;
-  reviewCount?: number;
-}>();
+  productId: string
+  avgRating?: number
+  reviewCount?: number
+}>()
 
-const reviewsStore = useReviewsStore();
-const authStore = useAuthStore();
-const modalStore = useModalStore();
-const queryClient = useQueryClient();
+const reviewsStore = useReviewsStore()
+const authStore = useAuthStore()
+const modalStore = useModalStore()
+const queryClient = useQueryClient()
 
-const reviewText = ref("");
-const reviewRating = ref(0);
-const isSubmitting = ref(false);
-const isFormOpen = ref(false);
-const showAll = ref(false);
+const reviewText = ref('')
+const reviewRating = ref(0)
+const isSubmitting = ref(false)
+const isFormOpen = ref(false)
+const showAll = ref(false)
 
 // Фото
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 5
 const imageFiles = ref<
-  { file: File; preview: string; blurPlaceholder?: string }[]
->([]);
-const isOptimizing = ref(false);
+  { file: File, preview: string, blurPlaceholder?: string }[]
+>([])
+const isOptimizing = ref(false)
 
 const { data: reviews, isLoading } = useQuery({
-  queryKey: ["product-reviews", () => props.productId],
+  queryKey: ['product-reviews', () => props.productId],
   queryFn: () => reviewsStore.fetchReviews(props.productId),
   staleTime: 2 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
   refetchOnWindowFocus: true,
-});
+})
 
 const { data: canReview } = useQuery({
-  queryKey: ["can-review", () => props.productId],
+  queryKey: ['can-review', () => props.productId],
   queryFn: () => reviewsStore.canReview(props.productId),
   staleTime: 5 * 60 * 1000,
   enabled: computed(() => authStore.isLoggedIn),
-});
+})
 
 const displayedReviews = computed(() => {
-  if (!reviews.value) return [];
-  return showAll.value ? reviews.value : reviews.value.slice(0, 3);
-});
+  if (!reviews.value)
+    return []
+  return showAll.value ? reviews.value : reviews.value.slice(0, 3)
+})
 
 // Распределение по звёздам
 const ratingDistribution = computed(() => {
-  if (!reviews.value?.length) return [];
-  const counts = [0, 0, 0, 0, 0];
-  reviews.value.forEach((r) => counts[r.rating - 1]++);
-  const total = reviews.value.length;
-  return [5, 4, 3, 2, 1].map((stars) => ({
+  if (!reviews.value?.length)
+    return []
+  const counts = [0, 0, 0, 0, 0]
+  reviews.value.forEach(r => counts[r.rating - 1]++)
+  const total = reviews.value.length
+  return [5, 4, 3, 2, 1].map(stars => ({
     stars,
     count: counts[stars - 1],
     percentage: total ? Math.round((counts[stars - 1] / total) * 100) : 0,
-  }));
-});
+  }))
+})
 
 function openReviewForm() {
   if (!authStore.isLoggedIn) {
-    modalStore.openLoginModal();
-    return;
+    modalStore.openLoginModal()
+    return
   }
-  isFormOpen.value = true;
+  isFormOpen.value = true
 }
 
 async function handleImageSelect(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const files = input.files;
-  if (!files) return;
+  const input = event.target as HTMLInputElement
+  const files = input.files
+  if (!files)
+    return
 
-  const remaining = MAX_IMAGES - imageFiles.value.length;
-  const toAdd = Array.from(files).slice(0, remaining);
+  const remaining = MAX_IMAGES - imageFiles.value.length
+  const toAdd = Array.from(files).slice(0, remaining)
 
-  isOptimizing.value = true;
+  isOptimizing.value = true
   for (const file of toAdd) {
-    let processedFile = file;
-    let blur: string | undefined;
+    let processedFile = file
+    let blur: string | undefined
 
     if (shouldOptimizeImage(file)) {
-      const result = await optimizeImageBeforeUpload(file);
-      processedFile = result.file;
-      blur = result.blurPlaceholder || undefined;
+      const result = await optimizeImageBeforeUpload(file)
+      processedFile = result.file
+      blur = result.blurPlaceholder || undefined
     }
 
-    const preview = URL.createObjectURL(processedFile);
+    const preview = URL.createObjectURL(processedFile)
     imageFiles.value.push({
       file: processedFile,
       preview,
       blurPlaceholder: blur,
-    });
+    })
   }
-  isOptimizing.value = false;
+  isOptimizing.value = false
 
   // Сброс input
-  input.value = "";
+  input.value = ''
 }
 
 function removeImage(index: number) {
-  const removed = imageFiles.value.splice(index, 1);
+  const removed = imageFiles.value.splice(index, 1)
   if (removed[0]) {
-    URL.revokeObjectURL(removed[0].preview);
+    URL.revokeObjectURL(removed[0].preview)
   }
 }
 
 async function submitReview() {
-  if (reviewRating.value === 0) return;
+  if (reviewRating.value === 0)
+    return
 
-  isSubmitting.value = true;
+  isSubmitting.value = true
 
   try {
     const images = imageFiles.value.length
-      ? imageFiles.value.map((img) => ({
+      ? imageFiles.value.map(img => ({
           file: img.file,
           blurPlaceholder: img.blurPlaceholder,
         }))
-      : undefined;
+      : undefined
 
     const result = await reviewsStore.submitReview(
       props.productId,
@@ -134,59 +138,61 @@ async function submitReview() {
       reviewText.value,
       undefined,
       images,
-    );
+    )
 
     if (result) {
       // Cleanup
-      imageFiles.value.forEach((img) => URL.revokeObjectURL(img.preview));
-      imageFiles.value = [];
-      reviewText.value = "";
-      reviewRating.value = 0;
-      isFormOpen.value = false;
+      imageFiles.value.forEach(img => URL.revokeObjectURL(img.preview))
+      imageFiles.value = []
+      reviewText.value = ''
+      reviewRating.value = 0
+      isFormOpen.value = false
       queryClient.invalidateQueries({
-        queryKey: ["product-reviews", props.productId],
-      });
+        queryKey: ['product-reviews', props.productId],
+      })
       queryClient.invalidateQueries({
-        queryKey: ["can-review", props.productId],
-      });
+        queryKey: ['can-review', props.productId],
+      })
 
       // Обновляем профиль в фоне (бонусы за отзыв начислятся после модерации)
-      const profileStore = useProfileStore();
-      profileStore.loadProfile(true, false, true);
+      const profileStore = useProfileStore()
+      profileStore.loadProfile(true, false, true)
     }
-  } catch (e: any) {
-    console.error("ProductReviews submitReview error:", e);
-  } finally {
-    isSubmitting.value = false;
+  }
+  catch (e: any) {
+    console.error('ProductReviews submitReview error:', e)
+  }
+  finally {
+    isSubmitting.value = false
   }
 }
 
 async function handleDelete(reviewId: string) {
-  const success = await reviewsStore.deleteReview(reviewId);
+  const success = await reviewsStore.deleteReview(reviewId)
   if (success) {
     queryClient.invalidateQueries({
-      queryKey: ["product-reviews", props.productId],
-    });
+      queryKey: ['product-reviews', props.productId],
+    })
     queryClient.invalidateQueries({
-      queryKey: ["can-review", props.productId],
-    });
+      queryKey: ['can-review', props.productId],
+    })
   }
 }
 
 // Scroll to reviews section from notification anchor
 onMounted(() => {
-  if (window.location.hash === "#reviews") {
+  if (window.location.hash === '#reviews') {
     nextTick(() => {
       document
-        .getElementById("reviews")
-        ?.scrollIntoView({ behavior: "smooth" });
-    });
+        .getElementById('reviews')
+        ?.scrollIntoView({ behavior: 'smooth' })
+    })
   }
-});
+})
 
 onUnmounted(() => {
-  imageFiles.value.forEach((img) => URL.revokeObjectURL(img.preview));
-});
+  imageFiles.value.forEach(img => URL.revokeObjectURL(img.preview))
+})
 </script>
 
 <template>
@@ -267,7 +273,9 @@ onUnmounted(() => {
 
     <!-- Форма отзыва -->
     <div v-if="isFormOpen" class="mb-6 p-4 bg-muted/50 rounded-lg border">
-      <h3 class="font-medium mb-3">Ваш отзыв</h3>
+      <h3 class="font-medium mb-3">
+        Ваш отзыв
+      </h3>
       <div class="mb-3">
         <label class="text-sm text-muted-foreground mb-1 block">Оценка</label>
         <StarRating v-model="reviewRating" size="lg" />
@@ -296,7 +304,7 @@ onUnmounted(() => {
               :src="img.preview"
               :alt="`Фото ${idx + 1}`"
               class="w-full h-full object-cover"
-            />
+            >
             <button
               class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
               @click="removeImage(idx)"
@@ -320,7 +328,7 @@ onUnmounted(() => {
             multiple
             class="hidden"
             @change="handleImageSelect"
-          />
+          >
         </label>
       </div>
 
@@ -331,7 +339,9 @@ onUnmounted(() => {
         >
           {{ isSubmitting ? "Отправка..." : "Отправить отзыв" }}
         </Button>
-        <Button variant="outline" @click="isFormOpen = false"> Отмена </Button>
+        <Button variant="outline" @click="isFormOpen = false">
+          Отмена
+        </Button>
       </div>
     </div>
 
@@ -367,7 +377,9 @@ onUnmounted(() => {
         name="lucide:message-square"
         class="w-12 h-12 mx-auto text-muted-foreground/40 mb-3"
       />
-      <p class="text-muted-foreground">Пока нет отзывов</p>
+      <p class="text-muted-foreground">
+        Пока нет отзывов
+      </p>
       <p v-if="canReview" class="text-sm text-muted-foreground mt-1">
         Будьте первым, кто оставит отзыв!
       </p>

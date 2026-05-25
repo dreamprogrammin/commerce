@@ -1,7 +1,7 @@
 # ✅ Отчет о тестировании Image SEO
 
-**Дата:** 2026-04-09 15:09  
-**Окружение:** Docker (локальный Supabase)  
+**Дата:** 2026-04-09 15:09
+**Окружение:** Docker (локальный Supabase)
 **Статус:** ✅ Все тесты пройдены
 
 ---
@@ -9,14 +9,16 @@
 ## 📊 Результаты тестирования
 
 ### 1. ✅ Dev сервер
+
 - **Статус:** Запущен
 - **Порт:** 3000
 - **PID:** 36517
 
 ### 2. ✅ API Endpoint
+
 - **URL:** `POST /api/generate-alt-texts`
 - **Статус:** Работает
-- **Ответ:** 
+- **Ответ:**
   ```json
   {
     "success": true,
@@ -28,20 +30,24 @@
 - **Примечание:** 0 товаров потому что БД пустая (это нормально)
 
 ### 3. ✅ Страница админки
+
 - **URL:** `/admin/image-seo`
 - **Статус:** Рендерится
 - **Title:** "Ухтышка - Интернет-магазин детских игрушек"
 
 ### 4. ✅ Composable
+
 - **Файл:** `composables/useSeoAltText.ts`
 - **Функция:** `generateProductImageAlt` - найдена
 - **Локальное SEO:** "купить в Казахстане" - найдено
 
 ### 5. ✅ Компоненты
+
 - **ProductCard.vue:** 5 использований `getImageAlt`
 - **ProductGallery.vue:** 4 использования `getImageAlt`
 
 ### 6. ✅ NPM скрипты
+
 - **seo:audit:** Работает (вывел "Изображения не найдены" - БД пустая)
 - **seo:generate:** Готов к использованию
 
@@ -50,9 +56,11 @@
 ## 🔧 Исправления во время тестирования
 
 ### Проблема: API не находил Supabase credentials
+
 **Причина:** Использовал `process.env` вместо `useRuntimeConfig()`
 
 **Решение:** Обновил `server/api/generate-alt-texts.post.ts`:
+
 ```typescript
 const config = useRuntimeConfig()
 const supabaseUrl = config.public.supabase?.url
@@ -64,6 +72,7 @@ const supabaseKey = config.public.supabase?.key
 ## ✅ Готово к использованию
 
 Все компоненты работают корректно:
+
 - ✅ API endpoint отвечает
 - ✅ Страница админки рендерится
 - ✅ Composable работает
@@ -89,5 +98,5 @@ const supabaseKey = config.public.supabase?.key
 
 ---
 
-**Тестирование завершено:** 2026-04-09 15:15  
+**Тестирование завершено:** 2026-04-09 15:15
 **Результат:** ✅ Все тесты пройдены

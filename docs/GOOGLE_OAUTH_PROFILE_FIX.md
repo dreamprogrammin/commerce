@@ -50,6 +50,7 @@ v_first_name := COALESCE(
   что авторизация ВСЕГДА завершается, даже если создание профиля упало с ошибкой
 
 **Новая RPC `ensure_profile_exists()`** — SECURITY DEFINER fallback для клиента:
+
 - Вызывается из `profileStore` после всех retry-попыток
 - Создаёт профиль с теми же fallback-правилами
 - Идемпотентна: возвращает существующий профиль, если он уже есть
@@ -67,7 +68,10 @@ const { error: ensureError } = await supabase.rpc('ensure_profile_exists')
 if (!ensureError) {
   // Re-fetch profile
   const { data: newProfile } = await supabase
-    .from('profiles').select('*').eq('id', userId).maybeSingle()
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle()
   if (newProfile) { profile.value = newProfile; return true }
 }
 // Если все попытки провалились — toast + profile = null
@@ -80,7 +84,7 @@ toast.error('Профиль не найден', { description: 'Попробуй
 
 ```typescript
 const isOAuthCallback = !!(to.query.code || to.query.access_token || to.hash?.includes('access_token'))
-const maxWaitMs = isOAuthCallback ? 3000 : 300  // было: 100 мс
+const maxWaitMs = isOAuthCallback ? 3000 : 300 // было: 100 мс
 
 let waited = 0
 while (!user.value && waited < maxWaitMs) {

@@ -238,7 +238,7 @@ SELECT generate_category_questions('uuid-категории', true);
 
 ```javascript
 // Проверить, что HTML-теги удаляются в Schema
-console.log(faqQuestions.value[0].answer_text);
+console.log(faqQuestions.value[0].answer_text)
 // Должно быть: "Текст • Пункт 1 • Пункт 2"
 // НЕ должно быть: "<strong>Текст</strong><ul><li>Пункт 1</li></ul>"
 ```
@@ -294,6 +294,6 @@ WHERE question_text LIKE 'Что такое%';
 
 ---
 
-**Дата:** 31 марта 2026  
-**Статус:** ✅ Готово к деплою  
+**Дата:** 31 марта 2026
+**Статус:** ✅ Готово к деплою
 **Автор:** Uhti Commerce Team

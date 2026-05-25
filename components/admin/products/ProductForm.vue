@@ -13,166 +13,167 @@ import type {
   ProductSearchResult,
   ProductUpdate,
   ProductWithImages,
-} from "@/types";
-import { VueDraggableNext } from "vue-draggable-next";
-import { debounce } from "lodash-es";
-import { storeToRefs } from "pinia";
-import { toast } from "vue-sonner";
-import { useSupabaseStorage } from "@/composables/menuItems/useSupabaseStorage";
-import { BUCKET_NAME_PRODUCT } from "@/constants";
-import { useAdminBrandsStore } from "@/stores/adminStore/adminBrandsStore";
-import { useAdminCategoriesStore } from "@/stores/adminStore/adminCategoriesStore";
-import { useAdminProductLinesStore } from "@/stores/adminStore/adminProductLinesStore";
-import { useAdminProductsStore } from "@/stores/adminStore/adminProductsStore";
-import { useAdminSuppliersStore } from "@/stores/adminStore/adminSuppliersStore";
+} from '@/types'
+import { debounce } from 'lodash-es'
+import { storeToRefs } from 'pinia'
+import { VueDraggableNext } from 'vue-draggable-next'
+import { toast } from 'vue-sonner'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useAdminBrandsStore } from '@/stores/adminStore/adminBrandsStore'
+import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
+import { useAdminProductLinesStore } from '@/stores/adminStore/adminProductLinesStore'
+import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
+import { useAdminSuppliersStore } from '@/stores/adminStore/adminSuppliersStore'
+import {
+  calculateBonusPoints,
+  calculateFinalPrice,
+} from '@/utils/bonusCalculator'
 import {
   formatFileSize,
   getOptimizationInfo,
   optimizeImageBeforeUpload,
-} from "@/utils/imageOptimizer";
-import {
-  calculateBonusPoints,
-  calculateFinalPrice,
-} from "@/utils/bonusCalculator";
-import { slugify } from "@/utils/slugify";
-import BrandForm from "../brands/BrandForm.vue";
-import ProductLineForm from "../product-lines/ProductLineForm.vue";
+} from '@/utils/imageOptimizer'
+import { slugify } from '@/utils/slugify'
+import BrandForm from '../brands/BrandForm.vue'
+import ProductLineForm from '../product-lines/ProductLineForm.vue'
 
 interface NewImageFile {
-  id: string;
-  file: File;
-  previewUrl: string;
-  blurDataUrl?: string;
+  id: string
+  file: File
+  previewUrl: string
+  blurDataUrl?: string
 }
 
 interface GalleryItem {
-  uid: string;
-  type: "existing" | "new";
-  existing?: ProductImageRow;
-  new?: NewImageFile;
-  previewUrl: string;
+  uid: string
+  type: 'existing' | 'new'
+  existing?: ProductImageRow
+  new?: NewImageFile
+  previewUrl: string
 }
 
 // --- 1. PROPS & EMITS ---
 const props = defineProps<{
-  initialData?: FullProduct | null;
-}>();
+  initialData?: FullProduct | null
+}>()
 
 const emit = defineEmits<{
   (
-    e: "create",
+    e: 'create',
     payload: {
-      data: ProductInsert;
-      newImageFiles: NewImageFile[];
-      attributeValues: AttributeValuePayload[];
+      data: ProductInsert
+      newImageFiles: NewImageFile[]
+      attributeValues: AttributeValuePayload[]
     },
-  ): void;
+  ): void
   (
-    e: "update",
+    e: 'update',
     payload: {
-      data: ProductUpdate;
-      newImageFiles: NewImageFile[];
-      imagesToDelete: string[];
-      existingImages: ProductImageRow[];
-      attributeValues: AttributeValuePayload[];
+      data: ProductUpdate
+      newImageFiles: NewImageFile[]
+      imagesToDelete: string[]
+      existingImages: ProductImageRow[]
+      attributeValues: AttributeValuePayload[]
     },
-  ): void;
-}>();
+  ): void
+}>()
 
 // --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ И COMPOSABLES ---
-const categoriesStore = useAdminCategoriesStore();
-const productStore = useAdminProductsStore();
-const brandsStore = useAdminBrandsStore();
-const productLinesStore = useAdminProductLinesStore();
-const suppliersStore = useAdminSuppliersStore();
-const { suppliers } = storeToRefs(suppliersStore);
-const { getVariantUrl } = useSupabaseStorage();
+const categoriesStore = useAdminCategoriesStore()
+const productStore = useAdminProductsStore()
+const brandsStore = useAdminBrandsStore()
+const productLinesStore = useAdminProductLinesStore()
+const suppliersStore = useAdminSuppliersStore()
+const { suppliers } = storeToRefs(suppliersStore)
+const { getVariantUrl } = useSupabaseStorage()
 
-const { brands, countries, materials } = storeToRefs(productStore);
+const { brands, countries, materials } = storeToRefs(productStore)
 
 // --- 3. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
-const formData = ref<Partial<ProductFormData>>({});
-const isBrandDialogOpen = ref(false);
-const categoryAttributes = ref<AttributeWithValue[]>([]);
-const productAttributeValues = ref<Record<number, number | null>>({});
-const numericAttributeValues = ref<Record<number, number | null>>({});
-const isProcessingImages = ref(false);
+const formData = ref<Partial<ProductFormData>>({})
+const isBrandDialogOpen = ref(false)
+const categoryAttributes = ref<AttributeWithValue[]>([])
+const productAttributeValues = ref<Record<number, number | null>>({})
+const numericAttributeValues = ref<Record<number, number | null>>({})
+const isProcessingImages = ref(false)
 
 const bonusOptions = [
-  { label: "Стандарт (5%)", value: 5 },
-  { label: "Повышенный (20%)", value: 20 },
-  { label: "Акция (80%)", value: 80 },
-  { label: "Подарок (100%)", value: 100 },
-];
+  { label: 'Стандарт (5%)', value: 5 },
+  { label: 'Повышенный (20%)', value: 20 },
+  { label: 'Акция (80%)', value: 80 },
+  { label: 'Подарок (100%)', value: 100 },
+]
 
-const newImageFiles = ref<NewImageFile[]>([]);
-const existingImages = ref<ProductImageRow[]>([]);
-const imagesToDelete = ref<string[]>([]);
-const selectedBonusPercent = ref(5);
-const isDraggingOver = ref(false);
+const newImageFiles = ref<NewImageFile[]>([])
+const existingImages = ref<ProductImageRow[]>([])
+const imagesToDelete = ref<string[]>([])
+const selectedBonusPercent = ref(5)
+const isDraggingOver = ref(false)
 
 // --- UNIFIED GALLERY (drag & drop) ---
 const galleryItems = computed<GalleryItem[]>({
   get() {
-    const items: GalleryItem[] = [];
+    const items: GalleryItem[] = []
     for (const img of existingImages.value) {
       items.push({
         uid: `existing-${img.id}`,
-        type: "existing",
+        type: 'existing',
         existing: img,
         previewUrl:
-          getExistingImageUrl(img.image_url) || "/images/placeholder.svg",
-      });
+          getExistingImageUrl(img.image_url) || '/images/placeholder.svg',
+      })
     }
     for (const img of newImageFiles.value) {
       items.push({
         uid: `new-${img.id}`,
-        type: "new",
+        type: 'new',
         new: img,
         previewUrl: img.previewUrl,
-      });
+      })
     }
-    return items;
+    return items
   },
   set(newOrder: GalleryItem[]) {
-    const newExisting: ProductImageRow[] = [];
-    const newNew: NewImageFile[] = [];
+    const newExisting: ProductImageRow[] = []
+    const newNew: NewImageFile[] = []
     for (const item of newOrder) {
-      if (item.type === "existing" && item.existing) {
-        newExisting.push(item.existing);
-      } else if (item.type === "new" && item.new) {
-        newNew.push(item.new);
+      if (item.type === 'existing' && item.existing) {
+        newExisting.push(item.existing)
+      }
+      else if (item.type === 'new' && item.new) {
+        newNew.push(item.new)
       }
     }
-    existingImages.value = newExisting;
-    newImageFiles.value = newNew;
+    existingImages.value = newExisting
+    newImageFiles.value = newNew
   },
-});
+})
 
-const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([]);
-const accessorySearchQuery = ref("");
-const accessorySearchResults = ref<ProductSearchResult[]>([]);
-const isSearchingAccessories = ref(false);
-const brandSearchQuery = ref("");
-const productLineSearchQuery = ref("");
-const brandProductLines = ref<ProductLine[]>([]);
-const isProductLineDialogOpen = ref(false);
-const isLoadingProductLines = ref(false);
-const fileInputKey = ref(0);
-const isSlugManuallyEdited = ref(false);
-const fileInput = ref<HTMLInputElement | null>(null);
-const isSettingUp = ref(false);
+const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([])
+const accessorySearchQuery = ref('')
+const accessorySearchResults = ref<ProductSearchResult[]>([])
+const isSearchingAccessories = ref(false)
+const brandSearchQuery = ref('')
+const productLineSearchQuery = ref('')
+const brandProductLines = ref<ProductLine[]>([])
+const isProductLineDialogOpen = ref(false)
+const isLoadingProductLines = ref(false)
+const fileInputKey = ref(0)
+const isSlugManuallyEdited = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const isSettingUp = ref(false)
 
 // 🎯 Информация об оптимизации
-const optimizationInfo = computed(() => getOptimizationInfo());
+const optimizationInfo = computed(() => getOptimizationInfo())
 
 // --- 4. ИНИЦИАЛИЗАЦИЯ ДАННЫХ ---
 
 function setupFormData(product: FullProduct | null | undefined) {
-  isSettingUp.value = true;
-  newImageFiles.value = [];
-  imagesToDelete.value = [];
-  linkedAccessories.value = [];
+  isSettingUp.value = true
+  newImageFiles.value = []
+  imagesToDelete.value = []
+  linkedAccessories.value = []
 
   if (product && product.id) {
     // ✏️ РЕЖИМ РЕДАКТИРОВАНИЯ
@@ -188,7 +189,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       bonus_points_award: product.bonus_points_award,
       min_age_years: product.min_age_years,
       max_age_years: product.max_age_years,
-      gender: product.gender as "unisex" | "male" | "female" | null,
+      gender: product.gender as 'unisex' | 'male' | 'female' | null,
       accessory_ids: product.accessory_ids || [],
       is_accessory: product.is_accessory || false,
       sku: product.sku,
@@ -209,30 +210,31 @@ function setupFormData(product: FullProduct | null | undefined) {
       // Закупки
       min_stock_level: (product as any).min_stock_level ?? 2,
       restock_quantity: (product as any).restock_quantity ?? 5,
-    };
+    }
     // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
     existingImages.value = [...(product.product_images || [])].sort(
       (a, b) => a.display_order - b.display_order,
-    );
+    )
 
     if (product.accessory_ids && product.accessory_ids.length > 0) {
       productStore
         .fetchProductsByIds(product.accessory_ids)
-        .then((data) => (linkedAccessories.value = data));
+        .then(data => (linkedAccessories.value = data))
     }
 
     if (product.price > 0 && product.bonus_points_award) {
       const percent = Math.round(
         (product.bonus_points_award / Number(product.price)) * 100,
-      );
-      selectedBonusPercent.value =
-        bonusOptions.find((opt) => opt.value === percent)?.value || 5;
+      )
+      selectedBonusPercent.value
+        = bonusOptions.find(opt => opt.value === percent)?.value || 5
     }
-  } else {
+  }
+  else {
     // ✨ РЕЖИМ СОЗДАНИЯ
     formData.value = {
-      name: "",
-      slug: "",
+      name: '',
+      slug: '',
       price: 0,
       cost_price: 0,
       is_active: true,
@@ -242,7 +244,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       bonus_points_award: 0,
       min_age_years: null,
       max_age_years: null,
-      gender: "unisex",
+      gender: 'unisex',
       accessory_ids: [],
       is_accessory: false,
       sku: null,
@@ -263,83 +265,83 @@ function setupFormData(product: FullProduct | null | undefined) {
       // Закупки
       min_stock_level: 2,
       restock_quantity: 5,
-    };
-    existingImages.value = [];
-    selectedBonusPercent.value = 5;
+    }
+    existingImages.value = []
+    selectedBonusPercent.value = 5
   }
   nextTick(() => {
-    isSettingUp.value = false;
-  });
+    isSettingUp.value = false
+  })
 }
 
 watch(
   () => props.initialData,
-  (newProduct) => setupFormData(newProduct),
+  newProduct => setupFormData(newProduct),
   { immediate: true },
-);
+)
 
 // --- 5. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ ---
 
 const filteredBrands = computed(() => {
   if (!brandSearchQuery.value) {
-    return brands.value;
+    return brands.value
   }
-  return brands.value.filter((brand) =>
+  return brands.value.filter(brand =>
     brand.name.toLowerCase().includes(brandSearchQuery.value.toLowerCase()),
-  );
-});
+  )
+})
 
 const filteredProductLines = computed(() => {
   if (!productLineSearchQuery.value) {
-    return brandProductLines.value;
+    return brandProductLines.value
   }
-  return brandProductLines.value.filter((line) =>
+  return brandProductLines.value.filter(line =>
     line.name
       .toLowerCase()
       .includes(productLineSearchQuery.value.toLowerCase()),
-  );
-});
+  )
+})
 
 // --- 6. ОБРАБОТЧИКИ СОБЫТИЙ ---
 
 async function handleBrandCreate(payload: {
-  data: BrandInsert | BrandUpdate;
-  file: File | null;
+  data: BrandInsert | BrandUpdate
+  file: File | null
 }) {
   const newBrand = await brandsStore.createBrand(
     payload.data as BrandInsert,
     payload.file,
-  );
+  )
   if (newBrand) {
-    isBrandDialogOpen.value = false;
-    await brandsStore.fetchBrands();
-    await productStore.fetchAllBrands();
-    await nextTick();
-    formData.value.brand_id = newBrand.id;
-    brandSearchQuery.value = "";
+    isBrandDialogOpen.value = false
+    await brandsStore.fetchBrands()
+    await productStore.fetchAllBrands()
+    await nextTick()
+    formData.value.brand_id = newBrand.id
+    brandSearchQuery.value = ''
   }
 }
 
 async function handleProductLineCreate(payload: {
-  data: ProductLineInsert;
-  file: File | null;
+  data: ProductLineInsert
+  file: File | null
 }) {
   const newLine = await productLinesStore.createProductLine(
     payload.data,
     payload.file,
-  );
+  )
   if (newLine) {
-    isProductLineDialogOpen.value = false;
+    isProductLineDialogOpen.value = false
     // Перезагружаем линейки текущего бренда
     if (formData.value.brand_id) {
-      brandProductLines.value =
-        await productLinesStore.fetchProductLinesByBrand(
+      brandProductLines.value
+        = await productLinesStore.fetchProductLinesByBrand(
           formData.value.brand_id,
-        );
+        )
     }
-    await nextTick();
-    formData.value.product_line_id = newLine.id;
-    productLineSearchQuery.value = "";
+    await nextTick()
+    formData.value.product_line_id = newLine.id
+    productLineSearchQuery.value = ''
   }
 }
 
@@ -349,70 +351,73 @@ watch(
   async (newBrandId, oldBrandId) => {
     // Сбрасываем линейку при смене бренда (но не при инициализации формы)
     if (newBrandId !== oldBrandId && !isSettingUp.value) {
-      formData.value.product_line_id = null;
+      formData.value.product_line_id = null
     }
 
     if (newBrandId) {
-      isLoadingProductLines.value = true;
+      isLoadingProductLines.value = true
       try {
-        brandProductLines.value =
-          await productLinesStore.fetchProductLinesByBrand(newBrandId);
-      } finally {
-        isLoadingProductLines.value = false;
+        brandProductLines.value
+          = await productLinesStore.fetchProductLinesByBrand(newBrandId)
       }
-    } else {
-      brandProductLines.value = [];
+      finally {
+        isLoadingProductLines.value = false
+      }
+    }
+    else {
+      brandProductLines.value = []
     }
   },
   { immediate: true },
-);
+)
 
 async function handleCategoryChange(categoryId: string | null) {
   if (!categoryId) {
-    categoryAttributes.value = [];
-    return;
+    categoryAttributes.value = []
+    return
   }
 
-  categoryAttributes.value =
-    await productStore.getAttributesForCategory(categoryId);
+  categoryAttributes.value
+    = await productStore.getAttributesForCategory(categoryId)
 
-  const newSelectValues: Record<number, number | null> = {};
-  const newNumericValues: Record<number, number | null> = {};
+  const newSelectValues: Record<number, number | null> = {}
+  const newNumericValues: Record<number, number | null> = {}
 
   for (const attr of categoryAttributes.value) {
-    if (attr.display_type === "numeric") {
-      newNumericValues[attr.id] = null;
-    } else {
-      newSelectValues[attr.id] = null;
+    if (attr.display_type === 'numeric') {
+      newNumericValues[attr.id] = null
+    }
+    else {
+      newSelectValues[attr.id] = null
     }
   }
 
   if (props.initialData?.id) {
     const savedValues = await productStore.getProductAttributeValues(
       props.initialData.id,
-    );
+    )
     for (const savedValue of savedValues) {
       if (savedValue.attribute_id in newSelectValues) {
-        newSelectValues[savedValue.attribute_id] = savedValue.option_id;
+        newSelectValues[savedValue.attribute_id] = savedValue.option_id
       }
       if (savedValue.attribute_id in newNumericValues) {
-        newNumericValues[savedValue.attribute_id] = savedValue.numeric_value;
+        newNumericValues[savedValue.attribute_id] = savedValue.numeric_value
       }
     }
   }
-  productAttributeValues.value = newSelectValues;
-  numericAttributeValues.value = newNumericValues;
+  productAttributeValues.value = newSelectValues
+  numericAttributeValues.value = newNumericValues
 }
 
 watch(
   () => formData.value.category_id,
   (newCategoryId) => {
-    const categoryIdForHandler =
-      newCategoryId === undefined ? null : newCategoryId;
-    handleCategoryChange(categoryIdForHandler);
+    const categoryIdForHandler
+      = newCategoryId === undefined ? null : newCategoryId
+    handleCategoryChange(categoryIdForHandler)
   },
   { immediate: true },
-);
+)
 
 // Автоматическая генерация slug при изменении названия
 watch(
@@ -420,18 +425,18 @@ watch(
   (newName) => {
     // Генерируем slug только если он пустой или не был изменён вручную
     if (
-      newName &&
-      formData.value &&
-      (!formData.value.slug || !isSlugManuallyEdited.value)
+      newName
+      && formData.value
+      && (!formData.value.slug || !isSlugManuallyEdited.value)
     ) {
-      formData.value.slug = slugify(newName);
+      formData.value.slug = slugify(newName)
     }
   },
-);
+)
 
 // Функция для отметки ручного изменения slug
 function onSlugInput() {
-  isSlugManuallyEdited.value = true;
+  isSlugManuallyEdited.value = true
 }
 
 watch(
@@ -442,18 +447,18 @@ watch(
   ],
   ([price, discount, percent]) => {
     if (
-      formData.value &&
-      typeof price === "number" &&
-      typeof percent === "number"
+      formData.value
+      && typeof price === 'number'
+      && typeof percent === 'number'
     ) {
       formData.value.bonus_points_award = calculateBonusPoints(
         price,
         discount || 0,
         percent,
-      );
+      )
     }
   },
-);
+)
 
 // --- 7. УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ ---
 
@@ -461,26 +466,26 @@ watch(
  * 🎯 Обработка загрузки изображений через input
  */
 async function handleFilesChange(event: Event) {
-  const target = event.target as HTMLInputElement;
+  const target = event.target as HTMLInputElement
   if (!target.files || target.files.length === 0) {
-    return;
+    return
   }
-  await processFiles(Array.from(target.files));
+  await processFiles(Array.from(target.files))
 }
 
 function removeNewImage(index: number) {
-  const fileToRemove = newImageFiles.value[index];
+  const fileToRemove = newImageFiles.value[index]
   if (fileToRemove) {
-    URL.revokeObjectURL(fileToRemove.previewUrl);
+    URL.revokeObjectURL(fileToRemove.previewUrl)
   }
-  newImageFiles.value.splice(index, 1);
+  newImageFiles.value.splice(index, 1)
 }
 
 function removeExistingImage(image: ProductImageRow) {
-  imagesToDelete.value.push(image.id);
+  imagesToDelete.value.push(image.id)
   existingImages.value = existingImages.value.filter(
-    (img) => img.id !== image.id,
-  );
+    img => img.id !== image.id,
+  )
 }
 
 /**
@@ -488,100 +493,106 @@ function removeExistingImage(image: ProductImageRow) {
  * Использует sm-вариант (400px) с обратной совместимостью для старых фото
  */
 function getExistingImageUrl(imageUrl: string) {
-  return getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, "sm") || "";
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm') || ''
 }
 
 // --- DRAG & DROP ФУНКЦИИ ---
 
 function onDragOver(event: DragEvent) {
-  event.preventDefault();
-  isDraggingOver.value = true;
+  event.preventDefault()
+  isDraggingOver.value = true
 }
 
 function onDragLeave() {
-  isDraggingOver.value = false;
+  isDraggingOver.value = false
 }
 
 async function onDrop(event: DragEvent) {
-  event.preventDefault();
-  isDraggingOver.value = false;
+  event.preventDefault()
+  isDraggingOver.value = false
 
-  const files = event.dataTransfer?.files;
-  if (!files || files.length === 0) return;
+  const files = event.dataTransfer?.files
+  if (!files || files.length === 0)
+    return
 
   // Фильтруем только изображения
-  const imageFiles = Array.from(files).filter((file) =>
-    file.type.startsWith("image/"),
-  );
+  const imageFiles = Array.from(files).filter(file =>
+    file.type.startsWith('image/'),
+  )
   if (imageFiles.length === 0) {
-    toast.error("Пожалуйста, загружайте только изображения");
-    return;
+    toast.error('Пожалуйста, загружайте только изображения')
+    return
   }
 
-  await processFiles(imageFiles);
+  await processFiles(imageFiles)
 }
 
 async function processFiles(files: File[]) {
-  isProcessingImages.value = true;
+  isProcessingImages.value = true
 
   const toastId = toast.loading(
     `${optimizationInfo.value.icon} Обработка ${files.length} изображений...`,
-  );
+  )
 
   try {
     const processedFiles = await Promise.all(
       files.map(async (file) => {
         try {
-          const result = await optimizeImageBeforeUpload(file);
+          const result = await optimizeImageBeforeUpload(file)
 
           console.log(
-            `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? "+ LQIP ✨" : ""}`,
-          );
+            `✅ ${file.name}: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.optimizedSize)} (↓${result.savings.toFixed(0)}%) ${result.blurPlaceholder ? '+ LQIP ✨' : ''}`,
+          )
 
           return {
             id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             file: result.file,
             previewUrl: URL.createObjectURL(result.file),
             blurDataUrl: result.blurPlaceholder,
-          };
-        } catch (error) {
-          console.error(`❌ Ошибка оптимизации ${file.name}:`, error);
-          toast.warning(`Ошибка обработки ${file.name}, используем оригинал`);
+          }
+        }
+        catch (error) {
+          console.error(`❌ Ошибка оптимизации ${file.name}:`, error)
+          toast.warning(`Ошибка обработки ${file.name}, используем оригинал`)
 
           return {
             id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             file,
             previewUrl: URL.createObjectURL(file),
             blurDataUrl: undefined,
-          };
+          }
         }
       }),
-    );
+    )
 
-    newImageFiles.value.push(...processedFiles);
+    newImageFiles.value.push(...processedFiles)
 
     toast.success(
       `✅ ${processedFiles.length} изображений загружено ${optimizationInfo.value.icon}`,
       { id: toastId },
-    );
+    )
 
     // 🎯 Пересоздаём input для очистки
-    fileInputKey.value++;
-  } catch (error) {
-    toast.error("❌ Ошибка при обработке файлов", { id: toastId });
-    console.error("processFiles error:", error);
-  } finally {
-    isProcessingImages.value = false;
+    fileInputKey.value++
+  }
+  catch (error) {
+    toast.error('❌ Ошибка при обработке файлов', { id: toastId })
+    console.error('processFiles error:', error)
+  }
+  finally {
+    isProcessingImages.value = false
   }
 }
 
 // Удалить изображение из unified gallery
 function removeGalleryItem(item: GalleryItem) {
-  if (item.type === "existing" && item.existing) {
-    removeExistingImage(item.existing);
-  } else if (item.type === "new" && item.new) {
-    const index = newImageFiles.value.findIndex((f) => f.id === item.new!.id);
-    if (index !== -1) removeNewImage(index);
+  if (item.type === 'existing' && item.existing) {
+    removeExistingImage(item.existing)
+  }
+  else if (item.type === 'new' && item.new) {
+    const index = newImageFiles.value.findIndex(f => f.id === item.new!.id)
+    if (index !== -1)
+      removeNewImage(index)
   }
 }
 
@@ -589,48 +600,48 @@ function removeGalleryItem(item: GalleryItem) {
 
 const debouncedSearch = debounce(async () => {
   if (accessorySearchQuery.value.length < 2) {
-    accessorySearchResults.value = [];
-    return;
+    accessorySearchResults.value = []
+    return
   }
-  isSearchingAccessories.value = true;
+  isSearchingAccessories.value = true
   accessorySearchResults.value = await productStore.searchProducts(
     accessorySearchQuery.value,
     5,
-  );
-  isSearchingAccessories.value = false;
-}, 300);
+  )
+  isSearchingAccessories.value = false
+}, 300)
 
 function addAccessory(product: ProductSearchResult) {
-  if (!linkedAccessories.value.some((p) => p.id === product.id)) {
-    linkedAccessories.value.push(product);
+  if (!linkedAccessories.value.some(p => p.id === product.id)) {
+    linkedAccessories.value.push(product)
   }
-  accessorySearchQuery.value = "";
-  accessorySearchResults.value = [];
+  accessorySearchQuery.value = ''
+  accessorySearchResults.value = []
 }
 
 function removeAccessory(productId: string) {
   // @ts-expect-error - Deep type instantiation with union types in filter
   linkedAccessories.value = linkedAccessories.value.filter(
     (p: ProductWithImages | ProductSearchResult) => p.id !== productId,
-  );
+  )
 }
 
 // --- 9. ОТПРАВКА ФОРМЫ ---
 
 function handleSubmit() {
   if (!formData.value) {
-    return;
+    return
   }
 
   if (!formData.value.name || !formData.value.slug) {
-    toast.error("❌ Название и Слаг - обязательные поля");
-    return;
+    toast.error('❌ Название и Слаг - обязательные поля')
+    return
   }
 
-  formData.value.accessory_ids = linkedAccessories.value.map((p) => p.id);
-  formData.value.sku = formData.value.sku || null;
+  formData.value.accessory_ids = linkedAccessories.value.map(p => p.id)
+  formData.value.sku = formData.value.sku || null
 
-  const productData = { ...formData.value };
+  const productData = { ...formData.value }
 
   // Собираем значения select/color атрибутов
   const selectValues = Object.entries(productAttributeValues.value).map(
@@ -638,7 +649,7 @@ function handleSubmit() {
       attribute_id: Number(attrId),
       option_id: optId,
     }),
-  );
+  )
 
   // Собираем значения числовых атрибутов
   const numericValues = Object.entries(numericAttributeValues.value).map(
@@ -647,198 +658,201 @@ function handleSubmit() {
       option_id: null,
       numeric_value: numVal,
     }),
-  );
+  )
 
-  const valuesToSave = [...selectValues, ...numericValues];
+  const valuesToSave = [...selectValues, ...numericValues]
 
   if (props.initialData) {
-    emit("update", {
+    emit('update', {
       data: productData as ProductUpdate,
       newImageFiles: newImageFiles.value,
       imagesToDelete: imagesToDelete.value,
       existingImages: existingImages.value,
       attributeValues: valuesToSave,
-    });
-  } else {
-    emit("create", {
+    })
+  }
+  else {
+    emit('create', {
       data: productData as ProductInsert,
       newImageFiles: newImageFiles.value,
       attributeValues: valuesToSave,
-    });
+    })
   }
 }
 
 function formatPrice(value: number) {
-  return new Intl.NumberFormat("ru-RU").format(Math.round(value));
+  return new Intl.NumberFormat('ru-RU').format(Math.round(value))
 }
 
 // --- 10. ИНИЦИАЛИЗАЦИЯ ---
 
 onMounted(() => {
   if (categoriesStore.allCategories.length === 0) {
-    categoriesStore.fetchAllCategories();
+    categoriesStore.fetchAllCategories()
   }
   if (productStore.brands.length === 0) {
-    productStore.fetchAllBrands();
+    productStore.fetchAllBrands()
   }
   if (productStore.countries.length === 0) {
-    productStore.fetchAllCountries();
+    productStore.fetchAllCountries()
   }
   if (productStore.materials.length === 0) {
-    productStore.fetchAllMaterials();
+    productStore.fetchAllMaterials()
   }
   if (suppliersStore.suppliers.length === 0) {
-    suppliersStore.fetchSuppliers();
+    suppliersStore.fetchSuppliers()
   }
-});
+})
 
 // --- 11. COMPUTED ДЛЯ ДВУСТОРОННЕЙ ПРИВЯЗКИ ---
 
 const skuValue = computed({
   get() {
-    return formData.value.sku ?? undefined;
+    return formData.value.sku ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.sku = value || null;
+      formData.value.sku = value || null
     }
   },
-});
+})
 
 const barcodeValue = computed({
   get() {
-    return formData.value.barcode ?? undefined;
+    return formData.value.barcode ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.barcode = value || null;
+      formData.value.barcode = value || null
     }
   },
-});
+})
 
 const descriptionValue = computed({
   get() {
-    return formData.value.description ?? undefined;
+    return formData.value.description ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.description = value || null;
+      formData.value.description = value || null
     }
   },
-});
+})
 
 const minAgeYearsValue = computed({
   get() {
-    return formData.value.min_age_years ?? undefined;
+    return formData.value.min_age_years ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.min_age_years = typeof value === "number" ? value : null;
+      formData.value.min_age_years = typeof value === 'number' ? value : null
     }
   },
-});
+})
 
 const maxAgeYearsValue = computed({
   get() {
-    return formData.value.max_age_years ?? undefined;
+    return formData.value.max_age_years ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.max_age_years = typeof value === "number" ? value : null;
+      formData.value.max_age_years = typeof value === 'number' ? value : null
     }
   },
-});
+})
 
 // --- 12. АКТУАЛЬНАЯ ЦЕНА СО СКИДКОЙ ---
 
 const discountedPrice = computed(() => {
-  const price = formData.value.price || 0;
-  const discount = formData.value.discount_percentage || 0;
+  const price = formData.value.price || 0
+  const discount = formData.value.discount_percentage || 0
   if (discount > 0 && price > 0) {
     // Используем функцию психологического округления
-    return calculateFinalPrice(price, discount);
+    return calculateFinalPrice(price, discount)
   }
-  return null;
-});
+  return null
+})
 
 // --- 13. СКИДКА И ПОРЯДОК ---
 
 const discountPercentageValue = computed({
   get() {
-    return formData.value.discount_percentage ?? undefined;
+    return formData.value.discount_percentage ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.discount_percentage =
-        typeof value === "number" && value > 0 ? value : 0;
+      formData.value.discount_percentage
+        = typeof value === 'number' && value > 0 ? value : 0
     }
   },
-});
+})
 
 const featuredOrderValue = computed({
   get() {
-    return formData.value.featured_order ?? undefined;
+    return formData.value.featured_order ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.featured_order = typeof value === "number" ? value : 0;
+      formData.value.featured_order = typeof value === 'number' ? value : 0
     }
   },
-});
+})
 
 const priceValue = computed({
   get() {
-    return formData.value.price ?? 0;
+    return formData.value.price ?? 0
   },
   set(value) {
     if (formData.value) {
-      formData.value.price =
-        typeof value === "number" && value >= 0 ? value : 0;
+      formData.value.price
+        = typeof value === 'number' && value >= 0 ? value : 0
     }
   },
-});
+})
 
 const costPriceValue = computed({
   get() {
-    return formData.value.cost_price ?? 0;
+    return formData.value.cost_price ?? 0
   },
   set(value) {
     if (formData.value) {
-      formData.value.cost_price =
-        typeof value === "number" && value >= 0 ? value : 0;
+      formData.value.cost_price
+        = typeof value === 'number' && value >= 0 ? value : 0
     }
   },
-});
+})
 
 const marginPercent = computed(() => {
-  const price = formData.value.price || 0;
-  const cost = formData.value.cost_price || 0;
-  if (!price || !cost) return null;
-  return Math.round(((price - cost) / price) * 100);
-});
+  const price = formData.value.price || 0
+  const cost = formData.value.cost_price || 0
+  if (!price || !cost)
+    return null
+  return Math.round(((price - cost) / price) * 100)
+})
 
 // --- КАЛЬКУЛЯЦИЯ РАСХОДОВ И ЧИСТОЙ ПРИБЫЛИ ---
-const acquiringRate = ref(1.5);
-const TAX_RATE = 0.04;
+const acquiringRate = ref(1.5)
+const TAX_RATE = 0.04
 
 const priceBreakdown = computed(() => {
-  const price = formData.value.price || 0;
-  if (!price) return null;
+  const price = formData.value.price || 0
+  if (!price)
+    return null
 
-  const discount = formData.value.discount_percentage || 0;
+  const discount = formData.value.discount_percentage || 0
   // Используем функцию психологического округления для цены продажи
-  const sellingPrice =
-    discount > 0 ? calculateFinalPrice(price, discount) : price;
-  const discountAmount = price - sellingPrice;
-  const costPrice = formData.value.cost_price || 0;
-  const tax = Math.round(sellingPrice * TAX_RATE);
-  const acquiring = Math.round((sellingPrice * acquiringRate.value) / 100);
-  const bonusPoints = formData.value.bonus_points_award || 0;
-  const totalExpenses = costPrice + tax + acquiring;
-  const netProfitBeforeBonus = sellingPrice - totalExpenses;
-  const netProfit = netProfitBeforeBonus - bonusPoints;
-  const netMargin =
-    sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0;
+  const sellingPrice
+    = discount > 0 ? calculateFinalPrice(price, discount) : price
+  const discountAmount = price - sellingPrice
+  const costPrice = formData.value.cost_price || 0
+  const tax = Math.round(sellingPrice * TAX_RATE)
+  const acquiring = Math.round((sellingPrice * acquiringRate.value) / 100)
+  const bonusPoints = formData.value.bonus_points_award || 0
+  const totalExpenses = costPrice + tax + acquiring
+  const netProfitBeforeBonus = sellingPrice - totalExpenses
+  const netProfit = netProfitBeforeBonus - bonusPoints
+  const netMargin
+    = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 100) : 0
 
   return {
     price,
@@ -851,93 +865,93 @@ const priceBreakdown = computed(() => {
     totalExpenses,
     netProfit,
     netMargin,
-  };
-});
+  }
+})
 
 const stockQuantityValue = computed({
   get() {
-    return formData.value.stock_quantity ?? 0;
+    return formData.value.stock_quantity ?? 0
   },
   set(value) {
     if (formData.value) {
-      formData.value.stock_quantity =
-        typeof value === "number" && value >= 0 ? value : 0;
+      formData.value.stock_quantity
+        = typeof value === 'number' && value >= 0 ? value : 0
     }
   },
-});
+})
 
 const pieceCountValue = computed({
   get() {
-    return formData.value.piece_count ?? undefined;
+    return formData.value.piece_count ?? undefined
   },
   set(value) {
     if (formData.value) {
-      formData.value.piece_count =
-        typeof value === "number" && value > 0 ? value : null;
+      formData.value.piece_count
+        = typeof value === 'number' && value > 0 ? value : null
     }
   },
-});
+})
 
 // Показываем поле "Количество деталей" только если у категории есть атрибут типа number_range
 const hasPieceCountAttribute = computed(() => {
   const hasAttr = categoryAttributes.value.some(
-    (attr) => attr.display_type === "number_range",
-  );
+    attr => attr.display_type === 'number_range',
+  )
   console.log(
-    "🔍 hasPieceCountAttribute:",
+    '🔍 hasPieceCountAttribute:',
     hasAttr,
-    "categoryAttributes:",
-    categoryAttributes.value.map((a) => ({
+    'categoryAttributes:',
+    categoryAttributes.value.map(a => ({
       name: a.name,
       type: a.display_type,
     })),
-  );
-  return hasAttr;
-});
+  )
+  return hasAttr
+})
 
 // Атрибуты для отображения в секции "Характеристики" (без number_range - он заменён на piece_count)
 // Select и color атрибуты
 const displayableAttributes = computed(() => {
   return categoryAttributes.value.filter(
-    (attr) =>
-      attr.display_type !== "number_range" && attr.display_type !== "numeric",
-  );
-});
+    attr =>
+      attr.display_type !== 'number_range' && attr.display_type !== 'numeric',
+  )
+})
 
 // Числовые атрибуты (display_type === 'numeric')
 const numericAttributes = computed(() => {
   return categoryAttributes.value.filter(
-    (attr) => attr.display_type === "numeric",
-  );
-});
+    attr => attr.display_type === 'numeric',
+  )
+})
 
 // --- 14. SEO ПОЛЯ ---
 
 const seoDescriptionValue = computed({
   get() {
-    return formData.value.seo_description ?? "";
+    return formData.value.seo_description ?? ''
   },
   set(value) {
     if (formData.value) {
-      formData.value.seo_description = value || null;
+      formData.value.seo_description = value || null
     }
   },
-});
+})
 
 const seoKeywordsString = computed({
   get() {
-    return formData.value.seo_keywords?.join(", ") ?? "";
+    return formData.value.seo_keywords?.join(', ') ?? ''
   },
   set(value: string) {
     if (formData.value) {
       const keywords = value
-        .split(",")
-        .map((k) => k.trim())
-        .filter((k) => k.length > 0);
-      formData.value.seo_keywords = keywords.length > 0 ? keywords : null;
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => k.length > 0)
+      formData.value.seo_keywords = keywords.length > 0 ? keywords : null
     }
   },
-});
+})
 </script>
 
 <template>
@@ -1070,9 +1084,9 @@ const seoKeywordsString = computed({
             </p>
             <p class="text-sm text-muted-foreground line-clamp-2">
               {{
-                seoDescriptionValue ||
-                formData.description ||
-                "Описание товара будет показано здесь..."
+                seoDescriptionValue
+                  || formData.description
+                  || "Описание товара будет показано здесь..."
               }}
             </p>
           </div>
@@ -1133,13 +1147,13 @@ const seoKeywordsString = computed({
             v-if="priceBreakdown"
             class="sm:col-span-2 p-4 bg-muted/50 border rounded-lg space-y-2 text-sm"
           >
-            <p class="font-semibold text-base mb-3">Калькуляция на единицу</p>
+            <p class="font-semibold text-base mb-3">
+              Калькуляция на единицу
+            </p>
             <!-- Цена продажи -->
             <div class="flex justify-between">
               <span class="text-muted-foreground">Цена продажи:</span>
-              <span class="font-medium"
-                >{{ formatPrice(priceBreakdown.price) }} ₸</span
-              >
+              <span class="font-medium">{{ formatPrice(priceBreakdown.price) }} ₸</span>
             </div>
             <!-- Скидка -->
             <div
@@ -1147,9 +1161,7 @@ const seoKeywordsString = computed({
               class="flex justify-between text-destructive"
             >
               <span>Скидка ({{ formData.discount_percentage }}%):</span>
-              <span class="font-medium"
-                >-{{ formatPrice(priceBreakdown.discountAmount) }} ₸</span
-              >
+              <span class="font-medium">-{{ formatPrice(priceBreakdown.discountAmount) }} ₸</span>
             </div>
             <!-- Цена после скидки -->
             <div
@@ -1163,34 +1175,22 @@ const seoKeywordsString = computed({
             <div class="border-t pt-2 mt-1 space-y-2">
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Себестоимость:</span>
-                <span class="font-medium text-destructive"
-                  >-{{ formatPrice(priceBreakdown.costPrice) }} ₸</span
-                >
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.costPrice) }} ₸</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">ИПН (4%):</span>
-                <span class="font-medium text-destructive"
-                  >-{{ formatPrice(priceBreakdown.tax) }} ₸</span
-                >
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.tax) }} ₸</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground"
-                  >Эквайринг ({{ acquiringRate }}%):</span
-                >
-                <span class="font-medium text-destructive"
-                  >-{{ formatPrice(priceBreakdown.acquiring) }} ₸</span
-                >
+                <span class="text-muted-foreground">Эквайринг ({{ acquiringRate }}%):</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.acquiring) }} ₸</span>
               </div>
               <div
                 v-if="priceBreakdown.bonusPoints > 0"
                 class="flex justify-between"
               >
-                <span class="text-muted-foreground"
-                  >Бонусы клиенту ({{ selectedBonusPercent }}%):</span
-                >
-                <span class="font-medium text-destructive"
-                  >-{{ formatPrice(priceBreakdown.bonusPoints) }} ₸</span
-                >
+                <span class="text-muted-foreground">Бонусы клиенту ({{ selectedBonusPercent }}%):</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.bonusPoints) }} ₸</span>
               </div>
             </div>
             <!-- Итого расходы -->
@@ -1198,14 +1198,12 @@ const seoKeywordsString = computed({
               class="flex justify-between border-t pt-2 text-muted-foreground"
             >
               <span>Итого расходы + бонусы:</span>
-              <span class="font-medium"
-                >{{
-                  formatPrice(
-                    priceBreakdown.totalExpenses + priceBreakdown.bonusPoints,
-                  )
-                }}
-                ₸</span
-              >
+              <span class="font-medium">{{
+                formatPrice(
+                  priceBreakdown.totalExpenses + priceBreakdown.bonusPoints,
+                )
+              }}
+                ₸</span>
             </div>
             <!-- Чистая прибыль -->
             <div
@@ -1217,11 +1215,9 @@ const seoKeywordsString = computed({
               "
             >
               <span>Чистая прибыль:</span>
-              <span
-                >{{ formatPrice(priceBreakdown.netProfit) }} ₸ ({{
-                  priceBreakdown.netMargin
-                }}%)</span
-              >
+              <span>{{ formatPrice(priceBreakdown.netProfit) }} ₸ ({{
+                priceBreakdown.netMargin
+              }}%)</span>
             </div>
             <!-- Предупреждение о низкой марже -->
             <div
@@ -1243,13 +1239,9 @@ const seoKeywordsString = computed({
                 "
                 class="w-4 h-4 shrink-0"
               />
-              <span v-if="priceBreakdown.netProfit <= 0"
-                >Товар продаётся в убыток! Проверьте цену, скидку и
-                бонусы.</span
-              >
-              <span v-else
-                >Маржа ниже 10%. Рекомендуется пересмотреть условия.</span
-              >
+              <span v-if="priceBreakdown.netProfit <= 0">Товар продаётся в убыток! Проверьте цену, скидку и
+                бонусы.</span>
+              <span v-else>Маржа ниже 10%. Рекомендуется пересмотреть условия.</span>
             </div>
           </div>
           <div class="p-3 bg-muted/50 rounded-md sm:col-span-2">
@@ -1294,8 +1286,8 @@ const seoKeywordsString = computed({
             <Label>{{ attribute.name }}</Label>
             <Select
               v-if="
-                attribute.display_type === 'select' ||
-                attribute.display_type === 'color'
+                attribute.display_type === 'select'
+                  || attribute.display_type === 'color'
               "
               v-model="productAttributeValues[attribute.id]"
             >
@@ -1305,7 +1297,9 @@ const seoKeywordsString = computed({
                 />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="null"> Не выбрано </SelectItem>
+                <SelectItem :value="null">
+                  Не выбрано
+                </SelectItem>
                 <SelectItem
                   v-for="option in attribute.attribute_options"
                   :key="option.id"
@@ -1393,9 +1387,7 @@ const seoKeywordsString = computed({
                 @click="addAccessory(product)"
               >
                 <span>{{ product.name }}</span>
-                <span class="text-xs text-muted-foreground"
-                  >{{ product.price }} ₸</span
-                >
+                <span class="text-xs text-muted-foreground">{{ product.price }} ₸</span>
               </div>
             </div>
           </div>
@@ -1673,7 +1665,9 @@ const seoKeywordsString = computed({
                 <SelectValue placeholder="Выберите поставщика" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="null"> Не указан </SelectItem>
+                <SelectItem :value="null">
+                  Не указан
+                </SelectItem>
                 <SelectItem v-for="s in suppliers" :key="s.id" :value="s.id">
                   {{ s.name }}
                 </SelectItem>
@@ -1697,7 +1691,9 @@ const seoKeywordsString = computed({
                 <SelectValue placeholder="Выберите страну" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="null"> Не указана </SelectItem>
+                <SelectItem :value="null">
+                  Не указана
+                </SelectItem>
                 <SelectItem
                   v-for="country in countries"
                   :key="country.id"
@@ -1716,7 +1712,9 @@ const seoKeywordsString = computed({
                 <SelectValue placeholder="Выберите материал" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="null"> Не указан </SelectItem>
+                <SelectItem :value="null">
+                  Не указан
+                </SelectItem>
                 <SelectItem
                   v-for="material in materials"
                   :key="material.id"
@@ -1803,9 +1801,15 @@ const seoKeywordsString = computed({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="unisex"> 👥 Унисекс </SelectItem>
-                <SelectItem value="male"> 👦 Для мальчиков </SelectItem>
-                <SelectItem value="female"> 👧 Для девочек </SelectItem>
+                <SelectItem value="unisex">
+                  👥 Унисекс
+                </SelectItem>
+                <SelectItem value="male">
+                  👦 Для мальчиков
+                </SelectItem>
+                <SelectItem value="female">
+                  👧 Для девочек
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1869,7 +1873,9 @@ const seoKeywordsString = computed({
                 />
               </div>
               <div class="space-y-1">
-                <p class="font-semibold text-base sm:text-sm">Добавить фото</p>
+                <p class="font-semibold text-base sm:text-sm">
+                  Добавить фото
+                </p>
                 <p class="text-xs text-muted-foreground hidden sm:block">
                   Перетащите или нажмите для выбора
                 </p>
@@ -1888,7 +1894,7 @@ const seoKeywordsString = computed({
               class="hidden"
               :disabled="isProcessingImages"
               @change="handleFilesChange"
-            />
+            >
           </div>
 
           <!-- ⏳ Индикатор загрузки -->
@@ -1977,10 +1983,10 @@ const seoKeywordsString = computed({
                     alt="Изображение товара"
                     @error="
                       (e: Event) =>
-                        ((e.target as HTMLImageElement).src =
-                          '/images/placeholder.svg')
+                        ((e.target as HTMLImageElement).src
+                          = '/images/placeholder.svg')
                     "
-                  />
+                  >
                 </div>
                 <!-- Бейдж главного изображения -->
                 <div
@@ -2012,9 +2018,7 @@ const seoKeywordsString = computed({
                     class="flex-1 flex items-center gap-1 text-xs text-muted-foreground"
                   >
                     <Icon name="lucide:grip-vertical" class="w-4 h-4" />
-                    <span v-if="index === 0" class="text-amber-500 font-medium"
-                      >Обложка</span
-                    >
+                    <span v-if="index === 0" class="text-amber-500 font-medium">Обложка</span>
                     <span v-else>{{ index + 1 }}-е фото</span>
                   </div>
                   <!-- Удалить -->

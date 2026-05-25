@@ -1,6 +1,6 @@
 # 🛒 Smart Slide-out Cart Implementation
 
-> **Дата реализации:** 31 марта 2026  
+> **Дата реализации:** 31 марта 2026
 > **Цель:** Увеличение конверсии и среднего чека через геймификацию и непрерывный шоппинг
 
 ---
@@ -30,13 +30,13 @@
 **Файл:** `stores/publicStore/cartStore.ts`
 
 ```typescript
-const isCartOpen = ref(false); // 🔥 Управление состоянием шторки корзины
+const isCartOpen = ref(false) // 🔥 Управление состоянием шторки корзины
 
 return {
   // ... другие поля
   isCartOpen,
   // ...
-};
+}
 ```
 
 ---
@@ -60,27 +60,29 @@ return {
 #### Progress Bar для бесплатной доставки
 
 ```typescript
-const FREE_SHIPPING_THRESHOLD = 15000;
+const FREE_SHIPPING_THRESHOLD = 15000
 
 const shippingProgress = computed(() => {
-  const progress = (cartStore.subtotal / FREE_SHIPPING_THRESHOLD) * 100;
-  return Math.min(progress, 100);
-});
+  const progress = (cartStore.subtotal / FREE_SHIPPING_THRESHOLD) * 100
+  return Math.min(progress, 100)
+})
 
 const remainingForFreeShipping = computed(() => {
-  const remaining = FREE_SHIPPING_THRESHOLD - cartStore.subtotal;
-  return remaining > 0 ? remaining : 0;
-});
+  const remaining = FREE_SHIPPING_THRESHOLD - cartStore.subtotal
+  return remaining > 0 ? remaining : 0
+})
 ```
 
 **Визуализация:**
 
 ```vue
 <Progress :model-value="shippingProgress" class="h-2" />
+
 <p v-if="!hasFreeShipping" class="text-xs text-muted-foreground">
-  Добавьте товаров на {{ formatPrice(remainingForFreeShipping) }} ₸ 
+  Добавьте товаров на {{ formatPrice(remainingForFreeShipping) }} ₸
   для бесплатной доставки 🚚
 </p>
+
 <p v-else class="text-xs text-green-600">
   🎉 Ура! Доставка за наш счет!
 </p>
@@ -147,15 +149,15 @@ async function addItem(
   // ... логика добавления ...
 
   const existingItem = items.value.find(
-    (item) => item.product.id === productId,
-  );
+    item => item.product.id === productId,
+  )
 
   if (existingItem) {
-    existingItem.quantity += quantity;
-    toast.success(`"${existingItem.product.name}" (+${quantity})`);
+    existingItem.quantity += quantity
+    toast.success(`"${existingItem.product.name}" (+${quantity})`)
     // 🔥 Открываем корзину при добавлении товара
-    isCartOpen.value = true;
-    return;
+    isCartOpen.value = true
+    return
   }
 
   // ... загрузка товара из БД ...
@@ -164,10 +166,10 @@ async function addItem(
     items.value.push({
       product: fullProduct as ProductWithImages,
       quantity,
-    });
-    toast.success(`"${fullProduct.name}" добавлен в корзину!`);
+    })
+    toast.success(`"${fullProduct.name}" добавлен в корзину!`)
     // 🔥 Открываем корзину при добавлении нового товара
-    isCartOpen.value = true;
+    isCartOpen.value = true
   }
 }
 ```
@@ -275,26 +277,26 @@ async function addItem(
 
 ```typescript
 // Собираем все accessory_ids из товаров в корзине
-const allAccessoryIds = new Set<string>();
-const cartProductIds = new Set(cartStore.items.map((item) => item.product.id));
+const allAccessoryIds = new Set<string>()
+const cartProductIds = new Set(cartStore.items.map(item => item.product.id))
 
 for (const item of cartStore.items) {
   if (item.product.accessory_ids?.length) {
     item.product.accessory_ids.forEach((id) => {
       // Добавляем только если этого товара еще нет в корзине
       if (!cartProductIds.has(id)) {
-        allAccessoryIds.add(id);
+        allAccessoryIds.add(id)
       }
-    });
+    })
   }
 }
 
 // Загружаем аксессуары (максимум 3)
 const { data } = await supabase
-  .from("products")
+  .from('products')
   .select(`*, product_images(*)`)
-  .in("id", Array.from(allAccessoryIds).slice(0, 3))
-  .eq("is_active", true);
+  .in('id', Array.from(allAccessoryIds).slice(0, 3))
+  .eq('is_active', true)
 ```
 
 **Визуализация:**
@@ -312,6 +314,7 @@ const { data } = await supabase
         <p class="text-sm font-medium">{{ acc.name }}</p>
         <p class="text-xs text-muted-foreground">{{ acc.price }} ₸</p>
       </div>
+
       <Button size="sm" @click="addAccessoryToCart(acc)">
         Добавить
       </Button>
@@ -355,7 +358,7 @@ const { data } = await supabase
 
 ### 1. Анимация добавления товара
 
-**Приоритет:** Medium  
+**Приоритет:** Medium
 **Story Points:** 2
 
 **Описание:**
@@ -371,7 +374,7 @@ const { data } = await supabase
 
 ### 2. Анимация добавления товара
 
-**Приоритет:** Medium  
+**Приоритет:** Medium
 **Story Points:** 2
 
 **Описание:**
@@ -387,7 +390,7 @@ const { data } = await supabase
 
 ### 2. Быстрый просмотр товара в корзине
 
-**Приоритет:** Low  
+**Приоритет:** Low
 **Story Points:** 2
 
 **Описание:**
@@ -397,7 +400,7 @@ const { data } = await supabase
 
 ### 3. Сохраненные корзины
 
-**Приоритет:** Medium  
+**Приоритет:** Medium
 **Story Points:** 5
 
 **Описание:**
@@ -479,6 +482,6 @@ const { data } = await supabase
 
 ---
 
-**Дата создания:** 31 марта 2026  
-**Автор:** Uhti Commerce Team  
+**Дата создания:** 31 марта 2026
+**Автор:** Uhti Commerce Team
 **Статус:** ✅ Реализовано и готово к тестированию

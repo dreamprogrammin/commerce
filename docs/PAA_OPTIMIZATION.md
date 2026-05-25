@@ -1,6 +1,6 @@
 # 🎯 Google PAA Snippets Optimization - Документация
 
-> **Дата реализации:** 31 марта 2026  
+> **Дата реализации:** 31 марта 2026
 > **Цель:** Захват блока "Вопросы по теме" (People Also Ask) в Google для uhti.kz
 
 ---
@@ -102,7 +102,7 @@ FROM (
 ```typescript
 export interface CategoryQuestion {
   // ...
-  priority_order: number;
+  priority_order: number
   // ...
 }
 ```
@@ -124,18 +124,19 @@ export interface CategoryQuestion {
 
 ```typescript
 function sanitizeAndRenderHTML(html: string | null): string {
-  if (!html) return "";
+  if (!html)
+    return ''
 
   // Разрешаем только безопасные теги для SEO
-  const allowedTags = ["strong", "ul", "li", "a", "br", "p"];
-  const tempDiv = document.createElement("div");
-  tempDiv.innerHTML = html;
+  const allowedTags = ['strong', 'ul', 'li', 'a', 'br', 'p']
+  const tempDiv = document.createElement('div')
+  tempDiv.innerHTML = html
 
   // Удаляем все скрипты и опасные атрибуты
-  const scripts = tempDiv.querySelectorAll("script, style");
-  scripts.forEach((s) => s.remove());
+  const scripts = tempDiv.querySelectorAll('script, style')
+  scripts.forEach(s => s.remove())
 
-  return tempDiv.innerHTML;
+  return tempDiv.innerHTML
 }
 ```
 
@@ -530,6 +531,6 @@ SELECT public.generate_questions_for_all_categories();
 
 ---
 
-**Дата создания:** 31 марта 2026  
-**Автор:** Uhti Commerce Team  
+**Дата создания:** 31 марта 2026
+**Автор:** Uhti Commerce Team
 **Статус:** ✅ Реализовано и готово к деплою

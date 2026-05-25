@@ -1,28 +1,29 @@
 /**
  * Скрипт для аудита качества alt текстов
- * 
+ *
  * Проверяет:
  * - Сколько изображений без alt текста
  * - Сколько с дефолтными alt текстами
  * - Сколько с качественными alt текстами
- * 
+ *
  * Запуск: npm run seo:audit
  */
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
 // Загружаем переменные окружения из .env
 try {
   const envFile = readFileSync(join(process.cwd(), '.env'), 'utf-8')
-  envFile.split('\n').forEach(line => {
+  envFile.split('\n').forEach((line) => {
     const [key, ...valueParts] = line.split('=')
     if (key && valueParts.length) {
       process.env[key.trim()] = valueParts.join('=').trim()
     }
   })
-} catch (e) {
+}
+catch (e) {
   // .env файл не найден, используем существующие переменные окружения
 }
 
@@ -92,7 +93,8 @@ async function auditAltTexts() {
       if (stats.examples.without.length < 5) {
         stats.examples.without.push(`${productSlug}: (пусто)`)
       }
-    } else if (
+    }
+    else if (
       image.alt_text.includes('Изображение товара')
       || image.alt_text === 'Image'
       || image.alt_text.match(/^фото \d+$/)
@@ -101,7 +103,8 @@ async function auditAltTexts() {
       if (stats.examples.default.length < 5) {
         stats.examples.default.push(`${productSlug}: "${image.alt_text}"`)
       }
-    } else {
+    }
+    else {
       stats.withGoodAlt++
       if (stats.examples.good.length < 5) {
         stats.examples.good.push(`${productSlug}: "${image.alt_text}"`)
@@ -136,7 +139,8 @@ async function auditAltTexts() {
   console.log('\n💡 Рекомендации:')
   if (stats.withoutAlt > 0 || stats.withDefaultAlt > 0) {
     console.log('   Запусти: npx tsx scripts/generate-alt-texts.ts')
-  } else {
+  }
+  else {
     console.log('   Все отлично! Все изображения имеют качественные alt тексты.')
   }
 

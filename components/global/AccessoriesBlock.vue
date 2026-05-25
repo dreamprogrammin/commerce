@@ -1,118 +1,121 @@
 <script setup lang="ts">
-import type { AccessoryProduct } from "@/types";
+import type { AccessoryProduct } from '@/types'
 
 const props = defineProps<{
-  accessories: AccessoryProduct[];
-  loading?: boolean;
-  cartMode?: boolean;
-}>();
-
-const selectedIds = defineModel<string[]>("selectedIds", { default: () => [] });
-
-// Category configuration with explicit Tailwind classes
-const categories = {
-  batteries: {
-    title: "Батарейки",
-    icon: "streamline-emojis:battery",
-    bg: "bg-amber-50",
-    text: "",
-  },
-  "gift-wrapping": {
-    title: "Упаковка",
-    icon: "streamline-emojis:wrapped-gift-1",
-    bg: "bg-pink-50",
-    text: "",
-  },
-  other: {
-    title: "Аксессуары",
-    icon: "lucide:package",
-    bg: "bg-blue-50",
-    text: "text-blue-600",
-  },
-} as const;
-
-type CategoryKey = keyof typeof categories;
-
-// Group accessories by category
-const groupedAccessories = computed(() => {
-  const groups: Record<CategoryKey, AccessoryProduct[]> = {
-    batteries: [],
-    "gift-wrapping": [],
-    other: [],
-  };
-
-  for (const acc of props.accessories) {
-    const slug = acc.categories?.slug;
-    if (slug === "batteries") groups.batteries.push(acc);
-    else if (slug === "gift-wrapping") groups["gift-wrapping"].push(acc);
-    else groups.other.push(acc);
-  }
-
-  return groups;
-});
-
-// Available categories (non-empty)
-const availableCategories = computed(() =>
-  (Object.keys(categories) as CategoryKey[]).filter(
-    (key) => groupedAccessories.value[key].length > 0,
-  ),
-);
-
-// Selected count per category
-const selectedCount = computed(() => {
-  const counts: Record<CategoryKey, number> = {
-    batteries: 0,
-    "gift-wrapping": 0,
-    other: 0,
-  };
-  for (const key of Object.keys(counts) as CategoryKey[]) {
-    counts[key] = groupedAccessories.value[key].filter((acc) =>
-      selectedIds.value.includes(acc.id),
-    ).length;
-  }
-  return counts;
-});
-
-// Modal/Drawer state
-const isMobile = ref(false);
-const isOpen = ref(false);
-const activeCategory = ref<CategoryKey | null>(null);
-
-const currentConfig = computed(() =>
-  activeCategory.value ? categories[activeCategory.value] : null,
-);
-const currentAccessories = computed(() =>
-  activeCategory.value ? groupedAccessories.value[activeCategory.value] : [],
-);
-
-onMounted(() => {
-  isMobile.value = window.innerWidth < 1024;
-  window.addEventListener("resize", () => {
-    isMobile.value = window.innerWidth < 1024;
-  });
-});
-
-function openCategory(key: CategoryKey) {
-  activeCategory.value = key;
-  isOpen.value = true;
-}
-
-function toggleAccessory(id: string) {
-  const idx = selectedIds.value.indexOf(id);
-  if (idx === -1) selectedIds.value = [...selectedIds.value, id];
-  else selectedIds.value = selectedIds.value.filter((i) => i !== id);
-}
-
-function close() {
-  emit('addToCart');
-  isOpen.value = false;
-  activeCategory.value = null;
-}
+  accessories: AccessoryProduct[]
+  loading?: boolean
+  cartMode?: boolean
+}>()
 
 const emit = defineEmits<{
   addToCart: []
   addItem: [id: string]
-}>();
+}>()
+
+const selectedIds = defineModel<string[]>('selectedIds', { default: () => [] })
+
+// Category configuration with explicit Tailwind classes
+const categories = {
+  'batteries': {
+    title: 'Батарейки',
+    icon: 'streamline-emojis:battery',
+    bg: 'bg-amber-50',
+    text: '',
+  },
+  'gift-wrapping': {
+    title: 'Упаковка',
+    icon: 'streamline-emojis:wrapped-gift-1',
+    bg: 'bg-pink-50',
+    text: '',
+  },
+  'other': {
+    title: 'Аксессуары',
+    icon: 'lucide:package',
+    bg: 'bg-blue-50',
+    text: 'text-blue-600',
+  },
+} as const
+
+type CategoryKey = keyof typeof categories
+
+// Group accessories by category
+const groupedAccessories = computed(() => {
+  const groups: Record<CategoryKey, AccessoryProduct[]> = {
+    'batteries': [],
+    'gift-wrapping': [],
+    'other': [],
+  }
+
+  for (const acc of props.accessories) {
+    const slug = acc.categories?.slug
+    if (slug === 'batteries')
+      groups.batteries.push(acc)
+    else if (slug === 'gift-wrapping')
+      groups['gift-wrapping'].push(acc)
+    else groups.other.push(acc)
+  }
+
+  return groups
+})
+
+// Available categories (non-empty)
+const availableCategories = computed(() =>
+  (Object.keys(categories) as CategoryKey[]).filter(
+    key => groupedAccessories.value[key].length > 0,
+  ),
+)
+
+// Selected count per category
+const selectedCount = computed(() => {
+  const counts: Record<CategoryKey, number> = {
+    'batteries': 0,
+    'gift-wrapping': 0,
+    'other': 0,
+  }
+  for (const key of Object.keys(counts) as CategoryKey[]) {
+    counts[key] = groupedAccessories.value[key].filter(acc =>
+      selectedIds.value.includes(acc.id),
+    ).length
+  }
+  return counts
+})
+
+// Modal/Drawer state
+const isMobile = ref(false)
+const isOpen = ref(false)
+const activeCategory = ref<CategoryKey | null>(null)
+
+const currentConfig = computed(() =>
+  activeCategory.value ? categories[activeCategory.value] : null,
+)
+const currentAccessories = computed(() =>
+  activeCategory.value ? groupedAccessories.value[activeCategory.value] : [],
+)
+
+onMounted(() => {
+  isMobile.value = window.innerWidth < 1024
+  window.addEventListener('resize', () => {
+    isMobile.value = window.innerWidth < 1024
+  })
+})
+
+function openCategory(key: CategoryKey) {
+  activeCategory.value = key
+  isOpen.value = true
+}
+
+function toggleAccessory(id: string) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx === -1)
+    selectedIds.value = [...selectedIds.value, id]
+  else selectedIds.value = selectedIds.value.filter(i => i !== id)
+}
+
+function close() {
+  emit('addToCart')
+  isOpen.value = false
+  activeCategory.value = null
+}
 </script>
 
 <template>

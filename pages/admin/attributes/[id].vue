@@ -81,7 +81,8 @@ async function handleDeleteOption(optionId: number) {
 
 // <-- ФУНКЦИЯ для сохранения единицы измерения -->
 async function handleSaveUnit() {
-  if (!currentAttribute.value) return
+  if (!currentAttribute.value)
+    return
   const success = await attributesStore.updateAttribute(currentAttribute.value.id, {
     unit: currentAttribute.value.unit,
   })
