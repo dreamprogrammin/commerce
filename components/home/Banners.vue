@@ -96,6 +96,7 @@ function getBannerBlurUrl(banner: Banner): string | null {
             :alt="banner.title"
             aspect-ratio="video"
             object-fit="cover"
+            sizes="(max-width: 767px) 100vw, 50vw"
             :placeholder-type="getBannerBlurUrl(banner) ? 'lqip' : 'shimmer'"
             :blur-data-url="getBannerBlurUrl(banner)"
             eager

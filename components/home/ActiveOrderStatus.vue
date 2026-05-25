@@ -259,6 +259,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
                       object-fit="contain"
                       placeholder-type="lqip"
                       aspect-ratio="square"
+                      sizes="64px"
                       eager
                       class="w-full h-full"
                     />

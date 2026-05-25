@@ -164,6 +164,7 @@ function formatPrice(price: number) {
                       :src="getMainImageVariant(product, 'md')"
                       :src-sm="getMainImageVariant(product, 'sm')"
                       :src-md="getMainImageVariant(product, 'md')"
+                      sizes="(max-width: 767px) 100vw, 50vw"
                       :blur-data-url="getMainImage(product)?.blur_placeholder"
                       :alt="product.name"
                       object-fit="contain"
