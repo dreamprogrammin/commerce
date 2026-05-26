@@ -160,6 +160,57 @@ export default defineNuxtConfig({
 
   nitro: {
     routeRules: {
+      // ─── Статические JS/CSS бандлы Nuxt (хешированные имена → immutable) ───
+      '/_nuxt/**': {
+        headers: {
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      },
+
+      // ─── Иконки и favicon (меняются редко → 1 год) ───────────────────────
+      '/favicon.ico': {
+        headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+      },
+      '/favicon-16x16.png': {
+        headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+      },
+      '/favicon-32x32.png': {
+        headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+      },
+      '/apple-touch-icon.png': {
+        headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+      },
+      '/android-chrome-192x192.png': {
+        headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+      },
+      '/android-chrome-512x512.png': {
+        headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+      },
+
+      // ─── OG-изображения (могут меняться → 1 неделя + SWR 30 дней) ────────
+      '/og-*.jpeg': {
+        headers: {
+          'Cache-Control': 'public, max-age=604800, stale-while-revalidate=2592000',
+        },
+      },
+      '/og-*.png': {
+        headers: {
+          'Cache-Control': 'public, max-age=604800, stale-while-revalidate=2592000',
+        },
+      },
+
+      // ─── Web App Manifest и верификационные файлы ─────────────────────────
+      '/site.webmanifest': {
+        headers: { 'Cache-Control': 'public, max-age=604800' },
+      },
+      '/*.txt': {
+        headers: { 'Cache-Control': 'public, max-age=86400' },
+      },
+      '/*.html': {
+        headers: { 'Cache-Control': 'public, max-age=86400' },
+      },
+
+      // ─── Прокси изображений из Supabase Storage ───────────────────────────
       '/api/image-proxy/**': {
         proxy: {
           to: 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/**',
