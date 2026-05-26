@@ -406,6 +406,15 @@ export default defineNuxtConfig({
           rel: 'dns-prefetch',
           href: 'https://gvsdevsvzgcivpphcuai.supabase.co',
         },
+        {
+          rel: 'preconnect',
+          href: 'https://fonts.googleapis.com',
+        },
+        {
+          rel: 'preconnect',
+          href: 'https://fonts.gstatic.com',
+          crossorigin: 'anonymous',
+        },
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         {
           rel: 'icon',
@@ -472,6 +481,24 @@ export default defineNuxtConfig({
     },
     build: {
       cssMinify: 'lightningcss',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            // Split large vendor libraries
+            if (id.includes('node_modules')) {
+              if (id.includes('@supabase')) {
+                return 'supabase'
+              }
+              if (id.includes('@tanstack')) {
+                return 'tanstack'
+              }
+              if (id.includes('embla-carousel')) {
+                return 'carousel'
+              }
+            }
+          },
+        },
+      },
     },
   },
 

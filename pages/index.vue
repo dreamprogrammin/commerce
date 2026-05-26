@@ -16,89 +16,13 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
-// ---------------------------------------------------------------------------
-// 🔬 DEV HYDRATION LOGGER
-// Удали этот блок (или HYDRATION_DEBUG = false) перед деплоем в продакшн
-// ---------------------------------------------------------------------------
-const HYDRATION_DEBUG = true
-
-function logHydration(componentName: string, strategy: string) {
-  if (!HYDRATION_DEBUG || !import.meta.client)
-    return
-  const time = performance.now().toFixed(0)
-  console.log(
-    `%c💧 [HYDRATED] %c${componentName}%c | strategy: ${strategy} | t=${time}ms`,
-    'color: #22c55e; font-weight: bold',
-    'color: #60a5fa; font-weight: bold',
-    'color: #94a3b8',
-  )
-}
-
-function logHydrationSkip(componentName: string, reason: string) {
-  if (!HYDRATION_DEBUG || !import.meta.client)
-    return
-  console.log(
-    `%c⏭️  [SKIPPED]  %c${componentName}%c | reason: ${reason}`,
-    'color: #f59e0b; font-weight: bold',
-    'color: #60a5fa; font-weight: bold',
-    'color: #94a3b8',
-  )
-}
-
-if (import.meta.client && HYDRATION_DEBUG) {
-  console.groupCollapsed('%c🏠 Home Page — Hydration Debug', 'color: #a78bfa; font-weight: bold; font-size: 13px')
-  console.log('%c[lazy/visible]  — SSR рендерит HTML, клиент гидрирует при входе во вьюпорт (@hydrated).', 'color: #94a3b8')
-  console.log('%c[ClientOnly]    — SSR рендерит #fallback, клиент монтирует с нуля (onMounted лог).', 'color: #94a3b8')
-  console.log('%c⚠️  ClientOnly нужен когда SSR и клиент рендерят РАЗНЫЙ контент (данные client-only).', 'color: #f59e0b')
-  console.groupEnd()
-}
-
-// Логируем монтирование ClientOnly-блоков (у них нет @hydrated — они монтируются, а не гидрируются)
-onMounted(() => {
-  if (!HYDRATION_DEBUG)
-    return
-  const t = performance.now().toFixed(0)
-  console.log(
-    `%c🟡 [CLIENT MOUNTED] %cCarousels block (ClientOnly)%c | t=${t}ms | popular=${popularProducts.value.length} newest=${newestProducts.value.length} recommended=${recommendedProducts.value.length} wishlist=${wishlistProducts.value.length}`,
-    'color: #f59e0b; font-weight: bold',
-    'color: #60a5fa; font-weight: bold',
-    'color: #94a3b8',
-  )
-})
-// ---------------------------------------------------------------------------
-
-// ⚡ Lazy hydration компоненты со стратегией "visible"
-//
-// Правило применения:
-//   ✅ LazyHydration — компонент рендерится на SSR И на клиенте одинаково.
-//      SSR → статический HTML → клиент гидрирует при входе во вьюпорт.
-//
-//   ❌ LazyHydration + ClientOnly — антипаттерн: SSR не рендерит компонент,
-//      IntersectionObserver наблюдать не за чем, @hydrated никогда не сработает.
-//
-//   ❌ LazyHydration для client-only данных — вызывает hydration mismatch:
-//      SSR рендерит скелетон (данные не пришли), клиент ожидает карусель (данные уже есть).
-//      Решение: ClientOnly + обычный компонент.
-//
-// Применяем LazyHydration только к компонентам без client-only зависимостей:
-const LazyHydrationBanners = defineLazyHydrationComponent(
-  'visible',
-  () => import('@/components/home/Banners.vue'),
-)
-const LazyHydrationBonusCard = defineLazyHydrationComponent(
-  'visible',
-  () => import('@/components/home/BonusProgramCard.vue'),
-)
-const LazyHydrationFeaturedProduct = defineLazyHydrationComponent(
-  'visible',
-  () => import('@/components/home/FeaturedProduct.vue'),
-)
-// ProductsCarousel намеренно НЕ LazyHydration — данные client-only (server:false),
-// поэтому обёрнут в ClientOnly в шаблоне.
-const LazyHydrationGuestPromo = defineLazyHydrationComponent(
-  'visible',
-  () => import('@/components/home/GuestRegistrationPromo.vue'),
-)
+// Lazy load non-critical components
+const LazyBanners = defineAsyncComponent(() => import('@/components/home/Banners.vue'))
+const LazyBonusCard = defineAsyncComponent(() => import('@/components/home/BonusProgramCard.vue'))
+const LazyFeaturedProduct = defineAsyncComponent(() => import('@/components/home/FeaturedProduct.vue'))
+const LazyGuestPromo = defineAsyncComponent(() => import('@/components/home/GuestRegistrationPromo.vue'))
+const LazyBrandsCarousel = defineAsyncComponent(() => import('@/components/home/BrandsCarousel.vue'))
+const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
@@ -583,7 +507,7 @@ useRobotsRule({ index: true, follow: true })
          гидрирует при появлении во вьюпорте. -->
     <div :class="desktopContainedClass">
       <ClientOnly>
-        <HomeBrandsCarousel
+        <LazyBrandsCarousel
           v-if="topBrands && topBrands.length > 0"
           :brands="topBrands"
         />
@@ -592,10 +516,7 @@ useRobotsRule({ index: true, follow: true })
 
     <!-- ✅ Баннеры (без изменений — уже было корректно) -->
     <div :class="alwaysContainedClass">
-      <LazyHydrationBanners
-        :hydrate-on-visible="{ rootMargin: '100px' }"
-        @hydrated="logHydration('Banners', 'visible rootMargin:100px')"
-      />
+      <LazyBanners />
     </div>
 
     <!-- Популярные категории -->
@@ -609,14 +530,8 @@ useRobotsRule({ index: true, follow: true })
         Акции и бонусы
       </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-        <LazyHydrationBonusCard
-          :hydrate-on-visible="{ rootMargin: '50px' }"
-          @hydrated="logHydration('BonusCard', 'visible rootMargin:50px')"
-        />
-        <LazyHydrationFeaturedProduct
-          :hydrate-on-visible="{ rootMargin: '50px' }"
-          @hydrated="logHydration('FeaturedProduct', 'visible rootMargin:50px')"
-        />
+        <LazyBonusCard />
+        <LazyFeaturedProduct />
       </div>
     </div>
 
@@ -643,7 +558,7 @@ useRobotsRule({ index: true, follow: true })
         </template>
         <template v-else>
           <!-- Избранное (только для залогиненных) -->
-          <HomeProductsCarousel
+          <LazyProductsCarousel
             v-if="showWishlistCarousel"
             :is-loading="isFetchingRecommendations"
             :products="wishlistProducts"
@@ -653,7 +568,7 @@ useRobotsRule({ index: true, follow: true })
           />
 
           <!-- Рекомендации ИЛИ Популярные товары -->
-          <HomeProductsCarousel
+          <LazyProductsCarousel
             v-if="showRecommendedCarousel"
             :is-loading="isFetchingRecommendations"
             :products="recommendedProducts"
@@ -663,7 +578,7 @@ useRobotsRule({ index: true, follow: true })
               'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0,
             }"
           />
-          <HomeProductsCarousel
+          <LazyProductsCarousel
             v-else-if="showPopularFallbackCarousel"
             :is-loading="isFetchingPopular"
             :products="popularProducts"
@@ -691,7 +606,7 @@ useRobotsRule({ index: true, follow: true })
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
         </template>
-        <HomeProductsCarousel
+        <LazyProductsCarousel
           v-else-if="showNewestCarousel"
           :is-loading="isFetchingNewest"
           :products="newestProducts"
@@ -827,9 +742,6 @@ useRobotsRule({ index: true, follow: true })
       Если компонент использует auth-данные внутри, он обработает это сам
       через onMounted или watch после гидрации.
     -->
-    <LazyHydrationGuestPromo
-      :hydrate-on-visible="{ rootMargin: '100px' }"
-      @hydrated="logHydration('GuestPromo', 'visible rootMargin:100px')"
-    />
+    <LazyGuestPromo />
   </div>
 </template>
