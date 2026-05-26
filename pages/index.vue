@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  Brand,
   CategoryRow,
   ProductWithGallery,
   RecommendedProduct,
@@ -21,7 +20,6 @@ const LazyBanners = defineAsyncComponent(() => import('@/components/home/Banners
 const LazyBonusCard = defineAsyncComponent(() => import('@/components/home/BonusProgramCard.vue'))
 const LazyFeaturedProduct = defineAsyncComponent(() => import('@/components/home/FeaturedProduct.vue'))
 const LazyGuestPromo = defineAsyncComponent(() => import('@/components/home/GuestRegistrationPromo.vue'))
-const LazyBrandsCarousel = defineAsyncComponent(() => import('@/components/home/BrandsCarousel.vue'))
 const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
 
 const authStore = useAuthStore()
@@ -171,47 +169,6 @@ const isLoadingMainBlock = computed(
   () => showRecommendationsSkeleton.value || showPopularSkeleton.value,
 )
 
-// TanStack Query — категории (SEO schema)
-const { data: categoriesData } = useQuery<CategoryRow[]>({
-  queryKey: ['home-categories-schema'],
-  queryFn: async () => {
-    if (ssrData.value?.categories?.length) {
-      return ssrData.value.categories as CategoryRow[]
-    }
-    await popularCategoriesStore.fetchPopularCategories()
-    return popularCategoriesStore.popularCategories
-  },
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
-})
-
-const popularCategoriesForSchema = computed(() => categoriesData.value || [])
-
-// TanStack Query — бренды
-const { data: brandsData } = useQuery<Brand[]>({
-  queryKey: ['home-brands-schema'],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('brands')
-      .select('id, name, slug, logo_url')
-      .order('name', { ascending: true })
-      .limit(20)
-
-    if (error)
-      throw error
-    return data || []
-  },
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
-})
-
-const brandsForSchema = computed(() => brandsData.value || [])
-const topBrands = computed(() => brandsForSchema.value || [])
-
 // ---------------------------------------------------------------------------
 // Вычисляемые флаги для условного рендера карусельных блоков.
 // ВАЖНО: v-if снаружи LazyHydration — компонент либо есть в DOM (и будет
@@ -259,8 +216,7 @@ const keywords = computed(() => {
     'мягкие игрушки',
     'настольные игры',
   ]
-  const topBrands = brandsForSchema.value.slice(0, 5).map(b => b.name)
-  return [...baseKeywords, ...topBrands].join(', ')
+  return baseKeywords.join(', ')
 })
 
 const ogImageUrl = `${siteUrl}/og-home-toys.jpeg`
@@ -290,7 +246,8 @@ useSeoMeta({
     'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
 })
 
-const storeSchema = computed(() => ({
+// Simplified static schemas (no reactive dependencies)
+const storeSchema = {
   '@context': 'https://schema.org',
   '@type': 'Store',
   '@id': `${siteUrl}/#store`,
@@ -323,46 +280,9 @@ const storeSchema = computed(() => ({
       'name': 'Kazakhstan',
     },
   },
-  'hasOfferCatalog':
-    popularCategoriesForSchema.value.length > 0
-      ? {
-          '@type': 'OfferCatalog',
-          'name': 'Каталог детских игрушек',
-          'itemListElement': popularCategoriesForSchema.value.map(
-            (cat, index) => ({
-              '@type': 'OfferCatalog',
-              'name': cat.name,
-              'url': `${siteUrl}${cat.href}`,
-              'position': index + 1,
-            }),
-          ),
-        }
-      : undefined,
-}))
+}
 
-const categoriesListSchema = computed(() => ({
-  '@context': 'https://schema.org',
-  '@type': 'ItemList',
-  'name': 'Популярные категории игрушек',
-  'description': 'Основные категории детских игрушек в магазине Ухтышка',
-  'numberOfItems': popularCategoriesForSchema.value.length,
-  'itemListElement': popularCategoriesForSchema.value.map((cat, index) => ({
-    '@type': 'ListItem',
-    'position': index + 1,
-    'item': {
-      '@type': 'WebPage',
-      '@id': `${siteUrl}${cat.href}`,
-      'name': cat.name,
-      'url': `${siteUrl}${cat.href}`,
-      'description':
-        cat.description
-        || cat.seo_title
-        || `Купить ${cat.name.toLowerCase()} в интернет-магазине Ухтышка. Широкий выбор, доставка по Казахстану.`,
-    },
-  })),
-}))
-
-const collectionPageSchema = computed(() => ({
+const collectionPageSchema = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
   '@id': `${siteUrl}/#collectionpage`,
@@ -370,14 +290,9 @@ const collectionPageSchema = computed(() => ({
   'name': metaTitle,
   'description': metaDescription,
   'isPartOf': { '@id': `${siteUrl}/#website` },
-  'about': {
-    '@type': 'ItemList',
-    'name': 'Категории детских игрушек',
-    'numberOfItems': popularCategoriesForSchema.value.length,
-  },
-}))
+}
 
-useHead(() => ({
+useHead({
   meta: [
     {
       name: 'keywords',
@@ -392,21 +307,16 @@ useHead(() => ({
   script: [
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify(storeSchema.value),
+      innerHTML: JSON.stringify(storeSchema),
       tagPosition: 'bodyClose',
     },
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify(categoriesListSchema.value),
-      tagPosition: 'bodyClose',
-    },
-    {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify(collectionPageSchema.value),
+      innerHTML: JSON.stringify(collectionPageSchema),
       tagPosition: 'bodyClose',
     },
   ],
-}))
+})
 
 useSchemaOrg([
   {
@@ -501,22 +411,16 @@ useRobotsRule({ index: true, follow: true })
       </template>
     </ClientOnly>
 
-    <!-- ✅ Карусель брендов
-         ИСПРАВЛЕНО: убрана ClientOnly-обёртка.
-         SSR рендерит статический HTML → IntersectionObserver следит за ним →
-         гидрирует при появлении во вьюпорте. -->
-    <div :class="desktopContainedClass">
-      <ClientOnly>
-        <LazyBrandsCarousel
-          v-if="topBrands && topBrands.length > 0"
-          :brands="topBrands"
-        />
-      </ClientOnly>
-    </div>
-
     <!-- ✅ Баннеры (без изменений — уже было корректно) -->
     <div :class="alwaysContainedClass">
       <LazyBanners />
+    </div>
+
+    <!-- Бренды в коллапсе -->
+    <div :class="alwaysContainedClass" class="py-6">
+      <ClientOnly>
+        <HomeBrandsCollapsible />
+      </ClientOnly>
     </div>
 
     <!-- Популярные категории -->
@@ -654,28 +558,6 @@ useRobotsRule({ index: true, follow: true })
               каталоге представлены только оригинальные товары от проверенных
               брендов с гарантией качества.
             </p>
-            <!--
-              ClientOnly здесь оправдан: это чисто клиентский интерактивный
-              список брендов, не является LazyHydration-компонентом.
-            -->
-            <ClientOnly>
-              <div
-                v-if="brandsForSchema.length > 0"
-                class="flex flex-wrap gap-2 mb-4"
-              >
-                <NuxtLink
-                  v-for="brand in brandsForSchema.slice(0, 8)"
-                  :key="brand.id"
-                  :to="`/brand/${brand.slug}`"
-                  class="text-sm px-3 py-1 bg-primary/5 hover:bg-primary/10 rounded-full transition-colors"
-                >
-                  {{ brand.name }}
-                </NuxtLink>
-              </div>
-              <template #fallback>
-                <div class="h-0" />
-              </template>
-            </ClientOnly>
           </div>
         </div>
         <div class="mt-8 pt-8 border-t">

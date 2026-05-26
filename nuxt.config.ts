@@ -481,19 +481,31 @@ export default defineNuxtConfig({
     },
     build: {
       cssMinify: 'lightningcss',
+      chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {
           manualChunks(id) {
-            // Split large vendor libraries
             if (id.includes('node_modules')) {
+              if (id.includes('vue/') || id.includes('@vue/')) {
+                return 'vue'
+              }
               if (id.includes('@supabase')) {
                 return 'supabase'
               }
               if (id.includes('@tanstack')) {
                 return 'tanstack'
               }
+              if (id.includes('radix-vue')) {
+                return 'radix'
+              }
               if (id.includes('embla-carousel')) {
                 return 'carousel'
+              }
+              if (id.includes('lottie')) {
+                return 'lottie'
+              }
+              if (id.includes('zod')) {
+                return 'zod'
               }
             }
           },
