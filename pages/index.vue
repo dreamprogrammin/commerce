@@ -22,6 +22,12 @@ const LazyFeaturedProduct = defineAsyncComponent(() => import('@/components/home
 const LazyGuestPromo = defineAsyncComponent(() => import('@/components/home/GuestRegistrationPromo.vue'))
 const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
 
+// Detect mobile for conditional loading
+const isMobile = computed(() => {
+  if (!import.meta.client) return false
+  return window.innerWidth < 768
+})
+
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const recommendationsStore = useRecommendationsStore()
@@ -301,8 +307,9 @@ useHead({
   ],
   link: [
     { rel: 'canonical', href: siteUrl },
-    { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-    { rel: 'dns-prefetch', href: 'https://fonts.gstatic.com' },
+    { rel: 'preconnect', href: 'https://fonts.googleapis.com', crossorigin: 'anonymous' },
+    { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: 'anonymous' },
+    { rel: 'dns-prefetch', href: 'https://gvsdevsvzgcivpphcuai.supabase.co' },
   ],
   script: [
     {
@@ -393,11 +400,13 @@ useRobotsRule({ index: true, follow: true })
 
     <!-- ✅ Слайдер в ClientOnly (нет SSR-данных, нужна клиентская логика) -->
     <ClientOnly>
-      <CommonAppCarousel
-        :is-loading="isLoadingSlides"
-        :error="slidesError"
-        :slides="slides || []"
-      />
+      <template v-if="!isMobile || slides?.length">
+        <CommonAppCarousel
+          :is-loading="isLoadingSlides"
+          :error="slidesError"
+          :slides="slides || []"
+        />
+      </template>
       <template #fallback>
         <div :class="carouselContainerVariants({ contained: 'desktop' })">
           <div class="py-4">
