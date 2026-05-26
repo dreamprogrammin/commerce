@@ -1,83 +1,44 @@
 import type { DehydratedState, VueQueryPluginOptions } from '@tanstack/vue-query'
-import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
-import { persistQueryClient } from '@tanstack/query-persist-client-core'
 import { dehydrate, hydrate, QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 
 export default defineNuxtPlugin((nuxt) => {
   const vueQueryState = useState<DehydratedState | null>('vue-query')
 
-  // 🔥 ИСПРАВЛЕННАЯ конфигурация QueryClient
+  // Optimized QueryClient configuration
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5 * 60 * 1000, // 5 минут - данные свежие
-        gcTime: 10 * 60 * 1000, // 10 минут - время жизни в кэше
-        refetchOnWindowFocus: true, // ✅ ИСПРАВЛЕНО: Проверять при возврате на вкладку
-        refetchOnReconnect: true, // ✅ ИСПРАВЛЕНО: Проверять при переподключении
-        refetchOnMount: true, // ✅ ИСПРАВЛЕНО: Разрешить refetch при монтировании (можно переопределить локально)
-        retry: 1, // ✅ ИСПРАВЛЕНО: Одна попытка повтора вместо полного отключения
-        retryDelay: 1000, // 1 секунда между попытками
-        networkMode: 'online', // Запросы только в онлайн режиме
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: true,
+        refetchOnMount: false,
+        retry: 1,
+        retryDelay: 1000,
+        networkMode: 'online',
       },
     },
   })
 
-  const options: VueQueryPluginOptions = { queryClient }
+  const options: VueQueryPluginOptions = { 
+    queryClient,
+    enableDevtoolsV6Plugin: false,
+  }
 
   nuxt.vueApp.use(VueQueryPlugin, options)
 
-  // 🔥 Гидратация на клиенте (для SSR)
-  if (import.meta.client) {
-    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Сначала гидратируем SSR state, ПОТОМ persistence
-    if (vueQueryState.value) {
-      hydrate(queryClient, vueQueryState.value)
-    }
-
-    // ✅ Настройка persistence в localStorage (ПОСЛЕ гидратации SSR)
-    const persister = createAsyncStoragePersister({
-      storage: window.localStorage,
-      key: 'tanstack-query-cache',
-      throttleTime: 1000,
-      serialize: JSON.stringify, // Явная сериализация
-      deserialize: JSON.parse, // Явная десериализация
-    })
-
-    persistQueryClient({
-      queryClient,
-      persister,
-      maxAge: 1000 * 60 * 60 * 24, // 24 часа - максимальный возраст кеша в localStorage
-      dehydrateOptions: {
-        // ✅ Умное кеширование: публичные данные всегда, приватные - только с флагом
-        shouldDehydrateQuery: (query) => {
-          // Только успешные запросы
-          if (query.state.status !== 'success')
-            return false
-
-          const queryKey = query.queryKey[0] as string
-          const isPrivateData = queryKey?.startsWith('user-') || queryKey?.startsWith('profile-')
-
-          if (isPrivateData) {
-            // ⚠️ Приватные данные: кешируем только если явно разрешено через meta.allowCache
-            // Используется для ускорения страницы профиля (/pages/profile/index.vue)
-            return query.meta?.allowCache === true
-          }
-
-          // ✅ Публичные данные: кешируем всегда
-          // Примеры: home-popular, global-slides, catalog-products, category-*
-          return true
-        },
-      },
-    })
+  // Hydration on client (for SSR)
+  if (import.meta.client && vueQueryState.value) {
+    hydrate(queryClient, vueQueryState.value)
   }
 
-  // 🔥 Дегидратация на сервере (для SSR)
+  // Dehydration on server (for SSR)
   if (import.meta.server) {
     nuxt.hooks.hook('app:rendered', () => {
       vueQueryState.value = dehydrate(queryClient)
     })
   }
 
-  // ✅ Экспортируем queryClient для доступа из других мест
   return {
     provide: {
       queryClient,

@@ -156,6 +156,12 @@ export default defineNuxtConfig({
 
   experimental: {
     payloadExtraction: false,
+    renderJsonPayloads: false,
+    componentIslands: true,
+  },
+
+  features: {
+    inlineStyles: false,
   },
 
   nitro: {
@@ -465,17 +471,23 @@ export default defineNuxtConfig({
       },
     },
     build: {
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          drop_console: false,
-        },
-      },
+      minify: 'esbuild',
+      cssMinify: 'lightningcss',
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vue-vendor': ['vue', 'vue-router'],
-            'supabase-vendor': ['@supabase/supabase-js'],
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              if (id.includes('vue') || id.includes('@vue')) {
+                return 'vue-vendor'
+              }
+              if (id.includes('supabase')) {
+                return 'supabase-vendor'
+              }
+              if (id.includes('tanstack')) {
+                return 'query-vendor'
+              }
+              return 'vendor'
+            }
           },
         },
       },

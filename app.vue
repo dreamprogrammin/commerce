@@ -8,6 +8,9 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import 'vue-sonner/style.css'
 
+// Polyfill for requestIdleCallback
+const requestIdleCallback = globalThis.requestIdleCallback || ((cb: IdleRequestCallback) => setTimeout(cb, 1))
+
 const nuxtApp = useNuxtApp()
 const isMobile = useMediaQuery('(max-width: 1023px)')
 const isPageLoading = ref(false)
@@ -22,23 +25,6 @@ const router = useRouter() // ← добавлено
 const supabaseUser = useSupabaseUser()
 const supabase = useSupabaseClient()
 
-watch(
-  supabaseUser,
-  (newUser) => {
-    if (!import.meta.client)
-      return
-    if (newUser) {
-      wishlistStore.fetchWishlistIds()
-      // mergeOnLogin вызывается в auth-init.client.ts при SIGNED_IN
-    }
-    else {
-      wishlistStore.wishlistProductIds = []
-      cartStore.cancelPendingSync()
-    }
-  },
-  { immediate: true },
-)
-
 // Авто-синхронизация профиля при входе (Magic Link из Telegram, OAuth и т.д.)
 // force=true, silent=true — всегда берём свежие данные из БД без мигания UI
 if (import.meta.client) {
@@ -47,9 +33,15 @@ if (import.meta.client) {
       (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')
       && session?.user
     ) {
-      profileStore.loadProfile(true, false, true)
+      // Defer non-critical operations
+      requestIdleCallback(() => {
+        wishlistStore.fetchWishlistIds()
+        profileStore.loadProfile(true, false, true)
+      })
     }
     else if (event === 'SIGNED_OUT') {
+      wishlistStore.wishlistProductIds = []
+      cartStore.cancelPendingSync()
       profileStore.clearProfile()
     }
   })
@@ -71,11 +63,12 @@ nuxtApp.hook('vue:error', () => {
 
 const { subscribeAll, unsubscribe } = useOrderRealtime()
 
-watch(
-  () => profileStore.profile,
-  (profile) => {
-    if (!import.meta.client)
-      return
+onMounted(async () => {
+  subscribeAll()
+
+  // Defer telegram modal check
+  requestIdleCallback(() => {
+    const profile = profileStore.profile
     if (!profile || profile.telegram_chat_id)
       return
 
@@ -86,12 +79,8 @@ watch(
 
     setTimeout(() => {
       modalStore.openTelegramModal()
-    }, 2000)
-  },
-)
-
-onMounted(async () => {
-  subscribeAll()
+    }, 3000)
+  })
 
   // Обработка токена из Telegram magic link
   if (route.hash && route.hash.includes('access_token=')) {

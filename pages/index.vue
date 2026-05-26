@@ -132,8 +132,8 @@ interface HomePersonalData {
   wishlist: ProductWithGallery[]
 }
 
-// ✅ SSR prefetch — только критичные данные первого экрана (категории)
-const { data: ssrData } = await useAsyncData(
+// ✅ SSR prefetch — LAZY для небл окирующего рендера
+const { data: ssrData } = useAsyncData(
   'home-ssr-critical',
   async () => {
     await popularCategoriesStore.fetchPopularCategories()
@@ -141,38 +141,10 @@ const { data: ssrData } = await useAsyncData(
       categories: popularCategoriesStore.popularCategories || [],
     }
   },
-  { server: true, lazy: false, getCachedData },
+  { server: true, lazy: true, getCachedData },
 )
 
 const supabase = useSupabaseClient()
-
-const { data: clientData } = await useAsyncData(
-  'home-client-data',
-  async () => {
-    const [recommended, popular, newest, brands] = await Promise.all([
-      recommendationsStore.fetchRecommendations().catch(() => []),
-      productsStore.fetchPopularProducts(10).catch(() => []),
-      productsStore.fetchNewestProducts(10).catch(() => []),
-      supabase
-        .from('brands')
-        .select(
-          'id, name, slug, logo_url, description, seo_description, seo_keywords',
-        )
-        .order('name', { ascending: true })
-        .limit(20)
-        .then(({ data }) => data || [])
-        .catch(() => []),
-    ])
-
-    return {
-      recommended: recommended || [],
-      popular: popular || [],
-      newest: newest || [],
-      brands: brands as Brand[],
-    }
-  },
-  { server: false, lazy: true, getCachedData },
-)
 
 // TanStack Query — рекомендации
 const recommendationsQueryKey = computed(() => [
@@ -190,15 +162,12 @@ const {
 } = useQuery<HomePersonalData>({
   queryKey: recommendationsQueryKey,
   queryFn: async (): Promise<HomePersonalData> => {
-    const recommended = await recommendationsStore.fetchRecommendations()
-    let wishlist: ProductWithGallery[] = []
-
-    if (isLoggedIn.value) {
-      await wishlistStore.fetchWishlistProducts()
-      wishlist = JSON.parse(
-        JSON.stringify(wishlistStore.wishlistProducts),
-      ) as ProductWithGallery[]
-    }
+    const [recommended, wishlist] = await Promise.all([
+      recommendationsStore.fetchRecommendations(),
+      isLoggedIn.value 
+        ? wishlistStore.fetchWishlistProducts().then(() => wishlistStore.wishlistProducts)
+        : Promise.resolve([]),
+    ])
 
     return {
       recommended: recommended || [],
@@ -207,13 +176,7 @@ const {
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 15 * 60 * 1000,
-  initialData: () => clientData.value
-    ? {
-        recommended: clientData.value.recommended as RecommendedProduct[],
-        wishlist: [] as ProductWithGallery[],
-      }
-    : undefined,
-  refetchOnMount: true,
+  refetchOnMount: false,
   refetchOnWindowFocus: false,
 })
 
@@ -238,7 +201,6 @@ const popularQuery = useQuery<ProductWithGallery[]>({
   queryFn: () => productsStore.fetchPopularProducts(10),
   staleTime: 5 * 60 * 1000,
   gcTime: 15 * 60 * 1000,
-  initialData: () => (clientData.value?.popular as ProductWithGallery[]) || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 })
@@ -261,7 +223,6 @@ const {
   queryFn: () => productsStore.fetchNewestProducts(10),
   staleTime: 5 * 60 * 1000,
   gcTime: 15 * 60 * 1000,
-  initialData: () => (clientData.value?.newest as ProductWithGallery[]) || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 })
@@ -290,12 +251,14 @@ const isLoadingMainBlock = computed(
 const { data: categoriesData } = useQuery<CategoryRow[]>({
   queryKey: ['home-categories-schema'],
   queryFn: async () => {
+    if (ssrData.value?.categories?.length) {
+      return ssrData.value.categories as CategoryRow[]
+    }
     await popularCategoriesStore.fetchPopularCategories()
     return popularCategoriesStore.popularCategories
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  initialData: () => (ssrData.value?.categories as CategoryRow[]) || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 })
@@ -308,9 +271,7 @@ const { data: brandsData } = useQuery<Brand[]>({
   queryFn: async () => {
     const { data, error } = await supabase
       .from('brands')
-      .select(
-        'id, name, slug, logo_url, description, seo_description, seo_keywords',
-      )
+      .select('id, name, slug, logo_url')
       .order('name', { ascending: true })
       .limit(20)
 
@@ -320,7 +281,6 @@ const { data: brandsData } = useQuery<Brand[]>({
   },
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
-  initialData: () => clientData.value?.brands || undefined,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 })
@@ -500,19 +460,26 @@ useHead(() => ({
       content: keywords.value || '',
     },
   ],
-  link: [{ rel: 'canonical', href: siteUrl }],
+  link: [
+    { rel: 'canonical', href: siteUrl },
+    { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+    { rel: 'dns-prefetch', href: 'https://fonts.gstatic.com' },
+  ],
   script: [
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify(storeSchema.value),
+      tagPosition: 'bodyClose',
     },
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify(categoriesListSchema.value),
+      tagPosition: 'bodyClose',
     },
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify(collectionPageSchema.value),
+      tagPosition: 'bodyClose',
     },
   ],
 }))
