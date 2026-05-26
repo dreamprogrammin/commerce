@@ -471,26 +471,7 @@ export default defineNuxtConfig({
       },
     },
     build: {
-      minify: 'esbuild',
       cssMinify: 'lightningcss',
-      rollupOptions: {
-        output: {
-          manualChunks: (id) => {
-            if (id.includes('node_modules')) {
-              if (id.includes('vue') || id.includes('@vue')) {
-                return 'vue-vendor'
-              }
-              if (id.includes('supabase')) {
-                return 'supabase-vendor'
-              }
-              if (id.includes('tanstack')) {
-                return 'query-vendor'
-              }
-              return 'vendor'
-            }
-          },
-        },
-      },
     },
   },
 
