@@ -1,13 +1,5 @@
 <script setup lang="ts">
-import {
-  Banknote,
-  CreditCard,
-  Lock,
-  Package,
-  Smartphone,
-  Star,
-  Tag,
-} from 'lucide-vue-next'
+// Иконки через Nuxt Icon — не тянут весь пакет lucide в бандл
 import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'

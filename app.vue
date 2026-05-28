@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useMediaQuery } from '@vueuse/core'
 import { Toaster } from 'vue-sonner'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
+import { useIsMobile } from '@/composables/useIsMobile'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -12,7 +12,7 @@ import 'vue-sonner/style.css'
 const requestIdleCallback = globalThis.requestIdleCallback || ((cb: IdleRequestCallback) => setTimeout(cb, 1))
 
 const nuxtApp = useNuxtApp()
-const isMobile = useMediaQuery('(max-width: 1023px)')
+const isMobile = useIsMobile(1023)
 const isPageLoading = ref(false)
 const modalStore = useModalStore()
 const profileStore = useProfileStore()
@@ -64,7 +64,10 @@ nuxtApp.hook('vue:error', () => {
 const { subscribeAll, unsubscribe } = useOrderRealtime()
 
 onMounted(async () => {
-  subscribeAll()
+  // Откладываем подписку на realtime — не критично при первом рендере
+  requestIdleCallback(() => {
+    subscribeAll()
+  })
 
   // Defer telegram modal check
   requestIdleCallback(() => {

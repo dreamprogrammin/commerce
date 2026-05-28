@@ -33,6 +33,29 @@ export default defineNuxtConfig({
     ...(process.env.NODE_ENV === 'production' ? ['@nuxtjs/storybook'] : []),
   ],
 
+  // @nuxt/fonts — font-display: swap убирает блокировку рендера шрифтами
+  fonts: {
+    defaults: {
+      weights: [400, 500, 600, 700],
+      styles: ['normal'],
+      subsets: ['cyrillic', 'latin'],
+    },
+    display: 'swap',
+    // Предзагружаем шрифты для быстрого первого рендера
+    preload: true,
+  },
+
+  // @nuxt/icon — оптимизируем иконки
+  icon: {
+    serverBundle: {
+      collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat'],
+    },
+    clientBundle: {
+      scan: true,
+      sizeLimitKb: 256,
+    },
+  },
+
   site: {
     url: 'https://uhti.kz',
     name: 'Ухтышка',
@@ -158,6 +181,8 @@ export default defineNuxtConfig({
     payloadExtraction: false,
     renderJsonPayloads: false,
     componentIslands: true,
+    treeshakeClientOnly: true,
+    watcher: 'parcel',
   },
 
   features: {
@@ -373,8 +398,16 @@ export default defineNuxtConfig({
         headers: { 'X-Robots-Tag': 'noindex, nofollow' },
       },
     },
-    compressPublicAssets: true,
+    compressPublicAssets: {
+      gzip: true,
+      brotli: true,
+    },
     minify: true,
+    esbuild: {
+      options: {
+        target: 'esnext',
+      },
+    },
   },
 
   image: {
@@ -481,10 +514,71 @@ export default defineNuxtConfig({
     },
     build: {
       cssMinify: 'lightningcss',
+      // ─── Разбиваем большой бандл на мелкие чанки → параллельная загрузка ───
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            // Supabase в отдельный чанк (тяжёлая библиотека)
+            if (id.includes('@supabase')) {
+              return 'vendor-supabase'
+            }
+            // TanStack Query
+            if (id.includes('@tanstack')) {
+              return 'vendor-query'
+            }
+            // UI компоненты (radix, reka, shadcn)
+            if (id.includes('radix-vue') || id.includes('reka-ui') || id.includes('shadcn')) {
+              return 'vendor-ui'
+            }
+            // Embla carousel
+            if (id.includes('embla-carousel')) {
+              return 'vendor-carousel'
+            }
+            // VueUse
+            if (id.includes('@vueuse')) {
+              return 'vendor-vueuse'
+            }
+            // Pinia
+            if (id.includes('pinia')) {
+              return 'vendor-pinia'
+            }
+            // GSAP и анимации (грузим отложенно)
+            if (id.includes('gsap') || id.includes('canvas-confetti')) {
+              return 'vendor-animations'
+            }
+            // Lottie
+            if (id.includes('lottie') || id.includes('dotlottie')) {
+              return 'vendor-lottie'
+            }
+            // vue-sonner, maska и прочие утилиты
+            if (id.includes('vue-sonner') || id.includes('maska') || id.includes('dompurify')) {
+              return 'vendor-utils'
+            }
+          },
+        },
+      },
+      // Поднимаем порог предупреждения о размере чанков
+      chunkSizeWarningLimit: 600,
+      // Минимизируем количество запросов через inlining мелких модулей
+      modulePreload: { polyfill: false },
+    },
+    // Оптимизация зависимостей — предварительно собираем тяжёлые пакеты
+    optimizeDeps: {
+      include: [
+        '@tanstack/vue-query',
+        '@vueuse/core',
+        'pinia',
+      ],
+      exclude: [
+        'gsap',
+        'vue3-lottie',
+        '@lottiefiles/dotlottie-vue',
+        'canvas-confetti',
+      ],
     },
   },
 
-  debug: process.env.NODE_ENV === 'development',
+  debug: false,
 
   shadcn: {
     prefix: '',
@@ -492,8 +586,9 @@ export default defineNuxtConfig({
   },
 
   build: {
-    transpile: ['vue-sonner'],
+    // vue-sonner v2+ поддерживает ESM нативно, transpile не нужен
+    transpile: [],
   },
 
-  devtools: { enabled: true },
+  devtools: { enabled: process.env.NODE_ENV === 'development' },
 })

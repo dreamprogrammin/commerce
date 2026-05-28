@@ -5,6 +5,7 @@ import type {
   RecommendedProduct,
 } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
+import { useMediaQuery } from '@vueuse/core'
 import { useSlides } from '@/composables/slides/useSlides'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
@@ -22,11 +23,8 @@ const LazyFeaturedProduct = defineAsyncComponent(() => import('@/components/home
 const LazyGuestPromo = defineAsyncComponent(() => import('@/components/home/GuestRegistrationPromo.vue'))
 const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
 
-// Detect mobile for conditional loading
-const isMobile = computed(() => {
-  if (!import.meta.client) return false
-  return window.innerWidth < 768
-})
+// Detect mobile for conditional loading — useMediaQuery кешируется, не дёргает DOM при рендере
+const isMobile = useMediaQuery('(max-width: 767px)')
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()

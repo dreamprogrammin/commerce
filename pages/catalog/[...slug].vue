@@ -14,16 +14,8 @@ import type {
 } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
 import { watchDebounced } from '@vueuse/core'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import CategoryBrands from '@/components/category/CategoryBrands.vue'
-import CategoryProductLines from '@/components/category/CategoryProductLines.vue'
-import CategoryQuestions from '@/components/category/CategoryQuestions.vue'
-import CategoryRatingBlock from '@/components/category/CategoryRatingBlock.vue'
-import CategoryReviews from '@/components/category/CategoryReviews.vue'
-import SEOContentRenderer from '@/components/category/SEOContentRenderer.vue'
-import DynamicFilters from '@/components/global/DynamicFilters.vue'
-import DynamicFiltersMobile from '@/components/global/DynamicFiltersMobile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
@@ -34,6 +26,37 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+
+// ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
+// DynamicFilters: 28KB + DynamicFiltersMobile: 30KB — основные виновники
+// Script Evaluation 1459ms на мобилке. Грузим только когда нужны.
+const DynamicFilters = defineAsyncComponent(() =>
+  import('@/components/global/DynamicFilters.vue'),
+)
+const DynamicFiltersMobile = defineAsyncComponent(() =>
+  import('@/components/global/DynamicFiltersMobile.vue'),
+)
+
+// Некритичные компоненты — грузим после первого рендера
+const CategoryBrands = defineAsyncComponent(() =>
+  import('@/components/category/CategoryBrands.vue'),
+)
+const CategoryProductLines = defineAsyncComponent(() =>
+  import('@/components/category/CategoryProductLines.vue'),
+)
+const CategoryQuestions = defineAsyncComponent(() =>
+  import('@/components/category/CategoryQuestions.vue'),
+)
+const CategoryRatingBlock = defineAsyncComponent(() =>
+  import('@/components/category/CategoryRatingBlock.vue'),
+)
+const CategoryReviews = defineAsyncComponent(() =>
+  import('@/components/category/CategoryReviews.vue'),
+)
+const SEOContentRenderer = defineAsyncComponent(() =>
+  import('@/components/category/SEOContentRenderer.vue'),
+)
+
 
 // --- 1. Инициализация ---
 const route = useRoute()

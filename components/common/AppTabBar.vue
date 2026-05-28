@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Search } from 'lucide-vue-next'
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -198,7 +197,8 @@ defineExpose({ closeAllPopups })
             <span
               class="absolute start-0 inset-y-0 flex items-center justify-center px-2"
             >
-              <Search
+              <Icon
+                name="lucide:search"
                 class="size-4.5 text-white/80 transition-all duration-200 group-hover:text-white group-hover:scale-110"
               />
             </span>
@@ -229,7 +229,7 @@ defineExpose({ closeAllPopups })
             <span
               class="absolute start-6 top-6 inset-y-0 flex items-center justify-center px-2"
             >
-              <Search class="size-5 text-gray-400" />
+              <Icon name="lucide:search" class="size-5 text-gray-400" />
             </span>
 
             <!-- Кнопка очистки -->

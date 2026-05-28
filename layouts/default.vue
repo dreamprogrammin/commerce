@@ -1,3 +1,8 @@
+<script setup lang="ts">
+// Футер грузим лениво — он внизу страницы, не нужен при первом рендере
+const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/Footer.vue'))
+</script>
+
 <template>
   <div class="flex flex-col" style="min-height: 100dvh">
     <!-- Header только на десктопе -->
@@ -16,7 +21,7 @@
       <slot />
     </main>
 
-    <!-- Footer -->
-    <CommonFooter />
+    <!-- Footer — ленивый -->
+    <LazyCommonFooter />
   </div>
 </template>

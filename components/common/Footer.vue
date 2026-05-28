@@ -4,8 +4,8 @@ import { formatPrice } from '@/utils/formatPrice'
 const currentYear = new Date().getFullYear()
 const supabase = useSupabaseClient()
 
-// Загружаем данные напрямую на сервере
-const { data: footerCategories } = await useAsyncData('footer-categories', async () => {
+// lazy: true — не блокируем SSR-рендер страницы, футер загружается параллельно
+const { data: footerCategories } = useAsyncData('footer-categories', async () => {
   const { data } = await supabase
     .from('categories')
     .select('id, name, slug, href')
@@ -14,9 +14,9 @@ const { data: footerCategories } = await useAsyncData('footer-categories', async
     .limit(6)
 
   return data || []
-})
+}, { lazy: true, server: true })
 
-const { data: popularProducts } = await useAsyncData('footer-popular-products', async () => {
+const { data: popularProducts } = useAsyncData('footer-popular-products', async () => {
   const { data } = await supabase
     .from('products')
     .select('id, name, slug, price, final_price')
@@ -26,7 +26,7 @@ const { data: popularProducts } = await useAsyncData('footer-popular-products', 
     .limit(5)
 
   return data || []
-})
+}, { lazy: true, server: true })
 </script>
 
 <template>
