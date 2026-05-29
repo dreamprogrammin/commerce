@@ -1616,28 +1616,37 @@ else {
             v-html="seoText"
           />
 
-          <!-- ─── ОПТИМИЗАЦИЯ: убрали ClientOnly со счётчиков ──────────────── -->
-          <!-- ClientOnly вызывал CLS (прыжки контента) — резервируем место через min-w -->
-          <div class="flex flex-wrap items-center gap-3 lg:gap-4 pt-2 text-xs lg:text-sm text-muted-foreground">
-            <div class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]">
-              <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
-              <span>{{ displayedProducts.length || '—' }} <span class="hidden lg:inline">товаров</span></span>
+          <!-- Счётчики с защитой от hydration mismatch -->
+          <ClientOnly>
+            <div class="flex flex-wrap items-center gap-3 lg:gap-4 pt-2 text-xs lg:text-sm text-muted-foreground">
+              <div class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]">
+                <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
+                <span>{{ displayedProducts.length || '—' }} <span class="hidden lg:inline">товаров</span></span>
+              </div>
+              <div
+                v-if="availableBrands.length > 0"
+                class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]"
+              >
+                <Icon name="lucide:award" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-500" />
+                <span>{{ availableBrands.length }} <span class="hidden lg:inline">брендов</span></span>
+              </div>
+              <div
+                v-if="priceRange.min > 0 || priceRange.max < 50000"
+                class="flex items-center gap-1.5 lg:gap-2"
+              >
+                <Icon name="lucide:tag" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-green-500" />
+                <span>от {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }} ₸</span>
+              </div>
             </div>
-            <div
-              v-if="availableBrands.length > 0"
-              class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]"
-            >
-              <Icon name="lucide:award" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-500" />
-              <span>{{ availableBrands.length }} <span class="hidden lg:inline">брендов</span></span>
-            </div>
-            <div
-              v-if="priceRange.min > 0 || priceRange.max < 50000"
-              class="flex items-center gap-1.5 lg:gap-2"
-            >
-              <Icon name="lucide:tag" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-green-500" />
-              <span>от {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }} ₸</span>
-            </div>
-          </div>
+            <template #fallback>
+              <div class="flex flex-wrap items-center gap-3 lg:gap-4 pt-2 text-xs lg:text-sm text-muted-foreground min-h-[20px]">
+                <div class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]">
+                  <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
+                  <span>— <span class="hidden lg:inline">товаров</span></span>
+                </div>
+              </div>
+            </template>
+          </ClientOnly>
         </div>
       </div>
     </div>
@@ -1991,19 +2000,20 @@ else {
         </div>
 
         <!-- Контент с плавным переходом -->
-        <Transition
-          enter-active-class="transition-opacity duration-200"
-          leave-active-class="transition-opacity duration-150"
-          enter-from-class="opacity-0"
-          leave-to-class="opacity-0"
-          mode="out-in"
-        >
-          <div :key="isLoading ? 'loading' : 'content'">
-            <ProductGridSkeleton
-              v-if="isLoading && displayedProducts.length === 0"
-            />
+        <ClientOnly>
+          <Transition
+            enter-active-class="transition-opacity duration-200"
+            leave-active-class="transition-opacity duration-150"
+            enter-from-class="opacity-0"
+            leave-to-class="opacity-0"
+            mode="out-in"
+          >
+            <div :key="isLoading ? 'loading' : 'content'">
+              <ProductGridSkeleton
+                v-if="isLoading && displayedProducts.length === 0"
+              />
 
-            <div v-else-if="displayedProducts.length > 0" class="space-y-8">
+              <div v-else-if="displayedProducts.length > 0" class="space-y-8">
               <ProductGrid :products="displayedProducts" />
 
               <div v-if="hasMore" class="text-center">
@@ -2052,6 +2062,11 @@ else {
             </div>
           </div>
         </Transition>
+
+        <template #fallback>
+          <ProductGridSkeleton />
+        </template>
+      </ClientOnly>
       </div>
     </div>
 
