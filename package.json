@@ -2,7 +2,7 @@
   "name": "nuxt-app",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@11.2.1",
+  "packageManager": "pnpm@11.4.0",
   "scripts": {
     "build": "NODE_OPTIONS='--max-old-space-size=4096' nuxt build",
     "dev": "nuxt dev",
@@ -74,8 +74,7 @@
     "vue": "latest",
     "vue-draggable-next": "^2.3.0",
     "vue-router": "latest",
-    "vue-sonner": "^2.0.2",
-    "vue3-lottie": "^3.3.1"
+    "vue-sonner": "^2.0.2"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.2.0",

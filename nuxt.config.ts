@@ -186,7 +186,7 @@ export default defineNuxtConfig({
   },
 
   features: {
-    inlineStyles: false,
+    inlineStyles: true,
   },
 
   nitro: {
@@ -196,6 +196,10 @@ export default defineNuxtConfig({
         headers: {
           'Cache-Control': 'public, max-age=31536000, immutable',
         },
+      },
+      // Убираем ворнинги для sw.js
+      '/sw.js': {
+        headers: { 'Content-Type': 'application/javascript' },
       },
 
       // ─── Иконки и favicon (меняются редко → 1 год) ───────────────────────
@@ -568,11 +572,20 @@ export default defineNuxtConfig({
         '@tanstack/vue-query',
         '@vueuse/core',
         'pinia',
+        'embla-carousel-autoplay',
+        'embla-carousel-vue',
+        'uuid',
+        'maska',
+        'vue-sonner',
+        'class-variance-authority',
+        'reka-ui',
+        'lucide-vue-next',
+        'vaul-vue',
+        'clsx',
+        'tailwind-merge',
       ],
       exclude: [
         'gsap',
-        'vue3-lottie',
-        '@lottiefiles/dotlottie-vue',
         'canvas-confetti',
       ],
     },
