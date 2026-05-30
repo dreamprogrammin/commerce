@@ -45,15 +45,14 @@ export default defineNuxtConfig({
     preload: true,
   },
 
-  // @nuxt/icon — оптимизируем иконки
+  // @nuxt/icon — стандартные настройки
   icon: {
-    mode: 'svg', // Принудительно используем SVG для уменьшения нагрузки на JS
     serverBundle: {
       collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat'],
     },
     clientBundle: {
       scan: true,
-      sizeLimitKb: 128, // Уменьшаем лимит для бандла
+      sizeLimitKb: 256,
     },
   },
 
@@ -140,38 +139,11 @@ export default defineNuxtConfig({
           '/_nuxt',
         ],
       },
-      // Yandex-специфичная конфигурация для очистки параметров фильтров
       {
         userAgent: ['Yandex'],
         cleanParam: [
-          // Сортировка и пагинация
           'sort_by',
           'page',
-
-          // Фильтры каталога
-          'brands',
-          'subcategories',
-          'materials',
-          'countries',
-          'price_min',
-          'price_max',
-
-          // Динамические атрибуты (возраст, размер и т.д.)
-          'attr_age',
-          'attr_size',
-          'attr_color',
-          'attr_material',
-          'attr_gender',
-
-          // UTM метки и tracking
-          'utm_source',
-          'utm_medium',
-          'utm_campaign',
-          'utm_content',
-          'utm_term',
-          'fbclid',
-          'gclid',
-          'yclid',
         ],
       },
     ],
@@ -187,14 +159,20 @@ export default defineNuxtConfig({
   },
 
   features: {
-    // Отключаем inlineStyles, так как при использовании Tailwind 4 и большого количества компонентов
-    // это раздувает HTML и замедляет парсинг и Layout.
-    inlineStyles: false,
+    // Возвращаем inlineStyles для стабильности Layout Time
+    inlineStyles: true,
   },
 
   nitro: {
     routeRules: {
-      // ... (keep existing rules)
+      '/_nuxt/**': {
+        headers: {
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      },
+      '/sw.js': {
+        headers: { 'Content-Type': 'application/javascript' },
+      },
       '/': { swr: 600 },
       '/catalog': { swr: 1800 },
       '/catalog/products/**': {
@@ -203,7 +181,27 @@ export default defineNuxtConfig({
           'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
         },
       },
-      // ...
+      '/profile/**': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
+      '/notifications': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
+      '/checkout': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
+      '/cart': { ssr: false, headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+      '/order/**': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
+      '/auth/magic': {
+        ssr: false,
+        headers: { 'X-Robots-Tag': 'noindex, nofollow' },
+      },
     },
     compressPublicAssets: {
       gzip: true,
@@ -256,9 +254,16 @@ export default defineNuxtConfig({
           crossorigin: 'anonymous',
         },
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-        // ...
       ],
-      // ...
+      meta: [
+        { charset: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'theme-color', content: '#ffffff' },
+        {
+          name: 'robots',
+          content: 'max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+        },
+      ],
     },
   },
 
@@ -273,61 +278,19 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [tailwindcss()],
-    server: {
-      hmr: {
-        protocol: 'ws',
-        host: 'localhost',
-      },
-    },
     build: {
       cssMinify: 'lightningcss',
-      // Оптимизируем загрузку JS через агрессивное разбиение и preload
-      modulePreload: {
-        polyfill: false,
-      },
+      // Отключаем manualChunks для стабильности инициализации
       rollupOptions: {
         output: {
-          // Упрощенное разбиение для предотвращения ReferenceError при инициализации
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              // Группируем только реально тяжелые и независимые библиотеки
-              if (id.includes('gsap'))
-                return 'vendor-gsap'
-              if (id.includes('lottie') || id.includes('dotlottie'))
-                return 'vendor-lottie'
-              if (id.includes('embla-carousel'))
-                return 'vendor-carousel'
-              // Остальное оставляем в общем вендоре или основном чанке
-              // чтобы избежать проблем с порядком инициализации core-библиотек
-              return 'vendor'
-            }
-          },
+          manualChunks: undefined,
         },
       },
       chunkSizeWarningLimit: 1000,
     },
-    // Оптимизируем зависимости
-    optimizeDeps: {
-      include: [
-        'gsap',
-        'embla-carousel',
-        '@tanstack/vue-query',
-        'lucide-vue-next',
-      ],
-    },
   },
 
   debug: false,
-
-  shadcn: {
-    prefix: '',
-    componentDir: './components/ui',
-  },
-
-  build: {
-    // vue-sonner v2+ поддерживает ESM нативно, transpile не нужен
-    transpile: [],
-  },
 
   devtools: { enabled: process.env.NODE_ENV === 'development' },
 })
