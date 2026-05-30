@@ -76,7 +76,7 @@ const recommendationsQueryKey = computed(() => [
   personalizationTrigger.value,
   isLoggedIn.value,
 ])
-
+ 
 // @ts-expect-error - Type instantiation depth issue with TanStack Query + Supabase complex types.
 const {
   data: mainPersonalData,
