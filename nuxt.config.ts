@@ -47,12 +47,13 @@ export default defineNuxtConfig({
 
   // @nuxt/icon — оптимизируем иконки
   icon: {
+    mode: 'svg', // Принудительно используем SVG для уменьшения нагрузки на JS
     serverBundle: {
       collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat'],
     },
     clientBundle: {
       scan: true,
-      sizeLimitKb: 256,
+      sizeLimitKb: 128, // Уменьшаем лимит для бандла
     },
   },
 

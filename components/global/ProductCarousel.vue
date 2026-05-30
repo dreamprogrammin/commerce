@@ -44,6 +44,7 @@ const carouselContainerClass = carouselContainerVariants({ contained: 'desktop' 
             <CarouselItem
               v-for="product in products"
               :key="product.id"
+              v-memo="[product.id, product.final_price, product.stock_quantity]"
               class="pl-2 md:pl-0
                    basis-[52.63%]
                    sm:basis-[45%]

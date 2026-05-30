@@ -374,7 +374,7 @@ useRobotsRule({ index: true, follow: true })
 <template>
   <div>
     <!-- ✅ Скрытый SEO-текст -->
-    <div class="sr-only">
+    <div v-once class="sr-only">
       <h1>{{ siteName }} - Интернет-магазин детских игрушек в Казахстане</h1>
       <p>
         Купить детские игрушки в Алматы и по всему Казахстану. Развивающие
@@ -393,6 +393,7 @@ useRobotsRule({ index: true, follow: true })
         <div v-if="isLoggedIn">
           <div
             v-if="isAdmin"
+            v-once
             class="p-4 bg-blue-50 border border-blue-200 rounded-md"
           >
             <NuxtLink
@@ -451,7 +452,7 @@ useRobotsRule({ index: true, follow: true })
 
     <!-- Карточки бонусов (без изменений — уже было корректно) -->
     <div :class="alwaysContainedClass" class="py-8 md:py-12">
-      <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-start mb-8">
+      <h2 v-once class="text-2xl md:text-3xl font-bold tracking-tight text-start mb-8">
         Акции и бонусы
       </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
