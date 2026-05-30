@@ -254,8 +254,6 @@ export default defineNuxtConfig({
           href: 'https://fonts.gstatic.com',
           crossorigin: 'anonymous',
         },
-        // Подключаем стили через preload для критических ресурсов
-        { rel: 'preload', as: 'style', href: '~/assets/css/tailwind.css' },
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         // ...
       ],
@@ -288,23 +286,18 @@ export default defineNuxtConfig({
       },
       rollupOptions: {
         output: {
-          // Улучшенное разбиение на чанки для лучшего кеширования и параллельной загрузки
+          // Упрощенное разбиение для предотвращения ReferenceError при инициализации
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('@supabase'))
-                return 'vendor-supabase'
-              if (id.includes('@tanstack'))
-                return 'vendor-query'
+              // Группируем только реально тяжелые и независимые библиотеки
               if (id.includes('gsap'))
                 return 'vendor-gsap'
               if (id.includes('lottie') || id.includes('dotlottie'))
                 return 'vendor-lottie'
               if (id.includes('embla-carousel'))
                 return 'vendor-carousel'
-              if (id.includes('lucide'))
-                return 'vendor-icons'
-              if (id.includes('radix-vue') || id.includes('reka-ui'))
-                return 'vendor-ui-core'
+              // Остальное оставляем в общем вендоре или основном чанке
+              // чтобы избежать проблем с порядком инициализации core-библиотек
               return 'vendor'
             }
           },
