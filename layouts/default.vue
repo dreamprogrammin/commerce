@@ -22,6 +22,6 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
     </main>
 
     <!-- Footer — ленивый -->
-    <LazyCommonFooter v-once />
+    <LazyCommonFooter />
   </div>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Toaster } from 'vue-sonner'
-import { useIsMobile } from '@/composables/useIsMobile'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
+import { useIsMobile } from '@/composables/useIsMobile'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -22,6 +22,7 @@ const route = useRoute()
 const router = useRouter() // ← добавлено
 
 // Глобальная инициализация при авторизации
+const supabaseUser = useSupabaseUser()
 const supabase = useSupabaseClient()
 
 // Авто-синхронизация профиля при входе (Magic Link из Telegram, OAuth и т.д.)
@@ -62,14 +63,7 @@ nuxtApp.hook('vue:error', () => {
 
 const { subscribeAll, unsubscribe } = useOrderRealtime()
 
-const shouldMountModals = ref(false)
-
 onMounted(async () => {
-  // Откладываем монтирование тяжёлых модалок
-  requestIdleCallback(() => {
-    shouldMountModals.value = true
-  })
-
   // Откладываем подписку на realtime — не критично при первом рендере
   requestIdleCallback(() => {
     subscribeAll()
@@ -237,18 +231,14 @@ useSchemaOrg([
 
     <!-- Авторизация: Drawer на мобильных, Modal на десктопе -->
     <ClientOnly>
-      <template v-if="shouldMountModals">
-        <AuthLoginDrawer v-if="isMobile" />
-        <AuthLoginModal v-else />
-      </template>
+      <AuthLoginDrawer v-if="isMobile" />
+      <AuthLoginModal v-else />
     </ClientOnly>
 
     <!-- Telegram-подписка: Drawer на мобильных, Dialog на десктопе -->
     <ClientOnly>
-      <template v-if="shouldMountModals">
-        <CommonTelegramSubscribeDrawer v-if="isMobile" />
-        <CommonTelegramSubscribeDialog v-else />
-      </template>
+      <CommonTelegramSubscribeDrawer v-if="isMobile" />
+      <CommonTelegramSubscribeDialog v-else />
     </ClientOnly>
   </div>
 </template>
