@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  CategoryRow,
   ProductWithGallery,
   RecommendedProduct,
 } from '@/types'
@@ -59,7 +58,7 @@ interface HomePersonalData {
 }
 
 // ✅ SSR prefetch — LAZY для небл окирующего рендера
-const { data: ssrData } = useAsyncData(
+useAsyncData(
   'home-ssr-critical',
   async () => {
     await popularCategoriesStore.fetchPopularCategories()
@@ -69,8 +68,6 @@ const { data: ssrData } = useAsyncData(
   },
   { server: true, lazy: true, getCachedData },
 )
-
-const supabase = useSupabaseClient()
 
 // TanStack Query — рекомендации
 const recommendationsQueryKey = computed(() => [
@@ -90,7 +87,7 @@ const {
   queryFn: async (): Promise<HomePersonalData> => {
     const [recommended, wishlist] = await Promise.all([
       recommendationsStore.fetchRecommendations(),
-      isLoggedIn.value 
+      isLoggedIn.value
         ? wishlistStore.fetchWishlistProducts().then(() => wishlistStore.wishlistProducts)
         : Promise.resolve([]),
     ])
@@ -168,13 +165,30 @@ const showNewestSkeleton = computed(
     (isLoadingNewest.value || isFetchingNewest.value)
     && !newestProductsData.value,
 )
-
 const isLoadingMainBlock = computed(
   () => showRecommendationsSkeleton.value || showPopularSkeleton.value,
 )
 
+// --- Progressive Loading ---
+const shouldRenderSecondaryBlocks = ref(false)
+const shouldRenderLowerBlocks = ref(false)
+
+onMounted(() => {
+  // Загружаем основные блоки чуть позже
+  requestIdleCallback(() => {
+    shouldRenderSecondaryBlocks.value = true
+  })
+
+  // Загружаем нижние блоки ещё позже
+  setTimeout(() => {
+    shouldRenderLowerBlocks.value = true
+  }, 1000)
+})
+
 // ---------------------------------------------------------------------------
 // Вычисляемые флаги для условного рендера карусельных блоков.
+// ...
+
 // ВАЖНО: v-if снаружи LazyHydration — компонент либо есть в DOM (и будет
 // гидрирован по стратегии), либо его нет вовсе. Это корректно.
 // ---------------------------------------------------------------------------
@@ -426,13 +440,13 @@ useRobotsRule({ index: true, follow: true })
     <!-- Бренды в коллапсе -->
     <div :class="alwaysContainedClass" class="py-6">
       <ClientOnly>
-        <HomeBrandsCollapsible />
+        <HomeBrandsCollapsible v-if="shouldRenderSecondaryBlocks" />
       </ClientOnly>
     </div>
 
     <!-- Популярные категории -->
     <div :class="desktopContainedClass">
-      <HomePopularCategories />
+      <HomePopularCategories v-if="shouldRenderSecondaryBlocks" />
     </div>
 
     <!-- Карточки бонусов (без изменений — уже было корректно) -->
@@ -448,22 +462,10 @@ useRobotsRule({ index: true, follow: true })
 
     <!--
       ✅ Карусели товаров — ClientOnly + обычные (не LazyHydration) компоненты.
-
-      ПОЧЕМУ так, а не LazyHydration без ClientOnly:
-      Данные каруселей загружаются с server:false (только на клиенте).
-      На SSR isLoadingMainBlock=true → рендерится скелетон.
-      На клиенте к моменту гидрации данные уже пришли → isLoadingMainBlock=false → ожидается карусель.
-      Результат: SSR-разметка (скелетон) ≠ клиентский vdom (карусель) → hydration mismatch.
-
-      ClientOnly решает это: SSR рендерит #fallback-скелетон вне дерева гидрации,
-      клиент монтирует карусель с нуля — никакого сравнения SSR↔client не происходит.
-
-      LazyHydration имеет смысл только когда SSR и клиент рендерят ОДНО И ТО ЖЕ.
-      Здесь это невозможно, т.к. данные клиентские.
     -->
     <div :class="alwaysContainedClass" class="py-8 md:py-12">
       <ClientOnly>
-        <template v-if="isLoadingMainBlock">
+        <template v-if="isLoadingMainBlock || !shouldRenderLowerBlocks">
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
         </template>
@@ -513,7 +515,7 @@ useRobotsRule({ index: true, follow: true })
     -->
     <div :class="alwaysContainedClass" class="py-8 md:py-12">
       <ClientOnly>
-        <template v-if="showNewestSkeleton">
+        <template v-if="showNewestSkeleton || !shouldRenderLowerBlocks">
           <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
           <ProductCarouselSkeleton />
         </template>

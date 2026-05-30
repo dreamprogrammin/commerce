@@ -1,2 +1,9 @@
+allowBuilds:
+  '@parcel/watcher': false
+  esbuild: false
+  puppeteer: false
+  sharp: false
+  simple-git-hooks: false
+  vue-demi: false
 ignoredBuiltDependencies:
   - puppeteer
