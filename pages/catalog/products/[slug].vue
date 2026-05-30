@@ -899,24 +899,24 @@ watchEffect(() => {
 <template>
   <div class="bg-background">
     <div :class="`${containerClass} py-4 lg:py-6`">
-      <div v-if="product">
-        <!-- Breadcrumbs с кнопкой избранного -->
-        <div class="flex items-center justify-between mb-4">
-          <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
-          <ClientOnly>
+      <ClientOnly>
+        <ProductDetailSkeleton v-if="isLoading" />
+
+        <div v-else-if="product">
+          <!-- Breadcrumbs с кнопкой избранного -->
+          <div class="flex items-center justify-between mb-4">
+            <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
             <ProductWishlistButton
               :product-id="product.id"
               :product-name="product.name"
               class="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg border bg-white hover:bg-muted transition-colors"
             />
-          </ClientOnly>
-        </div>
+          </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          <!-- Галерея -->
-          <div class="lg:col-span-7">
-            <div class="bg-white rounded-xl lg:p-4 lg:shadow-sm lg:border">
-              <ClientOnly>
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+            <!-- Галерея -->
+            <div class="lg:col-span-7">
+              <div class="bg-white rounded-xl lg:p-4 lg:shadow-sm lg:border">
                 <ProductGallery
                   v-if="
                     product.product_images && product.product_images.length > 0
@@ -926,159 +926,154 @@ watchEffect(() => {
                   :brand-name="product.brands?.name"
                   :line-name="product.product_lines?.name"
                 />
-                <template #fallback>
-                  <div class="aspect-square bg-muted animate-pulse rounded-lg" />
-                </template>
-              </ClientOnly>
-              <div
-                v-if="!product.product_images || product.product_images.length === 0"
-                class="bg-muted rounded-lg flex items-center justify-center h-64 lg:h-96"
-              >
-                <p class="text-muted-foreground">
-                  Изображения отсутствуют
-                </p>
+                <div
+                  v-else
+                  class="bg-muted rounded-lg flex items-center justify-center h-64 lg:h-96"
+                >
+                  <p class="text-muted-foreground">
+                    Изображения отсутствуют
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Правая колонка: Информация о товаре -->
-          <div
-            class="lg:col-span-5 lg:row-span-4 lg:row-start-1 lg:col-start-8"
-          >
+            <!-- Правая колонка: Информация о товаре -->
             <div
-              class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border lg:sticky lg:top-4"
+              class="lg:col-span-5 lg:row-span-4 lg:row-start-1 lg:col-start-8"
             >
-              <h1
-                class="text-xl lg:text-2xl font-bold mb-2 leading-tight flex flex-col gap-1"
-              >
-                <span>{{ product.name }}</span>
-                <!-- 🔥 ТИКЕТ 3: SEO-хвост для H1 (визуально выглядит как подзаголовок) -->
-                <span
-                  v-if="audienceText || brandName"
-                  class="text-sm font-medium text-muted-foreground/70"
-                >
-                  Игрушка {{ audienceText }}
-                  <template v-if="brandName">от {{ brandName }}</template>
-                </span>
-              </h1>
-
-              <!-- Бренд и линейка товара -->
               <div
-                v-if="brandName || productLineName"
-                class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-4"
+                class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border lg:sticky lg:top-4"
               >
-                <!-- Бренд -->
-                <NuxtLink
-                  v-if="brandName && brandLink"
-                  :to="brandLink"
-                  class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
+                <h1
+                  class="text-xl lg:text-2xl font-bold mb-2 leading-tight flex flex-col gap-1"
                 >
-                  <div
-                    class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
+                  <span>{{ product.name }}</span>
+                  <!-- 🔥 ТИКЕТ 3: SEO-хвост для H1 (визуально выглядит как подзаголовок) -->
+                  <span
+                    v-if="audienceText || brandName"
+                    class="text-sm font-medium text-muted-foreground/70"
                   >
-                    <ProgressiveImage
-                      v-if="product.brands?.logo_url"
-                      :src="brandLogoUrl"
-                      :alt="brandName || 'Бренд'"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full"
-                    />
-                    <Icon v-else name="lucide:building-2" class="w-4 h-4" />
-                  </div>
-                  <span class="group-hover:underline">{{ brandName }}</span>
-                </NuxtLink>
-
-                <!-- Разделитель между брендом и линейкой -->
-                <span
-                  v-if="brandName && productLineName"
-                  class="text-muted-foreground/50"
-                >/</span>
-
-                <!-- Линейка -->
-                <NuxtLink
-                  v-if="productLineName && productLineLink"
-                  :to="productLineLink"
-                  class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
-                >
-                  <div
-                    class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
-                  >
-                    <ProgressiveImage
-                      v-if="product.product_lines?.logo_url"
-                      :src="productLineLogoUrl"
-                      :alt="productLineName || 'Линейка'"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full"
-                    />
-                    <Icon
-                      v-else
-                      name="lucide:sparkles"
-                      class="w-4 h-4 text-primary/70"
-                    />
-                  </div>
-                  <span class="group-hover:underline font-medium">{{
-                    productLineName
-                  }}</span>
-                </NuxtLink>
-                <span
-                  v-else-if="productLineName"
-                  class="inline-flex items-center gap-1.5"
-                >
-                  <div
-                    class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
-                  >
-                    <ProgressiveImage
-                      v-if="product.product_lines?.logo_url"
-                      :src="productLineLogoUrl"
-                      :alt="productLineName || 'Линейка'"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full"
-                    />
-                    <Icon
-                      v-else
-                      name="lucide:sparkles"
-                      class="w-4 h-4 text-primary/70"
-                    />
-                  </div>
-                  <span class="font-medium">{{ productLineName }}</span>
-                </span>
-              </div>
-
-              <div class="mb-6 lg:mb-8">
-                <!-- Лейбл: Цена / Итого за комплект -->
-                <p
-                  class="text-xs font-medium text-muted-foreground mb-1 transition-all"
-                >
-                  {{ hasAccessoriesSelected ? "Итого за комплект" : "Цена" }}
-                </p>
-
-                <!-- Старая цена (зачеркнутая) если есть скидка и нет аксессуаров -->
-                <div
-                  v-if="
-                    mainProductPrice.hasDiscount && !hasAccessoriesSelected
-                  "
-                  class="flex items-center gap-2 mb-1"
-                >
-                  <span class="text-lg text-muted-foreground line-through">
-                    {{ formatPrice(mainProductPrice.original) }} ₸
+                    Игрушка {{ audienceText }}
+                    <template v-if="brandName">от {{ brandName }}</template>
                   </span>
-                  <Badge variant="destructive" class="text-xs">
-                    -{{ product.discount_percentage }}%
-                  </Badge>
+                </h1>
+
+                <!-- Бренд и линейка товара -->
+                <div
+                  v-if="brandName || productLineName"
+                  class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-4"
+                >
+                  <!-- Бренд -->
+                  <NuxtLink
+                    v-if="brandName && brandLink"
+                    :to="brandLink"
+                    class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
+                  >
+                    <div
+                      class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
+                    >
+                      <ProgressiveImage
+                        v-if="product.brands?.logo_url"
+                        :src="brandLogoUrl"
+                        :alt="brandName || 'Бренд'"
+                        aspect-ratio="square"
+                        object-fit="contain"
+                        placeholder-type="shimmer"
+                        class="w-full h-full"
+                      />
+                      <Icon v-else name="lucide:building-2" class="w-4 h-4" />
+                    </div>
+                    <span class="group-hover:underline">{{ brandName }}</span>
+                  </NuxtLink>
+
+                  <!-- Разделитель между брендом и линейкой -->
+                  <span
+                    v-if="brandName && productLineName"
+                    class="text-muted-foreground/50"
+                  >/</span>
+
+                  <!-- Линейка -->
+                  <NuxtLink
+                    v-if="productLineName && productLineLink"
+                    :to="productLineLink"
+                    class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
+                  >
+                    <div
+                      class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
+                    >
+                      <ProgressiveImage
+                        v-if="product.product_lines?.logo_url"
+                        :src="productLineLogoUrl"
+                        :alt="productLineName || 'Линейка'"
+                        aspect-ratio="square"
+                        object-fit="contain"
+                        placeholder-type="shimmer"
+                        class="w-full h-full"
+                      />
+                      <Icon
+                        v-else
+                        name="lucide:sparkles"
+                        class="w-4 h-4 text-primary/70"
+                      />
+                    </div>
+                    <span class="group-hover:underline font-medium">{{
+                      productLineName
+                    }}</span>
+                  </NuxtLink>
+                  <span
+                    v-else-if="productLineName"
+                    class="inline-flex items-center gap-1.5"
+                  >
+                    <div
+                      class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
+                    >
+                      <ProgressiveImage
+                        v-if="product.product_lines?.logo_url"
+                        :src="productLineLogoUrl"
+                        :alt="productLineName || 'Линейка'"
+                        aspect-ratio="square"
+                        object-fit="contain"
+                        placeholder-type="shimmer"
+                        class="w-full h-full"
+                      />
+                      <Icon
+                        v-else
+                        name="lucide:sparkles"
+                        class="w-4 h-4 text-primary/70"
+                      />
+                    </div>
+                    <span class="font-medium">{{ productLineName }}</span>
+                  </span>
                 </div>
 
-                <!-- Flip Counter Price Animation -->
-                <div class="flex items-baseline gap-1 mb-2">
-                  <div
-                    class="flex text-3xl lg:text-4xl font-bold text-primary"
+                <div class="mb-6 lg:mb-8">
+                  <!-- Лейбл: Цена / Итого за комплект -->
+                  <p
+                    class="text-xs font-medium text-muted-foreground mb-1 transition-all"
                   >
-                    <ClientOnly>
+                    {{ hasAccessoriesSelected ? "Итого за комплект" : "Цена" }}
+                  </p>
+
+                  <!-- Старая цена (зачеркнутая) если есть скидка и нет аксессуаров -->
+                  <div
+                    v-if="
+                      mainProductPrice.hasDiscount && !hasAccessoriesSelected
+                    "
+                    class="flex items-center gap-2 mb-1"
+                  >
+                    <span class="text-lg text-muted-foreground line-through">
+                      {{ formatPrice(mainProductPrice.original) }} ₸
+                    </span>
+                    <Badge variant="destructive" class="text-xs">
+                      -{{ product.discount_percentage }}%
+                    </Badge>
+                  </div>
+
+                  <!-- Flip Counter Price Animation -->
+                  <div class="flex items-baseline gap-1 mb-2">
+                    <div
+                      class="flex text-3xl lg:text-4xl font-bold text-primary"
+                    >
                       <template
                         v-for="(item, index) in priceChars"
                         :key="index"
@@ -1104,82 +1099,77 @@ watchEffect(() => {
                           </div>
                         </div>
                       </template>
-                      <template #fallback>
-                        <span>{{ formatPrice(totalPrice) }}</span>
-                      </template>
-                    </ClientOnly>
+                    </div>
+                    <span
+                      class="text-3xl lg:text-4xl font-bold text-primary ml-1"
+                    >₸</span>
                   </div>
-                  <span
-                    class="text-3xl lg:text-4xl font-bold text-primary ml-1"
-                  >₸</span>
-                </div>
 
-                <div
-                  class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium"
-                >
-                  <Icon name="lucide:gift" class="w-4 h-4" />
-                  <span>+{{ totalBonuses }} бонусов</span>
-                </div>
-
-                <!-- Плашка-расшифровка комплекта -->
-                <div
-                  v-if="hasAccessoriesSelected"
-                  class="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm"
-                >
-                  <span
-                    class="text-muted-foreground font-medium truncate max-w-[180px]"
-                  >{{ product.name }}</span>
-                  <template
-                    v-for="acc in selectedAccessoriesData"
-                    :key="acc.id"
+                  <div
+                    class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium"
                   >
-                    <span class="text-muted-foreground">+</span>
-                    <span class="text-muted-foreground font-medium">{{
-                      acc.name
-                    }}</span>
-                  </template>
-                </div>
-              </div>
+                    <Icon name="lucide:gift" class="w-4 h-4" />
+                    <span>+{{ totalBonuses }} бонусов</span>
+                  </div>
 
-              <div class="mb-6 pb-6 border-b">
-                <div class="flex items-center gap-2 text-sm">
-                  <Icon
-                    :name="
-                      product.stock_quantity > 0
-                        ? 'lucide:check-circle'
-                        : 'lucide:x-circle'
-                    "
-                    :class="
-                      product.stock_quantity > 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    "
-                    class="w-5 h-5"
-                  />
-                  <span
-                    :class="
-                      product.stock_quantity > 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    "
-                    class="font-medium"
+                  <!-- Плашка-расшифровка комплекта -->
+                  <div
+                    v-if="hasAccessoriesSelected"
+                    class="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm"
                   >
-                    {{
-                      product.stock_quantity > 0
-                        ? "В наличии"
-                        : "Нет в наличии"
-                    }}
-                  </span>
-                  <span
-                    v-if="product.stock_quantity > 0"
-                    class="text-muted-foreground"
-                  >
-                    ({{ product.stock_quantity }} шт.)
-                  </span>
+                    <span
+                      class="text-muted-foreground font-medium truncate max-w-[180px]"
+                    >{{ product.name }}</span>
+                    <template
+                      v-for="acc in selectedAccessoriesData"
+                      :key="acc.id"
+                    >
+                      <span class="text-muted-foreground">+</span>
+                      <span class="text-muted-foreground font-medium">{{
+                        acc.name
+                      }}</span>
+                    </template>
+                  </div>
                 </div>
-              </div>
 
-              <ClientOnly>
+                <div class="mb-6 pb-6 border-b">
+                  <div class="flex items-center gap-2 text-sm">
+                    <Icon
+                      :name="
+                        product.stock_quantity > 0
+                          ? 'lucide:check-circle'
+                          : 'lucide:x-circle'
+                      "
+                      :class="
+                        product.stock_quantity > 0
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      "
+                      class="w-5 h-5"
+                    />
+                    <span
+                      :class="
+                        product.stock_quantity > 0
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      "
+                      class="font-medium"
+                    >
+                      {{
+                        product.stock_quantity > 0
+                          ? "В наличии"
+                          : "Нет в наличии"
+                      }}
+                    </span>
+                    <span
+                      v-if="product.stock_quantity > 0"
+                      class="text-muted-foreground"
+                    >
+                      ({{ product.stock_quantity }} шт.)
+                    </span>
+                  </div>
+                </div>
+
                 <div class="hidden lg:block space-y-3 mb-6">
                   <template v-if="product.stock_quantity > 0">
                     <Button
@@ -1232,378 +1222,366 @@ watchEffect(() => {
                     В избранное
                   </Button>
                 </div>
-                <template #fallback>
-                  <div class="hidden lg:block space-y-3 mb-6">
-                    <div class="h-12 w-full bg-muted animate-pulse rounded-lg" />
-                    <div class="h-12 w-full bg-muted animate-pulse rounded-lg" />
-                  </div>
-                </template>
-              </ClientOnly>
 
-              <!-- Аксессуары (батарейки и подарочная упаковка) -->
-              <ClientOnly>
+                <!-- Аксессуары (батарейки и подарочная упаковка) -->
                 <AccessoriesBlock
                   v-model:selected-ids="selectedAccessoryIds"
                   :accessories="accessories || []"
                   :loading="accessoriesLoading"
                 />
-              </ClientOnly>
+              </div>
             </div>
-          </div>
 
-          <!-- О товаре (в стиле detmir.kz) -->
-          <div
-            class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
-          >
-            <h2 class="text-xl font-bold mb-4">
-              О товаре
-            </h2>
+            <!-- О товаре (в стиле detmir.kz) -->
+            <div
+              class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
+            >
+              <h2 class="text-xl font-bold mb-4">
+                О товаре
+              </h2>
 
-            <!-- Название товара -->
-            <h3 class="font-semibold text-base mb-3">
-              {{ product.name }}
-            </h3>
+              <!-- Название товара -->
+              <h3 class="font-semibold text-base mb-3">
+                {{ product.name }}
+              </h3>
 
-            <!-- SEO контент товара -->
-            <SEOContentRenderer
-              v-if="seoBlocks.length > 0"
-              :blocks="seoBlocks"
-              :collapsible="true"
-              class="mb-6"
-            />
+              <!-- SEO контент товара -->
+              <SEOContentRenderer
+                v-if="seoBlocks.length > 0"
+                :blocks="seoBlocks"
+                :collapsible="true"
+                class="mb-6"
+              />
 
-            <!-- Таблица характеристик с пунктирными линиями -->
-            <dl class="space-y-0">
-              <!-- Характеристики рендерим на SSR -->
-              <div v-if="brandName" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Бренд
-                </dt>
-                <dd class="product-spec-value">
-                  <NuxtLink
-                    v-if="brandLink"
-                    :to="brandLink"
-                    class="text-primary hover:underline"
-                  >
-                    {{ brandName }}
-                  </NuxtLink>
-                  <span v-else>{{ brandName }}</span>
-                </dd>
-              </div>
-
-              <!-- Линейка -->
-              <div v-if="productLineName" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Линейка
-                </dt>
-                <dd class="product-spec-value">
-                  <NuxtLink
-                    v-if="productLineLink"
-                    :to="productLineLink"
-                    class="text-primary hover:underline"
-                  >
-                    {{ productLineName }}
-                  </NuxtLink>
-                  <span v-else>{{ productLineName }}</span>
-                </dd>
-              </div>
-
-              <!-- Категория -->
-              <div v-if="categoryName" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Категория
-                </dt>
-                <dd class="product-spec-value">
-                  <NuxtLink
-                    v-if="categoryLink"
-                    :to="categoryLink"
-                    class="text-primary hover:underline"
-                  >
-                    {{ categoryName }}
-                  </NuxtLink>
-                  <span v-else>{{ categoryName }}</span>
-                </dd>
-              </div>
-
-              <!-- Возраст -->
-              <div v-if="ageRangeText" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Рекомендованный возраст
-                </dt>
-                <dd class="product-spec-value">
-                  {{ ageRangeText }}
-                </dd>
-              </div>
-
-              <!-- Материал -->
-              <div v-if="product.materials?.name" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Материал
-                </dt>
-                <dd class="product-spec-value">
-                  {{ product.materials.name }}
-                </dd>
-              </div>
-
-              <!-- Страна -->
-              <div v-if="product.countries?.name" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Страна производитель
-                </dt>
-                <dd class="product-spec-value">
-                  {{ product.countries.name }}
-                </dd>
-              </div>
-
-              <!-- Количество деталей -->
-              <div
-                v-if="hasPieceCountAttribute && product.piece_count"
-                class="product-spec-row"
-              >
-                <dt class="product-spec-label">
-                  Количество деталей
-                </dt>
-                <dd class="product-spec-value">
-                  {{ product.piece_count }} шт
-                </dd>
-              </div>
-
-              <!-- Артикул / Код товара -->
-              <div v-if="product.sku" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Код товара
-                </dt>
-                <dd class="product-spec-value">
-                  {{ product.sku }}
-                </dd>
-              </div>
-
-              <!-- Штрихкод -->
-              <div v-if="product.barcode" class="product-spec-row">
-                <dt class="product-spec-label">
-                  Штрихкод
-                </dt>
-                <dd class="product-spec-value">
-                  {{ product.barcode }}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <!-- Секция "Ещё товары" -->
-          <div
-            v-if="brandName || categoryName || breadcrumbs.length > 1"
-            class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
-          >
-            <h3 class="font-bold text-xl mb-4">
-              Ещё товары
-            </h3>
-
-            <div class="space-y-0 divide-y divide-border">
-              <!-- Товары бренда -->
-              <NuxtLink
-                v-if="brandName && brandLink"
-                :to="brandLink"
-                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-              >
-                <div
-                  class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
-                >
-                  <ProgressiveImage
-                    v-if="product.brands?.logo_url"
-                    :src="brandLogoUrl"
-                    :alt="brandName || 'Бренд'"
-                    aspect-ratio="square"
-                    object-fit="contain"
-                    placeholder-type="shimmer"
-                    class="w-full h-full p-1.5"
-                  />
-                  <Icon
-                    v-else
-                    name="lucide:building-2"
-                    class="w-6 h-6 text-muted-foreground"
-                  />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="font-semibold text-base leading-tight">
-                    {{ brandName }}
-                  </p>
-                  <p class="text-sm text-muted-foreground mt-0.5">
+              <!-- Таблица характеристик с пунктирными линиями -->
+              <dl class="space-y-0">
+                <!-- Бренд -->
+                <div v-if="brandName" class="product-spec-row">
+                  <dt class="product-spec-label">
                     Бренд
-                  </p>
+                  </dt>
+                  <dd class="product-spec-value">
+                    <NuxtLink
+                      v-if="brandLink"
+                      :to="brandLink"
+                      class="text-primary hover:underline"
+                    >
+                      {{ brandName }}
+                    </NuxtLink>
+                    <span v-else>{{ brandName }}</span>
+                  </dd>
                 </div>
-                <Icon
-                  name="lucide:chevron-right"
-                  class="w-5 h-5 text-primary shrink-0"
-                />
-              </NuxtLink>
 
-              <!-- Товары линейки -->
-              <NuxtLink
-                v-if="productLineName && productLineLink"
-                :to="productLineLink"
-                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-              >
-                <div
-                  class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
-                >
-                  <ProgressiveImage
-                    v-if="product.product_lines?.logo_url"
-                    :src="productLineLogoUrl"
-                    :alt="productLineName || 'Линейка'"
-                    aspect-ratio="square"
-                    object-fit="contain"
-                    placeholder-type="shimmer"
-                    class="w-full h-full p-1.5"
-                  />
-                  <Icon
-                    v-else
-                    name="lucide:sparkles"
-                    class="w-6 h-6 text-primary"
-                  />
+                <!-- Линейка -->
+                <div v-if="productLineName" class="product-spec-row">
+                  <dt class="product-spec-label">
+                    Линейка
+                  </dt>
+                  <dd class="product-spec-value">
+                    <NuxtLink
+                      v-if="productLineLink"
+                      :to="productLineLink"
+                      class="text-primary hover:underline"
+                    >
+                      {{ productLineName }}
+                    </NuxtLink>
+                    <span v-else>{{ productLineName }}</span>
+                  </dd>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <p class="font-semibold text-base leading-tight">
-                    {{ productLineName }}
-                  </p>
-                  <p class="text-sm text-muted-foreground mt-0.5">
-                    Линейка {{ brandName }}
-                  </p>
-                </div>
-                <Icon
-                  name="lucide:chevron-right"
-                  class="w-5 h-5 text-primary shrink-0"
-                />
-              </NuxtLink>
 
-              <!-- Товары категории -->
-              <NuxtLink
-                v-if="categoryName && categoryLink"
-                :to="categoryLink"
-                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-              >
-                <div
-                  class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
-                >
-                  <ProgressiveImage
-                    v-if="fullCategory?.image_url"
-                    :src="
-                      getVariantUrl(
-                        BUCKET_NAME_CATEGORY,
-                        fullCategory.image_url,
-                        'sm',
-                      )
-                    "
-                    :alt="categoryName || 'Категория'"
-                    aspect-ratio="square"
-                    object-fit="contain"
-                    placeholder-type="shimmer"
-                    class="w-full h-full p-1.5"
-                  />
-                  <Icon
-                    v-else
-                    name="lucide:box"
-                    class="w-6 h-6 text-muted-foreground"
-                  />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="font-semibold text-base leading-tight">
-                    {{ categoryName }}
-                  </p>
-                  <p class="text-sm text-muted-foreground mt-0.5">
+                <!-- Категория -->
+                <div v-if="categoryName" class="product-spec-row">
+                  <dt class="product-spec-label">
                     Категория
-                  </p>
+                  </dt>
+                  <dd class="product-spec-value">
+                    <NuxtLink
+                      v-if="categoryLink"
+                      :to="categoryLink"
+                      class="text-primary hover:underline"
+                    >
+                      {{ categoryName }}
+                    </NuxtLink>
+                    <span v-else>{{ categoryName }}</span>
+                  </dd>
                 </div>
-                <Icon
-                  name="lucide:chevron-right"
-                  class="w-5 h-5 text-primary shrink-0"
-                />
-              </NuxtLink>
 
-              <!-- Родительские категории из breadcrumbs -->
-              <NuxtLink
-                v-for="item in parentCategories"
-                :key="item.crumb.id"
-                :to="item.crumb.href!"
-                class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-              >
+                <!-- Возраст -->
+                <div v-if="ageRangeText" class="product-spec-row">
+                  <dt class="product-spec-label">
+                    Рекомендованный возраст
+                  </dt>
+                  <dd class="product-spec-value">
+                    {{ ageRangeText }}
+                  </dd>
+                </div>
+
+                <!-- Материал -->
+                <div v-if="product.materials?.name" class="product-spec-row">
+                  <dt class="product-spec-label">
+                    Материал
+                  </dt>
+                  <dd class="product-spec-value">
+                    {{ product.materials.name }}
+                  </dd>
+                </div>
+
+                <!-- Страна -->
+                <div v-if="product.countries?.name" class="product-spec-row">
+                  <dt class="product-spec-label">
+                    Страна производитель
+                  </dt>
+                  <dd class="product-spec-value">
+                    {{ product.countries.name }}
+                  </dd>
+                </div>
+
+                <!-- Количество деталей (только для категорий с атрибутом number_range) -->
                 <div
-                  class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
+                  v-if="hasPieceCountAttribute && product.piece_count"
+                  class="product-spec-row"
                 >
-                  <ProgressiveImage
-                    v-if="item.category?.image_url"
-                    :src="
-                      getVariantUrl(
-                        BUCKET_NAME_CATEGORY,
-                        item.category.image_url,
-                        'sm',
-                      )
-                    "
-                    :alt="item.crumb.name"
-                    aspect-ratio="square"
-                    object-fit="contain"
-                    placeholder-type="shimmer"
-                    class="w-full h-full p-1.5"
-                  />
-                  <Icon
-                    v-else
-                    name="lucide:layers"
-                    class="w-6 h-6 text-muted-foreground"
-                  />
+                  <dt class="product-spec-label">
+                    Количество деталей
+                  </dt>
+                  <dd class="product-spec-value">
+                    {{ product.piece_count }} шт
+                  </dd>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <p class="font-semibold text-base leading-tight">
-                    {{ item.crumb.name }}
-                  </p>
-                  <p class="text-sm text-muted-foreground mt-0.5">
-                    Категория
-                  </p>
+
+                <!-- Артикул / Код товара -->
+                <div v-if="product.sku" class="product-spec-row">
+                  <dt class="product-spec-label">
+                    Код товара
+                  </dt>
+                  <dd class="product-spec-value">
+                    {{ product.sku }}
+                  </dd>
                 </div>
-                <Icon
-                  name="lucide:chevron-right"
-                  class="w-5 h-5 text-primary shrink-0"
-                />
-              </NuxtLink>
+
+                <!-- Штрихкод -->
+                <div v-if="product.barcode" class="product-spec-row">
+                  <dt class="product-spec-label">
+                    Штрихкод
+                  </dt>
+                  <dd class="product-spec-value">
+                    {{ product.barcode }}
+                  </dd>
+                </div>
+              </dl>
             </div>
-          </div>
-          <!-- Отзывы -->
-          <div class="lg:col-span-7">
-            <ClientOnly>
+
+            <!-- Секция "Ещё товары" -->
+            <div
+              v-if="brandName || categoryName || breadcrumbs.length > 1"
+              class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
+            >
+              <h3 class="font-bold text-xl mb-4">
+                Ещё товары
+              </h3>
+
+              <div class="space-y-0 divide-y divide-border">
+                <!-- Товары бренда -->
+                <NuxtLink
+                  v-if="brandName && brandLink"
+                  :to="brandLink"
+                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
+                >
+                  <div
+                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
+                  >
+                    <ProgressiveImage
+                      v-if="product.brands?.logo_url"
+                      :src="brandLogoUrl"
+                      :alt="brandName || 'Бренд'"
+                      aspect-ratio="square"
+                      object-fit="contain"
+                      placeholder-type="shimmer"
+                      class="w-full h-full p-1.5"
+                    />
+                    <Icon
+                      v-else
+                      name="lucide:building-2"
+                      class="w-6 h-6 text-muted-foreground"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-base leading-tight">
+                      {{ brandName }}
+                    </p>
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                      Бренд
+                    </p>
+                  </div>
+                  <Icon
+                    name="lucide:chevron-right"
+                    class="w-5 h-5 text-primary shrink-0"
+                  />
+                </NuxtLink>
+
+                <!-- Товары линейки -->
+                <NuxtLink
+                  v-if="productLineName && productLineLink"
+                  :to="productLineLink"
+                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
+                >
+                  <div
+                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
+                  >
+                    <ProgressiveImage
+                      v-if="product.product_lines?.logo_url"
+                      :src="productLineLogoUrl"
+                      :alt="productLineName || 'Линейка'"
+                      aspect-ratio="square"
+                      object-fit="contain"
+                      placeholder-type="shimmer"
+                      class="w-full h-full p-1.5"
+                    />
+                    <Icon
+                      v-else
+                      name="lucide:sparkles"
+                      class="w-6 h-6 text-primary"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-base leading-tight">
+                      {{ productLineName }}
+                    </p>
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                      Линейка {{ brandName }}
+                    </p>
+                  </div>
+                  <Icon
+                    name="lucide:chevron-right"
+                    class="w-5 h-5 text-primary shrink-0"
+                  />
+                </NuxtLink>
+
+                <!-- Товары категории -->
+                <NuxtLink
+                  v-if="categoryName && categoryLink"
+                  :to="categoryLink"
+                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
+                >
+                  <div
+                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
+                  >
+                    <ProgressiveImage
+                      v-if="fullCategory?.image_url"
+                      :src="
+                        getVariantUrl(
+                          BUCKET_NAME_CATEGORY,
+                          fullCategory.image_url,
+                          'sm',
+                        )
+                      "
+                      :alt="categoryName || 'Категория'"
+                      aspect-ratio="square"
+                      object-fit="contain"
+                      placeholder-type="shimmer"
+                      class="w-full h-full p-1.5"
+                    />
+                    <Icon
+                      v-else
+                      name="lucide:box"
+                      class="w-6 h-6 text-muted-foreground"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-base leading-tight">
+                      {{ categoryName }}
+                    </p>
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                      Категория
+                    </p>
+                  </div>
+                  <Icon
+                    name="lucide:chevron-right"
+                    class="w-5 h-5 text-primary shrink-0"
+                  />
+                </NuxtLink>
+
+                <!-- Родительские категории из breadcrumbs -->
+                <NuxtLink
+                  v-for="item in parentCategories"
+                  :key="item.crumb.id"
+                  :to="item.crumb.href!"
+                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
+                >
+                  <div
+                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
+                  >
+                    <ProgressiveImage
+                      v-if="item.category?.image_url"
+                      :src="
+                        getVariantUrl(
+                          BUCKET_NAME_CATEGORY,
+                          item.category.image_url,
+                          'sm',
+                        )
+                      "
+                      :alt="item.crumb.name"
+                      aspect-ratio="square"
+                      object-fit="contain"
+                      placeholder-type="shimmer"
+                      class="w-full h-full p-1.5"
+                    />
+                    <Icon
+                      v-else
+                      name="lucide:layers"
+                      class="w-6 h-6 text-muted-foreground"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-base leading-tight">
+                      {{ item.crumb.name }}
+                    </p>
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                      Категория
+                    </p>
+                  </div>
+                  <Icon
+                    name="lucide:chevron-right"
+                    class="w-5 h-5 text-primary shrink-0"
+                  />
+                </NuxtLink>
+              </div>
+            </div>
+            <!-- Отзывы -->
+            <div class="lg:col-span-7">
               <ProductReviews
                 v-if="product.id"
                 :product-id="product.id"
                 :avg-rating="product.avg_rating ?? 0"
                 :review-count="product.review_count ?? 0"
               />
-            </ClientOnly>
-          </div>
-          <!-- Вопросы и ответы -->
-          <div class="lg:col-span-7">
-            <ClientOnly>
+            </div>
+            <!-- Вопросы и ответы -->
+            <div class="lg:col-span-7">
               <ProductQuestions v-if="product.id" :product-id="product.id" />
-            </ClientOnly>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div v-else-if="!isProductLoading" class="text-center py-20">
-        <h1 class="text-2xl font-bold">
-          Товар не найден
-        </h1>
-        <p class="text-muted-foreground mt-2">
-          Возможно, товар был удален или ссылка неверна.
-        </p>
-        <NuxtLink
-          to="/catalog"
-          class="inline-block mt-4 text-primary hover:underline"
-        >
-          ← Вернуться в каталог
-        </NuxtLink>
-      </div>
+        <div v-else class="text-center py-20">
+          <h1 class="text-2xl font-bold">
+            Товар не найден
+          </h1>
+          <p class="text-muted-foreground mt-2">
+            Возможно, товар был удален или ссылка неверна.
+          </p>
+          <NuxtLink
+            to="/catalog"
+            class="inline-block mt-4 text-primary hover:underline"
+          >
+            ← Вернуться в каталог
+          </NuxtLink>
+        </div>
 
-      <div v-else>
-        <ProductDetailSkeleton />
-      </div>
+        <template #fallback>
+          <ProductDetailSkeleton />
+        </template>
+      </ClientOnly>
     </div>
 
     <!-- 🎯 Sticky панель для мобильных -->
@@ -1704,19 +1682,17 @@ watchEffect(() => {
       </div>
 
       <!-- Карусель похожих товаров с prefetch -->
-      <ClientOnly>
-        <ProductCarousel
-          v-if="!similarProductsLoading && similarProducts?.length"
-          :products="similarProducts || []"
-          @mouseenter-product="prefetchProduct"
-        >
-          <template #header>
-            <h2 class="text-2xl lg:text-3xl font-bold mb-6">
-              Похожие товары
-            </h2>
-          </template>
-        </ProductCarousel>
-      </ClientOnly>
+      <ProductCarousel
+        v-else
+        :products="similarProducts || []"
+        @mouseenter-product="prefetchProduct"
+      >
+        <template #header>
+          <h2 class="text-2xl lg:text-3xl font-bold mb-6">
+            Похожие товары
+          </h2>
+        </template>
+      </ProductCarousel>
     </div>
   </div>
 </template>

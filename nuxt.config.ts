@@ -45,14 +45,15 @@ export default defineNuxtConfig({
     preload: true,
   },
 
-  // @nuxt/icon — стандартные настройки
+  // @nuxt/icon — оптимизируем иконки
   icon: {
+    mode: 'svg', // Принудительно используем SVG для уменьшения нагрузки на JS
     serverBundle: {
       collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat'],
     },
     clientBundle: {
       scan: true,
-      sizeLimitKb: 256,
+      sizeLimitKb: 128, // Уменьшаем лимит для бандла
     },
   },
 
@@ -159,8 +160,8 @@ export default defineNuxtConfig({
   },
 
   features: {
-    // Возвращаем inlineStyles для стабильности Layout Time
-    inlineStyles: true,
+    // Отключаем inlineStyles для корректной работы Tailwind 4 и уменьшения HTML
+    inlineStyles: false,
   },
 
   nitro: {
@@ -280,13 +281,32 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
     build: {
       cssMinify: 'lightningcss',
-      // Отключаем manualChunks для стабильности инициализации
       rollupOptions: {
         output: {
-          manualChunks: undefined,
+          // Упрощенное разбиение для предотвращения ReferenceError
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('gsap'))
+                return 'vendor-gsap'
+              if (id.includes('lottie') || id.includes('dotlottie'))
+                return 'vendor-lottie'
+              if (id.includes('embla-carousel'))
+                return 'vendor-carousel'
+              return 'vendor'
+            }
+          },
         },
       },
       chunkSizeWarningLimit: 1000,
+    },
+    // Оптимизируем зависимости
+    optimizeDeps: {
+      include: [
+        'gsap',
+        'embla-carousel',
+        '@tanstack/vue-query',
+        'lucide-vue-next',
+      ],
     },
   },
 
