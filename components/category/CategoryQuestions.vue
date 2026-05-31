@@ -95,22 +95,35 @@ function sanitizeAndRenderHTML(html: string | null): string {
 
 <style scoped>
 .faq-answer :deep(strong) {
-  @apply font-semibold text-foreground;
+  font-weight: 600;
+  color: hsl(var(--foreground));
 }
 
 .faq-answer :deep(ul) {
-  @apply list-disc list-inside my-2 space-y-1;
+  list-style-type: disc;
+  list-style-position: inside;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.faq-answer :deep(ul) > * + * {
+  margin-top: 0.25rem;
 }
 
 .faq-answer :deep(li) {
-  @apply text-muted-foreground;
+  color: hsl(var(--muted-foreground));
 }
 
 .faq-answer :deep(a) {
-  @apply text-primary hover:underline font-medium;
+  color: hsl(var(--primary));
+  font-weight: 500;
+}
+
+.faq-answer :deep(a:hover) {
+  text-decoration: underline;
 }
 
 .faq-answer :deep(p) {
-  @apply mb-2;
+  margin-bottom: 0.5rem;
 }
 </style>
