@@ -94,9 +94,6 @@ function sanitizeAndRenderHTML(html: string | null): string {
 </template>
 
 <style scoped>
-/* FIX Tailwind v4: @reference нужен чтобы @apply видел утилиты из основного CSS */
-@reference "~/assets/css/tailwind.css";
-
 .faq-answer :deep(strong) {
   @apply font-semibold text-foreground;
 }
