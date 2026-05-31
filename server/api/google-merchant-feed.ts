@@ -23,15 +23,15 @@ export default defineEventHandler(async (event) => {
   const baseUrl = 'https://uhti.kz'
 
   const items = (products || [])
-    .filter(product => {
-      // Проверяем что есть изображения и цена
-      const hasImages = Array.isArray(product.images) && product.images.length > 0
-      const hasPrice = product.final_price && product.final_price > 0
-      return hasImages && hasPrice
-    })
+    .filter(product => product.final_price && product.final_price > 0)
     .map((product) => {
-      const image = product.images[0]
-      const imageUrl = `${baseUrl}/storage/products/${image}`
+      // Безопасное получение первого изображения
+      const images = product.images || []
+      const firstImage = Array.isArray(images) && images.length > 0 ? images[0] : null
+      
+      if (!firstImage) return null // Пропускаем товары без изображений
+      
+      const imageUrl = `${baseUrl}/storage/products/${firstImage}`
       const productUrl = `${baseUrl}/catalog/products/${product.slug}`
       const hasDiscount = product.price > product.final_price
 
@@ -51,7 +51,9 @@ export default defineEventHandler(async (event) => {
       <g:product_type><![CDATA[${product.category?.name || 'Игрушки'}]]></g:product_type>
       <g:identifier_exists>false</g:identifier_exists>
     </item>`
-    }).join('\n')
+    })
+    .filter(Boolean) // Убираем null значения
+    .join('\n')
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
