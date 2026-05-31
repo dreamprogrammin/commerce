@@ -18,18 +18,16 @@ export default defineEventHandler(async (event) => {
       category:categories(name, slug)
     `)
     .eq('is_active', true)
-    .gt('final_price', 0)
-    .not('images', 'is', null)
     .order('name', { ascending: true })
-
-  if (!products || products.length === 0) {
-    throw createError({ statusCode: 500, message: 'No products available for feed' })
-  }
 
   const baseUrl = 'https://uhti.kz'
 
-  const items = products
-    .filter(product => product.images && product.images.length > 0)
+  const items = (products || [])
+    .filter(product => 
+      product.images && 
+      product.images.length > 0 && 
+      product.final_price > 0
+    )
     .map((product) => {
       const image = product.images[0]
       const imageUrl = `${baseUrl}/storage/products/${image}`
