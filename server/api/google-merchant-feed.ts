@@ -23,11 +23,12 @@ export default defineEventHandler(async (event) => {
   const baseUrl = 'https://uhti.kz'
 
   const items = (products || [])
-    .filter(product => 
-      product.images && 
-      product.images.length > 0 && 
-      product.final_price > 0
-    )
+    .filter(product => {
+      // Проверяем что есть изображения и цена
+      const hasImages = Array.isArray(product.images) && product.images.length > 0
+      const hasPrice = product.final_price && product.final_price > 0
+      return hasImages && hasPrice
+    })
     .map((product) => {
       const image = product.images[0]
       const imageUrl = `${baseUrl}/storage/products/${image}`
