@@ -42,9 +42,14 @@ export default defineEventHandler(async (event) => {
 
       // Если URL уже полный (начинается с http) - используем как есть
       // Иначе формируем Supabase Storage URL
-      const imageUrl = firstImage.image_url.startsWith('http')
+      let imageUrl = firstImage.image_url.startsWith('http')
         ? firstImage.image_url
         : `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/product-images/${firstImage.image_url}`
+      
+      // Если URL не заканчивается на расширение файла - добавляем _md.webp
+      if (!imageUrl.match(/\.(webp|jpg|jpeg|png)$/i)) {
+        imageUrl += '_md.webp'
+      }
       const productUrl = `${baseUrl}/catalog/products/${product.slug}`
 
       // Если final_price null — значит скидки нет, используем price
