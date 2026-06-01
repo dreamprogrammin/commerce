@@ -5,8 +5,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, images, final_price')
-    .eq('is_active', true)
+    .select('id, name, images, final_price, is_active')
     .limit(3)
 
   return {
@@ -18,6 +17,7 @@ export default defineEventHandler(async (event) => {
       images_type: typeof p.images,
       images_is_array: Array.isArray(p.images),
       final_price: p.final_price,
+      is_active: p.is_active,
     })),
   }
 })
