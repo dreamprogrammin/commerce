@@ -40,7 +40,11 @@ export default defineEventHandler(async (event) => {
 
       if (!firstImage?.image_url) return null // Нет фото — пропускаем
 
-      const imageUrl = firstImage.image_url
+      // Если URL уже полный (начинается с http) - используем как есть
+      // Иначе формируем Supabase Storage URL
+      const imageUrl = firstImage.image_url.startsWith('http')
+        ? firstImage.image_url
+        : `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/product-images/${firstImage.image_url}`
       const productUrl = `${baseUrl}/catalog/products/${product.slug}`
 
       // Если final_price null — значит скидки нет, используем price
