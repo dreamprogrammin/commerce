@@ -3,7 +3,7 @@ import { serverSupabaseClient } from '#supabase/server'
 export default defineEventHandler(async (event) => {
   const supabase = await serverSupabaseClient(event)
 
-  const { data: products } = await supabase
+  const { data: products, error } = await supabase
     .from('products')
     .select(`
       id,
@@ -12,28 +12,42 @@ export default defineEventHandler(async (event) => {
       description,
       price,
       final_price,
-      in_stock,
-      images,
+      stock_quantity,
       brand:brands(name),
-      category:categories(name, slug)
+      category:categories(name, slug),
+      product_images(image_url, display_order)
     `)
     .eq('is_active', true)
+    .gt('price', 0)
     .order('name', { ascending: true })
+
+  // Полезно для отладки — убери после фикса
+  if (error) {
+    console.error('Supabase query error:', error)
+    throw createError({ statusCode: 500, message: error.message })
+  }
+
+  console.log(`Fetched ${products?.length ?? 0} products`)
 
   const baseUrl = 'https://uhti.kz'
 
   const items = (products || [])
-    .filter(product => product.final_price && product.final_price > 0)
     .map((product) => {
-      // Безопасное получение первого изображения
-      const images = product.images || []
-      const firstImage = Array.isArray(images) && images.length > 0 ? images[0] : null
-      
-      if (!firstImage) return null // Пропускаем товары без изображений
-      
-      const imageUrl = `${baseUrl}/storage/products/${firstImage}`
+      // Сортируем по display_order, берём первое изображение
+      const images = product.product_images ?? []
+      const sortedImages = [...images].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+      const firstImage = sortedImages[0]
+
+      if (!firstImage?.image_url) return null // Нет фото — пропускаем
+
+      // image_url в product_images хранит уже готовый URL из Supabase Storage
+      const imageUrl = firstImage.image_url
       const productUrl = `${baseUrl}/catalog/products/${product.slug}`
-      const hasDiscount = product.price > product.final_price
+
+      // Если final_price null — значит скидки нет, используем price
+      const effectivePrice = product.final_price ?? product.price
+      const hasDiscount = product.final_price !== null && product.price > product.final_price
+      const inStock = (product.stock_quantity ?? 0) > 0
 
       return `
     <item>
@@ -42,8 +56,8 @@ export default defineEventHandler(async (event) => {
       <g:description><![CDATA[${product.description || product.name}]]></g:description>
       <g:link>${productUrl}</g:link>
       <g:image_link>${imageUrl}</g:image_link>
-      <g:availability>${product.in_stock ? 'in_stock' : 'out_of_stock'}</g:availability>
-      <g:price>${hasDiscount ? product.price : product.final_price} KZT</g:price>
+      <g:availability>${inStock ? 'in_stock' : 'out_of_stock'}</g:availability>
+      <g:price>${hasDiscount ? product.price : effectivePrice} KZT</g:price>
       ${hasDiscount ? `<g:sale_price>${product.final_price} KZT</g:sale_price>` : ''}
       <g:brand><![CDATA[${product.brand?.name || 'Ухтышка'}]]></g:brand>
       <g:condition>new</g:condition>
@@ -52,7 +66,7 @@ export default defineEventHandler(async (event) => {
       <g:identifier_exists>false</g:identifier_exists>
     </item>`
     })
-    .filter(Boolean) // Убираем null значения
+    .filter(Boolean)
     .join('\n')
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
