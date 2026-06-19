@@ -48,7 +48,6 @@ export async function duplicateProductAsVariant(
     name: original.name,
     description: original.description,
     price: original.price,
-    final_price: original.final_price,
     discount_percentage: original.discount_percentage,
     category_id: original.category_id,
     brand_id: original.brand_id,
