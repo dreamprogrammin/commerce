@@ -98,6 +98,12 @@ const productAttributeValues = ref<Record<number, number | null>>({})
 const numericAttributeValues = ref<Record<number, number | null>>({})
 const isProcessingImages = ref(false)
 
+// 🎨 Duplicate dialog
+const showDuplicateDialog = ref(false)
+const duplicateColorName = ref('')
+const duplicateColorHex = ref('#000000')
+const isDuplicating = ref(false)
+
 const bonusOptions = [
   { label: 'Стандарт (5%)', value: 5 },
   { label: 'Повышенный (20%)', value: 20 },
@@ -634,7 +640,55 @@ function removeAccessory(productId: string) {
   )
 }
 
-// --- 9. ОТПРАВКА ФОРМЫ ---
+// --- 9. ДУБЛИРОВАНИЕ С ДРУГИМ ЦВЕТОМ ---
+
+async function handleDuplicateAsVariant() {
+  if (!props.initialData?.id) {
+    toast.error('Невозможно дублировать несохраненный товар')
+    return
+  }
+
+  if (!duplicateColorName.value || !duplicateColorHex.value) {
+    toast.error('Укажите название и HEX цвета')
+    return
+  }
+
+  isDuplicating.value = true
+
+  try {
+    const { duplicateProductAsVariant } = await import('@/composables/admin/useProductVariants')
+    
+    const newProduct = await duplicateProductAsVariant(
+      props.initialData.id,
+      duplicateColorName.value,
+      duplicateColorHex.value,
+    )
+
+    if (newProduct) {
+      toast.success('Цветовой вариант создан!', {
+        description: `Товар "${duplicateColorName.value}" успешно создан`,
+      })
+      showDuplicateDialog.value = false
+      duplicateColorName.value = ''
+      duplicateColorHex.value = '#000000'
+      
+      // Redirect to new product
+      navigateTo(`/admin/products/${newProduct.id}`)
+    }
+    else {
+      toast.error('Не удалось создать вариант')
+    }
+  }
+  catch (error) {
+    console.error('[ProductForm] Duplicate error:', error)
+    toast.error('Ошибка при дублировании товара')
+  }
+  finally {
+    isDuplicating.value = false
+  }
+}
+
+// --- 10. ОТПРАВКА ФОРМЫ ---
 
 function handleSubmit() {
   if (!formData.value) {
@@ -1012,14 +1066,26 @@ const seoKeywordsString = computed({
 
           <!-- 🎨 Цветовые вариации -->
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-            <div class="lg:col-span-3">
-              <Label class="text-sm font-medium flex items-center gap-2">
-                <Icon name="lucide:palette" class="w-4 h-4" />
-                Цветовые вариации (опционально)
-              </Label>
-              <p class="text-xs text-muted-foreground mt-1">
-                Укажите цвет товара для группировки цветовых вариантов
-              </p>
+            <div class="lg:col-span-3 flex items-center justify-between">
+              <div>
+                <Label class="text-sm font-medium flex items-center gap-2">
+                  <Icon name="lucide:palette" class="w-4 h-4" />
+                  Цветовые вариации (опционально)
+                </Label>
+                <p class="text-xs text-muted-foreground mt-1">
+                  Укажите цвет товара для группировки цветовых вариантов
+                </p>
+              </div>
+              <Button
+                v-if="props.initialData"
+                type="button"
+                variant="outline"
+                size="sm"
+                @click="showDuplicateDialog = true"
+              >
+                <Icon name="lucide:copy" class="w-4 h-4 mr-2" />
+                Дублировать с другим цветом
+              </Button>
             </div>
             <div>
               <Label for="color_name">Название цвета</Label>
@@ -2112,4 +2178,65 @@ const seoKeywordsString = computed({
       </div>
     </div>
   </form>
+
+  <!-- 🎨 Duplicate Color Variant Dialog -->
+  <Dialog v-model:open="showDuplicateDialog">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Дублировать товар с другим цветом</DialogTitle>
+        <DialogDescription>
+          Создаст копию товара с новым цветом. Товары будут связаны через model_group_id.
+        </DialogDescription>
+      </DialogHeader>
+      <div class="space-y-4 py-4">
+        <div>
+          <Label for="dup-color-name">Название цвета</Label>
+          <Input
+            id="dup-color-name"
+            v-model="duplicateColorName"
+            placeholder="Красный"
+            :disabled="isDuplicating"
+          />
+        </div>
+        <div>
+          <Label for="dup-color-hex">HEX код цвета</Label>
+          <div class="flex gap-2">
+            <Input
+              id="dup-color-hex"
+              v-model="duplicateColorHex"
+              placeholder="#FF0000"
+              class="flex-1"
+              :disabled="isDuplicating"
+            />
+            <input
+              v-model="duplicateColorHex"
+              type="color"
+              class="w-12 h-10 rounded border cursor-pointer"
+              :disabled="isDuplicating"
+            />
+          </div>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button
+          variant="outline"
+          @click="showDuplicateDialog = false"
+          :disabled="isDuplicating"
+        >
+          Отмена
+        </Button>
+        <Button
+          @click="handleDuplicateAsVariant"
+          :disabled="isDuplicating || !duplicateColorName || !duplicateColorHex"
+        >
+          <Icon
+            :name="isDuplicating ? 'lucide:loader-2' : 'lucide:copy'"
+            class="w-4 h-4 mr-2"
+            :class="{ 'animate-spin': isDuplicating }"
+          />
+          {{ isDuplicating ? 'Создание...' : 'Создать вариант' }}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
