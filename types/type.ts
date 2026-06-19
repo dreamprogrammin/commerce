@@ -363,6 +363,10 @@ export interface ProductFormData {
   // SEO поля
   seo_description: string | null
   seo_keywords: string[] | null
+  // 🎨 Цветовые вариации
+  model_group_id?: string | null
+  color_hex?: string | null
+  color_name?: string | null
 }
 
 export type ProductSearchResult = Pick<ProductRow, 'id' | 'name' | 'price'>

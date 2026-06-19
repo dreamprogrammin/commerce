@@ -1,7 +1,4 @@
-import type { Database } from '@/types/supabase'
-
-type Product = Database['public']['Tables']['products']['Row']
-type ProductInsert = Database['public']['Tables']['products']['Insert']
+import type { ProductInsert, ProductRow } from '@/types'
 
 /**
  * Duplicates a product as a color variant
@@ -14,8 +11,8 @@ export async function duplicateProductAsVariant(
   originalProductId: string,
   newColorName: string,
   newColorHex: string,
-): Promise<Product | null> {
-  const supabase = useSupabaseClient<Database>()
+): Promise<ProductRow | null> {
+  const supabase = useSupabaseClient()
 
   // 1. Fetch original product
   const { data: original, error: fetchError } = await supabase
@@ -33,10 +30,8 @@ export async function duplicateProductAsVariant(
   let modelGroupId = original.model_group_id
 
   if (!modelGroupId) {
-    // Generate new UUID for the group
     modelGroupId = crypto.randomUUID()
 
-    // Update original product with the new model_group_id
     const { error: updateError } = await supabase
       .from('products')
       .update({ model_group_id: modelGroupId })
@@ -50,7 +45,6 @@ export async function duplicateProductAsVariant(
 
   // 3. Prepare new product data
   const newProduct: ProductInsert = {
-    // Copy main fields
     name: original.name,
     description: original.description,
     price: original.price,
@@ -71,18 +65,14 @@ export async function duplicateProductAsVariant(
     featured_order: original.featured_order,
     is_promotion: original.is_promotion,
     product_line_id: original.product_line_id,
-    barcode: null, // Clear barcode - will be set manually
     seo_title: original.seo_title,
     seo_description: original.seo_description,
     meta_description: original.meta_description,
     seo_h1: original.seo_h1,
-
-    // Reset fields
-    stock_quantity: 0, // Start with 0 stock
+    stock_quantity: 0,
     sales_count: 0,
-    slug: '', // Will be auto-generated
-
-    // Color variant fields
+    slug: '',
+    barcode: null,
     model_group_id: modelGroupId,
     color_name: newColorName,
     color_hex: newColorHex,
@@ -96,21 +86,10 @@ export async function duplicateProductAsVariant(
     .single()
 
   if (insertError) {
-    console.error('[duplicateProductAsVariant] Failed to insert new product:', insertError)
+    console.error('[duplicateProductAsVariant] Failed to insert:', insertError)
     return null
   }
 
   console.log('[duplicateProductAsVariant] Created variant:', newProductData.id)
   return newProductData
-}
-
-/**
- * Composable for product variant duplication
- */
-export function useProductVariants() {
-  const duplicateAsVariant = duplicateProductAsVariant
-
-  return {
-    duplicateAsVariant,
-  }
 }

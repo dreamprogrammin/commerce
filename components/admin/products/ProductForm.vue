@@ -210,6 +210,10 @@ function setupFormData(product: FullProduct | null | undefined) {
       // Закупки
       min_stock_level: (product as any).min_stock_level ?? 2,
       restock_quantity: (product as any).restock_quantity ?? 5,
+      // 🎨 Цветовые вариации
+      model_group_id: (product as any).model_group_id || null,
+      color_hex: (product as any).color_hex || null,
+      color_name: (product as any).color_name || null,
     }
     // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
     existingImages.value = [...(product.product_images || [])].sort(
@@ -265,6 +269,10 @@ function setupFormData(product: FullProduct | null | undefined) {
       // Закупки
       min_stock_level: 2,
       restock_quantity: 5,
+      // 🎨 Цветовые вариации
+      model_group_id: null,
+      color_hex: null,
+      color_name: null,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -1001,6 +1009,54 @@ const seoKeywordsString = computed({
               placeholder="Например, 4601234567890"
             />
           </div>
+
+          <!-- 🎨 Цветовые вариации -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+            <div class="lg:col-span-3">
+              <Label class="text-sm font-medium flex items-center gap-2">
+                <Icon name="lucide:palette" class="w-4 h-4" />
+                Цветовые вариации (опционально)
+              </Label>
+              <p class="text-xs text-muted-foreground mt-1">
+                Укажите цвет товара для группировки цветовых вариантов
+              </p>
+            </div>
+            <div>
+              <Label for="color_name">Название цвета</Label>
+              <Input
+                id="color_name"
+                v-model="formData.color_name"
+                placeholder="Красный"
+              />
+            </div>
+            <div>
+              <Label for="color_hex">HEX код цвета</Label>
+              <div class="flex gap-2">
+                <Input
+                  id="color_hex"
+                  v-model="formData.color_hex"
+                  placeholder="#FF0000"
+                  class="flex-1"
+                />
+                <input
+                  v-model="formData.color_hex"
+                  type="color"
+                  class="w-12 h-10 rounded border cursor-pointer"
+                />
+              </div>
+            </div>
+            <div>
+              <Label for="model_group_id">ID группы (авто)</Label>
+              <Input
+                id="model_group_id"
+                v-model="formData.model_group_id"
+                placeholder="Генерируется автоматически"
+                disabled
+                class="bg-muted"
+              />
+            </div>
+          </div>
+
           <div>
             <Label for="description">Описание</Label>
             <Textarea
