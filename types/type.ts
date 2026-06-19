@@ -326,6 +326,11 @@ export type FullProduct = ProductWithImages & {
   product_attribute_values: ProductAttributeValueWithDetails[] | null
   is_featured?: boolean
   featured_order?: number
+  // Поля из БД которые могут отсутствовать в типах
+  supplier_id?: string | null
+  min_stock_level?: number | null
+  restock_quantity?: number | null
+  model_group_id?: string | null
 }
 
 export type CustomFieldValue = string | number | boolean | null

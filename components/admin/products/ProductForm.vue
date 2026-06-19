@@ -199,7 +199,7 @@ function setupFormData(product: FullProduct | null | undefined) {
       sku: product.sku,
       brand_id: product.brand_id,
       product_line_id: product.product_line_id || null,
-      supplier_id: (product as any).supplier_id || null,
+      supplier_id: product.supplier_id || null,
       origin_country_id: product.origin_country_id,
       discount_percentage: product.discount_percentage || 0,
       material_id: product.material_id,
@@ -212,10 +212,10 @@ function setupFormData(product: FullProduct | null | undefined) {
       // Количество деталей для конструкторов
       piece_count: product.piece_count || null,
       // Закупки
-      min_stock_level: (product as any).min_stock_level ?? 2,
-      restock_quantity: (product as any).restock_quantity ?? 5,
+      min_stock_level: product.min_stock_level ?? 2,
+      restock_quantity: product.restock_quantity ?? 5,
       // 🎨 Вариации
-      model_group_id: (product as any).model_group_id || null,
+      model_group_id: product.model_group_id || null,
     }
     // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
     existingImages.value = [...(product.product_images || [])].sort(
