@@ -100,8 +100,6 @@ const isProcessingImages = ref(false)
 
 // 🎨 Duplicate dialog
 const showDuplicateDialog = ref(false)
-const duplicateColorName = ref('')
-const duplicateColorHex = ref('#000000')
 const isDuplicating = ref(false)
 
 const bonusOptions = [
@@ -216,10 +214,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       // Закупки
       min_stock_level: (product as any).min_stock_level ?? 2,
       restock_quantity: (product as any).restock_quantity ?? 5,
-      // 🎨 Цветовые вариации
+      // 🎨 Вариации
       model_group_id: (product as any).model_group_id || null,
-      color_hex: (product as any).color_hex || null,
-      color_name: (product as any).color_name || null,
     }
     // 🎯 ВАЖНО: Сортируем изображения по display_order для сохранения порядка
     existingImages.value = [...(product.product_images || [])].sort(
@@ -275,10 +271,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       // Закупки
       min_stock_level: 2,
       restock_quantity: 5,
-      // 🎨 Цветовые вариации
+      // 🎨 Вариации
       model_group_id: null,
-      color_hex: null,
-      color_name: null,
     }
     existingImages.value = []
     selectedBonusPercent.value = 5
@@ -648,29 +642,18 @@ async function handleDuplicateAsVariant() {
     return
   }
 
-  if (!duplicateColorName.value || !duplicateColorHex.value) {
-    toast.error('Укажите название и HEX цвета')
-    return
-  }
-
   isDuplicating.value = true
 
   try {
     const { duplicateProductAsVariant } = await import('@/composables/admin/useProductVariants')
     
-    const newProduct = await duplicateProductAsVariant(
-      props.initialData.id,
-      duplicateColorName.value,
-      duplicateColorHex.value,
-    )
+    const newProduct = await duplicateProductAsVariant(props.initialData.id)
 
     if (newProduct) {
-      toast.success('Цветовой вариант создан!', {
-        description: `Товар "${duplicateColorName.value}" успешно создан`,
+      toast.success('Вариант создан!', {
+        description: 'Добавьте изображения и измените название при необходимости',
       })
       showDuplicateDialog.value = false
-      duplicateColorName.value = ''
-      duplicateColorHex.value = '#000000'
       
       // Redirect to new product
       navigateTo(`/admin/products/${newProduct.id}`)
@@ -1065,15 +1048,15 @@ const seoKeywordsString = computed({
           </div>
 
           <!-- 🎨 Цветовые вариации -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-            <div class="lg:col-span-3 flex items-center justify-between">
+          <div class="p-4 bg-muted/30 rounded-lg">
+            <div class="flex items-center justify-between mb-3">
               <div>
                 <Label class="text-sm font-medium flex items-center gap-2">
-                  <Icon name="lucide:palette" class="w-4 h-4" />
-                  Цветовые вариации (опционально)
+                  <Icon name="lucide:layers" class="w-4 h-4" />
+                  Вариации товара (опционально)
                 </Label>
                 <p class="text-xs text-muted-foreground mt-1">
-                  Укажите цвет товара для группировки цветовых вариантов
+                  Свяжите разные цвета/модели одного товара через группу
                 </p>
               </div>
               <Button
@@ -1084,59 +1067,21 @@ const seoKeywordsString = computed({
                 @click="showDuplicateDialog = true"
               >
                 <Icon name="lucide:copy" class="w-4 h-4 mr-2" />
-                Дублировать с другим цветом
+                Дублировать товар
               </Button>
             </div>
             <div>
-              <Label for="color_name">Название цвета</Label>
-              <Input
-                id="color_name"
-                v-model="formData.color_name"
-                placeholder="Красный"
-              />
-            </div>
-            <div>
-              <Label for="color_hex">HEX код цвета</Label>
-              <div class="flex gap-2">
-                <Input
-                  id="color_hex"
-                  v-model="formData.color_hex"
-                  placeholder="#FF0000"
-                  class="flex-1"
-                />
-                <Popover>
-                  <PopoverTrigger as-child>
-                    <Button
-                      variant="outline"
-                      class="w-12 h-10 p-0"
-                      :style="{ backgroundColor: formData.color_hex || '#000' }"
-                    />
-                  </PopoverTrigger>
-                  <PopoverContent class="w-64">
-                    <div class="grid grid-cols-6 gap-2">
-                      <button
-                        v-for="color in ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080', '#FFC0CB', '#A52A2A', '#808080', '#000000', '#FFFFFF', '#FFD700', '#C0C0C0', '#FF69B4', '#4B0082', '#00CED1']"
-                        :key="color"
-                        type="button"
-                        class="w-8 h-8 rounded border-2 hover:scale-110 transition-transform"
-                        :class="{ 'ring-2 ring-primary ring-offset-1': formData.color_hex === color }"
-                        :style="{ backgroundColor: color }"
-                        @click="formData.color_hex = color"
-                      />
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            <div>
-              <Label for="model_group_id">ID группы (авто)</Label>
+              <Label for="model_group_id">ID группы вариаций</Label>
               <Input
                 id="model_group_id"
                 v-model="formData.model_group_id"
-                placeholder="Генерируется автоматически"
+                placeholder="Генерируется при дублировании"
                 disabled
                 class="bg-muted"
               />
+              <p class="text-xs text-muted-foreground mt-1">
+                Товары с одинаковым ID группы будут показываться как варианты
+              </p>
             </div>
           </div>
 
@@ -2196,59 +2141,24 @@ const seoKeywordsString = computed({
     </div>
   </form>
 
-  <!-- 🎨 Duplicate Color Variant Dialog -->
+  <!-- 🎨 Duplicate Variant Dialog -->
   <Dialog v-model:open="showDuplicateDialog">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>Дублировать товар с другим цветом</DialogTitle>
+        <DialogTitle>Дублировать товар как вариант</DialogTitle>
         <DialogDescription>
-          Создаст копию товара с новым цветом. Товары будут связаны через model_group_id.
+          Создаст копию товара без изображений. Товары будут связаны через model_group_id.
         </DialogDescription>
       </DialogHeader>
-      <div class="space-y-4 py-4">
-        <div>
-          <Label for="dup-color-name">Название цвета</Label>
-          <Input
-            id="dup-color-name"
-            v-model="duplicateColorName"
-            placeholder="Красный"
-            :disabled="isDuplicating"
-          />
-        </div>
-        <div>
-          <Label for="dup-color-hex">HEX код цвета</Label>
-          <div class="flex gap-2">
-            <Input
-              id="dup-color-hex"
-              v-model="duplicateColorHex"
-              placeholder="#FF0000"
-              class="flex-1"
-              :disabled="isDuplicating"
-            />
-            <Popover>
-              <PopoverTrigger as-child>
-                <Button
-                  variant="outline"
-                  class="w-12 h-10 p-0"
-                  :style="{ backgroundColor: duplicateColorHex }"
-                  :disabled="isDuplicating"
-                />
-              </PopoverTrigger>
-              <PopoverContent class="w-64">
-                <div class="grid grid-cols-6 gap-2">
-                  <button
-                    v-for="color in ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080', '#FFC0CB', '#A52A2A', '#808080', '#000000', '#FFFFFF', '#FFD700', '#C0C0C0', '#FF69B4', '#4B0082', '#00CED1']"
-                    :key="color"
-                    type="button"
-                    class="w-8 h-8 rounded border-2 hover:scale-110 transition-transform"
-                    :class="{ 'ring-2 ring-primary ring-offset-1': duplicateColorHex === color }"
-                    :style="{ backgroundColor: color }"
-                    @click="duplicateColorHex = color"
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+      <div class="py-4 space-y-3">
+        <div class="text-sm text-muted-foreground">
+          <p class="mb-2">Новый товар:</p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Скопирует все данные (название, цена, категория, бренд)</li>
+            <li>Обнулит остаток (stock_quantity = 0)</li>
+            <li>Не скопирует изображения - добавьте их вручную</li>
+            <li>Получит новый slug автоматически</li>
+          </ul>
         </div>
       </div>
       <DialogFooter>
@@ -2261,7 +2171,7 @@ const seoKeywordsString = computed({
         </Button>
         <Button
           @click="handleDuplicateAsVariant"
-          :disabled="isDuplicating || !duplicateColorName || !duplicateColorHex"
+          :disabled="isDuplicating"
         >
           <Icon
             :name="isDuplicating ? 'lucide:loader-2' : 'lucide:copy'"

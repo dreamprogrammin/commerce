@@ -1,16 +1,12 @@
 import type { ProductInsert, ProductRow } from '@/types'
 
 /**
- * Duplicates a product as a color variant
+ * Duplicates a product as variant (for different color/model)
  * @param originalProductId - ID of the product to duplicate
- * @param newColorName - Name of the new color (e.g., "Красный")
- * @param newColorHex - HEX code of the new color (e.g., "#FF0000")
  * @returns New product data or null if failed
  */
 export async function duplicateProductAsVariant(
   originalProductId: string,
-  newColorName: string,
-  newColorHex: string,
 ): Promise<ProductRow | null> {
   const supabase = useSupabaseClient()
 
@@ -73,8 +69,6 @@ export async function duplicateProductAsVariant(
     slug: '',
     barcode: null,
     model_group_id: modelGroupId,
-    color_name: newColorName,
-    color_hex: newColorHex,
   }
 
   // 4. Insert new product

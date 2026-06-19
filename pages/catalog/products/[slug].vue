@@ -111,12 +111,25 @@ const { data: colorVariants } = await useAsyncData(
     const supabase = useSupabaseClient()
     const { data } = await supabase
       .from('products')
-      .select('slug, color_hex, color_name, stock_quantity, id')
+      .select(`
+        slug,
+        stock_quantity,
+        id,
+        product_images!inner(image_url, blur_placeholder, display_order)
+      `)
       .eq('model_group_id', product.value.model_group_id)
       .eq('is_active', true)
       .not('id', 'eq', product.value.id)
+      .order('display_order', { referencedTable: 'product_images', ascending: true })
     
-    return data || []
+    // Оставляем только первое изображение для каждого товара
+    return data?.map(item => ({
+      id: item.id,
+      slug: item.slug,
+      stock_quantity: item.stock_quantity,
+      image_url: item.product_images[0]?.image_url || null,
+      blur_placeholder: item.product_images[0]?.blur_placeholder || null,
+    })) || []
   },
   {
     watch: [() => product.value?.model_group_id],
@@ -1141,21 +1154,23 @@ watchEffect(() => {
                     class="mt-4 pt-4 border-t"
                   >
                     <p class="text-sm font-medium text-muted-foreground mb-3">
-                      Доступные цвета:
+                      Другие варианты:
                     </p>
                     <div class="flex flex-wrap items-center gap-2">
-                      <!-- Current product color -->
+                      <!-- Current product thumbnail -->
                       <div
-                        v-if="product.color_hex"
+                        v-if="product.product_images?.[0]"
                         class="relative group"
-                        :title="product.color_name || 'Текущий цвет'"
                       >
-                        <div
-                          class="w-10 h-10 rounded-full border-2 border-primary ring-2 ring-offset-2 ring-primary cursor-default transition-all"
-                          :style="{ backgroundColor: product.color_hex }"
-                        />
-                        <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground whitespace-nowrap pointer-events-none">
-                          {{ product.color_name }}
+                        <div class="w-16 h-16 rounded-lg border-2 border-primary ring-2 ring-offset-2 ring-primary overflow-hidden">
+                          <ProgressiveImage
+                            :src="getVariantUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url, 'sm')"
+                            :blur-data-url="product.product_images[0].blur_placeholder"
+                            :alt="product.name"
+                            aspect-ratio="square"
+                            object-fit="cover"
+                            placeholder-type="lqip"
+                          />
                         </div>
                       </div>
 
@@ -1165,29 +1180,31 @@ watchEffect(() => {
                         :key="variant.id"
                         :to="`/catalog/products/${variant.slug}`"
                         class="relative group"
-                        :title="variant.color_name || 'Другой цвет'"
                       >
                         <div
-                          class="w-10 h-10 rounded-full border-2 transition-all hover:scale-110 hover:border-primary relative"
+                          class="w-16 h-16 rounded-lg border-2 transition-all hover:scale-105 hover:border-primary overflow-hidden"
                           :class="[
                             variant.stock_quantity <= 0
                               ? 'opacity-50 border-muted-foreground/30'
                               : 'border-muted hover:border-primary',
                           ]"
-                          :style="{ backgroundColor: variant.color_hex }"
                         >
+                          <ProgressiveImage
+                            v-if="variant.image_url"
+                            :src="getVariantUrl(BUCKET_NAME_PRODUCT, variant.image_url, 'sm')"
+                            :blur-data-url="variant.blur_placeholder"
+                            :alt="`Вариант ${variant.slug}`"
+                            aspect-ratio="square"
+                            object-fit="cover"
+                            placeholder-type="lqip"
+                          />
                           <!-- Out of stock indicator -->
                           <div
                             v-if="variant.stock_quantity <= 0"
-                            class="absolute inset-0 flex items-center justify-center"
+                            class="absolute inset-0 flex items-center justify-center bg-black/20"
                           >
-                            <div
-                              class="w-full h-0.5 bg-muted-foreground/50 rotate-45"
-                            />
+                            <div class="w-full h-0.5 bg-white/80 rotate-45" />
                           </div>
-                        </div>
-                        <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground whitespace-nowrap pointer-events-none">
-                          {{ variant.color_name }}
                         </div>
                       </NuxtLink>
                     </div>
