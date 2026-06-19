@@ -1104,11 +1104,28 @@ const seoKeywordsString = computed({
                   placeholder="#FF0000"
                   class="flex-1"
                 />
-                <input
-                  v-model="formData.color_hex"
-                  type="color"
-                  class="w-12 h-10 rounded border cursor-pointer"
-                />
+                <Popover>
+                  <PopoverTrigger as-child>
+                    <Button
+                      variant="outline"
+                      class="w-12 h-10 p-0"
+                      :style="{ backgroundColor: formData.color_hex || '#000' }"
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent class="w-64">
+                    <div class="grid grid-cols-6 gap-2">
+                      <button
+                        v-for="color in ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080', '#FFC0CB', '#A52A2A', '#808080', '#000000', '#FFFFFF', '#FFD700', '#C0C0C0', '#FF69B4', '#4B0082', '#00CED1']"
+                        :key="color"
+                        type="button"
+                        class="w-8 h-8 rounded border-2 hover:scale-110 transition-transform"
+                        :class="{ 'ring-2 ring-primary ring-offset-1': formData.color_hex === color }"
+                        :style="{ backgroundColor: color }"
+                        @click="formData.color_hex = color"
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div>
@@ -2208,12 +2225,29 @@ const seoKeywordsString = computed({
               class="flex-1"
               :disabled="isDuplicating"
             />
-            <input
-              v-model="duplicateColorHex"
-              type="color"
-              class="w-12 h-10 rounded border cursor-pointer"
-              :disabled="isDuplicating"
-            />
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  class="w-12 h-10 p-0"
+                  :style="{ backgroundColor: duplicateColorHex }"
+                  :disabled="isDuplicating"
+                />
+              </PopoverTrigger>
+              <PopoverContent class="w-64">
+                <div class="grid grid-cols-6 gap-2">
+                  <button
+                    v-for="color in ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080', '#FFC0CB', '#A52A2A', '#808080', '#000000', '#FFFFFF', '#FFD700', '#C0C0C0', '#FF69B4', '#4B0082', '#00CED1']"
+                    :key="color"
+                    type="button"
+                    class="w-8 h-8 rounded border-2 hover:scale-110 transition-transform"
+                    :class="{ 'ring-2 ring-primary ring-offset-1': duplicateColorHex === color }"
+                    :style="{ backgroundColor: color }"
+                    @click="duplicateColorHex = color"
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>
