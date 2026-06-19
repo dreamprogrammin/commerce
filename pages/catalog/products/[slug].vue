@@ -1162,7 +1162,7 @@ watchEffect(() => {
                         v-if="product.product_images?.[0]"
                         class="relative group"
                       >
-                        <div class="w-16 h-16 rounded-lg border-2 border-primary ring-2 ring-offset-2 ring-primary overflow-hidden">
+                        <div class="w-16 h-16 rounded-lg border-2 border-primary overflow-hidden">
                           <ProgressiveImage
                             :src="getVariantUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url, 'sm')"
                             :blur-data-url="product.product_images[0].blur_placeholder"
