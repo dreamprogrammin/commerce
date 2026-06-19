@@ -101,6 +101,29 @@ const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
   gcTime: 30 * 60 * 1000,
 })
 
+// 🎨 Color variants
+const { data: colorVariants } = await useAsyncData(
+  `color-variants-${slug.value}`,
+  async () => {
+    if (!product.value?.model_group_id)
+      return []
+    
+    const supabase = useSupabaseClient()
+    const { data } = await supabase
+      .from('products')
+      .select('slug, color_hex, color_name, stock_quantity, id')
+      .eq('model_group_id', product.value.model_group_id)
+      .eq('is_active', true)
+      .not('id', 'eq', product.value.id)
+    
+    return data || []
+  },
+  {
+    watch: [() => product.value?.model_group_id],
+    server: true,
+  },
+)
+
 const { data: productQuestions } = await useAsyncData(
   `product-questions-${route.params.slug}`,
   async () => {
@@ -1110,6 +1133,64 @@ watchEffect(() => {
                   >
                     <Icon name="lucide:gift" class="w-4 h-4" />
                     <span>+{{ totalBonuses }} бонусов</span>
+                  </div>
+
+                  <!-- 🎨 Color Variants Selector -->
+                  <div
+                    v-if="colorVariants && colorVariants.length > 0"
+                    class="mt-4 pt-4 border-t"
+                  >
+                    <p class="text-sm font-medium text-muted-foreground mb-3">
+                      Доступные цвета:
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <!-- Current product color -->
+                      <div
+                        v-if="product.color_hex"
+                        class="relative group"
+                        :title="product.color_name || 'Текущий цвет'"
+                      >
+                        <div
+                          class="w-10 h-10 rounded-full border-2 border-primary ring-2 ring-offset-2 ring-primary cursor-default transition-all"
+                          :style="{ backgroundColor: product.color_hex }"
+                        />
+                        <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground whitespace-nowrap pointer-events-none">
+                          {{ product.color_name }}
+                        </div>
+                      </div>
+
+                      <!-- Other variants -->
+                      <NuxtLink
+                        v-for="variant in colorVariants"
+                        :key="variant.id"
+                        :to="`/catalog/products/${variant.slug}`"
+                        class="relative group"
+                        :title="variant.color_name || 'Другой цвет'"
+                      >
+                        <div
+                          class="w-10 h-10 rounded-full border-2 transition-all hover:scale-110 hover:border-primary relative"
+                          :class="[
+                            variant.stock_quantity <= 0
+                              ? 'opacity-50 border-muted-foreground/30'
+                              : 'border-muted hover:border-primary',
+                          ]"
+                          :style="{ backgroundColor: variant.color_hex }"
+                        >
+                          <!-- Out of stock indicator -->
+                          <div
+                            v-if="variant.stock_quantity <= 0"
+                            class="absolute inset-0 flex items-center justify-center"
+                          >
+                            <div
+                              class="w-full h-0.5 bg-muted-foreground/50 rotate-45"
+                            />
+                          </div>
+                        </div>
+                        <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground whitespace-nowrap pointer-events-none">
+                          {{ variant.color_name }}
+                        </div>
+                      </NuxtLink>
+                    </div>
                   </div>
 
                   <!-- Плашка-расшифровка комплекта -->
