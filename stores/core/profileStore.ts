@@ -37,32 +37,40 @@ export const useProfileStore = defineStore('profileStore', () => {
    * @param silent Фоновый refetch — не устанавливает isLoading (не показывает скелетон)
    */
   async function loadProfile(force: boolean = false, waitForCreation: boolean = false, silent: boolean = false): Promise<boolean> {
-    // ✅ Упрощённая логика без таймаутов
+    console.log('[ProfileStore] loadProfile called:', { force, waitForCreation, silent, hasUser: !!user.value, hasProfile: !!profile.value, isLoading: isLoading.value })
 
     // Если уже идет загрузка - возвращаем существующий промис
     if (loadingPromise && !force) {
+      console.log('[ProfileStore] Returning existing loading promise')
       return await loadingPromise
     }
 
     // Если профиль уже есть (из кеша или предыдущей загрузки)
     if (!force && profile.value) {
+      console.log('[ProfileStore] Profile already loaded from cache')
       return true
     }
 
     if (!user.value) {
+      console.log('[ProfileStore] No user, clearing profile')
       profile.value = null
       isLoading.value = false
+      loadingPromise = null
       return false
     }
 
     // ✅ Создаем промис для текущей загрузки
     loadingPromise = (async () => {
+      console.log('[ProfileStore] Starting profile load...')
+      
       // silent=true — фоновый refetch, не трогаем isLoading чтобы не мигал UI
       if (!silent)
         isLoading.value = true
 
       try {
         // Пробуем загрузить профиль
+        console.log('[ProfileStore] Fetching profile for user:', user.value!.id)
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -74,9 +82,12 @@ export const useProfileStore = defineStore('profileStore', () => {
           throw error
         }
 
+        console.log('[ProfileStore] Profile fetch result:', { found: !!data, waitForCreation })
+
         // Если профиль найден - сохраняем и выходим
         if (data) {
           profile.value = data
+          console.log('[ProfileStore] Profile loaded successfully')
 
           // Активируем pending бонусы если есть (замена pg_cron)
           if (data.pending_bonus_balance > 0) {
@@ -88,15 +99,18 @@ export const useProfileStore = defineStore('profileStore', () => {
 
         // Если профиля нет и мы НЕ ждем создания
         if (!waitForCreation) {
+          console.log('[ProfileStore] Profile not found, not waiting for creation')
           profile.value = null
           return false
         }
 
         // ✅ Если ждем создания - делаем несколько попыток с экспоненциальной задержкой
+        console.log('[ProfileStore] Profile not found, waiting for creation with retries...')
         const maxAttempts = 5
         const delays = [100, 300, 500, 1000, 2000] // миллисекунды
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          console.log(`[ProfileStore] Retry attempt ${attempt + 1}/${maxAttempts}, waiting ${delays[attempt]}ms`)
           await new Promise(resolve => setTimeout(resolve, delays[attempt]))
 
           const { data: retryData, error: retryError } = await supabase
@@ -112,6 +126,7 @@ export const useProfileStore = defineStore('profileStore', () => {
 
           if (retryData) {
             profile.value = retryData
+            console.log('[ProfileStore] Profile found on retry', attempt + 1)
             return true
           }
         }
@@ -123,6 +138,7 @@ export const useProfileStore = defineStore('profileStore', () => {
           const { error: ensureError } = await (supabase as any).rpc('ensure_profile_exists')
 
           if (!ensureError) {
+            console.log('[ProfileStore] RPC ensure_profile_exists called successfully')
             // Re-fetch profile after RPC creation
             const { data: newProfile } = await supabase
               .from('profiles')
@@ -135,6 +151,9 @@ export const useProfileStore = defineStore('profileStore', () => {
               console.info('[ProfileStore] Profile created via ensure_profile_exists RPC')
               return true
             }
+            else {
+              console.error('[ProfileStore] Profile still not found after RPC')
+            }
           }
           else {
             console.error('[ProfileStore] ensure_profile_exists RPC error:', ensureError)
@@ -144,6 +163,7 @@ export const useProfileStore = defineStore('profileStore', () => {
           console.error('[ProfileStore] ensure_profile_exists RPC threw:', rpcError)
         }
 
+        console.error('[ProfileStore] Failed to load/create profile after all attempts')
         toast.error('Профиль не найден', {
           description: 'Попробуйте выйти и войти снова.',
         })
@@ -160,6 +180,7 @@ export const useProfileStore = defineStore('profileStore', () => {
       }
       finally {
         // ✅ КРИТИЧНО: ВСЕГДА снимаем загрузку и очищаем промис
+        console.log('[ProfileStore] loadProfile finally block, setting isLoading=false')
         if (!silent)
           isLoading.value = false
         loadingPromise = null

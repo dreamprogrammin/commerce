@@ -266,6 +266,24 @@ export default defineNuxtConfig({
     types: 'types/supabase.ts',
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_KEY,
+    cookieOptions: {
+      // ✅ Для Safari/iOS: используем lax вместо strict
+      sameSite: 'lax',
+      // ✅ Увеличиваем время жизни сессии
+      maxAge: 60 * 60 * 24 * 365, // 1 год
+    },
+    clientOptions: {
+      auth: {
+        // ✅ Используем localStorage вместо cookie storage для лучшей совместимости
+        storageKey: 'supabase-auth-token',
+        // ✅ Включаем автоматическое обновление токена
+        autoRefreshToken: true,
+        // ✅ Определяем сессию при загрузке
+        detectSessionInUrl: true,
+        // ✅ Использовать PKCE flow (более безопасен и работает лучше в Safari)
+        flowType: 'pkce',
+      },
+    },
   },
 
   css: ['~/assets/css/tailwind.css'],

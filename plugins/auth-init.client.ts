@@ -6,23 +6,20 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
  * Client-only plugin для инициализации auth state
  * Обрабатывает события Supabase Auth и синхронизирует профиль
  */
-export default defineNuxtPlugin(() => {
+export default defineNuxtPlugin(async () => {
   const supabase = useSupabaseClient()
   const profileStore = useProfileStore()
   const cartStore = useCartStore()
 
-  // Defer initial session check to avoid blocking
-  const requestIdleCallback = globalThis.requestIdleCallback || ((cb: IdleRequestCallback) => setTimeout(cb, 1))
-  
-  requestIdleCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
+  // ✅ Проверяем initial session синхронно (без requestIdleCallback)
+  const { data: { session } } = await supabase.auth.getSession()
 
-    if (session?.user && !profileStore.profile && !profileStore.isLoading) {
-      profileStore.loadProfile(false, true).catch((error) => {
-        console.error('[Auth Plugin] Profile load failed:', error)
-      })
-    }
-  })
+  if (session?.user && !profileStore.profile && !profileStore.isLoading) {
+    // Запускаем загрузку профиля, но не ждем результат чтобы не блокировать приложение
+    profileStore.loadProfile(false, true).catch((error) => {
+      console.error('[Auth Plugin] Profile load failed:', error)
+    })
+  }
 
   const processedEvents = new Set<string>()
 
@@ -35,15 +32,32 @@ export default defineNuxtPlugin(() => {
     }
     processedEvents.add(eventKey)
 
-    if (event === 'SIGNED_IN') {
-      const hasProfile = await profileStore.loadProfile(false, true)
+    console.log(`[Auth Plugin] Event: ${event}, User: ${session?.user?.id}`)
 
-      // Defer cart merge
-      requestIdleCallback(() => {
+    if (event === 'SIGNED_IN') {
+      // ✅ Для Safari/Firefox: ждем завершения загрузки профиля с таймаутом
+      let hasProfile = false
+      
+      try {
+        // Создаем промис с таймаутом 5 секунд
+        hasProfile = await Promise.race([
+          profileStore.loadProfile(false, true),
+          new Promise<boolean>((_, reject) => 
+            setTimeout(() => reject(new Error('Profile load timeout')), 5000)
+          ),
+        ])
+      } catch (error: any) {
+        console.error('[Auth Plugin] Profile load error or timeout:', error.message)
+        // Если таймаут или ошибка - пытаемся все равно показать приветствие
+        hasProfile = !!profileStore.profile
+      }
+
+      // Слияние корзины отложенно
+      setTimeout(() => {
         cartStore.mergeOnLogin().catch((error) => {
           console.error('[Auth Plugin] Cart merge failed:', error)
         })
-      })
+      }, 100)
 
       if (hasProfile) {
         toast.success('С возвращением!', {

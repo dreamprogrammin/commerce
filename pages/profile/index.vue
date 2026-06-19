@@ -153,10 +153,20 @@ const { data: bonusData, isLoading: isLoadingBonusQuery } = useQuery({
 
 // --- Инициализация ---
 onMounted(async () => {
-  // ✅ Сначала дожидаемся загрузки профиля
+  // ✅ Загружаем профиль с таймаутом для Safari/Firefox
   if (!profile.value && !isLoadingProfile.value) {
-    await profileStore.loadProfile(false, true)
+    try {
+      await Promise.race([
+        profileStore.loadProfile(false, true),
+        new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error('Profile load timeout')), 5000)
+        ),
+      ])
+    } catch (error) {
+      console.error('[Profile Page] Profile load timeout or error:', error)
+    }
   }
+
 
   // TanStack Query автоматически загружает данные параллельно
 })
