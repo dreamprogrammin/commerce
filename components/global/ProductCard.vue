@@ -17,6 +17,7 @@ const props = defineProps<{
 const cartStore = useCartStore()
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { triggerHaptic } = useHaptic()
+const { trackAddToCart } = useEcommerceTracking()
 
 // --- DEVICE DETECTION ---
 const isTouchDevice = ref(false)
@@ -526,7 +527,11 @@ const priceDetails = computed(() => {
             <Button
               v-if="!itemInCart"
               class="w-full h-10 font-semibold"
-              @click="() => { cartStore.addItem(product as BaseProduct, 1); triggerHaptic('medium'); }"
+              @click="() => { 
+                cartStore.addItem(product as BaseProduct, 1); 
+                trackAddToCart({ id: product.id, name: product.name, price: priceDetails.finalPrice });
+                triggerHaptic('medium'); 
+              }"
             >
               <Icon name="lucide:shopping-cart" class="w-4 h-4 mr-2" />
               В корзину

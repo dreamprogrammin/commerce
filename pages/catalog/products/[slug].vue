@@ -38,6 +38,7 @@ const reviewsStore = useReviewsStore()
 const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
+const { trackViewItem } = useEcommerceTracking()
 
 const priceValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   .toISOString()
@@ -338,9 +339,18 @@ function handleStickyScroll() {
   stickyLastScrollY = y
 }
 
-onMounted(() =>
-  window.addEventListener('scroll', handleStickyScroll, { passive: true }),
-)
+onMounted(() => {
+  window.addEventListener('scroll', handleStickyScroll, { passive: true })
+  
+  if (product.value) {
+    trackViewItem({
+      id: product.value.id,
+      name: product.value.name,
+      price: mainProductPrice.value.final,
+      category: product.value.categories?.name,
+    })
+  }
+})
 onUnmounted(() => window.removeEventListener('scroll', handleStickyScroll))
 
 const quantity = ref(1)

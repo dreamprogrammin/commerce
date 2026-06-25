@@ -474,6 +474,19 @@ export const useCartStore = defineStore(
           throw new Error('Не удалось получить ID заказа')
         }
 
+        // 🔥 Google Analytics: Отслеживание покупки
+        const { trackPurchase } = useEcommerceTracking()
+        trackPurchase(
+          orderId,
+          items.value.map(item => ({
+            id: item.product.id,
+            name: item.product.name,
+            price: item.product.final_price || item.product.price,
+            quantity: item.quantity,
+          })),
+          total.value,
+        )
+
         // ✅ Очищаем корзину ТОЛЬКО для авторизованных пользователей
         // Для гостей сохраняем корзину в localStorage, чтобы не пришлось заново набирать
         if (user.value) {

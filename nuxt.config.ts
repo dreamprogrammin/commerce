@@ -29,9 +29,15 @@ export default defineNuxtConfig({
     'nuxt-og-image',
     'nuxt-schema-org',
     '@nuxt/fonts',
+    'nuxt-gtag',
     // 🔥 Отключаем Storybook в dev режиме
     ...(process.env.NODE_ENV === 'production' ? ['@nuxtjs/storybook'] : []),
   ],
+
+  gtag: {
+    id: process.env.NUXT_PUBLIC_GTAG_ID,
+    loadingStrategy: 'defer',
+  },
 
   // @nuxt/fonts — font-display: swap убирает блокировку рендера шрифтами
   fonts: {

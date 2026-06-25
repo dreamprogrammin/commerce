@@ -98,6 +98,7 @@
     "eslint-plugin-storybook": "^10.1.10",
     "happy-dom": "^20.0.11",
     "lint-staged": "^16.1.4",
+    "nuxt-gtag": "^4.1.0",
     "playwright": "^1.57.0",
     "prettier": "^3.6.2",
     "puppeteer": "^24.34.0",

@@ -21,6 +21,7 @@ const cartStore = useCartStore()
 const supabase = useSupabaseClient()
 const { items, subtotal, totalItems, bonusesToAward } = storeToRefs(cartStore)
 const { getVariantUrl } = useSupabaseStorage()
+const { trackBeginCheckout } = useEcommerceTracking()
 
 // 🔥 Константа порога бесплатной доставки
 const FREE_SHIPPING_THRESHOLD = 15000
@@ -78,6 +79,19 @@ const priceChars = computed(() => {
 
 useFlipCounter(totalWithAccessories, digitColumns)
 useFlipCounter(subtotal, mobileDigitColumns)
+
+function handleCheckout() {
+  trackBeginCheckout(
+    items.value.map(item => ({
+      id: item.product.id,
+      name: item.product.name,
+      price: item.product.final_price || item.product.price,
+      quantity: item.quantity,
+    })),
+    subtotal.value,
+  )
+  navigateTo('/checkout')
+}
 
 // Загрузка рекомендованных аксессуаров
 async function loadSuggestedAccessories() {
@@ -833,12 +847,10 @@ const contentPaddingClass = computed(() =>
               Добавить {{ selectedAccessoryIds.length }} аксессуар(а)
             </Button>
 
-            <NuxtLink to="/checkout" class="w-full block">
-              <Button size="lg" class="w-full">
-                <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
-                Перейти к оформлению
-              </Button>
-            </NuxtLink>
+            <Button size="lg" class="w-full" @click="handleCheckout">
+              <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
+              Перейти к оформлению
+            </Button>
 
             <Button size="lg" variant="outline" class="w-full" as-child>
               <NuxtLink to="/catalog">
@@ -891,12 +903,10 @@ const contentPaddingClass = computed(() =>
               </p>
             </div>
           </div>
-          <NuxtLink to="/checkout" class="w-full block">
-            <Button size="lg" class="w-full text-base font-semibold">
-              <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
-              Перейти к оформлению
-            </Button>
-          </NuxtLink>
+          <Button size="lg" class="w-full text-base font-semibold" @click="handleCheckout">
+            <Icon name="lucide:shopping-bag" class="w-5 h-5 mr-2" />
+            Перейти к оформлению
+          </Button>
         </div>
       </div>
     </ClientOnly>
