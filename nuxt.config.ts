@@ -37,6 +37,10 @@ export default defineNuxtConfig({
   gtag: {
     id: process.env.NUXT_PUBLIC_GTAG_ID,
     loadingStrategy: 'defer',
+    enabled: true,
+    config: {
+      id: process.env.NUXT_PUBLIC_GTAG_ID,
+    },
   },
 
   // @nuxt/fonts — font-display: swap убирает блокировку рендера шрифтами
