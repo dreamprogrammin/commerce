@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'vue-sonner'
 
-definePageMeta({ layout: 'admin' })
+definePageMeta({ layout: 'Admin' })
 
 const supabase = useSupabaseClient()
 

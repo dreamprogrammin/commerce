@@ -53,6 +53,7 @@ const navLinks = [
   { to: '/admin/reports', label: 'Отчёты' },
   { to: '/admin/promotions', label: 'Акции' },
   { to: '/admin/broadcast', label: 'Рассылка' },
+  { to: '/admin/kaspi-export', label: 'Выгрузка Kaspi' },
 ]
 </script>
 
