@@ -1,9 +1,16 @@
 export default defineEventHandler(async (event) => {
-  const supabase = useSupabaseClient(event)
+  const client = await serverSupabaseClient(event)
   
-  const { data: products, error } = await supabase.rpc('get_kaspi_feed_products')
+  const { data: products, error } = await client.rpc('get_kaspi_feed_products')
   
-  if (error) throw createError({ statusCode: 500, message: error.message })
+  if (error) {
+    console.error('Kaspi feed error:', error)
+    throw createError({ statusCode: 500, message: error.message })
+  }
+
+  if (!products || products.length === 0) {
+    console.warn('No products for Kaspi feed')
+  }
 
   const currentDate = new Date().toISOString().split('T')[0]
   
@@ -12,7 +19,7 @@ export default defineEventHandler(async (event) => {
   <company>Ухтышка</company>
   <merchantid>YOUR_MERCHANT_ID</merchantid>
   <offers>
-${products.map(p => `    <offer sku="${p.sku}">
+${(products || []).map(p => `    <offer sku="${p.sku}">
       <model><![CDATA[${p.name}]]></model>
       <brand><![CDATA[${p.brand_name || ''}]]></brand>
       <availabilities>
