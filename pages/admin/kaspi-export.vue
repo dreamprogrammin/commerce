@@ -89,7 +89,7 @@ function copyFeedUrl() {
 
     <Alert>
       <AlertDescription>
-        💡 Топ-10 самых просматриваемых товаров на сайте (рекомендуем к выгрузке)
+        📦 Выберите товары для выгрузки на Kaspi Магазин
       </AlertDescription>
     </Alert>
 
@@ -149,7 +149,7 @@ function copyFeedUrl() {
         <TableBody>
           <TableRow v-for="(row, index) in products" :key="row.id">
             <TableCell>
-              <div class="font-medium" :class="{ 'text-blue-600': index < 10 }">{{ row.name }}</div>
+              <div class="font-medium">{{ row.name }}</div>
               <div class="text-sm text-muted-foreground">{{ row.sku }}</div>
             </TableCell>
             <TableCell>

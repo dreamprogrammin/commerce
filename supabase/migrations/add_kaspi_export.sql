@@ -14,7 +14,6 @@ RETURNS TABLE (
   final_price numeric,
   stock_quantity integer,
   export_to_kaspi boolean,
-  views_count integer,
   kaspi_price numeric,
   category_id uuid,
   brand_id uuid
@@ -30,12 +29,11 @@ BEGIN
     p.final_price,
     p.stock_quantity,
     p.export_to_kaspi,
-    COALESCE(p.views_count, 0) as views_count,
     CEIL((p.final_price / 0.87) / 10) * 10 as kaspi_price,
     p.category_id,
     p.brand_id
   FROM products p
-  ORDER BY COALESCE(p.views_count, 0) DESC;
+  ORDER BY p.name;
 END;
 $$;
 
