@@ -3,16 +3,58 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'vue-sonner'
 
 definePageMeta({ layout: 'Admin' })
 
 const supabase = useSupabaseClient()
 
-const { data: products, refresh } = await useAsyncData('kaspi-products', async () => {
-  const { data, error } = await supabase.rpc('get_kaspi_admin_list')
+const selectedCategory = ref<string>('all')
+const selectedBrand = ref<string>('all')
+
+const { data: categories } = await useAsyncData('categories', async () => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name')
+    .order('name')
   if (error) throw error
   return data
+})
+
+const { data: brands } = await useAsyncData('brands', async () => {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('id, name')
+    .order('name')
+  if (error) throw error
+  return data
+})
+
+const { data: allProducts, refresh, error: productsError } = await useAsyncData('kaspi-products', async () => {
+  const { data, error } = await supabase.rpc('get_kaspi_admin_list')
+  if (error) {
+    console.error('RPC Error:', error)
+    throw error
+  }
+  console.log('Products loaded:', data?.length)
+  return data
+})
+
+const products = computed(() => {
+  if (!allProducts.value) return []
+  
+  let filtered = allProducts.value
+  
+  if (selectedCategory.value !== 'all') {
+    filtered = filtered.filter(p => p.category_id === selectedCategory.value)
+  }
+  
+  if (selectedBrand.value !== 'all') {
+    filtered = filtered.filter(p => p.brand_id === selectedBrand.value)
+  }
+  
+  return filtered
 })
 
 async function toggleExport(productId: string, currentValue: boolean) {
@@ -50,6 +92,48 @@ function copyFeedUrl() {
         💡 Топ-10 самых просматриваемых товаров на сайте (рекомендуем к выгрузке)
       </AlertDescription>
     </Alert>
+
+    <Alert v-if="productsError" variant="destructive">
+      <AlertDescription>
+        Ошибка загрузки: {{ productsError.message }}
+      </AlertDescription>
+    </Alert>
+
+    <div v-if="!productsError" class="text-sm text-muted-foreground mb-2">
+      Найдено товаров: {{ products?.length || 0 }}
+    </div>
+
+    <div class="flex gap-4">
+      <div class="flex-1">
+        <label class="text-sm font-medium mb-2 block">Категория</label>
+        <Select v-model="selectedCategory">
+          <SelectTrigger>
+            <SelectValue placeholder="Все категории" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все категории</SelectItem>
+            <SelectItem v-for="cat in categories" :key="cat.id" :value="cat.id">
+              {{ cat.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div class="flex-1">
+        <label class="text-sm font-medium mb-2 block">Бренд</label>
+        <Select v-model="selectedBrand">
+          <SelectTrigger>
+            <SelectValue placeholder="Все бренды" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все бренды</SelectItem>
+            <SelectItem v-for="brand in brands" :key="brand.id" :value="brand.id">
+              {{ brand.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
 
     <div class="border rounded-lg">
       <Table>

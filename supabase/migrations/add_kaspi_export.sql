@@ -2,6 +2,9 @@
 ALTER TABLE products 
 ADD COLUMN IF NOT EXISTS export_to_kaspi boolean DEFAULT false;
 
+-- Удаляем старую версию функции
+DROP FUNCTION IF EXISTS get_kaspi_admin_list();
+
 -- Функция для админки: топ товары с расчетом цены Kaspi
 CREATE OR REPLACE FUNCTION get_kaspi_admin_list()
 RETURNS TABLE (
@@ -12,7 +15,9 @@ RETURNS TABLE (
   stock_quantity integer,
   export_to_kaspi boolean,
   views_count integer,
-  kaspi_price numeric
+  kaspi_price numeric,
+  category_id uuid,
+  brand_id uuid
 ) 
 LANGUAGE plpgsql
 AS $$
@@ -26,7 +31,9 @@ BEGIN
     p.stock_quantity,
     p.export_to_kaspi,
     COALESCE(p.views_count, 0) as views_count,
-    CEIL((p.final_price / 0.87) / 10) * 10 as kaspi_price
+    CEIL((p.final_price / 0.87) / 10) * 10 as kaspi_price,
+    p.category_id,
+    p.brand_id
   FROM products p
   ORDER BY COALESCE(p.views_count, 0) DESC;
 END;
