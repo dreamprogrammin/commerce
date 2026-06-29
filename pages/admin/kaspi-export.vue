@@ -107,7 +107,7 @@ function copyFeedUrl() {
       <div class="flex-1">
         <label class="text-sm font-medium mb-2 block">Категория</label>
         <Select v-model="selectedCategory">
-          <SelectTrigger>
+          <SelectTrigger class="w-full">
             <SelectValue placeholder="Все категории" />
           </SelectTrigger>
           <SelectContent>
@@ -122,7 +122,7 @@ function copyFeedUrl() {
       <div class="flex-1">
         <label class="text-sm font-medium mb-2 block">Бренд</label>
         <Select v-model="selectedBrand">
-          <SelectTrigger>
+          <SelectTrigger class="w-full">
             <SelectValue placeholder="Все бренды" />
           </SelectTrigger>
           <SelectContent>
@@ -161,8 +161,8 @@ function copyFeedUrl() {
             <TableCell class="font-semibold text-orange-600">{{ row.kaspi_price }} ₸</TableCell>
             <TableCell>
               <Switch 
-                :checked="row.export_to_kaspi" 
-                @update:checked="toggleExport(row.id, row.export_to_kaspi)"
+                :model-value="row.export_to_kaspi" 
+                @update:model-value="toggleExport(row.id, row.export_to_kaspi)"
               />
             </TableCell>
           </TableRow>
