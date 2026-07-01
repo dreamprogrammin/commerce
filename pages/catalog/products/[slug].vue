@@ -13,6 +13,7 @@ import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
 import { useFlipCounter } from '@/composables/useFlipCounter'
+import { useSeoAltText } from '@/composables/useSeoAltText'
 import {
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_CATEGORY,
@@ -39,6 +40,7 @@ const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 const { trackViewItem } = useEcommerceTracking()
+const { generateBrandLogoAlt, generateCategoryImageAlt } = useSeoAltText()
 
 const priceValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   .toISOString()
@@ -1021,7 +1023,7 @@ watchEffect(() => {
                       <ProgressiveImage
                         v-if="product.brands?.logo_url"
                         :src="brandLogoUrl"
-                        :alt="brandName || 'Бренд'"
+                        :alt="generateBrandLogoAlt(brandName || 'Бренд')"
                         aspect-ratio="square"
                         object-fit="contain"
                         placeholder-type="shimmer"

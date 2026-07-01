@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useSeoAltText } from '@/composables/useSeoAltText'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -18,6 +19,7 @@ const cartStore = useCartStore()
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { triggerHaptic } = useHaptic()
 const { trackAddToCart } = useEcommerceTracking()
+const { generateProductImageAlt, generateBrandLogoAlt } = useSeoAltText()
 
 // --- DEVICE DETECTION ---
 const isTouchDevice = ref(false)
@@ -107,24 +109,16 @@ function getVariantUrls(index: number) {
  * SEO-оптимизированный alt текст для изображений
  */
 function getImageAlt(index: number): string {
-  const parts = [props.product.name]
+  const totalImages = props.product.product_images?.length || 1
 
-  if (props.product.brands?.name) {
-    parts.unshift(props.product.brands.name)
-  }
-
-  if (props.product.product_line_name) {
-    parts.push(props.product.product_line_name)
-  }
-
-  if (index === 0) {
-    parts.push('купить в Казахстане')
-  }
-  else {
-    parts.push(`фото ${index + 1}`)
-  }
-
-  return parts.join(' ')
+  return generateProductImageAlt({
+    productName: props.product.name,
+    brandName: props.product.brands?.name,
+    lineName: props.product.product_line_name,
+    categoryName: props.product.categories?.name,
+    index,
+    totalImages,
+  })
 }
 
 /**
@@ -437,7 +431,7 @@ const priceDetails = computed(() => {
           >
             <ProgressiveImage
               :src="getBrandLogoUrl()!"
-              :alt="product.brands.name"
+              :alt="generateBrandLogoAlt(product.brands.name)"
               object-fit="contain"
               placeholder-type="shimmer"
               class="w-full h-full p-0.5"

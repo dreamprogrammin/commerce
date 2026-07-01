@@ -137,10 +137,14 @@ useHead({
       : `${siteName} - Интернет-магазин детских игрушек`
   },
   link: () => {
+    // Убираем query параметры для canonical URL (фильтры, utm-метки и т.д.)
+    const canonicalPath = route.path
+    const canonicalUrl = `${siteUrl}${canonicalPath}`
     const currentPath = route.fullPath
     const currentUrl = `${siteUrl}${currentPath}`
 
     return [
+      { rel: 'canonical', href: canonicalUrl },
       { rel: 'alternate', hreflang: 'ru', href: currentUrl },
       { rel: 'alternate', hreflang: 'kk', href: currentUrl },
       { rel: 'alternate', hreflang: 'x-default', href: currentUrl },

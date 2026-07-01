@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Banner } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useSeoAltText } from '@/composables/useSeoAltText'
 import { BUCKET_NAME_BANNERS } from '@/constants'
 
 // 🔥 Используем getCachedData для предотвращения повторных загрузок
@@ -37,6 +38,7 @@ const { data: banners, pending } = useAsyncData(
 const showSkeleton = computed(() => pending.value && (!banners.value || banners.value.length === 0))
 
 const { getVariantUrlWide, getPublicUrl } = useSupabaseStorage()
+const { generateBannerAlt } = useSeoAltText()
 
 function getBannerImageUrl(imageUrl: string | null) {
   if (!imageUrl)
@@ -93,7 +95,7 @@ function getBannerBlurUrl(banner: Banner): string | null {
           <ProgressiveImage
             v-if="banner.image_url"
             :src="getBannerImageUrl(banner.image_url)"
-            :alt="banner.title"
+            :alt="generateBannerAlt(banner.title)"
             aspect-ratio="video"
             object-fit="cover"
             :placeholder-type="getBannerBlurUrl(banner) ? 'lqip' : 'shimmer'"

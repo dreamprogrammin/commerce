@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Brand } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useSeoAltText } from '@/composables/useSeoAltText'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 
@@ -11,6 +12,7 @@ interface Props {
 defineProps<Props>()
 
 const { getVariantUrl } = useSupabaseStorage()
+const { generateBrandLogoAlt } = useSeoAltText()
 const headerContainerClass = carouselContainerVariants({ contained: 'always' })
 
 function getBrandLogoUrl(logoUrl: string | null) {
@@ -150,7 +152,7 @@ onMounted(() => {
                       <ProgressiveImage
                         :src="getBrandLogoUrl(brand.logo_url) || ''"
                         :blur-data-url="brand.blur_placeholder"
-                        :alt="brand.name"
+                        :alt="generateBrandLogoAlt(brand.name)"
                         object-fit="contain"
                         :placeholder-type="brand.blur_placeholder ? 'lqip' : 'shimmer'"
                         class="w-full h-full"

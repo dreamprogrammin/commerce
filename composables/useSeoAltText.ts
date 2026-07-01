@@ -9,6 +9,7 @@ interface ProductAltTextData {
   productName: string
   brandName?: string
   lineName?: string
+  categoryName?: string
   index: number
   totalImages: number
 }
@@ -18,7 +19,7 @@ export function useSeoAltText() {
    * Генерирует SEO-оптимизированный alt текст для изображения товара
    */
   function generateProductImageAlt(data: ProductAltTextData): string {
-    const { productName, brandName, lineName, index, totalImages } = data
+    const { productName, brandName, lineName, categoryName, index, totalImages } = data
     const parts: string[] = []
 
     // 1. Бренд (если есть)
@@ -37,7 +38,12 @@ export function useSeoAltText() {
     // 4. Контекст в зависимости от позиции изображения
     if (index === 0) {
       // Первое фото - самое важное для SEO
-      parts.push('купить в Казахстане')
+      if (categoryName) {
+        parts.push(`купить ${categoryName} в Алматы`)
+      }
+      else {
+        parts.push('купить в Алматы')
+      }
     }
     else if (index === 1 && totalImages > 1) {
       // Второе фото - обычно показывает товар с другого ракурса
@@ -63,7 +69,7 @@ export function useSeoAltText() {
    * Генерирует alt текст для логотипа бренда
    */
   function generateBrandLogoAlt(brandName: string): string {
-    return `Логотип ${brandName}`
+    return `Логотип бренда ${brandName} - официальные игрушки в Казахстане`
   }
 
   /**
@@ -76,9 +82,29 @@ export function useSeoAltText() {
     return `Логотип серии ${lineName}`
   }
 
+  /**
+   * Генерирует alt текст для изображения категории
+   */
+  function generateCategoryImageAlt(categoryName: string): string {
+    return `Купить ${categoryName} в Алматы - интернет-магазин Ухтышка`
+  }
+
+  /**
+   * Генерирует alt текст для баннеров и слайдов
+   */
+  function generateBannerAlt(bannerTitle: string): string {
+    const clean = bannerTitle?.trim() || ''
+    if (!clean) {
+      return 'Акция в интернет-магазине Ухтышка'
+    }
+    return `${clean} - акция в Ухтышка`
+  }
+
   return {
     generateProductImageAlt,
     generateBrandLogoAlt,
     generateLineLogoAlt,
+    generateCategoryImageAlt,
+    generateBannerAlt,
   }
 }
