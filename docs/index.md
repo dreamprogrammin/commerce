@@ -27,6 +27,7 @@
 | **[PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md)** | Полная техническая архитектура проекта  | 73 KB  |
 | **[OVERVIEW.md](./OVERVIEW.md)**                         | Бизнес-обзор и ключевые функции         | 28 KB  |
 | **[../CLAUDE.md](../CLAUDE.md)**                         | Инструкции для Claude AI при разработке | 13 KB  |
+| [CLAUDE_SETUP.md](./CLAUDE_SETUP.md)                     | Плагины и скиллы Claude Code для новой машины | 2 KB   |
 
 ---
 
