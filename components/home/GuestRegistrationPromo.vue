@@ -17,8 +17,16 @@ const showPromo = ref(false)
 // Состояние загрузки
 const isLoading = ref(false)
 
-// Проверяем localStorage - показывали ли промо в этой сессии
-const STORAGE_KEY = 'guest_promo_shown'
+// ⚠️ Раньше промо показывался по чистому таймеру (3с) и блокировал весь экран
+// ещё до того, как пользователь хоть как-то провзаимодействовал со страницей —
+// классический intrusive-interstitial паттерн (см. SEO-аудит, Visual-1).
+// Теперь триггер — первое из: скролл на ~40% высоты экрана ИЛИ 10с пребывания
+// на странице. Плюс localStorage с TTL вместо sessionStorage, чтобы не
+// показывать заново гостю при каждой новой вкладке/сессии в течение недели.
+const STORAGE_KEY = 'guest_promo_last_shown_at'
+const REPEAT_AFTER_MS = 7 * 24 * 60 * 60 * 1000 // 7 дней
+const SCROLL_TRIGGER_RATIO = 0.4
+const DWELL_TRIGGER_MS = 10000
 
 onMounted(() => {
   // ✅ Определяем размер экрана на клиенте
@@ -34,20 +42,39 @@ onMounted(() => {
   if (!isGuest.value)
     return
 
-  // Проверяем, показывали ли уже в этой сессии
-  const wasShown = sessionStorage.getItem(STORAGE_KEY)
-  if (wasShown)
+  // Не показываем повторно, если уже показывали недавно
+  const lastShownAt = Number(localStorage.getItem(STORAGE_KEY) || 0)
+  if (lastShownAt && Date.now() - lastShownAt < REPEAT_AFTER_MS)
     return
 
-  // Показываем с небольшой задержкой для лучшего UX
-  setTimeout(() => {
+  let triggered = false
+  let dwellTimer: ReturnType<typeof setTimeout>
+
+  function trigger() {
+    if (triggered)
+      return
+    triggered = true
     showPromo.value = true
-    sessionStorage.setItem(STORAGE_KEY, 'true')
-  }, 3000) // 3 секунды после загрузки
+    localStorage.setItem(STORAGE_KEY, String(Date.now()))
+    window.removeEventListener('scroll', handleScroll)
+    clearTimeout(dwellTimer)
+  }
+
+  function handleScroll() {
+    const scrolled = window.scrollY
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight
+    if (scrollable > 0 && scrolled / scrollable >= SCROLL_TRIGGER_RATIO)
+      trigger()
+  }
+  window.addEventListener('scroll', handleScroll, { passive: true })
+
+  dwellTimer = setTimeout(trigger, DWELL_TRIGGER_MS)
 
   // Очистка
   onUnmounted(() => {
     window.removeEventListener('resize', handleResize)
+    window.removeEventListener('scroll', handleScroll)
+    clearTimeout(dwellTimer)
   })
 })
 

@@ -164,7 +164,7 @@ watchEffect(() => {
 // ─── 4. Breadcrumbs ─────────────────────────────────────────────────────────
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   const crumbs: IBreadcrumbItem[] = [
-    { id: 'brands', name: 'Бренды', href: '/brand/all' },
+    { id: 'brands', name: 'Бренды', href: '/brands' },
   ]
   if (brand.value) {
     crumbs.push({
@@ -281,7 +281,7 @@ useSeoMeta({
 
 useBreadcrumbSchema(
   computed(() => [
-    { name: 'Бренды', path: '/brand/all' },
+    { name: 'Бренды', path: '/brands' },
     ...(brand.value
       ? [{ name: brand.value.name, path: `/brand/${brand.value.slug}` }]
       : []),
@@ -556,7 +556,7 @@ useRobotsRule({ index: true, follow: true })
         >
           К сожалению, бренд с таким названием не существует или был удален.
         </p>
-        <NuxtLink to="/brand/all">
+        <NuxtLink to="/brands">
           <Button>
             <ArrowLeft class="w-4 h-4 mr-2" />
             Все бренды

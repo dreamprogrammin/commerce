@@ -267,7 +267,7 @@ defineExpose({ closeAllPopups })
                 <NuxtLink
                   v-for="brand in brandSuggestions"
                   :key="brand.id"
-                  :to="`/brand/all?brand=${brand.slug}`"
+                  :to="`/brand/${brand.slug}`"
                   class="flex items-center gap-3 px-3 py-2.5 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg hover:shadow-md transition-all border border-blue-100"
                   @click="isSearchOpen = false"
                 >

@@ -24,7 +24,9 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     const staticPages = [
       { loc: '/', priority: 1.0, changefreq: 'daily' as const, lastmod: new Date().toISOString() },
       { loc: '/catalog', priority: 0.9, changefreq: 'daily' as const, lastmod: new Date().toISOString() },
-      { loc: '/brand/all', priority: 0.7, changefreq: 'weekly' as const, lastmod: new Date().toISOString() },
+      // ❌ '/brand/all' убран: страница возвращает 404 — pages/brand/[slug].vue
+      // не обрабатывает "all" как валидный слаг, а страница со списком всех
+      // брендов живёт на /brands (уже исключена из sitemap в nuxt.config.ts).
     ]
 
     staticPages.forEach((page) => {
@@ -152,11 +154,15 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     }
 
     // --- BRAND LANDING PAGES (?brand=slug) ---
-    // Запрашиваем все уникальные комбинации категория+бренд из товаров
+    // ⚠️ Включаем в sitemap ТОЛЬКО те пары категория+бренд, для которых реально
+    // существует уникальный SEO-контент (category_brand_seo) — именно от него
+    // зависит index/noindex в pages/catalog/[...slug].vue (см. robotsRule).
+    // Раньше здесь брались все комбинации из products, из-за чего в sitemap
+    // попадали noindex-страницы (без уникального SEO-текста) — расхождение
+    // sitemap/индексации, найденное в SEO-аудите.
     const { data: brandLandings, error: brandLandingsError } = await client
-      .from('products')
-      .select('categories!inner(slug, href, parent_id), brands!inner(slug, updated_at)')
-      .eq('is_active', true)
+      .from('category_brand_seo')
+      .select('updated_at, categories!inner(slug, href, parent_id), brands!inner(slug)')
       .not('categories.slug', 'is', null)
       .not('brands.slug', 'is', null)
       .limit(10000)
@@ -183,7 +189,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
         seen.add(key)
         sitemapRoutes.push({
           loc: `${categoryPath}?brand=${brand.slug}`,
-          lastmod: brand.updated_at ?? new Date().toISOString(),
+          lastmod: item.updated_at ?? new Date().toISOString(),
           changefreq: 'weekly',
           priority: 0.65,
         })

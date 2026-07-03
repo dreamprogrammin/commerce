@@ -168,7 +168,7 @@ function getImageUrl(imageUrl: string | null): string | null {
               <NuxtLink
                 v-for="brand in brandSuggestions"
                 :key="brand.id"
-                :to="`/brand/all?brand=${brand.slug}`"
+                :to="`/brand/${brand.slug}`"
                 class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl hover:shadow-md transition-all border border-blue-100"
                 @click="close"
               >

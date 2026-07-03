@@ -607,28 +607,43 @@ const categoryLink = computed(() =>
 )
 
 const schemaAdditionalProperties = computed(() => {
+  const properties: Array<{ '@type': 'PropertyValue', 'name': string, 'value': string }> = []
+
   const pavs = product.value?.product_attribute_values
-  if (!pavs?.length)
-    return []
-  const grouped = new Map<string, string[]>()
-  for (const pav of pavs) {
-    const attrName = pav.attributes?.name
-    if (!attrName)
-      continue
-    const option = pav.attributes?.attribute_options?.find(
-      o => o.id === pav.option_id,
-    )
-    if (!option?.value)
-      continue
-    if (!grouped.has(attrName))
-      grouped.set(attrName, [])
-    grouped.get(attrName)!.push(String(option.value))
+  if (pavs?.length) {
+    const grouped = new Map<string, string[]>()
+    for (const pav of pavs) {
+      const attrName = pav.attributes?.name
+      if (!attrName)
+        continue
+      const option = pav.attributes?.attribute_options?.find(
+        o => o.id === pav.option_id,
+      )
+      if (!option?.value)
+        continue
+      if (!grouped.has(attrName))
+        grouped.set(attrName, [])
+      grouped.get(attrName)!.push(String(option.value))
+    }
+    for (const [name, values] of grouped.entries()) {
+      properties.push({ '@type': 'PropertyValue', 'name': name, 'value': values.join(', ') })
+    }
   }
-  return Array.from(grouped.entries()).map(([name, values]) => ({
-    '@type': 'PropertyValue',
-    'name': name,
-    'value': values.join(', '),
-  }))
+
+  // Бонусные баллы программы лояльности — реальный, не выдуманный сигнал
+  // (см. SEO-аудит, находка S-5): additionalProperty вместо MemberProgram,
+  // т.к. поддержка MemberProgram у Google для нерозничных программ лояльности
+  // всё ещё непоследовательна.
+  const bonusPoints = Number(product.value?.bonus_points_award || 0)
+  if (bonusPoints > 0) {
+    properties.push({
+      '@type': 'PropertyValue',
+      'name': 'bonusPoints',
+      'value': String(bonusPoints),
+    })
+  }
+
+  return properties
 })
 
 const robotsRule = computed(() => {
@@ -675,7 +690,10 @@ useRobotsRule(robotsRule)
 const ogImageUrl = computed(() => {
   if (!product.value?.product_images?.[0]?.image_url)
     return 'https://uhti.kz/og-default.jpg'
-  return `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/${BUCKET_NAME_PRODUCT}/${product.value.product_images[0].image_url}`
+  return (
+    getVariantUrl(BUCKET_NAME_PRODUCT, product.value.product_images[0].image_url, 'lg')
+    || 'https://uhti.kz/og-default.jpg'
+  )
 })
 
 const productImages = computed(() => {
@@ -997,6 +1015,10 @@ watchEffect(() => {
                 >
                   <span>{{ product.name }}</span>
                   <!-- 🔥 ТИКЕТ 3: SEO-хвост для H1 (визуально выглядит как подзаголовок) -->
+                  <!-- {{ ' ' }} — явный пробел-разделитель: Vue схлопывает whitespace-only
+                       переносы строк между тегами, из-за чего текст H1 склеивался в один
+                       "токен" без пробела для краулеров/скринридеров (см. SEO-аудит, SXO-4) -->
+                  {{ ' ' }}
                   <span
                     v-if="audienceText || brandName"
                     class="text-sm font-medium text-muted-foreground/70"

@@ -100,6 +100,8 @@ function getBannerBlurUrl(banner: Banner): string | null {
             object-fit="cover"
             :placeholder-type="getBannerBlurUrl(banner) ? 'lqip' : 'shimmer'"
             :blur-data-url="getBannerBlurUrl(banner)"
+            :eager="index === 0"
+            :fetchpriority="index === 0 ? 'high' : 'auto'"
             class="group-hover:scale-105 transition-transform duration-300"
           />
 

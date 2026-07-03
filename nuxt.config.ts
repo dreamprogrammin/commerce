@@ -134,6 +134,7 @@ export default defineNuxtConfig({
           '/admin',
           '/confirm',
           '/forgot-password',
+          '/login',
           '/order',
           '/profile',
           '/register',
@@ -203,6 +204,26 @@ export default defineNuxtConfig({
 
   nitro: {
     routeRules: {
+      // 🔒 Базовые security-заголовки для всех страниц.
+      // CSP пока в Report-Only режиме — собираем нарушения перед принудительным включением,
+      // т.к. на сайте используются сторонние origin'ы (Supabase Storage, Google Fonts, GTM/GA).
+      '/**': {
+        headers: {
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'SAMEORIGIN',
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+          'Content-Security-Policy-Report-Only': [
+            `default-src 'self'`,
+            `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com`,
+            `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+            `font-src 'self' https://fonts.gstatic.com`,
+            `img-src 'self' data: blob: https://gvsdevsvzgcivpphcuai.supabase.co https://www.google-analytics.com https://www.googletagmanager.com`,
+            `connect-src 'self' https://gvsdevsvzgcivpphcuai.supabase.co https://www.google-analytics.com https://www.googletagmanager.com`,
+            `frame-ancestors 'self'`,
+          ].join('; '),
+        },
+      },
       // ... (keep existing rules)
       '/': { swr: 600 },
       '/catalog': { swr: 1800 },
@@ -324,6 +345,11 @@ export default defineNuxtConfig({
                 return 'vendor-lottie'
               if (id.includes('embla-carousel'))
                 return 'vendor-carousel'
+              // vue-draggable-next используется только в админке
+              // (components/admin/products/ProductForm.vue) — на публичных
+              // страницах (в т.ч. на LCP-критичной главной) не нужен.
+              if (id.includes('vue-draggable-next') || id.includes('sortablejs'))
+                return 'vendor-admin-dnd'
               // Остальное оставляем в общем вендоре или основном чанке
               // чтобы избежать проблем с порядком инициализации core-библиотек
               return 'vendor'

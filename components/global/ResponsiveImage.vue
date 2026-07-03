@@ -159,7 +159,7 @@ const isDev = computed(() => import.meta.env.DEV)
           isLoaded ? 'opacity-100' : 'opacity-0',
           objectFitClass,
         ]"
-        loading="lazy"
+        :loading="eager ? 'eager' : 'lazy'"
         decoding="async"
         :fetchpriority="eager ? 'high' : 'auto'"
         @load="onLoad"
