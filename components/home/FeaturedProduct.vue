@@ -66,12 +66,12 @@ function formatPrice(price: number) {
     <!-- Loading State - только если идёт загрузка И данных нет -->
     <div
       v-if="showSkeleton"
-      class="relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 shadow-sm"
+      class="relative overflow-hidden rounded-xl bg-card border border-border p-3 shadow-sm"
     >
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <Skeleton class="h-8 w-8 rounded-lg" />
+            <Skeleton class="size-8 rounded-lg" />
             <Skeleton class="h-4 w-16" />
           </div>
           <Skeleton class="h-7 w-12 rounded-lg" />
@@ -86,7 +86,7 @@ function formatPrice(price: number) {
     <!-- Products Carousel -->
     <div
       v-else-if="productsList.length > 0"
-      class="relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow duration-300"
+      class="relative overflow-hidden rounded-xl bg-card border border-border shadow-sm hover:shadow-md transition-shadow duration-300"
     >
       <Carousel
         class="w-full"
@@ -112,7 +112,7 @@ function formatPrice(price: number) {
                   </div>
                   <div class="min-w-0 flex-1">
                     <h3
-                      class="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
+                      class="text-sm sm:text-base font-bold text-foreground"
                     >
                       Товар дня
                     </h3>
@@ -121,19 +121,19 @@ function formatPrice(price: number) {
 
                 <!-- Timer -->
                 <div
-                  class="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 rounded-lg px-2 py-1 border border-red-200 dark:border-red-800 flex-shrink-0"
+                  class="flex items-center gap-1 bg-destructive/10 rounded-lg px-2 py-1 border border-destructive/20 flex-shrink-0"
                 >
                   <Icon
                     name="lucide:timer"
-                    class="w-3 h-3 text-red-600 dark:text-red-400"
+                    class="size-3 text-destructive"
                   />
-                  <span class="text-xs font-bold text-red-600 dark:text-red-400">23:59</span>
+                  <span class="text-xs font-bold text-destructive">23:59</span>
                 </div>
               </div>
 
               <!-- Main Content -->
               <div
-                class="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-3"
+                class="flex flex-col gap-2 sm:grid sm:grid-cols-2 sm:gap-3"
               >
                 <!-- Product Image -->
                 <NuxtLink
@@ -141,7 +141,7 @@ function formatPrice(price: number) {
                   class="block group relative"
                 >
                   <div
-                    class="relative w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group-hover:shadow-md transition-all duration-300"
+                    class="relative w-full aspect-square bg-muted rounded-lg overflow-hidden border border-border group-hover:shadow-md transition-all duration-300"
                   >
                     <!-- Badges -->
                     <div class="absolute top-2 left-2 z-10 flex flex-col gap-1">
@@ -182,17 +182,17 @@ function formatPrice(price: number) {
                 </NuxtLink>
 
                 <!-- Product Info -->
-                <div class="flex flex-col space-y-2 min-h-[260px] sm:min-h-0">
-                  <div class="space-y-1.5 flex-1">
+                <div class="flex flex-col gap-2 min-h-[260px] sm:min-h-0">
+                  <div class="flex flex-col gap-1.5 flex-1">
                     <!-- Category -->
                     <div class="h-6">
                       <div
                         v-if="product.categories"
-                        class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-semibold text-gray-700 dark:text-gray-300"
+                        class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-muted rounded text-xs font-semibold text-muted-foreground"
                       >
                         <Icon
                           name="lucide:tag"
-                          class="w-2.5 h-2.5 text-blue-500"
+                          class="size-2.5 text-primary"
                         />
                         {{ product.categories.name }}
                       </div>
@@ -204,25 +204,25 @@ function formatPrice(price: number) {
                       class="block group"
                     >
                       <h4
-                        class="text-sm sm:text-base font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors line-clamp-2 leading-tight mb-2"
+                        class="text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-tight mb-2"
                       >
                         {{ product.name }}
                       </h4>
                     </NuxtLink>
 
                     <!-- Price -->
-                    <div class="space-y-1">
+                    <div class="flex flex-col gap-1">
                       <!-- Old Price -->
                       <div class="h-5 flex items-center">
                         <div
                           v-if="product.discount_percentage > 0"
                           class="flex items-center gap-1"
                         >
-                          <span class="text-xs text-gray-400 line-through">
+                          <span class="text-xs text-muted-foreground line-through">
                             {{ formatPrice(product.price) }}
                           </span>
                           <span
-                            class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1 py-0.5 rounded text-xs font-bold"
+                            class="bg-destructive/10 text-destructive px-1 py-0.5 rounded text-xs font-bold"
                           >
                             -{{ product.discount_percentage }}%
                           </span>
@@ -232,7 +232,7 @@ function formatPrice(price: number) {
                       <!-- Current Price -->
                       <div class="h-8 flex items-center">
                         <span
-                          class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white"
+                          class="text-xl sm:text-2xl font-black text-foreground"
                         >
                           {{
                             formatPrice(product.final_price || product.price)
@@ -242,19 +242,19 @@ function formatPrice(price: number) {
 
                       <!-- Cashback -->
                       <div
-                        class="flex items-center gap-1.5 p-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800 h-9"
+                        class="flex items-center gap-1.5 p-1.5 bg-primary/10 rounded-lg border border-primary/20 h-9"
                       >
                         <div
-                          class="w-6 h-6 bg-blue-500 rounded flex items-center justify-center flex-shrink-0"
+                          class="size-6 bg-primary rounded flex items-center justify-center flex-shrink-0"
                         >
                           <Icon
                             name="lucide:coins"
-                            class="w-3 h-3 text-white"
+                            class="size-3 text-primary-foreground"
                           />
                         </div>
                         <div class="flex-1 min-w-0">
                           <p
-                            class="text-xs font-bold text-blue-600 dark:text-blue-400"
+                            class="text-xs font-bold text-primary"
                           >
                             +{{ product.bonus_points_award }} ₸
                           </p>
@@ -264,7 +264,7 @@ function formatPrice(price: number) {
                   </div>
 
                   <!-- Actions -->
-                  <div class="space-y-1.5">
+                  <div class="flex flex-col gap-1.5">
                     <Button
                       as-child
                       class="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg h-9 text-sm font-bold shadow-sm"
@@ -273,13 +273,13 @@ function formatPrice(price: number) {
                         :to="`/catalog/products/${product.slug}`"
                         class="flex items-center justify-center gap-1"
                       >
-                        <Icon name="lucide:shopping-cart" class="w-3.5 h-3.5" />
+                        <Icon name="lucide:shopping-cart" class="size-3.5" />
                         Купить
                       </NuxtLink>
                     </Button>
                     <div class="grid grid-cols-2 gap-1.5">
                       <div
-                        class="border border-gray-300 dark:border-gray-700 rounded-lg h-9 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        class="border border-border rounded-lg h-9 flex items-center justify-center hover:bg-accent transition-colors"
                       >
                         <ProductWishlistButton
                           :product-id="product.id"
@@ -295,7 +295,7 @@ function formatPrice(price: number) {
                           :to="`/catalog/products/${product.slug}`"
                           class="flex items-center justify-center gap-1"
                         >
-                          <Icon name="lucide:info" class="w-3 h-3" />
+                          <Icon name="lucide:info" class="size-3" />
                           <span class="hidden sm:inline">Еще</span>
                         </NuxtLink>
                       </Button>
@@ -320,7 +320,7 @@ function formatPrice(price: number) {
               :class="
                 currentSlide === index
                   ? 'w-5 bg-primary'
-                  : 'w-1 bg-gray-300 dark:bg-gray-600'
+                  : 'w-1 bg-border'
               "
               @click="emblaApi?.scrollTo(index)"
             />
@@ -332,21 +332,21 @@ function formatPrice(price: number) {
     <!-- Empty State -->
     <div
       v-else
-      class="relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 border-2 border-dashed border-gray-300 dark:border-gray-700 p-6"
+      class="relative overflow-hidden rounded-xl bg-card border-2 border-dashed border-border p-6"
     >
       <div
-        class="flex flex-col items-center justify-center text-center space-y-2"
+        class="flex flex-col items-center justify-center text-center gap-2"
       >
         <div
-          class="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center"
+          class="size-12 bg-muted rounded-lg flex items-center justify-center"
         >
-          <Icon name="lucide:gift" class="w-6 h-6 text-gray-400" />
+          <Icon name="lucide:gift" class="size-6 text-muted-foreground" />
         </div>
         <div>
-          <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+          <h3 class="text-sm font-bold text-foreground mb-1">
             Готовим предложение
           </h3>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
+          <p class="text-xs text-muted-foreground">
             Скоро появится товар с выгодой
           </p>
         </div>

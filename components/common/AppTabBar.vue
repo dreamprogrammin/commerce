@@ -211,17 +211,17 @@ defineExpose({ closeAllPopups })
         </button>
       </PopoverTrigger>
       <PopoverContent
-        class="p-0 min-w-screen rounded-2xl border border-gray-200 shadow-2xl overflow-hidden bg-white"
+        class="p-0 min-w-screen rounded-2xl border border-border shadow-2xl overflow-hidden bg-popover"
         align="start"
       >
         <div :class="`w-full ${containerClass}`">
           <!-- Поле поиска -->
-          <div class="relative p-6 pb-4 border-b border-gray-100">
+          <div class="relative p-6 pb-4 border-b border-border">
             <Input
               v-model="searchQuery"
               type="text"
               placeholder="Поиск игрушек..."
-              class="pl-12 h-12 text-base rounded-xl border-2 border-gray-200 bg-white focus:border-blue-500 transition-all duration-200 placeholder:text-gray-400"
+              class="pl-12 h-12 text-base rounded-xl border-2 bg-background focus:border-primary transition-all duration-200"
               autofocus
               @keydown.enter="handleSearch"
               @keydown.esc="isSearchOpen = false"
@@ -229,24 +229,24 @@ defineExpose({ closeAllPopups })
             <span
               class="absolute start-6 top-6 inset-y-0 flex items-center justify-center px-2"
             >
-              <Icon name="lucide:search" class="size-5 text-gray-400" />
+              <Icon name="lucide:search" class="size-5 text-muted-foreground" />
             </span>
 
             <!-- Кнопка очистки -->
             <button
               v-if="hasQuery"
               type="button"
-              class="absolute right-6 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100"
+              class="absolute right-6 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-accent"
               @click="searchQuery = ''"
             >
-              <Icon name="lucide:x" class="w-4 h-4" />
+              <Icon name="lucide:x" class="size-4" />
             </button>
           </div>
 
           <!-- Индикатор загрузки -->
           <div v-if="isSearching" class="p-8 flex justify-center">
-            <div class="flex items-center gap-3 text-blue-500">
-              <Icon name="lucide:loader-2" class="w-5 h-5 animate-spin" />
+            <div class="flex items-center gap-3 text-primary">
+              <Icon name="lucide:loader-2" class="size-5 animate-spin" />
               <span class="text-sm font-medium">Поиск...</span>
             </div>
           </div>
@@ -254,12 +254,12 @@ defineExpose({ closeAllPopups })
           <!-- Результаты поиска -->
           <div
             v-else-if="hasResults || brandSuggestions.length > 0"
-            class="max-h-[60vh] overflow-y-auto p-4 space-y-4"
+            class="max-h-[60vh] overflow-y-auto p-4 flex flex-col gap-4"
           >
             <!-- Бренды -->
-            <div v-if="brandSuggestions.length > 0" class="space-y-2">
+            <div v-if="brandSuggestions.length > 0" class="flex flex-col gap-2">
               <h3
-                class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2"
+                class="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2"
               >
                 Бренды
               </h3>
@@ -268,14 +268,14 @@ defineExpose({ closeAllPopups })
                   v-for="brand in brandSuggestions"
                   :key="brand.id"
                   :to="`/brand/${brand.slug}`"
-                  class="flex items-center gap-3 px-3 py-2.5 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg hover:shadow-md transition-all border border-blue-100"
+                  class="flex items-center gap-3 px-3 py-2.5 bg-accent rounded-lg hover:shadow-md transition-all border border-border"
                   @click="isSearchOpen = false"
                 >
                   <Icon
                     name="lucide:tag"
-                    class="w-4 h-4 text-blue-600 shrink-0"
+                    class="size-4 text-primary shrink-0"
                   />
-                  <span class="text-sm font-medium text-gray-900 truncate">
+                  <span class="text-sm font-medium text-foreground truncate">
                     {{ brand.name }}
                   </span>
                 </NuxtLink>
@@ -283,16 +283,16 @@ defineExpose({ closeAllPopups })
             </div>
 
             <!-- Товары -->
-            <div v-if="hasResults" class="space-y-2">
+            <div v-if="hasResults" class="flex flex-col gap-2">
               <div class="flex items-center justify-between px-2">
                 <h3
-                  class="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                  class="text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                 >
                   Товары · {{ searchResults.length }}
                 </h3>
                 <button
                   type="button"
-                  class="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  class="text-sm text-primary hover:text-primary/80 font-medium"
                   @click="handleSearch"
                 >
                   Показать все
@@ -304,12 +304,12 @@ defineExpose({ closeAllPopups })
                   v-for="product in searchResults.slice(0, 6)"
                   :key="product.id"
                   :to="`/catalog/products/${product.slug}`"
-                  class="group flex flex-col gap-2 p-3 bg-white rounded-xl hover:shadow-lg transition-all duration-200 border border-gray-100 hover:border-blue-200"
+                  class="group flex flex-col gap-2 p-3 bg-card rounded-xl hover:shadow-lg transition-all duration-200 border border-border hover:border-primary/40"
                   @click="isSearchOpen = false"
                 >
                   <!-- Изображение товара -->
                   <div
-                    class="aspect-square rounded-lg overflow-hidden bg-gray-50"
+                    class="aspect-square rounded-lg overflow-hidden bg-muted"
                   >
                     <ProgressiveImage
                       v-if="product.product_images[0]?.image_url"
@@ -334,7 +334,7 @@ defineExpose({ closeAllPopups })
                     >
                       <Icon
                         name="lucide:package"
-                        class="w-8 h-8 text-gray-300"
+                        class="size-8 text-muted-foreground/60"
                       />
                     </div>
                   </div>
@@ -342,7 +342,7 @@ defineExpose({ closeAllPopups })
                   <!-- Информация о товаре -->
                   <div class="flex-1 flex flex-col gap-1">
                     <h4
-                      class="text-sm font-medium text-gray-900 line-clamp-2 leading-tight"
+                      class="text-sm font-medium text-foreground line-clamp-2 leading-tight"
                     >
                       {{ product.name }}
                     </h4>
@@ -356,8 +356,8 @@ defineExpose({ closeAllPopups })
                             product.discount_percentage,
                             product.final_price,
                           ).hasDiscount
-                            ? 'text-red-600'
-                            : 'text-gray-900'
+                            ? 'text-destructive'
+                            : 'text-foreground'
                         "
                       >
                         {{
@@ -378,7 +378,7 @@ defineExpose({ closeAllPopups })
                             product.final_price,
                           ).hasDiscount
                         "
-                        class="text-xs text-gray-400 line-through"
+                        class="text-xs text-muted-foreground line-through"
                       >
                         {{
                           formatPrice(
@@ -395,10 +395,10 @@ defineExpose({ closeAllPopups })
                       v-if="product.stock_quantity > 0"
                       class="flex items-center gap-1 text-xs text-green-600"
                     >
-                      <Icon name="lucide:check-circle" class="w-3 h-3" />
+                      <Icon name="lucide:check-circle" class="size-3" />
                       <span>В наличии</span>
                     </div>
-                    <div v-else class="text-xs text-gray-400">
+                    <div v-else class="text-xs text-muted-foreground">
                       Нет в наличии
                     </div>
                   </div>
@@ -411,12 +411,12 @@ defineExpose({ closeAllPopups })
           <div v-else-if="hasQuery && !isSearching" class="p-8 text-center">
             <Icon
               name="lucide:search-x"
-              class="w-16 h-16 mx-auto text-gray-300 mb-4"
+              class="size-16 mx-auto text-muted-foreground/50 mb-4"
             />
-            <h3 class="text-lg font-semibold text-gray-700 mb-2">
+            <h3 class="text-lg font-semibold text-foreground mb-2">
               Ничего не найдено
             </h3>
-            <p class="text-sm text-gray-500 mb-4">
+            <p class="text-sm text-muted-foreground mb-4">
               Попробуйте изменить поисковый запрос
             </p>
             <Button variant="outline" size="sm" @click="searchQuery = ''">
@@ -425,38 +425,38 @@ defineExpose({ closeAllPopups })
           </div>
 
           <!-- Подсказки и история -->
-          <div v-else class="max-h-[60vh] overflow-y-auto p-4 space-y-4">
+          <div v-else class="max-h-[60vh] overflow-y-auto p-4 flex flex-col gap-4">
             <div v-if="suggestions.length > 0">
               <div class="flex items-center justify-between px-2 mb-3">
                 <h3
-                  class="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                  class="text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                 >
                   {{ hasQuery ? "Из истории" : "Недавние запросы" }}
                 </h3>
                 <button
                   v-if="suggestions.some((s) => s.type === 'history')"
                   type="button"
-                  class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  class="text-xs text-primary hover:text-primary/80 font-medium"
                   @click="clearSearchHistory"
                 >
                   Очистить
                 </button>
               </div>
 
-              <div class="space-y-1">
+              <div class="flex flex-col gap-1">
                 <button
                   v-for="(item, index) in suggestions"
                   :key="index"
                   type="button"
-                  class="w-full flex items-center gap-3 px-4 py-3 text-base rounded-lg hover:bg-blue-50 active:bg-blue-100 transition-all duration-200 text-left group"
+                  class="w-full flex items-center gap-3 px-4 py-3 text-base rounded-lg hover:bg-accent active:bg-accent/80 transition-all duration-200 text-left group"
                   @click="handleSelectSuggestion(item.text)"
                 >
                   <div
-                    class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
+                    class="size-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
                     :class="
                       item.type === 'history'
-                        ? 'bg-gray-100 group-hover:bg-blue-100'
-                        : 'bg-blue-50 group-hover:bg-blue-100'
+                        ? 'bg-muted group-hover:bg-accent'
+                        : 'bg-accent group-hover:bg-accent/80'
                     "
                   >
                     <Icon
@@ -465,28 +465,28 @@ defineExpose({ closeAllPopups })
                           ? 'lucide:history'
                           : 'lucide:trending-up'
                       "
-                      class="w-4 h-4 transition-colors"
+                      class="size-4 transition-colors"
                       :class="
                         item.type === 'history'
-                          ? 'text-gray-600 group-hover:text-blue-600'
-                          : 'text-blue-500'
+                          ? 'text-muted-foreground group-hover:text-primary'
+                          : 'text-primary'
                       "
                     />
                   </div>
                   <span
-                    class="flex-1 truncate text-gray-700 group-hover:text-gray-900 font-medium"
+                    class="flex-1 truncate text-muted-foreground group-hover:text-foreground font-medium"
                   >
                     {{ item.text }}
                   </span>
                   <button
                     v-if="item.type === 'history'"
                     type="button"
-                    class="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 transition-all"
+                    class="size-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
                     @click="handleRemoveHistory(item.text, $event)"
                   >
                     <Icon
                       name="lucide:x"
-                      class="w-4 h-4 text-gray-400 hover:text-red-600"
+                      class="size-4 text-muted-foreground hover:text-destructive"
                     />
                   </button>
                 </button>
@@ -539,7 +539,7 @@ defineExpose({ closeAllPopups })
 
               <NavigationMenuContent>
                 <div
-                  class="min-w-screen h-[45vh] bg-white dark:bg-gray-900 overflow-y-auto"
+                  class="min-w-screen h-[45vh] bg-popover overflow-y-auto"
                 >
                   <ul
                     :class="containerClass"
@@ -548,16 +548,16 @@ defineExpose({ closeAllPopups })
                     <li
                       v-for="childItem in rootItem.children"
                       :key="childItem.id"
-                      class="space-y-3"
+                      class="flex flex-col gap-3"
                     >
                       <NuxtLink
                         :to="childItem.href"
-                        class="group block select-none rounded-xl p-4 leading-none no-underline outline-none transition-all duration-200 hover:shadow-lg border border-gray-200 dark:border-gray-800 hover:border-blue-400 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        class="group block select-none rounded-xl p-4 leading-none no-underline outline-none transition-all duration-200 hover:shadow-lg border border-border hover:border-primary/50 bg-popover hover:bg-accent"
                         @click="handleLinkClick"
                       >
                         <div
                           v-if="childItem.image_url"
-                          class="mb-3 overflow-hidden dark:border-gray-800 dark:bg-gray-800 rounded-lg aspect-square w-16"
+                          class="mb-3 overflow-hidden bg-muted rounded-lg aspect-square w-16"
                         >
                           <ProgressiveImage
                             :src="getCategoryImageUrl(childItem.image_url)"
@@ -573,7 +573,7 @@ defineExpose({ closeAllPopups })
                           />
                         </div>
                         <div
-                          class="text-sm font-bold leading-tight text-gray-900 dark:text-gray-100 mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                          class="text-sm font-bold leading-tight text-foreground mb-1.5 group-hover:text-primary transition-colors"
                         >
                           {{ childItem.name }}
                         </div>
@@ -582,7 +582,7 @@ defineExpose({ closeAllPopups })
                         v-if="
                           childItem.children && childItem.children.length > 0
                         "
-                        class="ml-2 space-y-1 list-none"
+                        class="ml-2 flex flex-col gap-1 list-none"
                       >
                         <li
                           v-for="grandChildItem in childItem.children"
@@ -590,7 +590,7 @@ defineExpose({ closeAllPopups })
                         >
                           <NuxtLink
                             :to="grandChildItem.href"
-                            class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                            class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-muted-foreground hover:text-foreground"
                             @click="handleLinkClick"
                           >
                             {{ grandChildItem.name }}
@@ -611,13 +611,13 @@ defineExpose({ closeAllPopups })
                           v-if="
                             childItem.children && childItem.children.length > 0
                           "
-                          class="border-t border-gray-100 dark:border-gray-800 my-1"
+                          class="border-t border-border my-1"
                         />
-                        <ul class="space-y-1 list-none">
+                        <ul class="flex flex-col gap-1 list-none">
                           <li v-for="brand in childItem.brands" :key="brand.id">
                             <NuxtLink
                               :to="`${childItem.href}?brand=${brand.slug}`"
-                              class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                              class="block select-none py-1 px-3 text-sm leading-snug no-underline outline-none transition-colors duration-200 text-muted-foreground hover:text-foreground"
                               @click="handleLinkClick"
                             >
                               {{ rootItem.name }} {{ brand.name }}
@@ -630,12 +630,12 @@ defineExpose({ closeAllPopups })
                           categoriesStore.brandsLoading
                             && !childItem.brandsLoaded
                         "
-                        class="ml-2 mt-2 space-y-2 px-3"
+                        class="ml-2 mt-2 flex flex-col gap-2 px-3"
                       >
                         <div
                           v-for="n in 3"
                           :key="n"
-                          class="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                          class="h-3 w-24 bg-muted rounded animate-pulse"
                         />
                       </div>
                     </li>
@@ -649,15 +649,15 @@ defineExpose({ closeAllPopups })
                   >
                     <div class="inline-flex flex-col items-center gap-3">
                       <div
-                        class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center"
+                        class="size-16 bg-muted rounded-xl flex items-center justify-center"
                       >
                         <Icon
                           name="lucide:package-open"
-                          class="w-8 h-8 text-gray-400"
+                          class="size-8 text-muted-foreground"
                         />
                       </div>
                       <p
-                        class="text-sm text-gray-500 dark:text-gray-400 font-medium"
+                        class="text-sm text-muted-foreground font-medium"
                       >
                         Скоро здесь появятся подкатегории
                       </p>
@@ -668,10 +668,10 @@ defineExpose({ closeAllPopups })
                     class="py-20 text-center"
                   >
                     <div
-                      class="inline-flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 font-medium"
+                      class="inline-flex items-center gap-3 text-sm text-muted-foreground font-medium"
                     >
                       <div
-                        class="h-5 w-5 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500"
+                        class="size-5 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
                       />
                       Загрузка категорий
                     </div>

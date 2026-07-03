@@ -58,7 +58,7 @@ export default defineNuxtConfig({
   // @nuxt/icon — оптимизируем иконки
   icon: {
     serverBundle: {
-      collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat'],
+      collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat', 'line-md', 'simple-icons', 'gravity-ui', 'mdi', 'logos', 'ic', 'solar'],
     },
     clientBundle: {
       scan: true,

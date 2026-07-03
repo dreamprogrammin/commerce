@@ -105,31 +105,31 @@ function getImageUrl(imageUrl: string | null): string | null {
   <Sheet :open="isOpen" @update:open="emit('update:isOpen', $event)">
     <SheetContent
       side="top"
-      class="h-[100dvh] p-0 flex flex-col border-0 bg-white"
+      class="h-[100dvh] p-0 flex flex-col border-0 bg-background"
     >
       <!-- Header -->
-      <div class="flex-shrink-0 p-4 bg-white border-b sticky top-0 z-10">
+      <div class="flex-shrink-0 p-4 bg-background border-b sticky top-0 z-10">
         <div class="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
-            class="rounded-full h-10 w-10 shrink-0 hover:bg-gray-100 transition-colors"
+            class="rounded-full size-10 shrink-0 hover:bg-accent transition-colors"
             @click="close"
           >
-            <Icon name="lucide:arrow-left" class="w-5 h-5" />
+            <Icon name="lucide:arrow-left" class="size-5" />
           </Button>
 
           <div class="flex-1 relative">
             <Icon
               name="lucide:search"
-              class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500/60 pointer-events-none z-10"
+              class="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-primary/60 pointer-events-none z-10"
             />
             <Input
               ref="searchInput"
               v-model="searchQuery"
               type="search"
               placeholder="Поиск игрушек..."
-              class="h-11 pl-11 pr-4 text-base bg-blue-500/5 border-blue-500/20 focus-visible:bg-blue-500/10 focus-visible:border-blue-500/30 focus-visible:ring-blue-500/20 rounded-xl transition-colors"
+              class="h-11 pl-11 pr-4 text-base bg-primary/5 border-primary/20 focus-visible:bg-primary/10 focus-visible:border-primary/30 focus-visible:ring-primary/20 rounded-xl transition-colors"
               @keydown.enter="handleSearch"
               @keydown.esc="close"
             />
@@ -138,52 +138,52 @@ function getImageUrl(imageUrl: string | null): string | null {
             <button
               v-if="hasQuery"
               type="button"
-              class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+              class="absolute right-3 top-1/2 -translate-y-1/2 size-5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
               @click="searchQuery = ''"
             >
-              <Icon name="lucide:x" class="w-4 h-4" />
+              <Icon name="lucide:x" class="size-4" />
             </button>
           </div>
         </div>
       </div>
 
       <!-- Content -->
-      <div class="flex-1 overflow-y-auto bg-gray-50/50">
+      <div class="flex-1 overflow-y-auto bg-muted/50">
         <!-- Индикатор загрузки -->
         <div v-if="isSearching" class="p-8 flex justify-center">
-          <div class="flex items-center gap-3 text-blue-500">
-            <Icon name="lucide:loader-2" class="w-5 h-5 animate-spin" />
+          <div class="flex items-center gap-3 text-primary">
+            <Icon name="lucide:loader-2" class="size-5 animate-spin" />
             <span class="text-sm font-medium">Поиск...</span>
           </div>
         </div>
 
         <!-- Результаты поиска -->
-        <div v-else-if="hasResults || brandSuggestions.length > 0" class="p-4 space-y-4">
+        <div v-else-if="hasResults || brandSuggestions.length > 0" class="p-4 flex flex-col gap-4">
           <!-- Бренды -->
           <div v-if="brandSuggestions.length > 0" class="mb-4">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 mb-2">
+            <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 mb-2">
               Бренды
             </h3>
-            <div class="space-y-1">
+            <div class="flex flex-col gap-1">
               <NuxtLink
                 v-for="brand in brandSuggestions"
                 :key="brand.id"
                 :to="`/brand/${brand.slug}`"
-                class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl hover:shadow-md transition-all border border-blue-100"
+                class="flex items-center gap-3 px-4 py-3 bg-accent rounded-xl hover:shadow-md transition-all border border-border"
                 @click="close"
               >
-                <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
-                  <Icon name="lucide:tag" class="w-5 h-5 text-blue-600" />
+                <div class="size-10 rounded-full bg-background flex items-center justify-center shrink-0 shadow-sm">
+                  <Icon name="lucide:tag" class="size-5 text-primary" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-gray-900">
+                  <p class="text-sm font-semibold text-foreground">
                     {{ brand.name }}
                   </p>
-                  <p class="text-xs text-gray-500">
+                  <p class="text-xs text-muted-foreground">
                     Все товары бренда
                   </p>
                 </div>
-                <Icon name="lucide:chevron-right" class="w-5 h-5 text-gray-400" />
+                <Icon name="lucide:chevron-right" class="size-5 text-muted-foreground" />
               </NuxtLink>
             </div>
           </div>
@@ -191,12 +191,12 @@ function getImageUrl(imageUrl: string | null): string | null {
           <!-- Товары -->
           <div v-if="hasResults">
             <div class="flex items-center justify-between px-2 mb-3">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Товары · {{ searchResults.length }}
               </h3>
               <button
                 type="button"
-                class="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                class="text-sm text-primary hover:text-primary/80 font-medium"
                 @click="handleSearch"
               >
                 Показать все
@@ -207,11 +207,11 @@ function getImageUrl(imageUrl: string | null): string | null {
               v-for="product in searchResults"
               :key="product.id"
               :to="`/catalog/products/${product.slug}`"
-              class="w-full flex items-center gap-4 p-3 bg-white rounded-xl hover:shadow-md transition-all duration-200 text-left border border-transparent hover:border-blue-100"
+              class="w-full flex items-center gap-4 p-3 bg-card rounded-xl hover:shadow-md transition-all duration-200 text-left border border-transparent hover:border-primary/30"
               @click="close"
             >
               <!-- Изображение товара -->
-              <div class="w-16 h-16 rounded-lg overflow-hidden shrink-0">
+              <div class="size-16 rounded-lg overflow-hidden shrink-0">
                 <ProgressiveImage
                   v-if="product.product_images[0]?.image_url"
                   :src="getImageUrl(product.product_images[0].image_url)"
@@ -224,41 +224,41 @@ function getImageUrl(imageUrl: string | null): string | null {
                   :file-path="product.product_images[0].image_url"
                   eager
                 />
-                <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
-                  <Icon name="lucide:package" class="w-6 h-6 text-gray-300" />
+                <div v-else class="w-full h-full flex items-center justify-center bg-muted">
+                  <Icon name="lucide:package" class="size-6 text-muted-foreground/60" />
                 </div>
               </div>
 
               <!-- Информация о товаре -->
               <div class="flex-1 min-w-0">
-                <h4 class="text-sm font-medium text-gray-900 line-clamp-1 mb-1">
+                <h4 class="text-sm font-medium text-foreground line-clamp-1 mb-1">
                   {{ product.name }}
                 </h4>
 
                 <div class="flex items-center gap-2">
                   <span
                     class="text-base font-bold"
-                    :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-red-600' : 'text-gray-900'"
+                    :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-destructive' : 'text-foreground'"
                   >
                     {{ formatPrice(product.price, product.discount_percentage).final }} ₸
                   </span>
 
                   <span
                     v-if="formatPrice(product.price, product.discount_percentage).hasDiscount"
-                    class="text-xs text-gray-400 line-through"
+                    class="text-xs text-muted-foreground line-through"
                   >
                     {{ formatPrice(product.price, product.discount_percentage).original }} ₸
                   </span>
 
                   <span
                     v-if="formatPrice(product.price, product.discount_percentage).hasDiscount"
-                    class="text-xs font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded"
+                    class="text-xs font-semibold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded"
                   >
                     -{{ product.discount_percentage }}%
                   </span>
                 </div>
 
-                <p v-if="product.brands" class="text-xs text-gray-500 mt-0.5">
+                <p v-if="product.brands" class="text-xs text-muted-foreground mt-0.5">
                   {{ product.brands.name }}
                 </p>
               </div>
@@ -269,12 +269,12 @@ function getImageUrl(imageUrl: string | null): string | null {
                   v-if="product.stock_quantity > 0"
                   class="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full"
                 >
-                  <Icon name="lucide:check-circle" class="w-3 h-3" />
+                  <Icon name="lucide:check-circle" class="size-3" />
                   <span class="font-medium">В наличии</span>
                 </div>
                 <div
                   v-else
-                  class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full"
+                  class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full"
                 >
                   Нет в наличии
                 </div>
@@ -285,11 +285,11 @@ function getImageUrl(imageUrl: string | null): string | null {
 
         <!-- Нет результатов -->
         <div v-else-if="hasQuery && !isSearching" class="p-8 text-center">
-          <Icon name="lucide:search-x" class="w-16 h-16 mx-auto text-gray-300 mb-4" />
-          <h3 class="text-lg font-semibold text-gray-700 mb-2">
+          <Icon name="lucide:search-x" class="size-16 mx-auto text-muted-foreground/50 mb-4" />
+          <h3 class="text-lg font-semibold text-foreground mb-2">
             Ничего не найдено
           </h3>
-          <p class="text-sm text-gray-500 mb-4">
+          <p class="text-sm text-muted-foreground mb-4">
             Попробуйте изменить поисковый запрос
           </p>
           <Button
@@ -305,52 +305,52 @@ function getImageUrl(imageUrl: string | null): string | null {
         <div v-else class="p-3">
           <div v-if="suggestions.length > 0" class="mb-6">
             <div class="flex items-center justify-between px-2 mb-3">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 {{ hasQuery ? 'Из истории' : 'Недавние запросы' }}
               </h3>
               <button
                 v-if="suggestions.some(s => s.type === 'history')"
                 type="button"
-                class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                class="text-xs text-primary hover:text-primary/80 font-medium"
                 @click="clearSearchHistory"
               >
                 Очистить
               </button>
             </div>
 
-            <div class="space-y-1">
+            <div class="flex flex-col gap-1">
               <button
                 v-for="(item, index) in suggestions"
                 :key="index"
                 type="button"
-                class="w-full flex items-center gap-4 px-4 py-3.5 text-base rounded-xl hover:bg-blue-50/80 active:bg-blue-100/80 transition-all duration-200 text-left group"
+                class="w-full flex items-center gap-4 px-4 py-3.5 text-base rounded-xl hover:bg-primary/10 active:bg-primary/15 transition-all duration-200 text-left group"
                 @click="handleSelectSuggestion(item.text)"
               >
                 <div
-                  class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors"
-                  :class="item.type === 'history' ? 'bg-gray-100 group-hover:bg-blue-100/80' : 'bg-blue-50/80 group-hover:bg-blue-100/80'"
+                  class="size-9 rounded-full flex items-center justify-center shrink-0 transition-colors"
+                  :class="item.type === 'history' ? 'bg-muted group-hover:bg-primary/15' : 'bg-primary/10 group-hover:bg-primary/15'"
                 >
                   <Icon
                     :name="item.type === 'history' ? 'lucide:history' : 'lucide:trending-up'"
-                    class="w-5 h-5 transition-colors"
-                    :class="item.type === 'history' ? 'text-gray-600 group-hover:text-blue-600' : 'text-blue-500'"
+                    class="size-5 transition-colors"
+                    :class="item.type === 'history' ? 'text-muted-foreground group-hover:text-primary' : 'text-primary'"
                   />
                 </div>
-                <span class="flex-1 truncate text-gray-700 group-hover:text-gray-900 font-medium">
+                <span class="flex-1 truncate text-muted-foreground group-hover:text-foreground font-medium">
                   {{ item.text }}
                 </span>
                 <button
                   v-if="item.type === 'history'"
                   type="button"
-                  class="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 transition-all"
+                  class="size-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
                   @click="handleRemoveHistory(item.text, $event)"
                 >
-                  <Icon name="lucide:x" class="w-4 h-4 text-gray-400 hover:text-red-600" />
+                  <Icon name="lucide:x" class="size-4 text-muted-foreground hover:text-destructive" />
                 </button>
                 <Icon
                   v-else
                   name="lucide:arrow-up-left"
-                  class="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                 />
               </button>
             </div>
