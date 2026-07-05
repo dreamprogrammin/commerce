@@ -19,7 +19,6 @@ import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 const LazyBanners = defineAsyncComponent(() => import('@/components/home/Banners.vue'))
 const LazyBonusCard = defineAsyncComponent(() => import('@/components/home/BonusProgramCard.vue'))
 const LazyFeaturedProduct = defineAsyncComponent(() => import('@/components/home/FeaturedProduct.vue'))
-const LazyGuestPromo = defineAsyncComponent(() => import('@/components/home/GuestRegistrationPromo.vue'))
 const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
 
 // Detect mobile for conditional loading — useMediaQuery кешируется, не дёргает DOM при рендере
@@ -626,13 +625,5 @@ useRobotsRule({ index: true, follow: true })
       </div>
     </div>
 
-    <!--
-      ✅ Промо регистрации
-      ИСПРАВЛЕНО: убрана ClientOnly-обёртка.
-      Компонент рендерится на SSR → гидрируется при входе во вьюпорт.
-      Если компонент использует auth-данные внутри, он обработает это сам
-      через onMounted или watch после гидрации.
-    -->
-    <LazyGuestPromo />
   </div>
 </template>
