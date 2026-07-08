@@ -222,6 +222,12 @@ function handleRemove(itemToRemove: EditableCategory) {
         Управление Категориями
       </h1>
       <div class="flex gap-2">
+        <Button variant="outline" as-child>
+          <NuxtLink to="/admin/categories/gallery">
+            <Icon name="lucide:images" class="w-4 h-4 mr-2" />
+            Галерея для Figma
+          </NuxtLink>
+        </Button>
         <Button
           variant="outline"
           :disabled="isGeneratingAll"
