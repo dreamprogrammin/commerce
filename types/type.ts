@@ -456,6 +456,8 @@ export interface BaseProduct {
   // ⭐ Рейтинги и отзывы для Social Proof
   avg_rating?: number | null
   review_count?: number | null
+  // 🆕 Бейдж «Новинка» — колонка products.is_new (ещё не выбирается во всех запросах каталога)
+  is_new?: boolean | null
 }
 
 export interface SimpleAttributeOption {

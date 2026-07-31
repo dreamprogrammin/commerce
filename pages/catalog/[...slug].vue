@@ -14,7 +14,15 @@ import type {
 } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
 import { watchDebounced } from '@vueuse/core'
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
@@ -28,35 +36,36 @@ import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestion
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
-// DynamicFilters: 28KB + DynamicFiltersMobile: 30KB — основные виновники
+// DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
 // Script Evaluation 1459ms на мобилке. Грузим только когда нужны.
-const DynamicFilters = defineAsyncComponent(() =>
-  import('@/components/global/DynamicFilters.vue'),
+const DynamicFilters = defineAsyncComponent(
+  () => import('@/components/global/DynamicFilters.vue'),
 )
-const DynamicFiltersMobile = defineAsyncComponent(() =>
-  import('@/components/global/DynamicFiltersMobile.vue'),
+const MobileCatalogDrawer = defineAsyncComponent(
+  () => import('@/components/category/MobileCatalogDrawer.vue'),
 )
 
 // Некритичные компоненты — грузим после первого рендера
-const CategoryBrands = defineAsyncComponent(() =>
-  import('@/components/category/CategoryBrands.vue'),
+const CategoryBrands = defineAsyncComponent(
+  () => import('@/components/category/CategoryBrands.vue'),
 )
-const CategoryProductLines = defineAsyncComponent(() =>
-  import('@/components/category/CategoryProductLines.vue'),
+const CategoryProductLines = defineAsyncComponent(
+  () => import('@/components/category/CategoryProductLines.vue'),
 )
-const CategoryQuestions = defineAsyncComponent(() =>
-  import('@/components/category/CategoryQuestions.vue'),
+const CategoryQuestions = defineAsyncComponent(
+  () => import('@/components/category/CategoryQuestions.vue'),
 )
-const CategoryRatingBlock = defineAsyncComponent(() =>
-  import('@/components/category/CategoryRatingBlock.vue'),
+const CategoryRatingBlock = defineAsyncComponent(
+  () => import('@/components/category/CategoryRatingBlock.vue'),
 )
-const CategoryReviews = defineAsyncComponent(() =>
-  import('@/components/category/CategoryReviews.vue'),
+const CategoryReviews = defineAsyncComponent(
+  () => import('@/components/category/CategoryReviews.vue'),
 )
-const SEOContentRenderer = defineAsyncComponent(() =>
-  import('@/components/category/SEOContentRenderer.vue'),
+const SEOContentRenderer = defineAsyncComponent(
+  () => import('@/components/category/SEOContentRenderer.vue'),
 )
 
+definePageMeta({ layout: 'catalog-listing' })
 
 // --- 1. Инициализация ---
 const route = useRoute()
@@ -67,7 +76,8 @@ const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
-const { generateBrandCategoryDescription, generateCategoryDescription } = useSeoTemplates()
+const { generateBrandCategoryDescription, generateCategoryDescription }
+  = useSeoTemplates()
 
 const priceValidUntil = new Date(
   new Date().setFullYear(new Date().getFullYear() + 1),
@@ -84,6 +94,33 @@ onUnmounted(() => {
   if (abortController.value) {
     abortController.value.abort()
   }
+})
+
+// ─── Плавающая кнопка «Наверх» на десктопе (из Категория.dc.html) ──────────────
+const showScrollTop = ref(false)
+let scrollTopTicking = false
+
+function applyScrollTopVisibility() {
+  scrollTopTicking = false
+  showScrollTop.value = window.scrollY > 560
+}
+
+function onWindowScroll() {
+  if (!scrollTopTicking) {
+    scrollTopTicking = true
+    requestAnimationFrame(applyScrollTopVisibility)
+  }
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', onWindowScroll, { passive: true })
+})
+onUnmounted(() => {
+  window.removeEventListener('scroll', onWindowScroll)
 })
 
 function cleanDescription(html: string | null, maxLength = 200): string {
@@ -171,7 +208,8 @@ const numericAttributeRanges = ref<
 >({})
 const accumulatedProducts = ref<CatalogProduct[]>([])
 const isMobileFiltersOpen = ref(false)
-const isSubcategoriesDrawerOpen = ref(false)
+const isSortDrawerOpen = ref(false)
+const isSortPopoverOpen = ref(false)
 const isSeoTextExpanded = ref(false)
 
 interface ActiveFilters {
@@ -211,7 +249,7 @@ const filteredProductLines = computed(() => {
 
 // --- 3. Вычисляемые свойства ---
 const currentCategorySlug = computed(
-  () => (route.params.slug as string[]).slice(-1)[0] ?? 'all',
+  () => (route.params.slug as string[] | undefined)?.slice(-1)[0] ?? 'all',
 )
 
 const activeBrand = computed(() => {
@@ -294,24 +332,6 @@ const subcategories = computed(() =>
   categoriesStore.getSubcategories(currentCategorySlug.value),
 )
 
-const activeSubcategoryLabel = computed(() => {
-  const count = activeFilters.value.subCategoryIds.length
-  if (count === 0)
-    return 'Все категории'
-
-  const firstId = activeFilters.value.subCategoryIds[0]
-  const category = subcategories.value.find(c => c.id === firstId)
-
-  if (!category)
-    return 'Выбрано'
-
-  if (count > 1) {
-    return `${category.name} (+${count - 1})`
-  }
-
-  return category.name
-})
-
 const activeFiltersCount = computed(() => {
   let count = 0
   count += activeFilters.value.subCategoryIds.length
@@ -357,9 +377,10 @@ const activeFiltersCount = computed(() => {
 
 const canonicalUrl = computed(() => {
   const baseUrl = 'https://uhti.kz'
-  const basePath = currentCategory.value?.canonical_url
-    || currentCategory.value?.href
-    || route.path
+  const basePath
+    = currentCategory.value?.canonical_url
+      || currentCategory.value?.href
+      || route.path
 
   const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
 
@@ -591,7 +612,9 @@ async function loadFilterData(slug: string) {
       availableBrands.value
         = brandsResult.status === 'fulfilled' ? brandsResult.value : []
       availableProductLines.value
-        = productLinesResult.status === 'fulfilled' ? productLinesResult.value : []
+        = productLinesResult.status === 'fulfilled'
+          ? productLinesResult.value
+          : []
       availableFilters.value = (
         attributesResult.status === 'fulfilled' ? attributesResult.value : []
       ) as FilterAttribute[]
@@ -831,6 +854,53 @@ function clearAttributeFilter(attributeSlug: string) {
   }
 }
 
+// ─── Сортировка — стеклянная пилюля из CatalogFilterBar.dc.html (десктоп) ──────
+const catalogSortOptions: { value: SortByType, label: string }[] = [
+  { value: 'popularity', label: 'Популярные' },
+  { value: 'newest', label: 'По новизне' },
+  { value: 'price_asc', label: 'Цена: по возрастанию' },
+  { value: 'price_desc', label: 'Цена: по убыванию' },
+]
+
+const currentSortLabel = computed(
+  () =>
+    catalogSortOptions.find(o => o.value === activeFilters.value.sortBy)
+      ?.label ?? catalogSortOptions[0].label,
+)
+
+function selectCatalogSort(value: SortByType) {
+  activeFilters.value = { ...activeFilters.value, sortBy: value }
+  isSortPopoverOpen.value = false
+}
+
+// ─── Бренды — вторая пилюля из CatalogFilterBar.dc.html (десктоп) ──────────────
+const isBrandPopoverOpen = ref(false)
+
+// Только один из двух поповеров бара открыт одновременно — тот же приём,
+// что и в CategoryScrollBar.vue для пары «Сортировка»/«Категории».
+watch(isSortPopoverOpen, (open) => {
+  if (open)
+    isBrandPopoverOpen.value = false
+})
+watch(isBrandPopoverOpen, (open) => {
+  if (open)
+    isSortPopoverOpen.value = false
+})
+
+function toggleCatalogBrand(checked: boolean, brandId: string) {
+  const current = activeFilters.value.brandIds
+  const next = checked
+    ? [...current, brandId]
+    : current.filter(id => id !== brandId)
+  activeFilters.value = { ...activeFilters.value, brandIds: next }
+}
+
+// CategoryScrollBar's list toggles by id only (no separate checked flag),
+// same shape as toggleSubCategory below — compute checked from current state.
+function toggleCatalogBrandById(brandId: string) {
+  toggleCatalogBrand(!activeFilters.value.brandIds.includes(brandId), brandId)
+}
+
 function toggleSubCategory(catId: string) {
   const newIds = new Set(activeFilters.value.subCategoryIds)
   if (newIds.has(catId)) {
@@ -850,7 +920,9 @@ function resetAllFilters() {
     sortBy: 'popularity',
     subCategoryIds: [],
     price: [priceRange.value.min, priceRange.value.max],
-    pieceCount: pieceCountRange.value ? [pieceCountRange.value.min, pieceCountRange.value.max] : null,
+    pieceCount: pieceCountRange.value
+      ? [pieceCountRange.value.min, pieceCountRange.value.max]
+      : null,
     brandIds: [],
     productLineIds: [],
     materialIds: [],
@@ -995,7 +1067,8 @@ const metaDescription = computed(() => {
       brandSlug: activeBrand.value.slug,
       categoryName: categoryName.value,
       categorySlug: currentCategorySlug.value,
-      productsCount: categoryBrandSeo.value.products_count || displayedProducts.value.length,
+      productsCount:
+        categoryBrandSeo.value.products_count || displayedProducts.value.length,
       minPrice: categoryBrandSeo.value.min_price || minPrice.value || 0,
       maxPrice: categoryBrandSeo.value.min_price || 0,
       rating: categoryBrandSeo.value.avg_rating || undefined,
@@ -1004,7 +1077,9 @@ const metaDescription = computed(() => {
   }
 
   if (currentCategory.value?.meta_description) {
-    let cleanText = currentCategory.value.meta_description.replace(/<[^>]*>/g, '').trim()
+    let cleanText = currentCategory.value.meta_description
+      .replace(/<[^>]*>/g, '')
+      .trim()
 
     const hasBrandMentions = topBrands.value.some(brand =>
       cleanText.toLowerCase().includes(brand.toLowerCase()),
@@ -1015,7 +1090,8 @@ const metaDescription = computed(() => {
       if (firstSentenceEnd > 0 && firstSentenceEnd < 60) {
         const firstPart = cleanText.substring(0, firstSentenceEnd + 1)
         const brandsText = ` (${topBrands.value.join(', ')})`
-        cleanText = firstPart + brandsText + cleanText.substring(firstSentenceEnd + 1)
+        cleanText
+          = firstPart + brandsText + cleanText.substring(firstSentenceEnd + 1)
       }
       else {
         cleanText = `${cleanText.substring(0, 50)} (${topBrands.value.join(', ')})`
@@ -1025,7 +1101,10 @@ const metaDescription = computed(() => {
     const maxBaseLength = 80
     if (cleanText.length > maxBaseLength) {
       const cutPoint = cleanText.lastIndexOf(' ', maxBaseLength)
-      cleanText = cutPoint > 50 ? cleanText.substring(0, cutPoint) : cleanText.substring(0, maxBaseLength)
+      cleanText
+        = cutPoint > 50
+          ? cleanText.substring(0, cutPoint)
+          : cleanText.substring(0, maxBaseLength)
     }
 
     if (cleanText.endsWith('.')) {
@@ -1035,14 +1114,19 @@ const metaDescription = computed(() => {
     const parts = [cleanText]
 
     if (minPrice.value) {
-      parts.push(`💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`)
+      parts.push(
+        `💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`,
+      )
     }
 
     if (categoryStats.value.reviews > 0) {
-      const ratingValue = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
+      const ratingValue
+        = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
       const starCount = Math.round(ratingValue)
       const starEmojis = '⭐'.repeat(starCount)
-      parts.push(`${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`)
+      parts.push(
+        `${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`,
+      )
     }
 
     parts.push('Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!')
@@ -1052,9 +1136,10 @@ const metaDescription = computed(() => {
   }
 
   if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
-    const ratingValue = categoryStats.value.reviews > 0
-      ? Number.parseFloat(categoryStats.value.rating.replace(',', '.'))
-      : undefined
+    const ratingValue
+      = categoryStats.value.reviews > 0
+        ? Number.parseFloat(categoryStats.value.rating.replace(',', '.'))
+        : undefined
 
     return generateCategoryDescription({
       categoryName: categoryName.value,
@@ -1062,7 +1147,10 @@ const metaDescription = computed(() => {
       minPrice: minPrice.value,
       city: 'Алматы',
       rating: ratingValue,
-      reviewsCount: categoryStats.value.reviews > 0 ? categoryStats.value.reviews : undefined,
+      reviewsCount:
+        categoryStats.value.reviews > 0
+          ? categoryStats.value.reviews
+          : undefined,
     })
   }
 
@@ -1080,7 +1168,8 @@ const metaDescription = computed(() => {
   }
 
   if (categoryStats.value.reviews > 0) {
-    const ratingValue = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
+    const ratingValue
+      = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
     const starCount = Math.round(ratingValue)
     const starEmojis = '⭐'.repeat(starCount)
     snippet += `. ${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`
@@ -1103,7 +1192,9 @@ const metaTitle = computed(() => {
         ? catName
         : `${catName} ${brandName}`
 
-    const priceText = minPrice.value ? ` — от ${formatPrice(minPrice.value)} ₸` : ''
+    const priceText = minPrice.value
+      ? ` — от ${formatPrice(minPrice.value)} ₸`
+      : ''
     return `${prefix}${priceText} | Ухтышка`
   }
 
@@ -1111,7 +1202,9 @@ const metaTitle = computed(() => {
     const brandName = selectedSingleBrand.value?.name || ''
     const lineName = selectedSingleLine.value.name
     const prefix = brandName ? `${brandName} ${lineName}` : lineName
-    const priceText = minPrice.value ? ` — от ${formatPrice(minPrice.value)} ₸` : ''
+    const priceText = minPrice.value
+      ? ` — от ${formatPrice(minPrice.value)} ₸`
+      : ''
     return `${prefix}${priceText} | Ухтышка`
   }
 
@@ -1176,21 +1269,23 @@ const robotsRule = computed(() => {
 })
 
 // --- 5. Загрузка данных ---
-const [{ data: _categoriesData }, { data: _filterPayload }] = await Promise.all([
-  useAsyncData(
-    `catalog-meta-${currentCategorySlug.value}`,
-    () => categoriesStore.fetchCategoryData(),
-    { watch: [currentCategorySlug] },
-  ),
-  useAsyncData(
-    `catalog-filters-${currentCategorySlug.value}`,
-    () => loadFilterData(currentCategorySlug.value),
-    {
-      watch: [currentCategorySlug],
-      server: true,
-    },
-  ),
-])
+const [{ data: _categoriesData }, { data: _filterPayload }] = await Promise.all(
+  [
+    useAsyncData(
+      `catalog-meta-${currentCategorySlug.value}`,
+      () => categoriesStore.fetchCategoryData(),
+      { watch: [currentCategorySlug] },
+    ),
+    useAsyncData(
+      `catalog-filters-${currentCategorySlug.value}`,
+      () => loadFilterData(currentCategorySlug.value),
+      {
+        watch: [currentCategorySlug],
+        server: true,
+      },
+    ),
+  ],
+)
 
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
@@ -1351,15 +1446,6 @@ useBreadcrumbSchema(
 useHead(() => {
   const links: any[] = [{ rel: 'canonical', href: canonicalUrl.value }]
 
-  if (categoryOgImageUrl.value && (currentCategory.value?.description || seoText.value)) {
-    links.push({
-      rel: 'preload',
-      as: 'image',
-      href: categoryOgImageUrl.value,
-      fetchpriority: 'high',
-    })
-  }
-
   return {
     meta: [{ name: 'keywords', content: metaKeywords.value || '' }],
     link: links,
@@ -1479,7 +1565,8 @@ const schemaData = computed(() => {
               'hasMerchantReturnPolicy': {
                 '@type': 'MerchantReturnPolicy',
                 'applicableCountry': 'KZ',
-                'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+                'returnPolicyCategory':
+                  'https://schema.org/MerchantReturnFiniteReturnWindow',
                 'merchantReturnDays': 14,
                 'returnMethod': 'https://schema.org/ReturnByMail',
                 'returnFees': 'https://schema.org/FreeReturn',
@@ -1545,6 +1632,24 @@ else {
 </script>
 
 <template>
+  <CategoryMobileHeader
+    :sort-active="isSortDrawerOpen"
+    :filters-active="isMobileFiltersOpen"
+    :has-active-filters="activeFiltersCount > 0"
+    @sort="isSortDrawerOpen = true"
+    @filters="isMobileFiltersOpen = true"
+  />
+
+  <CategoryScrollBar
+    v-model:sort-by="activeFilters.sortBy"
+    :subcategories="subcategories"
+    :active-subcategory-ids="activeFilters.subCategoryIds"
+    :brands="availableBrands"
+    :active-brand-ids="activeFilters.brandIds"
+    @toggle-subcategory="toggleSubCategory"
+    @toggle-brand="toggleCatalogBrandById"
+  />
+
   <div :class="`${containerClass} py-4 lg:py-8`">
     <!-- ─── ОПТИМИЗАЦИЯ: убрали ClientOnly — breadcrumbs доступны на сервере ─── -->
     <!-- ClientOnly скрывал хлебные крошки до гидрации, увеличивая FCP -->
@@ -1555,118 +1660,20 @@ else {
       compact
     />
 
-    <!-- Блок с картинкой и описанием категории -->
-    <div
-      v-if="currentCategory && (currentCategory.description || seoText)"
-      class="bg-white dark:bg-card rounded-xl p-4 lg:p-8 mb-6 lg:mb-8 border shadow-sm"
+    <!-- ЕДИНСТВЕННЫЙ H1 ДЛЯ SEO И ЛЮДЕЙ -->
+    <h1
+      class="text-xl md:text-3xl font-bold mb-1 lg:mb-2 transition-opacity duration-200"
+      :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'"
     >
-      <!-- ЕДИНСТВЕННЫЙ H1 ДЛЯ SEO И ЛЮДЕЙ -->
-      <h1
-        class="text-xl md:text-3xl font-bold mb-4 transition-opacity duration-200"
-        :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'"
-      >
-        {{ title }}
-      </h1>
-
-      <div class="flex flex-col lg:flex-row gap-4 lg:gap-6 items-start">
-        <!-- Картинка — fetchpriority="high" ускоряет LCP -->
-        <div
-          v-if="currentCategory.image_url"
-          class="shrink-0 w-16 h-16 lg:w-[220px] lg:h-[160px] rounded-lg overflow-hidden shadow-sm lg:shadow-md bg-gray-50 dark:bg-gray-900 flex items-center justify-center"
-        >
-          <ProgressiveImage
-            :src="
-              getVariantUrl(
-                BUCKET_NAME_CATEGORY,
-                currentCategory.image_url,
-                'md',
-              )
-            "
-            :alt="currentCategory.name"
-            object-fit="contain"
-            placeholder-type="lqip"
-            :blur-data-url="currentCategory.blur_placeholder || undefined"
-            :eager="true"
-            fetchpriority="high"
-            class="w-full h-full"
-          />
-        </div>
-
-        <!-- Текстовый блок и статистика -->
-        <div class="flex-1 space-y-3 lg:space-y-4 w-full">
-          <!-- Рейтинг категории -->
-          <CategoryRatingBlock
-            v-if="showCategoryRating"
-            :avg-rating="categoryRatingData!.avg_rating"
-            :total-reviews="categoryRatingData!.total_reviews"
-          />
-
-          <!-- Описание категории из БД -->
-          <p
-            v-if="currentCategory.description"
-            class="text-sm lg:text-base text-muted-foreground leading-relaxed line-clamp-2 lg:line-clamp-none"
-          >
-            {{ currentCategory.description }}
-          </p>
-
-          <!-- SEO текст (HTML) -->
-          <div
-            v-else-if="seoText"
-            class="text-sm lg:text-base text-muted-foreground leading-relaxed line-clamp-2 lg:line-clamp-none prose prose-sm lg:prose max-w-none"
-            v-html="seoText"
-          />
-
-          <!-- Счётчики с защитой от hydration mismatch -->
-          <ClientOnly>
-            <div class="flex flex-wrap items-center gap-3 lg:gap-4 pt-2 text-xs lg:text-sm text-muted-foreground">
-              <div class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]">
-                <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
-                <span>{{ displayedProducts.length || '—' }} <span class="hidden lg:inline">товаров</span></span>
-              </div>
-              <div
-                v-if="availableBrands.length > 0"
-                class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]"
-              >
-                <Icon name="lucide:award" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-500" />
-                <span>{{ availableBrands.length }} <span class="hidden lg:inline">брендов</span></span>
-              </div>
-              <div
-                v-if="priceRange.min > 0 || priceRange.max < 50000"
-                class="flex items-center gap-1.5 lg:gap-2"
-              >
-                <Icon name="lucide:tag" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-green-500" />
-                <span>от {{ new Intl.NumberFormat("ru-RU").format(priceRange.min) }} ₸</span>
-              </div>
-            </div>
-            <template #fallback>
-              <div class="flex flex-wrap items-center gap-3 lg:gap-4 pt-2 text-xs lg:text-sm text-muted-foreground min-h-[20px]">
-                <div class="flex items-center gap-1.5 lg:gap-2 min-w-[60px]">
-                  <Icon name="lucide:package" class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-500" />
-                  <span>— <span class="hidden lg:inline">товаров</span></span>
-                </div>
-              </div>
-            </template>
-          </ClientOnly>
-        </div>
-      </div>
-    </div>
-
-    <!-- Заголовок для случая с активными фильтрами или без описания -->
-    <template v-else>
-      <h1
-        class="text-xl md:text-3xl font-bold mb-1 lg:mb-2 transition-opacity duration-200"
-        :class="brandSeoLoading ? 'opacity-0' : 'opacity-100'"
-      >
-        {{ title }}
-      </h1>
-      <CategoryRatingBlock
-        v-if="showCategoryRating"
-        :avg-rating="categoryRatingData!.avg_rating"
-        :total-reviews="categoryRatingData!.total_reviews"
-        class="mb-3 lg:mb-4"
-      />
-      <div v-else class="mb-3 lg:mb-4" />
-    </template>
+      {{ title }}
+    </h1>
+    <CategoryRatingBlock
+      v-if="showCategoryRating"
+      :avg-rating="categoryRatingData!.avg_rating"
+      :total-reviews="categoryRatingData!.total_reviews"
+      class="mb-3 lg:mb-4"
+    />
+    <div v-else class="mb-3 lg:mb-4" />
 
     <!-- Бренды как 3-й уровень навигации (перед товарами) -->
     <CategoryBrands
@@ -1721,104 +1728,66 @@ else {
 
       <div class="col-span-1 lg:col-span-3 min-w-0">
         <div class="mb-6 space-y-4">
-          <!-- Подкатегории на мобильных -->
-          <div v-if="subcategories.length > 0" class="lg:hidden">
-            <div class="flex items-center justify-between gap-2">
-              <Button
-                variant="outline"
-                class="inline-flex flex-1 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
-                @click="isSubcategoriesDrawerOpen = true"
-              >
-                <Icon
-                  :name="
-                    activeFilters.subCategoryIds.length > 0
-                      ? 'lucide:layers'
-                      : 'lucide:grid-2x2'
-                  "
-                  class="w-4 h-4 shrink-0"
-                />
-                <span class="truncate">{{ activeSubcategoryLabel }}</span>
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                :disabled="activeFilters.subCategoryIds.length === 0"
-                class="inline-flex items-center gap-2 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-purple-500/40 transition-all duration-200 whitespace-nowrap shrink-0 snap-start hover:scale-[1.02] active:scale-95"
-                @click="activeFilters.subCategoryIds = []"
-              >
-                <Icon name="lucide:x" class="w-5 h-5" />
-              </Button>
-            </div>
+          <!-- Подкатегории на мобильных — горизонтальная лента чипов, из Категория.dc.html -->
+          <div
+            v-if="subcategories.length > 0"
+            class="flex lg:hidden cf-chip-scroller"
+          >
+            <button
+              v-for="cat in subcategories"
+              :key="cat.id"
+              type="button"
+              class="cf-chip"
+              :class="{
+                'cf-chip--active': activeFilters.subCategoryIds.includes(
+                  cat.id,
+                ),
+              }"
+              @click="toggleSubCategory(cat.id)"
+            >
+              {{ cat.name }}
+            </button>
           </div>
 
-          <!-- Панель управления -->
-          <div class="flex flex-wrap items-center gap-2">
-            <ClientOnly>
-              <Button
-                :variant="activeFiltersCount > 0 ? 'default' : 'outline'"
-                class="lg:hidden h-11 w-11 p-0 shrink-0 relative transition-colors"
-                :class="[
-                  activeFiltersCount > 0
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
-                    : '',
-                ]"
-                @click="isMobileFiltersOpen = true"
-              >
-                <Icon name="lucide:sliders-horizontal" class="w-5 h-5" />
-                <Badge
-                  v-if="activeFiltersCount > 0"
-                  variant="secondary"
-                  class="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-white text-blue-500 border-2 border-blue-500"
-                >
-                  {{ activeFiltersCount }}
-                </Badge>
-              </Button>
-            </ClientOnly>
-
-            <CatalogHeader v-model:sort-by="activeFilters.sortBy" />
-
-            <div
-              v-if="!isLoadingFilters && availableFilters.length > 0"
-              class="h-6 w-px bg-border hidden lg:block"
-            />
-
-            <template v-if="!isLoadingFilters && availableFilters.length > 0">
+          <!-- Атрибутные фильтры (в потоке, не sticky) — сортировка и чипы подкатегорий
+               теперь в статичном баре CatalogFilterBar над breadcrumbs. Скрываем весь
+               блок целиком, если показывать нечего — иначе остаётся пустая полоса
+               с бордером (сортировка раньше всегда заполняла эту строку). -->
+          <div
+            v-if="!isLoadingFilters && displayableFilters.length > 0"
+            class="lg:bg-white dark:lg:bg-card lg:py-3 lg:border-b lg:border-border"
+          >
+            <div class="flex flex-wrap items-center gap-2">
               <template v-for="filter in displayableFilters" :key="filter.id">
                 <!-- Select type -->
                 <Popover v-if="filter.display_type === 'select'">
                   <PopoverTrigger as-child>
-                    <Button
-                      :variant="
-                        (activeFilters.attributes[filter.slug] || []).length > 0
-                          ? 'default'
-                          : 'outline'
-                      "
-                      class="hidden lg:inline-flex h-11 gap-2 transition-colors"
-                      :class="[
-                        (activeFilters.attributes[filter.slug] || []).length > 0
-                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
-                          : '',
-                      ]"
+                    <button
+                      type="button"
+                      class="cf-glass-btn hidden lg:inline-flex"
+                      :class="{
+                        'cf-glass-btn--active':
+                          (activeFilters.attributes[filter.slug] || []).length
+                          > 0,
+                      }"
                     >
                       {{ filter.name }}
-                      <Badge
+                      <span
                         v-if="
                           (activeFilters.attributes[filter.slug] || []).length
                             > 0
                         "
-                        variant="secondary"
-                        class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
+                        class="cf-glass-badge"
                       >
                         {{
                           (activeFilters.attributes[filter.slug] || []).length
                         }}
-                      </Badge>
+                      </span>
                       <Icon
                         name="lucide:chevron-down"
-                        class="w-3.5 h-3.5 opacity-50"
+                        class="w-3.5 h-3.5 opacity-60"
                       />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent class="w-64 p-3" align="start">
                     <div class="space-y-2">
@@ -1876,37 +1845,32 @@ else {
                 <!-- Color type -->
                 <Popover v-else-if="filter.display_type === 'color'">
                   <PopoverTrigger as-child>
-                    <Button
-                      :variant="
-                        (activeFilters.attributes[filter.slug] || []).length > 0
-                          ? 'default'
-                          : 'outline'
-                      "
-                      class="hidden lg:inline-flex h-11 gap-2 transition-colors"
-                      :class="[
-                        (activeFilters.attributes[filter.slug] || []).length > 0
-                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
-                          : '',
-                      ]"
+                    <button
+                      type="button"
+                      class="cf-glass-btn hidden lg:inline-flex"
+                      :class="{
+                        'cf-glass-btn--active':
+                          (activeFilters.attributes[filter.slug] || []).length
+                          > 0,
+                      }"
                     >
                       {{ filter.name }}
-                      <Badge
+                      <span
                         v-if="
                           (activeFilters.attributes[filter.slug] || []).length
                             > 0
                         "
-                        variant="secondary"
-                        class="h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs bg-white text-blue-500"
+                        class="cf-glass-badge"
                       >
                         {{
                           (activeFilters.attributes[filter.slug] || []).length
                         }}
-                      </Badge>
+                      </span>
                       <Icon
                         name="lucide:chevron-down"
-                        class="w-3.5 h-3.5 opacity-50"
+                        class="w-3.5 h-3.5 opacity-60"
                       />
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent class="w-64 p-3" align="start">
                     <div class="space-y-3">
@@ -1966,36 +1930,120 @@ else {
                   </PopoverContent>
                 </Popover>
               </template>
-            </template>
+            </div>
+          </div>
 
-            <!-- Подкатегории на десктопе -->
-            <template v-if="subcategories.length > 0">
-              <div class="hidden lg:block h-6 w-px bg-border" />
+          <!-- Сортировка + бренды + чипы подкатегорий (десктоп) — над сеткой
+               товаров, из CatalogFilterBar.dc.html. Без фона: просто ряд пилюль. -->
+          <div class="hidden lg:flex items-center gap-2">
+            <CatalogHeader
+              v-model:sort-by="activeFilters.sortBy"
+              v-model:open="isSortDrawerOpen"
+              hide-mobile-trigger
+              hide-desktop-trigger
+            />
+
+            <Popover v-model:open="isSortPopoverOpen">
+              <PopoverTrigger as-child>
+                <button
+                  type="button"
+                  class="cf-glass-btn"
+                  :class="{
+                    'cf-glass-btn--active': activeFilters.sortBy !== 'popularity',
+                  }"
+                >
+                  {{ currentSortLabel }}
+                  <Icon
+                    name="lucide:chevron-down"
+                    class="w-3.5 h-3.5 opacity-60 transition-transform"
+                    :class="{ 'rotate-180': isSortPopoverOpen }"
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                class="w-56 p-1.5 rounded-2xl shadow-xl flex flex-col gap-0.5"
+              >
+                <button
+                  v-for="option in catalogSortOptions"
+                  :key="option.value"
+                  type="button"
+                  class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors hover:bg-accent"
+                  :class="{ 'font-bold': activeFilters.sortBy === option.value }"
+                  @click="selectCatalogSort(option.value)"
+                >
+                  {{ option.label }}
+                  <Icon
+                    v-if="activeFilters.sortBy === option.value"
+                    name="lucide:check"
+                    class="w-4 h-4 text-primary"
+                  />
+                </button>
+              </PopoverContent>
+            </Popover>
+
+            <Popover v-if="availableBrands.length > 0" v-model:open="isBrandPopoverOpen">
+              <PopoverTrigger as-child>
+                <button
+                  type="button"
+                  class="cf-glass-btn"
+                  :class="{ 'cf-glass-btn--active': activeFilters.brandIds.length > 0 }"
+                >
+                  Бренды
+                  <span v-if="activeFilters.brandIds.length > 0" class="cf-glass-badge">
+                    {{ activeFilters.brandIds.length }}
+                  </span>
+                  <Icon
+                    name="lucide:chevron-down"
+                    class="w-3.5 h-3.5 opacity-60 transition-transform"
+                    :class="{ 'rotate-180': isBrandPopoverOpen }"
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                class="w-60 p-1.5 rounded-2xl shadow-xl flex flex-col gap-1 max-h-80 overflow-y-auto"
+              >
+                <div
+                  v-for="brand in availableBrands"
+                  :key="brand.id"
+                  class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent"
+                >
+                  <Checkbox
+                    :id="`cfb-brand-${brand.id}`"
+                    :model-value="activeFilters.brandIds.includes(brand.id)"
+                    @update:model-value="(checked) => toggleCatalogBrand(!!checked, brand.id)"
+                  />
+                  <Label
+                    :for="`cfb-brand-${brand.id}`"
+                    class="flex-1 min-w-0 flex items-center justify-between gap-2 font-normal cursor-pointer text-sm"
+                  >
+                    <span class="truncate">{{ brand.name }}</span>
+                    <span v-if="brand.products_count" class="text-xs text-muted-foreground shrink-0">
+                      {{ brand.products_count }}
+                    </span>
+                  </Label>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <div
+              v-if="subcategories.length > 0"
+              class="flex cf-chip-scroller flex-1 min-w-0"
+            >
               <button
                 v-for="cat in subcategories"
                 :key="cat.id"
                 type="button"
-                class="hidden lg:inline-flex group relative items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0"
-                :class="[
-                  activeFilters.subCategoryIds.includes(cat.id)
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]'
-                    : 'bg-secondary/60 text-secondary-foreground hover:bg-secondary hover:scale-[1.02] hover:shadow-md active:scale-95',
-                ]"
+                class="cf-chip"
+                :class="{
+                  'cf-chip--active': activeFilters.subCategoryIds.includes(cat.id),
+                }"
                 @click="toggleSubCategory(cat.id)"
               >
-                <div
-                  v-if="activeFilters.subCategoryIds.includes(cat.id)"
-                  class="flex items-center justify-center w-4 h-4 rounded-full bg-white/20"
-                >
-                  <Icon name="lucide:check" class="w-3 h-3" />
-                </div>
-                <span>{{ cat.name }}</span>
-                <div
-                  v-if="!activeFilters.subCategoryIds.includes(cat.id)"
-                  class="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-primary/20 transition-colors"
-                />
+                {{ cat.name }}
               </button>
-            </template>
+            </div>
           </div>
         </div>
 
@@ -2014,59 +2062,74 @@ else {
               />
 
               <div v-else-if="displayedProducts.length > 0" class="space-y-8">
-              <ProductGrid :products="displayedProducts" />
+                <ProductGrid :products="displayedProducts" />
 
-              <div v-if="hasMore" class="text-center">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  :disabled="isFetching"
-                  @click="loadMoreProducts"
+                <div v-if="hasMore" class="text-center">
+                  <button
+                    type="button"
+                    class="cf-glass-btn cf-glass-btn--lg"
+                    :disabled="isFetching"
+                    @click="loadMoreProducts"
+                  >
+                    <span v-if="isFetching">Загрузка...</span>
+                    <template v-else>
+                      <span>Показать ещё</span>
+                      <Icon name="lucide:chevron-down" class="w-4 h-4" />
+                    </template>
+                  </button>
+                </div>
+
+                <div
+                  v-if="isFetching && currentPage > 1"
+                  class="text-center text-sm text-muted-foreground"
                 >
-                  <span v-if="isFetching">Загрузка...</span>
-                  <span v-else>Показать ещё</span>
-                </Button>
+                  Загрузка товаров...
+                </div>
               </div>
 
               <div
-                v-if="isFetching && currentPage > 1"
-                class="text-center text-sm text-muted-foreground"
+                v-else
+                class="text-center py-16 bg-white dark:bg-card border border-border rounded-[22px]"
               >
-                Загрузка товаров...
+                <div
+                  class="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4"
+                >
+                  <Icon
+                    name="lucide:package-open"
+                    class="w-7 h-7 text-muted-foreground"
+                  />
+                </div>
+                <h3 class="text-xl font-bold">
+                  {{
+                    hasActiveFilters
+                      ? "Товары не найдены"
+                      : "Скоро здесь появятся товары"
+                  }}
+                </h3>
+                <p class="mt-2 text-sm text-muted-foreground">
+                  {{
+                    hasActiveFilters
+                      ? "Попробуйте изменить фильтры или выбрать другую категорию."
+                      : "Мы работаем над наполнением этой категории. Загляните позже!"
+                  }}
+                </p>
+                <button
+                  v-if="hasActiveFilters"
+                  type="button"
+                  class="cf-glass-btn cf-glass-btn--primary mt-5"
+                  @click="resetAllFilters"
+                >
+                  <Icon name="lucide:x" class="w-4 h-4" />
+                  Сбросить все фильтры
+                </button>
               </div>
             </div>
+          </Transition>
 
-            <div
-              v-else
-              class="text-center py-20 text-muted-foreground border-2 border-dashed rounded-lg"
-            >
-              <Icon name="lucide:package-open" class="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
-              <h3 class="text-2xl font-semibold">
-                {{ hasActiveFilters ? 'Товары не найдены' : 'Скоро здесь появятся товары' }}
-              </h3>
-              <p class="mt-2">
-                {{ hasActiveFilters
-                  ? 'Попробуйте изменить фильтры или выбрать другую категорию.'
-                  : 'Мы работаем над наполнением этой категории. Загляните позже!'
-                }}
-              </p>
-              <Button
-                v-if="hasActiveFilters"
-                variant="outline"
-                class="mt-4"
-                @click="resetAllFilters"
-              >
-                <Icon name="lucide:x" class="w-4 h-4 mr-2" />
-                Сбросить все фильтры
-              </Button>
-            </div>
-          </div>
-        </Transition>
-
-        <template #fallback>
-          <ProductGridSkeleton />
-        </template>
-      </ClientOnly>
+          <template #fallback>
+            <ProductGridSkeleton />
+          </template>
+        </ClientOnly>
       </div>
     </div>
 
@@ -2118,8 +2181,8 @@ else {
 
     <!-- Мобильные компоненты -->
     <ClientOnly>
-      <!-- Мобильные фильтры (Sheet) -->
-      <DynamicFiltersMobile
+      <!-- Мобильные фильтры (bottom sheet) -->
+      <MobileCatalogDrawer
         v-model="activeFilters"
         :open="isMobileFiltersOpen"
         :available-filters="availableFilters as unknown as AttributeWithValue[]"
@@ -2133,79 +2196,20 @@ else {
         :is-loading="isLoadingFilters"
         @update:open="isMobileFiltersOpen = $event"
       />
-
-      <!-- Drawer с подкатегориями -->
-      <Drawer v-model:open="isSubcategoriesDrawerOpen">
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle class="flex items-center gap-2">
-              <Icon name="lucide:layers" class="w-5 h-5 text-primary" />
-              Выберите подкатегории
-            </DrawerTitle>
-            <DrawerDescription>
-              Фильтрация применяется автоматически
-            </DrawerDescription>
-          </DrawerHeader>
-
-          <div class="px-4 pb-6 space-y-2 max-h-[60vh] overflow-y-auto">
-            <button
-              v-for="cat in subcategories"
-              :key="cat.id"
-              type="button"
-              class="w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-200"
-              :class="[
-                activeFilters.subCategoryIds.includes(cat.id)
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
-                  : 'bg-secondary/60 hover:bg-secondary hover:shadow-md active:scale-[0.98]',
-              ]"
-              @click="toggleSubCategory(cat.id)"
-            >
-              <div
-                class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0"
-                :class="
-                  activeFilters.subCategoryIds.includes(cat.id)
-                    ? 'bg-white/20'
-                    : 'bg-background/50'
-                "
-              >
-                <Icon
-                  :name="
-                    activeFilters.subCategoryIds.includes(cat.id)
-                      ? 'lucide:check'
-                      : 'lucide:folder'
-                  "
-                  class="w-5 h-5"
-                />
-              </div>
-              <div class="flex-1 text-left">
-                <div class="font-semibold text-base">
-                  {{ cat.name }}
-                </div>
-              </div>
-            </button>
-          </div>
-
-          <DrawerFooter class="gap-2">
-            <Button
-              v-if="activeFilters.subCategoryIds.length > 0"
-              variant="outline"
-              class="w-full"
-              @click="activeFilters.subCategoryIds = []"
-            >
-              <Icon name="lucide:x" class="w-4 h-4 mr-2" />
-              Сбросить все ({{ activeFilters.subCategoryIds.length }})
-            </Button>
-            <DrawerClose as-child>
-              <Button class="w-full">
-                <Icon name="lucide:check" class="w-4 h-4 mr-2" />
-                Применить
-              </Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
     </ClientOnly>
   </div>
+
+  <!-- Плавающая кнопка «Наверх» — только десктоп, из Категория.dc.html -->
+  <button
+    v-if="showScrollTop"
+    type="button"
+    class="hidden lg:flex cf-scrolltop"
+    aria-label="Наверх"
+    @click="scrollToTop"
+  >
+    <Icon name="lucide:arrow-up" class="w-4 h-4 text-primary" />
+    Наверх
+  </button>
 </template>
 
 <style scoped>
@@ -2216,5 +2220,136 @@ else {
   100% {
     background-position: 200% center;
   }
+}
+
+/* ─── Стеклянные пилюли из Категория.dc.html (панель управления, чипсы, "Наверх") ─── */
+.cf-glass-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
+  backdrop-filter: blur(14px) saturate(1.7);
+  -webkit-backdrop-filter: blur(14px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 2px rgba(15, 23, 42, 0.06),
+    0 6px 18px rgba(15, 23, 42, 0.1);
+  color: var(--foreground);
+  font: 600 14px var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.cf-glass-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cf-glass-btn--active {
+  border-color: var(--primary);
+  background: linear-gradient(150deg, rgba(219, 234, 254, 0.95), rgba(191, 219, 254, 0.6));
+  color: var(--blue-700);
+}
+
+.cf-glass-btn--lg {
+  height: 50px;
+  padding: 0 26px;
+  font-size: 15px;
+}
+
+.cf-glass-btn--primary {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: linear-gradient(150deg, rgba(77, 148, 255, 0.95), rgba(23, 101, 235, 0.85));
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 8px rgba(6, 53, 138, 0.28),
+    0 8px 20px rgba(43, 127, 255, 0.35);
+}
+
+.cf-glass-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font: 700 11px var(--font-sans);
+}
+
+.cf-chip-scroller {
+  /* display is driven by the Tailwind flex/hidden/lg:* utilities on each
+     usage site — a scoped display here would out-specificity them (see
+     mobilenav-dc-port memory) and the element would never actually hide. */
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.cf-chip-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.cf-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--muted);
+  color: var(--foreground);
+  font: 600 13.5px var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.cf-chip--active {
+  background: rgba(43, 127, 255, 0.12);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.cf-scrolltop {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 70;
+  align-items: center;
+  gap: 7px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18));
+  backdrop-filter: blur(24px) saturate(1.9);
+  -webkit-backdrop-filter: blur(24px) saturate(1.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 1px rgba(15, 23, 42, 0.05),
+    0 12px 32px rgba(15, 23, 42, 0.18);
+  color: var(--foreground);
+  font: 700 13px var(--font-sans);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.cf-scrolltop:active {
+  transform: translateX(-50%) scale(0.96);
 }
 </style>

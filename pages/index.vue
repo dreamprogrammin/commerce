@@ -4,25 +4,22 @@ import type {
   RecommendedProduct,
 } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
-import { useMediaQuery } from '@vueuse/core'
 import { useSlides } from '@/composables/slides/useSlides'
-import { carouselContainerVariants } from '@/lib/variants'
+import {
+  HOME_CHIPS_CATEGORY_LIMIT,
+  HOME_STATIC_CHIPS,
+} from '@/constants/homePlaceholders'
+import { carouselContainerVariants, sectionSpacingVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
-import { usePopularCategoriesStore } from '@/stores/publicStore/popularCategoriesStore'
+import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
-// Lazy load non-critical components
-const LazyBanners = defineAsyncComponent(() => import('@/components/home/Banners.vue'))
-const LazyBonusCard = defineAsyncComponent(() => import('@/components/home/BonusProgramCard.vue'))
-const LazyFeaturedProduct = defineAsyncComponent(() => import('@/components/home/FeaturedProduct.vue'))
+// Ленивая загрузка некритичных блоков
 const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
-
-// Detect mobile for conditional loading — useMediaQuery кешируется, не дёргает DOM при рендере
-const isMobile = useMediaQuery('(max-width: 767px)')
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
@@ -30,7 +27,7 @@ const recommendationsStore = useRecommendationsStore()
 const personalizationStore = usePersonalizationStore()
 const productsStore = useProductsStore()
 const wishlistStore = useWishlistStore()
-const popularCategoriesStore = usePopularCategoriesStore()
+const categoriesStore = useCategoriesStore()
 const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
 
 const { isLoggedIn, user } = storeToRefs(authStore)
@@ -47,35 +44,30 @@ function getCachedData(key: string) {
 }
 
 const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
-const desktopContainedClass = carouselContainerVariants({
-  contained: 'desktop',
-})
 
 interface HomePersonalData {
   recommended: RecommendedProduct[]
   wishlist: ProductWithGallery[]
 }
 
-// ✅ SSR prefetch — LAZY для небл окирующего рендера
+// ✅ SSR prefetch — прогреваем дерево категорий для секции «Популярные категории»
 useAsyncData(
   'home-ssr-critical',
   async () => {
-    await popularCategoriesStore.fetchPopularCategories()
-    return {
-      categories: popularCategoriesStore.popularCategories || [],
-    }
+    await categoriesStore.fetchCategoryData()
+    return { ok: true }
   },
   { server: true, lazy: true, getCachedData },
 )
 
-// TanStack Query — рекомендации
+// TanStack Query — рекомендации (лента «Подобрали для вас»)
 const recommendationsQueryKey = computed(() => [
   'home-recommendations',
   user.value?.id,
   personalizationTrigger.value,
   isLoggedIn.value,
 ])
- 
+
 // @ts-expect-error - Type instantiation depth issue with TanStack Query + Supabase complex types.
 const {
   data: mainPersonalData,
@@ -117,7 +109,7 @@ const showRecommendationsSkeleton = computed(
         && mainPersonalData.value.wishlist.length === 0)),
 )
 
-// TanStack Query — популярные товары
+// TanStack Query — популярные товары (fallback ленты для гостей)
 const popularQuery = useQuery<ProductWithGallery[]>({
   queryKey: ['home-popular'],
   queryFn: () => productsStore.fetchPopularProducts(10),
@@ -128,69 +120,22 @@ const popularQuery = useQuery<ProductWithGallery[]>({
 })
 
 const popularProductsData = popularQuery.data
-const isLoadingPopular = popularQuery.isLoading
 const isFetchingPopular = popularQuery.isFetching
 
 const popularProducts = computed<ProductWithGallery[]>(
   () => popularProductsData.value || [],
 )
 
-// TanStack Query — новинки
-const {
-  data: newestProductsData,
-  isLoading: isLoadingNewest,
-  isFetching: isFetchingNewest,
-} = useQuery<ProductWithGallery[]>({
-  queryKey: ['home-newest'],
-  queryFn: () => productsStore.fetchNewestProducts(10),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 15 * 60 * 1000,
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
-})
-
-const newestProducts = computed<ProductWithGallery[]>(
-  () => newestProductsData.value || [],
-)
-
 const showPopularSkeleton = computed(
   () =>
-    (isLoadingPopular.value || isFetchingPopular.value)
+    (popularQuery.isLoading.value || popularQuery.isFetching.value)
     && !popularProductsData.value,
 )
 
-const showNewestSkeleton = computed(
-  () =>
-    (isLoadingNewest.value || isFetchingNewest.value)
-    && !newestProductsData.value,
-)
 const isLoadingMainBlock = computed(
   () => showRecommendationsSkeleton.value || showPopularSkeleton.value,
 )
 
-// --- Progressive Loading ---
-const shouldRenderSecondaryBlocks = ref(false)
-const shouldRenderLowerBlocks = ref(false)
-
-onMounted(() => {
-  // Загружаем основные блоки чуть позже
-  requestIdleCallback(() => {
-    shouldRenderSecondaryBlocks.value = true
-  })
-
-  // Загружаем нижние блоки ещё позже
-  setTimeout(() => {
-    shouldRenderLowerBlocks.value = true
-  }, 1000)
-})
-
-// ---------------------------------------------------------------------------
-// Вычисляемые флаги для условного рендера карусельных блоков.
-// ...
-
-// ВАЖНО: v-if снаружи LazyHydration — компонент либо есть в DOM (и будет
-// гидрирован по стратегии), либо его нет вовсе. Это корректно.
-// ---------------------------------------------------------------------------
 const showWishlistCarousel = computed(
   () => isLoggedIn.value && wishlistProducts.value.length > 0,
 )
@@ -203,18 +148,49 @@ const showPopularFallbackCarousel = computed(
     && popularProducts.value
     && popularProducts.value.length > 0,
 )
-const showNewestCarousel = computed(
-  () => newestProducts.value && newestProducts.value.length > 0,
-)
 
-// ---------------------------------------------------------------------------
-// Скелетоны для карусельных блоков.
-// ИСПРАВЛЕНО: вместо ClientOnly + template#fallback используем серверный рендер
-// скелетона через v-if/v-else прямо в шаблоне. Скелетон виден на SSR и во
-// время загрузки данных, LazyHydration-карусель появляется когда данные готовы.
-// ---------------------------------------------------------------------------
+// --- Быстрые чипы: статические ссылки + корневые категории из menuTree ---
+const chipItems = computed(() => {
+  const roots = (categoriesStore.menuTree ?? [])
+    .slice(0, HOME_CHIPS_CATEGORY_LIMIT)
+    .map(r => ({
+      id: r.slug,
+      label: r.name,
+      to: r.href || `/catalog/${r.slug}`,
+      icon: r.icon_name || null,
+    }))
+  return [
+    ...HOME_STATIC_CHIPS.map(c => ({ ...c, icon: null as string | null })),
+    ...roots,
+  ]
+})
 
-// SEO
+// --- Progressive Loading ---
+const shouldRenderSecondaryBlocks = ref(false)
+const shouldRenderLowerBlocks = ref(false)
+
+onMounted(() => {
+  requestIdleCallback(() => {
+    shouldRenderSecondaryBlocks.value = true
+  })
+  setTimeout(() => {
+    shouldRenderLowerBlocks.value = true
+  }, 1000)
+})
+
+// --- «Перейти к покупкам» → скролл к ленте товаров ---
+const shopSectionRef = ref<HTMLElement | null>(null)
+function scrollToShop() {
+  const el = shopSectionRef.value
+  if (!el)
+    return
+  const top = el.getBoundingClientRect().top + window.scrollY - 80
+  window.scrollTo({ top, behavior: 'smooth' })
+}
+
+// ==========================================================================
+// SEO — сохранено без изменений при редизайне
+// ==========================================================================
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
 const metaTitle = `Купить детские игрушки в Алматы | ${siteName}`
@@ -263,7 +239,6 @@ useSeoMeta({
     'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
 })
 
-// Simplified static schemas (no reactive dependencies)
 const storeSchema = {
   '@context': 'https://schema.org',
   '@type': 'Store',
@@ -372,7 +347,7 @@ useRobotsRule({ index: true, follow: true })
 
 <template>
   <div>
-    <!-- ✅ Скрытый SEO-текст -->
+    <!-- ✅ Скрытый SEO-текст: единственный h1 страницы -->
     <div class="sr-only">
       <h1>{{ siteName }} - Интернет-магазин детских игрушек в Казахстане</h1>
       <p>
@@ -382,248 +357,321 @@ useRobotsRule({ index: true, follow: true })
       </p>
     </div>
 
-    <!-- Статус активного заказа -->
-    <div :class="alwaysContainedClass" class="py-4">
-      <ClientOnly>
-        <!--
-          ClientOnly здесь оправдан: блок зависит от auth-стора,
-          который не доступен на SSR, и не является LazyHydration-компонентом.
-        -->
-        <div v-if="isLoggedIn">
-          <div
-            v-if="isAdmin"
-            class="p-4 bg-blue-50 border border-blue-200 rounded-md"
-          >
-            <NuxtLink
-              to="/admin"
-              class="font-semibold text-primary hover:underline"
-            >
-              Перейти в панель администратора
-            </NuxtLink>
-          </div>
-          <HomeActiveOrderStatus v-else />
-        </div>
-        <template #fallback>
-          <div class="h-0" />
-        </template>
-      </ClientOnly>
-    </div>
+    <!-- ============ HERO (full-bleed) ============ -->
+    <HomeHero
+      :slides="slides || []"
+      :is-loading="isLoadingSlides"
+      :error="slidesError"
+    />
 
-    <!-- ✅ Слайдер в ClientOnly (нет SSR-данных, нужна клиентская логика) -->
-    <ClientOnly>
-      <template v-if="!isMobile || slides?.length">
-        <CommonAppCarousel
-          :is-loading="isLoadingSlides"
-          :error="slidesError"
-          :slides="slides || []"
-        />
-      </template>
-      <template #fallback>
-        <div :class="carouselContainerVariants({ contained: 'desktop' })">
-          <div class="py-4">
-            <div class="p-1">
-              <div
-                class="w-full h-auto rounded-2xl aspect-3/2 md:aspect-19/6 lg:aspect-21/9 bg-muted animate-pulse"
-              />
-            </div>
-          </div>
-        </div>
-      </template>
-    </ClientOnly>
+    <!-- Мобильная распорка под фиксированным героем -->
+    <div class="home-hero-spacer" />
 
-    <!-- ✅ Баннеры (без изменений — уже было корректно) -->
-    <div :class="alwaysContainedClass">
-      <LazyBanners />
-    </div>
-
-    <!-- Бренды в коллапсе -->
-    <div :class="alwaysContainedClass" class="py-6">
-      <ClientOnly>
-        <HomeBrandsCollapsible v-if="shouldRenderSecondaryBlocks" />
-      </ClientOnly>
-    </div>
-
-    <!-- Популярные категории -->
-    <div :class="desktopContainedClass">
-      <HomePopularCategories v-if="shouldRenderSecondaryBlocks" />
-    </div>
-
-    <!-- Карточки бонусов (без изменений — уже было корректно) -->
-    <div :class="alwaysContainedClass" class="py-8 md:py-12">
-      <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-start mb-8">
-        Акции и бонусы
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-        <LazyBonusCard />
-        <LazyFeaturedProduct />
+    <!-- ============ БЕЛЫЙ ЛИСТ КОНТЕНТА ============ -->
+    <div class="home-content">
+      <!-- Десктопная «таблетка» перехода к покупкам -->
+      <div class="hidden lg:block home-shop-tab-wrap">
+        <button type="button" class="home-shop-tab" @click="scrollToShop">
+          Перейти к покупкам
+          <Icon name="lucide:chevron-down" class="size-4" />
+        </button>
       </div>
-    </div>
 
-    <!--
-      ✅ Карусели товаров — ClientOnly + обычные (не LazyHydration) компоненты.
-    -->
-    <div :class="alwaysContainedClass" class="py-8 md:py-12">
+      <!-- Мобильная липкая строка поиска -->
+      <div class="lg:hidden">
+        <HomeStickySearchRow />
+      </div>
+
+      <!-- Статус активного заказа -->
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
+        <ClientOnly>
+          <div v-if="isLoggedIn">
+            <div
+              v-if="isAdmin"
+              class="p-4 bg-blue-50 border border-blue-200 rounded-md"
+            >
+              <NuxtLink
+                to="/admin"
+                class="font-semibold text-primary hover:underline"
+              >
+                Перейти в панель администратора
+              </NuxtLink>
+            </div>
+            <HomeActiveOrderStatus v-else />
+          </div>
+          <template #fallback>
+            <div class="h-0" />
+          </template>
+        </ClientOnly>
+      </div>
+
+      <!-- Быстрые чипы -->
+      <section ref="shopSectionRef" :class="alwaysContainedClass" class="pt-2 pb-1 scroll-mt-20">
+        <div class="rail-bleed">
+          <HomeCategoryChips :items="chipItems" />
+        </div>
+      </section>
+
+      <!-- Подобрали для вас.
+           Карусели сами задают себе ширину (заголовок — контейнер 'always',
+           лента — контейнер 'desktop' + отступ внутри ленты), поэтому внешнего
+           контейнера здесь быть НЕ должно: он давал двойной padding.
+           ProductCarouselSectionSkeleton повторяет их отступы 1-в-1. -->
       <ClientOnly>
         <template v-if="isLoadingMainBlock || !shouldRenderLowerBlocks">
-          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-          <ProductCarouselSkeleton />
+          <ProductCarouselSectionSkeleton />
         </template>
         <template v-else>
-          <!-- Избранное (только для залогиненных) -->
           <LazyProductsCarousel
             v-if="showWishlistCarousel"
             :is-loading="isFetchingRecommendations"
             :products="wishlistProducts"
             title="Ваше избранное"
             see-all-link="/profile/wishlist"
-            class="mt-16 pt-8 border-t"
           />
-
-          <!-- Рекомендации ИЛИ Популярные товары -->
           <LazyProductsCarousel
             v-if="showRecommendedCarousel"
             :is-loading="isFetchingRecommendations"
             :products="recommendedProducts"
-            title="Вам может понравиться"
+            title="Подобрали для вас"
             see-all-link="/catalog/all?recommended=true"
-            :class="{
-              'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0,
-            }"
           />
           <LazyProductsCarousel
             v-else-if="showPopularFallbackCarousel"
             :is-loading="isFetchingPopular"
             :products="popularProducts"
-            title="Популярные товары"
+            title="Подобрали для вас"
             see-all-link="/catalog/all?sort_by=popularity"
-            :class="{
-              'mt-16 pt-8 border-t': !isLoggedIn || wishlistProducts.length === 0,
-            }"
           />
         </template>
-        <!-- SSR fallback: статичный скелетон, не участвует в гидрации -->
         <template #fallback>
-          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-          <ProductCarouselSkeleton />
+          <ProductCarouselSectionSkeleton />
         </template>
       </ClientOnly>
-    </div>
 
-    <!--
-      ✅ Новые поступления — та же логика: данные client-only → ClientOnly-обёртка.
-    -->
-    <div :class="alwaysContainedClass" class="py-8 md:py-12">
-      <ClientOnly>
-        <template v-if="showNewestSkeleton || !shouldRenderLowerBlocks">
-          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-          <ProductCarouselSkeleton />
-        </template>
-        <LazyProductsCarousel
-          v-else-if="showNewestCarousel"
-          :is-loading="isFetchingNewest"
-          :products="newestProducts"
-          title="Новые поступления"
-          see-all-link="/catalog/all?sort_by=newest"
-          class="pt-4 border-t"
-        />
-        <template #fallback>
-          <Skeleton class="h-8 w-1/3 mb-8 rounded-lg" />
-          <ProductCarouselSkeleton />
-        </template>
-      </ClientOnly>
-    </div>
+      <!-- Популярные категории -->
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
+        <HomePopularCategories v-if="shouldRenderSecondaryBlocks" />
+      </div>
 
-    <!-- SEO-блок -->
-    <div :class="alwaysContainedClass" class="py-12 md:py-16 border-t">
-      <div class="prose prose-lg max-w-none">
-        <h2 class="text-2xl md:text-3xl font-bold mb-6">
-          Интернет-магазин детских игрушек {{ siteName }} в Алматы
-        </h2>
-        <div class="grid md:grid-cols-2 gap-8 text-muted-foreground">
-          <div>
-            <h3 class="text-xl font-semibold text-foreground mb-3">
-              Широкий ассортимент игрушек
-            </h3>
-            <p class="mb-4">
-              В нашем интернет-магазине в Алматы вы найдете огромный выбор
-              детских игрушек для детей всех возрастов: от развивающих игрушек
-              для малышей до конструкторов и настольных игр для школьников.
-            </p>
-            <ul class="space-y-2 list-disc list-inside">
-              <li>Развивающие игрушки и игры</li>
-              <li>Конструкторы и пазлы</li>
-              <li>Куклы и машинки</li>
-              <li>Мягкие игрушки</li>
-              <li>Настольные игры</li>
-            </ul>
-          </div>
-          <div>
-            <h3 class="text-xl font-semibold text-foreground mb-3">
-              Официальные бренды
-            </h3>
-            <p class="mb-4">
-              Мы работаем с ведущими производителями детских игрушек. В нашем
-              каталоге представлены только оригинальные товары от проверенных
-              брендов с гарантией качества.
-            </p>
-          </div>
+      <!-- Популярные бренды -->
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
+        <ClientOnly>
+          <HomeBrandsRail v-if="shouldRenderSecondaryBlocks" />
+        </ClientOnly>
+      </div>
+
+      <!-- Акции и бонусы -->
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'md' })]">
+        <div class="flex items-baseline justify-between gap-3 mb-5">
+          <h2 class="m-0 font-bold tracking-tight text-[clamp(22px,3vw,32px)]">
+            Акции и бонусы
+          </h2>
+          <span class="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+            <Icon name="lucide:sparkles" class="size-4 text-[color:var(--color-orange-600)]" />
+            Выгода каждый день
+          </span>
         </div>
-        <div class="mt-8 pt-8 border-t">
-          <h3 class="text-xl font-semibold text-foreground mb-3">
-            Преимущества покупки в {{ siteName }}
-          </h3>
-          <ul class="grid md:grid-cols-2 gap-3">
-            <li class="flex items-start gap-2">
-              <Icon
-                name="lucide:map-pin"
-                class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
-              />
-              <span><strong>Доставка по Алматы</strong> - быстрая и удобная</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <Icon
-                name="lucide:gift"
-                class="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5"
-              />
-              <span><strong>Бонусная программа</strong> - накапливайте баллы за покупки</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <Icon
-                name="lucide:shield-check"
-                class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
-              />
-              <span><strong>Гарантия качества</strong> - только сертифицированные товары</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <Icon
-                name="lucide:headphones"
-                class="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5"
-              />
-              <span><strong>Поддержка 24/7</strong> - всегда рады помочь</span>
-            </li>
-          </ul>
-          <div class="mt-6 pt-6 border-t">
-            <div class="flex items-center gap-3">
-              <Icon
-                name="lucide:phone"
-                class="w-6 h-6 text-primary flex-shrink-0"
-              />
-              <div>
-                <p class="text-sm text-muted-foreground">
-                  Свяжитесь с нами:
-                </p>
-                <a
-                  href="tel:+77771243843"
-                  class="text-lg font-semibold text-foreground hover:text-primary transition-colors"
-                >
-                  +7 (777) 124-38-43
-                </a>
+        <ClientOnly>
+          <template v-if="shouldRenderLowerBlocks">
+            <HomeLoyaltyBanner class="mb-4" />
+            <div class="home-promo-grid">
+              <HomeDealOfTheDayCard />
+              <HomePromoBenefitTiles />
+            </div>
+          </template>
+          <template #fallback>
+            <Skeleton class="h-64 w-full rounded-3xl" />
+          </template>
+        </ClientOnly>
+      </div>
+
+      <!-- Хиты продаж -->
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
+        <ClientOnly>
+          <HomeBestsellersGrid v-if="shouldRenderLowerBlocks" />
+        </ClientOnly>
+      </div>
+
+      <!-- SEO-блок (сохранён).
+           Нижнего отступа здесь быть НЕ должно: блок последний в `.home-content`,
+           и его padding-bottom давал белую полосу между листом и футером.
+           Поэтому вместо sectionSpacingVariants({ size: 'lg' }) — только верхний
+           отступ, теми же значениями (py-12 md:py-16 → pt-12 md:pt-16). -->
+      <div :class="alwaysContainedClass" class="border-t pt-12 md:pt-16">
+        <div class="prose prose-lg max-w-none">
+          <h2 class="text-2xl md:text-3xl font-bold mb-6">
+            Интернет-магазин детских игрушек {{ siteName }} в Алматы
+          </h2>
+          <div class="grid md:grid-cols-2 gap-8 text-muted-foreground">
+            <div>
+              <h3 class="text-xl font-semibold text-foreground mb-3">
+                Широкий ассортимент игрушек
+              </h3>
+              <p class="mb-4">
+                В нашем интернет-магазине в Алматы вы найдете огромный выбор
+                детских игрушек для детей всех возрастов: от развивающих игрушек
+                для малышей до конструкторов и настольных игр для школьников.
+              </p>
+              <ul class="space-y-2 list-disc list-inside">
+                <li>Развивающие игрушки и игры</li>
+                <li>Конструкторы и пазлы</li>
+                <li>Куклы и машинки</li>
+                <li>Мягкие игрушки</li>
+                <li>Настольные игры</li>
+              </ul>
+            </div>
+            <div>
+              <h3 class="text-xl font-semibold text-foreground mb-3">
+                Официальные бренды
+              </h3>
+              <p class="mb-4">
+                Мы работаем с ведущими производителями детских игрушек. В нашем
+                каталоге представлены только оригинальные товары от проверенных
+                брендов с гарантией качества.
+              </p>
+            </div>
+          </div>
+          <div class="mt-8 pt-8 border-t">
+            <h3 class="text-xl font-semibold text-foreground mb-3">
+              Преимущества покупки в {{ siteName }}
+            </h3>
+            <ul class="grid md:grid-cols-2 gap-3">
+              <li class="flex items-start gap-2">
+                <Icon
+                  name="lucide:map-pin"
+                  class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
+                />
+                <span><strong>Доставка по Алматы</strong> - быстрая и удобная</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <Icon
+                  name="lucide:gift"
+                  class="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5"
+                />
+                <span><strong>Бонусная программа</strong> - накапливайте баллы за покупки</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <Icon
+                  name="lucide:shield-check"
+                  class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
+                />
+                <span><strong>Гарантия качества</strong> - только сертифицированные товары</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <Icon
+                  name="lucide:headphones"
+                  class="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5"
+                />
+                <span><strong>Поддержка 24/7</strong> - всегда рады помочь</span>
+              </li>
+            </ul>
+            <div class="mt-6 pt-6 border-t">
+              <div class="flex items-center gap-3">
+                <Icon
+                  name="lucide:phone"
+                  class="w-6 h-6 text-primary flex-shrink-0"
+                />
+                <div>
+                  <p class="text-sm text-muted-foreground">
+                    Свяжитесь с нами:
+                  </p>
+                  <a
+                    href="tel:+77771243843"
+                    class="text-lg font-semibold text-foreground hover:text-primary transition-colors"
+                  >
+                    +7 (777) 124-38-43
+                  </a>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </template>
+
+<style scoped>
+/* Мобильная распорка = высота фиксированного героя; на десктопе героя нет
+   поверх, лист наезжает отрицательным margin'ом (см. .home-content). */
+.home-hero-spacer {
+  height: min(62vh, 540px);
+  background: #dfe7ee;
+}
+
+.home-content {
+  position: relative;
+  z-index: 6;
+  margin-top: -18px;
+  background: #fff;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 28px rgb(15 23 42 / 0.18);
+  min-height: 70vh;
+}
+
+.home-shop-tab-wrap {
+  position: relative;
+  height: 0;
+}
+
+.home-shop-tab {
+  position: absolute;
+  top: -19px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  height: 38px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-promo-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* Edge-bleed рельсов на мобильном (как .rail-bleed в прототипе).
+   Отступ обязан браться из --page-gutter — иначе рельс вылезает за контейнер
+   и даёт горизонтальный скролл всей страницы. */
+.rail-bleed {
+  margin-inline: 0;
+}
+
+@media (max-width: 767px) {
+  .rail-bleed {
+    margin-inline: calc(-1 * var(--page-gutter));
+    padding-inline: var(--page-gutter);
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-hero-spacer {
+    display: none;
+  }
+
+  .home-content {
+    margin-top: clamp(-60px, -4vw, -36px);
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -10px 30px rgb(0 0 0 / 0.07);
+    min-height: 0;
+  }
+
+  .home-promo-grid {
+    grid-template-columns: 1.5fr 1fr;
+    gap: 20px;
+    align-items: stretch;
+  }
+}
+</style>

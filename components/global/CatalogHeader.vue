@@ -1,5 +1,8 @@
 <script setup lang="ts">
+defineProps<{ hideMobileTrigger?: boolean, hideDesktopTrigger?: boolean }>()
+
 const sortBy = defineModel<string>('sortBy', { required: true })
+const isDrawerOpen = defineModel<boolean>('open', { default: false })
 
 const sortOptions = [
   { value: 'popularity', label: 'Популярные', icon: 'lucide:trending-up', description: 'Сначала популярные товары' },
@@ -9,7 +12,6 @@ const sortOptions = [
 ]
 
 const isPopoverOpen = ref(false)
-const isDrawerOpen = ref(false)
 
 // Проверяем, активна ли не-дефолтная сортировка
 const isActive = computed(() => sortBy.value !== 'popularity')
@@ -33,7 +35,7 @@ function selectSort(value: string) {
 
 <template>
   <!-- Десктоп: Popover -->
-  <Popover v-model:open="isPopoverOpen">
+  <Popover v-if="!hideDesktopTrigger" v-model:open="isPopoverOpen">
     <PopoverTrigger as-child>
       <Button
         :variant="isActive ? 'default' : 'outline'"
@@ -91,6 +93,7 @@ function selectSort(value: string) {
 
   <!-- Мобилка: только кнопка для открытия Drawer -->
   <Button
+    v-if="!hideMobileTrigger"
     :variant="isActive ? 'default' : 'outline'"
     class="h-11 w-11 p-0 shrink-0 transition-colors lg:hidden"
     :class="[
