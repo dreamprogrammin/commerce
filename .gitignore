@@ -29,3 +29,5 @@ storybook-static
 # Google Service Account (secret key)
 service-account.json
 *.json.key
+.vercel
+.env*

@@ -1,56 +1,15 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { carouselContainerVariants } from '@/lib/variants'
-import { useProfileStore } from '@/stores/core/profileStore'
+import ProfileNav from '@/components/profile/ProfileNav.vue'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 
 const authStore = useAuthStore()
-const profileStore = useProfileStore()
 const { isLoggedIn } = storeToRefs(authStore)
-const { fullName } = storeToRefs(profileStore)
+const route = useRoute()
 
-const alwaysContainedClass = carouselContainerVariants({ contained: 'always' })
-
-const navItems = [
-  {
-    to: '/profile',
-    icon: 'lucide:user',
-    label: 'Профиль',
-    shortLabel: 'Профиль',
-  },
-  {
-    to: '/profile/children',
-    icon: 'lucide:smile',
-    label: 'Мои дети',
-    shortLabel: 'Дети',
-  },
-  {
-    to: '/profile/order',
-    icon: 'lucide:shopping-bag',
-    label: 'Мои заказы',
-    shortLabel: 'Заказы',
-  },
-  {
-    to: '/profile/wishlist',
-    icon: 'lucide:heart',
-    label: 'Избранное',
-    shortLabel: 'Избранное',
-  },
-  {
-    to: '/profile/bonuses',
-    icon: 'lucide:star',
-    label: 'Бонусы',
-    shortLabel: 'Бонусы',
-  },
-  {
-    to: '/profile/settings',
-    icon: 'lucide:settings',
-    label: 'Настройки',
-    shortLabel: 'Настройки',
-  },
-]
-
-const userInitial = computed(() => fullName.value?.charAt(0) || 'П')
+// Страницы, уже переведённые на новый дизайн, рисуют карточки сами.
+// Остальные пока живут внутри общей карточки-обёртки — снимаем её по мере переноса.
+const isBare = computed(() => route.meta.profileBare === true)
 
 // ✅ Защита: если пользователь не авторизован - ничего не показываем
 // Middleware уже откроет модальное окно и прервет навигацию
@@ -63,144 +22,44 @@ useHead({
 
 <template>
   <!-- ✅ Показываем layout только авторизованным пользователям -->
-  <div v-if="isLoggedIn" class="min-h-screen flex flex-col md:block">
+  <div v-if="isLoggedIn" class="profile-shell min-h-screen">
     <!-- Desktop Header -->
-    <div class="hidden md:block">
+    <div class="hidden lg:block">
       <CommonHeader />
     </div>
 
-    <!-- Mobile: Profile Header -->
-    <div class="md:hidden">
-      <!-- User Card -->
-      <div
-        class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-6"
-      >
-        <div class="flex items-center gap-4">
-          <Avatar class="h-16 w-16 border-2 border-white/30">
-            <AvatarFallback class="bg-white/20 text-white text-xl">
-              <ClientOnly fallback="П">
-                {{ userInitial }}
-              </ClientOnly>
-            </AvatarFallback>
-          </Avatar>
-          <div class="flex-1 min-w-0">
-            <h2 class="text-xl font-bold truncate">
-              <ClientOnly fallback="Загрузка...">
-                {{ fullName || "Пользователь" }}
-              </ClientOnly>
-            </h2>
-            <p class="text-sm text-white/80">
-              Личный кабинет
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Scrollable Navigation Tabs -->
-      <div
-        class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10"
-      >
-        <div class="flex px-2 gap-1 overflow-x-auto hide-scrollbar">
-          <NuxtLink v-for="item in navItems" :key="item.to" :to="item.to">
-            <template #default="{ isActive }">
-              <div
-                class="flex items-center gap-2 px-4 py-3 rounded-t-lg transition-colors whitespace-nowrap"
-                :class="
-                  isActive
-                    ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                "
-              >
-                <Icon :name="item.icon" class="w-4 h-4 flex-shrink-0" />
-                <span class="text-sm font-medium">{{ item.shortLabel }}</span>
-              </div>
-            </template>
-          </NuxtLink>
-        </div>
-      </div>
+    <!-- Mobile: общий для сайта таббар (fixed) -->
+    <div class="lg:hidden">
+      <CommonAppTabBarMobile />
     </div>
 
-    <!-- Main Container -->
     <div
-      :class="`${alwaysContainedClass} flex-1 mx-auto px-4 py-4 md:py-8 pb-20 md:pb-6`"
+      class="mx-auto w-full max-w-[1240px] px-4 pt-[76px] pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:pt-5 lg:pb-10"
     >
-      <div class="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6 md:gap-8">
+      <!-- Mobile: навигация чипсами, в край экрана -->
+      <div class="-mx-4 mb-3.5 sm:-mx-6 lg:hidden">
+        <ProfileNav mobile class="px-4 sm:px-6" />
+      </div>
+
+      <div class="lg:flex lg:items-start lg:gap-[26px]">
         <!-- Desktop Sidebar -->
-        <aside class="hidden md:flex flex-col h-fit sticky top-4 space-y-6">
-          <div class="space-y-4">
-            <!-- User Info -->
-            <div
-              class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
-            >
-              <Avatar class="h-10 w-10">
-                <AvatarFallback>
-                  <ClientOnly fallback="П">
-                    {{ userInitial }}
-                  </ClientOnly>
-                </AvatarFallback>
-              </Avatar>
-              <span class="font-semibold text-base truncate flex-1">
-                <ClientOnly fallback="Загрузка...">
-                  {{ fullName || "Пользователь" }}
-                </ClientOnly>
-              </span>
-            </div>
-
-            <!-- Navigation -->
-            <nav class="flex flex-col space-y-1">
-              <NuxtLink v-for="item in navItems" :key="item.to" :to="item.to">
-                <template #default="{ isActive }">
-                  <Button
-                    :variant="isActive ? 'secondary' : 'ghost'"
-                    class="w-full justify-start"
-                  >
-                    <Icon :name="item.icon" class="w-4 h-4 mr-2" />
-                    {{ item.label }}
-                  </Button>
-                </template>
-              </NuxtLink>
-            </nav>
-          </div>
-
-          <!-- Logout Button -->
-          <div class="pt-4 border-t border-gray-200 dark:border-gray-800">
-            <Button
-              variant="ghost"
-              class="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-              @click="authStore.signOut()"
-            >
-              <Icon name="lucide:log-out" class="w-4 h-4 mr-2" />
-              Выйти
-            </Button>
-          </div>
+        <aside
+          class="profile-scroll sticky top-5 hidden max-h-[calc(100vh-40px)] w-[264px] flex-none overflow-y-auto lg:block"
+        >
+          <ProfileNav />
         </aside>
 
         <!-- Main Content -->
         <main
-          class="bg-background md:rounded-xl md:border md:shadow-sm md:p-6 min-h-[400px]"
+          class="min-w-0 flex-1"
+          :class="
+            isBare
+              ? ''
+              : 'rounded-[18px] border border-border bg-white p-4 shadow-sm sm:p-6'
+          "
         >
           <slot />
         </main>
-      </div>
-    </div>
-
-    <!-- Mobile: Bottom Navigation Bar -->
-    <div
-      class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg safe-area-pb z-20"
-    >
-      <div class="px-4 py-3 flex gap-2">
-        <Button variant="outline" class="flex-1" @click="$router.push('/')">
-          <Icon name="lucide:home" class="w-4 h-4 mr-2" />
-          Главная
-        </Button>
-        <Button
-          variant="destructive"
-          size="icon"
-          class="flex-shrink-0"
-          @click="authStore.signOut()"
-        >
-          <Icon name="lucide:log-out" class="w-5 h-5" />
-        </Button>
       </div>
     </div>
   </div>
@@ -219,16 +78,18 @@ useHead({
 </template>
 
 <style scoped>
-.safe-area-pb {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+/* Фон из макета: blue-50 сверху, уходящий в нейтральный к 320px */
+.profile-shell {
+  overflow-x: clip;
+  background: linear-gradient(180deg, var(--color-blue-50, oklch(0.97 0.014 254.604)), #f5f6f9 320px);
 }
 
-.hide-scrollbar {
+.profile-scroll {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
-.hide-scrollbar::-webkit-scrollbar {
+.profile-scroll::-webkit-scrollbar {
   display: none;
 }
 </style>
