@@ -46,10 +46,17 @@ export default defineNuxtConfig({
   // @nuxt/fonts — font-display: swap убирает блокировку рендера шрифтами
   fonts: {
     defaults: {
-      weights: [400, 500, 600, 700],
+      // 800/900 нужны заголовкам и ценам в дизайне главной — без них
+      // браузер синтезирует псевдожирное начертание
+      weights: [400, 500, 600, 700, 800, 900],
       styles: ['normal'],
       subsets: ['cyrillic', 'latin'],
     },
+    families: [
+      // Montserrat Alternates используется только для логотипа-словомарки
+      // («Ухтышка» в шапке, подвале и на бонусной карте) — тянем один вес
+      { name: 'Montserrat Alternates', weights: [800] },
+    ],
     display: 'swap',
     // Предзагружаем шрифты для быстрого первого рендера
     preload: true,

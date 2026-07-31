@@ -245,494 +245,544 @@ watch(() => props.numericAttributeRanges, (newRanges) => {
     }
   })
 }, { deep: true, immediate: true })
+
+// --- 4. UI-МЕЛОЧИ (тонкий скроллбар, появляется только во время скролла) ---
+const isScrolling = ref(false)
+let scrollTimeout: ReturnType<typeof setTimeout> | undefined
+
+function onAsideScroll() {
+  isScrolling.value = true
+  clearTimeout(scrollTimeout)
+  scrollTimeout = setTimeout(() => {
+    isScrolling.value = false
+  }, 700)
+}
+
+onUnmounted(() => {
+  clearTimeout(scrollTimeout)
+})
 </script>
 
 <template>
-  <div class="bg-white border rounded-xl p-4 flex flex-col sticky top-4 h-[calc(100vh-1rem)]">
-    <!-- Заголовок -->
-    <div class="flex items-center justify-between pb-3 border-b shrink-0">
-      <div class="flex items-center gap-2">
-        <Icon name="lucide:sliders-horizontal" class="w-5 h-5 text-muted-foreground" />
-        <h3 class="font-bold text-lg">
-          Фильтры
-        </h3>
-      </div>
-      <Badge v-if="activeFiltersCount > 0" variant="secondary" class="bg-primary/10 text-primary">
-        {{ activeFiltersCount }}
-      </Badge>
+  <div class="df-aside thin-scroll" :class="{ scrolling: isScrolling }" @scroll="onAsideScroll">
+    <div class="df-header-row">
+      <span class="df-title">
+        <Icon name="lucide:sliders-horizontal" class="df-title-icon" />
+        Фильтры
+      </span>
+      <button v-if="activeFiltersCount > 0" type="button" class="df-reset" @click="resetFilters">
+        Сбросить
+      </button>
     </div>
 
-    <!-- Контент с прокруткой -->
-    <div class="space-y-3 flex-1 overflow-y-auto pr-2 scrollbar-thin mt-4">
-      <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ -->
-      <div v-if="subcategories.length > 0" class="space-y-2">
-        <div class="flex items-center gap-2 mb-2">
-          <Icon name="lucide:layers" class="w-4 h-4 text-muted-foreground" />
-          <h4 class="font-semibold text-sm">
-            Подкатегории
-          </h4>
-        </div>
-        <button
-          v-for="cat in subcategories"
-          :key="cat.id"
-          type="button"
-          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
-          :class="[
-            props.modelValue.subCategoryIds.includes(cat.id)
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
-          ]"
-          @click="updateSubCategory(!props.modelValue.subCategoryIds.includes(cat.id), cat.id)"
-        >
-          <div
-            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-            :class="props.modelValue.subCategoryIds.includes(cat.id) ? 'bg-white/20' : 'bg-background/50'"
-          >
-            <Icon
-              :name="props.modelValue.subCategoryIds.includes(cat.id) ? 'lucide:check' : 'lucide:folder'"
-              class="w-4 h-4"
-            />
-          </div>
-          <div class="flex-1 text-left font-medium">
-            {{ cat.name }}
-          </div>
-        </button>
+    <!-- 1. ФИЛЬТР ПО ПОДКАТЕГОРИЯМ -->
+    <div v-if="subcategories.length > 0" class="df-card df-card--tight">
+      <button
+        v-for="cat in subcategories"
+        :key="cat.id"
+        type="button"
+        class="df-row"
+        :class="{ 'df-row--active': props.modelValue.subCategoryIds.includes(cat.id) }"
+        @click="updateSubCategory(!props.modelValue.subCategoryIds.includes(cat.id), cat.id)"
+      >
+        <span class="df-row-label">{{ cat.name }}</span>
+      </button>
+    </div>
+
+    <!-- 2. БРЕНДЫ -->
+    <div v-if="availableBrands.length > 0" class="df-card">
+      <div class="df-card-title">
+        Бренды
+      </div>
+      <button
+        v-for="brand in availableBrands"
+        :key="brand.id"
+        type="button"
+        class="df-row df-row--boxed"
+        :class="{ 'df-row--active': modelValue.brandIds?.includes(brand.id) }"
+        @click="updateDirectFilter(!modelValue.brandIds?.includes(brand.id), 'brandIds', brand.id)"
+      >
+        <span class="df-box" :class="{ 'df-box--active': modelValue.brandIds?.includes(brand.id) }">
+          <Icon v-if="modelValue.brandIds?.includes(brand.id)" name="lucide:check" class="df-box-icon" />
+        </span>
+        <span class="df-row-label">{{ brand.name }}</span>
+        <span v-if="brand.products_count" class="df-row-count">{{ brand.products_count }}</span>
+      </button>
+    </div>
+
+    <!-- 2.5. ЛИНЕЙКИ ПРОДУКТОВ -->
+    <div v-if="availableProductLines.length > 0" class="df-card">
+      <div class="df-card-title">
+        Линейки
+      </div>
+      <button
+        v-for="line in availableProductLines"
+        :key="line.id"
+        type="button"
+        class="df-row df-row--boxed"
+        :class="{ 'df-row--active': modelValue.productLineIds?.includes(line.id) }"
+        @click="updateDirectFilter(!modelValue.productLineIds?.includes(line.id), 'productLineIds', line.id)"
+      >
+        <span class="df-box" :class="{ 'df-box--active': modelValue.productLineIds?.includes(line.id) }">
+          <Icon v-if="modelValue.productLineIds?.includes(line.id)" name="lucide:check" class="df-box-icon" />
+        </span>
+        <span class="df-row-label">{{ line.name }}</span>
+      </button>
+    </div>
+
+    <!-- 3. МАТЕРИАЛЫ -->
+    <div v-if="availableMaterials.length > 0" class="df-card">
+      <div class="df-card-title">
+        Материал
+      </div>
+      <button
+        v-for="material in availableMaterials"
+        :key="material.id"
+        type="button"
+        class="df-row df-row--boxed"
+        :class="{ 'df-row--active': modelValue.materialIds?.includes(String(material.id)) }"
+        @click="updateDirectFilter(!modelValue.materialIds?.includes(String(material.id)), 'materialIds', material.id)"
+      >
+        <span class="df-box" :class="{ 'df-box--active': modelValue.materialIds?.includes(String(material.id)) }">
+          <Icon v-if="modelValue.materialIds?.includes(String(material.id))" name="lucide:check" class="df-box-icon" />
+        </span>
+        <span class="df-row-label">{{ material.name }}</span>
+      </button>
+    </div>
+
+    <!-- 4. СТРАНЫ -->
+    <div v-if="availableCountries.length > 0" class="df-card">
+      <div class="df-card-title">
+        Страна происхождения
+      </div>
+      <button
+        v-for="country in availableCountries"
+        :key="country.id"
+        type="button"
+        class="df-row df-row--boxed"
+        :class="{ 'df-row--active': modelValue.countryIds?.includes(String(country.id)) }"
+        @click="updateDirectFilter(!modelValue.countryIds?.includes(String(country.id)), 'countryIds', country.id)"
+      >
+        <span class="df-box" :class="{ 'df-box--active': modelValue.countryIds?.includes(String(country.id)) }">
+          <Icon v-if="modelValue.countryIds?.includes(String(country.id))" name="lucide:check" class="df-box-icon" />
+        </span>
+        <span class="df-row-label">{{ country.name }}</span>
+      </button>
+    </div>
+
+    <!-- 5. ДИНАМИЧЕСКИЕ АТРИБУТЫ (без number_range - он заменён на слайдер piece_count) -->
+    <div
+      v-for="filter in displayableFilters"
+      :key="filter.id"
+      class="df-card"
+    >
+      <div class="df-card-title">
+        {{ filter.name }}
       </div>
 
-      <!-- 2. БРЕНДЫ -->
-      <div v-if="availableBrands.length > 0" class="space-y-2 pt-3 border-t">
-        <div class="flex items-center gap-2 mb-2">
-          <Icon name="lucide:tag" class="w-4 h-4 text-muted-foreground" />
-          <h4 class="font-semibold text-sm">
-            Бренды
-          </h4>
-        </div>
+      <!-- Для типа 'select' -->
+      <template v-if="filter.display_type === 'select'">
         <button
-          v-for="brand in availableBrands"
-          :key="brand.id"
+          v-for="option in filter.attribute_options"
+          :key="option.id"
           type="button"
-          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
-          :class="[
-            modelValue.brandIds?.includes(brand.id)
-              ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md shadow-purple-500/20'
-              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
-          ]"
-          @click="updateDirectFilter(!modelValue.brandIds?.includes(brand.id), 'brandIds', brand.id)"
+          class="df-row df-row--boxed"
+          :class="{ 'df-row--active': modelValue.attributes[filter.slug]?.includes(option.id) }"
+          @click="updateAttribute(!modelValue.attributes[filter.slug]?.includes(option.id), filter.slug, option.id)"
         >
-          <div
-            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-            :class="modelValue.brandIds?.includes(brand.id) ? 'bg-white/20' : 'bg-background/50'"
-          >
-            <Icon
-              :name="modelValue.brandIds?.includes(brand.id) ? 'lucide:check' : 'lucide:award'"
-              class="w-4 h-4"
-            />
-          </div>
-          <div class="flex-1 text-left font-medium">
-            {{ brand.name }}
-          </div>
+          <span class="df-box" :class="{ 'df-box--active': modelValue.attributes[filter.slug]?.includes(option.id) }">
+            <Icon v-if="modelValue.attributes[filter.slug]?.includes(option.id)" name="lucide:check" class="df-box-icon" />
+          </span>
+          <span class="df-row-label">{{ option.value }}</span>
         </button>
-      </div>
+      </template>
 
-      <!-- 2.5. ЛИНЕЙКИ ПРОДУКТОВ -->
-      <div v-if="availableProductLines.length > 0" class="space-y-2 pt-3 border-t">
-        <div class="flex items-center gap-2 mb-2">
-          <Icon name="lucide:sparkles" class="w-4 h-4 text-muted-foreground" />
-          <h4 class="font-semibold text-sm">
-            Линейки
-          </h4>
+      <!-- Для типа 'color' -->
+      <template v-if="filter.display_type === 'color'">
+        <div class="df-color-grid">
+          <button
+            v-for="option in filter.attribute_options"
+            :key="option.id"
+            type="button"
+            :title="option.value"
+            class="df-color-item"
+            :class="{ 'df-color-item--active': modelValue.attributes[filter.slug]?.includes(option.id) }"
+            @click="() => {
+              const isCurrentlyChecked = modelValue.attributes[filter.slug]?.includes(option.id);
+              updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
+            }"
+          >
+            <span
+              class="df-color-swatch"
+              :style="{ backgroundColor: ((option.meta as unknown) as ColorOptionMeta)?.hex }"
+            />
+            <span class="df-color-label">{{ option.value }}</span>
+          </button>
         </div>
-        <button
-          v-for="line in availableProductLines"
-          :key="line.id"
-          type="button"
-          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
-          :class="[
-            modelValue.productLineIds?.includes(line.id)
-              ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-md shadow-pink-500/20'
-              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
-          ]"
-          @click="updateDirectFilter(!modelValue.productLineIds?.includes(line.id), 'productLineIds', line.id)"
-        >
-          <div
-            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-            :class="modelValue.productLineIds?.includes(line.id) ? 'bg-white/20' : 'bg-background/50'"
-          >
-            <Icon
-              :name="modelValue.productLineIds?.includes(line.id) ? 'lucide:check' : 'lucide:sparkles'"
-              class="w-4 h-4"
-            />
-          </div>
-          <div class="flex-1 text-left font-medium">
-            {{ line.name }}
-          </div>
-        </button>
-      </div>
+      </template>
+    </div>
 
-      <!-- 3. МАТЕРИАЛЫ -->
-      <div v-if="availableMaterials.length > 0" class="space-y-2 pt-3 border-t">
-        <div class="flex items-center gap-2 mb-2">
-          <Icon name="lucide:layers-2" class="w-4 h-4 text-muted-foreground" />
-          <h4 class="font-semibold text-sm">
-            Материал
-          </h4>
-        </div>
-        <button
-          v-for="material in availableMaterials"
-          :key="material.id"
-          type="button"
-          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
-          :class="[
-            modelValue.materialIds?.includes(String(material.id))
-              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md shadow-green-500/20'
-              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
-          ]"
-          @click="updateDirectFilter(!modelValue.materialIds?.includes(String(material.id)), 'materialIds', material.id)"
-        >
-          <div
-            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-            :class="modelValue.materialIds?.includes(String(material.id)) ? 'bg-white/20' : 'bg-background/50'"
-          >
-            <Icon
-              :name="modelValue.materialIds?.includes(String(material.id)) ? 'lucide:check' : 'lucide:box'"
-              class="w-4 h-4"
-            />
-          </div>
-          <div class="flex-1 text-left font-medium">
-            {{ material.name }}
-          </div>
-        </button>
-      </div>
-
-      <!-- 4. СТРАНЫ -->
-      <div v-if="availableCountries.length > 0" class="space-y-2 pt-3 border-t">
-        <div class="flex items-center gap-2 mb-2">
-          <Icon name="lucide:globe" class="w-4 h-4 text-muted-foreground" />
-          <h4 class="font-semibold text-sm">
-            Страна происхождения
-          </h4>
-        </div>
-        <button
-          v-for="country in availableCountries"
-          :key="country.id"
-          type="button"
-          class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
-          :class="[
-            modelValue.countryIds?.includes(String(country.id))
-              ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20'
-              : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
-          ]"
-          @click="updateDirectFilter(!modelValue.countryIds?.includes(String(country.id)), 'countryIds', country.id)"
-        >
-          <div
-            class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-            :class="modelValue.countryIds?.includes(String(country.id)) ? 'bg-white/20' : 'bg-background/50'"
-          >
-            <Icon
-              :name="modelValue.countryIds?.includes(String(country.id)) ? 'lucide:check' : 'lucide:map-pin'"
-              class="w-4 h-4"
-            />
-          </div>
-          <div class="flex-1 text-left font-medium">
-            {{ country.name }}
-          </div>
-        </button>
-      </div>
-
-      <!-- 5. ДИНАМИЧЕСКИЕ АТРИБУТЫ (без number_range - он заменён на слайдер piece_count) -->
+    <!-- 5.5. ЧИСЛОВЫЕ АТРИБУТЫ (слайдеры) -->
+    <ClientOnly v-for="numericFilter in numericFilters" :key="`numeric-${numericFilter.id}`">
       <div
-        v-for="filter in displayableFilters"
-        :key="filter.id"
-        class="space-y-2 pt-3 border-t"
+        v-if="numericAttributeRanges[numericFilter.id] && localNumericAttributes[numericFilter.id]"
+        class="df-card"
       >
-        <div class="flex items-center gap-2 mb-2">
-          <Icon name="lucide:settings-2" class="w-4 h-4 text-muted-foreground" />
-          <h4 class="font-semibold text-sm">
-            {{ filter.name }}
-          </h4>
+        <div class="df-card-title">
+          {{ numericFilter.name }}
         </div>
 
-        <!-- Для типа 'select' -->
-        <template v-if="filter.display_type === 'select'">
-          <div class="space-y-2">
-            <button
-              v-for="option in filter.attribute_options"
-              :key="option.id"
-              type="button"
-              class="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-sm"
-              :class="[
-                modelValue.attributes[filter.slug]?.includes(option.id)
-                  ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-md shadow-pink-500/20'
-                  : 'bg-secondary/60 hover:bg-secondary hover:shadow-sm active:scale-[0.98]',
-              ]"
-              @click="updateAttribute(!modelValue.attributes[filter.slug]?.includes(option.id), filter.slug, option.id)"
-            >
-              <div
-                class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-                :class="modelValue.attributes[filter.slug]?.includes(option.id) ? 'bg-white/20' : 'bg-background/50'"
-              >
-                <Icon
-                  :name="modelValue.attributes[filter.slug]?.includes(option.id) ? 'lucide:check' : 'lucide:circle'"
-                  class="w-4 h-4"
-                />
-              </div>
-              <div class="flex-1 text-left font-medium">
-                {{ option.value }}
-              </div>
-            </button>
+        <template v-if="isLoading">
+          <div class="space-y-2 pb-3">
+            <Skeleton class="h-3 w-full" />
+            <Skeleton class="h-3 w-1/2" />
           </div>
         </template>
-
-        <!-- Для типа 'color' -->
-        <template v-if="filter.display_type === 'color'">
-          <div class="grid grid-cols-3 gap-2 pt-2">
-            <button
-              v-for="option in filter.attribute_options"
-              :key="option.id"
-              type="button"
-              :title="option.value"
-              class="relative flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all duration-200"
-              :class="[
-                modelValue.attributes[filter.slug]?.includes(option.id)
-                  ? 'bg-primary/10 ring-2 ring-primary'
-                  : 'bg-secondary/60 hover:bg-secondary active:scale-95',
-              ]"
-              @click="() => {
-                const isCurrentlyChecked = modelValue.attributes[filter.slug]?.includes(option.id);
-                updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
-              }"
-            >
-              <div
-                :style="{ backgroundColor: ((option.meta as unknown) as ColorOptionMeta)?.hex }"
-                class="h-10 w-10 rounded-md border-2 transition-transform"
-                :class="{
-                  'border-primary scale-110': modelValue.attributes[filter.slug]?.includes(option.id),
-                  'border-border': !modelValue.attributes[filter.slug]?.includes(option.id),
-                }"
-              />
-              <span class="text-[10px] font-medium text-center line-clamp-1">
-                {{ option.value }}
-              </span>
-              <Icon
-                v-if="modelValue.attributes[filter.slug]?.includes(option.id)"
-                name="lucide:check-circle"
-                class="absolute top-0.5 right-0.5 w-4 h-4 text-primary"
-              />
-            </button>
+        <template v-else>
+          <div class="df-slider-wrap">
+            <Slider
+              v-model="localNumericAttributes[numericFilter.id]"
+              :min="numericAttributeRanges[numericFilter.id].min"
+              :max="numericAttributeRanges[numericFilter.id].max"
+              :step="1"
+              @value-commit="(val: number[]) => commitNumericAttributeToFilters(numericFilter.id, val)"
+            />
+          </div>
+          <div class="df-slider-values">
+            <span>{{ localNumericAttributes[numericFilter.id][0] }} {{ (numericFilter as any).unit || '' }}</span>
+            <span>{{ localNumericAttributes[numericFilter.id][1] }} {{ (numericFilter as any).unit || '' }}</span>
           </div>
         </template>
       </div>
 
-      <!-- 5.5. ЧИСЛОВЫЕ АТРИБУТЫ (слайдеры) -->
-      <ClientOnly v-for="numericFilter in numericFilters" :key="`numeric-${numericFilter.id}`">
-        <div
-          v-if="numericAttributeRanges[numericFilter.id] && localNumericAttributes[numericFilter.id]"
-          class="space-y-3 pt-3 border-t"
-        >
-          <div class="flex items-center gap-2">
-            <Icon name="lucide:ruler" class="w-4 h-4 text-muted-foreground" />
-            <h4 class="font-semibold text-sm">
-              {{ numericFilter.name }}
-            </h4>
+      <!-- Fallback для SSR -->
+      <template #fallback>
+        <div class="df-card">
+          <div class="df-card-title">
+            {{ numericFilter.name }}
           </div>
+          <div class="space-y-2 pb-3">
+            <Skeleton class="h-3 w-full" />
+            <Skeleton class="h-3 w-1/2" />
+          </div>
+        </div>
+      </template>
+    </ClientOnly>
 
-          <template v-if="isLoading">
-            <div class="space-y-3 pt-2">
-              <Skeleton class="h-3 w-full" />
-              <Skeleton class="h-3 w-1/2" />
-            </div>
-          </template>
-          <template v-else>
-            <div class="px-1 pt-2">
-              <Slider
-                v-model="localNumericAttributes[numericFilter.id]"
-                :min="numericAttributeRanges[numericFilter.id].min"
-                :max="numericAttributeRanges[numericFilter.id].max"
-                :step="1"
-                @value-commit="(val: number[]) => commitNumericAttributeToFilters(numericFilter.id, val)"
-              />
-            </div>
-            <div class="flex justify-between items-center gap-2">
-              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
-                <div class="text-[10px] text-muted-foreground mb-0.5">
-                  От
-                </div>
-                <div class="font-semibold text-xs">
-                  {{ localNumericAttributes[numericFilter.id][0] }} {{ (numericFilter as any).unit || '' }}
-                </div>
-              </div>
-              <Icon name="lucide:minus" class="w-3 h-3 text-muted-foreground" />
-              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
-                <div class="text-[10px] text-muted-foreground mb-0.5">
-                  До
-                </div>
-                <div class="font-semibold text-xs">
-                  {{ localNumericAttributes[numericFilter.id][1] }} {{ (numericFilter as any).unit || '' }}
-                </div>
-              </div>
-            </div>
-          </template>
+    <!-- 6. ФИЛЬТР ПО ЦЕНЕ -->
+    <ClientOnly>
+      <div class="df-card">
+        <div class="df-card-title">
+          Цена, ₸
         </div>
 
-        <!-- Fallback для SSR -->
-        <template #fallback>
-          <div class="space-y-3 pt-3 border-t">
-            <div class="flex items-center gap-2">
-              <Icon name="lucide:ruler" class="w-4 h-4 text-muted-foreground" />
-              <h4 class="font-semibold text-sm">
-                {{ numericFilter.name }}
-              </h4>
-            </div>
-            <div class="space-y-3 pt-2">
-              <Skeleton class="h-3 w-full" />
-              <Skeleton class="h-3 w-1/2" />
-            </div>
+        <template v-if="isLoading">
+          <div class="space-y-2 pb-3">
+            <Skeleton class="h-3 w-full" />
+            <Skeleton class="h-3 w-1/2" />
           </div>
         </template>
-      </ClientOnly>
-
-      <!-- 6. ФИЛЬТР ПО ЦЕНЕ -->
-      <ClientOnly>
-        <div class="space-y-3 pt-3 border-t">
-          <div class="flex items-center gap-2">
-            <Icon name="lucide:wallet" class="w-4 h-4 text-muted-foreground" />
-            <h4 class="font-semibold text-sm">
-              Цена
-            </h4>
+        <template v-else>
+          <div class="df-slider-wrap">
+            <Slider
+              v-model="localPrice"
+              :min="priceRange.min"
+              :max="priceRange.max"
+              :step="100"
+              @value-commit="commitPriceToFilters"
+            />
           </div>
+          <div class="df-slider-values">
+            <span>{{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[0])) }} ₸</span>
+            <span>{{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[1])) }} ₸</span>
+          </div>
+        </template>
+      </div>
 
-          <template v-if="isLoading">
-            <div class="space-y-3 pt-2">
-              <Skeleton class="h-3 w-full" />
-              <Skeleton class="h-3 w-1/2" />
-            </div>
-          </template>
-          <template v-else>
-            <div class="px-1 pt-2">
-              <Slider
-                v-model="localPrice"
-                :min="priceRange.min"
-                :max="priceRange.max"
-                :step="100"
-                @value-commit="commitPriceToFilters"
-              />
-            </div>
-            <div class="flex justify-between items-center gap-2">
-              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
-                <div class="text-[10px] text-muted-foreground mb-0.5">
-                  От
-                </div>
-                <div class="font-semibold text-xs">
-                  {{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[0])) }} ₸
-                </div>
-              </div>
-              <Icon name="lucide:minus" class="w-3 h-3 text-muted-foreground" />
-              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
-                <div class="text-[10px] text-muted-foreground mb-0.5">
-                  До
-                </div>
-                <div class="font-semibold text-xs">
-                  {{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[1])) }} ₸
-                </div>
-              </div>
-            </div>
-          </template>
+      <!-- Fallback для SSR -->
+      <template #fallback>
+        <div class="df-card">
+          <div class="df-card-title">
+            Цена, ₸
+          </div>
+          <div class="space-y-2 pb-3">
+            <Skeleton class="h-3 w-full" />
+            <Skeleton class="h-3 w-1/2" />
+          </div>
+        </div>
+      </template>
+    </ClientOnly>
+
+    <!-- 7. ФИЛЬТР ПО КОЛИЧЕСТВУ ДЕТАЛЕЙ (для конструкторов) -->
+    <ClientOnly v-if="pieceCountRange && localPieceCount">
+      <div class="df-card">
+        <div class="df-card-title">
+          Количество деталей
         </div>
 
-        <!-- Fallback для SSR -->
-        <template #fallback>
-          <div class="space-y-3 pt-3 border-t">
-            <div class="flex items-center gap-2">
-              <Icon name="lucide:wallet" class="w-4 h-4 text-muted-foreground" />
-              <h4 class="font-semibold text-sm">
-                Цена
-              </h4>
-            </div>
-            <div class="space-y-3 pt-2">
-              <Skeleton class="h-3 w-full" />
-              <Skeleton class="h-3 w-1/2" />
-            </div>
+        <template v-if="isLoading">
+          <div class="space-y-2 pb-3">
+            <Skeleton class="h-3 w-full" />
+            <Skeleton class="h-3 w-1/2" />
           </div>
         </template>
-      </ClientOnly>
-
-      <!-- 7. ФИЛЬТР ПО КОЛИЧЕСТВУ ДЕТАЛЕЙ (для конструкторов) -->
-      <ClientOnly v-if="pieceCountRange && localPieceCount">
-        <div class="space-y-3 pt-3 border-t">
-          <div class="flex items-center gap-2">
-            <Icon name="lucide:puzzle" class="w-4 h-4 text-muted-foreground" />
-            <h4 class="font-semibold text-sm">
-              Количество деталей
-            </h4>
+        <template v-else>
+          <div class="df-slider-wrap">
+            <Slider
+              v-model="localPieceCount"
+              :min="pieceCountRange.min"
+              :max="pieceCountRange.max"
+              :step="10"
+              @value-commit="commitPieceCountToFilters"
+            />
           </div>
+          <div class="df-slider-values">
+            <span>{{ localPieceCount[0] }} шт</span>
+            <span>{{ localPieceCount[1] }} шт</span>
+          </div>
+        </template>
+      </div>
 
-          <template v-if="isLoading">
-            <div class="space-y-3 pt-2">
-              <Skeleton class="h-3 w-full" />
-              <Skeleton class="h-3 w-1/2" />
-            </div>
-          </template>
-          <template v-else>
-            <div class="px-1 pt-2">
-              <Slider
-                v-model="localPieceCount"
-                :min="pieceCountRange.min"
-                :max="pieceCountRange.max"
-                :step="10"
-                @value-commit="commitPieceCountToFilters"
-              />
-            </div>
-            <div class="flex justify-between items-center gap-2">
-              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
-                <div class="text-[10px] text-muted-foreground mb-0.5">
-                  От
-                </div>
-                <div class="font-semibold text-xs">
-                  {{ localPieceCount[0] }} шт
-                </div>
-              </div>
-              <Icon name="lucide:minus" class="w-3 h-3 text-muted-foreground" />
-              <div class="flex-1 p-2 rounded-lg bg-secondary/60 text-center">
-                <div class="text-[10px] text-muted-foreground mb-0.5">
-                  До
-                </div>
-                <div class="font-semibold text-xs">
-                  {{ localPieceCount[1] }} шт
-                </div>
-              </div>
-            </div>
-          </template>
+      <!-- Fallback для SSR -->
+      <template #fallback>
+        <div class="df-card">
+          <div class="df-card-title">
+            Количество деталей
+          </div>
+          <div class="space-y-2 pb-3">
+            <Skeleton class="h-3 w-full" />
+            <Skeleton class="h-3 w-1/2" />
+          </div>
         </div>
-
-        <!-- Fallback для SSR -->
-        <template #fallback>
-          <div class="space-y-3 pt-3 border-t">
-            <div class="flex items-center gap-2">
-              <Icon name="lucide:puzzle" class="w-4 h-4 text-muted-foreground" />
-              <h4 class="font-semibold text-sm">
-                Количество деталей
-              </h4>
-            </div>
-            <div class="space-y-3 pt-2">
-              <Skeleton class="h-3 w-full" />
-              <Skeleton class="h-3 w-1/2" />
-            </div>
-          </div>
-        </template>
-      </ClientOnly>
-    </div>
-
-    <!-- Кнопка сброса -->
-    <div v-if="activeFiltersCount > 0" class="pt-3 border-t shrink-0">
-      <Button
-        variant="outline"
-        size="sm"
-        class="w-full"
-        @click="resetFilters"
-      >
-        <Icon name="lucide:x" class="w-3 h-3 mr-2" />
-        Сбросить фильтры
-      </Button>
-    </div>
+      </template>
+    </ClientOnly>
   </div>
 </template>
+
+<style scoped>
+.df-aside {
+  /* Must clear CategoryScrollBar (fixed, top:0/z:90, ~59px tall) once it
+     docks on scroll — SiteHeader itself is non-sticky on this page, so it's
+     not a factor. Otherwise the "Фильтры" title and first row stick
+     underneath it, hidden and unclickable. */
+  position: sticky;
+  top: 70px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 70px - 1rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.df-aside::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.df-aside::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 10px 0;
+}
+
+.df-aside::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+}
+
+.df-aside.scrolling {
+  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+}
+
+.df-aside.scrolling::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+.df-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px;
+  flex: none;
+}
+
+.df-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font: 800 17px var(--font-sans);
+  color: var(--foreground);
+}
+
+.df-title-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--primary);
+}
+
+.df-reset {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: 600 13px var(--font-sans);
+  color: var(--primary);
+  padding: 0;
+}
+
+.df-reset:hover {
+  color: var(--blue-700);
+}
+
+.df-card {
+  flex: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px 16px 8px;
+}
+
+.df-card--tight {
+  padding: 8px;
+}
+
+.df-card-title {
+  font: 700 15px var(--font-sans);
+  color: var(--foreground);
+  margin-bottom: 12px;
+}
+
+.df-card--tight .df-card-title {
+  margin: 4px 0 6px 4px;
+}
+
+.df-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font: 600 14px var(--font-sans);
+  color: var(--foreground);
+  margin-bottom: 8px;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.df-row:last-child {
+  margin-bottom: 0;
+}
+
+.df-row--boxed {
+  margin-bottom: 4px;
+  padding: 0 4px;
+}
+
+.df-row--active {
+  background: rgba(43, 127, 255, 0.12);
+  color: var(--primary);
+}
+
+.df-row-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.df-row-count {
+  font: 500 12px var(--font-sans);
+  color: var(--muted-foreground);
+}
+
+.df-box {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  display: grid;
+  place-content: center;
+  transition: all 0.15s ease;
+}
+
+.df-box--active {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.df-box-icon {
+  width: 13px;
+  height: 13px;
+  color: #fff;
+}
+
+.df-slider-wrap {
+  padding: 6px 4px 12px;
+}
+
+.df-slider-values {
+  display: flex;
+  justify-content: space-between;
+  font: 600 13px var(--font-sans);
+  color: var(--muted-foreground);
+  padding-bottom: 16px;
+}
+
+.df-color-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.df-color-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.df-color-item--active {
+  background: rgba(43, 127, 255, 0.1);
+  box-shadow: 0 0 0 2px var(--primary) inset;
+}
+
+.df-color-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+}
+
+.df-color-item--active .df-color-swatch {
+  border-color: var(--primary);
+}
+
+.df-color-label {
+  font: 500 11px var(--font-sans);
+  color: var(--foreground);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+</style>

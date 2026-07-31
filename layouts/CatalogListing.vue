@@ -5,19 +5,13 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
 
 <template>
   <div class="flex flex-col" style="min-height: 100dvh">
-    <!-- Header только на десктопе -->
+    <!-- Header только на десктопе; не sticky — на этой странице "прилипает" только CategoryScrollBar -->
     <div class="hidden lg:block">
-      <CommonSiteHeader />
+      <CommonSiteHeader :sticky="false" />
     </div>
 
-    <!-- Таббар только на мобильных -->
-    <div class="lg:hidden">
-      <CommonAppTabBarMobile />
-    </div>
-
-    <main
-      class="flex-1 lg:pt-0 pt-[76px] lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]"
-    >
+    <!-- Мобильный тулбар — часть контента страницы (CategoryMobileHeader), не layout-chrome -->
+    <main class="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
       <slot />
     </main>
 
