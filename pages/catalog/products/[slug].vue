@@ -12,7 +12,6 @@ import SEOContentRenderer from '@/components/product/SEOContentRenderer.vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
-import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useSeoAltText } from '@/composables/useSeoAltText'
 import {
   BUCKET_NAME_BRANDS,
@@ -29,8 +28,9 @@ import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 
+definePageMeta({ layout: 'product-detail' })
+
 const route = useRoute()
-const router = useRouter()
 const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const categoriesStore = useCategoriesStore()
@@ -40,7 +40,7 @@ const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 const { trackViewItem } = useEcommerceTracking()
-const { generateBrandLogoAlt, generateCategoryImageAlt } = useSeoAltText()
+const { generateBrandLogoAlt } = useSeoAltText()
 
 const priceValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   .toISOString()
@@ -59,10 +59,7 @@ await useAsyncData('product-categories', async () => {
   return true
 })
 
-const {
-  data: product,
-  error: productError,
-} = await useAsyncData(`product-${slug.value}`, async () => {
+const { data: product } = await useAsyncData(`product-${slug.value}`, async () => {
   const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
   if (!fetchedProduct) {
     throw createError({
@@ -75,7 +72,6 @@ const {
 })
 
 const isProductLoading = ref(false)
-const isProductError = computed(() => !!productError.value)
 
 const { data: accessories, isLoading: accessoriesLoading } = useQuery({
   queryKey: ['product-accessories', computed(() => product.value?.id)],
@@ -110,7 +106,7 @@ const { data: colorVariants } = await useAsyncData(
   async () => {
     if (!product.value?.model_group_id)
       return []
-    
+
     const supabase = useSupabaseClient()
     const { data } = await supabase
       .from('products')
@@ -124,7 +120,7 @@ const { data: colorVariants } = await useAsyncData(
       .eq('is_active', true)
       .not('id', 'eq', product.value.id)
       .order('display_order', { referencedTable: 'product_images', ascending: true })
-    
+
     // Оставляем только первое изображение для каждого товара
     return data?.map(item => ({
       id: item.id,
@@ -198,7 +194,6 @@ const faqSchemaItems = computed(() => {
     })
 })
 
-const digitColumns = ref<HTMLElement[]>([])
 const isLoading = computed(() => isProductLoading.value)
 
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
@@ -249,18 +244,6 @@ const totalBonuses = computed(() => {
   )
   for (const acc of selected) total += Number(acc.bonus_points_award || 0)
   return total
-})
-
-const priceChars = computed(() => {
-  const formatted = formatPrice(totalPrice.value)
-  let digitIndex = 0
-  return formatted.split('').map((char) => {
-    const isDigit = !Number.isNaN(Number(char)) && char !== ' '
-    const result = { char, isDigit, digitIndex: isDigit ? digitIndex : -1 }
-    if (isDigit)
-      digitIndex++
-    return result
-  })
 })
 
 const selectedAccessoriesData = computed(() =>
@@ -326,24 +309,50 @@ async function addToCart() {
   }
 }
 
-useFlipCounter(totalPrice, digitColumns)
+function incQuantity() {
+  if (!product.value)
+    return
+  const next = quantityInCart.value + 1
+  if (product.value.stock_quantity && next > product.value.stock_quantity)
+    return
+  cartStore.updateQuantity(product.value.id, next)
+}
 
+function decQuantity() {
+  if (!product.value)
+    return
+  // updateQuantity сам удаляет позицию из корзины при quantity <= 0
+  cartStore.updateQuantity(product.value.id, quantityInCart.value - 1)
+}
+
+// Панель покупки «едет» вниз ровно тогда, когда прячется MobileBottomNav,
+// поэтому пороги здесь обязаны совпадать с его собственными
+// (components/global/MobileBottomNav.vue) — иначе панель зависает в воздухе.
 const isNavVisible = ref(true)
 let stickyLastScrollY = 0
+let stickyTicking = false
+
+function applyStickyScroll() {
+  stickyTicking = false
+  const y = window.scrollY
+  const dy = y - stickyLastScrollY
+  if (dy > 6 && y > 280)
+    isNavVisible.value = false
+  else if (dy < -6 || y < 120)
+    isNavVisible.value = true
+  stickyLastScrollY = y
+}
 
 function handleStickyScroll() {
-  const y = window.scrollY
-  if (y < 60)
-    isNavVisible.value = true
-  else if (y > stickyLastScrollY)
-    isNavVisible.value = false
-  else isNavVisible.value = true
-  stickyLastScrollY = y
+  if (!stickyTicking) {
+    stickyTicking = true
+    requestAnimationFrame(applyStickyScroll)
+  }
 }
 
 onMounted(() => {
   window.addEventListener('scroll', handleStickyScroll, { passive: true })
-  
+
   if (product.value) {
     trackViewItem({
       id: product.value.id,
@@ -355,14 +364,10 @@ onMounted(() => {
 })
 onUnmounted(() => window.removeEventListener('scroll', handleStickyScroll))
 
-const quantity = ref(1)
-
 watch(
   () => product.value?.id,
   () => {
-    quantity.value = 1
     selectedAccessoryIds.value = []
-    digitColumns.value = []
   },
   { immediate: true },
 )
@@ -374,6 +379,51 @@ function prefetchProduct(productSlug: string) {
     staleTime: 5 * 60 * 1000,
   })
 }
+
+const { isWishlisted, toggleWishlist } = useProductWishlist(
+  () => product.value?.id,
+  () => product.value?.name,
+)
+
+const mainThumbUrl = computed(() => {
+  const image = product.value?.product_images?.[0]
+  return image ? getVariantUrl(BUCKET_NAME_PRODUCT, image.image_url, 'sm') : null
+})
+
+const questionsCount = computed(() => productQuestions.value?.length ?? 0)
+
+function pluralize(count: number, one: string, few: string, many: string) {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11)
+    return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+    return few
+  return many
+}
+
+const reviewCountLabel = computed(() => {
+  const count = product.value?.review_count ?? 0
+  return `${count} ${pluralize(count, 'отзыв', 'отзыва', 'отзывов')}`
+})
+
+const questionsCountLabel = computed(() =>
+  pluralize(questionsCount.value, 'вопрос', 'вопроса', 'вопросов'),
+)
+
+/** Способы получения и преимущества — статика магазина, единая для всех товаров. */
+const PICKUP_ROWS = [
+  { icon: 'lucide:store', title: 'Забрать в магазине', sub: 'Алматы — сегодня, бесплатно' },
+  { icon: 'lucide:truck', title: 'Курьером по Алматы', sub: '1–2 дня, при заказе до 14:00 — отправка в тот же день' },
+  { icon: 'lucide:package', title: 'По Казахстану', sub: '3–7 дней, Kazpost или CDEK' },
+]
+
+const PERKS = [
+  { icon: 'lucide:truck', text: 'Доставка 1–2 дня по Алматы' },
+  { icon: 'lucide:shield-check', text: 'Гарантия и возврат 14 дней' },
+  { icon: 'lucide:wallet', text: 'Оплата при получении' },
+  { icon: 'lucide:coins', text: 'Кэшбэк бонусами до 10%' },
+]
 
 // ─── SEO computed ───────────────────────────────────────────────────────────
 
@@ -606,6 +656,77 @@ const categoryLink = computed(() =>
   categorySlug.value ? `/catalog/${categorySlug.value}` : null,
 )
 
+/**
+ * «Ещё в этих категориях» — бренд, линейка, категория товара и её родители
+ * одним однородным списком строк-ссылок (в макете это один список карточек,
+ * а не четыре отдельных блока, как было раньше).
+ */
+const moreCategories = computed(() => {
+  const rows: Array<{
+    key: string
+    to: string
+    title: string
+    subtitle: string
+    image: string | null
+    icon: string
+  }> = []
+
+  if (brandName.value && brandLink.value) {
+    rows.push({
+      key: `brand-${brandSlug.value}`,
+      to: brandLink.value,
+      title: brandName.value,
+      subtitle: 'Все товары бренда',
+      image: brandLogoUrl.value,
+      icon: 'lucide:building-2',
+    })
+  }
+
+  if (productLineName.value && productLineLink.value) {
+    rows.push({
+      key: `line-${productLineSlug.value}`,
+      to: productLineLink.value,
+      title: productLineName.value,
+      subtitle: brandName.value ? `Линейка ${brandName.value}` : 'Линейка',
+      image: productLineLogoUrl.value,
+      icon: 'lucide:sparkles',
+    })
+  }
+
+  if (categoryName.value && categoryLink.value) {
+    rows.push({
+      key: `category-${categorySlug.value}`,
+      to: categoryLink.value,
+      title: categoryName.value,
+      subtitle: 'Категория',
+      image: fullCategory.value?.image_url
+        ? getVariantUrl(BUCKET_NAME_CATEGORY, fullCategory.value.image_url, 'sm')
+        : null,
+      icon: 'lucide:box',
+    })
+  }
+
+  for (const item of parentCategories.value) {
+    rows.push({
+      key: `parent-${item.crumb.id}`,
+      to: item.crumb.href!,
+      title: item.crumb.name,
+      subtitle: 'Категория',
+      image: item.category?.image_url
+        ? getVariantUrl(BUCKET_NAME_CATEGORY, item.category.image_url, 'sm')
+        : null,
+      icon: 'lucide:layers',
+    })
+  }
+
+  return rows
+})
+
+/** В макете «Похожие товары» — сетка 2/4 колонки, а не карусель. */
+const similarGridProducts = computed(() =>
+  (similarProducts.value || []).slice(0, 8),
+)
+
 const schemaAdditionalProperties = computed(() => {
   const properties: Array<{ '@type': 'PropertyValue', 'name': string, 'value': string }> = []
 
@@ -817,7 +938,6 @@ useSchemaOrg([
       const p = product.value
       // 🔥 Используем final_price из базы данных (с психологическим округлением)
       const finalPrice = p.final_price || Math.round(Number(p.price))
-      const originalPrice = Math.round(Number(p.price))
 
       return {
         '@type': 'Offer' as const,
@@ -963,399 +1083,242 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div class="bg-background">
-    <div :class="`${containerClass} py-4 lg:py-6`">
-      <ClientOnly>
-        <ProductDetailSkeleton v-if="isLoading" />
+  <div class="pdp-page">
+    <ClientOnly>
+      <ProductDetailSkeleton v-if="isLoading" />
 
-        <div v-else-if="product">
-          <!-- Breadcrumbs с кнопкой избранного -->
-          <div class="flex items-center justify-between mb-4">
-            <Breadcrumbs :items="breadcrumbs" compact class="flex-1" />
-            <ProductWishlistButton
-              :product-id="product.id"
-              :product-name="product.name"
-              class="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg border bg-white hover:bg-muted transition-colors"
-            />
-          </div>
+      <div v-else-if="product">
+        <!-- Мобильная шапка-пилюля: назад · миниатюра · название · шаринг · избранное -->
+        <ProductMobileHeader
+          :product-id="product.id"
+          :product-name="product.name"
+          :thumb-url="mainThumbUrl"
+          :back-to="categoryLink ?? '/catalog'"
+        />
 
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-            <!-- Галерея -->
-            <div class="lg:col-span-7">
-              <div class="bg-white rounded-xl lg:p-4 lg:shadow-sm lg:border">
-                <ProductGallery
-                  v-if="
-                    product.product_images && product.product_images.length > 0
-                  "
-                  :images="product.product_images"
-                  :product-name="product.name"
-                  :brand-name="product.brands?.name"
-                  :line-name="product.product_lines?.name"
-                />
-                <div
-                  v-else
-                  class="bg-muted rounded-lg flex items-center justify-center h-64 lg:h-96"
-                >
-                  <p class="text-muted-foreground">
-                    Изображения отсутствуют
-                  </p>
-                </div>
+        <div :class="`${containerClass} pt-[18px]`">
+          <!-- Хлебные крошки — только десктоп (на мобильных их роль играет шапка-пилюля) -->
+          <Breadcrumbs :items="breadcrumbs" compact class="hidden lg:block" />
+
+          <div class="pdp-top">
+            <!-- ГАЛЕРЕЯ -->
+            <div class="pdp-col-main">
+              <ProductGallery
+                v-if="product.product_images && product.product_images.length > 0"
+                :images="product.product_images"
+                :product-name="product.name"
+                :brand-name="product.brands?.name"
+                :line-name="product.product_lines?.name"
+                :discount-percentage="
+                  mainProductPrice.hasDiscount ? product.discount_percentage : null
+                "
+              />
+              <div
+                v-else
+                class="pdp-card flex h-64 items-center justify-center lg:h-96"
+              >
+                <p class="text-muted-foreground">
+                  Изображения отсутствуют
+                </p>
               </div>
             </div>
 
-            <!-- Правая колонка: Информация о товаре -->
-            <div
-              class="lg:col-span-5 lg:row-span-4 lg:row-start-1 lg:col-start-8"
-            >
-              <div
-                class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border lg:sticky lg:top-4"
-              >
-                <h1
-                  class="text-xl lg:text-2xl font-bold mb-2 leading-tight flex flex-col gap-1"
-                >
-                  <span>{{ product.name }}</span>
-                  <!-- 🔥 ТИКЕТ 3: SEO-хвост для H1 (визуально выглядит как подзаголовок) -->
-                  <!-- {{ ' ' }} — явный пробел-разделитель: Vue схлопывает whitespace-only
-                       переносы строк между тегами, из-за чего текст H1 склеивался в один
-                       "токен" без пробела для краулеров/скринридеров (см. SEO-аудит, SXO-4) -->
-                  {{ ' ' }}
-                  <span
-                    v-if="audienceText || brandName"
-                    class="text-sm font-medium text-muted-foreground/70"
-                  >
-                    Игрушка {{ audienceText }}
-                    <template v-if="brandName">от {{ brandName }}</template>
-                  </span>
+            <!--
+              БЛОК ПОКУПКИ. Один и тот же элемент играет две роли: на мобильных
+              это инфо-карточка под галереей, на десктопе — липкая колонка справа.
+              Дублировать разметку нельзя — в DOM появился бы второй <h1>.
+            -->
+            <div class="pdp-buybox-wrap">
+              <div class="pdp-card pdp-buybox">
+                <h1 class="pdp-title">
+                  {{ product.name }}
                 </h1>
 
-                <!-- Бренд и линейка товара -->
-                <div
-                  v-if="brandName || productLineName"
-                  class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-4"
+                <p
+                  v-if="audienceText || brandName"
+                  class="mb-3 hidden text-[13.5px] font-medium text-muted-foreground lg:block"
                 >
-                  <!-- Бренд -->
-                  <NuxtLink
-                    v-if="brandName && brandLink"
-                    :to="brandLink"
-                    class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
-                  >
-                    <div
-                      class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
-                    >
-                      <ProgressiveImage
-                        v-if="product.brands?.logo_url"
-                        :src="brandLogoUrl"
-                        :alt="generateBrandLogoAlt(brandName || 'Бренд')"
-                        aspect-ratio="square"
-                        object-fit="contain"
-                        placeholder-type="shimmer"
-                        class="w-full h-full"
-                      />
-                      <Icon v-else name="lucide:building-2" class="w-4 h-4" />
-                    </div>
-                    <span class="group-hover:underline">{{ brandName }}</span>
-                  </NuxtLink>
+                  Игрушка {{ audienceText }}
+                  <template v-if="brandName">
+                    от {{ brandName }}
+                  </template>
+                </p>
 
-                  <!-- Разделитель между брендом и линейкой -->
-                  <span
-                    v-if="brandName && productLineName"
-                    class="text-muted-foreground/50"
-                  >/</span>
-
-                  <!-- Линейка -->
-                  <NuxtLink
-                    v-if="productLineName && productLineLink"
-                    :to="productLineLink"
-                    class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"
-                  >
-                    <div
-                      class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
-                    >
-                      <ProgressiveImage
-                        v-if="product.product_lines?.logo_url"
-                        :src="productLineLogoUrl"
-                        :alt="productLineName || 'Линейка'"
-                        aspect-ratio="square"
-                        object-fit="contain"
-                        placeholder-type="shimmer"
-                        class="w-full h-full"
-                      />
-                      <Icon
-                        v-else
-                        name="lucide:sparkles"
-                        class="w-4 h-4 text-primary/70"
-                      />
-                    </div>
-                    <span class="group-hover:underline font-medium">{{
-                      productLineName
-                    }}</span>
-                  </NuxtLink>
-                  <span
-                    v-else-if="productLineName"
-                    class="inline-flex items-center gap-1.5"
-                  >
-                    <div
-                      class="w-8 h-8 rounded bg-white border overflow-hidden flex items-center justify-center shrink-0"
-                    >
-                      <ProgressiveImage
-                        v-if="product.product_lines?.logo_url"
-                        :src="productLineLogoUrl"
-                        :alt="productLineName || 'Линейка'"
-                        aspect-ratio="square"
-                        object-fit="contain"
-                        placeholder-type="shimmer"
-                        class="w-full h-full"
-                      />
-                      <Icon
-                        v-else
-                        name="lucide:sparkles"
-                        class="w-4 h-4 text-primary/70"
-                      />
-                    </div>
-                    <span class="font-medium">{{ productLineName }}</span>
-                  </span>
-                </div>
-
-                <div class="mb-6 lg:mb-8">
-                  <!-- Лейбл: Цена / Итого за комплект -->
-                  <p
-                    class="text-xs font-medium text-muted-foreground mb-1 transition-all"
-                  >
-                    {{ hasAccessoriesSelected ? "Итого за комплект" : "Цена" }}
-                  </p>
-
-                  <!-- Старая цена (зачеркнутая) если есть скидка и нет аксессуаров -->
-                  <div
-                    v-if="
-                      mainProductPrice.hasDiscount && !hasAccessoriesSelected
-                    "
-                    class="flex items-center gap-2 mb-1"
-                  >
-                    <span class="text-lg text-muted-foreground line-through">
-                      {{ formatPrice(mainProductPrice.original) }} ₸
-                    </span>
-                    <Badge variant="destructive" class="text-xs">
-                      -{{ product.discount_percentage }}%
-                    </Badge>
-                  </div>
-
-                  <!-- Flip Counter Price Animation -->
-                  <div class="flex items-baseline gap-1 mb-2">
-                    <div
-                      class="flex text-3xl lg:text-4xl font-bold text-primary"
-                    >
-                      <template
-                        v-for="(item, index) in priceChars"
-                        :key="index"
-                      >
-                        <!-- Space separator -->
-                        <span v-if="item.char === ' '" class="w-2" />
-                        <!-- Digit with flip animation -->
-                        <div
-                          v-else-if="item.isDigit"
-                          :ref="
-                            (el) => {
-                              if (el)
-                                digitColumns[item.digitIndex]
-                                  = el as HTMLElement;
-                            }
-                          "
-                          class="digit-column"
-                        >
-                          <div class="digit-ribbon">
-                            <div v-for="d in 10" :key="d" class="digit-item">
-                              {{ d - 1 }}
-                            </div>
-                          </div>
-                        </div>
-                      </template>
-                    </div>
-                    <span
-                      class="text-3xl lg:text-4xl font-bold text-primary ml-1"
-                    >₸</span>
-                  </div>
-
-                  <div
-                    class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium"
-                  >
-                    <Icon name="lucide:gift" class="w-4 h-4" />
-                    <span>+{{ totalBonuses }} бонусов</span>
-                  </div>
-
-                  <!-- 🎨 Color Variants Selector -->
-                  <div
-                    v-if="colorVariants && colorVariants.length > 0"
-                    class="mt-4 pt-4 border-t"
-                  >
-                    <p class="text-sm font-medium text-muted-foreground mb-3">
-                      Другие варианты:
-                    </p>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <!-- Current product thumbnail -->
-                      <div
-                        v-if="product.product_images?.[0]"
-                        class="relative group"
-                      >
-                        <div class="w-16 h-16 rounded-lg border-2 border-primary overflow-hidden">
-                          <ProgressiveImage
-                            :src="getVariantUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url, 'sm')"
-                            :blur-data-url="product.product_images[0].blur_placeholder"
-                            :alt="product.name"
-                            aspect-ratio="square"
-                            object-fit="cover"
-                            placeholder-type="lqip"
-                          />
-                        </div>
-                      </div>
-
-                      <!-- Other variants -->
-                      <NuxtLink
-                        v-for="variant in colorVariants"
-                        :key="variant.id"
-                        :to="`/catalog/products/${variant.slug}`"
-                        class="relative group"
-                      >
-                        <div
-                          class="w-16 h-16 rounded-lg border-2 transition-all hover:scale-105 hover:border-primary overflow-hidden"
-                          :class="[
-                            variant.stock_quantity <= 0
-                              ? 'opacity-50 border-muted-foreground/30'
-                              : 'border-muted hover:border-primary',
-                          ]"
-                        >
-                          <ProgressiveImage
-                            v-if="variant.image_url"
-                            :src="getVariantUrl(BUCKET_NAME_PRODUCT, variant.image_url, 'sm')"
-                            :blur-data-url="variant.blur_placeholder"
-                            :alt="`Вариант ${variant.slug}`"
-                            aspect-ratio="square"
-                            object-fit="cover"
-                            placeholder-type="lqip"
-                          />
-                          <!-- Out of stock indicator -->
-                          <div
-                            v-if="variant.stock_quantity <= 0"
-                            class="absolute inset-0 flex items-center justify-center bg-black/20"
-                          >
-                            <div class="w-full h-0.5 bg-white/80 rotate-45" />
-                          </div>
-                        </div>
-                      </NuxtLink>
-                    </div>
-                  </div>
-
-                  <!-- Плашка-расшифровка комплекта -->
-                  <div
-                    v-if="hasAccessoriesSelected"
-                    class="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm"
-                  >
-                    <span
-                      class="text-muted-foreground font-medium truncate max-w-[180px]"
-                    >{{ product.name }}</span>
-                    <template
-                      v-for="acc in selectedAccessoriesData"
-                      :key="acc.id"
-                    >
-                      <span class="text-muted-foreground">+</span>
-                      <span class="text-muted-foreground font-medium">{{
-                        acc.name
-                      }}</span>
-                    </template>
-                  </div>
-                </div>
-
-                <div class="mb-6 pb-6 border-b">
-                  <div class="flex items-center gap-2 text-sm">
-                    <Icon
-                      :name="
-                        product.stock_quantity > 0
-                          ? 'lucide:check-circle'
-                          : 'lucide:x-circle'
-                      "
-                      :class="
-                        product.stock_quantity > 0
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      "
-                      class="w-5 h-5"
+                <!-- Бренд -->
+                <NuxtLink
+                  v-if="brandName && brandLink"
+                  :to="brandLink"
+                  class="pdp-brand-pill mb-4 hidden lg:inline-flex"
+                >
+                  <span class="pdp-brand-logo">
+                    <ProgressiveImage
+                      v-if="product.brands?.logo_url"
+                      :src="brandLogoUrl"
+                      :alt="generateBrandLogoAlt(brandName || 'Бренд')"
+                      object-fit="contain"
+                      placeholder-type="shimmer"
+                      class="size-[18px]"
                     />
-                    <span
-                      :class="
-                        product.stock_quantity > 0
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      "
-                      class="font-medium"
-                    >
-                      {{
-                        product.stock_quantity > 0
-                          ? "В наличии"
-                          : "Нет в наличии"
-                      }}
+                    <Icon v-else name="lucide:building-2" class="size-4" />
+                  </span>
+                  <span class="text-[13px] font-bold text-foreground">{{ brandName }}</span>
+                </NuxtLink>
+
+                <!-- Цена -->
+                <p v-if="hasAccessoriesSelected" class="mb-1 text-xs font-medium text-muted-foreground">
+                  Итого за комплект
+                </p>
+                <div class="mb-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span class="pdp-price">{{ formatPrice(totalPrice) }} ₸</span>
+                  <template v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected">
+                    <span class="pdp-price-old">{{ formatPrice(mainProductPrice.original) }} ₸</span>
+                    <span class="pdp-discount">−{{ product.discount_percentage }}%</span>
+                  </template>
+                </div>
+
+                <!-- Расшифровка комплекта -->
+                <div
+                  v-if="hasAccessoriesSelected"
+                  class="mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground"
+                >
+                  <span class="max-w-[180px] truncate font-medium">{{ product.name }}</span>
+                  <template v-for="acc in selectedAccessoriesData" :key="acc.id">
+                    <span>+</span>
+                    <span class="font-medium">{{ acc.name }}</span>
+                  </template>
+                </div>
+
+                <span v-if="totalBonuses > 0" class="pdp-bonus">
+                  <Icon name="lucide:gift" class="size-[15px] text-orange-500" />
+                  <span class="pdp-bonus-text">+{{ totalBonuses }} бонусов на счёт</span>
+                </span>
+
+                <!-- Рейтинг и вопросы — плитки только на мобильных -->
+                <div class="mt-3.5 grid grid-cols-2 gap-2.5 lg:hidden">
+                  <a href="#reviews" class="pdp-tile">
+                    <Icon name="gravity-ui:star-fill" class="size-[22px] shrink-0 text-rating" />
+                    <span class="min-w-0">
+                      <span class="block text-base font-extrabold">
+                        {{ (product.avg_rating ?? 0).toFixed(1) }}
+                      </span>
+                      <span class="block text-xs font-semibold text-primary">{{ reviewCountLabel }}</span>
                     </span>
-                    <span
-                      v-if="product.stock_quantity > 0"
-                      class="text-muted-foreground"
-                    >
-                      ({{ product.stock_quantity }} шт.)
+                  </a>
+                  <a href="#questions" class="pdp-tile">
+                    <Icon name="lucide:message-circle" class="size-[22px] shrink-0 text-primary" />
+                    <span class="min-w-0">
+                      <span class="block text-base font-extrabold">{{ questionsCount }}</span>
+                      <span class="block text-xs font-semibold text-primary">{{ questionsCountLabel }}</span>
                     </span>
+                  </a>
+                </div>
+
+                <!-- Цветовые варианты -->
+                <div v-if="colorVariants && colorVariants.length > 0" class="mt-4">
+                  <span class="mb-2 block text-[13px] font-semibold text-muted-foreground">
+                    Другие варианты:
+                  </span>
+                  <div class="flex flex-wrap gap-2.5">
+                    <span
+                      v-if="product.product_images?.[0]"
+                      class="pdp-variant pdp-variant--active"
+                      aria-current="true"
+                    >
+                      <ProgressiveImage
+                        :src="getVariantUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url, 'sm')"
+                        :blur-data-url="product.product_images[0].blur_placeholder"
+                        :alt="product.name"
+                        object-fit="cover"
+                        placeholder-type="lqip"
+                        class="size-full rounded-[9px]"
+                      />
+                    </span>
+
+                    <NuxtLink
+                      v-for="variant in colorVariants"
+                      :key="variant.id"
+                      :to="`/catalog/products/${variant.slug}`"
+                      class="pdp-variant"
+                      :class="{ 'pdp-variant--out': variant.stock_quantity <= 0 }"
+                      :aria-label="`Вариант ${variant.slug}`"
+                    >
+                      <ProgressiveImage
+                        v-if="variant.image_url"
+                        :src="getVariantUrl(BUCKET_NAME_PRODUCT, variant.image_url, 'sm')"
+                        :blur-data-url="variant.blur_placeholder"
+                        :alt="`Вариант ${variant.slug}`"
+                        object-fit="cover"
+                        placeholder-type="lqip"
+                        class="size-full rounded-[9px]"
+                      />
+                      <span v-if="variant.stock_quantity <= 0" class="pdp-variant-strike" />
+                    </NuxtLink>
                   </div>
                 </div>
 
-                <ClientOnly>
-                  <div class="hidden lg:block space-y-3 mb-6">
-                    <template v-if="product.stock_quantity > 0">
-                      <Button
-                        v-if="!mainItemInCart"
-                        size="lg"
-                        class="w-full h-12 text-base font-semibold"
-                        @click="addToCart"
+                <!-- Наличие -->
+                <div class="mt-4 flex items-center gap-2 text-sm font-semibold">
+                  <template v-if="product.stock_quantity > 0">
+                    <Icon name="lucide:circle-check-big" class="size-[18px] text-success" />
+                    <span class="text-success">В наличии</span>
+                    <span class="text-[13px] font-medium text-muted-foreground">
+                      · осталось {{ product.stock_quantity }} шт.
+                    </span>
+                  </template>
+                  <template v-else>
+                    <Icon name="lucide:circle-x" class="size-[18px] text-destructive" />
+                    <span class="text-destructive">Нет в наличии</span>
+                  </template>
+                </div>
+
+                <!-- Покупка. На мобильных её роль играет фиксированная панель внизу -->
+                <div class="mt-[18px] hidden lg:block">
+                  <template v-if="product.stock_quantity > 0">
+                    <div v-if="mainItemInCart" class="pdp-stepper mb-2.5">
+                      <button
+                        type="button"
+                        class="pdp-stepper-btn"
+                        aria-label="Уменьшить количество"
+                        @click="decQuantity"
                       >
-                        <Icon
-                          name="lucide:shopping-cart"
-                          class="w-5 h-5 mr-2"
-                        />
-                        Добавить в корзину
-                      </Button>
+                        <Icon name="lucide:minus" class="size-[19px]" />
+                      </button>
+                      <span class="flex-1 text-center text-base font-extrabold text-white">
+                        {{ quantityInCart }} шт
+                      </span>
+                      <button
+                        type="button"
+                        class="pdp-stepper-btn"
+                        aria-label="Увеличить количество"
+                        @click="incQuantity"
+                      >
+                        <Icon name="lucide:plus" class="size-[19px]" />
+                      </button>
+                    </div>
+                    <button v-else type="button" class="pdp-cta mb-2.5" @click="addToCart">
+                      <Icon name="solar:cart-3-bold" class="size-[22px]" />
+                      Добавить в корзину
+                    </button>
+                  </template>
 
-                      <div v-else class="flex items-center gap-3">
-                        <Button
-                          size="lg"
-                          class="grow h-12 text-base font-semibold"
-                          @click="router.push('/cart')"
-                        >
-                          <Icon
-                            name="lucide:shopping-bag"
-                            class="w-5 h-5 mr-2"
-                          />
-                          Перейти в корзину
-                        </Button>
-
-                        <QuantitySelector
-                          :product="product"
-                          :quantity="quantityInCart"
-                          class="w-auto"
-                        />
-                      </div>
-                    </template>
-
-                    <template v-else>
-                      <StockAlertButton :product-id="product.id" />
-                      <p class="text-sm text-muted-foreground text-center">
-                        Нет в наличии
-                      </p>
-                    </template>
-
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      class="w-full h-12 text-base"
-                    >
-                      <Icon name="mdi:heart-outline" class="w-5 h-5 mr-2" />
-                      В избранное
-                    </Button>
+                  <div v-else class="mb-2.5">
+                    <StockAlertButton :product-id="product.id" />
                   </div>
-                </ClientOnly>
+
+                  <button
+                    type="button"
+                    class="pdp-glass-btn"
+                    :class="{ 'pdp-glass-btn--wished': isWishlisted }"
+                    :aria-pressed="isWishlisted"
+                    @click="toggleWishlist"
+                  >
+                    <Icon
+                      :name="isWishlisted ? 'line-md:heart-filled' : 'line-md:heart'"
+                      class="size-[21px]"
+                    />
+                    {{ isWishlisted ? 'В избранном' : 'В избранное' }}
+                  </button>
+                </div>
 
                 <!-- Аксессуары (батарейки и подарочная упаковка) -->
                 <AccessoriesBlock
@@ -1363,326 +1326,185 @@ watchEffect(() => {
                   :accessories="accessories || []"
                   :loading="accessoriesLoading"
                 />
+
+                <!-- Преимущества магазина -->
+                <div class="mt-3.5 hidden grid-cols-2 gap-2.5 lg:grid">
+                  <div v-for="perk in PERKS" :key="perk.text" class="pdp-perk">
+                    <Icon :name="perk.icon" class="size-5 shrink-0 text-primary" />
+                    <span class="text-[12.5px] font-semibold leading-tight">{{ perk.text }}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <!-- О товаре (в стиле detmir.kz) -->
-            <div
-              class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
-            >
-              <h2 class="text-xl font-bold mb-4">
+            <!-- Способы получения — на десктопе их заменяет блок преимуществ -->
+            <div class="pdp-col-main pdp-card lg:hidden">
+              <h2 class="pdp-card-title mb-1.5">
+                Способы получения
+              </h2>
+              <div v-for="row in PICKUP_ROWS" :key="row.title" class="pdp-pickup-row">
+                <span class="pdp-pickup-icon">
+                  <Icon :name="row.icon" class="size-5 text-primary" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-sm font-bold text-foreground">{{ row.title }}</span>
+                  <span class="block text-[12.5px] font-medium text-muted-foreground">{{ row.sub }}</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- О ТОВАРЕ -->
+            <div class="pdp-col-main pdp-card">
+              <h2 class="pdp-card-title mb-3">
                 О товаре
               </h2>
 
-              <!-- Название товара -->
-              <h3 class="font-semibold text-base mb-3">
-                {{ product.name }}
-              </h3>
+              <div v-if="seoBlocks.length > 0" class="relative">
+                <div :class="isDescriptionExpanded ? '' : 'max-h-[150px] overflow-hidden'">
+                  <SEOContentRenderer :blocks="seoBlocks" />
+                </div>
+                <div v-if="!isDescriptionExpanded" class="pdp-desc-fade" />
+                <button
+                  type="button"
+                  class="pdp-desc-toggle"
+                  @click="isDescriptionExpanded = !isDescriptionExpanded"
+                >
+                  {{ isDescriptionExpanded ? 'Свернуть' : 'Показать полностью' }}
+                  <Icon
+                    :name="isDescriptionExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'"
+                    class="size-4"
+                  />
+                </button>
+              </div>
 
-              <!-- SEO контент товара -->
-              <SEOContentRenderer
-                v-if="seoBlocks.length > 0"
-                :blocks="seoBlocks"
-                :collapsible="true"
-                class="mb-6"
-              />
-
-              <!-- Таблица характеристик с пунктирными линиями -->
-              <dl class="space-y-0">
-                <!-- Бренд -->
-                <div v-if="brandName" class="product-spec-row">
-                  <dt class="product-spec-label">
+              <!-- Характеристики -->
+              <dl class="mt-5 border-t border-border pt-1.5">
+                <div v-if="brandName" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Бренд
                   </dt>
-                  <dd class="product-spec-value">
-                    <NuxtLink
-                      v-if="brandLink"
-                      :to="brandLink"
-                      class="text-primary hover:underline"
-                    >
+                  <dd class="pdp-spec-value">
+                    <NuxtLink v-if="brandLink" :to="brandLink" class="text-primary hover:underline">
                       {{ brandName }}
                     </NuxtLink>
                     <span v-else>{{ brandName }}</span>
                   </dd>
                 </div>
 
-                <!-- Линейка -->
-                <div v-if="productLineName" class="product-spec-row">
-                  <dt class="product-spec-label">
+                <div v-if="productLineName" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Линейка
                   </dt>
-                  <dd class="product-spec-value">
-                    <NuxtLink
-                      v-if="productLineLink"
-                      :to="productLineLink"
-                      class="text-primary hover:underline"
-                    >
+                  <dd class="pdp-spec-value">
+                    <NuxtLink v-if="productLineLink" :to="productLineLink" class="text-primary hover:underline">
                       {{ productLineName }}
                     </NuxtLink>
                     <span v-else>{{ productLineName }}</span>
                   </dd>
                 </div>
 
-                <!-- Категория -->
-                <div v-if="categoryName" class="product-spec-row">
-                  <dt class="product-spec-label">
+                <div v-if="categoryName" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Категория
                   </dt>
-                  <dd class="product-spec-value">
-                    <NuxtLink
-                      v-if="categoryLink"
-                      :to="categoryLink"
-                      class="text-primary hover:underline"
-                    >
+                  <dd class="pdp-spec-value">
+                    <NuxtLink v-if="categoryLink" :to="categoryLink" class="text-primary hover:underline">
                       {{ categoryName }}
                     </NuxtLink>
                     <span v-else>{{ categoryName }}</span>
                   </dd>
                 </div>
 
-                <!-- Возраст -->
-                <div v-if="ageRangeText" class="product-spec-row">
-                  <dt class="product-spec-label">
+                <div v-if="ageRangeText" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Рекомендованный возраст
                   </dt>
-                  <dd class="product-spec-value">
+                  <dd class="pdp-spec-value">
                     {{ ageRangeText }}
                   </dd>
                 </div>
 
-                <!-- Материал -->
-                <div v-if="product.materials?.name" class="product-spec-row">
-                  <dt class="product-spec-label">
+                <div v-if="product.materials?.name" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Материал
                   </dt>
-                  <dd class="product-spec-value">
+                  <dd class="pdp-spec-value">
                     {{ product.materials.name }}
                   </dd>
                 </div>
 
-                <!-- Страна -->
-                <div v-if="product.countries?.name" class="product-spec-row">
-                  <dt class="product-spec-label">
+                <div v-if="product.countries?.name" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Страна производитель
                   </dt>
-                  <dd class="product-spec-value">
+                  <dd class="pdp-spec-value">
                     {{ product.countries.name }}
                   </dd>
                 </div>
 
-                <!-- Количество деталей (только для категорий с атрибутом number_range) -->
-                <div
-                  v-if="hasPieceCountAttribute && product.piece_count"
-                  class="product-spec-row"
-                >
-                  <dt class="product-spec-label">
+                <div v-if="hasPieceCountAttribute && product.piece_count" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Количество деталей
                   </dt>
-                  <dd class="product-spec-value">
+                  <dd class="pdp-spec-value">
                     {{ product.piece_count }} шт
                   </dd>
                 </div>
 
-                <!-- Артикул / Код товара -->
-                <div v-if="product.sku" class="product-spec-row">
-                  <dt class="product-spec-label">
+                <div v-if="product.sku" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Код товара
                   </dt>
-                  <dd class="product-spec-value">
+                  <dd class="pdp-spec-value">
                     {{ product.sku }}
                   </dd>
                 </div>
 
-                <!-- Штрихкод -->
-                <div v-if="product.barcode" class="product-spec-row">
-                  <dt class="product-spec-label">
+                <div v-if="product.barcode" class="pdp-spec-row">
+                  <dt class="pdp-spec-label">
                     Штрихкод
                   </dt>
-                  <dd class="product-spec-value">
+                  <dd class="pdp-spec-value">
                     {{ product.barcode }}
                   </dd>
                 </div>
               </dl>
             </div>
 
-            <!-- Секция "Ещё товары" -->
-            <div
-              v-if="brandName || categoryName || breadcrumbs.length > 1"
-              class="lg:col-span-7 bg-white rounded-xl p-4 lg:p-6 shadow-sm border"
-            >
-              <h3 class="font-bold text-xl mb-4">
-                Ещё товары
-              </h3>
-
-              <div class="space-y-0 divide-y divide-border">
-                <!-- Товары бренда -->
+            <!-- ЕЩЁ В ЭТИХ КАТЕГОРИЯХ -->
+            <div v-if="moreCategories.length" class="pdp-col-main pdp-card">
+              <h2 class="pdp-card-title mb-3.5">
+                Ещё в этих категориях
+              </h2>
+              <div class="flex flex-col gap-2">
                 <NuxtLink
-                  v-if="brandName && brandLink"
-                  :to="brandLink"
-                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
+                  v-for="row in moreCategories"
+                  :key="row.key"
+                  :to="row.to"
+                  class="pdp-more-row"
                 >
-                  <div
-                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
-                  >
+                  <span class="pdp-more-icon">
                     <ProgressiveImage
-                      v-if="product.brands?.logo_url"
-                      :src="brandLogoUrl"
-                      :alt="brandName || 'Бренд'"
-                      aspect-ratio="square"
+                      v-if="row.image"
+                      :src="row.image"
+                      :alt="row.title"
                       object-fit="contain"
                       placeholder-type="shimmer"
-                      class="w-full h-full p-1.5"
+                      class="size-[38px]"
                     />
-                    <Icon
-                      v-else
-                      name="lucide:building-2"
-                      class="w-6 h-6 text-muted-foreground"
-                    />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-base leading-tight">
-                      {{ brandName }}
-                    </p>
-                    <p class="text-sm text-muted-foreground mt-0.5">
-                      Бренд
-                    </p>
-                  </div>
-                  <Icon
-                    name="lucide:chevron-right"
-                    class="w-5 h-5 text-primary shrink-0"
-                  />
-                </NuxtLink>
-
-                <!-- Товары линейки -->
-                <NuxtLink
-                  v-if="productLineName && productLineLink"
-                  :to="productLineLink"
-                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-                >
-                  <div
-                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
-                  >
-                    <ProgressiveImage
-                      v-if="product.product_lines?.logo_url"
-                      :src="productLineLogoUrl"
-                      :alt="productLineName || 'Линейка'"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full p-1.5"
-                    />
-                    <Icon
-                      v-else
-                      name="lucide:sparkles"
-                      class="w-6 h-6 text-primary"
-                    />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-base leading-tight">
-                      {{ productLineName }}
-                    </p>
-                    <p class="text-sm text-muted-foreground mt-0.5">
-                      Линейка {{ brandName }}
-                    </p>
-                  </div>
-                  <Icon
-                    name="lucide:chevron-right"
-                    class="w-5 h-5 text-primary shrink-0"
-                  />
-                </NuxtLink>
-
-                <!-- Товары категории -->
-                <NuxtLink
-                  v-if="categoryName && categoryLink"
-                  :to="categoryLink"
-                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-                >
-                  <div
-                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
-                  >
-                    <ProgressiveImage
-                      v-if="fullCategory?.image_url"
-                      :src="
-                        getVariantUrl(
-                          BUCKET_NAME_CATEGORY,
-                          fullCategory.image_url,
-                          'sm',
-                        )
-                      "
-                      :alt="categoryName || 'Категория'"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full p-1.5"
-                    />
-                    <Icon
-                      v-else
-                      name="lucide:box"
-                      class="w-6 h-6 text-muted-foreground"
-                    />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-base leading-tight">
-                      {{ categoryName }}
-                    </p>
-                    <p class="text-sm text-muted-foreground mt-0.5">
-                      Категория
-                    </p>
-                  </div>
-                  <Icon
-                    name="lucide:chevron-right"
-                    class="w-5 h-5 text-primary shrink-0"
-                  />
-                </NuxtLink>
-
-                <!-- Родительские категории из breadcrumbs -->
-                <NuxtLink
-                  v-for="item in parentCategories"
-                  :key="item.crumb.id"
-                  :to="item.crumb.href!"
-                  class="flex items-center gap-3 py-4 hover:bg-muted/20 transition-colors group px-2 -mx-2 rounded-lg"
-                >
-                  <div
-                    class="flex items-center justify-center w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0"
-                  >
-                    <ProgressiveImage
-                      v-if="item.category?.image_url"
-                      :src="
-                        getVariantUrl(
-                          BUCKET_NAME_CATEGORY,
-                          item.category.image_url,
-                          'sm',
-                        )
-                      "
-                      :alt="item.crumb.name"
-                      aspect-ratio="square"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="w-full h-full p-1.5"
-                    />
-                    <Icon
-                      v-else
-                      name="lucide:layers"
-                      class="w-6 h-6 text-muted-foreground"
-                    />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-base leading-tight">
-                      {{ item.crumb.name }}
-                    </p>
-                    <p class="text-sm text-muted-foreground mt-0.5">
-                      Категория
-                    </p>
-                  </div>
-                  <Icon
-                    name="lucide:chevron-right"
-                    class="w-5 h-5 text-primary shrink-0"
-                  />
+                    <Icon v-else :name="row.icon" class="size-5 text-muted-foreground" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-[14.5px] font-bold text-foreground">{{ row.title }}</span>
+                    <span class="block text-[12.5px] font-medium text-muted-foreground">{{ row.subtitle }}</span>
+                  </span>
+                  <Icon name="lucide:chevron-right" class="size-[18px] text-muted-foreground" />
                 </NuxtLink>
               </div>
             </div>
-            <!-- Отзывы -->
-            <div class="lg:col-span-7">
+
+            <!-- ОТЗЫВЫ -->
+            <div class="pdp-col-main">
               <ProductReviews
                 v-if="product.id"
                 :product-id="product.id"
@@ -1690,240 +1512,608 @@ watchEffect(() => {
                 :review-count="product.review_count ?? 0"
               />
             </div>
-            <!-- Вопросы и ответы -->
-            <div class="lg:col-span-7">
+
+            <!-- ВОПРОСЫ -->
+            <div class="pdp-col-main">
               <ProductQuestions v-if="product.id" :product-id="product.id" />
             </div>
           </div>
-        </div>
 
-        <div v-else class="text-center py-20">
-          <h1 class="text-2xl font-bold">
-            Товар не найден
-          </h1>
-          <p class="text-muted-foreground mt-2">
-            Возможно, товар был удален или ссылка неверна.
-          </p>
-          <NuxtLink
-            to="/catalog"
-            class="inline-block mt-4 text-primary hover:underline"
-          >
-            ← Вернуться в каталог
-          </NuxtLink>
-        </div>
+          <!-- ПОХОЖИЕ ТОВАРЫ -->
+          <div v-if="similarProductsLoading || similarGridProducts.length" class="mt-9">
+            <div class="mb-[18px] flex items-baseline gap-3">
+              <h2 class="text-[22px] font-extrabold tracking-tight lg:text-3xl">
+                Похожие товары
+              </h2>
+              <NuxtLink v-if="categoryLink" :to="categoryLink" class="text-sm font-semibold text-primary">
+                Смотреть все
+              </NuxtLink>
+            </div>
 
-        <template #fallback>
-          <ProductDetailSkeleton />
-        </template>
-      </ClientOnly>
-    </div>
-
-    <!-- 🎯 Sticky панель для мобильных -->
-    <ClientOnly>
-      <div
-        v-if="product"
-        class="lg:hidden fixed left-4 right-4 z-40 product-sticky-bar"
-        :class="isNavVisible ? 'sticky-above-nav' : 'sticky-at-bottom'"
-      >
-        <!-- Если товар НЕ в корзине - показываем цену + кнопку -->
-        <div v-if="!mainItemInCart" class="px-4 py-3">
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex flex-col gap-0.5">
-              <div
-                v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected"
-                class="flex items-center gap-1.5"
-              >
-                <span class="text-xs text-muted-foreground line-through">
-                  {{ formatPrice(mainProductPrice.original) }} ₸
-                </span>
-                <Badge variant="destructive" class="text-[10px] px-1 py-0 h-4">
-                  -{{ product.discount_percentage }}%
-                </Badge>
-              </div>
-              <span
-                v-if="hasAccessoriesSelected"
-                class="text-[10px] text-muted-foreground leading-none"
-              >Итого за комплект</span>
-              <div class="flex items-baseline gap-0.5">
-                <span class="text-2xl font-bold leading-none">
-                  {{ formatPrice(totalPrice) }}
-                </span>
-                <span class="text-xl font-bold">₸</span>
+            <div v-if="similarProductsLoading" class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-[18px]">
+              <div v-for="i in 4" :key="i" class="pdp-card animate-pulse">
+                <div class="mb-3 aspect-square rounded-lg bg-muted" />
+                <div class="mb-2 h-4 w-3/4 rounded bg-muted" />
+                <div class="h-4 w-1/2 rounded bg-muted" />
               </div>
             </div>
 
-            <Button
-              v-if="product.stock_quantity > 0"
-              size="sm"
-              class="h-9 text-sm font-semibold px-4"
-              @click="addToCart"
+            <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-[18px]">
+              <div
+                v-for="similar in similarGridProducts"
+                :key="similar.id"
+                @mouseenter="prefetchProduct(similar.slug)"
+              >
+                <ProductCard :product="similar" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Фиксированная панель покупки (мобильные) -->
+        <div
+          class="pdp-buybar flex items-center gap-3 lg:hidden"
+          :class="{ 'pdp-buybar--down': !isNavVisible }"
+        >
+          <span class="flex flex-none flex-col">
+            <span
+              v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected"
+              class="text-xs font-medium text-price-old line-through"
             >
-              <Icon name="lucide:shopping-cart" class="w-4 h-4 mr-1.5" />
+              {{ formatPrice(mainProductPrice.original) }} ₸
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="text-[19px] font-extrabold tracking-tight text-primary">
+                {{ formatPrice(totalPrice) }} ₸
+              </span>
+              <span
+                v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected"
+                class="pdp-discount pdp-discount--sm"
+              >
+                −{{ product.discount_percentage }}%
+              </span>
+            </span>
+          </span>
+
+          <template v-if="product.stock_quantity > 0">
+            <div v-if="mainItemInCart" class="pdp-stepper pdp-stepper--pill flex-1">
+              <button
+                type="button"
+                class="pdp-stepper-btn pdp-stepper-btn--round"
+                aria-label="Уменьшить количество"
+                @click="decQuantity"
+              >
+                <Icon name="lucide:minus" class="size-[18px]" />
+              </button>
+              <span class="text-[15px] font-extrabold text-white">{{ quantityInCart }} шт</span>
+              <button
+                type="button"
+                class="pdp-stepper-btn pdp-stepper-btn--round"
+                aria-label="Увеличить количество"
+                @click="incQuantity"
+              >
+                <Icon name="lucide:plus" class="size-[18px]" />
+              </button>
+            </div>
+            <button v-else type="button" class="pdp-cta pdp-cta--pill flex-1" @click="addToCart">
+              <Icon name="solar:cart-3-bold" class="size-5" />
               В корзину
-            </Button>
+            </button>
+          </template>
 
-            <Button v-else size="sm" class="h-9 text-sm px-4" disabled>
-              Нет в наличии
-            </Button>
-          </div>
-        </div>
-
-        <!-- Если товар УЖЕ в корзине - показываем кнопку перехода + селектор количества -->
-        <div v-else class="px-4 py-3">
-          <div class="flex items-center gap-3">
-            <Button
-              size="sm"
-              class="h-9 text-sm font-semibold px-4"
-              @click="router.push('/cart')"
-            >
-              <Icon name="lucide:shopping-bag" class="w-4 h-4 mr-1.5" />
-              В корзине ({{ quantityInCart }})
-            </Button>
-            <QuantitySelector
-              :product="product"
-              :quantity="quantityInCart"
-              class="shrink-0"
-            />
+          <div v-else class="flex-1">
+            <StockAlertButton :product-id="product.id" />
           </div>
         </div>
       </div>
+
+      <div v-else class="text-center py-20">
+        <h1 class="text-2xl font-bold">
+          Товар не найден
+        </h1>
+        <p class="text-muted-foreground mt-2">
+          Возможно, товар был удален или ссылка неверна.
+        </p>
+        <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
+          ← Вернуться в каталог
+        </NuxtLink>
+      </div>
+
+      <template #fallback>
+        <ProductDetailSkeleton />
+      </template>
     </ClientOnly>
-
-    <!-- ✅ Похожие товары с независимой загрузкой -->
-    <div
-      v-if="
-        similarProductsLoading
-          || (similarProducts && similarProducts.length > 0)
-      "
-      class="bg-gray-50 py-8 lg:py-12 mt-8 lg:mt-12"
-    >
-      <!-- Скелетон для похожих товаров -->
-      <div v-if="similarProductsLoading" :class="`${containerClass}`">
-        <h2 class="text-2xl lg:text-3xl font-bold mb-6">
-          Похожие товары
-        </h2>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div
-            v-for="i in 4"
-            :key="i"
-            class="bg-white rounded-xl p-4 animate-pulse"
-          >
-            <div class="aspect-square bg-muted rounded-lg mb-3" />
-            <div class="h-4 bg-muted rounded w-3/4 mb-2" />
-            <div class="h-4 bg-muted rounded w-1/2" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Карусель похожих товаров с prefetch -->
-      <ProductCarousel
-        v-else
-        :products="similarProducts || []"
-        @mouseenter-product="prefetchProduct"
-      >
-        <template #header>
-          <h2 class="text-2xl lg:text-3xl font-bold mb-6">
-            Похожие товары
-          </h2>
-        </template>
-      </ProductCarousel>
-    </div>
   </div>
 </template>
 
 <style scoped>
-/* Стили для таблицы характеристик в стиле detmir.kz */
-.product-spec-row {
+.pdp-page {
+  background: var(--page-surface);
+  /* На мобильных снизу висит панель покупки (~70px) поверх контента —
+     резервируем под неё место дополнительно к отступу под навбар из лейаута */
+  padding-bottom: 96px;
+}
+
+@media (width >= 64rem) {
+  .pdp-page {
+    padding-bottom: 48px;
+  }
+}
+
+/* ── Раскладка верхнего экрана ──────────────────────────────────────────────
+   Один поток на мобильных (галерея → блок покупки → способы получения → …);
+   на десктопе блок покупки уезжает во вторую колонку и залипает. Row-span
+   с запасом — колонка обязана перекрыть все карточки слева, иначе sticky
+   «закончится» на первой же из них. */
+.pdp-top {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+@media (width >= 64rem) {
+  .pdp-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 384px;
+    column-gap: 26px;
+    row-gap: 18px;
+    align-items: start;
+  }
+
+  .pdp-col-main {
+    grid-column: 1;
+  }
+
+  .pdp-buybox-wrap {
+    grid-column: 2;
+    grid-row: 1 / span 8;
+    position: sticky;
+    top: 90px;
+  }
+}
+
+/* ── Карточка ─────────────────────────────────────────────────────────────── */
+.pdp-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 18px 16px;
+  box-shadow: var(--elevation-card);
+}
+
+.pdp-card-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+@media (width >= 64rem) {
+  .pdp-card {
+    padding: 24px 26px;
+  }
+
+  .pdp-buybox {
+    padding: 26px;
+  }
+}
+
+/* ── Блок покупки ─────────────────────────────────────────────────────────── */
+.pdp-title {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+
+@media (width >= 64rem) {
+  .pdp-title {
+    font-size: clamp(19px, 2.2vw, 22px);
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+  }
+}
+
+.pdp-brand-pill {
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 7px;
+  border-radius: 999px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.55));
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px rgba(15, 23, 42, 0.07);
+  align-self: flex-start;
+  width: fit-content;
+  transition: box-shadow 0.15s ease;
+}
+
+.pdp-brand-pill:hover {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 6px 14px rgba(15, 23, 42, 0.12);
+}
+
+.pdp-brand-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--border);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.pdp-price {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--price);
+}
+
+@media (width >= 64rem) {
+  .pdp-price {
+    font-size: 34px;
+  }
+}
+
+.pdp-price-old {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--price-old);
+  text-decoration: line-through;
+}
+
+@media (width >= 64rem) {
+  .pdp-price-old {
+    font-size: 17px;
+  }
+}
+
+.pdp-discount {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--discount);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.pdp-discount--sm {
+  padding: 1px 7px;
+  font-size: 11px;
+}
+
+.pdp-bonus {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 11px;
+  background: linear-gradient(100deg, var(--bonus-surface), var(--bonus-border));
+  padding: 8px 13px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.pdp-bonus-text {
+  color: var(--bonus);
+}
+
+.pdp-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  background: var(--muted);
+}
+
+.pdp-variant {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  padding: 5px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
+}
+
+.pdp-variant--active {
+  border: 2px solid var(--primary);
+  box-shadow: 0 5px 14px rgb(43 127 255 / 0.26);
+}
+
+.pdp-variant--out {
+  opacity: 0.5;
+}
+
+.pdp-variant-strike {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  transform: rotate(45deg);
+}
+
+/* ── Кнопки ───────────────────────────────────────────────────────────────── */
+.pdp-cta {
+  width: 100%;
+  height: 56px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
+  backdrop-filter: blur(12px) saturate(1.7);
+  -webkit-backdrop-filter: blur(12px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -3px 10px rgba(6, 53, 138, 0.3),
+    0 10px 24px rgba(43, 127, 255, 0.34);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+}
+
+.pdp-cta:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -3px 10px rgba(6, 53, 138, 0.34),
+    0 14px 30px rgba(43, 127, 255, 0.44);
+}
+
+.pdp-cta:active {
+  transform: scale(0.985);
+}
+
+.pdp-cta--pill {
+  width: auto;
+  height: 52px;
+  border-radius: 999px;
+  font-size: 15.5px;
+  gap: 9px;
+}
+
+.pdp-glass-btn {
+  width: 100%;
+  height: 52px;
+  border-radius: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.6));
+  backdrop-filter: blur(10px) saturate(1.6);
+  -webkit-backdrop-filter: blur(10px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 5px 14px rgba(15, 23, 42, 0.08);
+  color: var(--foreground);
+  transition: box-shadow 0.18s ease;
+}
+
+.pdp-glass-btn:hover {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 8px 20px rgba(15, 23, 42, 0.14);
+}
+
+.pdp-glass-btn--wished {
+  border-color: rgba(244, 63, 94, 0.35);
+  background: linear-gradient(150deg, rgba(255, 241, 244, 0.98), rgba(255, 224, 231, 0.7));
+  color: var(--destructive);
+}
+
+.pdp-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(12px) saturate(1.7);
+  -webkit-backdrop-filter: blur(12px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 8px rgba(6, 53, 138, 0.28),
+    0 10px 24px rgba(43, 127, 255, 0.32);
+  padding: 0 8px;
+}
+
+.pdp-stepper--pill {
+  height: 52px;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+.pdp-stepper-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.26);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: background 0.15s ease;
+}
+
+.pdp-stepper-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.pdp-stepper-btn--round {
+  border-radius: 999px;
+}
+
+/* ── Способы получения ────────────────────────────────────────────────────── */
+.pdp-pickup-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.pdp-pickup-row:last-child {
+  border-bottom: none;
+}
+
+.pdp-pickup-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--brand-surface);
+  display: grid;
+  place-content: center;
+}
+
+/* ── Описание ─────────────────────────────────────────────────────────────── */
+.pdp-desc-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  height: 64px;
+  background: linear-gradient(180deg, transparent, var(--card));
+  pointer-events: none;
+}
+
+.pdp-desc-toggle {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pdp-desc-toggle:hover {
+  color: var(--brand-active);
+}
+
+/* ── Характеристики ───────────────────────────────────────────────────────── */
+.pdp-spec-row {
   display: flex;
   align-items: baseline;
-  padding: 0.625rem 0;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px dashed var(--border);
 }
 
-.product-spec-row::after {
-  content: '';
-  flex-grow: 1;
-  border-bottom: 1px dotted hsl(var(--border));
-  margin: 0 0.5rem;
-  min-width: 2rem;
-  order: 1;
+.pdp-spec-row:last-child {
+  border-bottom: none;
 }
 
-.product-spec-label {
-  flex-shrink: 0;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.875rem;
-  order: 0;
-}
-
-.product-spec-value {
-  flex-shrink: 0;
-  font-size: 0.875rem;
+.pdp-spec-label {
+  font-size: 14px;
   font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.pdp-spec-value {
+  font-size: 14px;
+  font-weight: 600;
   text-align: right;
-  order: 2;
 }
 
-.digit-column {
-  height: 2.25rem; /* text-3xl = 1.875rem, but we need line height */
-  line-height: 2.25rem;
-  overflow: hidden;
-  position: relative;
-  width: 1.25rem;
-  text-align: center;
-  border-radius: 0.25rem;
-  transition: background-color 0.3s ease;
-}
-
-@media (min-width: 1024px) {
-  .digit-column {
-    height: 2.75rem; /* text-4xl = 2.25rem */
-    line-height: 2.75rem;
-    width: 1.5rem;
-  }
-}
-
-.digit-ribbon {
-  position: relative;
-  will-change: transform;
-}
-
-.digit-item {
-  height: 2.25rem;
-  line-height: 2.25rem;
-}
-
-@media (min-width: 1024px) {
-  .digit-item {
-    height: 2.75rem;
-    line-height: 2.75rem;
-  }
-}
-
-/* Sticky panel: glass card */
-.product-sticky-bar {
-  /* Базовая позиция — у нижнего края (когда навбар скрыт) */
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 20px;
+/* ── Ещё в этих категориях ────────────────────────────────────────────────── */
+.pdp-more-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 10px 13px;
+  border-radius: 16px;
+  background: linear-gradient(165deg, color-mix(in oklch, var(--muted) 45%, var(--card)), var(--muted));
+  border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  /* transform анимируется плавно (GPU) в отличие от bottom+env() */
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.15s ease;
 }
 
-/* Навбар виден — поднимаем панель на высоту навбара (84px - 16px = 68px) */
-.sticky-above-nav {
-  transform: translateY(-68px);
+.pdp-more-row:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 16px rgba(15, 23, 42, 0.09);
 }
 
-/* Навбар скрылся — панель на базовой позиции */
-.sticky-at-bottom {
-  transform: translateY(0);
+.pdp-more-icon {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.pdp-perk {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: var(--muted);
+}
+
+/* ── Фиксированная панель покупки (мобильные) ─────────────────────────────── */
+.pdp-buybar {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  /* MobileBottomNav: bottom 12px + высота 50px + запас 10px */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+  z-index: 45;
+  /* display/align/gap намеренно живут утилитами на самом элементе:
+     scoped-селектор [data-v-*] бьёт `lg:hidden` по специфичности, и панель
+     осталась бы видимой на десктопе. */
+  padding: 9px 14px;
+  border-radius: 20px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.48));
+  backdrop-filter: blur(24px) saturate(1.9);
+  -webkit-backdrop-filter: blur(24px) saturate(1.9);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 12px 32px rgba(15, 23, 42, 0.18);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Навбар уехал вниз — панель занимает его место */
+.pdp-buybar--down {
+  transform: translateY(62px);
 }
 </style>

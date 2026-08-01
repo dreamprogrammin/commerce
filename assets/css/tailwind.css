@@ -11,8 +11,8 @@
    в CSS, т.к. портированная вёрстка ссылается на var(--font-sans) напрямую. */
 @theme {
   --font-sans:
-    'Nunito', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    'Nunito', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
   --font-display: 'Montserrat Alternates', var(--font-sans);
 }
 
@@ -133,12 +133,15 @@
   --product-line: oklch(59.2% 0.249 0.584); /* pink-600 */
   --success: oklch(72.3% 0.219 149.579); /* green-500 */
 
+  /* Холодная «бумага» под карточками контента (карточка товара).
+     Прототип Claude Design задаёт её литералом #eef0f3. */
+  --page-surface: oklch(94.6% 0.005 264.5);
+
   --shadow-brand: 0 8px 18px -8px rgb(43 127 255 / 0.8);
   --shadow-brand-strong: 0 20px 46px -20px rgb(43 127 255 / 0.7);
   --shadow-glass: 0 10px 30px rgb(15 23 42 / 0.2);
   --elevation-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --elevation-card-hover:
-    0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --elevation-card-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 .dark {
@@ -183,9 +186,9 @@
   --bonus-border: oklch(47.3% 0.137 46.201); /* orange-800 */
   --rating-empty: oklch(37.3% 0.034 259.733); /* gray-700 */
   --sold-out: oklch(70.7% 0.022 261.325); /* gray-400 */
+  --page-surface: oklch(17.5% 0.006 264.5);
   --elevation-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --elevation-card-hover:
-    0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+  --elevation-card-hover: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
 }
 
 /* ============================================================
