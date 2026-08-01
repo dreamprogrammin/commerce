@@ -196,24 +196,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    id="reviews"
-    class="bg-white rounded-xl p-4 lg:p-6 shadow-sm border scroll-mt-20"
-  >
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg lg:text-xl font-bold">
+  <div id="reviews" class="pr-card scroll-mt-20">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <h2 class="pr-title">
         Отзывы
-        <span
-          v-if="reviewCount"
-          class="text-muted-foreground font-normal text-base"
-        >
-          ({{ reviewCount }})
-        </span>
       </h2>
-      <Button v-if="canReview && !isFormOpen" size="sm" @click="openReviewForm">
-        <Icon name="lucide:message-square-plus" class="w-4 h-4 mr-1" />
-        Оставить отзыв
-      </Button>
+      <span v-if="reviewCount" class="pr-rating-pill">
+        <Icon name="gravity-ui:star-fill" class="size-[15px] text-rating" />
+        {{ (avgRating || 0).toFixed(1) }}
+        <span class="text-[13px] font-medium text-muted-foreground">· {{ reviewCount }}</span>
+      </span>
     </div>
 
     <!-- Средний рейтинг + распределение -->
@@ -354,13 +346,15 @@ onUnmounted(() => {
 
     <!-- Список отзывов -->
     <div v-else-if="reviews?.length">
-      <ReviewCard
-        v-for="review in displayedReviews"
-        :key="review.id"
-        :review="review"
-        :can-delete="review.user_id === authStore.user?.id"
-        @delete="handleDelete"
-      />
+      <div class="flex flex-col gap-2.5">
+        <ReviewCard
+          v-for="review in displayedReviews"
+          :key="review.id"
+          :review="review"
+          :can-delete="review.user_id === authStore.user?.id"
+          @delete="handleDelete"
+        />
+      </div>
 
       <button
         v-if="!showAll && reviews.length > 3"
@@ -368,6 +362,15 @@ onUnmounted(() => {
         @click="showAll = true"
       >
         Показать все отзывы ({{ reviews.length }})
+      </button>
+
+      <button
+        v-if="canReview && !isFormOpen"
+        type="button"
+        class="pr-write-btn"
+        @click="openReviewForm"
+      >
+        Написать отзыв
       </button>
     </div>
 
@@ -383,15 +386,77 @@ onUnmounted(() => {
       <p v-if="canReview" class="text-sm text-muted-foreground mt-1">
         Будьте первым, кто оставит отзыв!
       </p>
-      <Button
+      <button
         v-if="canReview && !isFormOpen"
-        variant="outline"
-        size="sm"
-        class="mt-3"
+        type="button"
+        class="pr-write-btn"
         @click="openReviewForm"
       >
-        Оставить отзыв
-      </Button>
+        Написать отзыв
+      </button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.pr-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 18px 16px;
+  box-shadow: var(--elevation-card);
+}
+
+@media (width >= 64rem) {
+  .pr-card {
+    padding: 24px 26px;
+  }
+}
+
+.pr-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.pr-rating-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.55));
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px rgba(15, 23, 42, 0.07);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.pr-write-btn {
+  margin-top: 12px;
+  width: 100%;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.62));
+  backdrop-filter: blur(10px) saturate(1.6);
+  -webkit-backdrop-filter: blur(10px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 5px 14px rgba(43, 127, 255, 0.16);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: box-shadow 0.18s ease;
+}
+
+.pr-write-btn:hover {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 8px 20px rgba(43, 127, 255, 0.26);
+}
+</style>

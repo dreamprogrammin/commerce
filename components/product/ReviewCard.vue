@@ -35,6 +35,28 @@ function getAuthorName(review: ProductReview): string {
   return parts.length ? parts.join(' ') : 'Покупатель'
 }
 
+/**
+ * Оттенок аватара-монограммы. Детерминированный (по имени автора), иначе
+ * при каждом ререндере отзыв менял бы цвет.
+ */
+// Литералы, а не var(--purple-600): такой переменной в tailwind.css нет —
+// Tailwind 4 отдаёт только --color-purple-600, и то лишь если утилита с ней
+// где-то сгенерирована (см. заметку про tree-shaking токенов).
+const AVATAR_TINTS = [
+  'linear-gradient(135deg,#8e51ff,var(--product-line))',
+  'linear-gradient(135deg,#ff8904,var(--product-line))',
+  'linear-gradient(135deg,var(--primary),#8e51ff)',
+]
+
+function getAvatarTint(review: ProductReview) {
+  if (review.profiles?.avatar_url)
+    return 'var(--muted)'
+  const name = getAuthorName(review)
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % AVATAR_TINTS.length
+  return AVATAR_TINTS[hash]
+}
+
 function getThumbUrl(imageUrl: string) {
   return getImageUrl(BUCKET_NAME_REVIEWS, imageUrl, IMAGE_PRESETS.REVIEW_THUMB)
 }
@@ -57,19 +79,19 @@ function navigateLightbox(direction: number, images: ProductReview['review_image
 </script>
 
 <template>
-  <div class="py-4 border-b last:border-b-0">
+  <div class="rvc-card">
     <div class="flex items-start gap-3">
-      <!-- Аватар -->
-      <div class="shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+      <!-- Аватар: фото профиля, иначе градиентная «монограмма» из макета -->
+      <div class="rvc-avatar" :style="{ background: getAvatarTint(review) }">
         <ProgressiveImage
           v-if="review.profiles?.avatar_url"
           :src="review.profiles.avatar_url"
           :alt="getAuthorName(review)"
           object-fit="cover"
           placeholder-type="shimmer"
-          class="w-full h-full"
+          class="size-full"
         />
-        <Icon v-else name="lucide:user" class="w-5 h-5 text-muted-foreground" />
+        <span v-else>{{ getAuthorName(review).charAt(0) }}</span>
       </div>
 
       <div class="flex-1 min-w-0">
@@ -159,3 +181,25 @@ function navigateLightbox(direction: number, images: ProductReview['review_image
     </Dialog>
   </div>
 </template>
+
+<style scoped>
+.rvc-card {
+  padding: 15px 16px;
+  border-radius: 18px;
+  background: var(--muted);
+}
+
+.rvc-avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: grid;
+  place-content: center;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+</style>
