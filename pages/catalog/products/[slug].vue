@@ -12,6 +12,7 @@ import SEOContentRenderer from '@/components/product/SEOContentRenderer.vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
+import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useSeoAltText } from '@/composables/useSeoAltText'
 import {
   BUCKET_NAME_BRANDS,
@@ -194,6 +195,7 @@ const faqSchemaItems = computed(() => {
     })
 })
 
+const digitColumns = ref<HTMLElement[]>([])
 const isLoading = computed(() => isProductLoading.value)
 
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
@@ -244,6 +246,23 @@ const totalBonuses = computed(() => {
   )
   for (const acc of selected) total += Number(acc.bonus_points_award || 0)
   return total
+})
+
+/**
+ * Разбор отформатированной цены на «барабаны» для флип-счётчика:
+ * цифры получают сквозной индекс (по нему useFlipCounter находит колонку),
+ * пробелы-разделители тысяч рендерятся отдельным распоркой.
+ */
+const priceChars = computed(() => {
+  const formatted = formatPrice(totalPrice.value)
+  let digitIndex = 0
+  return formatted.split('').map((char) => {
+    const isDigit = !Number.isNaN(Number(char)) && char !== ' '
+    const result = { char, isDigit, digitIndex: isDigit ? digitIndex : -1 }
+    if (isDigit)
+      digitIndex++
+    return result
+  })
 })
 
 const selectedAccessoriesData = computed(() =>
@@ -325,6 +344,8 @@ function decQuantity() {
   cartStore.updateQuantity(product.value.id, quantityInCart.value - 1)
 }
 
+useFlipCounter(totalPrice, digitColumns)
+
 // Панель покупки «едет» вниз ровно тогда, когда прячется MobileBottomNav,
 // поэтому пороги здесь обязаны совпадать с его собственными
 // (components/global/MobileBottomNav.vue) — иначе панель зависает в воздухе.
@@ -368,6 +389,9 @@ watch(
   () => product.value?.id,
   () => {
     selectedAccessoryIds.value = []
+    // Колонки флип-счётчика пересобираются под новую цену — иначе в массиве
+    // останутся отвязанные узлы от прошлого товара
+    digitColumns.value = []
   },
   { immediate: true },
 )
@@ -1173,7 +1197,28 @@ watchEffect(() => {
                   Итого за комплект
                 </p>
                 <div class="mb-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span class="pdp-price">{{ formatPrice(totalPrice) }} ₸</span>
+                  <!-- Флип-счётчик: каждая цифра — барабан 0…9, useFlipCounter
+                       крутит .digit-ribbon при изменении итоговой суммы.
+                       В барабанах лежат все цифры 0-9, поэтому для скринридеров
+                       они скрыты, а цена дублируется обычным текстом. -->
+                  <span class="pdp-price">
+                    <span class="sr-only">{{ formatPrice(totalPrice) }} ₸</span>
+                    <span class="pdp-price-reels" aria-hidden="true">
+                      <template v-for="(item, index) in priceChars" :key="index">
+                        <span v-if="item.char === ' '" class="pdp-digit-gap" />
+                        <span
+                          v-else-if="item.isDigit"
+                          :ref="(el) => { if (el) digitColumns[item.digitIndex] = el as HTMLElement }"
+                          class="digit-column"
+                        >
+                          <span class="digit-ribbon">
+                            <span v-for="d in 10" :key="d" class="digit-item">{{ d - 1 }}</span>
+                          </span>
+                        </span>
+                      </template>
+                      <span class="pdp-currency">₸</span>
+                    </span>
+                  </span>
                   <template v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected">
                     <span class="pdp-price-old">{{ formatPrice(mainProductPrice.original) }} ₸</span>
                     <span class="pdp-discount">−{{ product.discount_percentage }}%</span>
@@ -1751,14 +1796,74 @@ watchEffect(() => {
   overflow: hidden;
 }
 
-/* nowrap: formatPrice разделяет тысячи пробелом, и перед ₸ тоже пробел —
-   без запрета переноса знак тенге уезжает на вторую строку в узкой колонке */
+/* Цена — контейнер флип-счётчика: цифры это барабаны фиксированной ширины,
+   поэтому flex, а не текст. Перенос запрещён: разряды и ₸ всегда в одну строку. */
 .pdp-price {
   font-size: 27px;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--price);
   white-space: nowrap;
+}
+
+.pdp-price-reels {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+}
+
+.pdp-digit-gap {
+  width: 8px;
+}
+
+.pdp-currency {
+  margin-left: 7px;
+}
+
+/* Барабан одной цифры. clientHeight колонки = шаг прокрутки ленты,
+   поэтому высота колонки и высота .digit-item обязаны совпадать. */
+.digit-column {
+  position: relative;
+  height: 34px;
+  line-height: 34px;
+  width: 17px;
+  overflow: hidden;
+  text-align: center;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.digit-ribbon {
+  position: relative;
+  display: block;
+  will-change: transform;
+}
+
+.digit-item {
+  display: block;
+  height: 34px;
+  line-height: 34px;
+}
+
+@media (width >= 64rem) {
+  .pdp-digit-gap {
+    width: 10px;
+  }
+
+  .pdp-currency {
+    margin-left: 9px;
+  }
+
+  .digit-column {
+    height: 42px;
+    line-height: 42px;
+    width: 21px;
+  }
+
+  .digit-item {
+    height: 42px;
+    line-height: 42px;
+  }
 }
 
 @media (width >= 64rem) {
