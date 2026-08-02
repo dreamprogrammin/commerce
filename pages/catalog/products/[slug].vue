@@ -722,9 +722,13 @@ const moreCategories = computed(() => {
   return rows
 })
 
-/** В макете «Похожие товары» — сетка 2/4 колонки, а не карусель. */
+/**
+ * «Похожие товары» — сетка, а не карусель (как в макете).
+ * 12 штук, чтобы сетка заполнялась целыми рядами на 2 (моб.) / 4 (lg) / 6 (2xl)
+ * колонок; на xl (5 колонок) последний ряд остаётся неполным — это нормально.
+ */
 const similarGridProducts = computed(() =>
-  (similarProducts.value || []).slice(0, 8),
+  (similarProducts.value || []).slice(0, 12),
 )
 
 const schemaAdditionalProperties = computed(() => {
@@ -1530,15 +1534,15 @@ watchEffect(() => {
               </NuxtLink>
             </div>
 
-            <div v-if="similarProductsLoading" class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-[18px]">
-              <div v-for="i in 4" :key="i" class="pdp-card animate-pulse">
+            <div v-if="similarProductsLoading" class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-[18px] xl:grid-cols-5 2xl:grid-cols-6">
+              <div v-for="i in 6" :key="i" class="pdp-card animate-pulse">
                 <div class="mb-3 aspect-square rounded-lg bg-muted" />
                 <div class="mb-2 h-4 w-3/4 rounded bg-muted" />
                 <div class="h-4 w-1/2 rounded bg-muted" />
               </div>
             </div>
 
-            <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-[18px]">
+            <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-[18px] xl:grid-cols-5 2xl:grid-cols-6">
               <div
                 v-for="similar in similarGridProducts"
                 :key="similar.id"
