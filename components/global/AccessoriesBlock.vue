@@ -5,6 +5,12 @@ const props = defineProps<{
   accessories: AccessoryProduct[]
   loading?: boolean
   cartMode?: boolean
+  /**
+   * Блок уже лежит внутри чужой карточки (блок покупки на карточке товара) —
+   * тогда собственная белая карточка даёт «карточку в карточке». В этом режиме
+   * фон приглушённый, как у остальных вложенных секций блока покупки.
+   */
+  flat?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -121,7 +127,9 @@ function close() {
 <template>
   <div
     v-if="loading || accessories.length > 0"
-    class="bg-white rounded-xl p-4 shadow-sm border mt-4"
+    :class="flat
+      ? 'mt-[18px] rounded-2xl bg-muted p-3.5'
+      : 'bg-white rounded-xl p-4 shadow-sm border mt-4'"
   >
     <h3 class="font-bold text-base mb-3 flex items-center gap-2">
       <Icon name="lucide:plus-circle" class="w-6 h-6 text-primary" mode="svg" />
@@ -149,11 +157,13 @@ function close() {
         v-for="key in availableCategories"
         :key="key"
         class="relative flex items-center p-3 rounded-lg border transition-all active:scale-[0.98] gap-3"
-        :class="
+        :class="[
           selectedCount[key] > 0
             ? 'border-primary bg-primary/5'
-            : 'hover:border-primary/50'
-        "
+            : 'hover:border-primary/50',
+          // на приглушённом фоне строка обязана быть светлой, иначе сливается
+          flat && selectedCount[key] === 0 ? 'bg-card' : '',
+        ]"
         @click="openCategory(key)"
       >
         <Badge

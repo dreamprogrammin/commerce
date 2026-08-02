@@ -1374,6 +1374,7 @@ watchEffect(() => {
                   v-model:selected-ids="selectedAccessoryIds"
                   :accessories="accessories || []"
                   :loading="accessoriesLoading"
+                  flat
                 />
 
                 <!-- Преимущества магазина -->
