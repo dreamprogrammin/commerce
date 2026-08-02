@@ -352,15 +352,17 @@ async function onWish() {
             </div>
 
             <div v-else class="flex h-[52px] items-center justify-between gap-2 rounded-full bg-muted pl-4 pr-[5px]">
+              <!-- whitespace-nowrap: иначе «15 890 ₸» переносится по пробелу
+                   и знак тенге уезжает на вторую строку (узкая колонка на мобильных) -->
               <span class="flex flex-col justify-center leading-tight">
                 <span
                   v-if="priceDetails.hasDiscount"
-                  class="text-[13px] font-medium text-muted-foreground line-through"
+                  class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
                 >
                   {{ formatPrice(priceDetails.originalPrice) }} ₸
                 </span>
                 <span
-                  class="text-[17px] font-extrabold"
+                  class="whitespace-nowrap text-[17px] font-extrabold"
                   :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
                 >
                   {{ formatPrice(priceDetails.finalPrice) }} ₸

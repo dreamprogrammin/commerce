@@ -1558,12 +1558,12 @@ watchEffect(() => {
           <span class="flex flex-none flex-col">
             <span
               v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected"
-              class="text-xs font-medium text-price-old line-through"
+              class="whitespace-nowrap text-xs font-medium text-price-old line-through"
             >
               {{ formatPrice(mainProductPrice.original) }} ₸
             </span>
             <span class="inline-flex items-center gap-1.5">
-              <span class="text-[19px] font-extrabold tracking-tight text-primary">
+              <span class="whitespace-nowrap text-[19px] font-extrabold tracking-tight text-primary">
                 {{ formatPrice(totalPrice) }} ₸
               </span>
               <span
@@ -1747,11 +1747,14 @@ watchEffect(() => {
   overflow: hidden;
 }
 
+/* nowrap: formatPrice разделяет тысячи пробелом, и перед ₸ тоже пробел —
+   без запрета переноса знак тенге уезжает на вторую строку в узкой колонке */
 .pdp-price {
   font-size: 27px;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--price);
+  white-space: nowrap;
 }
 
 @media (width >= 64rem) {
@@ -1765,6 +1768,7 @@ watchEffect(() => {
   font-weight: 500;
   color: var(--price-old);
   text-decoration: line-through;
+  white-space: nowrap;
 }
 
 @media (width >= 64rem) {
