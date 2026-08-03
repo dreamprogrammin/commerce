@@ -574,7 +574,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                     class="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-500 [&:has([data-state=checked])]:border-red-500 cursor-pointer transition-colors"
                   >
                     <div class="flex items-center gap-3">
-                      <Smartphone class="w-6 h-6 text-red-600" />
+                      <Icon name="lucide:smartphone" class="w-6 h-6 text-red-600" />
                       <div>
                         <span class="text-sm font-medium block">Kaspi QR / Перевод</span>
                         <span class="text-xs text-muted-foreground">Переводом на Kaspi.kz</span>
@@ -589,7 +589,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                     class="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-500 [&:has([data-state=checked])]:border-green-500 cursor-pointer transition-colors"
                   >
                     <div class="flex items-center gap-3">
-                      <Banknote class="w-6 h-6 text-green-600" />
+                      <Icon name="lucide:banknote" class="w-6 h-6 text-green-600" />
                       <div>
                         <span class="text-sm font-medium block">Наличными при получении</span>
                         <span class="text-xs text-muted-foreground">Оплата курьеру или при самовывозе</span>
@@ -604,7 +604,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                     class="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-500 [&:has([data-state=checked])]:border-blue-500 cursor-pointer transition-colors"
                   >
                     <div class="flex items-center gap-3">
-                      <CreditCard class="w-6 h-6 text-blue-600" />
+                      <Icon name="lucide:credit-card" class="w-6 h-6 text-blue-600" />
                       <div>
                         <span class="text-sm font-medium block">Картой курьеру</span>
                         <span class="text-xs text-muted-foreground">Оплата картой при получении</span>
@@ -621,7 +621,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
         <Card v-if="isLoggedIn && bonusBalance > 0">
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
-              <Star class="w-5 h-5 text-primary fill-primary" />
+              <Icon name="lucide:star" class="w-5 h-5 text-primary fill-primary" />
               Применить бонусы
             </CardTitle>
             <CardDescription>
@@ -682,7 +682,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
         <Card>
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
-              <Tag class="w-5 h-5 text-primary" />
+              <Icon name="lucide:tag" class="w-5 h-5 text-primary" />
               Промокод
             </CardTitle>
           </CardHeader>
@@ -819,7 +819,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger class="flex items-center gap-1 cursor-help">
-                      <Star class="w-3 h-3" />
+                      <Icon name="lucide:star" class="w-3 h-3" />
                       Вы получите (через 14 дней):
                     </TooltipTrigger>
                     <TooltipContent class="max-w-xs">
@@ -879,11 +879,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               class="hidden lg:flex items-center justify-center gap-4 text-xs text-muted-foreground w-full pt-2 border-t"
             >
               <div class="flex items-center gap-1">
-                <Lock class="w-3 h-3" />
+                <Icon name="lucide:lock" class="w-3 h-3" />
                 <span>Безопасная оплата</span>
               </div>
               <div class="flex items-center gap-1">
-                <Package class="w-3 h-3" />
+                <Icon name="lucide:package" class="w-3 h-3" />
                 <span>Гарантия возврата 14 дней</span>
               </div>
             </div>

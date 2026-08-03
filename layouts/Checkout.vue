@@ -20,7 +20,7 @@ const currentStep = computed(() => {
 
     <!-- Checkout Stepper -->
     <div class="bg-background border-b">
-      <CheckoutStepper :current-step="currentStep" />
+      <OrderCheckoutStepper :current-step="currentStep" />
     </div>
 
     <slot />
