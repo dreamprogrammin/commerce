@@ -621,7 +621,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
         <Card v-if="isLoggedIn && bonusBalance > 0">
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
-              <Icon name="lucide:star" class="w-5 h-5 text-primary fill-primary" />
+              <Icon name="gravity-ui:star-fill" class="w-5 h-5 text-primary" />
               Применить бонусы
             </CardTitle>
             <CardDescription>
