@@ -147,5 +147,28 @@ BEGIN
 END $$;
 
 
+-- =================================================================
+-- ==       ПРАВА ДОСТУПА ДЛЯ ЛОКАЛЬНОЙ БАЗЫ                      ==
+-- =================================================================
+-- Новые образы Supabase Postgres создают таблицы в схеме `public` без
+-- привилегий SELECT/INSERT/UPDATE/DELETE для ролей `anon` и `authenticated`
+-- (остаются только TRUNCATE/REFERENCES/TRIGGER). Из-за этого локальный
+-- каталог падает с ошибкой 42501 `permission denied for table`.
+-- На проде база создавалась под старыми, разрешительными дефолтами,
+-- поэтому там гранты уже есть — и этот файл до прода не доезжает.
+-- Доступ к строкам по-прежнему определяется политиками RLS.
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+-- Те же права для таблиц, которые появятся позже.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+
+
 -- Финальное сообщение
 SELECT 'База данных успешно наполнена тестовыми данными!' AS status;

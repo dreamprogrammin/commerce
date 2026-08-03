@@ -242,6 +242,12 @@ export default defineNuxtConfig({
       },
       // ...
     },
+    // В dev файловый драйвер кэша хранит SWR-payload по пути маршрута,
+    // из-за чего «/catalog» (файл) конфликтует с «/catalog/products/**» (нужна директория)
+    // и вложенные страницы падают с ENOTDIR. На проде драйвер другой, поэтому только для dev.
+    devStorage: {
+      cache: { driver: 'memory' },
+    },
     compressPublicAssets: {
       gzip: true,
       brotli: true,
