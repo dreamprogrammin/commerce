@@ -224,11 +224,35 @@ function formatAge(birthDate: string): string {
 
     <!-- Диалог добавления/редактирования -->
     <Dialog v-model:open="isDialogOpen">
-      <DialogContent class="rounded-3xl sm:max-w-[460px]" @open-auto-focus.prevent>
+      <!--
+        [&>button]:hidden убирает штатный крестик shadcn. Именно утилитой, а не
+        scoped-правилом: класс из этого пропа `cn()` кладёт прямо на элемент
+        контента, тогда как scoped-атрибут data-v-* уходит на корень обёртки
+        (DialogPortal → Teleport) и до контента не доезжает.
+        Наши кнопки лежат внутри DialogHeader и form, прямыми потомками не
+        являются и под селектор не попадают.
+      -->
+      <DialogContent
+        class="rounded-3xl sm:max-w-[460px] [&>button]:hidden"
+        @open-auto-focus.prevent
+      >
         <DialogHeader>
-          <DialogTitle class="text-[21px] font-extrabold tracking-[-0.02em]">
-            {{ editingChild ? 'Редактировать данные' : 'Добавить ребёнка' }}
-          </DialogTitle>
+          <div class="flex items-center justify-between gap-3">
+            <DialogTitle class="text-[21px] font-extrabold tracking-[-0.02em]">
+              {{ editingChild ? 'Редактировать данные' : 'Добавить ребёнка' }}
+            </DialogTitle>
+            <!-- Свой крестик вместо штатного: в макете это кружок 38px с рамкой.
+                 Править общий components/ui/dialog/DialogContent.vue нельзя —
+                 он обслуживает все диалоги приложения. -->
+            <button
+              type="button"
+              class="ch-close"
+              aria-label="Закрыть"
+              @click="isDialogOpen = false"
+            >
+              <Icon name="lucide:x" class="size-[19px]" />
+            </button>
+          </div>
           <DialogDescription class="sr-only">
             Эта информация поможет нам рекомендовать наиболее подходящие товары.
           </DialogDescription>
@@ -289,7 +313,11 @@ function formatAge(birthDate: string): string {
               <button type="button" class="ch-btn-ghost" @click="isDialogOpen = false">
                 Отмена
               </button>
-              <button type="submit" class="ch-add-btn bg-gradient-to-br from-blue-400 to-blue-600" :disabled="isLoading">
+              <button
+                type="submit"
+                class="ch-add-btn ch-add-btn--wide bg-gradient-to-br from-blue-400 to-blue-600"
+                :disabled="isLoading"
+              >
                 <Icon name="lucide:check" class="size-[18px]" />
                 {{ isLoading ? 'Сохранение...' : 'Сохранить' }}
               </button>
@@ -363,6 +391,29 @@ function formatAge(birthDate: string): string {
 .ch-add-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* «Сохранить» в макете шире «Отмены»: 0 24px против 0 20px */
+.ch-add-btn--wide {
+  padding: 0 24px;
+}
+
+.ch-close {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: background 0.15s ease;
+}
+
+.ch-close:hover {
+  background: var(--muted);
 }
 
 .ch-btn-ghost {
