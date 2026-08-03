@@ -376,7 +376,11 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: [
         'gsap',
-        'embla-carousel',
+        // Именно прямые зависимости: сам `embla-carousel` лежит в дереве pnpm
+        // транзитивно и из корня проекта не резолвится, из-за чего Vite ругался
+        // на нерезолвимую запись. Ядро всё равно попадёт в пребандл через них.
+        'embla-carousel-vue',
+        'embla-carousel-autoplay',
         '@tanstack/vue-query',
         'lucide-vue-next',
       ],

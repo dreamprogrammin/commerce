@@ -44,7 +44,7 @@ INSERT INTO public.categories
     (name, slug, href, description, is_root_category, display_in_menu, display_order, icon_name)
 VALUES
     ('Мальчикам', 'boys', '/catalog/boys', 'Игрушки и товары для мальчиков', TRUE, TRUE, 10, 'lucide:user'),
-    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, TRUE, 20, 'lucide:female'),
+    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, TRUE, 20, 'lucide:user-round'),
     ('Малышам', 'kiddy', '/catalog/kiddy', 'Безопасные и развивающие игрушки 0-3', TRUE, TRUE, 30, 'lucide:baby'),
     ('Конструкторы', 'constructors-root', '/catalog/constructors-root', 'Конструкторы для детей всех возрастов', TRUE, TRUE, 40, 'lucide:blocks'),
     ('Игры', 'games', '/catalog/games', 'Настольные игры и пазлы для всей семьи', TRUE, TRUE, 50, 'lucide:gamepad-2'),
