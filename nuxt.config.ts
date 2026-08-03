@@ -1,3 +1,4 @@
+import process from 'node:process'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -248,6 +249,15 @@ export default defineNuxtConfig({
     devStorage: {
       cache: { driver: 'memory' },
     },
+    // Локально `pnpm build` падал с ELOOP: трассируя внешние зависимости, Nitro
+    // раскладывает их в .output/server/node_modules/.nitro/ по образцу pnpm,
+    // а пары вроде vue ↔ @vue/server-renderer дают взаимные симлинки —
+    // рекурсивный обход упирается в лимит вложенности ядра.
+    // На Vercel сборка проходит штатно, поэтому там оставляем поведение
+    // по умолчанию и трогаем только локальные сборки.
+    ...(process.env.VERCEL
+      ? {}
+      : { externals: { trace: false } }),
     compressPublicAssets: {
       gzip: true,
       brotli: true,
