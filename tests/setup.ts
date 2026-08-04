@@ -22,6 +22,9 @@ function createMockQueryBuilder() {
     update: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
     insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+    // upsert стор вызывает наравне с insert; без заглушки тест падает
+    // не ассертом, а Unhandled Rejection «upsert is not a function»
+    upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
     match: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
@@ -75,6 +78,21 @@ global.useSupabaseUser = () => ({ value: null })
 global.useRouter = () => mockRouter
 global.navigateTo = vi.fn()
 global.toast = mockToast
+
+/**
+ * Автоимпорт из pinia-plugin-persistedstate/nuxt. Стор объявляет
+ * `storage: piniaPluginPersistedstate.localStorage()` на верхнем уровне
+ * (stores/core/profileStore.ts, stores/publicStore/cartStore.ts), поэтому
+ * без заглушки файл теста падает целиком на ReferenceError ещё до первого it().
+ * localStorage в happy-dom есть, отдаём его — persist работает как в браузере.
+ */
+// globalThis, а не global: в файле исторически `global.*`, но линтер это
+// запрещает — новую строку добавляем в правильной форме, старые не трогаем
+globalThis.piniaPluginPersistedstate = {
+  localStorage: () => localStorage,
+  sessionStorage: () => sessionStorage,
+  cookies: () => localStorage,
+}
 
 // Mock vue-sonner globally
 vi.mock('vue-sonner', () => ({
