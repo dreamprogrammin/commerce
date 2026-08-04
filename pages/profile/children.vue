@@ -2,6 +2,7 @@
 import type { ChildrenInsert, ChildrenRow, ChildrenUpdate } from '@/types'
 import { toast } from 'vue-sonner'
 import { useChildrenStore } from '@/stores/publicStore/childrenStore'
+import { formatChildAge } from '@/utils/formatChildAge'
 
 definePageMeta({
   layout: 'profile',
@@ -88,31 +89,7 @@ async function handleSubmit() {
   isDialogOpen.value = false
 }
 
-function formatAge(birthDate: string): string {
-  const today = new Date()
-  const birth = new Date(birthDate)
-  let ageYears = today.getFullYear() - birth.getFullYear()
-  let ageMonths = today.getMonth() - birth.getMonth()
-
-  if (today.getDate() < birth.getDate())
-    ageMonths--
-
-  if (ageMonths < 0) {
-    ageYears--
-    ageMonths += 12
-  }
-
-  if (ageYears > 0) {
-    const yearsStr = (ageYears % 10 === 1 && ageYears % 100 !== 11) ? 'год' : (ageYears % 10 >= 2 && ageYears % 10 <= 4 && (ageYears % 100 < 10 || ageYears % 100 >= 20)) ? 'года' : 'лет'
-    return `${ageYears} ${yearsStr}`
-  }
-  else {
-    if (ageMonths === 0)
-      return 'Меньше месяца'
-    const monthsStr = (ageMonths % 10 === 1 && ageMonths % 100 !== 11) ? 'месяц' : (ageMonths % 10 >= 2 && ageMonths % 10 <= 4 && (ageMonths % 100 < 10 || ageMonths % 100 >= 20)) ? 'месяца' : 'месяцев'
-    return `${ageMonths} ${monthsStr}`
-  }
-}
+// Расчёт возраста живёт в utils/formatChildAge.ts — он покрыт тестами
 </script>
 
 <template>
@@ -166,7 +143,7 @@ function formatAge(birthDate: string): string {
           v-for="child in children"
           :key="child.id"
           type="button"
-          class="ch-card"
+          class="ch-card shadow-sm hover:shadow-md"
           @click="openForEdit(child)"
         >
           <span
@@ -188,7 +165,7 @@ function formatAge(birthDate: string): string {
             <span class="mt-2.5 flex flex-wrap gap-2">
               <span class="ch-chip">
                 <Icon name="lucide:cake" class="size-[13px] text-muted-foreground" />
-                {{ formatAge(child.birth_date) }}
+                {{ formatChildAge(child.birth_date) }}
               </span>
               <span class="ch-chip">
                 <Icon name="lucide:calendar" class="size-[13px] text-muted-foreground" />
@@ -437,7 +414,13 @@ function formatAge(birthDate: string): string {
   background: var(--muted);
 }
 
-/* Карточка ребёнка — кликабельна целиком, поэтому button, а не div */
+/*
+ * Карточка ребёнка — кликабельна целиком, поэтому button, а не div.
+ * Тени намеренно НЕ здесь, а утилитами shadow-sm / hover:shadow-md на элементе:
+ * в макете покой = --shadow-sm, наведение = --shadow-md (см. tokens/shadows.css),
+ * и это ровно шкала Tailwind. Репозиторный --elevation-card слабее (shadow-xs),
+ * а --elevation-card-hover наоборот shadow-xl — обе мимо макета.
+ */
 .ch-card {
   display: flex;
   align-items: center;
@@ -447,7 +430,6 @@ function formatAge(birthDate: string): string {
   border: 1px solid var(--border);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: var(--elevation-card);
   cursor: pointer;
   text-align: left;
   transition:
@@ -456,7 +438,6 @@ function formatAge(birthDate: string): string {
 }
 
 .ch-card:hover {
-  box-shadow: var(--elevation-card-hover);
   transform: translateY(-2px);
 }
 
