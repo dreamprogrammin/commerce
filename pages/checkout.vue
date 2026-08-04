@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { usePromoCodeStore } from '@/stores/publicStore/promoCodeStore'
 import { formatPrice } from '@/utils/formatPrice'
@@ -21,6 +22,7 @@ const authStore = useAuthStore()
 const cartStore = useCartStore()
 const profileStore = useProfileStore()
 const promoCodeStore = usePromoCodeStore()
+const modalStore = useModalStore()
 const { triggerHaptic } = useHaptic()
 
 const { user, isLoggedIn } = storeToRefs(authStore)
@@ -28,8 +30,8 @@ const { bonusBalance } = storeToRefs(profileStore)
 const {
   subtotal,
   discountAmount,
-  total,
   items,
+  totalItems,
   isProcessing,
   bonusesToSpend,
   bonusesToAward,
@@ -51,6 +53,7 @@ const bonusesInput = ref(0)
 const promoCodeInput = ref('')
 const showGuestModal = ref(false)
 const agreedToTerms = ref(true)
+const hasTriedSubmit = ref(false)
 
 const {
   appliedCode: appliedPromoCode,
@@ -165,14 +168,44 @@ const deliveryCost = computed(() => {
   return subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : 1000
 })
 
-// Итоговая сумма с учетом доставки
-const totalWithDelivery = computed(() => {
-  return total.value + deliveryCost.value
+const isCourier = computed(() => orderForm.value.deliveryMethod === 'courier')
+
+/**
+ * Итог по формуле макета: товары − промокод − бонусы + доставка.
+ *
+ * Раньше «Итого к оплате» считалось как subtotal − бонусы + доставка, а строка
+ * «Промокод −X ₸» рисовалась рядом, но в сумму не входила: покупатель видел
+ * одно число, а сервер (он применяет промокод сам внутри RPC) списывал другое.
+ */
+const orderTotal = computed(() => {
+  const afterDiscounts
+    = subtotal.value - promoDiscount.value - discountAmount.value
+  return Math.max(0, afterDiscounts) + deliveryCost.value
 })
+
+// --- БОНУСЫ ---
+const maxBonuses = computed(() =>
+  Math.min(
+    bonusBalance.value,
+    Math.floor(Math.max(0, subtotal.value - promoDiscount.value)),
+  ),
+)
+
+const useBonuses = computed(() => bonusesToSpend.value > 0)
+
+function toggleBonuses() {
+  if (useBonuses.value) {
+    cartStore.setBonusesToSpend(0)
+    bonusesInput.value = 0
+    return
+  }
+  cartStore.setBonusesToSpend(maxBonuses.value)
+  bonusesInput.value = bonusesToSpend.value
+}
 
 // Проверка готовности формы к отправке
 const isFormValid = computed(() => {
-  const { name, email, phone, deliveryMethod, address } = orderForm.value
+  const { name, email, phone, address } = orderForm.value
 
   // Базовые поля
   if (!name.trim() || !email.trim() || !phone.trim())
@@ -181,7 +214,7 @@ const isFormValid = computed(() => {
     return false
 
   // Адрес для курьера
-  if (deliveryMethod === 'courier' && !address.line1.trim())
+  if (isCourier.value && !address.line1.trim())
     return false
 
   // Согласие с условиями
@@ -190,6 +223,15 @@ const isFormValid = computed(() => {
 
   return true
 })
+
+// Предупреждение об адресе показываем только после попытки оформить —
+// подсвечивать пустое поле сразу при открытии страницы незачем.
+const showAddrWarn = computed(
+  () =>
+    hasTriedSubmit.value
+    && isCourier.value
+    && !orderForm.value.address.line1.trim(),
+)
 
 // Предзаполнение формы
 watch(
@@ -232,13 +274,12 @@ function applyBonuses() {
   }
 
   // Проверка 2: Не превышают ли бонусы стоимость заказа
-  const maxBonuses = Math.floor(subtotal.value)
-  if (bonusesInput.value > maxBonuses) {
+  if (bonusesInput.value > maxBonuses.value) {
     toast.warning('Слишком много бонусов', {
-      description: `Максимум для этого заказа: ${maxBonuses} бонусов (стоимость корзины)`,
+      description: `Максимум для этого заказа: ${maxBonuses.value} бонусов (стоимость корзины)`,
     })
-    bonusesInput.value = maxBonuses
-    cartStore.setBonusesToSpend(maxBonuses)
+    bonusesInput.value = maxBonuses.value
+    cartStore.setBonusesToSpend(maxBonuses.value)
     return
   }
 
@@ -253,6 +294,8 @@ function applyBonuses() {
 }
 
 async function placeOrder() {
+  hasTriedSubmit.value = true
+
   // Валидация обязательных полей
   if (
     !orderForm.value.name.trim()
@@ -284,6 +327,12 @@ async function placeOrder() {
     return
   }
 
+  // Адрес обязателен для курьера
+  if (isCourier.value && !orderForm.value.address.line1.trim()) {
+    toast.error('Укажите адрес доставки')
+    return
+  }
+
   // Форматируем номер для отправки в бэк: +77771234567
   const formattedPhone = `+${phoneDigits.value}`
 
@@ -307,13 +356,12 @@ async function placeOrder() {
   await cartStore.checkout({
     deliveryMethod: orderForm.value.deliveryMethod,
     paymentMethod: orderForm.value.paymentMethod,
-    deliveryAddress:
-      orderForm.value.deliveryMethod === 'courier'
-        ? {
-            line1: orderForm.value.address.line1,
-            city: orderForm.value.address.city,
-          }
-        : undefined,
+    deliveryAddress: isCourier.value
+      ? {
+          line1: orderForm.value.address.line1,
+          city: orderForm.value.address.city,
+        }
+      : undefined,
     guestInfo,
     promoCode: appliedPromoCode.value || undefined,
     contactName: isLoggedIn.value
@@ -330,636 +378,699 @@ async function placeOrder() {
   // Очищаем промокод после успешного заказа
   promoCodeStore.clearCode()
 }
+
+const PAYMENT_METHODS = [
+  {
+    key: 'kaspi' as const,
+    name: 'Kaspi — перевод или QR',
+    desc: 'Оплата после подтверждения заказа',
+    icon: 'lucide:smartphone',
+    tint: 'bg-red-50 text-red-600',
+  },
+  {
+    key: 'cash' as const,
+    name: 'Наличными при получении',
+    desc: 'Курьеру или в пункте самовывоза',
+    icon: 'lucide:banknote',
+    tint: 'bg-green-50 text-green-600',
+  },
+  {
+    key: 'card' as const,
+    name: 'Картой при получении',
+    desc: 'Оплата картой курьеру',
+    icon: 'lucide:credit-card',
+    tint: 'bg-blue-50 text-blue-600',
+  },
+]
+
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
-// Scroll-aware visibility для sticky bar
+/**
+ * Липкая CTA-панель едет вниз синхронно с MobileBottomNav, поэтому пороги
+ * скролла здесь скопированы из него один в один: своя эвристика уводила
+ * панель и навигацию в разные стороны на одном и том же жесте.
+ */
 const isNavVisible = ref(true)
 let lastScrollY = 0
+let ticking = false
 
-function handleScroll() {
-  const currentScrollY = window.scrollY
-  if (currentScrollY < 60) {
-    isNavVisible.value = true
-  }
-  else if (currentScrollY > lastScrollY) {
+function applyScroll() {
+  ticking = false
+  const y = window.scrollY
+  const dy = y - lastScrollY
+  if (dy > 6 && y > 280)
     isNavVisible.value = false
-  }
-  else {
+  else if (dy < -6 || y < 120)
     isNavVisible.value = true
-  }
-  lastScrollY = currentScrollY
+  lastScrollY = y
 }
 
-onMounted(() =>
-  window.addEventListener('scroll', handleScroll, { passive: true }),
-)
+function handleScroll() {
+  if (!ticking) {
+    ticking = true
+    requestAnimationFrame(applyScroll)
+  }
+}
+
+onMounted(() => {
+  lastScrollY = window.scrollY
+  window.addEventListener('scroll', handleScroll, { passive: true })
+})
 onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 </script>
 
 <template>
-  <div :class="containerClass" class="py-12">
-    <!-- Модалка для гостей -->
-    <GuestBonusModal v-model:open="showGuestModal" />
+  <div :class="`${containerClass} py-6 sm:py-8`">
+    <div class="mx-auto w-full max-w-[1200px]">
+      <!-- Модалка для гостей -->
+      <GuestBonusModal v-model:open="showGuestModal" />
 
-    <!-- Корзина пуста -->
-    <div
-      v-if="items.length === 0"
-      class="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg flex flex-col items-center gap-4"
-    >
-      <h1 class="text-3xl font-bold mb-4">
-        Ваша корзина пуста
-      </h1>
-      <NuxtLink to="/catalog">
-        <Button class="mt-4" size="lg">
-          Начать покупки
-        </Button>
-      </NuxtLink>
-    </div>
+      <!-- ============ КОРЗИНА ПУСТА ============ -->
+      <div
+        v-if="items.length === 0"
+        class="flex flex-col items-center gap-3.5 px-6 py-12 text-center"
+      >
+        <span class="grid size-[88px] place-content-center rounded-full bg-brand-surface">
+          <Icon name="solar:cart-3-bold" class="size-[42px] text-primary" />
+        </span>
+        <h1 class="text-[22px] font-extrabold tracking-[-0.02em]">
+          Корзина пуста
+        </h1>
+        <p class="max-w-[340px] text-[15px] text-muted-foreground">
+          Добавьте товары в корзину, чтобы оформить заказ.
+        </p>
+        <NuxtLink
+          to="/catalog"
+          class="mt-1.5 inline-flex h-12 items-center rounded-xl bg-primary px-[26px] text-[15px] font-bold text-primary-foreground transition-colors hover:bg-brand-hover"
+        >
+          Перейти в каталог
+        </NuxtLink>
+      </div>
 
-    <!-- Есть товары в корзине -->
-    <div
-      v-else
-      class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-32 lg:pb-0"
-    >
-      <!-- Левая колонка: Форма -->
-      <div class="lg:col-span-2 space-y-8">
-        <!-- Блок 1: Контактная информация -->
-        <Card>
-          <CardHeader>
-            <CardTitle>1. Контактная информация</CardTitle>
-            <CardDescription v-if="!isLoggedIn">
+      <!-- ============ ОФОРМЛЕНИЕ ============ -->
+      <div
+        v-else
+        class="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_344px] lg:items-start lg:gap-6"
+      >
+        <div class="flex min-w-0 flex-col gap-7">
+          <h1 class="text-[clamp(22px,3vw,28px)] font-extrabold tracking-[-0.025em]">
+            Оформление заказа
+          </h1>
+
+          <!-- Контактные данные -->
+          <section>
+            <div class="mb-3 flex items-center justify-between gap-2.5">
+              <h2 class="text-base font-extrabold">
+                Контактные данные
+              </h2>
+              <button
+                v-if="!isLoggedIn"
+                type="button"
+                class="inline-flex items-center gap-1.5 text-[13px] font-bold text-primary hover:underline"
+                @click="modalStore.openLoginModal()"
+              >
+                <Icon name="lucide:log-in" class="size-[15px]" />
+                Войти
+              </button>
+            </div>
+
+            <div class="flex flex-col gap-2.5">
+              <div class="grid gap-2.5 sm:grid-cols-2">
+                <div>
+                  <input
+                    id="name"
+                    v-model="orderForm.name"
+                    class="co-input"
+                    :class="{ 'co-input--error': orderForm.name && !isValidName }"
+                    autocomplete="name"
+                    placeholder="Ваше имя"
+                  >
+                  <p
+                    v-if="orderForm.name && !isValidName"
+                    class="mt-1.5 text-xs text-destructive"
+                  >
+                    Минимум 2 символа
+                  </p>
+                </div>
+                <div>
+                  <input
+                    id="phone"
+                    v-model="orderForm.phone"
+                    v-maska="phoneMaskOptions"
+                    class="co-input"
+                    :class="{
+                      'co-input--error':
+                        orderForm.phone && orderForm.phone.length > 4 && !isValidPhone,
+                    }"
+                    autocomplete="tel"
+                    inputmode="tel"
+                    placeholder="+7 (___) ___-__-__"
+                    @focus="handlePhoneFocus"
+                    @blur="handlePhoneBlur"
+                  >
+                  <p
+                    v-if="orderForm.phone && orderForm.phone.length > 4 && phoneErrorMessage"
+                    class="mt-1.5 text-xs text-destructive"
+                  >
+                    {{ phoneErrorMessage }}
+                  </p>
+                </div>
+              </div>
+              <!-- Email в макете нет, но без него create_guest_checkout падает,
+                   а isFormValid не пропускает форму — поле обязательное. -->
+              <div>
+                <input
+                  id="email"
+                  v-model="orderForm.email"
+                  type="email"
+                  class="co-input"
+                  :class="{ 'co-input--error': orderForm.email && !isValidEmail }"
+                  autocomplete="email"
+                  inputmode="email"
+                  placeholder="Email для чека и статуса заказа"
+                >
+                <p
+                  v-if="orderForm.email && !isValidEmail"
+                  class="mt-1.5 text-xs text-destructive"
+                >
+                  Введите корректный email
+                </p>
+              </div>
+            </div>
+
+            <button
+              v-if="!isLoggedIn"
+              type="button"
+              class="mt-3 flex w-full items-center gap-2.5 rounded-[14px] bg-bonus-surface px-3.5 py-3 text-left"
+              @click="showGuestModal = true"
+            >
+              <Icon name="lucide:gift" class="size-[18px] shrink-0 text-bonus" />
+              <span class="text-xs leading-[1.4]">
+                Войдите, чтобы копить и списывать бонусы — до 10% кэшбэка с каждого заказа
+              </span>
+            </button>
+          </section>
+
+          <!-- Способ получения -->
+          <section>
+            <h2 class="mb-3.5 text-base font-extrabold">
+              Способ получения
+            </h2>
+            <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <button
                 type="button"
-                class="font-semibold text-primary hover:underline"
-                @click="showGuestModal = true"
+                class="co-opt gap-[11px]"
+                :class="isCourier ? 'co-opt--active text-primary' : 'text-foreground'"
+                @click="orderForm.deliveryMethod = 'courier'"
               >
-                Зарегистрируйтесь
+                <Icon name="lucide:truck" class="size-[22px] shrink-0" />
+                <span class="flex flex-col items-start leading-[1.25]">
+                  <span class="text-sm font-bold">Курьером</span>
+                  <span class="text-xs text-muted-foreground">за 1–2 дня по Алматы</span>
+                </span>
               </button>
-              и получите 1000 бонусов после подтверждения первого заказа! 🎁
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div class="space-y-1">
-                <Label for="name">Имя *</Label>
-                <Input
-                  id="name"
-                  v-model="orderForm.name"
-                  required
-                  autocomplete="name"
-                  placeholder="Иван"
-                  :class="{
-                    'border-destructive': orderForm.name && !isValidName,
-                  }"
-                />
-                <p
-                  v-if="orderForm.name && !isValidName"
-                  class="text-xs text-destructive"
-                >
-                  Минимум 2 символа
-                </p>
-              </div>
-              <div class="space-y-1">
-                <Label for="phone">Телефон *</Label>
-                <Input
-                  id="phone"
-                  v-model="orderForm.phone"
-                  v-maska="phoneMaskOptions"
-                  required
-                  autocomplete="tel"
-                  placeholder="+7 (___) ___-__-__"
-                  inputmode="tel"
-                  :class="{
-                    'border-destructive':
-                      orderForm.phone
-                      && orderForm.phone.length > 4
-                      && !isValidPhone,
-                  }"
-                  @focus="handlePhoneFocus"
-                  @blur="handlePhoneBlur"
-                />
-                <p
-                  v-if="
-                    orderForm.phone
-                      && orderForm.phone.length > 4
-                      && phoneErrorMessage
-                  "
-                  class="text-xs text-destructive"
-                >
-                  {{ phoneErrorMessage }}
-                </p>
-                <p
-                  v-else-if="orderForm.phone && isValidPhone"
-                  class="text-xs text-green-600"
-                >
-                  ✓ Номер введен корректно
-                </p>
-              </div>
-            </div>
-            <div class="space-y-1">
-              <Label for="email">Email *</Label>
-              <Input
-                id="email"
-                v-model="orderForm.email"
-                type="email"
-                required
-                autocomplete="email"
-                placeholder="example@mail.com"
-                inputmode="email"
-                :class="{
-                  'border-destructive': orderForm.email && !isValidEmail,
-                }"
-              />
-              <p
-                v-if="orderForm.email && !isValidEmail"
-                class="text-xs text-destructive"
+              <button
+                type="button"
+                class="co-opt gap-[11px]"
+                :class="!isCourier ? 'co-opt--active text-primary' : 'text-foreground'"
+                @click="orderForm.deliveryMethod = 'pickup'"
               >
-                Введите корректный email
-              </p>
+                <Icon name="lucide:store" class="size-[22px] shrink-0" />
+                <span class="flex flex-col items-start leading-[1.25]">
+                  <span class="text-sm font-bold">Самовывоз</span>
+                  <span class="text-xs text-muted-foreground">бесплатно, сегодня</span>
+                </span>
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          </section>
 
-        <!-- Блок 2: Доставка -->
-        <Card>
-          <CardHeader>
-            <CardTitle>2. Доставка и оплата</CardTitle>
-          </CardHeader>
-          <CardContent class="space-y-6">
+          <!-- Адрес доставки -->
+          <section v-if="isCourier" class="flex flex-col gap-5">
             <div>
-              <Label>Способ доставки</Label>
-              <RadioGroup
-                v-model="orderForm.deliveryMethod"
-                class="grid grid-cols-2 gap-4 mt-2"
-              >
-                <div>
-                  <RadioGroupItem
-                    id="pickup"
-                    value="pickup"
-                    class="peer sr-only"
-                  />
-                  <Label
-                    for="pickup"
-                    class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+              <h2 class="mb-2.5 text-base font-extrabold">
+                Адрес доставки
+              </h2>
+              <div class="flex flex-col gap-2.5">
+                <input
+                  id="city"
+                  v-model="orderForm.address.city"
+                  class="co-input"
+                  placeholder="Город"
+                >
+                <div
+                  class="co-input flex items-center gap-2.5"
+                  :class="{ 'co-input--error': showAddrWarn }"
+                >
+                  <Icon name="lucide:map-pin" class="size-[18px] shrink-0 text-primary" />
+                  <input
+                    id="address"
+                    v-model="orderForm.address.line1"
+                    class="min-w-0 flex-1 border-none bg-transparent outline-none"
+                    placeholder="Улица, дом, квартира"
                   >
-                    <span class="text-sm font-medium">Самовывоз</span>
-                    <span class="text-xs text-muted-foreground mt-1">Бесплатно</span>
-                  </Label>
                 </div>
-                <div>
-                  <RadioGroupItem
-                    id="courier"
-                    value="courier"
-                    class="peer sr-only"
-                  />
-                  <Label
-                    for="courier"
-                    class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                  >
-                    <span class="text-sm font-medium">Яндекс Доставка</span>
-                    <span class="text-xs text-muted-foreground mt-1">От 500 ₸</span>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <!-- Адрес для курьера -->
-            <div
-              v-if="orderForm.deliveryMethod === 'courier'"
-              class="space-y-4 animate-in fade-in"
-            >
-              <div>
-                <Label for="city">Город *</Label>
-                <Input id="city" v-model="orderForm.address.city" required />
-              </div>
-              <div>
-                <Label for="address">Улица, дом, квартира *</Label>
-                <Input
-                  id="address"
-                  v-model="orderForm.address.line1"
-                  required
-                  placeholder="ул. Пушкина, д. 1, кв. 1"
-                />
-              </div>
-              <div>
-                <Label for="comment">Комментарий для курьера</Label>
-                <Textarea
+                <input
                   id="comment"
                   v-model="orderForm.comment"
-                  placeholder="Позвоните за час, не работает домофон, оставьте у двери..."
-                  rows="3"
-                  class="resize-none"
-                />
-                <p class="text-xs text-muted-foreground mt-1">
-                  Необязательно, но поможет курьеру доставить заказ быстрее
-                </p>
+                  class="co-input"
+                  placeholder="Комментарий к адресу — подъезд, этаж, домофон"
+                >
+              </div>
+            </div>
+          </section>
+
+          <!-- Способ оплаты -->
+          <section>
+            <h2 class="mb-3.5 text-base font-extrabold">
+              Способ оплаты
+            </h2>
+            <div class="flex flex-col gap-2.5">
+              <button
+                v-for="pm in PAYMENT_METHODS"
+                :key="pm.key"
+                type="button"
+                class="co-opt"
+                :class="{ 'co-opt--active': orderForm.paymentMethod === pm.key }"
+                @click="orderForm.paymentMethod = pm.key"
+              >
+                <span
+                  class="grid size-[42px] shrink-0 place-content-center rounded-[11px]"
+                  :class="pm.tint"
+                >
+                  <Icon :name="pm.icon" class="size-[22px]" />
+                </span>
+                <span class="flex min-w-0 flex-1 flex-col gap-[3px] text-left">
+                  <span class="text-sm font-bold">{{ pm.name }}</span>
+                  <span class="text-xs text-muted-foreground">{{ pm.desc }}</span>
+                </span>
+                <span
+                  class="co-radio"
+                  :class="{ 'co-radio--active': orderForm.paymentMethod === pm.key }"
+                >
+                  <span
+                    v-if="orderForm.paymentMethod === pm.key"
+                    class="size-2.5 rounded-full bg-white"
+                  />
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Промокод и бонусы -->
+          <section class="flex flex-col gap-[18px]">
+            <div>
+              <h2 class="mb-2.5 text-base font-extrabold">
+                Промокод
+              </h2>
+              <div
+                v-if="appliedPromoCode"
+                class="flex items-center justify-between gap-3 rounded-[14px] bg-brand-surface px-3.5 py-3"
+              >
+                <span class="inline-flex items-center gap-2 text-sm">
+                  <Icon name="lucide:badge-check" class="size-[15px] text-success" />
+                  <b class="font-bold">{{ appliedPromoCode }}</b>
+                  <span class="text-muted-foreground">— скидка {{ formatPrice(promoDiscount) }} ₸</span>
+                </span>
+                <button
+                  type="button"
+                  class="shrink-0 text-[13px] font-semibold text-muted-foreground hover:text-destructive"
+                  @click="clearPromoCode"
+                >
+                  Отменить
+                </button>
+              </div>
+              <div v-else class="flex gap-2.5">
+                <input
+                  v-model="promoCodeInput"
+                  class="co-input flex-1 uppercase"
+                  placeholder="Введите промокод"
+                  @keyup.enter="applyPromoCode"
+                >
+                <button
+                  type="button"
+                  class="co-cta h-12 shrink-0 rounded-full px-[22px] text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="isPromoValidating || !promoCodeInput.trim()"
+                  @click="applyPromoCode"
+                >
+                  {{ isPromoValidating ? 'Проверяем…' : 'Применить' }}
+                </button>
               </div>
             </div>
 
-            <!-- Способ оплаты -->
-            <div class="pt-4 border-t">
-              <Label>Способ оплаты</Label>
-              <RadioGroup
-                v-model="orderForm.paymentMethod"
-                class="grid grid-cols-1 gap-3 mt-2"
-              >
-                <div>
-                  <RadioGroupItem
-                    id="kaspi"
-                    value="kaspi"
-                    class="peer sr-only"
-                  />
-                  <Label
-                    for="kaspi"
-                    class="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-500 [&:has([data-state=checked])]:border-red-500 cursor-pointer transition-colors"
-                  >
-                    <div class="flex items-center gap-3">
-                      <Icon name="lucide:smartphone" class="w-6 h-6 text-red-600" />
-                      <div>
-                        <span class="text-sm font-medium block">Kaspi QR / Перевод</span>
-                        <span class="text-xs text-muted-foreground">Переводом на Kaspi.kz</span>
-                      </div>
-                    </div>
-                  </Label>
-                </div>
-                <div>
-                  <RadioGroupItem id="cash" value="cash" class="peer sr-only" />
-                  <Label
-                    for="cash"
-                    class="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-500 [&:has([data-state=checked])]:border-green-500 cursor-pointer transition-colors"
-                  >
-                    <div class="flex items-center gap-3">
-                      <Icon name="lucide:banknote" class="w-6 h-6 text-green-600" />
-                      <div>
-                        <span class="text-sm font-medium block">Наличными при получении</span>
-                        <span class="text-xs text-muted-foreground">Оплата курьеру или при самовывозе</span>
-                      </div>
-                    </div>
-                  </Label>
-                </div>
-                <div>
-                  <RadioGroupItem id="card" value="card" class="peer sr-only" />
-                  <Label
-                    for="card"
-                    class="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-500 [&:has([data-state=checked])]:border-blue-500 cursor-pointer transition-colors"
-                  >
-                    <div class="flex items-center gap-3">
-                      <Icon name="lucide:credit-card" class="w-6 h-6 text-blue-600" />
-                      <div>
-                        <span class="text-sm font-medium block">Картой курьеру</span>
-                        <span class="text-xs text-muted-foreground">Оплата картой при получении</span>
-                      </div>
-                    </div>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </CardContent>
-        </Card>
+            <div class="h-px bg-muted" />
 
-        <!-- Блок 3: Бонусы (только для авторизованных) -->
-        <Card v-if="isLoggedIn && bonusBalance > 0">
-          <CardHeader>
-            <CardTitle class="flex items-center gap-2">
-              <Icon name="gravity-ui:star-fill" class="w-5 h-5 text-primary" />
-              Применить бонусы
-            </CardTitle>
-            <CardDescription>
-              У вас
-              <span class="font-bold text-primary">{{ bonusBalance }}</span>
-              активных бонусов (1 бонус = 1 ₸ скидки)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div class="space-y-2">
-              <div class="flex items-center gap-2">
-                <Input
+            <!-- Списание бонусов -->
+            <div v-if="isLoggedIn">
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="maxBonuses <= 0"
+                @click="toggleBonuses"
+              >
+                <span class="co-check" :class="{ 'co-check--active': useBonuses }">
+                  <Icon v-if="useBonuses" name="lucide:check" class="size-[15px] text-white" />
+                </span>
+                <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span class="text-sm font-bold">Списать бонусы</span>
+                  <span class="text-xs text-muted-foreground">
+                    Доступно {{ formatPrice(bonusBalance) }} бонусов · 1 бонус = 1 ₸
+                  </span>
+                </span>
+                <span class="text-[15px] font-extrabold text-bonus">
+                  −{{ formatPrice(bonusesToSpend) }} ₸
+                </span>
+              </button>
+
+              <!-- Частичное списание: макет предлагает всё-или-ничего,
+                   но в проде поле суммы было — оставляем его под галочкой. -->
+              <div v-if="useBonuses" class="mt-3 flex flex-wrap items-center gap-2.5">
+                <input
                   id="bonuses"
                   v-model.number="bonusesInput"
                   type="number"
-                  placeholder="Сколько списать?"
-                  :max="Math.min(bonusBalance, Math.floor(subtotal))"
+                  class="co-input min-w-[120px] flex-1"
                   min="0"
-                  class="flex-1"
-                />
-                <Button
+                  :max="maxBonuses"
+                  placeholder="Сколько списать?"
+                >
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  @click="
-                    bonusesInput = Math.min(bonusBalance, Math.floor(subtotal))
-                  "
+                  class="h-12 shrink-0 rounded-full border px-4 text-[13px] font-semibold transition-colors hover:bg-muted"
+                  @click="bonusesInput = maxBonuses"
                 >
                   Максимум
-                </Button>
-                <Button type="button" variant="default" @click="applyBonuses">
-                  Применить
-                </Button>
-              </div>
-            </div>
-            <div class="text-xs text-muted-foreground mt-2 space-y-1">
-              <p>
-                Максимум для этого заказа:
-                <span class="font-semibold text-foreground">
-                  {{ Math.min(bonusBalance, Math.floor(subtotal)) }} бонусов
-                </span>
-                <span
-                  v-if="bonusBalance > Math.floor(subtotal)"
-                  class="text-amber-600"
+                </button>
+                <button
+                  type="button"
+                  class="co-cta h-12 shrink-0 rounded-full px-5 text-[13px] font-extrabold text-white"
+                  @click="applyBonuses"
                 >
-                  (ограничено стоимостью корзины)
-                </span>
+                  Применить
+                </button>
+              </div>
+              <p class="mt-2 text-[11px] text-muted-foreground">
+                💡 Бонусы начисляются при подтверждении заказа и активируются через 14 дней
               </p>
-              <p class="text-[11px]">
-                💡 Бонусы начисляются при подтверждении заказа и активируются
-                через 14 дней
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <!-- Блок 4: Промокод -->
-        <Card>
-          <CardHeader>
-            <CardTitle class="flex items-center gap-2">
-              <Icon name="lucide:tag" class="w-5 h-5 text-primary" />
-              Промокод
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              v-if="appliedPromoCode"
-              class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg"
-            >
-              <div>
-                <span
-                  class="font-semibold text-green-700 dark:text-green-300"
-                >{{ appliedPromoCode }}</span>
-                <span class="text-sm text-muted-foreground ml-2">— скидка {{ promoDiscount }} ₸</span>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                @click="clearPromoCode"
-              >
-                Отменить
-              </Button>
-            </div>
-            <div v-else class="flex items-center gap-2">
-              <Input
-                v-model="promoCodeInput"
-                placeholder="Введите промокод"
-                class="flex-1 uppercase"
-                @keyup.enter="applyPromoCode"
-              />
-              <Button
-                type="button"
-                variant="default"
-                :disabled="isPromoValidating || !promoCodeInput.trim()"
-                @click="applyPromoCode"
-              >
-                {{ isPromoValidating ? "Проверяем..." : "Применить" }}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <!-- Кнопка оформления удалена отсюда - перенесена в правую колонку -->
-      </div>
-
-      <!-- Правая колонка: Состав заказа -->
-      <aside class="col-span-1 lg:sticky top-24">
-        <Card>
-          <CardHeader>
-            <CardTitle>Ваш заказ</CardTitle>
-          </CardHeader>
-          <CardContent class="space-y-4 text-sm">
-            <!-- Товары -->
-            <div
-              v-for="item in items"
-              :key="item.product.id"
-              class="flex justify-between items-start"
-            >
-              <span class="pr-2">{{ item.product.name }} × {{ item.quantity }}</span>
-              <span class="font-semibold whitespace-nowrap">
-                {{
-                  formatPrice(
-                    (item.product.final_price || item.product.price)
-                      * item.quantity,
-                  )
-                }}
-                ₸
-              </span>
             </div>
 
-            <!-- Разделитель -->
-            <div class="pt-4 border-t space-y-2">
-              <div class="flex justify-between">
-                <span>Сумма:</span>
-                <span>{{ formatPrice(subtotal) }} ₸</span>
-              </div>
-
-              <!-- Скидка бонусами -->
-              <div
-                v-if="discountAmount > 0"
-                class="flex justify-between text-primary font-medium"
-              >
-                <span>Скидка бонусами:</span>
-                <span>-{{ formatPrice(discountAmount) }} ₸</span>
-              </div>
-
-              <!-- Скидка промокодом -->
-              <div
-                v-if="promoDiscount > 0"
-                class="flex justify-between text-green-600 font-medium"
-              >
-                <span>Промокод {{ appliedPromoCode }}:</span>
-                <span>-{{ promoDiscount }} ₸</span>
-              </div>
-
-              <!-- Доставка -->
-              <div class="flex justify-between items-center">
-                <span>Доставка:</span>
-                <div class="flex items-center gap-2">
-                  <span
-                    v-if="deliveryCost === 0"
-                    class="text-green-600 font-medium flex items-center gap-1"
-                  >
-                    Бесплатно
-                    <Badge
-                      variant="outline"
-                      class="bg-green-50 text-green-700 border-green-200"
-                    >
-                      🎉 Бесплатно
-                    </Badge>
-                  </span>
-                  <span v-else class="font-medium">{{ formatPrice(deliveryCost) }} ₸</span>
-                </div>
-              </div>
-
-              <!-- Прогресс до бесплатной доставки (если курьер и не достигнут порог) -->
-              <div
-                v-if="
-                  orderForm.deliveryMethod === 'courier'
-                    && subtotal < FREE_SHIPPING_THRESHOLD
-                "
-                class="text-xs text-muted-foreground"
-              >
-                Добавьте товаров на
-                {{ formatPrice(FREE_SHIPPING_THRESHOLD - subtotal) }} ₸ для
-                бесплатной доставки 🚚
-              </div>
-
-              <!-- Будущие бонусы (только для авторизованных) -->
-              <div
-                v-if="isLoggedIn && bonusesToAward > 0"
-                class="flex justify-between text-xs text-muted-foreground"
-              >
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger class="flex items-center gap-1 cursor-help">
-                      <Icon name="lucide:star" class="w-3 h-3" />
-                      Вы получите (через 14 дней):
-                    </TooltipTrigger>
-                    <TooltipContent class="max-w-xs">
-                      <p class="text-xs">
-                        Бонусы будут начислены после подтверждения заказа
-                        администратором и активируются через 14 дней
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <span>+{{ bonusesToAward }} бонусов</span>
-              </div>
-            </div>
-          </CardContent>
-
-          <!-- Итого -->
-          <CardFooter class="pt-4 border-t flex-col space-y-4">
-            <div class="flex justify-between font-bold text-lg w-full">
-              <span>Итого к оплате:</span>
-              <span>{{ formatPrice(totalWithDelivery) }} ₸</span>
-            </div>
-
-            <!-- Чекбокс согласия -->
-            <div class="flex items-start gap-2 w-full">
-              <Checkbox id="terms" v-model:checked="agreedToTerms" />
-              <Label for="terms" class="text-xs leading-tight cursor-pointer">
-                Я согласен с условиями
-                <a
-                  href="/terms"
-                  target="_blank"
-                  class="text-primary hover:underline"
-                >Публичной оферты</a>
-                и
-                <a
-                  href="/privacy"
-                  target="_blank"
-                  class="text-primary hover:underline"
-                >политикой обработки персональных данных</a>
-              </Label>
-            </div>
-
-            <!-- Кнопка оформления заказа (скрыта на мобильных) -->
-            <Button
+            <button
+              v-else
               type="button"
-              size="lg"
-              class="w-full text-lg hidden lg:flex"
-              :disabled="isProcessing || !isFormValid"
-              @click="placeOrder"
+              class="flex w-full items-center gap-3.5 rounded-[14px] border border-bonus-border bg-bonus-surface p-3.5 text-left"
+              @click="showGuestModal = true"
             >
-              <span v-if="isProcessing">Оформляем заказ...</span>
-              <span v-else>Подтвердить заказ на
-                {{ formatPrice(totalWithDelivery) }} ₸</span>
-            </Button>
+              <span class="grid size-10 shrink-0 place-content-center rounded-[11px] bg-white">
+                <Icon name="lucide:lock" class="size-[19px] text-bonus" />
+              </span>
+              <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span class="text-sm font-bold">Списание бонусов</span>
+                <span class="text-xs text-muted-foreground">Войдите, чтобы копить и тратить бонусы</span>
+              </span>
+              <span class="shrink-0 text-[13px] font-bold text-primary">Войти</span>
+            </button>
+          </section>
+        </div>
 
-            <!-- Trust Badges (скрыты на мобильных) -->
+        <!-- ============ САЙДБАР ============ -->
+        <aside class="rounded-[18px] bg-muted p-[22px] lg:sticky lg:top-[88px]">
+          <div class="mb-4 text-lg font-extrabold tracking-[-0.02em]">
+            Ваш заказ
+          </div>
+
+          <div class="flex flex-col gap-[11px] text-sm font-medium">
+            <div class="flex items-center justify-between">
+              <span class="text-muted-foreground">Товары, {{ totalItems }} шт</span>
+              <span>{{ formatPrice(subtotal) }} ₸</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-muted-foreground">Доставка</span>
+              <span v-if="deliveryCost === 0" class="font-semibold text-success">Бесплатно</span>
+              <span v-else>{{ formatPrice(deliveryCost) }} ₸</span>
+            </div>
             <div
-              class="hidden lg:flex items-center justify-center gap-4 text-xs text-muted-foreground w-full pt-2 border-t"
+              v-if="promoDiscount > 0"
+              class="flex items-center justify-between text-destructive"
             >
-              <div class="flex items-center gap-1">
-                <Icon name="lucide:lock" class="w-3 h-3" />
-                <span>Безопасная оплата</span>
-              </div>
-              <div class="flex items-center gap-1">
-                <Icon name="lucide:package" class="w-3 h-3" />
-                <span>Гарантия возврата 14 дней</span>
-              </div>
+              <span>Промокод</span>
+              <span>−{{ formatPrice(promoDiscount) }} ₸</span>
             </div>
-          </CardFooter>
-        </Card>
-      </aside>
-    </div>
-
-    <!-- 🎯 Sticky панель для мобильных -->
-    <ClientOnly>
-      <div
-        v-if="items.length > 0"
-        class="lg:hidden fixed left-4 right-4 z-40 checkout-sticky-bar"
-        :class="isNavVisible ? 'sticky-above-nav' : 'sticky-at-bottom'"
-      >
-        <div class="px-4 py-3">
-          <div class="flex items-center justify-between gap-3 mb-3">
-            <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-muted-foreground">Итого к оплате</span>
-              <div class="flex items-baseline gap-0.5">
-                <span class="text-2xl font-bold leading-none text-primary">
-                  {{ formatPrice(totalWithDelivery) }}
-                </span>
-                <span class="text-xl font-bold text-primary">₸</span>
-              </div>
+            <div
+              v-if="discountAmount > 0"
+              class="flex items-center justify-between text-bonus"
+            >
+              <span>Списание бонусов</span>
+              <span>−{{ formatPrice(discountAmount) }} ₸</span>
             </div>
-            <div class="text-right">
-              <p class="text-xs text-muted-foreground">
-                Товары
-              </p>
-              <p class="text-sm font-semibold">
-                {{ totalItems }} шт.
-              </p>
+            <div
+              v-if="isCourier && subtotal < FREE_SHIPPING_THRESHOLD"
+              class="text-xs text-muted-foreground"
+            >
+              Добавьте товаров на
+              {{ formatPrice(FREE_SHIPPING_THRESHOLD - subtotal) }} ₸ для бесплатной доставки 🚚
             </div>
           </div>
-          <Button
+
+          <Separator class="my-4" />
+
+          <div class="mb-4 flex items-baseline justify-between">
+            <span class="text-base font-bold">Итого</span>
+            <b class="text-[22px] font-extrabold">{{ formatPrice(orderTotal) }} ₸</b>
+          </div>
+
+          <div
+            v-if="isLoggedIn && bonusesToAward > 0"
+            class="mb-4 flex items-center justify-between text-[13px] font-bold text-bonus"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <Icon name="lucide:gift" class="size-3.5" />
+              Начислим бонусов
+            </span>
+            <span>+{{ formatPrice(bonusesToAward) }}</span>
+          </div>
+
+          <!-- Не <label>: Checkbox из reka-ui рендерится как <button>, его
+               label[for] всё равно не переключает, а ссылки внутри label
+               ловят клик мимо цели. Кликабельна сама галочка. -->
+          <div class="mb-3.5 flex items-start gap-2.5">
+            <Checkbox id="terms" v-model:checked="agreedToTerms" class="mt-0.5" />
+            <span class="text-[11px] leading-[1.45] text-muted-foreground">
+              Я согласен с условиями
+              <a href="/terms" target="_blank" class="text-primary hover:underline">Публичной оферты</a>
+              и
+              <a href="/privacy-policy" target="_blank" class="text-primary hover:underline">политикой обработки персональных данных</a>
+            </span>
+          </div>
+
+          <button
             type="button"
-            size="lg"
-            class="w-full text-base font-semibold"
+            class="co-cta hidden h-[52px] w-full items-center justify-center gap-2.5 rounded-full text-[15px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50 lg:flex"
             :disabled="isProcessing || !isFormValid"
             @click="placeOrder"
           >
-            <span v-if="isProcessing">Оформляем заказ...</span>
-            <span v-else>Подтвердить заказ</span>
-          </Button>
+            <template v-if="isProcessing">
+              Оформляем заказ…
+            </template>
+            <template v-else>
+              Оформить заказ
+              <Icon name="lucide:arrow-right" class="size-[18px]" />
+            </template>
+          </button>
+
+          <div
+            v-if="showAddrWarn"
+            class="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-[13px] font-medium text-red-700"
+          >
+            Пожалуйста, укажите адрес доставки
+          </div>
+
+          <div
+            class="mt-3.5 flex items-center justify-center gap-4 text-[11px] text-muted-foreground"
+          >
+            <span class="inline-flex items-center gap-1">
+              <Icon name="lucide:lock" class="size-3" />
+              Безопасная оплата
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <Icon name="lucide:package" class="size-3" />
+              Возврат 14 дней
+            </span>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Компенсация высоты липкой панели на мобильных -->
+      <div v-if="items.length > 0" class="h-[168px] lg:hidden" />
+    </div>
+
+    <!-- ============ МОБИЛЬНАЯ CTA-ПАНЕЛЬ ============ -->
+    <ClientOnly>
+      <div
+        v-if="items.length > 0"
+        class="co-mobile-cta fixed inset-x-3 z-40 lg:hidden"
+        :class="isNavVisible ? 'co-mobile-cta--above-nav' : 'co-mobile-cta--at-bottom'"
+      >
+        <div
+          v-if="showAddrWarn"
+          class="mb-2.5 rounded-2xl border border-red-300/60 bg-red-50/85 px-3.5 py-2.5 text-xs font-medium text-red-700 backdrop-blur-lg"
+        >
+          Пожалуйста, укажите адрес доставки
         </div>
+        <button
+          type="button"
+          class="co-mobile-cta__btn flex h-[60px] w-full items-center justify-between rounded-[22px] px-[22px] text-white disabled:opacity-60"
+          :disabled="isProcessing || !isFormValid"
+          @click="placeOrder"
+        >
+          <span class="text-base font-bold">
+            {{ isProcessing ? 'Оформляем…' : 'Оформить заказ' }}
+          </span>
+          <span class="flex flex-col items-end leading-[1.12]">
+            <b class="text-[17px] font-extrabold">{{ formatPrice(orderTotal) }} ₸</b>
+            <span
+              v-if="isLoggedIn && bonusesToAward > 0"
+              class="inline-flex items-center gap-1 text-[11px] font-semibold opacity-90"
+            >
+              <Icon name="lucide:gift" class="size-[11px]" />
+              +{{ formatPrice(bonusesToAward) }}
+            </span>
+          </span>
+        </button>
       </div>
     </ClientOnly>
   </div>
 </template>
 
 <style scoped>
-.checkout-sticky-bar {
-  /* Базовая позиция — у нижнего края (когда навбар скрыт) */
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 20px;
+/* Поля ввода по макету: 48px, радиус 12, тонкая рамка. */
+.co-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--background);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.co-input:focus-within,
+.co-input:focus {
+  border-color: var(--primary);
+}
+.co-input--error {
+  border-color: var(--destructive);
+}
+
+/* Строка-переключатель: «стекло» в покое, голубая заливка в выбранном
+   состоянии. Значения литералами, а не через var(--color-blue-*):
+   Tailwind 4 выкидывает переменную темы, если её не использует утилита. */
+.co-opt {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 18px;
+  cursor: pointer;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--background);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  /* transform анимируется плавно (GPU) в отличие от bottom+env() */
+    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+    inset 0 -2px 4px rgb(15 23 42 / 0.07),
+    0 1px 0 rgb(15 23 42 / 0.05);
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.co-opt--active {
+  border-color: rgb(43 127 255 / 0.5);
+  background: linear-gradient(150deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55));
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+    inset 0 -2px 6px rgb(6 53 138 / 0.09),
+    0 6px 16px rgb(43 127 255 / 0.16);
+}
+
+.co-radio {
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1.5px solid var(--rating-empty);
+  background: var(--background);
+  box-shadow: inset 0 -1px 3px rgb(15 23 42 / 0.06);
+  transition: all 0.15s ease;
+}
+.co-radio--active {
+  border: 1px solid rgb(255 255 255 / 0.5);
+  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    0 4px 10px rgb(43 127 255 / 0.32);
+}
+
+.co-check {
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 2px solid var(--rating-empty);
+  background: var(--background);
+  transition: all 0.15s ease;
+}
+.co-check--active {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.co-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.45);
+  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    inset 0 -2px 8px rgb(6 53 138 / 0.28),
+    0 8px 20px rgb(43 127 255 / 0.3);
+  transition: background 0.15s ease;
+}
+.co-cta:hover:not(:disabled) {
+  background: linear-gradient(150deg, rgb(96 163 255 / 1), rgb(29 112 246 / 0.92));
+}
+
+/* Липкая панель. Базовая позиция — у нижнего края (когда навбар скрыт),
+   при видимом навбаре поднимаем на его высоту. */
+.co-mobile-cta {
+  bottom: calc(16px + env(safe-area-inset-bottom));
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
-
-/* Навбар виден — поднимаем панель на высоту навбара (84px - 16px = 68px) */
-.sticky-above-nav {
+.co-mobile-cta--above-nav {
   transform: translateY(-68px);
 }
-
-/* Навбар скрылся — панель на базовой позиции */
-.sticky-at-bottom {
+.co-mobile-cta--at-bottom {
   transform: translateY(0);
+}
+
+.co-mobile-cta__btn {
+  border: 1px solid rgb(255 255 255 / 0.45);
+  background: linear-gradient(180deg, rgb(59 138 255 / 0.92), rgb(43 127 255 / 0.9));
+  backdrop-filter: blur(22px) saturate(1.6);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  box-shadow:
+    0 14px 34px rgb(43 127 255 / 0.36),
+    inset 0 1px 0 rgb(255 255 255 / 0.4);
+  transition: background 0.15s ease;
+}
+.co-mobile-cta__btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgb(59 138 255 / 1), rgb(37 105 235 / 0.96));
 }
 </style>
