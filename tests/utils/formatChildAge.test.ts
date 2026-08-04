@@ -86,6 +86,6 @@ describe('formatChildAge', () => {
 
   it('без второго аргумента считает от текущей даты и не падает', () => {
     expect(() => formatChildAge('2020-01-01')).not.toThrow()
-    expect(formatChildAge('2020-01-01')).toMatch(/год|года|лет/)
+    expect(formatChildAge('2020-01-01')).toMatch(/^\d+ (?:года?|лет)$/)
   })
 })
