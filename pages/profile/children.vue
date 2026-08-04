@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import type { ChildrenInsert, ChildrenRow, ChildrenUpdate } from '@/types'
-import { ChevronRight, PlusCircle } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useChildrenStore } from '@/stores/publicStore/childrenStore'
+import { formatChildAge } from '@/utils/formatChildAge'
 
 definePageMeta({
   layout: 'profile',
+  profileBare: true, // страница рисует собственные карточки, обёртка layout не нужна
+})
+
+useHead({
+  title: 'Мои дети',
 })
 
 const childrenStore = useChildrenStore()
@@ -19,7 +24,6 @@ const isDialogOpen = ref(false)
 const isDeleteConfirmOpen = ref(false)
 const childToDelete = ref<ChildrenRow | null>(null)
 const editingChild = ref<ChildrenRow | null>(null)
-const showCards = ref(false)
 
 const formData = ref<{ name: string, gender: 'male' | 'female', birth_date: string }>({
   name: '',
@@ -27,18 +31,14 @@ const formData = ref<{ name: string, gender: 'male' | 'female', birth_date: stri
   birth_date: '',
 })
 
-// Показываем карточки с небольшой задержкой для анимации
-watch(children, () => {
-  if (children.value.length > 0) {
-    setTimeout(() => {
-      showCards.value = true
-    }, 100)
-  }
-}, { immediate: true })
+const GENDERS = [
+  { value: 'female', label: 'Девочка', icon: 'fluent-emoji-flat:girl' },
+  { value: 'male', label: 'Мальчик', icon: 'fluent-emoji-flat:boy' },
+] as const
 
 function openForNew() {
   editingChild.value = null
-  formData.value = { name: '', gender: 'male', birth_date: '' }
+  formData.value = { name: '', gender: 'female', birth_date: '' }
   nextTick(() => {
     isDialogOpen.value = true
   })
@@ -89,272 +89,215 @@ async function handleSubmit() {
   isDialogOpen.value = false
 }
 
-function formatAge(birthDate: string): string {
-  const today = new Date()
-  const birth = new Date(birthDate)
-  let ageYears = today.getFullYear() - birth.getFullYear()
-  let ageMonths = today.getMonth() - birth.getMonth()
-
-  if (today.getDate() < birth.getDate())
-    ageMonths--
-
-  if (ageMonths < 0) {
-    ageYears--
-    ageMonths += 12
-  }
-
-  if (ageYears > 0) {
-    const yearsStr = (ageYears % 10 === 1 && ageYears % 100 !== 11) ? 'год' : (ageYears % 10 >= 2 && ageYears % 10 <= 4 && (ageYears % 100 < 10 || ageYears % 100 >= 20)) ? 'года' : 'лет'
-    return `${ageYears} ${yearsStr}`
-  }
-  else {
-    if (ageMonths === 0)
-      return 'Меньше месяца'
-    const monthsStr = (ageMonths % 10 === 1 && ageMonths % 100 !== 11) ? 'месяц' : (ageMonths % 10 >= 2 && ageMonths % 10 <= 4 && (ageMonths % 100 < 10 || ageMonths % 100 >= 20)) ? 'месяца' : 'месяцев'
-    return `${ageMonths} ${monthsStr}`
-  }
-}
-const nameInputClass = computed(() => {
-  // Если мы добавляем нового ребенка, не применяем никаких кастомных классов
-  if (!editingChild.value) {
-    return ''
-  }
-
-  // Если редактируем мальчика, возвращаем классы для СВЕТЛО-ГОЛУБОГО ФОНА
-  if (formData.value.gender === 'male') {
-    // bg-sky-50 - очень светлый голубой для светлой темы
-    // dark:bg-sky-950 - очень темный голубой (почти черный) для темной темы
-    return 'bg-sky-50 dark:bg-sky-950'
-  }
-
-  // Если редактируем девочку, возвращаем классы для СВЕТЛО-РОЗОВОГО ФОНА
-  if (formData.value.gender === 'female') {
-    // bg-pink-50 - очень светлый розовый для светлой темы
-    // dark:bg-pink-950 - очень темный розовый для темной темы
-    return 'bg-pink-50 dark:bg-pink-950'
-  }
-
-  // На всякий случай, если пол не определен
-  return ''
-})
+// Расчёт возраста живёт в utils/formatChildAge.ts — он покрыт тестами
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto">
-    <!-- Заголовок с градиентом -->
-    <div class="mb-8">
-      <div class="flex items-center justify-between mb-2">
-        <h1 class="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          Мои дети
-        </h1>
-        <Button
-          class="shadow-sm hover:shadow-md transition-shadow"
-          @click="openForNew"
-        >
-          <PlusCircle class="w-4 h-4 mr-2" />
+  <div class="flex flex-col gap-[18px]">
+    <!-- Шапка раздела -->
+    <div
+      class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-3.5">
+        <div>
+          <h1 class="mb-[5px] text-[clamp(24px,2.8vw,30px)] font-extrabold tracking-[-0.025em]">
+            Мои дети
+          </h1>
+          <p class="max-w-[520px] text-sm font-medium text-muted-foreground">
+            Управляйте информацией о детях для персонализированных рекомендаций
+          </p>
+        </div>
+        <button type="button" class="ch-add-btn bg-gradient-to-br from-blue-400 to-blue-600" @click="openForNew">
+          <Icon name="lucide:plus" class="size-[19px]" />
           Добавить
-        </Button>
+        </button>
       </div>
-      <p class="text-muted-foreground text-sm">
-        Управляйте информацией о детях для персонализированных рекомендаций
-      </p>
     </div>
 
-    <!-- Состояние загрузки -->
     <ClientOnly>
-      <div v-if="isLoading && children.length === 0" class="text-center py-16">
-        <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-muted/50">
-          <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p class="text-muted-foreground font-medium">
-            Загрузка данных...
-          </p>
+      <!-- Скелетон: та же сетка, чтобы высота не прыгала -->
+      <div v-if="isLoading && children.length === 0" class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+        <div
+          v-for="i in 2"
+          :key="i"
+          class="flex animate-pulse items-center gap-4 rounded-[20px] border border-border bg-white p-[18px] shadow-sm"
+        >
+          <div class="size-16 flex-none rounded-[18px] bg-muted" />
+          <div class="min-w-0 flex-1">
+            <div class="mb-2.5 h-5 w-32 rounded bg-muted" />
+            <div class="flex gap-2">
+              <div class="h-6 w-24 rounded-full bg-muted" />
+              <div class="h-6 w-24 rounded-full bg-muted" />
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Пустое состояние -->
-      <Card v-else-if="children.length === 0" class="border-dashed border-2">
-        <div class="text-center py-16 px-6">
-          <div class="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10">
-            <Icon name="fluent-emoji-flat:family" class="text-5xl" />
-          </div>
-          <h2 class="text-2xl font-bold mb-3">
-            У вас пока нет детей в списке
-          </h2>
-          <p class="text-muted-foreground mb-6 max-w-md mx-auto">
-            Добавьте информацию о детях, чтобы получать персонализированные рекомендации товаров и услуг
-          </p>
-          <Button size="lg" class="shadow-sm" @click="openForNew">
-            <PlusCircle class="w-5 h-5 mr-2" />
-            Добавить первого ребенка
-          </Button>
-        </div>
-      </Card>
-
-      <!-- Список детей -->
-      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card
-          v-for="(child, index) in children"
+      <!--
+        Пустого состояния отдельной карточкой нет: пунктирная плитка «Добавить
+        ребёнка» замыкает сетку и при нуле детей остаётся единственной — так же,
+        как в макете.
+      -->
+      <div v-else class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+        <button
+          v-for="child in children"
           :key="child.id"
-          class="child-card cursor-pointer overflow-hidden p-0 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
-          :style="{ animationDelay: `${index * 100}ms` }"
-          :class="{ 'animate-fade-in': showCards }"
+          type="button"
+          class="ch-card shadow-sm hover:shadow-md"
           @click="openForEdit(child)"
         >
-          <div class="p-5 sm:p-6 relative">
-            <!-- Тонкий цветной оверлей -->
-            <div
-              class="color-overlay absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-300"
-              :class="child.gender === 'male' ? 'bg-blue-500/8' : 'bg-pink-500/8'"
+          <span
+            class="ch-avatar"
+            :class="child.gender === 'male'
+              ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100'
+              : 'border-pink-200 bg-gradient-to-br from-pink-50 to-pink-100'"
+          >
+            <Icon
+              :name="child.gender === 'male' ? 'fluent-emoji-flat:boy' : 'fluent-emoji-flat:girl'"
+              class="size-10"
             />
+          </span>
 
-            <div class="flex items-center gap-4 relative z-10">
-              <!-- Аватар -->
-              <div class="relative">
-                <div
-                  class="child-avatar flex items-center justify-center w-16 h-16 rounded-2xl ring-2 ring-offset-2 ring-offset-background transition-transform duration-300"
-                  :class="child.gender === 'male'
-                    ? 'bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 ring-blue-500/20'
-                    : 'bg-gradient-to-br from-pink-100 to-pink-200 dark:from-pink-900 dark:to-pink-800 ring-pink-500/20'"
-                >
-                  <Icon
-                    :name="child.gender === 'male' ? 'fluent-emoji-flat:boy' : 'fluent-emoji-flat:girl'"
-                    class="text-5xl"
-                  />
-                </div>
-              </div>
+          <span class="min-w-0 flex-1 text-left">
+            <span class="block truncate text-lg font-extrabold text-foreground">
+              {{ child.name }}
+            </span>
+            <span class="mt-2.5 flex flex-wrap gap-2">
+              <span class="ch-chip">
+                <Icon name="lucide:cake" class="size-[13px] text-muted-foreground" />
+                {{ formatChildAge(child.birth_date) }}
+              </span>
+              <span class="ch-chip">
+                <Icon name="lucide:calendar" class="size-[13px] text-muted-foreground" />
+                {{ new Date(child.birth_date).toLocaleDateString('ru-RU') }}
+              </span>
+            </span>
+          </span>
 
-              <!-- Информация -->
-              <div class="flex-grow min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <h3 class="font-bold text-lg text-card-foreground truncate">
-                    {{ child.name }}
-                  </h3>
-                </div>
-                <div class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                  <div class="flex items-center gap-1.5">
-                    <Icon name="mdi:cake-variant" class="text-base" />
-                    <span class="font-medium">{{ formatAge(child.birth_date) }}</span>
-                  </div>
-                  <div class="flex items-center gap-1.5">
-                    <Icon name="mdi:calendar" class="text-base" />
-                    <span>{{ new Date(child.birth_date).toLocaleDateString('ru-RU') }}</span>
-                  </div>
-                </div>
-              </div>
+          <!-- Декоративный, а не кнопка: кликабельна вся карточка -->
+          <span class="ch-chevron">
+            <Icon name="lucide:chevron-right" class="size-5" />
+          </span>
+        </button>
 
-              <!-- Кнопка -->
-              <div class="flex-shrink-0">
-                <div class="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center">
-                  <ChevronRight class="chevron-icon w-5 h-5 text-muted-foreground transition-transform duration-300" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
+        <button type="button" class="ch-add-tile" @click="openForNew">
+          <span class="ch-add-tile__icon">
+            <Icon name="lucide:plus" class="size-6" />
+          </span>
+          <span class="text-[14.5px] font-bold">Добавить ребёнка</span>
+        </button>
       </div>
 
       <template #fallback>
-        <div class="text-center py-16">
-          <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-muted/50">
-            <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p class="text-muted-foreground font-medium">
-              Загрузка данных...
-            </p>
-          </div>
+        <div class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+          <div
+            v-for="i in 2"
+            :key="i"
+            class="h-[100px] animate-pulse rounded-[20px] border border-border bg-white shadow-sm"
+          />
         </div>
       </template>
     </ClientOnly>
 
     <!-- Диалог добавления/редактирования -->
     <Dialog v-model:open="isDialogOpen">
-      <DialogContent class="sm:max-w-[500px]" @open-auto-focus.prevent>
+      <!--
+        [&>button]:hidden убирает штатный крестик shadcn. Именно утилитой, а не
+        scoped-правилом: класс из этого пропа `cn()` кладёт прямо на элемент
+        контента, тогда как scoped-атрибут data-v-* уходит на корень обёртки
+        (DialogPortal → Teleport) и до контента не доезжает.
+        Наши кнопки лежат внутри DialogHeader и form, прямыми потомками не
+        являются и под селектор не попадают.
+      -->
+      <DialogContent
+        class="rounded-3xl sm:max-w-[460px] [&>button]:hidden"
+        @open-auto-focus.prevent
+      >
         <DialogHeader>
-          <DialogTitle class="text-2xl">
-            {{ editingChild ? 'Редактировать данные' : 'Добавить ребенка' }}
-          </DialogTitle>
-          <DialogDescription class="text-base">
-            Эта информация поможет нам рекомендовать вам наиболее подходящие товары.
+          <div class="flex items-center justify-between gap-3">
+            <DialogTitle class="text-[21px] font-extrabold tracking-[-0.02em]">
+              {{ editingChild ? 'Редактировать данные' : 'Добавить ребёнка' }}
+            </DialogTitle>
+            <!-- Свой крестик вместо штатного: в макете это кружок 38px с рамкой.
+                 Править общий components/ui/dialog/DialogContent.vue нельзя —
+                 он обслуживает все диалоги приложения. -->
+            <button
+              type="button"
+              class="ch-close"
+              aria-label="Закрыть"
+              @click="isDialogOpen = false"
+            >
+              <Icon name="lucide:x" class="size-[19px]" />
+            </button>
+          </div>
+          <DialogDescription class="sr-only">
+            Эта информация поможет нам рекомендовать наиболее подходящие товары.
           </DialogDescription>
         </DialogHeader>
-        <form class="space-y-5 py-4" @submit.prevent="handleSubmit">
-          <div class="space-y-2">
-            <Label for="name" class="text-base font-medium">Имя ребенка</Label>
+
+        <form class="space-y-[18px]" @submit.prevent="handleSubmit">
+          <div>
+            <Label for="name" class="mb-[7px] block text-[13.5px] font-bold">Имя</Label>
             <Input
               id="name"
               v-model="formData.name"
-              placeholder="Введите имя"
-              class="h-11"
-              :class="nameInputClass"
+              placeholder="Например, Алма"
+              class="h-12 rounded-[13px] text-[15px]"
               required
             />
           </div>
 
-          <div class="space-y-2">
-            <Label for="gender" class="text-base font-medium">Пол</Label>
-            <Select v-model="formData.gender">
-              <SelectTrigger class="h-11">
-                <SelectValue placeholder="Выберите пол" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">
-                  <div class="flex items-center gap-2">
-                    <Icon name="fluent-emoji-flat:boy" class="text-xl" />
-                    <span>Мальчик</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="female">
-                  <div class="flex items-center gap-2">
-                    <Icon name="fluent-emoji-flat:girl" class="text-xl" />
-                    <span>Девочка</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div>
+            <span class="mb-[7px] block text-[13.5px] font-bold">Пол</span>
+            <div class="flex gap-2.5">
+              <button
+                v-for="option in GENDERS"
+                :key="option.value"
+                type="button"
+                class="ch-gender"
+                :class="formData.gender === option.value ? 'ch-gender--on' : ''"
+                :aria-pressed="formData.gender === option.value"
+                @click="formData.gender = option.value"
+              >
+                <Icon :name="option.icon" class="size-[19px]" />
+                {{ option.label }}
+              </button>
+            </div>
           </div>
 
-          <div class="space-y-2">
-            <Label for="birth_date" class="text-base font-medium">Дата рождения</Label>
+          <div>
+            <Label for="birth_date" class="mb-[7px] block text-[13.5px] font-bold">Дата рождения</Label>
             <Input
               id="birth_date"
               v-model="formData.birth_date"
               type="date"
-              class="h-11"
+              class="h-12 rounded-[13px] text-[15px]"
               required
             />
           </div>
 
-          <DialogFooter class="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4 border-t">
-            <div>
-              <Button
-                v-if="editingChild"
-                type="button"
-                variant="destructive"
-                size="lg"
-                @click="triggerDeleteConfirmation"
-              >
-                <Icon name="mdi:delete" class="w-4 h-4 mr-2" />
-                Удалить
-              </Button>
-            </div>
-            <div class="flex gap-2 w-full sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                class="flex-1 sm:flex-initial"
-                @click="isDialogOpen = false"
-              >
+          <DialogFooter class="flex flex-col-reverse gap-2.5 pt-1.5 sm:flex-row sm:justify-between">
+            <button
+              v-if="editingChild"
+              type="button"
+              class="ch-btn-ghost text-destructive"
+              @click="triggerDeleteConfirmation"
+            >
+              <Icon name="lucide:trash-2" class="size-[18px]" />
+              Удалить
+            </button>
+            <div class="flex justify-end gap-2.5">
+              <button type="button" class="ch-btn-ghost" @click="isDialogOpen = false">
                 Отмена
-              </Button>
-              <Button
+              </button>
+              <button
                 type="submit"
-                size="lg"
-                class="flex-1 sm:flex-initial"
+                class="ch-add-btn ch-add-btn--wide bg-gradient-to-br from-blue-400 to-blue-600"
                 :disabled="isLoading"
               >
-                <Icon v-if="!isLoading" name="mdi:check" class="w-4 h-4 mr-2" />
+                <Icon name="lucide:check" class="size-[18px]" />
                 {{ isLoading ? 'Сохранение...' : 'Сохранить' }}
-              </Button>
+              </button>
             </div>
           </DialogFooter>
         </form>
@@ -363,27 +306,24 @@ const nameInputClass = computed(() => {
 
     <!-- Диалог подтверждения удаления -->
     <AlertDialog v-model:open="isDeleteConfirmOpen">
-      <AlertDialogContent @open-auto-focus.prevent>
+      <AlertDialogContent class="rounded-3xl" @open-auto-focus.prevent>
         <AlertDialogHeader>
-          <div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Icon name="mdi:alert-circle" class="w-8 h-8 text-destructive" />
+          <div class="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-destructive/10">
+            <Icon name="lucide:alert-circle" class="size-8 text-destructive" />
           </div>
           <AlertDialogTitle class="text-center text-xl">
             Вы уверены?
           </AlertDialogTitle>
           <AlertDialogDescription class="text-center text-base">
-            Это действие необратимо. Все данные о ребенке <strong>"{{ childToDelete?.name }}"</strong> будут удалены безвозвратно.
+            Это действие необратимо. Все данные о ребенке <strong>«{{ childToDelete?.name }}»</strong> будут удалены безвозвратно.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter class="flex-col-reverse sm:flex-row gap-2">
-          <AlertDialogCancel
-            class="w-full sm:w-auto"
-            @click="childToDelete = null"
-          >
+        <AlertDialogFooter class="flex-col-reverse gap-2 sm:flex-row">
+          <AlertDialogCancel class="w-full rounded-full sm:w-auto" @click="childToDelete = null">
             Отмена
           </AlertDialogCancel>
           <AlertDialogAction
-            class="w-full sm:w-auto bg-destructive hover:bg-destructive/90"
+            class="w-full rounded-full bg-destructive hover:bg-destructive/90 sm:w-auto"
             @click="handleDeleteConfirm"
           >
             Да, удалить
@@ -395,35 +335,209 @@ const nameInputClass = computed(() => {
 </template>
 
 <style scoped>
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/*
+ * Основная кнопка-пилюля. Сам градиент задаётся утилитами
+ * (bg-gradient-to-br from-blue-400 to-blue-600) на элементе, а не здесь:
+ * var(--color-blue-*) существует только пока какая-то утилита их использует,
+ * иначе Tailwind 4 вырежет переменные и в проде кнопка станет прозрачной.
+ */
+.ch-add-btn {
+  flex: none;
+  height: 46px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: none;
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 20px rgb(43 127 255 / 0.3);
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
-  opacity: 0;
+.ch-add-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgb(43 127 255 / 0.4);
 }
 
-.child-card:hover .child-avatar {
-  transform: scale(1.1) rotate(5deg);
+.ch-add-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
-.child-card:hover .chevron-icon {
-  transform: translateX(5px);
+/* «Сохранить» в макете шире «Отмены»: 0 24px против 0 20px */
+.ch-add-btn--wide {
+  padding: 0 24px;
 }
 
-.child-card:hover .color-overlay {
-  opacity: 1;
+.ch-close {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: background 0.15s ease;
 }
 
-.child-card:active {
-  transform: scale(0.98) !important;
+.ch-close:hover {
+  background: var(--muted);
+}
+
+.ch-btn-ghost {
+  height: 46px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.ch-btn-ghost:hover {
+  background: var(--muted);
+}
+
+/*
+ * Карточка ребёнка — кликабельна целиком, поэтому button, а не div.
+ * Тени намеренно НЕ здесь, а утилитами shadow-sm / hover:shadow-md на элементе:
+ * в макете покой = --shadow-sm, наведение = --shadow-md (см. tokens/shadows.css),
+ * и это ровно шкала Tailwind. Репозиторный --elevation-card слабее (shadow-xs),
+ * а --elevation-card-hover наоборот shadow-xl — обе мимо макета.
+ */
+.ch-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.ch-card:hover {
+  transform: translateY(-2px);
+}
+
+.ch-avatar {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  border-width: 1px;
+  border-style: solid;
+  display: grid;
+  place-content: center;
+}
+
+.ch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.ch-chevron {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  display: grid;
+  place-content: center;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.ch-card:hover .ch-chevron {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Пунктирная плитка — она же пустое состояние */
+.ch-add-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 112px;
+  padding: 20px;
+  border: 2px dashed var(--rating-empty);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.ch-add-tile:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--brand-surface);
+}
+
+.ch-add-tile__icon {
+  display: grid;
+  place-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--brand-surface);
+  color: var(--primary);
+}
+
+/* Переключатель пола вместо Select — как в макете */
+.ch-gender {
+  flex: 1;
+  height: 48px;
+  border-radius: 13px;
+  border: 1px solid var(--input);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.ch-gender--on {
+  border: 2px solid var(--primary);
+  background: var(--brand-surface);
+  color: var(--primary);
 }
 </style>
