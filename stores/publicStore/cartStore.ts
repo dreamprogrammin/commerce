@@ -26,15 +26,42 @@ export const useCartStore = defineStore(
     const isCartOpen = ref(false) // 🔥 Управление состоянием шторки корзины
     const hasMergedOnLogin = ref(false) // Флаг для предотвращения повторного мерджа
 
+    /**
+     * Количество позиции числом. Корзина восстанавливается из localStorage
+     * (persist), поэтому там может лежать что угодно, включая записи от старой
+     * версии схемы. Любое нечисло здесь превращало итог в NaN.
+     */
+    function itemQuantity(item: ICartItem): number {
+      const quantity = Number(item.quantity)
+      return Number.isFinite(quantity) ? quantity : 0
+    }
+
+    /**
+     * Цена позиции за штуку.
+     *
+     * final_price — generated-колонка БД и в типах помечена обязательной, но
+     * в корзину товар может приехать из localStorage от версии, где её ещё не
+     * было, или из выборки, которая её не запросила. Тогда undefined * qty
+     * давало NaN, и он утекал дальше: в total, в maxBonusesForOrder и в
+     * total_amount, который уходит на сервер при синхронизации заказа.
+     *
+     * Фолбэк на price — та же конвенция, что уже используется на карточке
+     * товара и в ProductCard (`final_price || price`).
+     */
+    function itemUnitPrice(item: ICartItem): number {
+      const price = Number(item.product?.final_price ?? item.product?.price)
+      return Number.isFinite(price) ? price : 0
+    }
+
     const totalItems = computed(() =>
-      items.value.reduce((sum: number, item) => sum + item.quantity, 0),
+      items.value.reduce((sum: number, item) => sum + itemQuantity(item), 0),
     )
 
     const subtotal = computed(() =>
-      items.value.reduce((sum: number, item) => {
-        // 🔥 Используем final_price из базы данных (с округлением)
-        return sum + item.product.final_price * item.quantity
-      }, 0),
+      items.value.reduce(
+        (sum: number, item) => sum + itemUnitPrice(item) * itemQuantity(item),
+        0,
+      ),
     )
 
     const discountAmount = computed(() => {

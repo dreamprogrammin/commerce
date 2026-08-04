@@ -1,6 +1,7 @@
 import type { ProductWithImages } from '@/types'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { mockQueryBuilder, mockSupabaseClient, mockToast } from '../setup'
 
@@ -247,6 +248,11 @@ describe('cartStore', () => {
       }))
 
       const store = useCartStore()
+
+      // Списание бонусов зажато балансом профиля и суммой заказа:
+      // без реального баланса setBonusesToSpend честно обнулит сумму.
+      const profileStore = useProfileStore()
+      profileStore.profile = { active_bonus_balance: 500 } as never
 
       mockQueryBuilder.single.mockResolvedValueOnce({
         data: mockProduct,
