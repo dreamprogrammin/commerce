@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useHaptic } from '@/composables/useHaptic'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_PRODUCT, FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
@@ -24,24 +24,12 @@ const cartStore = useCartStore()
 const authStore = useAuthStore()
 const modalStore = useModalStore()
 const supabase = useSupabaseClient()
-const { items, subtotal, totalItems } = storeToRefs(cartStore)
+const { items, subtotal, totalItems, deliveryCost, isFreeShipping }
+  = storeToRefs(cartStore)
 const { isLoggedIn } = storeToRefs(authStore)
 const { getVariantUrl } = useSupabaseStorage()
 const { trackBeginCheckout } = useEcommerceTracking()
 const { triggerHaptic } = useHaptic()
-
-/**
- * Порог и цена доставки продублированы из pages/checkout.vue намеренно:
- * макет требует показать строку «Доставка» уже в корзине, а до выбора способа
- * получения расчёт идёт по курьеру — это же значение потом увидит /checkout.
- */
-const FREE_SHIPPING_THRESHOLD = 15000
-const COURIER_DELIVERY_COST = 1000
-
-const deliveryCost = computed(() =>
-  subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : COURIER_DELIVERY_COST,
-)
-const hasFreeShipping = computed(() => deliveryCost.value === 0)
 
 // Прогресс бесплатной доставки
 const shippingProgress = computed(() =>
@@ -485,11 +473,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             <Icon
               name="lucide:truck"
               class="size-5 shrink-0"
-              :class="hasFreeShipping ? 'text-success' : 'text-primary'"
+              :class="isFreeShipping ? 'text-success' : 'text-primary'"
             />
             <div class="min-w-0 flex-1">
               <p
-                v-if="hasFreeShipping"
+                v-if="isFreeShipping"
                 class="text-[13px] font-semibold text-success"
               >
                 Доставка бесплатная — порог пройден 🎉
@@ -710,7 +698,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <Icon name="lucide:info" class="size-3.5 text-muted-foreground/70" />
               </span>
               <span
-                v-if="hasFreeShipping"
+                v-if="isFreeShipping"
                 class="font-semibold text-success"
               >Бесплатно</span>
               <span v-else>{{ formatPrice(deliveryCost) }} ₸</span>

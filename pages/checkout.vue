@@ -3,6 +3,7 @@
 import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
+import { FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -35,13 +36,14 @@ const {
   isProcessing,
   bonusesToSpend,
   bonusesToAward,
+  deliveryMethod,
+  deliveryCost,
 } = storeToRefs(cartStore)
 
 const orderForm = ref({
   name: '',
   phone: '',
   email: '',
-  deliveryMethod: 'pickup' as 'pickup' | 'courier',
   paymentMethod: 'kaspi' as 'kaspi' | 'cash' | 'card',
   address: {
     city: 'Алматы',
@@ -155,20 +157,9 @@ const phoneErrorMessage = computed(() => {
   return ''
 })
 
-// Константа порога бесплатной доставки (как в умной корзине)
-const FREE_SHIPPING_THRESHOLD = 15000
-
-// Расчет стоимости доставки
-const deliveryCost = computed(() => {
-  // Самовывоз — бесплатно
-  if (orderForm.value.deliveryMethod === 'pickup')
-    return 0
-
-  // Курьер: если сумма >= 15000 ₸ — бесплатно, иначе 1000 ₸
-  return subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : 1000
-})
-
-const isCourier = computed(() => orderForm.value.deliveryMethod === 'courier')
+// Способ получения и стоимость доставки живут в cartStore — то же значение
+// видит /cart, поэтому «Итого» на двух шагах больше не расходится.
+const isCourier = computed(() => deliveryMethod.value === 'courier')
 
 /**
  * Итог по формуле макета: товары − промокод − бонусы + доставка.
@@ -354,7 +345,7 @@ async function placeOrder() {
     : undefined
 
   await cartStore.checkout({
-    deliveryMethod: orderForm.value.deliveryMethod,
+    deliveryMethod: deliveryMethod.value,
     paymentMethod: orderForm.value.paymentMethod,
     deliveryAddress: isCourier.value
       ? {
@@ -581,7 +572,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 type="button"
                 class="co-opt gap-[11px]"
                 :class="isCourier ? 'co-opt--active text-primary' : 'text-foreground'"
-                @click="orderForm.deliveryMethod = 'courier'"
+                @click="cartStore.setDeliveryMethod('courier')"
               >
                 <Icon name="lucide:truck" class="size-[22px] shrink-0" />
                 <span class="flex flex-col items-start leading-[1.25]">
@@ -593,7 +584,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 type="button"
                 class="co-opt gap-[11px]"
                 :class="!isCourier ? 'co-opt--active text-primary' : 'text-foreground'"
-                @click="orderForm.deliveryMethod = 'pickup'"
+                @click="cartStore.setDeliveryMethod('pickup')"
               >
                 <Icon name="lucide:store" class="size-[22px] shrink-0" />
                 <span class="flex flex-col items-start leading-[1.25]">
