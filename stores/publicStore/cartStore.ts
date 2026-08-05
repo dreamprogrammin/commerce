@@ -490,6 +490,11 @@ export const useCartStore = defineStore(
             p_payment_method: orderData.paymentMethod,
             p_promo_code: orderData.promoCode || null,
             p_delivery_cost: orderData.deliveryCost || 0,
+            // Комментарий к адресу (подъезд, этаж, домофон). Форма собирала
+            // его и раньше, но до RPC он не доезжал и терялся молча.
+            // Для авторизованных заказов пока не передаём: у create_user_order
+            // такого параметра нет, см. 20260805100000_guest_checkout_comment.
+            p_comment: orderData.comment || null,
           })
 
           if (error)

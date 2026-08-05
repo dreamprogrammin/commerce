@@ -2462,6 +2462,7 @@ export type Database = {
       | {
         Args: {
           p_cart_items: Json
+          p_comment?: string
           p_delivery_address?: Json
           p_delivery_cost?: number
           p_delivery_method: string
