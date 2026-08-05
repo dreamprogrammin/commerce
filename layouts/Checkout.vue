@@ -14,9 +14,10 @@ const currentStep = computed(() => {
 
 <template>
   <div>
-    <div class="hidden md:block">
-      <CommonHeader />
-    </div>
+    <!-- Та же шапка, что на витрине: fixed + стекло при скролле. Обёртки нет
+         намеренно — SiteHeader сам responsive (десктоп-строка ≥lg, компактная
+         плашка <lg), а своего мобильного хедера у этого макета не было. -->
+    <CommonSiteHeader />
 
     <!-- Checkout Stepper -->
     <div class="bg-background border-b">
