@@ -162,6 +162,20 @@ const phoneErrorMessage = computed(() => {
 const isCourier = computed(() => deliveryMethod.value === 'courier')
 
 /**
+ * Бонусы за заказ без привязки к авторизации — как potentialBonuses в
+ * pages/cart.vue. cartStore.bonusesToAward обнуляется для гостя, но в макете
+ * мобильная панель показывает bonusEarnShort всем: для гостя это приманка
+ * «вот сколько вы теряете», а не факт начисления.
+ */
+const potentialBonuses = computed(() =>
+  items.value.reduce((sum, item) => {
+    const award = Number(item.product.bonus_points_award) || 0
+    const quantity = Number(item.quantity) || 0
+    return sum + award * quantity
+  }, 0),
+)
+
+/**
  * Итог по формуле макета: товары − промокод − бонусы + доставка.
  *
  * Раньше «Итого к оплате» считалось как subtotal − бонусы + доставка, а строка
@@ -780,10 +794,30 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               <span class="shrink-0 text-[13px] font-bold text-primary">Войти</span>
             </button>
           </section>
+
+          <!-- Согласие живёт в основной колонке, а не в сайдбаре: сайдбар
+               по макету скрыт на мобильном, и вместе с ним пропала бы
+               единственная возможность прочитать оферту и снять галочку.
+               Не <label>: Checkbox из reka-ui рендерится как <button>, его
+               label[for] всё равно не переключает, а ссылки внутри label
+               ловят клик мимо цели. Кликабельна сама галочка. -->
+          <div class="flex items-start gap-2.5">
+            <Checkbox id="terms" v-model:checked="agreedToTerms" class="mt-0.5" />
+            <span class="text-[11px] leading-[1.45] text-muted-foreground">
+              Я согласен с условиями
+              <a href="/terms" target="_blank" class="text-primary hover:underline">Публичной оферты</a>
+              и
+              <a href="/privacy-policy" target="_blank" class="text-primary hover:underline">политикой обработки персональных данных</a>
+            </span>
+          </div>
         </div>
 
         <!-- ============ САЙДБАР ============ -->
-        <aside class="rounded-[18px] bg-muted p-[22px] lg:sticky lg:top-[88px]">
+        <!-- В макете sideStyle на мобиле — display:none: сводку там заменяет
+             липкая панель с итогом. cart.vue уже так, теперь и чекаут. -->
+        <aside
+          class="hidden rounded-[18px] bg-muted p-[22px] lg:sticky lg:top-[88px] lg:block"
+        >
           <div class="mb-4 text-lg font-extrabold tracking-[-0.02em]">
             Ваш заказ
           </div>
@@ -837,19 +871,6 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               Начислим бонусов
             </span>
             <span>+{{ formatPrice(bonusesToAward) }}</span>
-          </div>
-
-          <!-- Не <label>: Checkbox из reka-ui рендерится как <button>, его
-               label[for] всё равно не переключает, а ссылки внутри label
-               ловят клик мимо цели. Кликабельна сама галочка. -->
-          <div class="mb-3.5 flex items-start gap-2.5">
-            <Checkbox id="terms" v-model:checked="agreedToTerms" class="mt-0.5" />
-            <span class="text-[11px] leading-[1.45] text-muted-foreground">
-              Я согласен с условиями
-              <a href="/terms" target="_blank" class="text-primary hover:underline">Публичной оферты</a>
-              и
-              <a href="/privacy-policy" target="_blank" class="text-primary hover:underline">политикой обработки персональных данных</a>
-            </span>
           </div>
 
           <button
@@ -918,11 +939,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <span class="flex flex-col items-end leading-[1.12]">
             <b class="text-[17px] font-extrabold">{{ formatPrice(orderTotal) }} ₸</b>
             <span
-              v-if="isLoggedIn && bonusesToAward > 0"
+              v-if="potentialBonuses > 0"
               class="inline-flex items-center gap-1 text-[11px] font-semibold opacity-90"
             >
               <Icon name="lucide:gift" class="size-[11px]" />
-              +{{ formatPrice(bonusesToAward) }}
+              +{{ formatPrice(potentialBonuses) }}
             </span>
           </span>
         </button>

@@ -542,15 +542,13 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 
                 <span
                   v-if="item.product.bonus_points_award"
-                  class="inline-flex items-center gap-[7px] self-start whitespace-nowrap rounded-[10px] bg-gradient-to-r from-orange-50 to-orange-100 px-2.5 py-1.5 text-[12.5px] font-bold"
+                  class="cart-bonus-chip inline-flex items-center gap-[7px] self-start whitespace-nowrap rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-bold"
                 >
                   <Icon
                     name="lucide:gift"
                     class="size-[13px] shrink-0 text-orange-500"
                   />
-                  <span
-                    class="bg-gradient-to-r from-orange-400 to-pink-600 bg-clip-text text-transparent"
-                  >
+                  <span class="cart-bonus-chip__text">
                     +{{ formatPrice((item.product.bonus_points_award || 0) * item.quantity) }} бонусов
                   </span>
                 </span>
@@ -742,7 +740,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <Icon name="lucide:gift" class="size-3.5" />
                 Начислим бонусов
               </span>
-              <span>+{{ formatPrice(potentialBonuses) }}</span>
+              <span>+{{ formatPrice(potentialBonuses) }} бонусов</span>
             </div>
             <button
               v-else
@@ -835,6 +833,22 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
     inset 0 -2px 4px rgb(15 23 42 / 0.07),
     inset 0 0 0 1px rgb(255 255 255 / 0.5),
     0 1px 0 rgb(15 23 42 / 0.05);
+}
+
+/* Бонусный чип. Угол 100deg взят из макета — утилитой не выразить
+   (bg-gradient-to-r даёт 90deg), поэтому свой класс. Цвета литералами
+   по той же причине, что и ниже: Tailwind 4 выкидывает переменную темы,
+   если её не использует ни одна утилита. */
+.cart-bonus-chip {
+  background: linear-gradient(100deg, oklch(0.98 0.016 73.684) 0%, oklch(0.954 0.038 75.164) 100%);
+}
+
+.cart-bonus-chip__text {
+  background: linear-gradient(100deg, oklch(0.75 0.183 55.934) 0%, oklch(0.592 0.249 0.584) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: var(--bonus);
 }
 
 /* Синий градиентный степпер — общий с .pc-stepper карточки товара.
