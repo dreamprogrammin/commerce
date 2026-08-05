@@ -34,6 +34,14 @@ export const useCartStore = defineStore(
      * курьер (в макете `fulfill:'delivery'`).
      */
     const deliveryMethod = ref<DeliveryMethod>('courier')
+
+    /**
+     * Адрес доставки — тоже общий, а не локальное поле формы оформления.
+     * Его показывает мобильная локейшн-панель, которая живёт в layout и
+     * видна на обоих шагах, а вводится он на /checkout. В макете это ровно
+     * так же: S.address — одно поле состояния на всю корзину.
+     */
+    const deliveryAddress = ref({ city: 'Алматы', line1: '' })
     const isAddingItem = ref(false) // Флаг для предотвращения race condition
     const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
     const isMergingFromServer = ref(false) // Блокирует sync→server пока грузим данные с сервера
@@ -575,6 +583,7 @@ export const useCartStore = defineStore(
       totalItems,
       subtotal,
       deliveryMethod,
+      deliveryAddress,
       deliveryCost,
       isFreeShipping,
       setDeliveryMethod,
@@ -595,8 +604,10 @@ export const useCartStore = defineStore(
     persist: {
       key: CART_STORAGE_KEY,
       // deliveryMethod персистим вместе с корзиной: выбранный на /checkout
-      // самовывоз должен пережить возврат на /cart, иначе «Итого» снова разъедется.
-      pick: ['items', 'bonusesToSpend', 'deliveryMethod'],
+      // самовывоз должен пережить возврат на /cart, иначе «Итого» снова
+      // разъедется. deliveryAddress — по той же причине: локейшн-панель
+      // показывает его на обоих шагах.
+      pick: ['items', 'bonusesToSpend', 'deliveryMethod', 'deliveryAddress'],
       storage: piniaPluginPersistedstate.localStorage(),
     },
   },

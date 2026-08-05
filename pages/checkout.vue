@@ -45,12 +45,12 @@ const orderForm = ref({
   phone: '',
   email: '',
   paymentMethod: 'kaspi' as 'kaspi' | 'cash' | 'card',
-  address: {
-    city: 'Алматы',
-    line1: '',
-  },
   comment: '',
 })
+
+// Адрес живёт в cartStore: его же читает мобильная локейшн-панель из layout,
+// которая висит и над корзиной, и над оформлением.
+const { deliveryAddress } = storeToRefs(cartStore)
 const bonusesInput = ref(0)
 const promoCodeInput = ref('')
 const showGuestModal = ref(false)
@@ -210,7 +210,7 @@ function toggleBonuses() {
 
 // Проверка готовности формы к отправке
 const isFormValid = computed(() => {
-  const { name, email, phone, address } = orderForm.value
+  const { name, email, phone } = orderForm.value
 
   // Базовые поля
   if (!name.trim() || !email.trim() || !phone.trim())
@@ -219,7 +219,7 @@ const isFormValid = computed(() => {
     return false
 
   // Адрес для курьера
-  if (isCourier.value && !address.line1.trim())
+  if (isCourier.value && !deliveryAddress.value.line1.trim())
     return false
 
   // Согласие с условиями
@@ -235,7 +235,7 @@ const showAddrWarn = computed(
   () =>
     hasTriedSubmit.value
     && isCourier.value
-    && !orderForm.value.address.line1.trim(),
+    && !deliveryAddress.value.line1.trim(),
 )
 
 // Предзаполнение формы
@@ -333,7 +333,7 @@ async function placeOrder() {
   }
 
   // Адрес обязателен для курьера
-  if (isCourier.value && !orderForm.value.address.line1.trim()) {
+  if (isCourier.value && !deliveryAddress.value.line1.trim()) {
     toast.error('Укажите адрес доставки')
     return
   }
@@ -363,8 +363,8 @@ async function placeOrder() {
     paymentMethod: orderForm.value.paymentMethod,
     deliveryAddress: isCourier.value
       ? {
-          line1: orderForm.value.address.line1,
-          city: orderForm.value.address.city,
+          line1: deliveryAddress.value.line1,
+          city: deliveryAddress.value.city,
         }
       : undefined,
     guestInfo,
@@ -618,7 +618,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               <div class="flex flex-col gap-2.5">
                 <input
                   id="city"
-                  v-model="orderForm.address.city"
+                  v-model="deliveryAddress.city"
                   class="co-input"
                   placeholder="Город"
                 >
@@ -629,7 +629,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                   <Icon name="lucide:map-pin" class="size-[18px] shrink-0 text-primary" />
                   <input
                     id="address"
-                    v-model="orderForm.address.line1"
+                    v-model="deliveryAddress.line1"
                     class="min-w-0 flex-1 border-none bg-transparent outline-none"
                     placeholder="Улица, дом, квартира"
                   >
