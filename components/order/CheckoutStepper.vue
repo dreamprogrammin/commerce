@@ -1,34 +1,150 @@
 <script setup lang="ts">
-defineProps<{ currentStep: number }>()
+import { storeToRefs } from 'pinia'
+import { toast } from 'vue-sonner'
+import { useCartStore } from '@/stores/publicStore/cartStore'
 
-const steps = [
-  { id: 1, name: 'Корзина', icon: 'lucide:shopping-cart' },
-  { id: 2, name: 'Оформление', icon: 'lucide:truck' },
-  { id: 3, name: 'Готово', icon: 'lucide:package-check' },
-]
+/**
+ * Шаги оформления — порт CheckoutSteps.dc.html.
+ *
+ * Три вкладки во всю ширину: «Корзина» · «Оформление» · «Заказ принят».
+ * Пройденный и текущий шаги окрашены в primary, текущий вдобавок подчёркнут
+ * снизу полосой 3px. Номер шага — кружок 26px: залит primary у пройденных и
+ * текущего, серый (--muted) у будущих.
+ *
+ * Кликабельность повторяет `clickable` из макета: назад можно на любой
+ * пройденный шаг, вперёд — только на «Оформление» и только пока заказ не
+ * оформлен. Шаг 3 недостижим кликом по построению (условие `n < cur` при
+ * n = 3 невыполнимо), поэтому маршрута страницы успеха здесь нет.
+ */
+const props = defineProps<{ currentStep: number }>()
+
+const cartStore = useCartStore()
+const { items } = storeToRefs(cartStore)
+
+/**
+ * Корзина живёт в localStorage, поэтому на сервере она всегда пуста, а на
+ * клиенте наполняется до гидратации. Держим первый клиентский рендер равным
+ * серверному и включаем реальную проверку только после mount — иначе Vue
+ * ругается на несовпадение атрибута disabled у кнопки «Оформление».
+ */
+const isMounted = ref(false)
+onMounted(() => {
+  isMounted.value = true
+})
+
+const canCheckout = computed(() => isMounted.value && items.value.length > 0)
+
+const LABELS = ['Корзина', 'Оформление', 'Заказ принят']
+
+const steps = computed(() =>
+  LABELS.map((label, index) => {
+    const num = index + 1
+    const active = props.currentStep === num
+    const done = props.currentStep > num
+    return {
+      num,
+      label,
+      active,
+      // Формула из макета: назад — всегда, вперёд — только шаг 2 и только
+      // при непустой корзине, пока заказ не оформлен.
+      clickable:
+        num < props.currentStep
+        || (num === 2 && canCheckout.value && props.currentStep < 3),
+      // Пройденный и текущий окрашены одинаково, различает их подчёркивание.
+      filled: active || done,
+    }
+  }),
+)
+
+function go(num: number) {
+  if (num === props.currentStep)
+    return
+
+  // Тот же guard, что в go() макета: на оформление не пускаем с пустой корзиной.
+  if (num >= 2 && items.value.length === 0) {
+    toast.info('Добавьте товары в корзину')
+    return
+  }
+
+  navigateTo(num === 1 ? '/cart' : '/checkout')
+}
 </script>
 
 <template>
-  <div class="flex justify-between items-center w-full max-w-2xl mx-auto py-4 px-4">
-    <div v-for="(step, index) in steps" :key="step.id" class="flex flex-col items-center flex-1 relative">
-      <!-- Линия соединения -->
-      <div
-        v-if="index !== 0" class="absolute top-4 -left-1/2 w-full h-[2px] -z-10"
-        :class="currentStep >= step.id ? 'bg-primary' : 'bg-muted'"
-      />
-
-      <div
-        class="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-colors border-2"
-        :class="currentStep >= step.id ? 'bg-primary border-primary text-primary-foreground' : 'bg-background border-muted text-muted-foreground'"
-      >
-        <Icon :name="step.icon" class="w-4 h-4 md:w-5 md:h-5" />
-      </div>
-      <span
-        class="text-xs mt-2 font-medium hidden sm:block"
-        :class="currentStep >= step.id ? 'text-primary' : 'text-muted-foreground'"
-      >
-        {{ step.name }}
-      </span>
-    </div>
+  <div class="flex w-full gap-1.5">
+    <button
+      v-for="step in steps"
+      :key="step.num"
+      type="button"
+      class="cs-tab"
+      :class="{ 'cs-tab--current': step.active, 'cs-tab--filled': step.filled }"
+      :disabled="!step.clickable"
+      @click="go(step.num)"
+    >
+      <span class="cs-num">{{ step.num }}</span>
+      <span class="truncate">{{ step.label }}</span>
+    </button>
   </div>
 </template>
+
+<style scoped>
+.cs-tab {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 52px;
+  padding: 0 clamp(6px, 1.5vw, 16px);
+  border: none;
+  border-bottom: 3px solid var(--border);
+  background: transparent;
+  font-weight: 700;
+  font-size: clamp(13px, 1.6vw, 16px);
+  color: var(--muted-foreground);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+/* У недоступного шага в макете меняется только курсор — ни прозрачности,
+   ни затемнения: это индикатор прогресса, а не набор кнопок. */
+.cs-tab:disabled {
+  cursor: default;
+}
+.cs-tab:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Пройденный и текущий — цвет primary. */
+.cs-tab--filled {
+  color: var(--primary);
+}
+
+/* Текущий шаг — единственный с синей полосой снизу. */
+.cs-tab--current {
+  border-bottom-color: var(--primary);
+}
+
+.cs-num {
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 13px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.cs-tab--filled .cs-num {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+</style>
