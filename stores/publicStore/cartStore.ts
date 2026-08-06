@@ -1,6 +1,9 @@
 import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
+import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { useProfileStore } from '../core/profileStore'
+
+export type DeliveryMethod = 'pickup' | 'courier'
 
 const CART_STORAGE_KEY = 'uhti-cart-v1'
 
@@ -20,6 +23,25 @@ export const useCartStore = defineStore(
     const items = ref<ICartItem[]>([])
     const isProcessing = ref(false)
     const bonusesToSpend = ref(0)
+
+    /**
+     * Способ получения — общий для корзины и оформления.
+     *
+     * Раньше он жил только в orderForm на /checkout со значением 'pickup', а
+     * /cart считала доставку по курьеру. Покупатель видел в корзине «Итого» с
+     * доставкой, переходил дальше и получал сумму на 1000 ₸ меньше. Теперь
+     * значение одно на оба шага, как S.fulfill в макете, и по умолчанию —
+     * курьер (в макете `fulfill:'delivery'`).
+     */
+    const deliveryMethod = ref<DeliveryMethod>('courier')
+
+    /**
+     * Адрес доставки — тоже общий, а не локальное поле формы оформления.
+     * Его показывает мобильная локейшн-панель, которая живёт в layout и
+     * видна на обоих шагах, а вводится он на /checkout. В макете это ровно
+     * так же: S.address — одно поле состояния на всю корзину.
+     */
+    const deliveryAddress = ref({ city: 'Алматы', line1: '' })
     const isAddingItem = ref(false) // Флаг для предотвращения race condition
     const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
     const isMergingFromServer = ref(false) // Блокирует sync→server пока грузим данные с сервера
@@ -63,6 +85,24 @@ export const useCartStore = defineStore(
         0,
       ),
     )
+
+    /**
+     * Стоимость доставки. Самовывоз бесплатен всегда, курьер — от порога.
+     * Считается от subtotal (до промокода и бонусов), как в calc() макета.
+     */
+    const deliveryCost = computed(() => {
+      if (deliveryMethod.value === 'pickup')
+        return 0
+      return subtotal.value >= FREE_SHIPPING_THRESHOLD
+        ? 0
+        : COURIER_DELIVERY_COST
+    })
+
+    const isFreeShipping = computed(() => deliveryCost.value === 0)
+
+    function setDeliveryMethod(method: DeliveryMethod) {
+      deliveryMethod.value = method
+    }
 
     const discountAmount = computed(() => {
       // Только для авторизованных пользователей
@@ -542,6 +582,11 @@ export const useCartStore = defineStore(
       isCartOpen,
       totalItems,
       subtotal,
+      deliveryMethod,
+      deliveryAddress,
+      deliveryCost,
+      isFreeShipping,
+      setDeliveryMethod,
       discountAmount,
       total,
       bonusesToAward,
@@ -558,7 +603,11 @@ export const useCartStore = defineStore(
   {
     persist: {
       key: CART_STORAGE_KEY,
-      pick: ['items', 'bonusesToSpend'],
+      // deliveryMethod персистим вместе с корзиной: выбранный на /checkout
+      // самовывоз должен пережить возврат на /cart, иначе «Итого» снова
+      // разъедется. deliveryAddress — по той же причине: локейшн-панель
+      // показывает его на обоих шагах.
+      pick: ['items', 'bonusesToSpend', 'deliveryMethod', 'deliveryAddress'],
       storage: piniaPluginPersistedstate.localStorage(),
     },
   },

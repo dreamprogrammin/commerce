@@ -3,6 +3,7 @@
 import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
+import { FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -35,20 +36,21 @@ const {
   isProcessing,
   bonusesToSpend,
   bonusesToAward,
+  deliveryMethod,
+  deliveryCost,
 } = storeToRefs(cartStore)
 
 const orderForm = ref({
   name: '',
   phone: '',
   email: '',
-  deliveryMethod: 'pickup' as 'pickup' | 'courier',
   paymentMethod: 'kaspi' as 'kaspi' | 'cash' | 'card',
-  address: {
-    city: 'Алматы',
-    line1: '',
-  },
   comment: '',
 })
+
+// Адрес живёт в cartStore: его же читает мобильная локейшн-панель из layout,
+// которая висит и над корзиной, и над оформлением.
+const { deliveryAddress } = storeToRefs(cartStore)
 const bonusesInput = ref(0)
 const promoCodeInput = ref('')
 const showGuestModal = ref(false)
@@ -155,33 +157,42 @@ const phoneErrorMessage = computed(() => {
   return ''
 })
 
-// Константа порога бесплатной доставки (как в умной корзине)
-const FREE_SHIPPING_THRESHOLD = 15000
-
-// Расчет стоимости доставки
-const deliveryCost = computed(() => {
-  // Самовывоз — бесплатно
-  if (orderForm.value.deliveryMethod === 'pickup')
-    return 0
-
-  // Курьер: если сумма >= 15000 ₸ — бесплатно, иначе 1000 ₸
-  return subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : 1000
-})
-
-const isCourier = computed(() => orderForm.value.deliveryMethod === 'courier')
+// Способ получения и стоимость доставки живут в cartStore — то же значение
+// видит /cart, поэтому «Итого» на двух шагах больше не расходится.
+const isCourier = computed(() => deliveryMethod.value === 'courier')
 
 /**
- * Итог по формуле макета: товары − промокод − бонусы + доставка.
- *
- * Раньше «Итого к оплате» считалось как subtotal − бонусы + доставка, а строка
- * «Промокод −X ₸» рисовалась рядом, но в сумму не входила: покупатель видел
- * одно число, а сервер (он применяет промокод сам внутри RPC) списывал другое.
+ * Бонусы за заказ без привязки к авторизации — как potentialBonuses в
+ * pages/cart.vue. cartStore.bonusesToAward обнуляется для гостя, но в макете
+ * мобильная панель показывает bonusEarnShort всем: для гостя это приманка
+ * «вот сколько вы теряете», а не факт начисления.
  */
-const orderTotal = computed(() => {
-  const afterDiscounts
-    = subtotal.value - promoDiscount.value - discountAmount.value
-  return Math.max(0, afterDiscounts) + deliveryCost.value
-})
+const potentialBonuses = computed(() =>
+  items.value.reduce((sum, item) => {
+    const award = Number(item.product.bonus_points_award) || 0
+    const quantity = Number(item.quantity) || 0
+    return sum + award * quantity
+  }, 0),
+)
+
+/**
+ * Итог = товары − бонусы + доставка. Промокод НЕ вычитается, и это не описка.
+ *
+ * По макету формула включает промокод, и какое-то время здесь так и было —
+ * с обоснованием «сервер применяет промокод сам внутри RPC». Это оказалось
+ * неверно, проверено на живой базе: create_guest_checkout принимает
+ * p_promo_code и не использует его ни разу, а v_promo_discount в обеих
+ * функциях остаётся нулём. Скидка по промокоду до заказа не доезжает.
+ *
+ * Пока это так, вычитать промокод здесь нельзя: покупателю показали бы сумму
+ * меньше той, что реально запишется в заказ. Строка «Промокод −X ₸» рядом
+ * остаётся — она приходит из validate_promo_code и вводит в заблуждение, но
+ * это отдельное решение (убирать промокод из интерфейса или чинить RPC),
+ * и оно за пределами вёрстки.
+ */
+const orderTotal = computed(
+  () => Math.max(0, subtotal.value - discountAmount.value) + deliveryCost.value,
+)
 
 // --- БОНУСЫ ---
 const maxBonuses = computed(() =>
@@ -205,7 +216,7 @@ function toggleBonuses() {
 
 // Проверка готовности формы к отправке
 const isFormValid = computed(() => {
-  const { name, email, phone, address } = orderForm.value
+  const { name, email, phone } = orderForm.value
 
   // Базовые поля
   if (!name.trim() || !email.trim() || !phone.trim())
@@ -214,7 +225,7 @@ const isFormValid = computed(() => {
     return false
 
   // Адрес для курьера
-  if (isCourier.value && !address.line1.trim())
+  if (isCourier.value && !deliveryAddress.value.line1.trim())
     return false
 
   // Согласие с условиями
@@ -230,7 +241,7 @@ const showAddrWarn = computed(
   () =>
     hasTriedSubmit.value
     && isCourier.value
-    && !orderForm.value.address.line1.trim(),
+    && !deliveryAddress.value.line1.trim(),
 )
 
 // Предзаполнение формы
@@ -328,7 +339,7 @@ async function placeOrder() {
   }
 
   // Адрес обязателен для курьера
-  if (isCourier.value && !orderForm.value.address.line1.trim()) {
+  if (isCourier.value && !deliveryAddress.value.line1.trim()) {
     toast.error('Укажите адрес доставки')
     return
   }
@@ -354,12 +365,12 @@ async function placeOrder() {
     : undefined
 
   await cartStore.checkout({
-    deliveryMethod: orderForm.value.deliveryMethod,
+    deliveryMethod: deliveryMethod.value,
     paymentMethod: orderForm.value.paymentMethod,
     deliveryAddress: isCourier.value
       ? {
-          line1: orderForm.value.address.line1,
-          city: orderForm.value.address.city,
+          line1: deliveryAddress.value.line1,
+          city: deliveryAddress.value.city,
         }
       : undefined,
     guestInfo,
@@ -581,7 +592,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 type="button"
                 class="co-opt gap-[11px]"
                 :class="isCourier ? 'co-opt--active text-primary' : 'text-foreground'"
-                @click="orderForm.deliveryMethod = 'courier'"
+                @click="cartStore.setDeliveryMethod('courier')"
               >
                 <Icon name="lucide:truck" class="size-[22px] shrink-0" />
                 <span class="flex flex-col items-start leading-[1.25]">
@@ -593,7 +604,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 type="button"
                 class="co-opt gap-[11px]"
                 :class="!isCourier ? 'co-opt--active text-primary' : 'text-foreground'"
-                @click="orderForm.deliveryMethod = 'pickup'"
+                @click="cartStore.setDeliveryMethod('pickup')"
               >
                 <Icon name="lucide:store" class="size-[22px] shrink-0" />
                 <span class="flex flex-col items-start leading-[1.25]">
@@ -613,7 +624,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               <div class="flex flex-col gap-2.5">
                 <input
                   id="city"
-                  v-model="orderForm.address.city"
+                  v-model="deliveryAddress.city"
                   class="co-input"
                   placeholder="Город"
                 >
@@ -624,7 +635,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                   <Icon name="lucide:map-pin" class="size-[18px] shrink-0 text-primary" />
                   <input
                     id="address"
-                    v-model="orderForm.address.line1"
+                    v-model="deliveryAddress.line1"
                     class="min-w-0 flex-1 border-none bg-transparent outline-none"
                     placeholder="Улица, дом, квартира"
                   >
@@ -789,10 +800,30 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               <span class="shrink-0 text-[13px] font-bold text-primary">Войти</span>
             </button>
           </section>
+
+          <!-- Согласие живёт в основной колонке, а не в сайдбаре: сайдбар
+               по макету скрыт на мобильном, и вместе с ним пропала бы
+               единственная возможность прочитать оферту и снять галочку.
+               Не <label>: Checkbox из reka-ui рендерится как <button>, его
+               label[for] всё равно не переключает, а ссылки внутри label
+               ловят клик мимо цели. Кликабельна сама галочка. -->
+          <div class="flex items-start gap-2.5">
+            <Checkbox id="terms" v-model:checked="agreedToTerms" class="mt-0.5" />
+            <span class="text-[11px] leading-[1.45] text-muted-foreground">
+              Я согласен с условиями
+              <a href="/terms" target="_blank" class="text-primary hover:underline">Публичной оферты</a>
+              и
+              <a href="/privacy-policy" target="_blank" class="text-primary hover:underline">политикой обработки персональных данных</a>
+            </span>
+          </div>
         </div>
 
         <!-- ============ САЙДБАР ============ -->
-        <aside class="rounded-[18px] bg-muted p-[22px] lg:sticky lg:top-[88px]">
+        <!-- В макете sideStyle на мобиле — display:none: сводку там заменяет
+             липкая панель с итогом. cart.vue уже так, теперь и чекаут. -->
+        <aside
+          class="hidden rounded-[18px] bg-muted p-[22px] lg:sticky lg:top-[88px] lg:block"
+        >
           <div class="mb-4 text-lg font-extrabold tracking-[-0.02em]">
             Ваш заказ
           </div>
@@ -846,19 +877,6 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               Начислим бонусов
             </span>
             <span>+{{ formatPrice(bonusesToAward) }}</span>
-          </div>
-
-          <!-- Не <label>: Checkbox из reka-ui рендерится как <button>, его
-               label[for] всё равно не переключает, а ссылки внутри label
-               ловят клик мимо цели. Кликабельна сама галочка. -->
-          <div class="mb-3.5 flex items-start gap-2.5">
-            <Checkbox id="terms" v-model:checked="agreedToTerms" class="mt-0.5" />
-            <span class="text-[11px] leading-[1.45] text-muted-foreground">
-              Я согласен с условиями
-              <a href="/terms" target="_blank" class="text-primary hover:underline">Публичной оферты</a>
-              и
-              <a href="/privacy-policy" target="_blank" class="text-primary hover:underline">политикой обработки персональных данных</a>
-            </span>
           </div>
 
           <button
@@ -927,11 +945,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <span class="flex flex-col items-end leading-[1.12]">
             <b class="text-[17px] font-extrabold">{{ formatPrice(orderTotal) }} ₸</b>
             <span
-              v-if="isLoggedIn && bonusesToAward > 0"
+              v-if="potentialBonuses > 0"
               class="inline-flex items-center gap-1 text-[11px] font-semibold opacity-90"
             >
               <Icon name="lucide:gift" class="size-[11px]" />
-              +{{ formatPrice(bonusesToAward) }}
+              +{{ formatPrice(potentialBonuses) }}
             </span>
           </span>
         </button>

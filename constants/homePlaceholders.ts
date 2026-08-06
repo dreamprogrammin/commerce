@@ -1,3 +1,6 @@
+import { formatPrice } from '@/utils/formatPrice'
+import { FREE_SHIPPING_THRESHOLD } from './index'
+
 /**
  * Плейсхолдеры для главной страницы.
  *
@@ -29,10 +32,10 @@ export const DEAL_COUNTDOWN_MODE = 'end-of-local-day' as const
  *
  * ⚠️ Копия выверена по коду, а не по прототипу:
  *
- * • «бесплатно от 15 000 ₸» — ПРАВДА: FREE_SHIPPING_THRESHOLD = 15000
- *   (pages/checkout.vue). Значение продублировано здесь осознанно, потому что
- *   константа объявлена локально в двух страницах; при вынесении в общий
- *   модуль заменить импортом.
+ * • Порог бесплатной доставки больше не дублируется: константа переехала в
+ *   constants/index.ts, и подпись собирается из неё. Раньше здесь лежала
+ *   копия числа с пометкой «при вынесении в общий модуль заменить импортом» —
+ *   вынесли, заменили.
  *
  * • Срок доставки — в прототипе стоит «1–2 дня», но это ПРОТИВОРЕЧИТ
  *   опубликованной оферте: pages/terms.vue → «По Алматы: 1-3 рабочих дня».
@@ -40,12 +43,20 @@ export const DEAL_COUNTDOWN_MODE = 'end-of-local-day' as const
  *
  * • Маршрута /delivery в проекте нет — ведём на раздел доставки в оферте.
  */
-export const HOME_FREE_SHIPPING_THRESHOLD = 15000
+
+/**
+ * Порог прописью — единственное место, где число превращается в текст.
+ * Собирается из FREE_SHIPPING_THRESHOLD, чтобы подпись не могла разойтись
+ * с тем, что реально считает корзина. Через formatPrice, а не
+ * toLocaleString: последний в Node и в браузере разделяет разряды
+ * по-разному, и строка разъехалась бы между сервером и клиентом.
+ */
+export const FREE_SHIPPING_LABEL = `${formatPrice(FREE_SHIPPING_THRESHOLD)} ₸`
 
 export const HOME_DELIVERY_TILE = {
   id: 'delivery',
   title: 'Доставка 1–3 дня',
-  subtitle: 'по Алматы, бесплатно от 15 000 ₸',
+  subtitle: `по Алматы, бесплатно от ${FREE_SHIPPING_LABEL}`,
   icon: 'lucide:truck',
   href: '/terms',
   accent: 'blue',

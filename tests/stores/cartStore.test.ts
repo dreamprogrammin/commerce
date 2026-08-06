@@ -240,6 +240,67 @@ describe('cartStore', () => {
     })
   })
 
+  /**
+   * Способ получения и стоимость доставки переехали в стор из-за бага:
+   * /cart считала доставку по курьеру, а orderForm на /checkout стартовала
+   * с 'pickup', и «Итого» на двух шагах отличалось на цену доставки.
+   */
+  describe('доставка', () => {
+    async function fillCart(store: ReturnType<typeof useCartStore>, price: number) {
+      mockQueryBuilder.single.mockResolvedValueOnce({
+        data: { ...mockProduct, price, final_price: price },
+        error: null,
+      })
+      await store.addItem('product-1', 1)
+    }
+
+    it('по умолчанию выбран курьер — как fulfill:delivery в макете', () => {
+      const store = useCartStore()
+
+      expect(store.deliveryMethod).toBe('courier')
+    })
+
+    it('берёт 1000 ₸ за курьера, пока корзина не добила до порога', async () => {
+      const store = useCartStore()
+      await fillCart(store, 5000)
+
+      expect(store.deliveryCost).toBe(1000)
+      expect(store.isFreeShipping).toBe(false)
+    })
+
+    it('везёт бесплатно от 15 000 ₸', async () => {
+      const store = useCartStore()
+      await fillCart(store, 15000)
+
+      expect(store.deliveryCost).toBe(0)
+      expect(store.isFreeShipping).toBe(true)
+    })
+
+    it('обнуляет доставку при самовывозе даже ниже порога', async () => {
+      const store = useCartStore()
+      await fillCart(store, 5000)
+
+      store.setDeliveryMethod('pickup')
+
+      expect(store.deliveryCost).toBe(0)
+    })
+
+    it('даёт корзине и оформлению одну и ту же сумму доставки', async () => {
+      const store = useCartStore()
+      await fillCart(store, 5000)
+
+      // Обе страницы читают одно и то же поле стора, поэтому «Итого»
+      // не может разойтись: смена способа видна сразу на обоих шагах.
+      const totalOnCart = store.subtotal + store.deliveryCost
+      store.setDeliveryMethod('pickup')
+      const totalOnCheckout = store.subtotal + store.deliveryCost
+
+      expect(totalOnCart).toBe(6000)
+      expect(totalOnCheckout).toBe(5000)
+      expect(store.deliveryMethod).toBe('pickup')
+    })
+  })
+
   describe('clearCart', () => {
     it('должен очистить корзину и бонусы', async () => {
       // ✅ Устанавливаем авторизованного пользователя

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductWithImages } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_PRODUCT, FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
 
@@ -9,9 +9,6 @@ const cartStore = useCartStore()
 const router = useRouter()
 const supabase = useSupabaseClient()
 const { getVariantUrl } = useSupabaseStorage()
-
-// 🔥 Константа порога бесплатной доставки
-const FREE_SHIPPING_THRESHOLD = 15000
 
 // Прогресс бесплатной доставки
 const shippingProgress = computed(() => {

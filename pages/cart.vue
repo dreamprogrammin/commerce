@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useHaptic } from '@/composables/useHaptic'
-import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_PRODUCT, FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
@@ -24,24 +24,12 @@ const cartStore = useCartStore()
 const authStore = useAuthStore()
 const modalStore = useModalStore()
 const supabase = useSupabaseClient()
-const { items, subtotal, totalItems } = storeToRefs(cartStore)
+const { items, subtotal, totalItems, deliveryCost, isFreeShipping }
+  = storeToRefs(cartStore)
 const { isLoggedIn } = storeToRefs(authStore)
 const { getVariantUrl } = useSupabaseStorage()
 const { trackBeginCheckout } = useEcommerceTracking()
 const { triggerHaptic } = useHaptic()
-
-/**
- * Порог и цена доставки продублированы из pages/checkout.vue намеренно:
- * макет требует показать строку «Доставка» уже в корзине, а до выбора способа
- * получения расчёт идёт по курьеру — это же значение потом увидит /checkout.
- */
-const FREE_SHIPPING_THRESHOLD = 15000
-const COURIER_DELIVERY_COST = 1000
-
-const deliveryCost = computed(() =>
-  subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : COURIER_DELIVERY_COST,
-)
-const hasFreeShipping = computed(() => deliveryCost.value === 0)
 
 // Прогресс бесплатной доставки
 const shippingProgress = computed(() =>
@@ -485,11 +473,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             <Icon
               name="lucide:truck"
               class="size-5 shrink-0"
-              :class="hasFreeShipping ? 'text-success' : 'text-primary'"
+              :class="isFreeShipping ? 'text-success' : 'text-primary'"
             />
             <div class="min-w-0 flex-1">
               <p
-                v-if="hasFreeShipping"
+                v-if="isFreeShipping"
                 class="text-[13px] font-semibold text-success"
               >
                 Доставка бесплатная — порог пройден 🎉
@@ -554,15 +542,13 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 
                 <span
                   v-if="item.product.bonus_points_award"
-                  class="inline-flex items-center gap-[7px] self-start whitespace-nowrap rounded-[10px] bg-gradient-to-r from-orange-50 to-orange-100 px-2.5 py-1.5 text-[12.5px] font-bold"
+                  class="cart-bonus-chip inline-flex items-center gap-[7px] self-start whitespace-nowrap rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-bold"
                 >
                   <Icon
                     name="lucide:gift"
                     class="size-[13px] shrink-0 text-orange-500"
                   />
-                  <span
-                    class="bg-gradient-to-r from-orange-400 to-pink-600 bg-clip-text text-transparent"
-                  >
+                  <span class="cart-bonus-chip__text">
                     +{{ formatPrice((item.product.bonus_points_award || 0) * item.quantity) }} бонусов
                   </span>
                 </span>
@@ -710,7 +696,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <Icon name="lucide:info" class="size-3.5 text-muted-foreground/70" />
               </span>
               <span
-                v-if="hasFreeShipping"
+                v-if="isFreeShipping"
                 class="font-semibold text-success"
               >Бесплатно</span>
               <span v-else>{{ formatPrice(deliveryCost) }} ₸</span>
@@ -754,7 +740,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <Icon name="lucide:gift" class="size-3.5" />
                 Начислим бонусов
               </span>
-              <span>+{{ formatPrice(potentialBonuses) }}</span>
+              <span>+{{ formatPrice(potentialBonuses) }} бонусов</span>
             </div>
             <button
               v-else
@@ -847,6 +833,22 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
     inset 0 -2px 4px rgb(15 23 42 / 0.07),
     inset 0 0 0 1px rgb(255 255 255 / 0.5),
     0 1px 0 rgb(15 23 42 / 0.05);
+}
+
+/* Бонусный чип. Угол 100deg взят из макета — утилитой не выразить
+   (bg-gradient-to-r даёт 90deg), поэтому свой класс. Цвета литералами
+   по той же причине, что и ниже: Tailwind 4 выкидывает переменную темы,
+   если её не использует ни одна утилита. */
+.cart-bonus-chip {
+  background: linear-gradient(100deg, oklch(0.98 0.016 73.684) 0%, oklch(0.954 0.038 75.164) 100%);
+}
+
+.cart-bonus-chip__text {
+  background: linear-gradient(100deg, oklch(0.75 0.183 55.934) 0%, oklch(0.592 0.249 0.584) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: var(--bonus);
 }
 
 /* Синий градиентный степпер — общий с .pc-stepper карточки товара.
