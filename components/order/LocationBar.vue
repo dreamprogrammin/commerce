@@ -21,7 +21,8 @@ const cartStore = useCartStore()
 const authStore = useAuthStore()
 const modalStore = useModalStore()
 
-const { deliveryMethod, deliveryAddress } = storeToRefs(cartStore)
+const { deliveryMethod, deliveryAddress, deliverySlotLabel }
+  = storeToRefs(cartStore)
 const { isLoggedIn } = storeToRefs(authStore)
 
 /**
@@ -45,15 +46,17 @@ const addressLine = computed(() =>
 const city = computed(() => deliveryAddress.value.city || 'Алматы')
 
 /**
- * В макете здесь стоит выбранный слот доставки («Алматы, 12:00–14:00»), но
- * слотов у нас нет — ни колонок в БД, ни параметров RPC. Показываем способ
- * получения: врать про время доставки хуже, чем не называть его.
+ * Как в макете: у курьера — город и выбранный интервал («Алматы, 12:00–14:00»),
+ * у самовывоза — «Алматы · самовывоз». До монтирования интервал не показываем:
+ * выбор восстанавливается из localStorage и на сервере ещё неизвестен.
  */
-const topLine = computed(() =>
-  isCourier.value
-    ? `${city.value} · доставка курьером`
-    : `${city.value} · самовывоз`,
-)
+const topLine = computed(() => {
+  if (!isCourier.value)
+    return `${city.value} · самовывоз`
+  return isMounted.value && deliverySlotLabel.value
+    ? `${city.value}, ${deliverySlotLabel.value}`
+    : `${city.value} · доставка курьером`
+})
 
 const bottomLine = computed(() => {
   if (addressLine.value)

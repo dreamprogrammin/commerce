@@ -367,6 +367,39 @@ describe('cartStore', () => {
       // выражает намерение явно и переживёт смену дефолта.
       expect(guestRpcParams().p_comment).toBeNull()
     })
+
+    it('шлёт желаемые дату и интервал при курьерской доставке', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      store.deliveryDateIndex = 1
+      store.deliverySlotIndex = 2
+
+      await store.checkout(guestOrder())
+
+      const params = guestRpcParams()
+      // Индекс 1 — «завтра»: дата считается от сегодняшней, а не берётся
+      // из хранилища, поэтому сохранённый выбор не может оказаться в прошлом.
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+
+      expect(params.p_delivery_date).toBe(iso)
+      expect(params.p_delivery_slot).toBe('16:00–18:00')
+    })
+
+    it('не шлёт дату и интервал при самовывозе', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      await store.checkout({ ...guestOrder(), deliveryMethod: 'pickup' })
+
+      const params = guestRpcParams()
+      expect(params.p_delivery_date).toBeNull()
+      expect(params.p_delivery_slot).toBeNull()
+    })
   })
 
   describe('clearCart', () => {

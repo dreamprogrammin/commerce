@@ -1,6 +1,12 @@
 import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
 import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
+import {
+  buildDeliveryDates,
+  clampIndex,
+  DELIVERY_DATE_COUNT,
+  DELIVERY_SLOTS,
+} from '@/utils/deliverySlots'
 import { useProfileStore } from '../core/profileStore'
 
 export type DeliveryMethod = 'pickup' | 'courier'
@@ -42,6 +48,23 @@ export const useCartStore = defineStore(
      * так же: S.address — одно поле состояния на всю корзину.
      */
     const deliveryAddress = ref({ city: 'Алматы', line1: '' })
+
+    /**
+     * Желаемые дата и интервал доставки — индексами, а не значениями.
+     * Почему индексами, см. utils/deliverySlots.ts: индекс 0 всегда «сегодня»,
+     * поэтому сохранённый выбор не протухает. Абсолютные значения считаются
+     * ниже, в момент отправки заказа.
+     */
+    const deliveryDateIndex = ref(0)
+    const deliverySlotIndex = ref(0)
+
+    const deliveryDateIso = computed(
+      () => buildDeliveryDates()[clampIndex(deliveryDateIndex.value, DELIVERY_DATE_COUNT)]?.iso ?? null,
+    )
+
+    const deliverySlotLabel = computed(
+      () => DELIVERY_SLOTS[clampIndex(deliverySlotIndex.value, DELIVERY_SLOTS.length)] ?? null,
+    )
     const isAddingItem = ref(false) // Флаг для предотвращения race condition
     const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
     const isMergingFromServer = ref(false) // Блокирует sync→server пока грузим данные с сервера
@@ -467,6 +490,8 @@ export const useCartStore = defineStore(
           quantity: i.quantity,
         }))
 
+        const isCourierOrder = orderData.deliveryMethod === 'courier'
+
         let orderId: string | null = null
 
         // Определяем: гость или авторизованный пользователь
@@ -495,6 +520,9 @@ export const useCartStore = defineStore(
             // Для авторизованных заказов пока не передаём: у create_user_order
             // такого параметра нет, см. 20260805100000_guest_checkout_comment.
             p_comment: orderData.comment || null,
+            // Дату и слот шлём только для курьера: у самовывоза их нет.
+            p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
+            p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
           })
 
           if (error)
@@ -519,6 +547,9 @@ export const useCartStore = defineStore(
             p_contact_name: orderData.contactName || null,
             p_contact_phone: orderData.contactPhone || null,
             p_delivery_cost: orderData.deliveryCost || 0,
+            p_comment: orderData.comment || null,
+            p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
+            p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
           })
 
           if (error)
@@ -589,6 +620,10 @@ export const useCartStore = defineStore(
       subtotal,
       deliveryMethod,
       deliveryAddress,
+      deliveryDateIndex,
+      deliverySlotIndex,
+      deliveryDateIso,
+      deliverySlotLabel,
       deliveryCost,
       isFreeShipping,
       setDeliveryMethod,
@@ -612,7 +647,14 @@ export const useCartStore = defineStore(
       // самовывоз должен пережить возврат на /cart, иначе «Итого» снова
       // разъедется. deliveryAddress — по той же причине: локейшн-панель
       // показывает его на обоих шагах.
-      pick: ['items', 'bonusesToSpend', 'deliveryMethod', 'deliveryAddress'],
+      pick: [
+        'items',
+        'bonusesToSpend',
+        'deliveryMethod',
+        'deliveryAddress',
+        'deliveryDateIndex',
+        'deliverySlotIndex',
+      ],
       storage: piniaPluginPersistedstate.localStorage(),
     },
   },
