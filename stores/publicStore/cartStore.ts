@@ -58,6 +58,22 @@ export const useCartStore = defineStore(
     const deliveryDateIndex = ref(0)
     const deliverySlotIndex = ref(0)
 
+    /**
+     * Когда оформлен последний заказ — только чтобы показать дату гостю.
+     *
+     * Гостевой заказ лежит в guest_checkouts, а RLS отдаёт эту таблицу лишь
+     * админам: покупатель-гость не может прочитать даже собственный заказ и
+     * узнать время его создания. Запоминаем момент оформления на клиенте.
+     *
+     * Храним вместе с id: иначе, оформив два заказа и вернувшись по ссылке на
+     * первый, покупатель увидел бы дату второго.
+     *
+     * Время клиентское, а не серверное — при сбитых часах разойдётся с тем,
+     * что записано в базе. Для справочной строки это приемлемо, для чего-то
+     * большего брать её отсюда нельзя.
+     */
+    const lastOrder = ref<{ id: string, at: string } | null>(null)
+
     const deliveryDateIso = computed(
       () => buildDeliveryDates()[clampIndex(deliveryDateIndex.value, DELIVERY_DATE_COUNT)]?.iso ?? null,
     )
@@ -596,6 +612,9 @@ export const useCartStore = defineStore(
           clearCart()
         }
 
+        if (orderId)
+          lastOrder.value = { id: orderId, at: new Date().toISOString() }
+
         // Редирект на страницу успеха
         await router.push(`/order/success/${orderId}`)
       }
@@ -624,6 +643,7 @@ export const useCartStore = defineStore(
       deliverySlotIndex,
       deliveryDateIso,
       deliverySlotLabel,
+      lastOrder,
       deliveryCost,
       isFreeShipping,
       setDeliveryMethod,
@@ -654,6 +674,7 @@ export const useCartStore = defineStore(
         'deliveryAddress',
         'deliveryDateIndex',
         'deliverySlotIndex',
+        'lastOrder',
       ],
       storage: piniaPluginPersistedstate.localStorage(),
     },

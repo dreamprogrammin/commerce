@@ -8,6 +8,7 @@ import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { orderItemUnitPrice } from '@/utils/orderItems'
@@ -24,6 +25,7 @@ const router = useRouter()
 const user = useSupabaseUser()
 const supabase = useSupabaseClient()
 const cartStore = useCartStore()
+const modalStore = useModalStore()
 const profileStore = useProfileStore()
 const { profile } = storeToRefs(profileStore)
 const personalizationStore = usePersonalizationStore()
@@ -120,10 +122,23 @@ async function fetchOrder() {
   }
 }
 
+/**
+ * Дата заказа. У авторизованного берётся из самого заказа, у гостя — из
+ * момента оформления, запомненного корзиной: свой заказ гость прочитать не
+ * может, RLS отдаёт guest_checkouts только админам. Если id не совпадает
+ * (гость вернулся по ссылке на другой заказ), строку не показываем вовсе.
+ */
 const orderDate = computed(() => {
-  if (!order.value)
+  const iso
+    = order.value?.created_at
+      ?? (cartStore.lastOrder?.id === fullOrderId.value
+        ? cartStore.lastOrder.at
+        : null)
+
+  if (!iso)
     return ''
-  const d = new Date(order.value.created_at)
+
+  const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
 })
@@ -313,6 +328,27 @@ onMounted(async () => {
               <Icon name="lucide:trash-2" class="size-[17px]" />
             </button>
           </div>
+        </section>
+
+        <!-- ============ ГОСТЬ: ПРИГЛАШЕНИЕ ВОЙТИ ============ -->
+        <section
+          v-if="!isAuthenticated"
+          class="os-card-invite flex flex-wrap items-center gap-4 px-6 py-[22px]"
+        >
+          <span class="os-badge os-badge--blue">
+            <Icon name="lucide:user" class="size-5 text-primary" />
+          </span>
+          <span class="flex min-w-[180px] flex-1 flex-col gap-[3px]">
+            <span class="text-[17px] font-bold">Войдите, чтобы следить за заказом</span>
+            <span class="text-sm leading-[1.4] text-muted-foreground">
+              Статус, история заказов и бонусы — в личном кабинете
+            </span>
+          </span>
+          <!-- В макете это ссылка на главную: у прототипа нет модалки входа.
+               У нас есть — открываем её, не уводя покупателя со страницы. -->
+          <button type="button" class="os-cta h-[46px] shrink-0 px-[22px]" @click="modalStore.openLoginModal()">
+            Войти
+          </button>
         </section>
 
         <!-- ============ АВТОРИЗОВАННЫЙ: ОТСЛЕЖИВАНИЕ ============ -->
@@ -521,6 +557,19 @@ onMounted(async () => {
     inset 0 1.5px 0 rgb(255 255 255 / 0.95),
     inset 0 -2px 6px rgb(6 53 138 / 0.06),
     0 1px 0 rgb(15 23 42 / 0.04);
+}
+
+/* Приглашение войти: тот же голубой градиент, что у «Корзина сохранена», но
+   светлее в нижней точке и с обычной рамкой — в макете карточка звучит тише,
+   чтобы не спорить с блоком про корзину. */
+.os-card-invite {
+  border-radius: 22px;
+  background: linear-gradient(162deg, rgb(239 246 255 / 0.98), rgb(219 234 254 / 0.4));
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+    inset 0 -2px 4px rgb(15 23 42 / 0.07),
+    0 1px 0 rgb(15 23 42 / 0.05);
 }
 
 .os-card-green {
