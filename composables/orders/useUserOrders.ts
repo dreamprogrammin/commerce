@@ -4,6 +4,13 @@ import { useProfileStore } from '@/stores/core/profileStore'
 export interface OrderItem {
   id: string
   quantity: number
+  /**
+   * Цена на момент покупки. Две формы имени — потому что схемы разошлись:
+   * в проде колонка price_at_purchase, в схеме из миграций price_per_item.
+   * Читать через orderItemUnitPrice, а не напрямую.
+   */
+  price_at_purchase?: number | null
+  price_per_item?: number | null
   product: {
     id: string
     name: string

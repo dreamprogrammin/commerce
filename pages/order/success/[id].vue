@@ -10,6 +10,7 @@ import { usePersonalizationStore } from '@/stores/core/personalizationStore'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
+import { orderItemUnitPrice } from '@/utils/orderItems'
 
 definePageMeta({ layout: 'checkout' })
 
@@ -40,6 +41,9 @@ const showCancelDialog = ref(false)
 
 interface OrderItemRow {
   quantity: number
+  // Обе формы имени: какая приедет, зависит от окружения — см. utils/orderItems.
+  price_at_purchase?: number | null
+  price_per_item?: number | null
   product: {
     name: string
     price: number
@@ -70,10 +74,10 @@ const order = ref<OrderRow | null>(null)
  * админам — покупатель-гость собственный заказ прочитать не может. Поэтому
  * в гостевой ветке макета и нет ни состава, ни сумм: там только номер.
  *
- * price_at_purchase намеренно не запрашиваем: в проде колонка называется так,
- * а в схеме из каталога миграций — price_per_item, и запрос по имени сломался
- * бы в одном из окружений. Считаем по цене товара, как это делает
- * pages/profile/order/[id].vue.
+ * Позиции берём целиком (`order_items(*)`), а не перечисляя колонки: цена
+ * покупки называется price_at_purchase в проде и price_per_item в схеме из
+ * миграций, и запрос по имени вернул бы 400 в одном из окружений. Нужное поле
+ * выбирает orderItemUnitPrice.
  */
 async function fetchOrder() {
   if (!isAuthenticated.value)
@@ -94,7 +98,7 @@ async function fetchOrder() {
         delivery_slot,
         bonuses_awarded,
         order_items(
-          quantity,
+          *,
           product:products(
             name,
             price,
@@ -154,7 +158,9 @@ const payLabel = computed(() =>
 
 const items = computed(() =>
   (order.value?.order_items ?? []).map((row) => {
-    const unit = row.product?.final_price || row.product?.price || 0
+    // Цена на момент покупки, а не текущая: если товар с тех пор подорожал
+    // или подешевел, список позиций обязан сходиться с «Итого».
+    const unit = orderItemUnitPrice(row)
     return {
       name: row.product?.name ?? 'Товар',
       image: row.product?.product_images?.[0]?.image_url ?? null,

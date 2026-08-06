@@ -16,6 +16,8 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+// Цена берётся из заказа, а не из товара: товар мог подорожать после покупки.
+import { orderItemUnitPrice } from '@/utils/orderItems'
 
 const route = useRoute()
 const router = useRouter()
@@ -67,8 +69,7 @@ async function fetchOrder() {
         bonuses_spent,
         bonuses_awarded,
         order_items(
-          id,
-          quantity,
+          *,
           product:products(
             id,
             name,
@@ -491,7 +492,7 @@ useHead({
                 <p class="text-sm text-muted-foreground">
                   {{
                     (
-                      item.product.final_price || item.product.price
+                      orderItemUnitPrice(item)
                     ).toLocaleString("ru-RU")
                   }}
                   ₸ × {{ item.quantity }}
@@ -527,8 +528,7 @@ useHead({
                 <p class="font-semibold">
                   {{
                     (
-                      (item.product.final_price || item.product.price)
-                      * item.quantity
+                      orderItemUnitPrice(item) * item.quantity
                     ).toLocaleString("ru-RU")
                   }}
                   ₸
