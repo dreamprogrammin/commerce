@@ -314,10 +314,12 @@ useHead({
     <div v-else-if="order" class="space-y-6">
       <!-- ✅ Lottie Animation Tracker -->
       <Card>
-        <CardContent class="p-0">
-          <OrderTrackerLottie
-            :status="order.status as 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'"
-          />
+        <!-- Полоса прогресса переехала из OrderTrackerLottie в отдельный
+             компонент, поэтому собираем блок здесь; отступы тоже перешли
+             к обёртке, раньше их приносил сам трекер. -->
+        <CardContent class="flex flex-col items-center gap-6 py-8">
+          <OrderTrackerLottie :status="order.status" />
+          <OrderProgressBar :status="order.status" class="max-w-md" />
         </CardContent>
       </Card>
 

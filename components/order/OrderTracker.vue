@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ORDER_STEPS, orderStatusToStep } from '@/utils/orderStatus'
+
 /**
  * Статус заказа — порт блока «Статус заказа» из OrderSuccess.dc.html.
  *
@@ -23,38 +25,7 @@ watch(
   value => (orderStatus.value = value),
 )
 
-const STEPS = [
-  {
-    icon: 'lucide:check',
-    title: 'Заказ принят',
-    sub: 'Мы получили ваш заказ и начинаем его обработку',
-  },
-  {
-    icon: 'lucide:package-check',
-    title: 'Подтверждён',
-    sub: 'Готовим к отправке',
-  },
-  { icon: 'lucide:truck', title: 'Отправлен', sub: 'В пути' },
-  { icon: 'lucide:home', title: 'Доставлен', sub: 'Спасибо за покупку!' },
-] as const
-
-/**
- * Статусов в БД больше, чем шагов в ленте: 'processing' и 'confirmed'
- * покупателю выглядят одинаково — заказ подтверждён и собирается.
- * Отменённый заказ не подсвечивает ничего: -1 гасит всю ленту.
- */
-const STATUS_TO_STEP: Record<string, number> = {
-  pending: 0,
-  new: 0,
-  confirmed: 1,
-  processing: 1,
-  shipped: 2,
-  delivered: 3,
-  completed: 3,
-  cancelled: -1,
-}
-
-const activeStep = computed(() => STATUS_TO_STEP[orderStatus.value] ?? 0)
+const activeStep = computed(() => orderStatusToStep(orderStatus.value))
 
 onMounted(() => {
   const channel = supabase
@@ -85,7 +56,7 @@ onMounted(() => {
 
     <div class="flex flex-col gap-1">
       <div
-        v-for="(step, index) in STEPS"
+        v-for="(step, index) in ORDER_STEPS"
         :key="step.title"
         class="flex items-stretch gap-4"
       >
@@ -97,7 +68,7 @@ onMounted(() => {
             <Icon :name="step.icon" class="size-[18px]" />
           </span>
           <span
-            v-if="index < STEPS.length - 1"
+            v-if="index < ORDER_STEPS.length - 1"
             class="ot-line"
             :class="{ 'ot-line--done': index < activeStep }"
           />

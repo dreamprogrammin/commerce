@@ -165,28 +165,6 @@ const items = computed(() =>
   }),
 )
 
-/**
- * Пятисегментная полоса прогресса из макета. Гранулярность у неё выше, чем у
- * ленты статусов (5 против 4), поэтому маппинг свой: 'processing' —
- * «Комплектуется», отдельный сегмент, которого в ленте нет.
- */
-const TRACK = ['Принят', 'Подтверждён', 'Комплектуется', 'В пути', 'Доставлен']
-
-const STATUS_TO_SEGMENT: Record<string, number> = {
-  pending: 0,
-  new: 0,
-  confirmed: 1,
-  processing: 2,
-  shipped: 3,
-  delivered: 4,
-  completed: 4,
-  cancelled: -1,
-}
-
-const activeSegment = computed(() =>
-  order.value ? (STATUS_TO_SEGMENT[order.value.status] ?? 0) : 0,
-)
-
 async function handleCancelOrder() {
   isCancelling.value = true
   const result = await cancelOrder(fullOrderId.value)
@@ -257,21 +235,10 @@ onMounted(async () => {
       <!-- ============ НОМЕР ЗАКАЗА И «ЧТО ДАЛЬШЕ» ============ -->
       <section class="os-card flex flex-col gap-5 p-6">
         <div class="flex flex-col items-center gap-[9px] border-b pb-[18px]">
-          <ClientOnly>
-            <template v-if="isAuthenticated">
-              <img
-                src="/images/order-success.png"
-                alt=""
-                class="-mb-0.5 h-auto w-[200px] max-w-[60%]"
-              >
-              <span class="text-[22px] font-extrabold leading-[1.3] tracking-[-0.02em]">
-                Заказ принят
-              </span>
-              <span class="-mt-1 text-center text-[15px] leading-[1.5] text-muted-foreground">
-                Мы получили ваш заказ и начинаем его обработку
-              </span>
-            </template>
-          </ClientOnly>
+          <!-- Анимированный герой: своя .lottie и своя подпись на каждый
+               статус. В макете здесь стоп-кадр — экспорт прототипа не умеет
+               анимации, а не потому что её быть не должно. -->
+          <OrderTrackerLottie v-if="order" :status="order.status" />
 
           <span class="mt-2 text-sm text-muted-foreground">Номер вашего заказа</span>
           <span class="os-number">{{ orderNo }}</span>
@@ -284,25 +251,11 @@ onMounted(async () => {
             {{ orderDate }}
           </span>
 
-          <!-- Полоса прогресса -->
-          <div v-if="order" class="mt-3 flex w-full max-w-[472px] items-start gap-2">
-            <span
-              v-for="(label, index) in TRACK"
-              :key="label"
-              class="flex min-w-0 flex-1 flex-col items-stretch gap-2"
-            >
-              <span
-                class="os-seg"
-                :class="{ 'os-seg--done': index <= activeSegment }"
-              />
-              <span
-                class="text-center text-[11px] leading-[1.2]"
-                :class="index <= activeSegment ? 'font-bold text-primary' : 'font-medium text-muted-foreground'"
-              >
-                {{ label }}
-              </span>
-            </span>
-          </div>
+          <OrderProgressBar
+            v-if="order"
+            :status="order.status"
+            class="mt-3 max-w-[472px]"
+          />
         </div>
 
         <div class="flex flex-col gap-3">
@@ -607,24 +560,6 @@ onMounted(async () => {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: 0.01em;
-}
-
-/* Сегмент полосы прогресса. */
-.os-seg {
-  display: block;
-  width: 100%;
-  height: 8px;
-  flex: none;
-  border-radius: 999px;
-  background: var(--border);
-  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.08);
-  transition: background 0.2s ease;
-}
-.os-seg--done {
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    0 3px 8px rgb(43 127 255 / 0.28);
 }
 
 /* Белая кнопка-«стекло» — та же поверхность, что у карточек. */
