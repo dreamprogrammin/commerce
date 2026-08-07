@@ -70,6 +70,7 @@ interface OrderData {
   delivery_slot: string | null
   promo_code: string | null
   promo_discount: number | null
+  pickup_point: { name: string, address: string } | null
   profile: OrderProfile | null
   order_items: OrderItem[]
 }
@@ -91,6 +92,7 @@ interface GuestCheckoutData {
   delivery_slot: string | null
   promo_code: string | null
   promo_discount: number | null
+  pickup_point: { name: string, address: string } | null
   guest_checkout_items: GuestCheckoutItem[]
 }
 
@@ -163,6 +165,7 @@ Deno.serve(async (req) => {
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, guest_name, guest_phone, guest_email, status, source, comment,
           delivery_date, delivery_slot, promo_code, promo_discount,
+          pickup_point:pickup_points(name, address),
           guest_checkout_items(
             quantity, 
             product_id,
@@ -207,6 +210,7 @@ Deno.serve(async (req) => {
           delivery_slot: guestData.delivery_slot,
           promo_code: guestData.promo_code,
           promo_discount: guestData.promo_discount,
+          pickup_point: guestData.pickup_point,
           profile: null,
           order_items: guestData.guest_checkout_items.map(item => ({
             quantity: item.quantity,
@@ -227,6 +231,7 @@ Deno.serve(async (req) => {
           delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
           customer_name, customer_phone, comment, delivery_date, delivery_slot,
           promo_code, promo_discount,
+          pickup_point:pickup_points(name, address),
           order_items(
             quantity,
             product_id,
@@ -485,6 +490,12 @@ Deno.serve(async (req) => {
     
     messageText += `*Оплата:* ${escapeMarkdown(typedOrderData.payment_method) || 'Не указано'}\n`
     messageText += `*Доставка:* ${typedOrderData.delivery_method === 'courier' ? 'Курьер' : 'Самовывоз'}\n`
+
+    // При самовывозе адрес доставки пуст, вместо него — куда ехать за заказом.
+    if (typedOrderData.delivery_method !== 'courier' && typedOrderData.pickup_point) {
+      const pp = typedOrderData.pickup_point
+      messageText += `*Пункт выдачи:* ${escapeMarkdown(pp.name)} — ${escapeMarkdown(pp.address)}\n`
+    }
 
     if (typedOrderData.delivery_method === 'courier' && typedOrderData.delivery_address) {
       const city = escapeMarkdown(typedOrderData.delivery_address.city)

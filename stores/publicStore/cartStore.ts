@@ -55,6 +55,12 @@ export const useCartStore = defineStore(
      * поэтому сохранённый выбор не протухает. Абсолютные значения считаются
      * ниже, в момент отправки заказа.
      */
+    /**
+     * Выбранный пункт самовывоза. Как и способ получения, живёт в корзине:
+     * его показывает локейшн-панель из layout, а выбирают на /checkout.
+     */
+    const pickupPointId = ref<string | null>(null)
+
     const deliveryDateIndex = ref(0)
     const deliverySlotIndex = ref(0)
 
@@ -539,6 +545,9 @@ export const useCartStore = defineStore(
             // Дату и слот шлём только для курьера: у самовывоза их нет.
             p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
             p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
+            // Пункт нужен только самовывозу; при курьере сервер его всё равно
+            // отбросит, но не шлём и отсюда — так понятнее в логах.
+            p_pickup_point_id: isCourierOrder ? null : pickupPointId.value,
           })
 
           if (error)
@@ -566,6 +575,7 @@ export const useCartStore = defineStore(
             p_comment: orderData.comment || null,
             p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
             p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
+            p_pickup_point_id: isCourierOrder ? null : pickupPointId.value,
           })
 
           if (error)
@@ -639,6 +649,7 @@ export const useCartStore = defineStore(
       subtotal,
       deliveryMethod,
       deliveryAddress,
+      pickupPointId,
       deliveryDateIndex,
       deliverySlotIndex,
       deliveryDateIso,
@@ -672,6 +683,7 @@ export const useCartStore = defineStore(
         'bonusesToSpend',
         'deliveryMethod',
         'deliveryAddress',
+        'pickupPointId',
         'deliveryDateIndex',
         'deliverySlotIndex',
         'lastOrder',

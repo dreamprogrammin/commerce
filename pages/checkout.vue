@@ -45,6 +45,7 @@ const {
   deliveryCost,
   deliveryDateIndex,
   deliverySlotIndex,
+  pickupPointId,
 } = storeToRefs(cartStore)
 
 const orderForm = ref({
@@ -173,9 +174,45 @@ const isCourier = computed(() => deliveryMethod.value === 'courier')
  * у SSR и у покупателя может отличаться, и подпись «Сегодня, 5 августа»
  * разъехалась бы при гидратации.
  */
+/**
+ * Пункты самовывоза. Список публичный — RLS отдаёт только опубликованные,
+ * поэтому отдельной фильтрации здесь не нужно.
+ */
+const pickupPoints = ref<{
+  id: string
+  name: string
+  address: string
+  working_hours: string | null
+  note: string | null
+}[]>([])
+
+async function loadPickupPoints() {
+  const { data, error } = await supabase
+    .from('pickup_points')
+    .select('id, name, address, working_hours, note')
+    .order('display_order', { ascending: true })
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('Не удалось загрузить пункты самовывоза:', error)
+    return
+  }
+
+  pickupPoints.value = (data ?? []) as typeof pickupPoints.value
+
+  // Сохранённый выбор мог указывать на снятый с публикации пункт — тогда
+  // сбрасываем, иначе покупатель оформил бы заказ на несуществующий адрес.
+  if (pickupPointId.value && !pickupPoints.value.some(p => p.id === pickupPointId.value))
+    pickupPointId.value = null
+
+  if (!pickupPointId.value && pickupPoints.value.length === 1)
+    pickupPointId.value = pickupPoints.value[0].id
+}
+
 const deliveryDates = ref(buildDeliveryDates())
 onMounted(() => {
   deliveryDates.value = buildDeliveryDates()
+  loadPickupPoints()
 })
 
 /**
@@ -241,6 +278,10 @@ const isFormValid = computed(() => {
 
   // Адрес для курьера
   if (isCourier.value && !deliveryAddress.value.line1.trim())
+    return false
+
+  // Самовывоз без выбранного пункта — только если их вообще нет в справочнике
+  if (!isCourier.value && pickupPoints.value.length > 0 && !pickupPointId.value)
     return false
 
   // Согласие с условиями
@@ -625,6 +666,40 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <span class="flex flex-col items-start leading-[1.25]">
                   <span class="text-sm font-bold">Самовывоз</span>
                   <span class="text-xs text-muted-foreground">бесплатно, сегодня</span>
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Пункт самовывоза -->
+          <section v-if="!isCourier && pickupPoints.length > 0">
+            <h2 class="mb-2.5 text-base font-extrabold">
+              Пункт самовывоза
+            </h2>
+            <div class="flex flex-col gap-2.5">
+              <button
+                v-for="point in pickupPoints"
+                :key="point.id"
+                type="button"
+                class="co-opt"
+                :class="{ 'co-opt--active': pickupPointId === point.id }"
+                @click="pickupPointId = point.id"
+              >
+                <span
+                  class="co-radio"
+                  :class="{ 'co-radio--active': pickupPointId === point.id }"
+                >
+                  <span v-if="pickupPointId === point.id" class="size-2.5 rounded-full bg-white" />
+                </span>
+                <span class="flex min-w-0 flex-1 flex-col gap-[3px] text-left">
+                  <span class="text-sm font-bold">{{ point.name }}</span>
+                  <span class="text-xs text-muted-foreground">{{ point.address }}</span>
+                  <span v-if="point.working_hours" class="text-xs text-muted-foreground">
+                    {{ point.working_hours }}
+                  </span>
+                  <span v-if="point.note" class="text-xs text-muted-foreground">
+                    {{ point.note }}
+                  </span>
                 </span>
               </button>
             </div>
