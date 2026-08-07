@@ -63,6 +63,7 @@ interface OrderRow {
   delivery_address: { city?: string, line1?: string } | null
   delivery_date: string | null
   delivery_slot: string | null
+  pickup_point: { name: string, address: string } | null
   bonuses_awarded: number
   order_items: OrderItemRow[]
 }
@@ -98,6 +99,7 @@ async function fetchOrder() {
         delivery_address,
         delivery_date,
         delivery_slot,
+        pickup_point:pickup_points(name, address),
         bonuses_awarded,
         order_items(
           *,
@@ -146,8 +148,10 @@ const orderDate = computed(() => {
 const fulfillLabel = computed(() => {
   if (!order.value)
     return ''
-  if (order.value.delivery_method !== 'courier')
-    return 'Самовывоз из магазина'
+  if (order.value.delivery_method !== 'courier') {
+    const pp = order.value.pickup_point
+    return pp ? `Самовывоз · ${pp.name}, ${pp.address}` : 'Самовывоз из магазина'
+  }
 
   const addr = order.value.delivery_address
   const place = [addr?.city, addr?.line1].filter(Boolean).join(', ')

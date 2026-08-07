@@ -46,6 +46,7 @@ const navLinks = [
   { to: '/admin/questions', label: 'Вопросы', badge: () => adminQuestionsStore.unansweredCount },
   { to: '/admin/reviews', label: 'Отзывы', badge: () => adminReviewsStore.unpublishedCount },
   { to: '/admin/suppliers', label: 'Поставщики' },
+  { to: '/admin/pickup-points', label: 'Пункты самовывоза' },
   { to: '/admin/restock', label: 'К закупке' },
   { to: '/admin/pos', label: 'Оффлайн касса' },
   { to: '/admin/returns', label: 'Возвраты' },
