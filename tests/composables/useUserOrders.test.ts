@@ -53,7 +53,7 @@ describe('useUserOrders', () => {
     mockRouter.push.mockClear()
 
     // ✅ Устанавливаем пользователя по умолчанию
-    global.useSupabaseUser = vi.fn(() => ({
+    globalThis.useSupabaseUser = vi.fn(() => ({
       value: { id: 'user-123', email: 'test@example.com' },
     }))
   })
@@ -97,7 +97,7 @@ describe('useUserOrders', () => {
 
     it('не должен загружать для неавторизованного пользователя', async () => {
       // ✅ Устанавливаем неавторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({ value: null }))
+      globalThis.useSupabaseUser = vi.fn(() => ({ value: null }))
 
       const { useUserOrders } = await import('@/composables/orders/useUserOrders')
       const { fetchOrders, orders } = useUserOrders()
@@ -124,7 +124,7 @@ describe('useUserOrders', () => {
 
     it('не должен создавать подписку для неавторизованного пользователя', async () => {
       // ✅ Устанавливаем неавторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({ value: null }))
+      globalThis.useSupabaseUser = vi.fn(() => ({ value: null }))
 
       const { useUserOrders } = await import('@/composables/orders/useUserOrders')
       const { subscribeToOrderUpdates } = useUserOrders()

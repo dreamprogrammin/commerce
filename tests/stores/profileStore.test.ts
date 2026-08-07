@@ -22,18 +22,21 @@ describe('profileStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
 
-    // ✅ Очищаем и пересоздаем моки с дефолтным поведением
-    mockQueryBuilder.select.mockClear().mockReturnThis()
-    mockQueryBuilder.eq.mockClear().mockReturnThis()
-    mockQueryBuilder.maybeSingle.mockClear().mockResolvedValue({ data: null, error: null })
-    mockQueryBuilder.single.mockClear().mockResolvedValue({ data: null, error: null })
-    mockQueryBuilder.update.mockClear().mockReturnThis()
-    mockSupabaseClient.from.mockClear()
+    // mockReset, а не mockClear: последний чистит историю вызовов, но
+    // оставляет очередь mockResolvedValueOnce. Непотреблённое значение из
+    // раннего теста доставалось позднему — отсюда «Иван Иванов» там, где
+    // ожидался email, и перевёрнутый isAdmin.
+    mockQueryBuilder.select.mockReset().mockReturnThis()
+    mockQueryBuilder.eq.mockReset().mockReturnThis()
+    mockQueryBuilder.maybeSingle.mockReset().mockResolvedValue({ data: null, error: null })
+    mockQueryBuilder.single.mockReset().mockResolvedValue({ data: null, error: null })
+    mockQueryBuilder.update.mockReset().mockReturnThis()
+    mockSupabaseClient.from.mockReset().mockReturnValue(mockQueryBuilder)
     mockToast.success.mockClear()
     mockToast.error.mockClear()
 
     // ✅ Устанавливаем пользователя по умолчанию
-    global.useSupabaseUser = vi.fn(() => ({
+    globalThis.useSupabaseUser = vi.fn(() => ({
       value: { id: 'user-123', email: 'test@example.com' },
     }))
   })
@@ -56,7 +59,7 @@ describe('profileStore', () => {
 
     it('должен вернуть false если пользователь не авторизован', async () => {
       // ✅ Устанавливаем неавторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({ value: null }))
+      globalThis.useSupabaseUser = vi.fn(() => ({ value: null }))
 
       const store = useProfileStore()
       const result = await store.loadProfile()
@@ -190,52 +193,57 @@ describe('profileStore', () => {
 
       expect(result).toBe(false)
       expect(store.profile).toBeNull()
-      // 1 основной запрос + 5 retries
-      expect(mockQueryBuilder.maybeSingle).toHaveBeenCalledTimes(6)
+      // 1 основной запрос + 5 повторов + 1 после ensure_profile_exists.
+      // Последний появился, когда в стор добавили RPC-фолбэк на создание
+      // профиля; тест про него не знал и ждал 6.
+      expect(mockQueryBuilder.maybeSingle).toHaveBeenCalledTimes(7)
     }, 10000) // увеличиваем timeout для теста
 
-    it('eDGE CASE: должен обработать таймаут при долгой загрузке', async () => {
+    /**
+     * Раньше здесь проверялся таймаут: тест ждал, что второй вызов бросит
+     * ожидание через 10 секунд и повторит запрос с force. Такой логики в
+     * сторе нет — единственный setTimeout там это задержка между повторами.
+     * Тест висел 12 секунд и падал.
+     *
+     * Проверяем то, что стор действительно делает: параллельные вызовы
+     * склеиваются в один запрос через loadingPromise.
+     */
+    it('склеивает параллельные вызовы в один запрос', async () => {
       const store = useProfileStore()
 
-      // Симулируем ОЧЕНЬ медленный запрос (12 секунд - больше таймаута)
-      mockQueryBuilder.maybeSingle
-        .mockImplementationOnce(
-          () =>
-            new Promise((resolve) => {
-              setTimeout(() => {
-                resolve({
-                  data: mockProfile,
-                  error: null,
-                })
-              }, 12000)
-            }),
-        )
-        // Второй запрос (после таймаута) должен пройти быстро
-        .mockResolvedValueOnce({
-          data: mockProfile,
-          error: null,
-        })
+      let resolveFetch: (v: unknown) => void = () => {}
+      mockQueryBuilder.maybeSingle.mockImplementationOnce(
+        () => new Promise((resolve) => { resolveFetch = resolve }),
+      )
 
-      // Первый вызов - начинает загрузку
-      const promise1 = store.loadProfile()
+      const first = store.loadProfile()
+      const second = store.loadProfile()
+      const third = store.loadProfile()
 
-      // Ждем немного
-      await new Promise(resolve => setTimeout(resolve, 100))
+      resolveFetch({ data: mockProfile, error: null })
+      const results = await Promise.all([first, second, third])
 
-      // Второй вызов - должен попытаться использовать первый промис
-      // но получит таймаут через 10 секунд, а затем retry с force=true
-      const promise2 = store.loadProfile()
-
-      // ✅ Второй промис теперь НЕ выбрасывает ошибку, а делает retry
-      const result2 = await promise2
-
-      expect(result2).toBe(true)
+      expect(results).toEqual([true, true, true])
       expect(store.profile).toEqual(mockProfile)
       expect(store.isLoading).toBe(false)
+      // Три вызова — один поход в базу.
+      expect(mockQueryBuilder.maybeSingle).toHaveBeenCalledTimes(1)
+    })
 
-      // Должно быть 2 запроса: первый зависший + retry после таймаута
+    it('force=true игнорирует и кеш, и текущую загрузку', async () => {
+      const store = useProfileStore()
+
+      mockQueryBuilder.maybeSingle
+        .mockResolvedValueOnce({ data: mockProfile, error: null })
+        .mockResolvedValueOnce({ data: { ...mockProfile, role: 'admin' }, error: null })
+
+      await store.loadProfile()
+      expect(store.isAdmin).toBe(false)
+
+      await store.loadProfile(true)
+      expect(store.isAdmin).toBe(true)
       expect(mockQueryBuilder.maybeSingle).toHaveBeenCalledTimes(2)
-    }, 15000)
+    })
   })
 
   describe('computed properties', () => {
@@ -360,7 +368,7 @@ describe('profileStore', () => {
 
     it('должен вернуть false если пользователь не авторизован', async () => {
       // ✅ Устанавливаем неавторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({ value: null }))
+      globalThis.useSupabaseUser = vi.fn(() => ({ value: null }))
 
       const store = useProfileStore()
       const result = await store.updateProfile({ first_name: 'Петр' })

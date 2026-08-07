@@ -223,7 +223,7 @@ describe('cartStore', () => {
 
     it('должен правильно вычислить bonusesToAward', async () => {
       // ✅ Устанавливаем авторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({
+      globalThis.useSupabaseUser = vi.fn(() => ({
         value: { id: 'user-123', email: 'test@example.com' },
       }))
 
@@ -405,7 +405,7 @@ describe('cartStore', () => {
   describe('clearCart', () => {
     it('должен очистить корзину и бонусы', async () => {
       // ✅ Устанавливаем авторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({
+      globalThis.useSupabaseUser = vi.fn(() => ({
         value: { id: 'user-123', email: 'test@example.com' },
       }))
 
