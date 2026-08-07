@@ -22,11 +22,11 @@
 
 ### Архитектура
 
-| Документ                                                 | Описание                                | Размер |
-| -------------------------------------------------------- | --------------------------------------- | ------ |
-| **[PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md)** | Полная техническая архитектура проекта  | 73 KB  |
-| **[OVERVIEW.md](./OVERVIEW.md)**                         | Бизнес-обзор и ключевые функции         | 28 KB  |
-| **[../CLAUDE.md](../CLAUDE.md)**                         | Инструкции для Claude AI при разработке | 13 KB  |
+| Документ                                                 | Описание                                      | Размер |
+| -------------------------------------------------------- | --------------------------------------------- | ------ |
+| **[PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md)** | Полная техническая архитектура проекта        | 73 KB  |
+| **[OVERVIEW.md](./OVERVIEW.md)**                         | Бизнес-обзор и ключевые функции               | 28 KB  |
+| **[../CLAUDE.md](../CLAUDE.md)**                         | Инструкции для Claude AI при разработке       | 13 KB  |
 | [CLAUDE_SETUP.md](./CLAUDE_SETUP.md)                     | Плагины и скиллы Claude Code для новой машины | 2 KB   |
 
 ---
@@ -94,18 +94,19 @@
 
 ### UI/UX компоненты
 
-| Документ                                                       | Описание                         | Статус       |
-| -------------------------------------------------------------- | -------------------------------- | ------------ |
-| [CHECKOUT_STEPPER.md](./CHECKOUT_STEPPER.md)                   | Stepper для checkout             | 🛒 Компонент |
-| [CHECKOUT_CONTACT_INFO.md](./CHECKOUT_CONTACT_INFO.md)         | Контактная информация в checkout | 📞 Компонент |
-| [CHECKOUT_REDESIGN_REPORT.md](./CHECKOUT_REDESIGN_REPORT.md)   | Редизайн checkout                | 🎨 Отчет     |
-| [SMART_SIDEBAR_REPORT.md](./SMART_SIDEBAR_REPORT.md)           | Умный сайдбар                    | 📊 Отчет     |
-| [SMART_CART_IMPLEMENTATION.md](./SMART_CART_IMPLEMENTATION.md) | Реализация умной корзины         | 🛒 Функция   |
-| [SMART_BUNDLE_REPORT.md](./SMART_BUNDLE_REPORT.md)             | Умные бандлы                     | 📦 Отчет     |
-| [CART_PERSISTENCE_REPORT.md](./CART_PERSISTENCE_REPORT.md)     | Персистентность корзины          | 💾 Отчет     |
-| [CART_SYNC_AUDIT_REPORT.md](./CART_SYNC_AUDIT_REPORT.md)       | Аудит синхронизации корзины      | 📊 Аудит     |
-| [MOBILE_STICKY_PANEL.md](./MOBILE_STICKY_PANEL.md)             | Sticky панель для мобильных      | 📱 Компонент |
-| [CONFETTI_FEATURE.md](./CONFETTI_FEATURE.md)                   | Конфетти эффект                  | 🎉 Функция   |
+| Документ                                                               | Описание                                                     | Статус       |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------ | ------------ |
+| [CHECKOUT_STEPPER.md](./CHECKOUT_STEPPER.md)                           | Stepper для checkout                                         | 🛒 Компонент |
+| [CHECKOUT_CONTACT_INFO.md](./CHECKOUT_CONTACT_INFO.md)                 | Контактная информация в checkout                             | 📞 Компонент |
+| [CHECKOUT_REDESIGN_REPORT.md](./CHECKOUT_REDESIGN_REPORT.md)           | Редизайн checkout                                            | 🎨 Отчет     |
+| [SMART_SIDEBAR_REPORT.md](./SMART_SIDEBAR_REPORT.md)                   | Умный сайдбар                                                | 📊 Отчет     |
+| [SMART_CART_IMPLEMENTATION.md](./SMART_CART_IMPLEMENTATION.md)         | Реализация умной корзины                                     | 🛒 Функция   |
+| [SMART_BUNDLE_REPORT.md](./SMART_BUNDLE_REPORT.md)                     | Умные бандлы                                                 | 📦 Отчет     |
+| [CART_PERSISTENCE_REPORT.md](./CART_PERSISTENCE_REPORT.md)             | Персистентность корзины                                      | 💾 Отчет     |
+| [CART_SYNC_AUDIT_REPORT.md](./CART_SYNC_AUDIT_REPORT.md)               | Аудит синхронизации корзины                                  | 📊 Аудит     |
+| [MOBILE_STICKY_PANEL.md](./MOBILE_STICKY_PANEL.md)                     | Sticky панель для мобильных                                  | 📱 Компонент |
+| [CONFETTI_FEATURE.md](./CONFETTI_FEATURE.md)                           | Конфетти эффект                                              | 🎉 Функция   |
+| [SCOPED_STYLES_TAILWIND_LAYERS.md](./SCOPED_STYLES_TAILWIND_LAYERS.md) | Scoped-стили глушат утилиты Tailwind: причина, скрипты, план | 🧩 Гайд      |
 
 ### Уведомления и интеграции
 
