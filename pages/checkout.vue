@@ -1096,231 +1096,245 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 </template>
 
 <style scoped>
-/* Поля ввода по макету: 48px, радиус 12, тонкая рамка. */
-.co-input {
-  width: 100%;
-  height: 48px;
-  padding: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  background: var(--background);
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-.co-input:focus-within,
-.co-input:focus {
-  border-color: var(--primary);
-}
-.co-input--error {
-  border-color: var(--destructive);
-}
+/* Стили этого файла лежат в @layer components намеренно.
 
-/* Строка-переключатель: «стекло» в покое, голубая заливка в выбранном
-   состоянии. Значения литералами, а не через var(--color-blue-*):
-   Tailwind 4 выкидывает переменную темы, если её не использует утилита. */
-/* gap не задаём здесь: пока он стоял, утилита gap-[11px] на кнопках способа
-   получения не работала (scoped-стиль идёт вне @layer и бьёт утилиты), и
-   вместо заложенных в макет 11px рисовались эти 13px. Расстояние теперь
-   указано классом на каждой кнопке. */
-.co-opt {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 14px;
-  border-radius: 18px;
-  cursor: pointer;
-  text-align: left;
-  border: 1px solid var(--border);
-  background: var(--background);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    0 1px 0 rgb(15 23 42 / 0.05);
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease,
-    border-color 0.15s ease;
-}
-.co-opt--active {
-  border-color: rgb(43 127 255 / 0.5);
-  background: linear-gradient(150deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55));
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
-    inset 0 -2px 6px rgb(6 53 138 / 0.09),
-    0 6px 16px rgb(43 127 255 / 0.16);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял утилиту на том же
+   элементе: так на этой странице умирали `hidden` и `lg:flex` у кнопки
+   «Оформить заказ» и `gap-[11px]` у кнопок способа получения.
 
-/* Пилюля даты — pill() из макета. Активная в том же синем градиенте, что и
-   кнопки-CTA, неактивная — белое «стекло», как .co-opt. */
-.co-pill {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  height: 46px;
-  padding: 0 20px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--foreground);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    0 1px 0 rgb(15 23 42 / 0.05);
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease;
-}
-.co-pill--active {
-  font-weight: 800;
-  color: #fff;
-  border-color: rgb(255 255 255 / 0.45);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 8px rgb(6 53 138 / 0.28),
-    0 8px 20px rgb(43 127 255 / 0.3);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок. */
 
-/* Карточка интервала — slotCard() из макета: та же «стеклянная» поверхность,
-   что у .co-opt, но колонкой и с меньшими отступами. */
-.co-slot {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-  padding: 13px 16px;
-  border-radius: 18px;
-  cursor: pointer;
-  text-align: left;
-  border: 1px solid var(--border);
-  background: var(--background);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    0 1px 0 rgb(15 23 42 / 0.05);
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease,
-    border-color 0.15s ease;
-}
-.co-slot--active {
-  border-color: rgb(43 127 255 / 0.5);
-  background: linear-gradient(150deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55));
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
-    inset 0 -2px 6px rgb(6 53 138 / 0.09),
-    0 6px 16px rgb(43 127 255 / 0.16);
-}
+@layer components {
+  /* Поля ввода по макету: 48px, радиус 12, тонкая рамка. */
+  .co-input {
+    width: 100%;
+    height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--background);
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .co-input:focus-within,
+  .co-input:focus {
+    border-color: var(--primary);
+  }
+  .co-input--error {
+    border-color: var(--destructive);
+  }
 
-.co-radio {
-  flex: none;
-  display: grid;
-  place-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1.5px solid var(--rating-empty);
-  background: var(--background);
-  box-shadow: inset 0 -1px 3px rgb(15 23 42 / 0.06);
-  transition: all 0.15s ease;
-}
-.co-radio--active {
-  border: 1px solid rgb(255 255 255 / 0.5);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    0 4px 10px rgb(43 127 255 / 0.32);
-}
+  /* Строка-переключатель: «стекло» в покое, голубая заливка в выбранном
+     состоянии. Значения литералами, а не через var(--color-blue-*):
+     Tailwind 4 выкидывает переменную темы, если её не использует утилита. */
+  /* gap не задаём здесь: пока он стоял, утилита gap-[11px] на кнопках способа
+     получения не работала (scoped-стиль идёт вне @layer и бьёт утилиты), и
+     вместо заложенных в макет 11px рисовались эти 13px. Расстояние теперь
+     указано классом на каждой кнопке. */
+  .co-opt {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 14px;
+    border-radius: 18px;
+    cursor: pointer;
+    text-align: left;
+    border: 1px solid var(--border);
+    background: var(--background);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      0 1px 0 rgb(15 23 42 / 0.05);
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .co-opt--active {
+    border-color: rgb(43 127 255 / 0.5);
+    background: linear-gradient(150deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55));
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+      inset 0 -2px 6px rgb(6 53 138 / 0.09),
+      0 6px 16px rgb(43 127 255 / 0.16);
+  }
 
-.co-check {
-  flex: none;
-  display: grid;
-  place-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  border: 2px solid var(--rating-empty);
-  background: var(--background);
-  transition: all 0.15s ease;
-}
-.co-check--active {
-  border-color: var(--primary);
-  background: var(--primary);
-}
+  /* Пилюля даты — pill() из макета. Активная в том же синем градиенте, что и
+     кнопки-CTA, неактивная — белое «стекло», как .co-opt. */
+  .co-pill {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    height: 46px;
+    padding: 0 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: var(--foreground);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      0 1px 0 rgb(15 23 42 / 0.05);
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .co-pill--active {
+    font-weight: 800;
+    color: #fff;
+    border-color: rgb(255 255 255 / 0.45);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 8px rgb(6 53 138 / 0.28),
+      0 8px 20px rgb(43 127 255 / 0.3);
+  }
 
-/* Только оформление, без раскладки. display/align здесь ломали бы утилиты:
-   scoped-стиль идёт вне @layer, а утилиты Tailwind — внутри utilities, и
-   беслойное правило бьёт слой независимо от специфичности. Из-за этого
-   `hidden`/`lg:flex` на кнопке «Оформить заказ» были мертвы. Раскладку задаём
-   классами на самой кнопке — как в .cart-cta на /cart. */
-.co-cta {
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(150deg, rgb(77 148 255), rgb(23 101 235));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 8px rgb(6 53 138 / 0.28),
-    0 8px 20px rgb(43 127 255 / 0.3);
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease;
-}
-.co-cta:hover:not(:disabled) {
-  background: linear-gradient(150deg, rgb(96 163 255), rgb(29 112 246));
-}
-/* То же, что у мобильной панели: недоступность — отдельной заливкой.
-   opacity поверх полупрозрачного градиента давала «стеклянную» кнопку. */
-.co-cta:disabled {
-  background: linear-gradient(150deg, rgb(148 163 184), rgb(100 116 139));
-  border-color: rgb(255 255 255 / 0.28);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.28),
-    0 6px 16px rgb(15 23 42 / 0.16);
-}
+  /* Карточка интервала — slotCard() из макета: та же «стеклянная» поверхность,
+     что у .co-opt, но колонкой и с меньшими отступами. */
+  .co-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 13px 16px;
+    border-radius: 18px;
+    cursor: pointer;
+    text-align: left;
+    border: 1px solid var(--border);
+    background: var(--background);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      0 1px 0 rgb(15 23 42 / 0.05);
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .co-slot--active {
+    border-color: rgb(43 127 255 / 0.5);
+    background: linear-gradient(150deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55));
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+      inset 0 -2px 6px rgb(6 53 138 / 0.09),
+      0 6px 16px rgb(43 127 255 / 0.16);
+  }
 
-/* Липкая панель. Базовая позиция — у нижнего края (когда навбар скрыт),
-   при видимом навбаре поднимаем на его высоту. */
-.co-mobile-cta {
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
-}
-.co-mobile-cta--above-nav {
-  transform: translateY(-68px);
-}
-.co-mobile-cta--at-bottom {
-  transform: translateY(0);
-}
+  .co-radio {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1.5px solid var(--rating-empty);
+    background: var(--background);
+    box-shadow: inset 0 -1px 3px rgb(15 23 42 / 0.06);
+    transition: all 0.15s ease;
+  }
+  .co-radio--active {
+    border: 1px solid rgb(255 255 255 / 0.5);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 4px 10px rgb(43 127 255 / 0.32);
+  }
 
-/* Заливка непрозрачная. Раньше был полупрозрачный градиент (0.92/0.9) плюс
-   backdrop-filter, а сверху утилита disabled:opacity-60 — и в состоянии
-   «форма не заполнена» кнопка светилась насквозь. Для гостя это состояние
-   первое, что видно на мобильном: имя, телефон и email пустые, isFormValid
-   false, кнопка disabled сразу при открытии страницы.
-   Поэтому: сплошной градиент, а недоступность показываем отдельной заливкой,
-   а не прозрачностью поверх прозрачного. */
-.co-mobile-cta__btn {
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(180deg, rgb(59 138 255), rgb(29 108 240));
-  box-shadow:
-    0 14px 34px rgb(43 127 255 / 0.36),
-    inset 0 1px 0 rgb(255 255 255 / 0.4);
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease;
-}
-.co-mobile-cta__btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgb(96 163 255), rgb(37 105 235));
-}
-.co-mobile-cta__btn:disabled {
-  background: linear-gradient(180deg, rgb(148 163 184), rgb(100 116 139));
-  border-color: rgb(255 255 255 / 0.28);
-  box-shadow:
-    0 10px 24px rgb(15 23 42 / 0.18),
-    inset 0 1px 0 rgb(255 255 255 / 0.28);
+  .co-check {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 2px solid var(--rating-empty);
+    background: var(--background);
+    transition: all 0.15s ease;
+  }
+  .co-check--active {
+    border-color: var(--primary);
+    background: var(--primary);
+  }
+
+  /* Только оформление, без раскладки. display/align здесь ломали бы утилиты:
+     scoped-стиль идёт вне @layer, а утилиты Tailwind — внутри utilities, и
+     беслойное правило бьёт слой независимо от специфичности. Из-за этого
+     `hidden`/`lg:flex` на кнопке «Оформить заказ» были мертвы. Раскладку задаём
+     классами на самой кнопке — как в .cart-cta на /cart. */
+  .co-cta {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(150deg, rgb(77 148 255), rgb(23 101 235));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 8px rgb(6 53 138 / 0.28),
+      0 8px 20px rgb(43 127 255 / 0.3);
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .co-cta:hover:not(:disabled) {
+    background: linear-gradient(150deg, rgb(96 163 255), rgb(29 112 246));
+  }
+  /* То же, что у мобильной панели: недоступность — отдельной заливкой.
+     opacity поверх полупрозрачного градиента давала «стеклянную» кнопку. */
+  .co-cta:disabled {
+    background: linear-gradient(150deg, rgb(148 163 184), rgb(100 116 139));
+    border-color: rgb(255 255 255 / 0.28);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.28),
+      0 6px 16px rgb(15 23 42 / 0.16);
+  }
+
+  /* Липкая панель. Базовая позиция — у нижнего края (когда навбар скрыт),
+     при видимом навбаре поднимаем на его высоту. */
+  .co-mobile-cta {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  }
+  .co-mobile-cta--above-nav {
+    transform: translateY(-68px);
+  }
+  .co-mobile-cta--at-bottom {
+    transform: translateY(0);
+  }
+
+  /* Заливка непрозрачная. Раньше был полупрозрачный градиент (0.92/0.9) плюс
+     backdrop-filter, а сверху утилита disabled:opacity-60 — и в состоянии
+     «форма не заполнена» кнопка светилась насквозь. Для гостя это состояние
+     первое, что видно на мобильном: имя, телефон и email пустые, isFormValid
+     false, кнопка disabled сразу при открытии страницы.
+     Поэтому: сплошной градиент, а недоступность показываем отдельной заливкой,
+     а не прозрачностью поверх прозрачного. */
+  .co-mobile-cta__btn {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(180deg, rgb(59 138 255), rgb(29 108 240));
+    box-shadow:
+      0 14px 34px rgb(43 127 255 / 0.36),
+      inset 0 1px 0 rgb(255 255 255 / 0.4);
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .co-mobile-cta__btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgb(96 163 255), rgb(37 105 235));
+  }
+  .co-mobile-cta__btn:disabled {
+    background: linear-gradient(180deg, rgb(148 163 184), rgb(100 116 139));
+    border-color: rgb(255 255 255 / 0.28);
+    box-shadow:
+      0 10px 24px rgb(15 23 42 / 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.28);
+  }
 }
 </style>
