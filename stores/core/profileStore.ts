@@ -12,6 +12,37 @@ export const useProfileStore = defineStore('profileStore', () => {
   // ✅ Добавляем флаг для предотвращения множественных загрузок
   let loadingPromise: Promise<boolean> | null = null
 
+  /**
+   * Потолок ожидания одного сетевого вызова.
+   *
+   * У fetch нет таймаута по умолчанию: если соединение зависнет, промис не
+   * разрешится никогда. Тогда loadingPromise не очистится, isLoading останется
+   * true, и все, кто ждал загрузку профиля, будут ждать вечно — на экране
+   * навсегда останется скелетон. Обрываем ожидание, чтобы управление дошло до
+   * catch и finally, которые уже умеют прибирать состояние.
+   */
+  const NETWORK_TIMEOUT_MS = 10_000
+
+  async function withTimeout<T>(work: PromiseLike<T>, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label}: превышено время ожидания (${NETWORK_TIMEOUT_MS} мс)`)),
+        NETWORK_TIMEOUT_MS,
+      )
+    })
+
+    try {
+      return await Promise.race([work, deadline])
+    }
+    finally {
+      // Снимаем таймер и в успешной ветке: иначе он держал бы процесс
+      // и на сервере, и в тестах.
+      clearTimeout(timer)
+    }
+  }
+
   // Computed свойства
   const bonusBalance = computed(() => profile.value?.active_bonus_balance ?? 0)
   const pendingBonuses = computed(() => profile.value?.pending_bonus_balance ?? 0)
@@ -62,7 +93,7 @@ export const useProfileStore = defineStore('profileStore', () => {
     // ✅ Создаем промис для текущей загрузки
     loadingPromise = (async () => {
       console.log('[ProfileStore] Starting profile load...')
-      
+
       // silent=true — фоновый refetch, не трогаем isLoading чтобы не мигал UI
       if (!silent)
         isLoading.value = true
@@ -70,12 +101,15 @@ export const useProfileStore = defineStore('profileStore', () => {
       try {
         // Пробуем загрузить профиль
         console.log('[ProfileStore] Fetching profile for user:', user.value!.id)
-        
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.value!.id)
-          .maybeSingle()
+
+        const { data, error } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.value!.id)
+            .maybeSingle(),
+          'загрузка профиля',
+        )
 
         if (error) {
           console.error('[ProfileStore] Profile loading error:', error)
@@ -113,11 +147,14 @@ export const useProfileStore = defineStore('profileStore', () => {
           console.log(`[ProfileStore] Retry attempt ${attempt + 1}/${maxAttempts}, waiting ${delays[attempt]}ms`)
           await new Promise(resolve => setTimeout(resolve, delays[attempt]))
 
-          const { data: retryData, error: retryError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.value!.id)
-            .maybeSingle()
+          const { data: retryData, error: retryError } = await withTimeout(
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.value!.id)
+              .maybeSingle(),
+            `загрузка профиля, попытка ${attempt + 1}`,
+          )
 
           if (retryError) {
             console.error('[ProfileStore] Profile retry error:', retryError)
@@ -135,16 +172,22 @@ export const useProfileStore = defineStore('profileStore', () => {
         console.warn('[ProfileStore] Profile not found after retries, calling ensure_profile_exists RPC...')
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: ensureError } = await (supabase as any).rpc('ensure_profile_exists')
+          const { error: ensureError } = await withTimeout(
+            (supabase as any).rpc('ensure_profile_exists'),
+            'создание профиля',
+          )
 
           if (!ensureError) {
             console.log('[ProfileStore] RPC ensure_profile_exists called successfully')
             // Re-fetch profile after RPC creation
-            const { data: newProfile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', user.value!.id)
-              .maybeSingle()
+            const { data: newProfile } = await withTimeout(
+              supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.value!.id)
+                .maybeSingle(),
+              'чтение профиля после создания',
+            )
 
             if (newProfile) {
               profile.value = newProfile
