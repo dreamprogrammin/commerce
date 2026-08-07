@@ -1,0 +1,210 @@
+# ============================================================================
+#  Миграции Supabase
+# ============================================================================
+#  ЗАЧЕМ. Схема прод-базы два месяца расходилась с репозиторием: миграцию
+#  20260522043812 применили руками через SQL-редактор дашборда, а файл не
+#  доехал в git. Этот же workflow на неё и упал 2026-05-30 — единственный раз,
+#  когда он вообще запускался: ветку main вскоре переименовали в master, и
+#  триггер перестал срабатывать вовсе.
+#
+#  Отсюда два задания:
+#    • «Сверить» — на каждый пуш в dev, без записи. Ловит расхождение в тот же
+#      день, а не через два месяца.
+#    • «Применить» — вручную, кнопкой Run workflow. Запись в боевую базу
+#      происходит только когда её попросили явно.
+#
+#  ПОЧЕМУ ТРИГГЕР ИМЕННО dev. Сайт uhti.kz крутит сборку с master, а база у
+#  master и у превью-сборок с dev — одна и та же, боевая. Значит миграция
+#  должна лечь на базу раньше, чем фронт до неё доедет мерджем dev → master.
+#  Повесить применение на master было бы ровно обратным порядком.
+#
+#  ЧТО НУЖНО В НАСТРОЙКАХ РЕПОЗИТОРИЯ (все три уже заведены):
+#    SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_ID, SUPABASE_DB_PASSWORD
+# ============================================================================
+
+name: Миграции Supabase
+
+on:
+  # Без paths-фильтра намеренно: расхождение появляется и когда SQL выполнили
+  # мимо git — тогда ни один файл в supabase/migrations не менялся, и фильтр
+  # такой пуш бы пропустил.
+  push:
+    branches: [dev]
+
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Впишите APPLY заглавными. Любое другое значение — запуск упадёт, не тронув базу.'
+        required: true
+        default: ''
+
+# Два применения одновременно оставили бы базу в неизвестном состоянии.
+# cancel-in-progress: false — прерывать db push на половине нельзя.
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+env:
+  # Версия закреплена намеренно. На latest поведение db push менялось между
+  # релизами, а это задание пишет в базу с живыми заказами: пусть обновление
+  # CLI будет отдельным осознанным коммитом, а не сюрпризом на выкатке.
+  SUPABASE_CLI_VERSION: 2.111.0
+
+jobs:
+  # --------------------------------------------------------------------------
+  #  Сверка. Ничего не пишет.
+  # --------------------------------------------------------------------------
+  check:
+    name: Сверить git с прод-базой
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Связаться с проектом
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+
+      - name: Сухой прогон
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          # Ненулевой код возврата здесь означает ровно одно: на проде есть
+          # версия, которой нет в git. Это и есть та поломка 2026-05-30.
+          if ! supabase db push --linked --dry-run --output-format json >dry.json 2>dry.log; then
+            echo "::error title=История миграций разошлась::На проде есть версия, которой нет в репозитории. Разбирать вручную: supabase migration list --linked"
+            cat dry.log
+            exit 1
+          fi
+
+          # ВАЖНО: код возврата 0 и когда применять нечего, и когда есть
+          # непримененные миграции. Проверено на CLI 2.111.0 — различать их
+          # можно только по полю upToDate.
+          RESULT=$(tail -n 1 dry.json)
+          # has(), а не `// "null"`: в jq оператор // подставляет альтернативу и
+          # для false тоже, поэтому честный upToDate:false читался бы как «поля нет».
+          UP_TO_DATE=$(printf '%s' "$RESULT" | jq -r 'if has("upToDate") then (.upToDate | tostring) else "нет-поля" end')
+          PENDING=$(printf '%s' "$RESULT" | jq -r '.migrations // [] | join("\n")')
+
+          # Файл без таймстампа CLI молча пропускает — так в репозитории уже
+          # лежал мёртвый add_kaspi_export.sql, который никогда бы не применился.
+          if grep -q 'Skipping migration' dry.log; then
+            echo "::warning title=Файл миграции пропущен::Имя не совпадает с <timestamp>_name.sql, поэтому CLI его игнорирует и на прод он не попадёт никогда."
+            grep 'Skipping migration' dry.log
+          fi
+
+          if [ "$UP_TO_DATE" = "true" ]; then
+            echo "База и репозиторий сходятся, применять нечего."
+            echo '### ✅ Прод-база сходится с репозиторием' >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$UP_TO_DATE" != "false" ]; then
+            echo "::error title=Не разобрать ответ CLI::В выводе db push нет поля upToDate — возможно, у CLI сменился формат вывода."
+            cat dry.json
+            exit 1
+          fi
+
+          echo "::error title=Есть непримененные миграции::В git лежат миграции, которых нет на проде. Применить: вкладка Actions → Миграции Supabase → Run workflow → APPLY"
+          {
+            echo '### ⚠️ Непримененные миграции'
+            echo
+            echo 'В репозитории есть миграции, которых нет на прод-базе:'
+            echo
+            printf '%s\n' "$PENDING" | sed 's/^/- `/; s/$/`/'
+            echo
+            echo 'Применить: **Actions → Миграции Supabase → Run workflow**, вписать `APPLY`.'
+          } >>"$GITHUB_STEP_SUMMARY"
+          exit 1
+
+  # --------------------------------------------------------------------------
+  #  Применение. Пишет в боевую базу.
+  # --------------------------------------------------------------------------
+  apply:
+    name: Применить миграции к прод-базе
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      # Отдельным шагом, а не условием на job: неверное подтверждение должно
+      # покраснеть, а не тихо «пропустить» задание с зелёной галочкой.
+      - name: Проверить подтверждение
+        env:
+          # Через env, а не подстановкой в текст скрипта: значение приходит из
+          # формы и в скрипт попадать не должно.
+          CONFIRM: ${{ inputs.confirm }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          # Пробелы по краям обрезаем — при копипасте в поле формы они липнут, а
+          # падение с необъяснимым «не подтверждено» тут ничего не защищает.
+          # Регистр остаётся строгим: подтверждение должно быть осознанным.
+          CONFIRM_TRIMMED=$(printf '%s' "$CONFIRM" | tr -d '[:space:]')
+          if [ "$CONFIRM_TRIMMED" != "APPLY" ]; then
+            echo "::error title=Не подтверждено::Чтобы применить миграции к боевой базе, в поле подтверждения нужно вписать APPLY заглавными."
+            exit 1
+          fi
+          echo "Подтверждено. Применяем миграции из ветки $REF_NAME."
+
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Связаться с проектом
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+
+      - name: Показать список перед применением
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          supabase db push --linked --dry-run --output-format json >dry.json 2>dry.log || {
+            echo "::error title=История миграций разошлась::Применять нельзя, пока на проде есть версия без файла в git."
+            cat dry.log
+            exit 1
+          }
+          RESULT=$(tail -n 1 dry.json)
+          {
+            echo '### Будет применено'
+            echo
+            printf '%s' "$RESULT" | jq -r '.migrations // [] | if length == 0 then "Нечего применять — база уже сходится с репозиторием." else map("- `" + . + "`") | join("\n") end'
+            echo
+            printf '_Ветка: `%s`, коммит `%s`_\n' "$REF_NAME" "$SHA"
+          } >>"$GITHUB_STEP_SUMMARY"
+          printf '%s' "$RESULT" | jq .
+
+      - name: Применить
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push --linked --yes
+
+      - name: Убедиться, что сошлось
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase db push --linked --dry-run --output-format json >after.json 2>after.log
+          UP_TO_DATE=$(tail -n 1 after.json | jq -r 'if has("upToDate") then (.upToDate | tostring) else "нет-поля" end')
+          if [ "$UP_TO_DATE" != "true" ]; then
+            echo "::error title=После применения база всё ещё расходится::Часть миграций не легла."
+            cat after.json after.log
+            exit 1
+          fi
+          echo '### ✅ Применено, база сходится с репозиторием' >>"$GITHUB_STEP_SUMMARY"
