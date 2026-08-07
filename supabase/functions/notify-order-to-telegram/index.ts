@@ -68,6 +68,8 @@ interface OrderData {
   comment: string | null
   delivery_date: string | null
   delivery_slot: string | null
+  promo_code: string | null
+  promo_discount: number | null
   profile: OrderProfile | null
   order_items: OrderItem[]
 }
@@ -87,6 +89,8 @@ interface GuestCheckoutData {
   comment: string | null
   delivery_date: string | null
   delivery_slot: string | null
+  promo_code: string | null
+  promo_discount: number | null
   guest_checkout_items: GuestCheckoutItem[]
 }
 
@@ -158,7 +162,7 @@ Deno.serve(async (req) => {
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, guest_name, guest_phone, guest_email, status, source, comment,
-          delivery_date, delivery_slot,
+          delivery_date, delivery_slot, promo_code, promo_discount,
           guest_checkout_items(
             quantity, 
             product_id,
@@ -201,6 +205,8 @@ Deno.serve(async (req) => {
           comment: guestData.comment,
           delivery_date: guestData.delivery_date,
           delivery_slot: guestData.delivery_slot,
+          promo_code: guestData.promo_code,
+          promo_discount: guestData.promo_discount,
           profile: null,
           order_items: guestData.guest_checkout_items.map(item => ({
             quantity: item.quantity,
@@ -220,6 +226,7 @@ Deno.serve(async (req) => {
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
           customer_name, customer_phone, comment, delivery_date, delivery_slot,
+          promo_code, promo_discount,
           order_items(
             quantity,
             product_id,
@@ -459,6 +466,12 @@ Deno.serve(async (req) => {
     })
 
     messageText += `*Итого:* ${typedOrderData.final_amount} ₸\n`
+
+    // Промокод показываем под итогом: иначе оператор видит сумму ниже
+    // стоимости позиций и не понимает почему.
+    if (typedOrderData.promo_code && Number(typedOrderData.promo_discount) > 0) {
+      messageText += `🏷 *Промокод* ${escapeMarkdown(typedOrderData.promo_code)}: −${typedOrderData.promo_discount} ₸\n`
+    }
     
     // Бонусы показываем ТОЛЬКО для зарегистрированных пользователей
     if (typedOrderData.user_id && tableName === 'orders') {
