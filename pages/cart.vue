@@ -712,7 +712,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             <div class="flex items-center gap-1">
               <div class="flex text-[22px] font-extrabold">
                 <template v-for="(char, index) in priceChars" :key="index">
-                  <span v-if="char.char === ' '" class="w-1.5" />
+                  <span v-if="char.char === ' '" class="w-1.5 shrink-0" />
                   <div
                     v-else-if="char.isDigit"
                     :ref="(el) => { if (el) digitColumns[char.digitIndex] = el as HTMLElement }"
@@ -794,7 +794,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <span class="flex flex-col items-end leading-[1.12]">
             <b class="flex items-center text-[17px] font-extrabold">
               <template v-for="(char, index) in priceChars" :key="`mobile-${index}`">
-                <span v-if="char.char === ' '" class="w-1" />
+                <span v-if="char.char === ' '" class="w-1 shrink-0" />
                 <span
                   v-else-if="char.isDigit"
                   :ref="(el) => { if (el) mobileDigitColumns[char.digitIndex] = el as HTMLElement }"
@@ -926,9 +926,15 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 }
 
 /* Flip counter styles */
+/* flex-shrink: 0 обязателен. Колонка лежит во флекс-контейнере (в сайдбаре
+   это .flex у обёртки цены, в мобильной панели — <b class="flex">), а у
+   флекс-элементов по умолчанию flex-shrink: 1. При длинной сумме на узком
+   экране колонки сжимались, и цифры подрезало по бокам: у колонки
+   overflow: hidden. Ширина 0.65em здесь — не пожелание, а размер барабана. */
 .digit-column {
   position: relative;
   display: inline-block;
+  flex-shrink: 0;
   width: 0.65em;
   height: 1.5em;
   overflow: hidden;

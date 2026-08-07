@@ -1814,6 +1814,7 @@ watchEffect(() => {
 }
 
 .pdp-digit-gap {
+  flex-shrink: 0;
   width: 8px;
 }
 
@@ -1823,8 +1824,11 @@ watchEffect(() => {
 
 /* Барабан одной цифры. clientHeight колонки = шаг прокрутки ленты,
    поэтому высота колонки и высота .digit-item обязаны совпадать. */
+/* flex-shrink: 0 обязателен: .pdp-price-reels — inline-flex, а у колонки
+   overflow: hidden, и при сжатии цифры подрезало бы по бокам. */
 .digit-column {
   position: relative;
+  flex-shrink: 0;
   height: 34px;
   line-height: 34px;
   width: 17px;
