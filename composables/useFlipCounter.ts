@@ -1,6 +1,26 @@
 import type { Ref } from 'vue'
 import { gsap } from 'gsap'
 
+/** Барабан всегда собран из десяти цифр — см. `v-for="d in 10"` в разметке. */
+const ROWS_IN_RIBBON = 10
+
+/**
+ * Сдвиг барабана в процентах его собственной высоты.
+ *
+ * В пикселях это считать нельзя. Строка цифры равна 1.5em, и в мобильной
+ * панели корзины (17px) она даёт дробные 25.5px, а `clientHeight` по
+ * спецификации округляется до целого — 26. Ошибка в 0.5px копилась на каждую
+ * цифру: девятка промахивалась на 4.5px, и барабан вставал между строк —
+ * цифры «плыли». В сайдбаре шрифт 22px, 1.5em = 33px ровно, поэтому там баг
+ * не проявлялся.
+ *
+ * Проценты берутся от высоты самого барабана, поэтому шаг в одну цифру —
+ * всегда ровно 100/10, независимо от дробности пикселей.
+ */
+function ribbonOffsetPercent(digit: string): number {
+  return -Number.parseInt(digit, 10) * (100 / ROWS_IN_RIBBON)
+}
+
 export function useFlipCounter(
   source: Ref<number>,
   columnsRef: Ref<HTMLElement[]>,
@@ -26,15 +46,16 @@ export function useFlipCounter(
       if (!ribbon)
         return
 
-      const digitHeight = column.clientHeight
-      if (digitHeight === 0)
+      // clientHeight здесь — только признак того, что колонка отрисована
+      // (в скрытой колонке он 0), но не мера сдвига.
+      if (column.clientHeight === 0)
         return
 
-      const targetY = -Number.parseInt(digit, 10) * digitHeight
+      const targetY = ribbonOffsetPercent(digit)
 
       if (animate) {
         gsap.to(ribbon, {
-          y: targetY,
+          yPercent: targetY,
           duration: 0.8 + (index * 0.08),
           ease: 'power3.out',
           overwrite: true,
@@ -50,7 +71,9 @@ export function useFlipCounter(
         })
       }
       else {
-        gsap.set(ribbon, { y: targetY })
+        // y: 0 — на случай, если на барабане остался пиксельный сдвиг:
+        // GSAP складывает y и yPercent, и остаток сместил бы всю ленту.
+        gsap.set(ribbon, { y: 0, yPercent: targetY })
       }
     })
   }
@@ -119,14 +142,13 @@ export function useFlipCounter(
           if (!ribbon)
             return
 
-          const digitHeight = column.clientHeight
-          if (digitHeight === 0)
+          if (column.clientHeight === 0)
             return
 
-          const targetY = -Number.parseInt(digit, 10) * digitHeight
+          const targetY = ribbonOffsetPercent(digit)
 
           gsap.to(ribbon, {
-            y: targetY,
+            yPercent: targetY,
             duration: 0.8 + (index * 0.08),
             ease: 'power3.out',
             overwrite: true,
