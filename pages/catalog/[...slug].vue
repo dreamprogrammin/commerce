@@ -1947,7 +1947,7 @@ else {
               <PopoverTrigger as-child>
                 <button
                   type="button"
-                  class="cf-glass-btn"
+                  class="cf-glass-btn inline-flex"
                   :class="{
                     'cf-glass-btn--active': activeFilters.sortBy !== 'popularity',
                   }"
@@ -1986,7 +1986,7 @@ else {
               <PopoverTrigger as-child>
                 <button
                   type="button"
-                  class="cf-glass-btn"
+                  class="cf-glass-btn inline-flex"
                   :class="{ 'cf-glass-btn--active': activeFilters.brandIds.length > 0 }"
                 >
                   Бренды
@@ -2067,7 +2067,7 @@ else {
                 <div v-if="hasMore" class="text-center">
                   <button
                     type="button"
-                    class="cf-glass-btn cf-glass-btn--lg"
+                    class="cf-glass-btn cf-glass-btn--lg inline-flex"
                     :disabled="isFetching"
                     @click="loadMoreProducts"
                   >
@@ -2116,7 +2116,7 @@ else {
                 <button
                   v-if="hasActiveFilters"
                   type="button"
-                  class="cf-glass-btn cf-glass-btn--primary mt-5"
+                  class="cf-glass-btn cf-glass-btn--primary mt-5 inline-flex"
                   @click="resetAllFilters"
                 >
                   <Icon name="lucide:x" class="w-4 h-4" />
@@ -2223,8 +2223,13 @@ else {
 }
 
 /* ─── Стеклянные пилюли из Категория.dc.html (панель управления, чипсы, "Наверх") ─── */
+/* display здесь задавать нельзя: scoped-стиль компилируется вне @layer, а
+   утилиты Tailwind лежат в @layer utilities, и беслойное правило бьёт слой
+   независимо от специфичности. Пока тут стоял display: inline-flex, классы
+   `hidden` и `lg:inline-flex` на кнопках атрибутных фильтров не работали
+   вовсе, и кнопки для десктопа были видны на мобильном. Раскладку задаём
+   утилитами на самой кнопке. */
 .cf-glass-btn {
-  display: inline-flex;
   align-items: center;
   gap: 8px;
   height: 42px;

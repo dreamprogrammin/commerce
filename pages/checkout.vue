@@ -681,7 +681,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 v-for="point in pickupPoints"
                 :key="point.id"
                 type="button"
-                class="co-opt"
+                class="co-opt gap-[13px]"
                 :class="{ 'co-opt--active': pickupPointId === point.id }"
                 @click="pickupPointId = point.id"
               >
@@ -797,7 +797,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 v-for="pm in PAYMENT_METHODS"
                 :key="pm.key"
                 type="button"
-                class="co-opt"
+                class="co-opt gap-[13px]"
                 :class="{ 'co-opt--active': orderForm.paymentMethod === pm.key }"
                 @click="orderForm.paymentMethod = pm.key"
               >
@@ -1120,10 +1120,13 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 /* Строка-переключатель: «стекло» в покое, голубая заливка в выбранном
    состоянии. Значения литералами, а не через var(--color-blue-*):
    Tailwind 4 выкидывает переменную темы, если её не использует утилита. */
+/* gap не задаём здесь: пока он стоял, утилита gap-[11px] на кнопках способа
+   получения не работала (scoped-стиль идёт вне @layer и бьёт утилиты), и
+   вместо заложенных в макет 11px рисовались эти 13px. Расстояние теперь
+   указано классом на каждой кнопке. */
 .co-opt {
   display: flex;
   align-items: center;
-  gap: 13px;
   width: 100%;
   padding: 14px;
   border-radius: 18px;
