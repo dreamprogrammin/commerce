@@ -16,6 +16,8 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+// Цена берётся из заказа, а не из товара: товар мог подорожать после покупки.
+import { orderItemUnitPrice } from '@/utils/orderItems'
 
 const route = useRoute()
 const router = useRouter()
@@ -67,8 +69,7 @@ async function fetchOrder() {
         bonuses_spent,
         bonuses_awarded,
         order_items(
-          id,
-          quantity,
+          *,
           product:products(
             id,
             name,
@@ -314,10 +315,12 @@ useHead({
     <div v-else-if="order" class="space-y-6">
       <!-- ✅ Lottie Animation Tracker -->
       <Card>
-        <CardContent class="p-0">
-          <OrderTrackerLottie
-            :status="order.status as 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'"
-          />
+        <!-- Полоса прогресса переехала из OrderTrackerLottie в отдельный
+             компонент, поэтому собираем блок здесь; отступы тоже перешли
+             к обёртке, раньше их приносил сам трекер. -->
+        <CardContent class="flex flex-col items-center gap-6 py-8">
+          <OrderTrackerLottie :status="order.status" />
+          <OrderProgressBar :status="order.status" class="max-w-md" />
         </CardContent>
       </Card>
 
@@ -489,7 +492,7 @@ useHead({
                 <p class="text-sm text-muted-foreground">
                   {{
                     (
-                      item.product.final_price || item.product.price
+                      orderItemUnitPrice(item)
                     ).toLocaleString("ru-RU")
                   }}
                   ₸ × {{ item.quantity }}
@@ -525,8 +528,7 @@ useHead({
                 <p class="font-semibold">
                   {{
                     (
-                      (item.product.final_price || item.product.price)
-                      * item.quantity
+                      orderItemUnitPrice(item) * item.quantity
                     ).toLocaleString("ru-RU")
                   }}
                   ₸

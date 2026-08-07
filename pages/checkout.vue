@@ -10,6 +10,11 @@ import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { usePromoCodeStore } from '@/stores/publicStore/promoCodeStore'
+import {
+  buildDeliveryDates,
+  DELIVERY_SLOT_DURATION,
+  DELIVERY_SLOTS,
+} from '@/utils/deliverySlots'
 import { formatPrice } from '@/utils/formatPrice'
 
 definePageMeta({ layout: 'checkout' })
@@ -38,6 +43,8 @@ const {
   bonusesToAward,
   deliveryMethod,
   deliveryCost,
+  deliveryDateIndex,
+  deliverySlotIndex,
 } = storeToRefs(cartStore)
 
 const orderForm = ref({
@@ -160,6 +167,16 @@ const phoneErrorMessage = computed(() => {
 // Способ получения и стоимость доставки живут в cartStore — то же значение
 // видит /cart, поэтому «Итого» на двух шагах больше не расходится.
 const isCourier = computed(() => deliveryMethod.value === 'courier')
+
+/**
+ * Даты пересобираем на клиенте после монтирования, а не на сервере: «сегодня»
+ * у SSR и у покупателя может отличаться, и подпись «Сегодня, 5 августа»
+ * разъехалась бы при гидратации.
+ */
+const deliveryDates = ref(buildDeliveryDates())
+onMounted(() => {
+  deliveryDates.value = buildDeliveryDates()
+})
 
 /**
  * Бонусы за заказ без привязки к авторизации — как potentialBonuses в
@@ -648,6 +665,53 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 >
               </div>
             </div>
+
+            <!-- Дата -->
+            <div>
+              <h2 class="mb-2.5 text-base font-extrabold">
+                Дата
+              </h2>
+              <div class="flex flex-wrap gap-2.5">
+                <button
+                  v-for="(date, index) in deliveryDates"
+                  :key="date.iso"
+                  type="button"
+                  class="co-pill"
+                  :class="{ 'co-pill--active': deliveryDateIndex === index }"
+                  @click="deliveryDateIndex = index"
+                >
+                  {{ date.label }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Время -->
+            <div>
+              <h2 class="mb-2.5 text-base font-extrabold">
+                Время
+              </h2>
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
+                <button
+                  v-for="(slot, index) in DELIVERY_SLOTS"
+                  :key="slot"
+                  type="button"
+                  class="co-slot"
+                  :class="{ 'co-slot--active': deliverySlotIndex === index }"
+                  @click="deliverySlotIndex = index"
+                >
+                  <span class="inline-flex items-center gap-[5px] text-xs font-medium text-muted-foreground">
+                    <Icon
+                      name="lucide:clock"
+                      class="size-[13px]"
+                      :class="deliverySlotIndex === index ? 'text-primary' : 'text-muted-foreground'"
+                    />
+                    {{ DELIVERY_SLOT_DURATION }}
+                  </span>
+                  <span class="text-[15px] font-bold">{{ slot }}</span>
+                  <span class="text-xs font-medium text-success">Бесплатно</span>
+                </button>
+              </div>
+            </div>
           </section>
 
           <!-- Способ оплаты -->
@@ -1004,6 +1068,71 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
     border-color 0.15s ease;
 }
 .co-opt--active {
+  border-color: rgb(43 127 255 / 0.5);
+  background: linear-gradient(150deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55));
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+    inset 0 -2px 6px rgb(6 53 138 / 0.09),
+    0 6px 16px rgb(43 127 255 / 0.16);
+}
+
+/* Пилюля даты — pill() из макета. Активная в том же синем градиенте, что и
+   кнопки-CTA, неактивная — белое «стекло», как .co-opt. */
+.co-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+    inset 0 -2px 4px rgb(15 23 42 / 0.07),
+    0 1px 0 rgb(15 23 42 / 0.05);
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.co-pill--active {
+  font-weight: 800;
+  color: #fff;
+  border-color: rgb(255 255 255 / 0.45);
+  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    inset 0 -2px 8px rgb(6 53 138 / 0.28),
+    0 8px 20px rgb(43 127 255 / 0.3);
+}
+
+/* Карточка интервала — slotCard() из макета: та же «стеклянная» поверхность,
+   что у .co-opt, но колонкой и с меньшими отступами. */
+.co-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 13px 16px;
+  border-radius: 18px;
+  cursor: pointer;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--background);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+    inset 0 -2px 4px rgb(15 23 42 / 0.07),
+    0 1px 0 rgb(15 23 42 / 0.05);
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.co-slot--active {
   border-color: rgb(43 127 255 / 0.5);
   background: linear-gradient(150deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55));
   box-shadow:

@@ -301,6 +301,107 @@ describe('cartStore', () => {
     })
   })
 
+  /**
+   * Комментарий к адресу («подъезд, этаж, домофон») форма собирала и раньше,
+   * но checkout() его не передавал — поле молча терялось между страницей и
+   * RPC. Тест держит именно это звено: колонка и вывод в Telegram давно были.
+   */
+  describe('checkout: комментарий к адресу', () => {
+    // Тест bonusesToAward выше подменяет useSupabaseUser на залогиненного и
+    // назад не возвращает, поэтому гостя объявляем сами, а не полагаемся на
+    // порядок выполнения: иначе checkout уходит в ветку create_user_order.
+    beforeEach(() => {
+      globalThis.useSupabaseUser = () => ({ value: null })
+    })
+
+    function guestOrder(comment?: string) {
+      return {
+        deliveryMethod: 'courier' as const,
+        paymentMethod: 'kaspi',
+        deliveryAddress: { city: 'Алматы', line1: 'Абая 150' },
+        guestInfo: {
+          name: 'Проба',
+          email: 'probe@test.local',
+          phone: '+77770000000',
+        },
+        deliveryCost: 1000,
+        comment,
+      }
+    }
+
+    function guestRpcParams() {
+      const call = mockSupabaseClient.rpc.mock.calls.find(
+        ([name]) => name === 'create_guest_checkout',
+      )
+      expect(call, 'create_guest_checkout не вызывался').toBeDefined()
+      return call![1]
+    }
+
+    async function fillCart(store: ReturnType<typeof useCartStore>) {
+      mockQueryBuilder.single.mockResolvedValueOnce({
+        data: mockProduct,
+        error: null,
+      })
+      await store.addItem('product-1', 1)
+    }
+
+    it('доносит комментарий до create_guest_checkout', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      await store.checkout(guestOrder('подъезд 2, этаж 5, домофон 1234'))
+
+      expect(guestRpcParams().p_comment).toBe('подъезд 2, этаж 5, домофон 1234')
+    })
+
+    it('без комментария шлёт null, а не undefined', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      await store.checkout(guestOrder())
+
+      // undefined в теле запроса PostgREST означает «параметр не передан»,
+      // и функция подставила бы DEFAULT — совпадает по результату, но null
+      // выражает намерение явно и переживёт смену дефолта.
+      expect(guestRpcParams().p_comment).toBeNull()
+    })
+
+    it('шлёт желаемые дату и интервал при курьерской доставке', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      store.deliveryDateIndex = 1
+      store.deliverySlotIndex = 2
+
+      await store.checkout(guestOrder())
+
+      const params = guestRpcParams()
+      // Индекс 1 — «завтра»: дата считается от сегодняшней, а не берётся
+      // из хранилища, поэтому сохранённый выбор не может оказаться в прошлом.
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+
+      expect(params.p_delivery_date).toBe(iso)
+      expect(params.p_delivery_slot).toBe('16:00–18:00')
+    })
+
+    it('не шлёт дату и интервал при самовывозе', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      await store.checkout({ ...guestOrder(), deliveryMethod: 'pickup' })
+
+      const params = guestRpcParams()
+      expect(params.p_delivery_date).toBeNull()
+      expect(params.p_delivery_slot).toBeNull()
+    })
+  })
+
   describe('clearCart', () => {
     it('должен очистить корзину и бонусы', async () => {
       // ✅ Устанавливаем авторизованного пользователя

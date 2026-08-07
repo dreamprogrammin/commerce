@@ -66,6 +66,8 @@ interface OrderData {
   customer_name: string | null
   customer_phone: string | null
   comment: string | null
+  delivery_date: string | null
+  delivery_slot: string | null
   profile: OrderProfile | null
   order_items: OrderItem[]
 }
@@ -83,6 +85,8 @@ interface GuestCheckoutData {
   status: string
   source: 'online' | 'offline' | null
   comment: string | null
+  delivery_date: string | null
+  delivery_slot: string | null
   guest_checkout_items: GuestCheckoutItem[]
 }
 
@@ -154,6 +158,7 @@ Deno.serve(async (req) => {
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, guest_name, guest_phone, guest_email, status, source, comment,
+          delivery_date, delivery_slot,
           guest_checkout_items(
             quantity, 
             product_id,
@@ -194,6 +199,8 @@ Deno.serve(async (req) => {
           bonuses_awarded: 0, // У гостей нет бонусов
           bonuses_spent: 0,   // У гостей нет бонусов
           comment: guestData.comment,
+          delivery_date: guestData.delivery_date,
+          delivery_slot: guestData.delivery_slot,
           profile: null,
           order_items: guestData.guest_checkout_items.map(item => ({
             quantity: item.quantity,
@@ -212,7 +219,7 @@ Deno.serve(async (req) => {
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
-          customer_name, customer_phone, comment,
+          customer_name, customer_phone, comment, delivery_date, delivery_slot,
           order_items(
             quantity,
             product_id,
@@ -379,6 +386,16 @@ Deno.serve(async (req) => {
       timeZone: 'Asia/Almaty'
     })
 
+    // Желаемая дата приходит из колонки DATE — как «2026-08-07», без времени.
+    // Разбираем строку сами, а не через Date: календарной дате незачем зависеть
+    // от часового пояса. Date разберёт её как полночь UTC, и при показе в зоне
+    // с отрицательным смещением получился бы предыдущий день; для Алматы (+05)
+    // сейчас совпадает, но это совпадение, а не гарантия.
+    const formatDeliveryDate = (isoDate: string): string => {
+      const [year, month, day] = isoDate.split('-')
+      return day && month && year ? `${day}.${month}.${year}` : isoDate
+    }
+
     // Собираем информацию о товарах с изображениями
     const productsWithImages: Array<{
       text: string
@@ -460,6 +477,20 @@ Deno.serve(async (req) => {
       const city = escapeMarkdown(typedOrderData.delivery_address.city)
       const line1 = escapeMarkdown(typedOrderData.delivery_address.line1)
       messageText += `*Адрес:* ${city}, ${line1}\n`
+    }
+
+    // Желаемое время — прямо под адресом: оператору оно нужно раньше
+    // комментария, по нему планируется маршрут курьера. Дата и интервал
+    // независимы: покупатель мог выбрать только одно из двух.
+    const desiredWhen = [
+      typedOrderData.delivery_date
+        ? formatDeliveryDate(typedOrderData.delivery_date)
+        : null,
+      typedOrderData.delivery_slot,
+    ].filter(Boolean).join(', ')
+
+    if (desiredWhen) {
+      messageText += `*Желаемое время:* ${escapeMarkdown(desiredWhen)}\n`
     }
 
     if (typedOrderData.comment) {

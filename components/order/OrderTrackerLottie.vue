@@ -1,87 +1,61 @@
 <script setup lang="ts">
 import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
+import { orderStatusInfo } from '@/utils/orderStatus'
 
-type OrderStatus = 'new' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
-
+/**
+ * Анимированный герой страницы успеха.
+ *
+ * В макете (OrderSuccess.dc.html) на этом месте стоит картинка
+ * assets/images/order-success.png с подписью «Заказ принят» — но это
+ * стоп-кадр: экспорт прототипа не умеет анимации. На каждый статус заказа
+ * своя .lottie, и подпись с описанием меняются вместе с ней. Ту самую
+ * картинку из макета используем как постер до гидратации.
+ */
 const props = defineProps<{
-  status: OrderStatus
+  status: string
 }>()
 
-const BASE_URL = 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/animations/'
-
-const STEPS: OrderStatus[] = ['new', 'confirmed', 'processing', 'shipped', 'delivered']
-
-const isCancelled = computed(() => props.status === 'cancelled')
-
-const animationSrc = computed(() => {
-  if (props.status === 'confirmed')
-    return `${BASE_URL}Success.lottie`
-  if (props.status === 'processing')
-    return `${BASE_URL}box.lottie`
-  if (props.status === 'shipped')
-    return `${BASE_URL}delivery-truck.lottie`
-  if (props.status === 'delivered')
-    return `${BASE_URL}delivery.lottie`
-  return `${BASE_URL}Order.lottie`
-})
-
-const statusInfo: Record<OrderStatus, { title: string, description: string }> = {
-  new: { title: 'Заказ принят', description: 'Мы получили ваш заказ и начинаем его обработку' },
-  confirmed: { title: 'Заказ подтверждён', description: 'Заказ подтверждён и готовится к отправке' },
-  processing: { title: 'Заказ комплектуется', description: 'Собираем ваш заказ и передаём курьеру' },
-  shipped: { title: 'Заказ в пути', description: 'Курьер уже мчит к вам!' },
-  delivered: { title: 'Заказ доставлен', description: 'Заказ успешно доставлен' },
-  cancelled: { title: 'Заказ отменён', description: 'Заказ был отменён' },
-}
-
-const progressSteps = computed(() => {
-  if (isCancelled.value)
-    return STEPS.map(() => false)
-  const idx = STEPS.indexOf(props.status)
-  return STEPS.map((_, i) => i <= idx)
-})
+const info = computed(() => orderStatusInfo(props.status))
 </script>
 
 <template>
-  <div class="flex flex-col items-center space-y-6 py-8">
+  <div class="flex flex-col items-center gap-[9px]">
     <ClientOnly>
       <DotLottieVue
-        :src="animationSrc"
+        :key="info.animation"
+        :src="info.animation"
         :autoplay="true"
         :loop="true"
         :speed="1"
-        style="width: 250px; height: 250px;"
+        class="otl-art"
       />
       <template #fallback>
-        <div class="w-[250px] h-[250px] bg-muted animate-pulse rounded-full" />
+        <!-- Стоп-кадр из макета: на сервере и до гидратации место занято
+             картинкой того же размера, поэтому вёрстка не прыгает. -->
+        <img
+          src="/images/order-success.png"
+          alt=""
+          class="otl-art"
+        >
       </template>
     </ClientOnly>
 
-    <div class="text-center space-y-2">
-      <h3 class="text-2xl font-bold text-foreground">
-        {{ statusInfo[status].title }}
-      </h3>
-      <p class="text-muted-foreground">
-        {{ statusInfo[status].description }}
-      </p>
-    </div>
-
-    <div class="w-full max-w-md">
-      <div class="flex items-center gap-2">
-        <div
-          v-for="(isActive, index) in progressSteps"
-          :key="index"
-          class="flex-1 h-2 rounded-full transition-colors duration-300"
-          :class="isCancelled ? 'bg-destructive/20' : isActive ? 'bg-primary' : 'bg-muted'"
-        />
-      </div>
-      <div v-if="!isCancelled" class="flex justify-between mt-2 text-xs text-muted-foreground">
-        <span>Принят</span>
-        <span>Подтверждён</span>
-        <span>Комплектуется</span>
-        <span>В пути</span>
-        <span>Доставлен</span>
-      </div>
-    </div>
+    <span class="text-[22px] font-extrabold leading-[1.3] tracking-[-0.02em]">
+      {{ info.title }}
+    </span>
+    <span class="-mt-1 text-center text-[15px] leading-[1.5] text-muted-foreground">
+      {{ info.description }}
+    </span>
   </div>
 </template>
+
+<style scoped>
+/* Размер из макета: 200px, но не шире 60% карточки на узких экранах. */
+.otl-art {
+  width: 200px;
+  max-width: 60%;
+  height: auto;
+  aspect-ratio: 1;
+  margin-bottom: -2px;
+}
+</style>
