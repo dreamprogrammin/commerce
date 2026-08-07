@@ -4,13 +4,13 @@ import { vi } from 'vitest'
 import { computed, onMounted, onUnmounted, ref, toRaw, watch } from 'vue'
 
 // Make Pinia and Vue composables available globally (Nuxt auto-imports)
-global.defineStore = defineStore
-global.ref = ref
-global.computed = computed
-global.toRaw = toRaw
-global.watch = watch
-global.onMounted = onMounted
-global.onUnmounted = onUnmounted
+globalThis.defineStore = defineStore
+globalThis.ref = ref
+globalThis.computed = computed
+globalThis.toRaw = toRaw
+globalThis.watch = watch
+globalThis.onMounted = onMounted
+globalThis.onUnmounted = onUnmounted
 
 // ✅ Создаем фабрику query builder для правильной работы моков
 function createMockQueryBuilder() {
@@ -73,11 +73,11 @@ const mockToast = {
 }
 
 // Make Nuxt composables available globally
-global.useSupabaseClient = () => mockSupabaseClient
-global.useSupabaseUser = () => ({ value: null })
-global.useRouter = () => mockRouter
-global.navigateTo = vi.fn()
-global.toast = mockToast
+globalThis.useSupabaseClient = () => mockSupabaseClient
+globalThis.useSupabaseUser = () => ({ value: null })
+globalThis.useRouter = () => mockRouter
+globalThis.navigateTo = vi.fn()
+globalThis.toast = mockToast
 
 /**
  * Автоимпорт из pinia-plugin-persistedstate/nuxt. Стор объявляет
@@ -86,7 +86,7 @@ global.toast = mockToast
  * без заглушки файл теста падает целиком на ReferenceError ещё до первого it().
  * localStorage в happy-dom есть, отдаём его — persist работает как в браузере.
  */
-// globalThis, а не global: в файле исторически `global.*`, но линтер это
+// globalThis, а не global: в файле исторически `globalThis.*`, но линтер это
 // запрещает — новую строку добавляем в правильной форме, старые не трогаем
 globalThis.piniaPluginPersistedstate = {
   localStorage: () => localStorage,

@@ -51,17 +51,21 @@ describe('wishlistStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
 
-    // ✅ Очищаем и пересоздаем моки с дефолтным поведением
-    mockQueryBuilder.select.mockClear().mockReturnThis()
-    mockQueryBuilder.eq.mockClear().mockReturnThis()
-    mockQueryBuilder.delete.mockClear().mockReturnThis()
-    mockQueryBuilder.insert.mockClear().mockResolvedValue({ data: null, error: null })
-    mockQueryBuilder.match.mockClear().mockReturnThis()
-    mockSupabaseClient.from.mockClear()
-    mockProductsStore.fetchProductsByIds.mockClear()
-    mockToast.success.mockClear()
-    mockToast.error.mockClear()
-    mockToast.info.mockClear()
+    // mockReset, а не mockClear: последний оставляет очередь
+    // mockResolvedValueOnce, и непотреблённое значение утекает в соседний тест.
+    mockQueryBuilder.select.mockReset().mockReturnThis()
+    mockQueryBuilder.eq.mockReset().mockReturnThis()
+    mockQueryBuilder.delete.mockReset().mockReturnThis()
+    mockQueryBuilder.insert.mockReset().mockResolvedValue({ data: null, error: null })
+    mockQueryBuilder.match.mockReset().mockResolvedValue({ data: null, error: null })
+    // Выборка избранного заканчивается .order(), а не .eq() — подставлять
+    // ответ нужно в последнее звено цепочки, иначе await получит сам билдер.
+    mockQueryBuilder.order.mockReset().mockResolvedValue({ data: [], error: null })
+    mockSupabaseClient.from.mockReset().mockReturnValue(mockQueryBuilder)
+    mockProductsStore.fetchProductsByIds.mockReset()
+    mockToast.success.mockReset()
+    mockToast.error.mockReset()
+    mockToast.info.mockReset()
 
     // ✅ Сбрасываем authStore
     mockAuthStore.isLoggedIn = true
@@ -72,7 +76,7 @@ describe('wishlistStore', () => {
     it('должен загрузить избранные товары', async () => {
       const store = useWishlistStore()
 
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [{ product_id: 'product-1' }],
         error: null,
       })
@@ -101,7 +105,7 @@ describe('wishlistStore', () => {
     it('должен обработать пустой wishlist', async () => {
       const store = useWishlistStore()
 
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [],
         error: null,
       })
@@ -117,7 +121,7 @@ describe('wishlistStore', () => {
       const store = useWishlistStore()
 
       const error = new Error('Database error')
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: null,
         error,
       })
@@ -132,7 +136,7 @@ describe('wishlistStore', () => {
     it('должен загрузить несколько товаров', async () => {
       const store = useWishlistStore()
 
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [{ product_id: 'product-1' }, { product_id: 'product-2' }],
         error: null,
       })
@@ -155,7 +159,7 @@ describe('wishlistStore', () => {
       const store = useWishlistStore()
 
       // Начальное состояние - пустой wishlist
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [],
         error: null,
       })
@@ -166,7 +170,7 @@ describe('wishlistStore', () => {
         error: null,
       })
 
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [{ product_id: 'product-1' }],
         error: null,
       })
@@ -185,7 +189,7 @@ describe('wishlistStore', () => {
       const store = useWishlistStore()
 
       // Начальное состояние - товар в wishlist
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [{ product_id: 'product-1' }],
         error: null,
       })
@@ -198,7 +202,7 @@ describe('wishlistStore', () => {
         error: null,
       })
 
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [],
         error: null,
       })
@@ -210,23 +214,32 @@ describe('wishlistStore', () => {
       )
     })
 
-    it('должен показать сообщение о необходимости авторизации', async () => {
+    /**
+     * Раньше тест ждал тост «авторизуйтесь». Стор его больше не показывает,
+     * и это правильно: приглашение войти теперь дают компоненты, которые
+     * открывают модалку ДО обращения к стору — WishlistButton.vue и
+     * composables/useProductWishlist.ts. Сам стор для гостя обязан молча
+     * ничего не делать, иначе поверх модалки прилетал бы ещё и тост.
+     */
+    it('для гостя ничего не делает и не трогает состояние', async () => {
       const store = useWishlistStore()
       mockAuthStore.isLoggedIn = false
       mockAuthStore.user = null
 
       await store.toggleWishlist('product-1', 'Test Product')
 
-      expect(mockToast.info).toHaveBeenCalledWith(
-        expect.stringContaining('авторизуйтесь'),
-      )
+      expect(store.wishlistProductIds).toEqual([])
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled()
+      expect(mockToast.success).not.toHaveBeenCalled()
+      expect(mockToast.error).not.toHaveBeenCalled()
+      expect(mockToast.info).not.toHaveBeenCalled()
     })
 
     it('bUG: должен правильно форматировать ошибку', async () => {
       const store = useWishlistStore()
 
       // Начальное состояние - пустой wishlist
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [],
         error: null,
       })
@@ -256,7 +269,7 @@ describe('wishlistStore', () => {
       const store = useWishlistStore()
 
       // Начальное состояние - пустой wishlist
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [],
         error: null,
       })
@@ -270,7 +283,7 @@ describe('wishlistStore', () => {
       })
 
       // После toggle должен загрузиться обновленный список
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [{ product_id: 'product-1' }],
         error: null,
       })
@@ -287,7 +300,7 @@ describe('wishlistStore', () => {
     it('должен правильно определить наличие товара в wishlist', async () => {
       const store = useWishlistStore()
 
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [{ product_id: 'product-1' }],
         error: null,
       })
@@ -310,7 +323,7 @@ describe('wishlistStore', () => {
     it('должен обработать null в ответе от fetchProductsByIds', async () => {
       const store = useWishlistStore()
 
-      mockQueryBuilder.eq.mockResolvedValueOnce({
+      mockQueryBuilder.order.mockResolvedValueOnce({
         data: [{ product_id: 'product-1' }],
         error: null,
       })
