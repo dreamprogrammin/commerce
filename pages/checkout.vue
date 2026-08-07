@@ -856,7 +856,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 >
                 <button
                   type="button"
-                  class="co-cta h-12 shrink-0 rounded-full px-[22px] text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  class="co-cta inline-flex h-12 shrink-0 items-center justify-center rounded-full px-[22px] text-sm font-extrabold text-white disabled:cursor-not-allowed"
                   :disabled="isPromoValidating || !promoCodeInput.trim()"
                   @click="applyPromoCode"
                 >
@@ -910,7 +910,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 </button>
                 <button
                   type="button"
-                  class="co-cta h-12 shrink-0 rounded-full px-5 text-[13px] font-extrabold text-white"
+                  class="co-cta inline-flex h-12 shrink-0 items-center justify-center rounded-full px-5 text-[13px] font-extrabold text-white"
                   @click="applyBonuses"
                 >
                   Применить
@@ -1018,7 +1018,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 
           <button
             type="button"
-            class="co-cta hidden h-[52px] w-full items-center justify-center gap-2.5 rounded-full text-[15px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50 lg:flex"
+            class="co-cta hidden h-[52px] w-full items-center justify-center gap-2.5 rounded-full text-[15px] font-extrabold text-white disabled:cursor-not-allowed lg:flex"
             :disabled="isProcessing || !isFormValid"
             @click="placeOrder"
           >
@@ -1072,7 +1072,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
         </div>
         <button
           type="button"
-          class="co-mobile-cta__btn flex h-[60px] w-full items-center justify-between rounded-[22px] px-[22px] text-white disabled:opacity-60"
+          class="co-mobile-cta__btn flex h-[60px] w-full items-center justify-between rounded-[22px] px-[22px] text-white disabled:cursor-not-allowed"
           :disabled="isProcessing || !isFormValid"
           @click="placeOrder"
         >
@@ -1250,20 +1250,33 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   background: var(--primary);
 }
 
+/* Только оформление, без раскладки. display/align здесь ломали бы утилиты:
+   scoped-стиль идёт вне @layer, а утилиты Tailwind — внутри utilities, и
+   беслойное правило бьёт слой независимо от специфичности. Из-за этого
+   `hidden`/`lg:flex` на кнопке «Оформить заказ» были мертвы. Раскладку задаём
+   классами на самой кнопке — как в .cart-cta на /cart. */
 .co-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+  background: linear-gradient(150deg, rgb(77 148 255), rgb(23 101 235));
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.5),
     inset 0 -2px 8px rgb(6 53 138 / 0.28),
     0 8px 20px rgb(43 127 255 / 0.3);
-  transition: background 0.15s ease;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .co-cta:hover:not(:disabled) {
-  background: linear-gradient(150deg, rgb(96 163 255 / 1), rgb(29 112 246 / 0.92));
+  background: linear-gradient(150deg, rgb(96 163 255), rgb(29 112 246));
+}
+/* То же, что у мобильной панели: недоступность — отдельной заливкой.
+   opacity поверх полупрозрачного градиента давала «стеклянную» кнопку. */
+.co-cta:disabled {
+  background: linear-gradient(150deg, rgb(148 163 184), rgb(100 116 139));
+  border-color: rgb(255 255 255 / 0.28);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    0 6px 16px rgb(15 23 42 / 0.16);
 }
 
 /* Липкая панель. Базовая позиция — у нижнего края (когда навбар скрыт),
@@ -1280,17 +1293,31 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   transform: translateY(0);
 }
 
+/* Заливка непрозрачная. Раньше был полупрозрачный градиент (0.92/0.9) плюс
+   backdrop-filter, а сверху утилита disabled:opacity-60 — и в состоянии
+   «форма не заполнена» кнопка светилась насквозь. Для гостя это состояние
+   первое, что видно на мобильном: имя, телефон и email пустые, isFormValid
+   false, кнопка disabled сразу при открытии страницы.
+   Поэтому: сплошной градиент, а недоступность показываем отдельной заливкой,
+   а не прозрачностью поверх прозрачного. */
 .co-mobile-cta__btn {
   border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(180deg, rgb(59 138 255 / 0.92), rgb(43 127 255 / 0.9));
-  backdrop-filter: blur(22px) saturate(1.6);
-  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  background: linear-gradient(180deg, rgb(59 138 255), rgb(29 108 240));
   box-shadow:
     0 14px 34px rgb(43 127 255 / 0.36),
     inset 0 1px 0 rgb(255 255 255 / 0.4);
-  transition: background 0.15s ease;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .co-mobile-cta__btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgb(59 138 255 / 1), rgb(37 105 235 / 0.96));
+  background: linear-gradient(180deg, rgb(96 163 255), rgb(37 105 235));
+}
+.co-mobile-cta__btn:disabled {
+  background: linear-gradient(180deg, rgb(148 163 184), rgb(100 116 139));
+  border-color: rgb(255 255 255 / 0.28);
+  box-shadow:
+    0 10px 24px rgb(15 23 42 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
 }
 </style>
