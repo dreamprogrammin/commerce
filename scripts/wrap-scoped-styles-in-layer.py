@@ -44,7 +44,12 @@ def wrap(path: str) -> bool:
         print(f'  пропуск (нет scoped-блока): {path}')
         return False
     open_tag, body, close_tag = m.groups()
-    if '@layer' in body:
+    # Проверяем по коду без комментариев: подстрока '@layer' встречается и в
+    # пояснении вроде «scoped-правило вне слоёв бьёт @layer utilities», и файл
+    # молча объявлялся уже обёрнутым — самая неприятная поломка для этого
+    # скрипта, потому что отчёт при этом выглядит успешным.
+    code = re.sub(r'/\*.*?\*/', '', body, flags=re.S)
+    if re.search(r'^\s*@layer\b', code, re.M):
         print(f'  пропуск (уже в слое): {path}')
         return False
 

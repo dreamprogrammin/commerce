@@ -287,7 +287,7 @@ async function handleSubmit() {
               Удалить
             </button>
             <div class="flex justify-end gap-2.5">
-              <button type="button" class="ch-btn-ghost" @click="isDialogOpen = false">
+              <button type="button" class="ch-btn-ghost text-foreground" @click="isDialogOpen = false">
                 Отмена
               </button>
               <button
@@ -335,209 +335,229 @@ async function handleSubmit() {
 </template>
 
 <style scoped>
-/*
- * Основная кнопка-пилюля. Сам градиент задаётся утилитами
- * (bg-gradient-to-br from-blue-400 to-blue-600) на элементе, а не здесь:
- * var(--color-blue-*) существует только пока какая-то утилита их использует,
- * иначе Tailwind 4 вырежет переменные и в проде кнопка станет прозрачной.
- */
-.ch-add-btn {
-  flex: none;
-  height: 46px;
-  padding: 0 20px;
-  border-radius: 999px;
-  border: none;
-  color: #fff;
-  font-size: 14.5px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 8px 20px rgb(43 127 255 / 0.3);
-  transition:
-    transform 0.14s ease,
-    box-shadow 0.14s ease;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.ch-add-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 26px rgb(43 127 255 / 0.4);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.ch-add-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-/* «Сохранить» в макете шире «Отмены»: 0 24px против 0 20px */
-.ch-add-btn--wide {
-  padding: 0 24px;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.ch-close {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--muted-foreground);
-  cursor: pointer;
-  display: grid;
-  place-content: center;
-  transition: background 0.15s ease;
-}
+@layer components {
+  /*
+   * Основная кнопка-пилюля. Сам градиент задаётся утилитами
+   * (bg-gradient-to-br from-blue-400 to-blue-600) на элементе, а не здесь:
+   * var(--color-blue-*) существует только пока какая-то утилита их использует,
+   * иначе Tailwind 4 вырежет переменные и в проде кнопка станет прозрачной.
+   */
+  .ch-add-btn {
+    flex: none;
+    height: 46px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: none;
+    color: #fff;
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 20px rgb(43 127 255 / 0.3);
+    transition:
+      transform 0.14s ease,
+      box-shadow 0.14s ease;
+  }
 
-.ch-close:hover {
-  background: var(--muted);
-}
+  .ch-add-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px rgb(43 127 255 / 0.4);
+  }
 
-.ch-btn-ghost {
-  height: 46px;
-  padding: 0 20px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--foreground);
-  font-size: 14.5px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: background 0.15s ease;
-}
+  .ch-add-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 
-.ch-btn-ghost:hover {
-  background: var(--muted);
-}
+  /* «Сохранить» в макете шире «Отмены»: 0 24px против 0 20px */
+  .ch-add-btn--wide {
+    padding: 0 24px;
+  }
 
-/*
- * Карточка ребёнка — кликабельна целиком, поэтому button, а не div.
- * Тени намеренно НЕ здесь, а утилитами shadow-sm / hover:shadow-md на элементе:
- * в макете покой = --shadow-sm, наведение = --shadow-md (см. tokens/shadows.css),
- * и это ровно шкала Tailwind. Репозиторный --elevation-card слабее (shadow-xs),
- * а --elevation-card-hover наоборот shadow-xl — обе мимо макета.
- */
-.ch-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--card);
-  cursor: pointer;
-  text-align: left;
-  transition:
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
-}
+  .ch-close {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted-foreground);
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: background 0.15s ease;
+  }
 
-.ch-card:hover {
-  transform: translateY(-2px);
-}
+  .ch-close:hover {
+    background: var(--muted);
+  }
 
-.ch-avatar {
-  flex: none;
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
-  border-width: 1px;
-  border-style: solid;
-  display: grid;
-  place-content: center;
-}
+  /*
+   * Форма кнопки без цвета текста: цвет задаётся утилитой на месте
+   * (text-foreground у «Отмены», text-destructive у «Удалить»).
+   * Пока color жил здесь, он отменял text-destructive и кнопка удаления
+   * была не красной — scoped-правило вне слоёв бьёт @layer utilities.
+   */
+  .ch-btn-ghost {
+    height: 46px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.15s ease;
+  }
 
-.ch-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: 999px;
-  background: var(--muted);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--foreground);
-}
+  .ch-btn-ghost:hover {
+    background: var(--muted);
+  }
 
-.ch-chevron {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--muted-foreground);
-  display: grid;
-  place-content: center;
-  transition:
-    border-color 0.15s ease,
-    color 0.15s ease;
-}
+  /*
+   * Карточка ребёнка — кликабельна целиком, поэтому button, а не div.
+   * Тени намеренно НЕ здесь, а утилитами shadow-sm / hover:shadow-md на элементе:
+   * в макете покой = --shadow-sm, наведение = --shadow-md (см. tokens/shadows.css),
+   * и это ровно шкала Tailwind. Репозиторный --elevation-card слабее (shadow-xs),
+   * а --elevation-card-hover наоборот shadow-xl — обе мимо макета.
+   */
+  .ch-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--card);
+    cursor: pointer;
+    text-align: left;
+    transition:
+      box-shadow 0.18s ease,
+      transform 0.18s ease;
+  }
 
-.ch-card:hover .ch-chevron {
-  border-color: var(--primary);
-  color: var(--primary);
-}
+  .ch-card:hover {
+    transform: translateY(-2px);
+  }
 
-/* Пунктирная плитка — она же пустое состояние */
-.ch-add-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 112px;
-  padding: 20px;
-  border: 2px dashed var(--rating-empty);
-  border-radius: 20px;
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  transition: all 0.16s ease;
-}
+  .ch-avatar {
+    flex: none;
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    border-width: 1px;
+    border-style: solid;
+    display: grid;
+    place-content: center;
+  }
 
-.ch-add-tile:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--brand-surface);
-}
+  .ch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
 
-.ch-add-tile__icon {
-  display: grid;
-  place-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  background: var(--brand-surface);
-  color: var(--primary);
-}
+  .ch-chevron {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted-foreground);
+    display: grid;
+    place-content: center;
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
 
-/* Переключатель пола вместо Select — как в макете */
-.ch-gender {
-  flex: 1;
-  height: 48px;
-  border-radius: 13px;
-  border: 1px solid var(--input);
-  background: var(--card);
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.15s ease;
-}
+  .ch-card:hover .ch-chevron {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
 
-.ch-gender--on {
-  border: 2px solid var(--primary);
-  background: var(--brand-surface);
-  color: var(--primary);
+  /* Пунктирная плитка — она же пустое состояние */
+  .ch-add-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 112px;
+    padding: 20px;
+    border: 2px dashed var(--rating-empty);
+    border-radius: 20px;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    transition: all 0.16s ease;
+  }
+
+  .ch-add-tile:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--brand-surface);
+  }
+
+  .ch-add-tile__icon {
+    display: grid;
+    place-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    background: var(--brand-surface);
+    color: var(--primary);
+  }
+
+  /* Переключатель пола вместо Select — как в макете */
+  .ch-gender {
+    flex: 1;
+    height: 48px;
+    border-radius: 13px;
+    border: 1px solid var(--input);
+    background: var(--card);
+    color: var(--foreground);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.15s ease;
+  }
+
+  .ch-gender--on {
+    border: 2px solid var(--primary);
+    background: var(--brand-surface);
+    color: var(--primary);
+  }
 }
 </style>
