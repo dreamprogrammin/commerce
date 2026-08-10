@@ -247,9 +247,6 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
                       'w-14 h-14 z-20 top-1 left-2 opacity-80': index === 1,
                       'w-12 h-12 z-10 top-2 left-4 opacity-60': index === 2,
                     }"
-                    :style="{
-                      transform: `translateY(${index * 2}px) scale(${1 - index * 0.1})`,
-                    }"
                   >
                     <ProgressiveImage
                       v-if="thumbnail.imageUrl"
@@ -367,14 +364,24 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
     opacity: 1;
   }
 
-  /* ВНИМАНИЕ: три правила ниже не работают.
-     На тех же элементах в разметке стоит инлайновый :style с transform
-     (`translateY(index*2px) scale(1 - index*0.1)`), а инлайн-стиль бьёт любое
-     правило таблицы стилей без !important. Так что стек миниатюр при наведении
-     не шевелится и никогда не шевелился — это не следствие обёртки в слои.
-     Чтобы эффект заработал, базовый transform надо перенести из :style сюда
-     же, в nth-child-правила. Не стал: компонент виден только залогиненному с
-     активным заказом, проверить результат глазами нечем. */
+  /* Стек миниатюр: покой и наведение заданы рядом.
+     Базовые значения раньше стояли инлайновым :style в разметке
+     (`translateY(index*2px) scale(1 - index*0.1)`), а инлайн бьёт любое
+     правило таблицы стилей без !important — из-за этого правила наведения
+     ниже не срабатывали вовсе и стек никогда не шевелился. Теперь оба
+     состояния здесь, и инлайн-стиля на этих элементах нет. */
+  .product-thumbnails-container > div > div:nth-child(1) {
+    transform: translateY(0) scale(1);
+  }
+
+  .product-thumbnails-container > div > div:nth-child(2) {
+    transform: translateY(2px) scale(0.9);
+  }
+
+  .product-thumbnails-container > div > div:nth-child(3) {
+    transform: translateY(4px) scale(0.8);
+  }
+
   .order-card:hover .product-thumbnails-container > div > div:nth-child(1) {
     transform: translateY(0) scale(1.05) rotate(-2deg);
   }
