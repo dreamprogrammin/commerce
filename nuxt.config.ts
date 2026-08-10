@@ -65,6 +65,28 @@ export default defineNuxtConfig({
 
   // @nuxt/icon — оптимизируем иконки
   icon: {
+    // CSS иконок — в отдельный слой, иначе он бьёт утилиты Tailwind.
+    //
+    // По умолчанию @nuxt/icon отдаёт `:where(.i-lucide\:x){width:1em;height:1em}`
+    // ВНЕ слоёв. Беслойное правило бьёт любой слой независимо от специфичности,
+    // поэтому утилиты Tailwind на иконках не работали вовсе: `size-[26px]`
+    // рисовался как 16px, `size-5` — как 14px. Нулевая специфичность у :where()
+    // сделана как раз чтобы правило легко перебивали, но слои этот замысел
+    // ломают.
+    //
+    // Имя слоя СВОЁ, а не 'components'. Стили иконок Nuxt подмешивает
+    // отдельными <style> раньше entry.css, и слой регистрируется первым.
+    // С именем 'components' это переставляло весь порядок в
+    // `components → properties → theme → base → utilities`: preflight из base
+    // оказывался ПОСЛЕ компонентов и сносил им рамки и фон — проверено, вёрстка
+    // оформления разваливалась.
+    //
+    // Со своим именем всё встаёт правильно:
+    // `icons → properties → theme → base → components → utilities`.
+    // Иконки слабее всех: размер задаёт разметка (utilities), а компонент,
+    // задающий размер своим классом, тоже сильнее. Порядок слоёв Tailwind
+    // при этом не меняется.
+    cssLayer: 'icons',
     serverBundle: {
       collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat', 'line-md', 'simple-icons', 'gravity-ui', 'mdi', 'logos', 'ic', 'solar'],
     },
