@@ -350,6 +350,29 @@ export default defineNuxtConfig({
         host: 'localhost',
       },
     },
+    css: {
+      lightningcss: {
+        /*
+         * Без targets Lightning CSS не знает, каким браузерам нужны префиксы,
+         * и оставляет ровно одно объявление из пары. Со стеклянными панелями
+         * это било насмерть: `backdrop-filter` + `-webkit-backdrop-filter`
+         * схлопывались в одно, и результат зависел от порядка в исходнике.
+         *
+         * Формат targets — упакованная версия: (major << 16) | (minor << 8).
+         * Safari 15.4 — там `backdrop-filter` только под префиксом, и это
+         * заметная доля iPhone; Chrome/Firefox/Edge — стандартное свойство.
+         * Проверено на реальном выводе: с этими targets Lightning CSS
+         * печатает ОБА объявления, без них — только стандартное.
+         */
+        targets: {
+          safari: (15 << 16) | (4 << 8),
+          ios_saf: (15 << 16) | (4 << 8),
+          chrome: 100 << 16,
+          firefox: 100 << 16,
+          edge: 100 << 16,
+        },
+      },
+    },
     build: {
       cssMinify: 'lightningcss',
       // Оптимизируем загрузку JS через агрессивное разбиение и preload

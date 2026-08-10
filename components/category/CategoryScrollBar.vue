@@ -254,8 +254,8 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   padding: 7px 8px;
   border-radius: 24px;
   background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
-  backdrop-filter: blur(24px) saturate(1.9);
   -webkit-backdrop-filter: blur(24px) saturate(1.9);
+  backdrop-filter: blur(24px) saturate(1.9);
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.85),
@@ -307,8 +307,8 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.9);
   background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
-  backdrop-filter: blur(14px) saturate(1.7);
   -webkit-backdrop-filter: blur(14px) saturate(1.7);
+  backdrop-filter: blur(14px) saturate(1.7);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 -1px 2px rgba(15, 23, 42, 0.06),

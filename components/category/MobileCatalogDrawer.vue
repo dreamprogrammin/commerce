@@ -583,8 +583,8 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 12px;
   background: rgba(238, 240, 243, 0.8);
-  backdrop-filter: blur(26px) saturate(1.8);
   -webkit-backdrop-filter: blur(26px) saturate(1.8);
+  backdrop-filter: blur(26px) saturate(1.8);
   border-radius: 22px 22px 0 0;
   padding: 0 14px 0;
   overflow-y: auto;
@@ -635,8 +635,8 @@ onUnmounted(() => {
   margin: 0 -14px;
   padding: 9px 20px 10px;
   background: rgba(238, 240, 243, 0.72);
-  backdrop-filter: blur(18px) saturate(1.6);
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
   border-radius: 22px 22px 0 0;
   display: flex;
   flex-direction: column;
@@ -692,8 +692,8 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.6));
-  backdrop-filter: blur(10px) saturate(1.6);
   -webkit-backdrop-filter: blur(10px) saturate(1.6);
+  backdrop-filter: blur(10px) saturate(1.6);
   box-shadow:
     inset 0 1px 0 #fff,
     0 3px 10px rgba(15, 23, 42, 0.1);
@@ -888,8 +888,8 @@ onUnmounted(() => {
   margin: 4px -14px 0;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(238, 240, 243, 0) 0%, rgba(238, 240, 243, 0.88) 34%);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .mcd-apply {
@@ -898,8 +898,8 @@ onUnmounted(() => {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.45);
   background: linear-gradient(150deg, rgba(77, 148, 255, 0.95), rgba(23, 101, 235, 0.85));
-  backdrop-filter: blur(12px) saturate(1.7);
   -webkit-backdrop-filter: blur(12px) saturate(1.7);
+  backdrop-filter: blur(12px) saturate(1.7);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     inset 0 -2px 8px rgba(6, 53, 138, 0.28),

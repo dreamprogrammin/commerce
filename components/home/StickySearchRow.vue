@@ -111,8 +111,8 @@ function onLogin() {
   z-index: 100;
   padding: 10px 0;
   background: rgb(255 255 255 / 0.86);
-  backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
   box-shadow: 0 6px 20px rgb(15 23 42 / 0.1);
 }
 
