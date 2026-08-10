@@ -193,21 +193,36 @@ const isDev = computed(() => import.meta.env.DEV)
 </template>
 
 <style scoped>
-img {
-  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  img {
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  50% {
-    opacity: 0.7;
+
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 }
 </style>

@@ -194,47 +194,62 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@keyframes shimmer-smooth {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(200%);
-  }
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-@keyframes sparkle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translateX(-100%) scale(0.5);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(100%) scale(1.5);
-  }
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-@keyframes pulse-glow {
-  0%,
-  100% {
-    opacity: 0.4;
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  @keyframes shimmer-smooth {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(200%);
+    }
   }
-  50% {
-    opacity: 0.8;
+
+  @keyframes sparkle {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translateX(-100%) scale(0.5);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(100%) scale(1.5);
+    }
   }
-}
 
-.animate-shimmer-smooth {
-  animation: shimmer-smooth 1.8s ease-in-out infinite;
-}
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
 
-.animate-sparkle {
-  animation: sparkle 2.5s ease-in-out infinite;
-  animation-delay: 0.3s;
-}
+  .animate-shimmer-smooth {
+    animation: shimmer-smooth 1.8s ease-in-out infinite;
+  }
 
-.animate-pulse-glow {
-  animation: pulse-glow 1.2s ease-in-out infinite;
+  .animate-sparkle {
+    animation: sparkle 2.5s ease-in-out infinite;
+    animation-delay: 0.3s;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 1.2s ease-in-out infinite;
+  }
 }
 </style>
