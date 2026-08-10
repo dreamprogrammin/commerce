@@ -88,63 +88,78 @@ function go(num: number) {
 </template>
 
 <style scoped>
-.cs-tab {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  height: 52px;
-  padding: 0 clamp(6px, 1.5vw, 16px);
-  border: none;
-  border-bottom: 3px solid var(--border);
-  background: transparent;
-  font-weight: 700;
-  font-size: clamp(13px, 1.6vw, 16px);
-  color: var(--muted-foreground);
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-/* У недоступного шага в макете меняется только курсор — ни прозрачности,
-   ни затемнения: это индикатор прогресса, а не набор кнопок. */
-.cs-tab:disabled {
-  cursor: default;
-}
-.cs-tab:not(:disabled) {
-  cursor: pointer;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-/* Пройденный и текущий — цвет primary. */
-.cs-tab--filled {
-  color: var(--primary);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-/* Текущий шаг — единственный с синей полосой снизу. */
-.cs-tab--current {
-  border-bottom-color: var(--primary);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.cs-num {
-  flex: none;
-  display: grid;
-  place-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 13px;
-  background: var(--muted);
-  color: var(--muted-foreground);
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
+@layer components {
+  .cs-tab {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    height: 52px;
+    padding: 0 clamp(6px, 1.5vw, 16px);
+    border: none;
+    border-bottom: 3px solid var(--border);
+    background: transparent;
+    font-weight: 700;
+    font-size: clamp(13px, 1.6vw, 16px);
+    color: var(--muted-foreground);
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
 
-.cs-tab--filled .cs-num {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  /* У недоступного шага в макете меняется только курсор — ни прозрачности,
+     ни затемнения: это индикатор прогресса, а не набор кнопок. */
+  .cs-tab:disabled {
+    cursor: default;
+  }
+  .cs-tab:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Пройденный и текущий — цвет primary. */
+  .cs-tab--filled {
+    color: var(--primary);
+  }
+
+  /* Текущий шаг — единственный с синей полосой снизу. */
+  .cs-tab--current {
+    border-bottom-color: var(--primary);
+  }
+
+  .cs-num {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 13px;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .cs-tab--filled .cs-num {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
 }
 </style>
