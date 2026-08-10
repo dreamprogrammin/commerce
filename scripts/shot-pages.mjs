@@ -100,10 +100,35 @@ for (const [wName, width, height] of widths) {
 
   // Карточка товара
   const link = page.locator('a[href*="/catalog/products/"]').first()
+  let productHref = null
   if (await link.count()) {
-    const href = await link.getAttribute('href')
-    console.log(`product     http=${await go(href)}`)
+    productHref = await link.getAttribute('href')
+    console.log(`product     http=${await go(productHref)}`)
     await shot('04-product')
+  }
+
+  // Скелетоны загрузки. Без задержки ответов они мелькают и в снимок не
+  // попадают, поэтому притормаживаем запросы к Supabase и снимаем страницу
+  // товара, не дожидаясь данных.
+  // Отдельная вкладка: перехват запросов действует на страницу, и если делать
+  // это на основной, задержка остаётся жить дальше по сценарию — /checkout
+  // уходил в таймаут и обрывал прогон.
+  try {
+    const sp = await ctx.newPage()
+    await sp.route('**/rest/v1/**', async (route) => {
+      await new Promise(r => setTimeout(r, 6000))
+      await route.continue().catch(() => {})
+    })
+    await sp.goto(base + (productHref || '/catalog/all'), { waitUntil: 'commit', timeout: 30000 })
+    await sp.waitForTimeout(1500)
+    const sk = await sp.locator('.pdp-skeleton, [class*="skeleton"], .animate-pulse').count()
+    console.log(`  скелетонов на экране: ${sk}`)
+    await sp.screenshot({ path: `${outDir}/04b-skeleton-${wName}.png`, fullPage: true })
+    report.push({ name: '04b-skeleton', w: wName, overflow: 0, errors: 0 })
+    await sp.close()
+  }
+  catch (e) {
+    console.log(`  скелетоны не сняты: ${e.message.split('\n')[0].slice(0, 70)}`)
   }
 
   console.log(`cart        http=${await go('/cart')}`)

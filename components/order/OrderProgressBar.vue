@@ -47,30 +47,45 @@ const cancelled = computed(() => isOrderCancelled(props.status))
 </template>
 
 <style scoped>
-.opb-seg {
-  display: block;
-  width: 100%;
-  height: 8px;
-  flex: none;
-  border-radius: 999px;
-  background: var(--border);
-  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.08);
-  transition: background 0.25s ease;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-/* Пройденные сегменты — тот же синий градиент, что у CTA во всём флоу.
-   Литералами, а не через var(--color-blue-*): Tailwind 4 выкидывает
-   переменную темы, если её не использует ни одна утилита. */
-.opb-seg--done {
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    0 3px 8px rgb(43 127 255 / 0.28);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-/* У отменённого заказа полоса гаснет целиком и краснеет — прогресса нет. */
-.opb-seg--cancelled {
-  background: color-mix(in srgb, var(--destructive) 20%, transparent);
-  box-shadow: none;
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  .opb-seg {
+    display: block;
+    width: 100%;
+    height: 8px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--border);
+    box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.08);
+    transition: background 0.25s ease;
+  }
+
+  /* Пройденные сегменты — тот же синий градиент, что у CTA во всём флоу.
+     Литералами, а не через var(--color-blue-*): Tailwind 4 выкидывает
+     переменную темы, если её не использует ни одна утилита. */
+  .opb-seg--done {
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 3px 8px rgb(43 127 255 / 0.28);
+  }
+
+  /* У отменённого заказа полоса гаснет целиком и краснеет — прогресса нет. */
+  .opb-seg--cancelled {
+    background: color-mix(in srgb, var(--destructive) 20%, transparent);
+    box-shadow: none;
+  }
 }
 </style>
