@@ -35,8 +35,8 @@ for (const [wName, width, height] of widths) {
   page.on('console', m => m.type() === 'error' && errors.push(m.text()))
   page.on('pageerror', e => errors.push(String(e)))
 
-  const shot = async (name) => {
-    await page.waitForTimeout(900)
+  const shot = async (name, settle = 900) => {
+    await page.waitForTimeout(settle)
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth)
     await page.screenshot({ path: `${outDir}/${name}-${wName}.png`, fullPage: true })
@@ -124,6 +124,26 @@ for (const [wName, width, height] of widths) {
   }
   catch (e) {
     console.log(`  самовывоз не переключился: ${e.message.split('\n')[0].slice(0, 80)}`)
+  }
+
+  // Страницы, которым не нужно взаимодействие. Слаги живые: lego рисуется
+  // кастомным шаблоном, cada — стандартным, так что покрыты оба. Если бренд
+  // уберут из каталога, шаг отдаст 404 — это видно в выводе, а не молча.
+  const plain = [
+    ['08-brand-custom', '/brand/lego'],
+    ['09-brand-standard', '/brand/cada'],
+    ['10-brand-line', '/brand/lego/lego-city'],
+    // Заказ читается по id, но RLS не отдаёт его анониму (проверено запросом
+    // к orders — пустой ответ). Снимается состояние «заказ не найден»: этого
+    // хватает для раскладки, но НЕ покрывает OrderTracker, OrderProgressBar и
+    // OrderTrackerLottie — их видно только на реальном заказе, под логином.
+    // 6 секунд — чтобы осело конфетти: canvas-confetti стреляет при монтаже,
+    // и на 900мс снимок ловил летящие частицы, то есть чистый шум.
+    ['11-order-success', '/order/success/00000000-0000-0000-0000-000000000000', 6000],
+  ]
+  for (const [name, path, settle] of plain) {
+    console.log(`${name.padEnd(18)} http=${await go(path)}`)
+    await shot(name, settle)
   }
 
   if (errors.length) {

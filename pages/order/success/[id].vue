@@ -520,153 +520,168 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Страница успеха в макете лежит на сером полотне, а не на белом. */
-.os-page {
-  min-height: 100%;
-  background: var(--page-surface);
-  padding: 24px clamp(14px, 4vw, 24px) 40px;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-/* Зелёный кружок с галочкой. Значения литералами, а не через var(--color-*):
-   Tailwind 4 выкидывает переменную темы, если её не использует утилита. */
-.os-check {
-  display: grid;
-  place-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 999px;
-  background: linear-gradient(150deg, rgb(220 252 231 / 0.95), rgb(185 248 207 / 0.6));
-  border: 1px solid rgb(0 166 62 / 0.28);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
-    inset 0 -3px 8px rgb(3 84 63 / 0.1),
-    0 8px 20px rgb(0 166 62 / 0.16);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.os-card {
-  border-radius: 22px;
-  background: var(--background);
-  border: 1px solid var(--border);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    0 1px 0 rgb(15 23 42 / 0.05);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.os-card-blue {
-  border-radius: 22px;
-  background: linear-gradient(162deg, rgb(239 246 255 / 0.98), rgb(219 234 254 / 0.55));
-  border: 1px solid rgb(191 219 254 / 0.95);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
-    inset 0 -2px 6px rgb(6 53 138 / 0.06),
-    0 1px 0 rgb(15 23 42 / 0.04);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-/* Приглашение войти: тот же голубой градиент, что у «Корзина сохранена», но
-   светлее в нижней точке и с обычной рамкой — в макете карточка звучит тише,
-   чтобы не спорить с блоком про корзину. */
-.os-card-invite {
-  border-radius: 22px;
-  background: linear-gradient(162deg, rgb(239 246 255 / 0.98), rgb(219 234 254 / 0.4));
-  border: 1px solid var(--border);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    0 1px 0 rgb(15 23 42 / 0.05);
-}
+@layer components {
+  /* Страница успеха в макете лежит на сером полотне, а не на белом. */
+  .os-page {
+    min-height: 100%;
+    background: var(--page-surface);
+    padding: 24px clamp(14px, 4vw, 24px) 40px;
+  }
 
-.os-card-green {
-  border-radius: 22px;
-  background: linear-gradient(162deg, rgb(240 253 244 / 0.98), rgb(220 252 231 / 0.55));
-  border: 1px solid rgb(185 248 207 / 0.9);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
-    inset 0 -2px 6px rgb(3 84 63 / 0.06),
-    0 1px 0 rgb(15 23 42 / 0.04);
-}
+  /* Зелёный кружок с галочкой. Значения литералами, а не через var(--color-*):
+     Tailwind 4 выкидывает переменную темы, если её не использует утилита. */
+  .os-check {
+    display: grid;
+    place-content: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 999px;
+    background: linear-gradient(150deg, rgb(220 252 231 / 0.95), rgb(185 248 207 / 0.6));
+    border: 1px solid rgb(0 166 62 / 0.28);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+      inset 0 -3px 8px rgb(3 84 63 / 0.1),
+      0 8px 20px rgb(0 166 62 / 0.16);
+  }
 
-.os-badge {
-  flex: none;
-  display: grid;
-  place-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
-}
-.os-badge--blue {
-  background: rgb(219 234 254 / 0.95);
-  border: 1px solid rgb(43 127 255 / 0.24);
-}
-.os-badge--green {
-  background: rgb(220 252 231 / 0.95);
-  border: 1px solid rgb(0 166 62 / 0.24);
-}
+  .os-card {
+    border-radius: 22px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      0 1px 0 rgb(15 23 42 / 0.05);
+  }
 
-/* Плашка с номером заказа. */
-.os-number {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
-  border-radius: 14px;
-  background: var(--page-surface);
-  border: 1px solid var(--border);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
-    inset 0 -2px 5px rgb(15 23 42 / 0.06);
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-}
+  .os-card-blue {
+    border-radius: 22px;
+    background: linear-gradient(162deg, rgb(239 246 255 / 0.98), rgb(219 234 254 / 0.55));
+    border: 1px solid rgb(191 219 254 / 0.95);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+      inset 0 -2px 6px rgb(6 53 138 / 0.06),
+      0 1px 0 rgb(15 23 42 / 0.04);
+  }
 
-/* Белая кнопка-«стекло» — та же поверхность, что у карточек. */
-.os-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--background);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    0 1px 0 rgb(15 23 42 / 0.05);
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-.os-btn:hover {
-  color: var(--primary);
-}
-.os-btn--icon:hover {
-  color: var(--destructive);
-}
+  /* Приглашение войти: тот же голубой градиент, что у «Корзина сохранена», но
+     светлее в нижней точке и с обычной рамкой — в макете карточка звучит тише,
+     чтобы не спорить с блоком про корзину. */
+  .os-card-invite {
+    border-radius: 22px;
+    background: linear-gradient(162deg, rgb(239 246 255 / 0.98), rgb(219 234 254 / 0.4));
+    border: 1px solid var(--border);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      0 1px 0 rgb(15 23 42 / 0.05);
+  }
 
-/* Синяя кнопка — общая с CTA корзины и оформления. */
-.os-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  border-radius: 999px;
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 8px rgb(6 53 138 / 0.28),
-    0 8px 20px rgb(43 127 255 / 0.3);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  transition: background 0.15s ease;
-}
-.os-cta:hover {
-  background: linear-gradient(150deg, rgb(96 163 255 / 1), rgb(29 112 246 / 0.92));
-  color: #fff;
+  .os-card-green {
+    border-radius: 22px;
+    background: linear-gradient(162deg, rgb(240 253 244 / 0.98), rgb(220 252 231 / 0.55));
+    border: 1px solid rgb(185 248 207 / 0.9);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+      inset 0 -2px 6px rgb(3 84 63 / 0.06),
+      0 1px 0 rgb(15 23 42 / 0.04);
+  }
+
+  .os-badge {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  }
+  .os-badge--blue {
+    background: rgb(219 234 254 / 0.95);
+    border: 1px solid rgb(43 127 255 / 0.24);
+  }
+  .os-badge--green {
+    background: rgb(220 252 231 / 0.95);
+    border: 1px solid rgb(0 166 62 / 0.24);
+  }
+
+  /* Плашка с номером заказа. */
+  .os-number {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: 14px;
+    background: var(--page-surface);
+    border: 1px solid var(--border);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+      inset 0 -2px 5px rgb(15 23 42 / 0.06);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
+  /* Белая кнопка-«стекло» — та же поверхность, что у карточек. */
+  .os-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--background);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      0 1px 0 rgb(15 23 42 / 0.05);
+    color: var(--foreground);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  .os-btn:hover {
+    color: var(--primary);
+  }
+  .os-btn--icon:hover {
+    color: var(--destructive);
+  }
+
+  /* Синяя кнопка — общая с CTA корзины и оформления. */
+  .os-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border-radius: 999px;
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 8px rgb(6 53 138 / 0.28),
+      0 8px 20px rgb(43 127 255 / 0.3);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+    transition: background 0.15s ease;
+  }
+  .os-cta:hover {
+    background: linear-gradient(150deg, rgb(96 163 255 / 1), rgb(29 112 246 / 0.92));
+    color: #fff;
+  }
 }
 </style>

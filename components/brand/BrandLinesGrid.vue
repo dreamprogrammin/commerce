@@ -240,40 +240,55 @@ function getLineLink(lineSlug: string): string {
 </template>
 
 <style scoped>
-/* ── Liquid Glass: панель-контейнер ── */
-.liquid-glass-panel {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow:
-    0 8px 32px rgba(31, 38, 135, 0.08),
-    0 1.5px 4px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-/* ── Liquid Glass: карточка коллекции ── */
-.liquid-glass-card {
-  position: relative;
-  aspect-ratio: 3 / 2;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    0 0.5px 0 rgba(255, 255, 255, 0.3) inset;
-  transition:
-    box-shadow 0.3s ease,
-    border-color 0.3s ease,
-    transform 0.3s ease;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.liquid-glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.45);
-  box-shadow:
-    0 8px 24px rgba(31, 38, 135, 0.12),
-    0 2px 6px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* ── Liquid Glass: панель-контейнер ── */
+  .liquid-glass-panel {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow:
+      0 8px 32px rgba(31, 38, 135, 0.08),
+      0 1.5px 4px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  /* ── Liquid Glass: карточка коллекции ── */
+  .liquid-glass-card {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      0 0.5px 0 rgba(255, 255, 255, 0.3) inset;
+    transition:
+      box-shadow 0.3s ease,
+      border-color 0.3s ease,
+      transform 0.3s ease;
+  }
+
+  .liquid-glass-card:hover {
+    border-color: rgba(255, 255, 255, 0.45);
+    box-shadow:
+      0 8px 24px rgba(31, 38, 135, 0.12),
+      0 2px 6px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+  }
 }
 </style>
