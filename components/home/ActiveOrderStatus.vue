@@ -228,7 +228,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
         <div class="p-4 sm:p-5 relative">
           <!-- Цветной оверлей при hover (цвет зависит от статуса) -->
           <div
-            class="color-overlay absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-300"
+            class="color-overlay absolute inset-0 pointer-events-none transition-opacity duration-300"
             :class="orderColorScheme.overlay"
           />
 
@@ -339,12 +339,28 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
   transform: translateX(5px);
 }
 
-/* Hover эффект для оверлея */
+/* Оверлей: прозрачен в покое, проявляется при наведении.
+   Ноль задаётся здесь, а не утилитой opacity-0 в разметке. С утилитой это
+   держалось на том, что scoped-стиль идёт вне слоёв и потому бьёт её. Стоило
+   обернуть файл в @layer components — и opacity-0 начинала выигрывать всегда,
+   а подсветка при наведении переставала работать вовсе. Теперь оба значения
+   в одном месте, и спорить не с чем. */
+.color-overlay {
+  opacity: 0;
+}
+
 .order-card:hover .color-overlay {
   opacity: 1;
 }
 
-/* Hover эффект для стека изображений */
+/* ВНИМАНИЕ: три правила ниже не работают.
+   На тех же элементах в разметке стоит инлайновый :style с transform
+   (`translateY(index*2px) scale(1 - index*0.1)`), а инлайн-стиль бьёт любое
+   правило таблицы стилей без !important. Так что стек миниатюр при наведении
+   не шевелится и никогда не шевелился — это не следствие обёртки в слои.
+   Чтобы эффект заработал, базовый transform надо перенести из :style сюда
+   же, в nth-child-правила. Не стал: компонент виден только залогиненному с
+   активным заказом, проверить результат глазами нечем. */
 .order-card:hover .product-thumbnails-container > div > div:nth-child(1) {
   transform: translateY(0) scale(1.05) rotate(-2deg);
 }
