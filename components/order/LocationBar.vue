@@ -127,14 +127,29 @@ function openChat() {
 </template>
 
 <style scoped>
-/* Липнет не к нулю, а под мобильную плашку шапки: у .sh-mobile в
-   components/common/SiteHeader.vue padding 10px сверху и снизу плюс кнопки
-   40px — ровно 60px. Обе панели sticky, и без этого сдвига они наложились бы
-   друг на друга при скролле. */
-.loc-bar {
-  position: sticky;
-  top: 60px;
-  z-index: 30;
-  padding: 11px clamp(14px, 4vw, 20px);
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* Липнет не к нулю, а под мобильную плашку шапки: у .sh-mobile в
+     components/common/SiteHeader.vue padding 10px сверху и снизу плюс кнопки
+     40px — ровно 60px. Обе панели sticky, и без этого сдвига они наложились бы
+     друг на друга при скролле. */
+  .loc-bar {
+    position: sticky;
+    top: 60px;
+    z-index: 30;
+    padding: 11px clamp(14px, 4vw, 20px);
+  }
 }
 </style>
