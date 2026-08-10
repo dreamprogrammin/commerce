@@ -83,77 +83,92 @@ function goBack() {
 </template>
 
 <style scoped>
-.pmh-bar {
-  position: sticky;
-  top: 0;
-  z-index: 60;
-  padding: 8px var(--page-gutter) 6px;
-  background: linear-gradient(180deg, var(--page-surface) 62%, transparent);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.pmh-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 7px;
-  border-radius: 20px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
-  backdrop-filter: blur(24px) saturate(1.9);
-  -webkit-backdrop-filter: blur(24px) saturate(1.9);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 1px rgba(15, 23, 42, 0.05),
-    0 12px 32px rgba(15, 23, 42, 0.16);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.pmh-icon-btn {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  border: none;
-  background: transparent;
-  color: var(--foreground);
-  cursor: pointer;
-  display: grid;
-  place-content: center;
-  transition: color 0.15s ease;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.pmh-icon-btn:hover {
-  color: var(--primary);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.pmh-icon-btn--wished {
-  background: rgba(244, 63, 94, 0.12);
-  color: var(--destructive);
-}
+@layer components {
+  .pmh-bar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    padding: 8px var(--page-gutter) 6px;
+    background: linear-gradient(180deg, var(--page-surface) 62%, transparent);
+  }
 
-.pmh-icon-btn--wished:hover {
-  color: var(--destructive);
-}
+  .pmh-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 7px;
+    border-radius: 20px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
+    backdrop-filter: blur(24px) saturate(1.9);
+    -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      inset 0 -1px 1px rgba(15, 23, 42, 0.05),
+      0 12px 32px rgba(15, 23, 42, 0.16);
+  }
 
-.pmh-thumb {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: inset 0 0 0 1px var(--border);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
+  .pmh-icon-btn {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    border: none;
+    background: transparent;
+    color: var(--foreground);
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: color 0.15s ease;
+  }
 
-.pmh-title {
-  flex: 1;
-  min-width: 0;
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--foreground);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  .pmh-icon-btn:hover {
+    color: var(--primary);
+  }
+
+  .pmh-icon-btn--wished {
+    background: rgba(244, 63, 94, 0.12);
+    color: var(--destructive);
+  }
+
+  .pmh-icon-btn--wished:hover {
+    color: var(--destructive);
+  }
+
+  .pmh-thumb {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--border);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
+  .pmh-title {
+    flex: 1;
+    min-width: 0;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 </style>

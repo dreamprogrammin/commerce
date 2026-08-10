@@ -336,77 +336,92 @@ function getCategoryColor(index: number): string {
 </template>
 
 <style scoped>
-/* Анимация появления */
-@keyframes fadeInUp {
-  from {
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* Анимация появления */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .category-card {
+    animation: fadeInUp 0.4s ease-out forwards;
     opacity: 0;
-    transform: translateY(16px);
+    animation-delay: var(--animation-delay, 0ms);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .promo-card {
+    animation: fadeInUp 0.4s ease-out forwards;
   }
-}
 
-.category-card {
-  animation: fadeInUp 0.4s ease-out forwards;
-  opacity: 0;
-  animation-delay: var(--animation-delay, 0ms);
-}
-
-.promo-card {
-  animation: fadeInUp 0.4s ease-out forwards;
-}
-
-/* ==========================================
-   Сетка каталога — mobile: 2 колонки, desktop: 3 колонки
-   Masonry-подобная сетка с row-span для больших карточек
-   ========================================== */
-.catalog-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: minmax(130px, auto);
-  gap: 0.75rem;
-}
-
-/* Маленькая карточка: 1 ряд */
-.catalog-card-small {
-  grid-row: span 1;
-  min-height: 130px;
-}
-
-/* Средняя карточка: 2 ряда */
-.catalog-card-medium {
-  grid-row: span 2;
-  min-height: 268px;
-}
-
-/* Большая карточка: 2 ряда */
-.catalog-card-large {
-  grid-row: span 2;
-  min-height: 268px;
-}
-
-/* Desktop: 3 колонки с увеличенными высотами */
-@media (min-width: 768px) {
+  /* ==========================================
+     Сетка каталога — mobile: 2 колонки, desktop: 3 колонки
+     Masonry-подобная сетка с row-span для больших карточек
+     ========================================== */
   .catalog-grid {
-    grid-template-columns: repeat(3, 1fr);
-    grid-auto-rows: minmax(160px, auto);
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: minmax(130px, auto);
+    gap: 0.75rem;
   }
 
+  /* Маленькая карточка: 1 ряд */
   .catalog-card-small {
-    min-height: 160px;
+    grid-row: span 1;
+    min-height: 130px;
   }
 
+  /* Средняя карточка: 2 ряда */
   .catalog-card-medium {
     grid-row: span 2;
-    min-height: 330px;
+    min-height: 268px;
   }
 
+  /* Большая карточка: 2 ряда */
   .catalog-card-large {
     grid-row: span 2;
-    min-height: 330px;
+    min-height: 268px;
+  }
+
+  /* Desktop: 3 колонки с увеличенными высотами */
+  @media (min-width: 768px) {
+    .catalog-grid {
+      grid-template-columns: repeat(3, 1fr);
+      grid-auto-rows: minmax(160px, auto);
+      gap: 1rem;
+    }
+
+    .catalog-card-small {
+      min-height: 160px;
+    }
+
+    .catalog-card-medium {
+      grid-row: span 2;
+      min-height: 330px;
+    }
+
+    .catalog-card-large {
+      grid-row: span 2;
+      min-height: 330px;
+    }
   }
 }
 </style>

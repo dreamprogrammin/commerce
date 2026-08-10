@@ -183,23 +183,38 @@ function navigateLightbox(direction: number, images: ProductReview['review_image
 </template>
 
 <style scoped>
-.rvc-card {
-  padding: 15px 16px;
-  border-radius: 18px;
-  background: var(--muted);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.rvc-avatar {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  overflow: hidden;
-  display: grid;
-  place-content: center;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  .rvc-card {
+    padding: 15px 16px;
+    border-radius: 18px;
+    background: var(--muted);
+  }
+
+  .rvc-avatar {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    overflow: hidden;
+    display: grid;
+    place-content: center;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
 }
 </style>
