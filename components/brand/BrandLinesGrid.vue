@@ -257,8 +257,8 @@ function getLineLink(lineSlug: string): string {
   /* ── Liquid Glass: панель-контейнер ── */
   .liquid-glass-panel {
     background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
+    backdrop-filter: blur(16px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow:
       0 8px 32px rgba(31, 38, 135, 0.08),

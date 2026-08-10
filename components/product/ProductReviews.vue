@@ -456,8 +456,8 @@ onUnmounted(() => {
     border-radius: 13px;
     border: 1px solid rgba(255, 255, 255, 0.9);
     background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.62));
-    backdrop-filter: blur(10px) saturate(1.6);
     -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(10px) saturate(1.6);
     box-shadow:
       inset 0 1px 0 #fff,
       0 5px 14px rgba(43, 127, 255, 0.16);
