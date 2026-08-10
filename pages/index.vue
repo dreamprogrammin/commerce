@@ -593,85 +593,100 @@ useRobotsRule({ index: true, follow: true })
 </template>
 
 <style scoped>
-/* Мобильная распорка = высота фиксированного героя; на десктопе героя нет
-   поверх, лист наезжает отрицательным margin'ом (см. .home-content). */
-.home-hero-spacer {
-  height: min(62vh, 540px);
-  background: #dfe7ee;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.home-content {
-  position: relative;
-  z-index: 6;
-  margin-top: -18px;
-  background: #fff;
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -12px 28px rgb(15 23 42 / 0.18);
-  min-height: 70vh;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.home-shop-tab-wrap {
-  position: relative;
-  height: 0;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.home-shop-tab {
-  position: absolute;
-  top: -19px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 7;
-  height: 38px;
-  padding: 0 22px;
-  border-radius: 999px;
-  background: #fff;
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 14px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.home-promo-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-
-/* Edge-bleed рельсов на мобильном (как .rail-bleed в прототипе).
-   Отступ обязан браться из --page-gutter — иначе рельс вылезает за контейнер
-   и даёт горизонтальный скролл всей страницы. */
-.rail-bleed {
-  margin-inline: 0;
-}
-
-@media (max-width: 767px) {
-  .rail-bleed {
-    margin-inline: calc(-1 * var(--page-gutter));
-    padding-inline: var(--page-gutter);
-  }
-}
-
-@media (min-width: 1024px) {
+@layer components {
+  /* Мобильная распорка = высота фиксированного героя; на десктопе героя нет
+     поверх, лист наезжает отрицательным margin'ом (см. .home-content). */
   .home-hero-spacer {
-    display: none;
+    height: min(62vh, 540px);
+    background: #dfe7ee;
   }
 
   .home-content {
-    margin-top: clamp(-60px, -4vw, -36px);
-    border-radius: 28px 28px 0 0;
-    box-shadow: 0 -10px 30px rgb(0 0 0 / 0.07);
-    min-height: 0;
+    position: relative;
+    z-index: 6;
+    margin-top: -18px;
+    background: #fff;
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -12px 28px rgb(15 23 42 / 0.18);
+    min-height: 70vh;
+  }
+
+  .home-shop-tab-wrap {
+    position: relative;
+    height: 0;
+  }
+
+  .home-shop-tab {
+    position: absolute;
+    top: -19px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 7;
+    height: 38px;
+    padding: 0 22px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .home-promo-grid {
-    grid-template-columns: 1.5fr 1fr;
-    gap: 20px;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* Edge-bleed рельсов на мобильном (как .rail-bleed в прототипе).
+     Отступ обязан браться из --page-gutter — иначе рельс вылезает за контейнер
+     и даёт горизонтальный скролл всей страницы. */
+  .rail-bleed {
+    margin-inline: 0;
+  }
+
+  @media (max-width: 767px) {
+    .rail-bleed {
+      margin-inline: calc(-1 * var(--page-gutter));
+      padding-inline: var(--page-gutter);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .home-hero-spacer {
+      display: none;
+    }
+
+    .home-content {
+      margin-top: clamp(-60px, -4vw, -36px);
+      border-radius: 28px 28px 0 0;
+      box-shadow: 0 -10px 30px rgb(0 0 0 / 0.07);
+      min-height: 0;
+    }
+
+    .home-promo-grid {
+      grid-template-columns: 1.5fr 1fr;
+      gap: 20px;
+      align-items: stretch;
+    }
   }
 }
 </style>
