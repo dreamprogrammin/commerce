@@ -222,18 +222,36 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   right: 0;
   z-index: 90;
   padding: 10px 0 4px;
-  opacity: 0;
+
+  /*
+   * Появление — только сдвигом, БЕЗ анимации opacity.
+   * Любое промежуточное значение opacity делает этот элемент новым backdrop
+   * root, и `backdrop-filter` у .csb-capsule внутри перестаёт размывать
+   * страницу: блюр пропадал на все 0.3s перехода, капсула вспыхивала
+   * насквозь прозрачной. Проверено попиксельно — при opacity:.99 сквозь
+   * капсулу читаются названия брендов и бейджи скидок, при opacity:1 они
+   * размыты. Transform на это не влияет, проверялся отдельно.
+   *
+   * Прятать через opacity тут и не нужно: translateY(-130%) уводит панель
+   * за верхний край, а visibility убирает её из чтения скринридером и из
+   * порядка фокуса. Задержка visibility в 0.3s — чтобы панель исчезала
+   * после того, как уедет, а не мгновенно.
+   */
   transform: translateY(-130%);
+  visibility: hidden;
   pointer-events: none;
   transition:
     transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
-    opacity 0.3s ease;
+    visibility 0s linear 0.3s;
 }
 
 .csb-bar--shown {
-  opacity: 1;
   transform: translateY(0);
+  visibility: visible;
   pointer-events: auto;
+  transition:
+    transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
+    visibility 0s;
 }
 
 .csb-inner {
