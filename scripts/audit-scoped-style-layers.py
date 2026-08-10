@@ -169,6 +169,7 @@ def analyse(path):
 
     # класс -> {состояние -> набор свойств}; состояние None = базовое правило
     rules = collections.defaultdict(lambda: collections.defaultdict(set))
+    descendant = collections.defaultdict(set)
     complex_sel = []
     for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
         sel = sel.strip()
@@ -183,6 +184,17 @@ def analyse(path):
                 continue
             if re.search(r'[\s>+~]', part) or '::' in part or ':deep' in part:
                 complex_sel.append((part, sorted(props)))
+                # Правило вида `.card:hover .icon` применяется к ЭЛЕМЕНТУ .icon,
+                # просто при условии на предке. Значит утилита на самом .icon с
+                # тем же свойством после обёртки его перебьёт — и, в отличие от
+                # обычного случая, перебьёт во всех состояниях сразу.
+                # Псевдоэлементы (::-webkit-scrollbar) сюда не годятся: утилита
+                # в них не попадает, и :deep()/:global тоже пропускаем — там
+                # цель вне разметки этого файла.
+                if '::' not in part and ':deep' not in part and ':global' not in part:
+                    tail = re.split(r'[\s>+~]+', part.strip())[-1]
+                    for c in re.findall(r'\.([a-zA-Z][\w-]*)', tail):
+                        descendant[c] |= props
                 continue
             state = None
             sm = re.search(r':(hover|focus|disabled|focus-within|active)', part)
@@ -205,6 +217,15 @@ def analyse(path):
 
     conflicts = set()
     for toks in elements:
+        # правила «через предка»
+        for o in [t for t in toks if t in descendant]:
+            css_props = {q for p in descendant[o] for q in expand(p)}
+            for t in toks:
+                if t in descendant or t in rules:
+                    continue
+                prop, _ = util_prop(t)
+                if prop and prop in css_props:
+                    conflicts.add((f'.{o} (через правило на предке)', None, t, (prop,)))
         own = [t for t in toks if t in rules]
         if not own:
             continue
@@ -247,9 +268,9 @@ def report_one(path):
             print(f'   {s}  ->  {", ".join(p)}')
     if conflicts:
         print(f'\n!!! КОНФЛИКТЫ ({len(conflicts)}) — обёртка изменит вид:')
-        for o, rstate, t, hit in sorted(conflicts):
-            rs = f':{rstate}' if rstate else ''
-            print(f'   .{o}{rs} спорит с {t} за {", ".join(hit)}')
+        for o, rstate, t, hit in sorted(conflicts, key=lambda c: (c[0], c[2])):
+            label = o if o.startswith('.') else f'.{o}{f":{rstate}" if rstate else ""}'
+            print(f'   {label} спорит с {t} за {", ".join(hit)}')
     if conflicts or haz:
         return 1
     print('\nЯвных конфликтов не видно — но это НЕ гарантия. Проверка статическая\n'
