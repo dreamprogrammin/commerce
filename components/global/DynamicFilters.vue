@@ -560,229 +560,244 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.df-aside {
-  /* Must clear CategoryScrollBar (fixed, top:0/z:90, ~59px tall) once it
-     docks on scroll — SiteHeader itself is non-sticky on this page, so it's
-     not a factor. Otherwise the "Фильтры" title and first row stick
-     underneath it, hidden and unclickable. */
-  position: sticky;
-  top: 70px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: calc(100vh - 70px - 1rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 6px;
-  padding-bottom: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.df-aside::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.df-aside::-webkit-scrollbar-track {
-  background: transparent;
-  margin: 10px 0;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.df-aside::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 99px;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.df-aside.scrolling {
-  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
-}
+@layer components {
+  .df-aside {
+    /* Must clear CategoryScrollBar (fixed, top:0/z:90, ~59px tall) once it
+       docks on scroll — SiteHeader itself is non-sticky on this page, so it's
+       not a factor. Otherwise the "Фильтры" title and first row stick
+       underneath it, hidden and unclickable. */
+    position: sticky;
+    top: 70px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: calc(100vh - 70px - 1rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 6px;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
 
-.df-aside.scrolling::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.35);
-}
+  .df-aside::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
 
-.df-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 6px;
-  flex: none;
-}
+  .df-aside::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 10px 0;
+  }
 
-.df-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font: 800 17px var(--font-sans);
-  color: var(--foreground);
-}
+  .df-aside::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 99px;
+  }
 
-.df-title-icon {
-  width: 17px;
-  height: 17px;
-  color: var(--primary);
-}
+  .df-aside.scrolling {
+    scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+  }
 
-.df-reset {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font: 600 13px var(--font-sans);
-  color: var(--primary);
-  padding: 0;
-}
+  .df-aside.scrolling::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.35);
+  }
 
-.df-reset:hover {
-  color: var(--blue-700);
-}
+  .df-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 6px;
+    flex: none;
+  }
 
-.df-card {
-  flex: none;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 16px 16px 8px;
-}
+  .df-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font: 800 17px var(--font-sans);
+    color: var(--foreground);
+  }
 
-.df-card--tight {
-  padding: 8px;
-}
+  .df-title-icon {
+    width: 17px;
+    height: 17px;
+    color: var(--primary);
+  }
 
-.df-card-title {
-  font: 700 15px var(--font-sans);
-  color: var(--foreground);
-  margin-bottom: 12px;
-}
+  .df-reset {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font: 600 13px var(--font-sans);
+    color: var(--primary);
+    padding: 0;
+  }
 
-.df-card--tight .df-card-title {
-  margin: 4px 0 6px 4px;
-}
+  .df-reset:hover {
+    color: var(--blue-700);
+  }
 
-.df-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  border-radius: 12px;
-  cursor: pointer;
-  text-align: left;
-  font: 600 14px var(--font-sans);
-  color: var(--foreground);
-  margin-bottom: 8px;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
+  .df-card {
+    flex: none;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px 16px 8px;
+  }
 
-.df-row:last-child {
-  margin-bottom: 0;
-}
+  .df-card--tight {
+    padding: 8px;
+  }
 
-.df-row--boxed {
-  margin-bottom: 4px;
-  padding: 0 4px;
-}
+  .df-card-title {
+    font: 700 15px var(--font-sans);
+    color: var(--foreground);
+    margin-bottom: 12px;
+  }
 
-.df-row--active {
-  background: rgba(43, 127, 255, 0.12);
-  color: var(--primary);
-}
+  .df-card--tight .df-card-title {
+    margin: 4px 0 6px 4px;
+  }
 
-.df-row-label {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  .df-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 10px;
+    border: none;
+    background: transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    font: 600 14px var(--font-sans);
+    color: var(--foreground);
+    margin-bottom: 8px;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
+  }
 
-.df-row-count {
-  font: 500 12px var(--font-sans);
-  color: var(--muted-foreground);
-}
+  .df-row:last-child {
+    margin-bottom: 0;
+  }
 
-.df-box {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border);
-  background: #fff;
-  display: grid;
-  place-content: center;
-  transition: all 0.15s ease;
-}
+  .df-row--boxed {
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
 
-.df-box--active {
-  border-color: var(--primary);
-  background: var(--primary);
-}
+  .df-row--active {
+    background: rgba(43, 127, 255, 0.12);
+    color: var(--primary);
+  }
 
-.df-box-icon {
-  width: 13px;
-  height: 13px;
-  color: #fff;
-}
+  .df-row-label {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-.df-slider-wrap {
-  padding: 6px 4px 12px;
-}
+  .df-row-count {
+    font: 500 12px var(--font-sans);
+    color: var(--muted-foreground);
+  }
 
-.df-slider-values {
-  display: flex;
-  justify-content: space-between;
-  font: 600 13px var(--font-sans);
-  color: var(--muted-foreground);
-  padding-bottom: 16px;
-}
+  .df-box {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: #fff;
+    display: grid;
+    place-content: center;
+    transition: all 0.15s ease;
+  }
 
-.df-color-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding-bottom: 12px;
-}
+  .df-box--active {
+    border-color: var(--primary);
+    background: var(--primary);
+  }
 
-.df-color-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-}
+  .df-box-icon {
+    width: 13px;
+    height: 13px;
+    color: #fff;
+  }
 
-.df-color-item--active {
-  background: rgba(43, 127, 255, 0.1);
-  box-shadow: 0 0 0 2px var(--primary) inset;
-}
+  .df-slider-wrap {
+    padding: 6px 4px 12px;
+  }
 
-.df-color-swatch {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 2px solid var(--border);
-}
+  .df-slider-values {
+    display: flex;
+    justify-content: space-between;
+    font: 600 13px var(--font-sans);
+    color: var(--muted-foreground);
+    padding-bottom: 16px;
+  }
 
-.df-color-item--active .df-color-swatch {
-  border-color: var(--primary);
-}
+  .df-color-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding-bottom: 12px;
+  }
 
-.df-color-label {
-  font: 500 11px var(--font-sans);
-  color: var(--foreground);
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
+  .df-color-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .df-color-item--active {
+    background: rgba(43, 127, 255, 0.1);
+    box-shadow: 0 0 0 2px var(--primary) inset;
+  }
+
+  .df-color-swatch {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+  }
+
+  .df-color-item--active .df-color-swatch {
+    border-color: var(--primary);
+  }
+
+  .df-color-label {
+    font: 500 11px var(--font-sans);
+    color: var(--foreground);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
 }
 </style>

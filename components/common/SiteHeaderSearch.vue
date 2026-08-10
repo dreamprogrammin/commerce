@@ -406,108 +406,123 @@ function formatPrice(price: number, discount?: number) {
 </template>
 
 <style scoped>
-.sh-search {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 46px;
-  padding: 0 18px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 999px;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.sh-search--dense {
-  height: 38px;
-  padding: 0 13px;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 12px;
-  box-shadow: none;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.sh-search__icon {
-  flex: none;
-  width: 19px;
-  height: 19px;
-  color: var(--muted-foreground);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.sh-search--dense .sh-search__icon {
-  width: 17px;
-  height: 17px;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.sh-search__input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  font: 500 15px var(--font-sans);
-  color: var(--foreground);
-}
+@layer components {
+  .sh-search {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 46px;
+    padding: 0 18px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
+  }
 
-.sh-search--dense .sh-search__input {
-  font-size: 14px;
-}
+  .sh-search--dense {
+    height: 38px;
+    padding: 0 13px;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    box-shadow: none;
+  }
 
-/* Убираем нативный крестик у type=search */
-.sh-search__input::-webkit-search-decoration,
-.sh-search__input::-webkit-search-cancel-button {
-  appearance: none;
-}
+  .sh-search__icon {
+    flex: none;
+    width: 19px;
+    height: 19px;
+    color: var(--muted-foreground);
+  }
 
-.sh-search__clear {
-  flex: none;
-  display: grid;
-  place-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  color: var(--muted-foreground);
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
+  .sh-search--dense .sh-search__icon {
+    width: 17px;
+    height: 17px;
+  }
 
-.sh-search__clear:hover {
-  background: var(--muted);
-  color: var(--foreground);
-}
+  .sh-search__input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: 500 15px var(--font-sans);
+    color: var(--foreground);
+  }
 
-.sh-search__submit {
-  flex: none;
-  height: 32px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 999px;
-  background: var(--primary);
-  color: #fff;
-  font: 600 13.5px var(--font-sans);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease;
-}
+  .sh-search--dense .sh-search__input {
+    font-size: 14px;
+  }
 
-/* var(--blue-600) doesn't exist (Tailwind v4 generates --color-blue-600, and
-   even that isn't guaranteed to survive tree-shaking) — --brand-hover is the
-   already-proven literal for this exact primary-button-hover case, see
-   StickySearchRow.vue / BrandsRail.vue. */
-.sh-search__submit:hover {
-  background: var(--brand-hover);
-}
+  /* Убираем нативный крестик у type=search */
+  .sh-search__input::-webkit-search-decoration,
+  .sh-search__input::-webkit-search-cancel-button {
+    appearance: none;
+  }
 
-/* Pulls the button flush toward the pill's own rounded edge instead of
-   sitting inside the regular (symmetric) form padding — matches the
-   mockup's own form, which used a tighter right pad (6px) than left (16px)
-   specifically because the button supplies its own visual edge. Only
-   applies when the button is actually rendered; doesn't touch the
-   left/icon side or any other consumer's padding. */
-.sh-search--with-submit {
-  padding-right: 6px;
+  .sh-search__clear {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    color: var(--muted-foreground);
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .sh-search__clear:hover {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+
+  .sh-search__submit {
+    flex: none;
+    height: 32px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fff;
+    font: 600 13.5px var(--font-sans);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+
+  /* var(--blue-600) doesn't exist (Tailwind v4 generates --color-blue-600, and
+     even that isn't guaranteed to survive tree-shaking) — --brand-hover is the
+     already-proven literal for this exact primary-button-hover case, see
+     StickySearchRow.vue / BrandsRail.vue. */
+  .sh-search__submit:hover {
+    background: var(--brand-hover);
+  }
+
+  /* Pulls the button flush toward the pill's own rounded edge instead of
+     sitting inside the regular (symmetric) form padding — matches the
+     mockup's own form, which used a tighter right pad (6px) than left (16px)
+     specifically because the button supplies its own visual edge. Only
+     applies when the button is actually rendered; doesn't touch the
+     left/icon side or any other consumer's padding. */
+  .sh-search--with-submit {
+    padding-right: 6px;
+  }
 }
 </style>
