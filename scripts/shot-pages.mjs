@@ -64,6 +64,26 @@ for (const [wName, width, height] of widths) {
   console.log(`listing     http=${await go('/catalog/all')}`)
   await shot('03-listing')
 
+  // Панель фильтров. MobileCatalogDrawer и DynamicFilters в закрытом виде в
+  // разметке отсутствуют, поэтому без этого шага они не проверяются вовсе.
+  try {
+    const fb = page.locator('button[aria-label="Фильтры"]').first()
+    await fb.waitFor({ state: 'visible', timeout: 8000 })
+    await fb.click({ timeout: 8000, force: true })
+    await page.waitForTimeout(1800)
+    const drawer = await page.locator('.mcd-aside, .df-aside').count()
+    console.log(`  панель фильтров: элементов .mcd-aside/.df-aside = ${drawer}`)
+    await shot('03b-filters')
+    // Не пытаемся закрыть кнопкой или Escape: панель остаётся поверх страницы
+    // и перехватывает клики, из-за чего дальше не добавлялись товары в корзину.
+    // Перезагрузка возвращает заведомо чистое состояние.
+    await go('/catalog/all')
+    await page.waitForTimeout(800)
+  }
+  catch (e) {
+    console.log(`  фильтры не открылись: ${e.message.split('\n')[0].slice(0, 70)}`)
+  }
+
   // Наполняем корзину через интерфейс
   const addBtns = page.locator('[aria-label="В корзину"]')
   const n = await addBtns.count()
