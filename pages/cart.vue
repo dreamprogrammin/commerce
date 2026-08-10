@@ -823,141 +823,156 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 </template>
 
 <style scoped>
-/* Поверхность карточек макета: белое «стекло» с внутренним рельефом.
-   Тот же рецепт, что у .pc-card в components/global/ProductCard.vue —
-   карточки корзины и карточки товара обязаны читаться как один материал. */
-.cart-surface {
-  border: 1px solid var(--border);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    inset 0 0 0 1px rgb(255 255 255 / 0.5),
-    0 1px 0 rgb(15 23 42 / 0.05);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-/* Бонусный чип. Угол 100deg взят из макета — утилитой не выразить
-   (bg-gradient-to-r даёт 90deg), поэтому свой класс. Цвета литералами
-   по той же причине, что и ниже: Tailwind 4 выкидывает переменную темы,
-   если её не использует ни одна утилита. */
-.cart-bonus-chip {
-  background: linear-gradient(100deg, oklch(0.98 0.016 73.684) 0%, oklch(0.954 0.038 75.164) 100%);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.cart-bonus-chip__text {
-  background: linear-gradient(100deg, oklch(0.75 0.183 55.934) 0%, oklch(0.592 0.249 0.584) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: var(--bonus);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-/* Синий градиентный степпер — общий с .pc-stepper карточки товара.
-   Значения записаны литералами, а не через var(--color-blue-*): Tailwind 4
-   выкидывает переменную темы, если её не использует ни одна утилита. */
-.cart-stepper {
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 8px rgb(6 53 138 / 0.28),
-    0 8px 20px rgb(43 127 255 / 0.3);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.cart-stepper-btn {
-  background: rgb(255 255 255 / 0.26);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
-  color: #fff;
-  transition: background 0.12s ease;
-}
-.cart-stepper-btn:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.38);
-}
+@layer components {
+  /* Поверхность карточек макета: белое «стекло» с внутренним рельефом.
+     Тот же рецепт, что у .pc-card в components/global/ProductCard.vue —
+     карточки корзины и карточки товара обязаны читаться как один материал. */
+  .cart-surface {
+    border: 1px solid var(--border);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      inset 0 0 0 1px rgb(255 255 255 / 0.5),
+      0 1px 0 rgb(15 23 42 / 0.05);
+  }
 
-.cart-cta {
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 8px rgb(6 53 138 / 0.28),
-    0 8px 20px rgb(43 127 255 / 0.3);
-  transition: background 0.15s ease;
-}
-.cart-cta:hover {
-  background: linear-gradient(150deg, rgb(96 163 255 / 1), rgb(29 112 246 / 0.92));
-}
+  /* Бонусный чип. Угол 100deg взят из макета — утилитой не выразить
+     (bg-gradient-to-r даёт 90deg), поэтому свой класс. Цвета литералами
+     по той же причине, что и ниже: Tailwind 4 выкидывает переменную темы,
+     если её не использует ни одна утилита. */
+  .cart-bonus-chip {
+    background: linear-gradient(100deg, oklch(0.98 0.016 73.684) 0%, oklch(0.954 0.038 75.164) 100%);
+  }
 
-/* Лента рекомендаций: полосу прокрутки прячем, свайп остаётся. */
-.cart-rail {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  scroll-behavior: smooth;
-}
-.cart-rail::-webkit-scrollbar {
-  display: none;
-}
+  .cart-bonus-chip__text {
+    background: linear-gradient(100deg, oklch(0.75 0.183 55.934) 0%, oklch(0.592 0.249 0.584) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: var(--bonus);
+  }
 
-/* Липкая панель. Базовая позиция — у нижнего края (когда навбар скрыт),
-   при видимом навбаре поднимаем на его высоту. Анимируем transform, а не
-   bottom + env(): последнее не composited и дёргается на iOS. */
-.cart-mobile-cta {
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
-}
-.cart-mobile-cta--above-nav {
-  transform: translateY(-68px);
-}
-.cart-mobile-cta--at-bottom {
-  transform: translateY(0);
-}
+  /* Синий градиентный степпер — общий с .pc-stepper карточки товара.
+     Значения записаны литералами, а не через var(--color-blue-*): Tailwind 4
+     выкидывает переменную темы, если её не использует ни одна утилита. */
+  .cart-stepper {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 8px rgb(6 53 138 / 0.28),
+      0 8px 20px rgb(43 127 255 / 0.3);
+  }
 
-.cart-mobile-cta__btn {
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(180deg, rgb(59 138 255 / 0.92), rgb(43 127 255 / 0.9));
-  backdrop-filter: blur(22px) saturate(1.6);
-  -webkit-backdrop-filter: blur(22px) saturate(1.6);
-  box-shadow:
-    0 14px 34px rgb(43 127 255 / 0.36),
-    inset 0 1px 0 rgb(255 255 255 / 0.4);
-  transition: background 0.15s ease;
-}
-.cart-mobile-cta__btn:hover {
-  background: linear-gradient(180deg, rgb(59 138 255 / 1), rgb(37 105 235 / 0.96));
-}
+  .cart-stepper-btn {
+    background: rgb(255 255 255 / 0.26);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
+    color: #fff;
+    transition: background 0.12s ease;
+  }
+  .cart-stepper-btn:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.38);
+  }
 
-/* Flip counter styles */
-/* flex-shrink: 0 обязателен. Колонка лежит во флекс-контейнере (в сайдбаре
-   это .flex у обёртки цены, в мобильной панели — <b class="flex">), а у
-   флекс-элементов по умолчанию flex-shrink: 1. При длинной сумме на узком
-   экране колонки сжимались, и цифры подрезало по бокам: у колонки
-   overflow: hidden. Ширина 0.65em здесь — не пожелание, а размер барабана. */
-.digit-column {
-  position: relative;
-  display: inline-block;
-  flex-shrink: 0;
-  width: 0.65em;
-  height: 1.5em;
-  overflow: hidden;
-  line-height: 1.5em;
-  text-align: center;
-  vertical-align: baseline;
-}
+  .cart-cta {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 8px rgb(6 53 138 / 0.28),
+      0 8px 20px rgb(43 127 255 / 0.3);
+    transition: background 0.15s ease;
+  }
+  .cart-cta:hover {
+    background: linear-gradient(150deg, rgb(96 163 255 / 1), rgb(29 112 246 / 0.92));
+  }
 
-.digit-ribbon {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  will-change: transform;
-}
+  /* Лента рекомендаций: полосу прокрутки прячем, свайп остаётся. */
+  .cart-rail {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-behavior: smooth;
+  }
+  .cart-rail::-webkit-scrollbar {
+    display: none;
+  }
 
-/* display:block обязателен: в мобильной панели барабан собран из <span>
-   (родитель — инлайновый <b>), а высота на инлайновом элементе не работает —
-   лента перестала бы прокручиваться ровно на одну цифру. */
-.digit-item {
-  display: block;
-  height: 1.5em;
-  line-height: 1.5em;
-  text-align: center;
+  /* Липкая панель. Базовая позиция — у нижнего края (когда навбар скрыт),
+     при видимом навбаре поднимаем на его высоту. Анимируем transform, а не
+     bottom + env(): последнее не composited и дёргается на iOS. */
+  .cart-mobile-cta {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  }
+  .cart-mobile-cta--above-nav {
+    transform: translateY(-68px);
+  }
+  .cart-mobile-cta--at-bottom {
+    transform: translateY(0);
+  }
+
+  .cart-mobile-cta__btn {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(180deg, rgb(59 138 255 / 0.92), rgb(43 127 255 / 0.9));
+    backdrop-filter: blur(22px) saturate(1.6);
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+    box-shadow:
+      0 14px 34px rgb(43 127 255 / 0.36),
+      inset 0 1px 0 rgb(255 255 255 / 0.4);
+    transition: background 0.15s ease;
+  }
+  .cart-mobile-cta__btn:hover {
+    background: linear-gradient(180deg, rgb(59 138 255 / 1), rgb(37 105 235 / 0.96));
+  }
+
+  /* Flip counter styles */
+  /* flex-shrink: 0 обязателен. Колонка лежит во флекс-контейнере (в сайдбаре
+     это .flex у обёртки цены, в мобильной панели — <b class="flex">), а у
+     флекс-элементов по умолчанию flex-shrink: 1. При длинной сумме на узком
+     экране колонки сжимались, и цифры подрезало по бокам: у колонки
+     overflow: hidden. Ширина 0.65em здесь — не пожелание, а размер барабана. */
+  .digit-column {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+    width: 0.65em;
+    height: 1.5em;
+    overflow: hidden;
+    line-height: 1.5em;
+    text-align: center;
+    vertical-align: baseline;
+  }
+
+  .digit-ribbon {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    will-change: transform;
+  }
+
+  /* display:block обязателен: в мобильной панели барабан собран из <span>
+     (родитель — инлайновый <b>), а высота на инлайновом элементе не работает —
+     лента перестала бы прокручиваться ровно на одну цифру. */
+  .digit-item {
+    display: block;
+    height: 1.5em;
+    line-height: 1.5em;
+    text-align: center;
+  }
 }
 </style>

@@ -324,159 +324,174 @@ function getImageAlt(image: ProductImageRow, index: number): string {
 </template>
 
 <style scoped>
-.pg-card {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 14px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 14px;
-  box-shadow: var(--elevation-card);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.pg-rail {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.pg-rail::-webkit-scrollbar {
-  display: none;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.pg-thumb {
-  flex: none;
-  width: 60px;
-  height: 60px;
-  border-radius: 14px;
-  padding: 7px;
-  cursor: pointer;
-  background: var(--card);
-  border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  display: grid;
-  place-items: center;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.pg-thumb--active {
-  border: 2px solid var(--primary);
-  box-shadow: 0 4px 12px rgb(43 127 255 / 0.22);
-}
-
-.pg-stage {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  aspect-ratio: 1;
-  border-radius: 22px;
-  overflow: hidden;
-  background: var(--card);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -18px 40px rgba(15, 23, 42, 0.05);
-}
-
-.pg-discount {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 2;
-  padding: 6px 13px;
-  border-radius: 999px;
-  background: var(--discount);
-  color: #fff;
-  font-weight: 800;
-  font-size: 14px;
-  box-shadow: 0 6px 16px rgb(220 38 38 / 0.32);
-}
-
-.pg-slider {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  cursor: grab;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  touch-action: pan-y pinch-zoom;
-}
-
-.pg-slider::-webkit-scrollbar {
-  display: none;
-}
-
-.pg-slider:active {
-  cursor: grabbing;
-}
-
-.pg-slide {
-  flex: 0 0 100%;
-  width: 100%;
-  height: 100%;
-  scroll-snap-align: center;
-  scroll-snap-stop: always;
-  padding: 18px;
-  cursor: zoom-in;
-}
-
-.pg-dots {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 13px;
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.pg-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--rating-empty);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
-  transition:
-    width 0.22s ease,
-    background 0.22s ease;
-}
-
-.pg-dot--active {
-  width: 20px;
-  background: var(--primary);
-}
-
-@media (width >= 64rem) {
+@layer components {
   .pg-card {
-    flex-direction: row;
-    padding: 18px;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 14px;
+    box-shadow: var(--elevation-card);
   }
 
   .pg-rail {
-    flex-direction: column;
-    overflow-x: visible;
-    overflow-y: auto;
-    max-height: 560px;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .pg-rail::-webkit-scrollbar {
+    display: none;
   }
 
   .pg-thumb {
-    width: 72px;
-    height: 72px;
+    flex: none;
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+    padding: 7px;
+    cursor: pointer;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    display: grid;
+    place-items: center;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .pg-thumb--active {
+    border: 2px solid var(--primary);
+    box-shadow: 0 4px 12px rgb(43 127 255 / 0.22);
+  }
+
+  .pg-stage {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    aspect-ratio: 1;
+    border-radius: 22px;
+    overflow: hidden;
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -18px 40px rgba(15, 23, 42, 0.05);
+  }
+
+  .pg-discount {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 2;
+    padding: 6px 13px;
+    border-radius: 999px;
+    background: var(--discount);
+    color: #fff;
+    font-weight: 800;
+    font-size: 14px;
+    box-shadow: 0 6px 16px rgb(220 38 38 / 0.32);
+  }
+
+  .pg-slider {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    cursor: grab;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .pg-slider::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pg-slider:active {
+    cursor: grabbing;
   }
 
   .pg-slide {
-    padding: 34px;
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    padding: 18px;
+    cursor: zoom-in;
+  }
+
+  .pg-dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 13px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .pg-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--rating-empty);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+    transition:
+      width 0.22s ease,
+      background 0.22s ease;
+  }
+
+  .pg-dot--active {
+    width: 20px;
+    background: var(--primary);
+  }
+
+  @media (width >= 64rem) {
+    .pg-card {
+      flex-direction: row;
+      padding: 18px;
+    }
+
+    .pg-rail {
+      flex-direction: column;
+      overflow-x: visible;
+      overflow-y: auto;
+      max-height: 560px;
+    }
+
+    .pg-thumb {
+      width: 72px;
+      height: 72px;
+    }
+
+    .pg-slide {
+      padding: 34px;
+    }
   }
 }
 </style>
