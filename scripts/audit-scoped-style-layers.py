@@ -135,7 +135,14 @@ def third_party_hazards(text):
     беслойным. После обёртки иконки поехали с 19px на 16px.
 
     Ловим статически самый частый вид: свой класс на <Icon>, задающий размер.
+
+    Если в nuxt.config задан `icon.cssLayer`, опасности нет: CSS иконок сам
+    лежит в слое и проигрывает и утилитам, и компонентам. Тогда проверка
+    молчит.
     """
+    cfg = ROOT / 'nuxt.config.ts'
+    if cfg.exists() and re.search(r'^\s*cssLayer:', cfg.read_text(encoding='utf-8'), re.M):
+        return []
     tmpl = text.split('<style')[0]
     m = re.search(r'<style[^>]*\bscoped\b[^>]*>(.*?)</style>', text, re.S)
     if not m:
