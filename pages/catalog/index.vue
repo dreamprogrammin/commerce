@@ -4,6 +4,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { promoEmoji, promoGradientClass, promoSubtitle } from '@/utils/promoTiles'
 
 definePageMeta({ layout: 'catalog' })
 
@@ -273,9 +274,7 @@ function getCategoryColor(index: number): string {
               :key="item.id"
               :to="item.href"
               class="promo-card relative block overflow-hidden rounded-2xl active:scale-[0.97] transition-transform duration-200 group"
-              :class="item.id === 'sale'
-                ? 'bg-gradient-to-br from-amber-400 via-orange-400 to-red-400'
-                : 'bg-gradient-to-br from-blue-400 via-indigo-400 to-violet-400'"
+              :class="promoGradientClass(item.id)"
             >
               <div class="relative aspect-[4/3] flex flex-col justify-between p-4">
                 <!-- Декор -->
@@ -285,7 +284,7 @@ function getCategoryColor(index: number): string {
                 <!-- Иконка -->
                 <div class="relative z-10">
                   <span class="text-5xl md:text-6xl drop-shadow-lg">
-                    {{ item.id === 'sale' ? '🏷️' : '✨' }}
+                    {{ promoEmoji(item.id) }}
                   </span>
                 </div>
 
@@ -295,7 +294,7 @@ function getCategoryColor(index: number): string {
                     {{ item.name }}
                   </h3>
                   <p class="text-xs md:text-sm text-white/80 mt-0.5">
-                    {{ item.id === 'sale' ? 'Скидки до 50%' : 'Новые поступления' }}
+                    {{ promoSubtitle(item.id) }}
                   </p>
                 </div>
               </div>

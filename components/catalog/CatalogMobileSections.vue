@@ -18,6 +18,7 @@
 import type { AdditionalMenuItem, CategoryRow } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { isDiscountPromo } from '@/utils/promoTiles'
 
 const props = defineProps<{
   categories: CategoryRow[]
@@ -47,14 +48,12 @@ const SECTION_TINTS: Record<string, string> = {
 
 const TINT_CYCLE = Object.values(SECTION_TINTS)
 
-/** id промо-плиток, которым положен «бонусный» оранжевый, а не фирменный синий. */
-const PROMO_ACCENT_IDS = new Set(['promotions', 'sale', 'discounts'])
-
 const promoTiles = computed(() =>
   props.promos.map(item => ({
     ...item,
     icon: item.icon || 'lucide:sparkles',
-    accent: PROMO_ACCENT_IDS.has(item.id) ? 'bonus' : 'brand',
+    // Скидочной плитке — «бонусный» оранжевый, остальным фирменный синий.
+    accent: isDiscountPromo(item.id) ? 'bonus' : 'brand',
   })),
 )
 
