@@ -2213,148 +2213,163 @@ else {
 </template>
 
 <style scoped>
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  @keyframes shimmer {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
   }
-  100% {
-    background-position: 200% center;
+
+  /* ─── Стеклянные пилюли из Категория.dc.html (панель управления, чипсы, "Наверх") ─── */
+  /* display здесь задавать нельзя: scoped-стиль компилируется вне @layer, а
+     утилиты Tailwind лежат в @layer utilities, и беслойное правило бьёт слой
+     независимо от специфичности. Пока тут стоял display: inline-flex, классы
+     `hidden` и `lg:inline-flex` на кнопках атрибутных фильтров не работали
+     вовсе, и кнопки для десктопа были видны на мобильном. Раскладку задаём
+     утилитами на самой кнопке. */
+  .cf-glass-btn {
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
+    backdrop-filter: blur(14px) saturate(1.7);
+    -webkit-backdrop-filter: blur(14px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 2px rgba(15, 23, 42, 0.06),
+      0 6px 18px rgba(15, 23, 42, 0.1);
+    color: var(--foreground);
+    font: 600 14px var(--font-sans);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
   }
-}
 
-/* ─── Стеклянные пилюли из Категория.dc.html (панель управления, чипсы, "Наверх") ─── */
-/* display здесь задавать нельзя: scoped-стиль компилируется вне @layer, а
-   утилиты Tailwind лежат в @layer utilities, и беслойное правило бьёт слой
-   независимо от специфичности. Пока тут стоял display: inline-flex, классы
-   `hidden` и `lg:inline-flex` на кнопках атрибутных фильтров не работали
-   вовсе, и кнопки для десктопа были видны на мобильном. Раскладку задаём
-   утилитами на самой кнопке. */
-.cf-glass-btn {
-  align-items: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
-  backdrop-filter: blur(14px) saturate(1.7);
-  -webkit-backdrop-filter: blur(14px) saturate(1.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(15, 23, 42, 0.06),
-    0 6px 18px rgba(15, 23, 42, 0.1);
-  color: var(--foreground);
-  font: 600 14px var(--font-sans);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
+  .cf-glass-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 
-.cf-glass-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+  .cf-glass-btn--active {
+    border-color: var(--primary);
+    background: linear-gradient(150deg, rgba(219, 234, 254, 0.95), rgba(191, 219, 254, 0.6));
+    color: var(--blue-700);
+  }
 
-.cf-glass-btn--active {
-  border-color: var(--primary);
-  background: linear-gradient(150deg, rgba(219, 234, 254, 0.95), rgba(191, 219, 254, 0.6));
-  color: var(--blue-700);
-}
+  .cf-glass-btn--lg {
+    height: 50px;
+    padding: 0 26px;
+    font-size: 15px;
+  }
 
-.cf-glass-btn--lg {
-  height: 50px;
-  padding: 0 26px;
-  font-size: 15px;
-}
+  .cf-glass-btn--primary {
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: linear-gradient(150deg, rgba(77, 148, 255, 0.95), rgba(23, 101, 235, 0.85));
+    color: #fff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -2px 8px rgba(6, 53, 138, 0.28),
+      0 8px 20px rgba(43, 127, 255, 0.35);
+  }
 
-.cf-glass-btn--primary {
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: linear-gradient(150deg, rgba(77, 148, 255, 0.95), rgba(23, 101, 235, 0.85));
-  color: #fff;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -2px 8px rgba(6, 53, 138, 0.28),
-    0 8px 20px rgba(43, 127, 255, 0.35);
-}
+  .cf-glass-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fff;
+    font: 700 11px var(--font-sans);
+  }
 
-.cf-glass-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--primary);
-  color: #fff;
-  font: 700 11px var(--font-sans);
-}
+  .cf-chip-scroller {
+    /* display is driven by the Tailwind flex/hidden/lg:* utilities on each
+       usage site — a scoped display here would out-specificity them (see
+       mobilenav-dc-port memory) and the element would never actually hide. */
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
 
-.cf-chip-scroller {
-  /* display is driven by the Tailwind flex/hidden/lg:* utilities on each
-     usage site — a scoped display here would out-specificity them (see
-     mobilenav-dc-port memory) and the element would never actually hide. */
-  align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
+  .cf-chip-scroller::-webkit-scrollbar {
+    display: none;
+  }
 
-.cf-chip-scroller::-webkit-scrollbar {
-  display: none;
-}
+  .cf-chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: none;
+    background: var(--muted);
+    color: var(--foreground);
+    font: 600 13.5px var(--font-sans);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
+  }
 
-.cf-chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: none;
-  background: var(--muted);
-  color: var(--foreground);
-  font: 600 13.5px var(--font-sans);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
+  .cf-chip--active {
+    background: rgba(43, 127, 255, 0.12);
+    color: var(--primary);
+    font-weight: 700;
+  }
 
-.cf-chip--active {
-  background: rgba(43, 127, 255, 0.12);
-  color: var(--primary);
-  font-weight: 700;
-}
+  .cf-scrolltop {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 70;
+    align-items: center;
+    gap: 7px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: none;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18));
+    backdrop-filter: blur(24px) saturate(1.9);
+    -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      inset 0 -1px 1px rgba(15, 23, 42, 0.05),
+      0 12px 32px rgba(15, 23, 42, 0.18);
+    color: var(--foreground);
+    font: 700 13px var(--font-sans);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
 
-.cf-scrolltop {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  z-index: 70;
-  align-items: center;
-  gap: 7px;
-  height: 44px;
-  padding: 0 18px;
-  border-radius: 999px;
-  border: none;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18));
-  backdrop-filter: blur(24px) saturate(1.9);
-  -webkit-backdrop-filter: blur(24px) saturate(1.9);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 1px rgba(15, 23, 42, 0.05),
-    0 12px 32px rgba(15, 23, 42, 0.18);
-  color: var(--foreground);
-  font: 700 13px var(--font-sans);
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.cf-scrolltop:active {
-  transform: translateX(-50%) scale(0.96);
+  .cf-scrolltop:active {
+    transform: translateX(-50%) scale(0.96);
+  }
 }
 </style>

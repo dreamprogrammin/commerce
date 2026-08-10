@@ -393,88 +393,103 @@ async function onWish() {
 </template>
 
 <style scoped>
-.pc-card {
-  border: 1px solid rgb(255 255 255 / 0.92);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    inset 0 0 0 1px rgb(255 255 255 / 0.5),
-    0 1px 0 rgb(15 23 42 / 0.05);
-  transition:
-    box-shadow 0.3s ease,
-    border-color 0.3s ease;
-}
-.pc-card--active {
-  border-color: var(--primary);
-  box-shadow:
-    inset 0 0 0 1px var(--primary),
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    inset 0 0 0 1px rgb(255 255 255 / 0.5),
-    0 1px 0 rgb(15 23 42 / 0.05);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.pc-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.pc-scroll::-webkit-scrollbar {
-  display: none;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-/* ВНИМАНИЕ: у .pc-wish и .pc-add НЕТ backdrop-filter — и добавлять его сюда нельзя.
-   Карточка живёт в каруселях и сетках по 18+ штук на экран, а backdrop-filter
-   заставляет браузер переснимать и блюрить подложку на каждом кадре. Замер на
-   главной (390px, CPU ×6): с блюром медиана кадра 47.6ms / 42% кадров >50ms,
-   без него — 24.9ms / 11%. При быстром скролле секции успевали «пропасть и
-   появиться». Непрозрачность градиента ниже и так 85–95%, размытия за ним
-   почти не видно. Стекло оставлено только там, где оно читается: шапка,
-   липкая строка, нижняя навигация, deal-карточка. */
-.pc-wish {
-  border: 1px solid rgb(255 255 255 / 0.8);
-  background: linear-gradient(150deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.7));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.9),
-    0 4px 12px rgb(15 23 42 / 0.14);
-  transition: transform 0.12s ease;
-}
-.pc-wish:hover {
-  transform: scale(1.1);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.pc-add {
-  border: 1px solid rgb(255 255 255 / 0.9);
-  background: linear-gradient(150deg, rgb(255 255 255 / 0.97), rgb(224 233 247 / 0.85));
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 4px 12px rgb(43 127 255 / 0.2);
-  color: var(--primary);
-  transition: background 0.12s ease;
-}
-.pc-add:hover {
-  background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.75));
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.pc-stepper {
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  backdrop-filter: blur(12px) saturate(1.7);
-  -webkit-backdrop-filter: blur(12px) saturate(1.7);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 8px rgb(6 53 138 / 0.28),
-    0 8px 20px rgb(43 127 255 / 0.3);
-}
+@layer components {
+  .pc-card {
+    border: 1px solid rgb(255 255 255 / 0.92);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      inset 0 0 0 1px rgb(255 255 255 / 0.5),
+      0 1px 0 rgb(15 23 42 / 0.05);
+    transition:
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+  .pc-card--active {
+    border-color: var(--primary);
+    box-shadow:
+      inset 0 0 0 1px var(--primary),
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      inset 0 0 0 1px rgb(255 255 255 / 0.5),
+      0 1px 0 rgb(15 23 42 / 0.05);
+  }
 
-.pc-stepper-btn {
-  background: rgb(255 255 255 / 0.26);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
-  color: #fff;
-  transition: background 0.12s ease;
-}
-.pc-stepper-btn:hover {
-  background: rgb(255 255 255 / 0.38);
+  .pc-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .pc-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ВНИМАНИЕ: у .pc-wish и .pc-add НЕТ backdrop-filter — и добавлять его сюда нельзя.
+     Карточка живёт в каруселях и сетках по 18+ штук на экран, а backdrop-filter
+     заставляет браузер переснимать и блюрить подложку на каждом кадре. Замер на
+     главной (390px, CPU ×6): с блюром медиана кадра 47.6ms / 42% кадров >50ms,
+     без него — 24.9ms / 11%. При быстром скролле секции успевали «пропасть и
+     появиться». Непрозрачность градиента ниже и так 85–95%, размытия за ним
+     почти не видно. Стекло оставлено только там, где оно читается: шапка,
+     липкая строка, нижняя навигация, deal-карточка. */
+  .pc-wish {
+    border: 1px solid rgb(255 255 255 / 0.8);
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.7));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 4px 12px rgb(15 23 42 / 0.14);
+    transition: transform 0.12s ease;
+  }
+  .pc-wish:hover {
+    transform: scale(1.1);
+  }
+
+  .pc-add {
+    border: 1px solid rgb(255 255 255 / 0.9);
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.97), rgb(224 233 247 / 0.85));
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 4px 12px rgb(43 127 255 / 0.2);
+    color: var(--primary);
+    transition: background 0.12s ease;
+  }
+  .pc-add:hover {
+    background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.75));
+  }
+
+  .pc-stepper {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    backdrop-filter: blur(12px) saturate(1.7);
+    -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 8px rgb(6 53 138 / 0.28),
+      0 8px 20px rgb(43 127 255 / 0.3);
+  }
+
+  .pc-stepper-btn {
+    background: rgb(255 255 255 / 0.26);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
+    color: #fff;
+    transition: background 0.12s ease;
+  }
+  .pc-stepper-btn:hover {
+    background: rgb(255 255 255 / 0.38);
+  }
 }
 </style>
