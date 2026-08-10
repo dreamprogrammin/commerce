@@ -91,54 +91,69 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Белая карточка макета: те же значения, что у .cart-surface в корзине —
-   страницы обязаны читаться как один материал. Литералами, а не через
-   var(--color-*): Tailwind 4 выкидывает переменную темы, если её не
-   использует ни одна утилита. */
-.os-card {
-  border-radius: 22px;
-  background: var(--background);
-  border: 1px solid var(--border);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.98),
-    inset 0 -2px 4px rgb(15 23 42 / 0.07),
-    0 1px 0 rgb(15 23 42 / 0.05);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.ot-dot {
-  flex: none;
-  display: grid;
-  place-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 2px solid var(--border);
-  background: var(--background);
-  box-shadow: inset 0 -1px 3px rgb(15 23 42 / 0.06);
-  color: var(--muted-foreground);
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
-}
-.ot-dot--done {
-  border: 1px solid rgb(255 255 255 / 0.5);
-  background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    0 6px 14px rgb(43 127 255 / 0.3);
-  color: #fff;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.ot-line {
-  width: 2px;
-  flex: 1;
-  min-height: 18px;
-  border-radius: 999px;
-  background: var(--border);
-  transition: background 0.2s ease;
-}
-.ot-line--done {
-  background: var(--primary);
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* Белая карточка макета: те же значения, что у .cart-surface в корзине —
+     страницы обязаны читаться как один материал. Литералами, а не через
+     var(--color-*): Tailwind 4 выкидывает переменную темы, если её не
+     использует ни одна утилита. */
+  .os-card {
+    border-radius: 22px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      0 1px 0 rgb(15 23 42 / 0.05);
+  }
+
+  .ot-dot {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    border: 2px solid var(--border);
+    background: var(--background);
+    box-shadow: inset 0 -1px 3px rgb(15 23 42 / 0.06);
+    color: var(--muted-foreground);
+    transition:
+      background 0.2s ease,
+      color 0.2s ease,
+      border-color 0.2s ease;
+  }
+  .ot-dot--done {
+    border: 1px solid rgb(255 255 255 / 0.5);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 6px 14px rgb(43 127 255 / 0.3);
+    color: #fff;
+  }
+
+  .ot-line {
+    width: 2px;
+    flex: 1;
+    min-height: 18px;
+    border-radius: 999px;
+    background: var(--border);
+    transition: background 0.2s ease;
+  }
+  .ot-line--done {
+    background: var(--primary);
+  }
 }
 </style>

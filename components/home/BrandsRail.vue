@@ -84,126 +84,141 @@ function logoOf(logoUrl: string | null): string | null {
 </template>
 
 <style scoped>
-.brands-cta {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border: none;
-  border-radius: 999px;
-  background: var(--primary);
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition:
-    background 0.15s ease,
-    transform 0.1s ease;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.brands-cta:hover {
-  background: var(--brand-hover);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.brands-cta:active {
-  transform: scale(0.97);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.brands-cta--desktop {
-  height: 44px;
-  padding: 0 20px;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.brands-cta--mobile {
-  display: none;
-  width: 100%;
-  height: 52px;
-  margin-top: 14px;
-  border-radius: 14px;
-  font-size: 15px;
-}
+@layer components {
+  .brands-cta {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: none;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    box-shadow: var(--shadow-sm);
+    transition:
+      background 0.15s ease,
+      transform 0.1s ease;
+  }
 
-.brands-scroll {
-  overflow-x: auto;
-}
+  .brands-cta:hover {
+    background: var(--brand-hover);
+  }
 
-.brands-wrap {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 14px;
-}
+  .brands-cta:active {
+    transform: scale(0.97);
+  }
 
-.brand-card {
-  display: grid;
-  place-items: center;
-  height: 132px;
-  padding: 18px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background: #fff;
-  transition:
-    border-color 0.15s ease,
-    transform 0.12s ease;
-}
-
-.brand-card:hover {
-  border-color: var(--color-blue-200);
-  transform: translateY(-2px);
-}
-
-.brand-card__logo {
-  max-width: 100%;
-  max-height: 64px;
-  object-fit: contain;
-  display: block;
-}
-
-.brand-card__fallback {
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--foreground);
-  text-align: center;
-}
-
-:global(.dark) .brand-card {
-  background: var(--card);
-}
-
-@media (max-width: 1023px) {
   .brands-cta--desktop {
-    display: none;
+    height: 44px;
+    padding: 0 20px;
   }
 
   .brands-cta--mobile {
-    display: inline-flex;
+    display: none;
+    width: 100%;
+    height: 52px;
+    margin-top: 14px;
+    border-radius: 14px;
+    font-size: 15px;
   }
 
-  /* Edge-bleed: отступ строго из --page-gutter (см. assets/css/tailwind.css),
-     иначе рельс не совпадает с контейнером секции. */
   .brands-scroll {
-    margin-inline: calc(-1 * var(--page-gutter));
-    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
   }
 
   .brands-wrap {
-    grid-auto-flow: column;
-    grid-template-columns: none;
-    grid-template-rows: repeat(3, 88px);
-    grid-auto-columns: 128px;
-    gap: 12px;
-    width: max-content;
-    padding-inline: var(--page-gutter);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
   }
 
   .brand-card {
-    height: 88px;
-    padding: 12px;
+    display: grid;
+    place-items: center;
+    height: 132px;
+    padding: 18px;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    background: #fff;
+    transition:
+      border-color 0.15s ease,
+      transform 0.12s ease;
+  }
+
+  .brand-card:hover {
+    border-color: var(--color-blue-200);
+    transform: translateY(-2px);
   }
 
   .brand-card__logo {
-    max-height: 44px;
+    max-width: 100%;
+    max-height: 64px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .brand-card__fallback {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--foreground);
+    text-align: center;
+  }
+
+  :global(.dark) .brand-card {
+    background: var(--card);
+  }
+
+  @media (max-width: 1023px) {
+    .brands-cta--desktop {
+      display: none;
+    }
+
+    .brands-cta--mobile {
+      display: inline-flex;
+    }
+
+    /* Edge-bleed: отступ строго из --page-gutter (см. assets/css/tailwind.css),
+       иначе рельс не совпадает с контейнером секции. */
+    .brands-scroll {
+      margin-inline: calc(-1 * var(--page-gutter));
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .brands-wrap {
+      grid-auto-flow: column;
+      grid-template-columns: none;
+      grid-template-rows: repeat(3, 88px);
+      grid-auto-columns: 128px;
+      gap: 12px;
+      width: max-content;
+      padding-inline: var(--page-gutter);
+    }
+
+    .brand-card {
+      height: 88px;
+      padding: 12px;
+    }
+
+    .brand-card__logo {
+      max-height: 44px;
+    }
   }
 }
 </style>

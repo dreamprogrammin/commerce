@@ -334,47 +334,62 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
 </template>
 
 <style scoped>
-/* Hover эффект для стрелки */
-.order-card:hover .chevron-icon {
-  transform: translateX(5px);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-/* Оверлей: прозрачен в покое, проявляется при наведении.
-   Ноль задаётся здесь, а не утилитой opacity-0 в разметке. С утилитой это
-   держалось на том, что scoped-стиль идёт вне слоёв и потому бьёт её. Стоило
-   обернуть файл в @layer components — и opacity-0 начинала выигрывать всегда,
-   а подсветка при наведении переставала работать вовсе. Теперь оба значения
-   в одном месте, и спорить не с чем. */
-.color-overlay {
-  opacity: 0;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.order-card:hover .color-overlay {
-  opacity: 1;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-/* ВНИМАНИЕ: три правила ниже не работают.
-   На тех же элементах в разметке стоит инлайновый :style с transform
-   (`translateY(index*2px) scale(1 - index*0.1)`), а инлайн-стиль бьёт любое
-   правило таблицы стилей без !important. Так что стек миниатюр при наведении
-   не шевелится и никогда не шевелился — это не следствие обёртки в слои.
-   Чтобы эффект заработал, базовый transform надо перенести из :style сюда
-   же, в nth-child-правила. Не стал: компонент виден только залогиненному с
-   активным заказом, проверить результат глазами нечем. */
-.order-card:hover .product-thumbnails-container > div > div:nth-child(1) {
-  transform: translateY(0) scale(1.05) rotate(-2deg);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.order-card:hover .product-thumbnails-container > div > div:nth-child(2) {
-  transform: translateY(2px) scale(0.95) rotate(2deg);
-}
+@layer components {
+  /* Hover эффект для стрелки */
+  .order-card:hover .chevron-icon {
+    transform: translateX(5px);
+  }
 
-.order-card:hover .product-thumbnails-container > div > div:nth-child(3) {
-  transform: translateY(4px) scale(0.85) rotate(-2deg);
-}
+  /* Оверлей: прозрачен в покое, проявляется при наведении.
+     Ноль задаётся здесь, а не утилитой opacity-0 в разметке. С утилитой это
+     держалось на том, что scoped-стиль идёт вне слоёв и потому бьёт её. Стоило
+     обернуть файл в @layer components — и opacity-0 начинала выигрывать всегда,
+     а подсветка при наведении переставала работать вовсе. Теперь оба значения
+     в одном месте, и спорить не с чем. */
+  .color-overlay {
+    opacity: 0;
+  }
 
-/* Active эффект (при клике) */
-.order-card:active {
-  transform: scale(0.98) !important;
+  .order-card:hover .color-overlay {
+    opacity: 1;
+  }
+
+  /* ВНИМАНИЕ: три правила ниже не работают.
+     На тех же элементах в разметке стоит инлайновый :style с transform
+     (`translateY(index*2px) scale(1 - index*0.1)`), а инлайн-стиль бьёт любое
+     правило таблицы стилей без !important. Так что стек миниатюр при наведении
+     не шевелится и никогда не шевелился — это не следствие обёртки в слои.
+     Чтобы эффект заработал, базовый transform надо перенести из :style сюда
+     же, в nth-child-правила. Не стал: компонент виден только залогиненному с
+     активным заказом, проверить результат глазами нечем. */
+  .order-card:hover .product-thumbnails-container > div > div:nth-child(1) {
+    transform: translateY(0) scale(1.05) rotate(-2deg);
+  }
+
+  .order-card:hover .product-thumbnails-container > div > div:nth-child(2) {
+    transform: translateY(2px) scale(0.95) rotate(2deg);
+  }
+
+  .order-card:hover .product-thumbnails-container > div > div:nth-child(3) {
+    transform: translateY(4px) scale(0.85) rotate(-2deg);
+  }
+
+  /* Active эффект (при клике) */
+  .order-card:active {
+    transform: scale(0.98) !important;
+  }
 }
 </style>

@@ -38,40 +38,55 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 </template>
 
 <style scoped>
-.pds-top {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.pds-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 18px 16px;
-  box-shadow: var(--elevation-card);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-@media (width >= 64rem) {
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
   .pds-top {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 384px;
-    column-gap: 26px;
-    row-gap: 18px;
-    align-items: start;
-  }
-
-  .pds-col-main {
-    grid-column: 1;
-  }
-
-  .pds-buybox {
-    grid-column: 2;
-    grid-row: 1 / span 8;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
   }
 
   .pds-card {
-    padding: 24px 26px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 18px 16px;
+    box-shadow: var(--elevation-card);
+  }
+
+  @media (width >= 64rem) {
+    .pds-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 384px;
+      column-gap: 26px;
+      row-gap: 18px;
+      align-items: start;
+    }
+
+    .pds-col-main {
+      grid-column: 1;
+    }
+
+    .pds-buybox {
+      grid-column: 2;
+      grid-row: 1 / span 8;
+    }
+
+    .pds-card {
+      padding: 24px 26px;
+    }
   }
 }
 </style>
