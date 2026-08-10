@@ -1677,561 +1677,576 @@ watchEffect(() => {
 </template>
 
 <style scoped>
-.pdp-page {
-  background: var(--page-surface);
-  /* На мобильных снизу висит панель покупки (~70px) поверх контента —
-     резервируем под неё место дополнительно к отступу под навбар из лейаута */
-  padding-bottom: 96px;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-@media (width >= 64rem) {
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
   .pdp-page {
-    padding-bottom: 48px;
+    background: var(--page-surface);
+    /* На мобильных снизу висит панель покупки (~70px) поверх контента —
+       резервируем под неё место дополнительно к отступу под навбар из лейаута */
+    padding-bottom: 96px;
   }
-}
 
-/* ── Раскладка верхнего экрана ──────────────────────────────────────────────
-   Один поток на мобильных (галерея → блок покупки → способы получения → …);
-   на десктопе блок покупки уезжает во вторую колонку и залипает. Row-span
-   с запасом — колонка обязана перекрыть все карточки слева, иначе sticky
-   «закончится» на первой же из них. */
-.pdp-top {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
+  @media (width >= 64rem) {
+    .pdp-page {
+      padding-bottom: 48px;
+    }
+  }
 
-@media (width >= 64rem) {
+  /* ── Раскладка верхнего экрана ──────────────────────────────────────────────
+     Один поток на мобильных (галерея → блок покупки → способы получения → …);
+     на десктопе блок покупки уезжает во вторую колонку и залипает. Row-span
+     с запасом — колонка обязана перекрыть все карточки слева, иначе sticky
+     «закончится» на первой же из них. */
   .pdp-top {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 384px;
-    column-gap: 26px;
-    row-gap: 18px;
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
   }
 
-  .pdp-col-main {
-    grid-column: 1;
+  @media (width >= 64rem) {
+    .pdp-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 384px;
+      column-gap: 26px;
+      row-gap: 18px;
+      align-items: start;
+    }
+
+    .pdp-col-main {
+      grid-column: 1;
+    }
+
+    .pdp-buybox-wrap {
+      grid-column: 2;
+      grid-row: 1 / span 8;
+      position: sticky;
+      top: 90px;
+    }
   }
 
-  .pdp-buybox-wrap {
-    grid-column: 2;
-    grid-row: 1 / span 8;
-    position: sticky;
-    top: 90px;
-  }
-}
-
-/* ── Карточка ─────────────────────────────────────────────────────────────── */
-.pdp-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 18px 16px;
-  box-shadow: var(--elevation-card);
-}
-
-.pdp-card-title {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-@media (width >= 64rem) {
+  /* ── Карточка ─────────────────────────────────────────────────────────────── */
   .pdp-card {
-    padding: 24px 26px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 18px 16px;
+    box-shadow: var(--elevation-card);
   }
 
-  .pdp-buybox {
-    padding: 26px;
+  .pdp-card-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
   }
-}
 
-/* ── Блок покупки ─────────────────────────────────────────────────────────── */
-.pdp-title {
-  margin: 0 0 6px;
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
-  text-wrap: pretty;
-}
+  @media (width >= 64rem) {
+    .pdp-card {
+      padding: 24px 26px;
+    }
 
-@media (width >= 64rem) {
+    .pdp-buybox {
+      padding: 26px;
+    }
+  }
+
+  /* ── Блок покупки ─────────────────────────────────────────────────────────── */
   .pdp-title {
-    font-size: clamp(19px, 2.2vw, 22px);
-    line-height: 1.3;
-    letter-spacing: -0.015em;
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    text-wrap: pretty;
   }
-}
 
-.pdp-brand-pill {
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px 6px 7px;
-  border-radius: 999px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.55));
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 3px 10px rgba(15, 23, 42, 0.07);
-  align-self: flex-start;
-  width: fit-content;
-  transition: box-shadow 0.15s ease;
-}
+  @media (width >= 64rem) {
+    .pdp-title {
+      font-size: clamp(19px, 2.2vw, 22px);
+      line-height: 1.3;
+      letter-spacing: -0.015em;
+    }
+  }
 
-.pdp-brand-pill:hover {
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 6px 14px rgba(15, 23, 42, 0.12);
-}
+  .pdp-brand-pill {
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 7px;
+    border-radius: 999px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.55));
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 3px 10px rgba(15, 23, 42, 0.07);
+    align-self: flex-start;
+    width: fit-content;
+    transition: box-shadow 0.15s ease;
+  }
 
-.pdp-brand-logo {
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: inset 0 0 0 1px var(--border);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
+  .pdp-brand-pill:hover {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 6px 14px rgba(15, 23, 42, 0.12);
+  }
 
-/* Цена — контейнер флип-счётчика: цифры это барабаны фиксированной ширины,
-   поэтому flex, а не текст. Перенос запрещён: разряды и ₸ всегда в одну строку. */
-.pdp-price {
-  font-size: 27px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--price);
-  white-space: nowrap;
-}
+  .pdp-brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--border);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
 
-.pdp-price-reels {
-  display: inline-flex;
-  align-items: baseline;
-  flex-wrap: nowrap;
-}
+  /* Цена — контейнер флип-счётчика: цифры это барабаны фиксированной ширины,
+     поэтому flex, а не текст. Перенос запрещён: разряды и ₸ всегда в одну строку. */
+  .pdp-price {
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--price);
+    white-space: nowrap;
+  }
 
-.pdp-digit-gap {
-  flex-shrink: 0;
-  width: 8px;
-}
+  .pdp-price-reels {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: nowrap;
+  }
 
-.pdp-currency {
-  margin-left: 7px;
-}
-
-/* Барабан одной цифры. clientHeight колонки = шаг прокрутки ленты,
-   поэтому высота колонки и высота .digit-item обязаны совпадать. */
-/* flex-shrink: 0 обязателен: .pdp-price-reels — inline-flex, а у колонки
-   overflow: hidden, и при сжатии цифры подрезало бы по бокам. */
-.digit-column {
-  position: relative;
-  flex-shrink: 0;
-  height: 34px;
-  line-height: 34px;
-  width: 17px;
-  overflow: hidden;
-  text-align: center;
-  border-radius: 4px;
-  transition: background-color 0.3s ease;
-}
-
-.digit-ribbon {
-  position: relative;
-  display: block;
-  will-change: transform;
-}
-
-.digit-item {
-  display: block;
-  height: 34px;
-  line-height: 34px;
-}
-
-@media (width >= 64rem) {
   .pdp-digit-gap {
-    width: 10px;
+    flex-shrink: 0;
+    width: 8px;
   }
 
   .pdp-currency {
-    margin-left: 9px;
+    margin-left: 7px;
   }
 
+  /* Барабан одной цифры. clientHeight колонки = шаг прокрутки ленты,
+     поэтому высота колонки и высота .digit-item обязаны совпадать. */
+  /* flex-shrink: 0 обязателен: .pdp-price-reels — inline-flex, а у колонки
+     overflow: hidden, и при сжатии цифры подрезало бы по бокам. */
   .digit-column {
-    height: 42px;
-    line-height: 42px;
-    width: 21px;
+    position: relative;
+    flex-shrink: 0;
+    height: 34px;
+    line-height: 34px;
+    width: 17px;
+    overflow: hidden;
+    text-align: center;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+  }
+
+  .digit-ribbon {
+    position: relative;
+    display: block;
+    will-change: transform;
   }
 
   .digit-item {
-    height: 42px;
-    line-height: 42px;
+    display: block;
+    height: 34px;
+    line-height: 34px;
   }
-}
 
-@media (width >= 64rem) {
-  .pdp-price {
-    font-size: 34px;
+  @media (width >= 64rem) {
+    .pdp-digit-gap {
+      width: 10px;
+    }
+
+    .pdp-currency {
+      margin-left: 9px;
+    }
+
+    .digit-column {
+      height: 42px;
+      line-height: 42px;
+      width: 21px;
+    }
+
+    .digit-item {
+      height: 42px;
+      line-height: 42px;
+    }
   }
-}
 
-.pdp-price-old {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--price-old);
-  text-decoration: line-through;
-  white-space: nowrap;
-}
+  @media (width >= 64rem) {
+    .pdp-price {
+      font-size: 34px;
+    }
+  }
 
-@media (width >= 64rem) {
   .pdp-price-old {
-    font-size: 17px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--price-old);
+    text-decoration: line-through;
+    white-space: nowrap;
   }
-}
 
-.pdp-discount {
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--discount);
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 800;
-  line-height: 1.2;
-}
+  @media (width >= 64rem) {
+    .pdp-price-old {
+      font-size: 17px;
+    }
+  }
 
-.pdp-discount--sm {
-  padding: 1px 7px;
-  font-size: 11px;
-}
+  .pdp-discount {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--discount);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
 
-.pdp-bonus {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border-radius: 11px;
-  background: linear-gradient(100deg, var(--bonus-surface), var(--bonus-border));
-  padding: 8px 13px;
-  font-size: 13.5px;
-  font-weight: 700;
-}
+  .pdp-discount--sm {
+    padding: 1px 7px;
+    font-size: 11px;
+  }
 
-.pdp-bonus-text {
-  color: var(--bonus);
-}
+  .pdp-bonus {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 11px;
+    background: linear-gradient(100deg, var(--bonus-surface), var(--bonus-border));
+    padding: 8px 13px;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
 
-.pdp-tile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 13px;
-  border-radius: 16px;
-  background: var(--muted);
-}
+  .pdp-bonus-text {
+    color: var(--bonus);
+  }
 
-.pdp-variant {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  padding: 5px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  transition: box-shadow 0.15s ease;
-}
+  .pdp-tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 13px;
+    border-radius: 16px;
+    background: var(--muted);
+  }
 
-.pdp-variant--active {
-  border: 2px solid var(--primary);
-  box-shadow: 0 5px 14px rgb(43 127 255 / 0.26);
-}
+  .pdp-variant {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    padding: 5px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    transition: box-shadow 0.15s ease;
+  }
 
-.pdp-variant--out {
-  opacity: 0.5;
-}
+  .pdp-variant--active {
+    border: 2px solid var(--primary);
+    box-shadow: 0 5px 14px rgb(43 127 255 / 0.26);
+  }
 
-.pdp-variant-strike {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.85);
-  transform: rotate(45deg);
-}
+  .pdp-variant--out {
+    opacity: 0.5;
+  }
 
-/* ── Кнопки ───────────────────────────────────────────────────────────────── */
-.pdp-cta {
-  width: 100%;
-  height: 56px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
-  -webkit-backdrop-filter: blur(12px) saturate(1.7);
-  backdrop-filter: blur(12px) saturate(1.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -3px 10px rgba(6, 53, 138, 0.3),
-    0 10px 24px rgba(43, 127, 255, 0.34);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition:
-    box-shadow 0.18s ease,
-    transform 0.12s ease;
-}
+  .pdp-variant-strike {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.85);
+    transform: rotate(45deg);
+  }
 
-.pdp-cta:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -3px 10px rgba(6, 53, 138, 0.34),
-    0 14px 30px rgba(43, 127, 255, 0.44);
-}
+  /* ── Кнопки ───────────────────────────────────────────────────────────────── */
+  .pdp-cta {
+    width: 100%;
+    height: 56px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
+    -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    backdrop-filter: blur(12px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -3px 10px rgba(6, 53, 138, 0.3),
+      0 10px 24px rgba(43, 127, 255, 0.34);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition:
+      box-shadow 0.18s ease,
+      transform 0.12s ease;
+  }
 
-.pdp-cta:active {
-  transform: scale(0.985);
-}
+  .pdp-cta:hover {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      inset 0 -3px 10px rgba(6, 53, 138, 0.34),
+      0 14px 30px rgba(43, 127, 255, 0.44);
+  }
 
-.pdp-cta--pill {
-  width: auto;
-  height: 52px;
-  border-radius: 999px;
-  font-size: 15.5px;
-  gap: 9px;
-}
+  .pdp-cta:active {
+    transform: scale(0.985);
+  }
 
-.pdp-glass-btn {
-  width: 100%;
-  height: 52px;
-  border-radius: 16px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 15px;
-  font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.6));
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-  backdrop-filter: blur(10px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 5px 14px rgba(15, 23, 42, 0.08);
-  color: var(--foreground);
-  transition: box-shadow 0.18s ease;
-}
+  .pdp-cta--pill {
+    width: auto;
+    height: 52px;
+    border-radius: 999px;
+    font-size: 15.5px;
+    gap: 9px;
+  }
 
-.pdp-glass-btn:hover {
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 8px 20px rgba(15, 23, 42, 0.14);
-}
+  .pdp-glass-btn {
+    width: 100%;
+    height: 52px;
+    border-radius: 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.6));
+    -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(10px) saturate(1.6);
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 5px 14px rgba(15, 23, 42, 0.08);
+    color: var(--foreground);
+    transition: box-shadow 0.18s ease;
+  }
 
-.pdp-glass-btn--wished {
-  border-color: rgba(244, 63, 94, 0.35);
-  background: linear-gradient(150deg, rgba(255, 241, 244, 0.98), rgba(255, 224, 231, 0.7));
-  color: var(--destructive);
-}
+  .pdp-glass-btn:hover {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 8px 20px rgba(15, 23, 42, 0.14);
+  }
 
-.pdp-stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  -webkit-backdrop-filter: blur(12px) saturate(1.7);
-  backdrop-filter: blur(12px) saturate(1.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -2px 8px rgba(6, 53, 138, 0.28),
-    0 10px 24px rgba(43, 127, 255, 0.32);
-  padding: 0 8px;
-}
+  .pdp-glass-btn--wished {
+    border-color: rgba(244, 63, 94, 0.35);
+    background: linear-gradient(150deg, rgba(255, 241, 244, 0.98), rgba(255, 224, 231, 0.7));
+    color: var(--destructive);
+  }
 
-.pdp-stepper--pill {
-  height: 52px;
-  border-radius: 999px;
-  padding: 0 6px;
-}
+  .pdp-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    backdrop-filter: blur(12px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -2px 8px rgba(6, 53, 138, 0.28),
+      0 10px 24px rgba(43, 127, 255, 0.32);
+    padding: 0 8px;
+  }
 
-.pdp-stepper-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(255, 255, 255, 0.26);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  color: #fff;
-  cursor: pointer;
-  display: grid;
-  place-content: center;
-  transition: background 0.15s ease;
-}
+  .pdp-stepper--pill {
+    height: 52px;
+    border-radius: 999px;
+    padding: 0 6px;
+  }
 
-.pdp-stepper-btn:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
+  .pdp-stepper-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: none;
+    background: rgba(255, 255, 255, 0.26);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    color: #fff;
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: background 0.15s ease;
+  }
 
-.pdp-stepper-btn--round {
-  border-radius: 999px;
-}
+  .pdp-stepper-btn:hover {
+    background: rgba(255, 255, 255, 0.4);
+  }
 
-/* ── Способы получения ────────────────────────────────────────────────────── */
-.pdp-pickup-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 0;
-  border-bottom: 1px dashed var(--border);
-}
+  .pdp-stepper-btn--round {
+    border-radius: 999px;
+  }
 
-.pdp-pickup-row:last-child {
-  border-bottom: none;
-}
+  /* ── Способы получения ────────────────────────────────────────────────────── */
+  .pdp-pickup-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px dashed var(--border);
+  }
 
-.pdp-pickup-icon {
-  width: 40px;
-  height: 40px;
-  flex: none;
-  border-radius: 12px;
-  background: var(--brand-surface);
-  display: grid;
-  place-content: center;
-}
+  .pdp-pickup-row:last-child {
+    border-bottom: none;
+  }
 
-/* ── Описание ─────────────────────────────────────────────────────────────── */
-.pdp-desc-fade {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 44px;
-  height: 64px;
-  background: linear-gradient(180deg, transparent, var(--card));
-  pointer-events: none;
-}
+  .pdp-pickup-icon {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: 12px;
+    background: var(--brand-surface);
+    display: grid;
+    place-content: center;
+  }
 
-.pdp-desc-toggle {
-  margin-top: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  background: transparent;
-  color: var(--primary);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
+  /* ── Описание ─────────────────────────────────────────────────────────────── */
+  .pdp-desc-fade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 44px;
+    height: 64px;
+    background: linear-gradient(180deg, transparent, var(--card));
+    pointer-events: none;
+  }
 
-.pdp-desc-toggle:hover {
-  color: var(--brand-active);
-}
+  .pdp-desc-toggle {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+  }
 
-/* ── Характеристики ───────────────────────────────────────────────────────── */
-.pdp-spec-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 11px 0;
-  border-bottom: 1px dashed var(--border);
-}
+  .pdp-desc-toggle:hover {
+    color: var(--brand-active);
+  }
 
-.pdp-spec-row:last-child {
-  border-bottom: none;
-}
+  /* ── Характеристики ───────────────────────────────────────────────────────── */
+  .pdp-spec-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 11px 0;
+    border-bottom: 1px dashed var(--border);
+  }
 
-.pdp-spec-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--muted-foreground);
-}
+  .pdp-spec-row:last-child {
+    border-bottom: none;
+  }
 
-.pdp-spec-value {
-  font-size: 14px;
-  font-weight: 600;
-  text-align: right;
-}
+  .pdp-spec-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
 
-/* ── Ещё в этих категориях ────────────────────────────────────────────────── */
-.pdp-more-row {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 10px 13px;
-  border-radius: 16px;
-  background: linear-gradient(165deg, color-mix(in oklch, var(--muted) 45%, var(--card)), var(--muted));
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 2px 8px rgba(15, 23, 42, 0.04);
-  transition: box-shadow 0.15s ease;
-}
+  .pdp-spec-value {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+  }
 
-.pdp-more-row:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 6px 16px rgba(15, 23, 42, 0.09);
-}
+  /* ── Ещё в этих категориях ────────────────────────────────────────────────── */
+  .pdp-more-row {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 10px 13px;
+    border-radius: 16px;
+    background: linear-gradient(165deg, color-mix(in oklch, var(--muted) 45%, var(--card)), var(--muted));
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 2px 8px rgba(15, 23, 42, 0.04);
+    transition: box-shadow 0.15s ease;
+  }
 
-.pdp-more-icon {
-  width: 48px;
-  height: 48px;
-  flex: none;
-  border-radius: 12px;
-  background: var(--card);
-  display: grid;
-  place-items: center;
-  box-shadow: inset 0 0 0 1px var(--border);
-  overflow: hidden;
-}
+  .pdp-more-row:hover {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 6px 16px rgba(15, 23, 42, 0.09);
+  }
 
-.pdp-perk {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 11px 12px;
-  border-radius: 14px;
-  background: var(--muted);
-}
+  .pdp-more-icon {
+    width: 48px;
+    height: 48px;
+    flex: none;
+    border-radius: 12px;
+    background: var(--card);
+    display: grid;
+    place-items: center;
+    box-shadow: inset 0 0 0 1px var(--border);
+    overflow: hidden;
+  }
 
-/* ── Фиксированная панель покупки (мобильные) ─────────────────────────────── */
-.pdp-buybar {
-  position: fixed;
-  left: 10px;
-  right: 10px;
-  /* MobileBottomNav: bottom 12px + высота 50px + запас 10px */
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
-  z-index: 45;
-  /* display/align/gap намеренно живут утилитами на самом элементе:
-     scoped-селектор [data-v-*] бьёт `lg:hidden` по специфичности, и панель
-     осталась бы видимой на десктопе. */
-  padding: 9px 14px;
-  border-radius: 20px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.48));
-  -webkit-backdrop-filter: blur(24px) saturate(1.9);
-  backdrop-filter: blur(24px) saturate(1.9);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 12px 32px rgba(15, 23, 42, 0.18);
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
+  .pdp-perk {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 12px;
+    border-radius: 14px;
+    background: var(--muted);
+  }
 
-/* Навбар уехал вниз — панель занимает его место */
-.pdp-buybar--down {
-  transform: translateY(62px);
+  /* ── Фиксированная панель покупки (мобильные) ─────────────────────────────── */
+  .pdp-buybar {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    /* MobileBottomNav: bottom 12px + высота 50px + запас 10px */
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+    z-index: 45;
+    /* display/align/gap намеренно живут утилитами на самом элементе:
+       scoped-селектор [data-v-*] бьёт `lg:hidden` по специфичности, и панель
+       осталась бы видимой на десктопе. */
+    padding: 9px 14px;
+    border-radius: 20px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.48));
+    -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    backdrop-filter: blur(24px) saturate(1.9);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 12px 32px rgba(15, 23, 42, 0.18);
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Навбар уехал вниз — панель занимает его место */
+  .pdp-buybar--down {
+    transform: translateY(62px);
+  }
 }
 </style>

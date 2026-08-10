@@ -399,64 +399,79 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.pr-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 18px 16px;
-  box-shadow: var(--elevation-card);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-@media (width >= 64rem) {
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
   .pr-card {
-    padding: 24px 26px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 18px 16px;
+    box-shadow: var(--elevation-card);
   }
-}
 
-.pr-title {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
+  @media (width >= 64rem) {
+    .pr-card {
+      padding: 24px 26px;
+    }
+  }
 
-.pr-rating-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.55));
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 3px 10px rgba(15, 23, 42, 0.07);
-  font-size: 14px;
-  font-weight: 800;
-}
+  .pr-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
 
-.pr-write-btn {
-  margin-top: 12px;
-  width: 100%;
-  height: 44px;
-  padding: 0 20px;
-  border-radius: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.62));
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-  backdrop-filter: blur(10px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 5px 14px rgba(43, 127, 255, 0.16);
-  color: var(--primary);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: box-shadow 0.18s ease;
-}
+  .pr-rating-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.55));
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 3px 10px rgba(15, 23, 42, 0.07);
+    font-size: 14px;
+    font-weight: 800;
+  }
 
-.pr-write-btn:hover {
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 8px 20px rgba(43, 127, 255, 0.26);
+  .pr-write-btn {
+    margin-top: 12px;
+    width: 100%;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.62));
+    -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(10px) saturate(1.6);
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 5px 14px rgba(43, 127, 255, 0.16);
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
+  }
+
+  .pr-write-btn:hover {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 8px 20px rgba(43, 127, 255, 0.26);
+  }
 }
 </style>

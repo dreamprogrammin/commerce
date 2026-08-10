@@ -120,252 +120,267 @@ function onLogin() {
 </template>
 
 <style scoped>
-.loyalty {
-  position: relative;
-  overflow: hidden;
-  border-radius: 24px;
-  background: linear-gradient(120deg, #0f52d9 0%, #2b7fff 52%, #5aa0ff 100%);
-  color: #fff;
-  padding: clamp(26px, 3vw, 44px);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: clamp(24px, 3vw, 44px);
-  flex-wrap: wrap;
-  box-shadow: 0 20px 46px -20px rgb(43 127 255 / 0.7);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.loyalty__blob {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.loyalty__blob--1 {
-  top: -90px;
-  left: -40px;
-  width: 260px;
-  height: 260px;
-  background: rgb(255 255 255 / 0.1);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.loyalty__blob--2 {
-  bottom: -120px;
-  right: 34%;
-  width: 240px;
-  height: 240px;
-  background: rgb(255 255 255 / 0.07);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.loyalty__body {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
-  min-width: 260px;
-  flex: 1 1 340px;
-}
+@layer components {
+  .loyalty {
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    background: linear-gradient(120deg, #0f52d9 0%, #2b7fff 52%, #5aa0ff 100%);
+    color: #fff;
+    padding: clamp(26px, 3vw, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(24px, 3vw, 44px);
+    flex-wrap: wrap;
+    box-shadow: 0 20px 46px -20px rgb(43 127 255 / 0.7);
+  }
 
-.loyalty__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border-radius: 999px;
-  padding: 7px 15px;
-  font-weight: 700;
-  font-size: 12.5px;
-  background: rgb(255 255 255 / 0.16);
-  border: 1px solid rgb(255 255 255 / 0.32);
-  backdrop-filter: blur(6px);
-}
+  .loyalty__blob {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
 
-.loyalty__title {
-  margin: 0;
-  font-weight: 800;
-  font-size: clamp(26px, 3vw, 42px);
-  line-height: 1.08;
-  letter-spacing: -0.03em;
-  text-wrap: balance;
-}
+  .loyalty__blob--1 {
+    top: -90px;
+    left: -40px;
+    width: 260px;
+    height: 260px;
+    background: rgb(255 255 255 / 0.1);
+  }
 
-.loyalty__pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+  .loyalty__blob--2 {
+    bottom: -120px;
+    right: 34%;
+    width: 240px;
+    height: 240px;
+    background: rgb(255 255 255 / 0.07);
+  }
 
-.loyalty__pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-weight: 600;
-  font-size: 13px;
-  background: rgb(255 255 255 / 0.14);
-  border: 1px solid rgb(255 255 255 / 0.2);
-}
+  .loyalty__body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    min-width: 260px;
+    flex: 1 1 340px;
+  }
 
-.loyalty__actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
-  flex-wrap: wrap;
-}
+  .loyalty__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 999px;
+    padding: 7px 15px;
+    font-weight: 700;
+    font-size: 12.5px;
+    background: rgb(255 255 255 / 0.16);
+    border: 1px solid rgb(255 255 255 / 0.32);
+    backdrop-filter: blur(6px);
+  }
 
-.loyalty__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 48px;
-  border-radius: 14px;
-  font-weight: 700;
-  font-size: 15px;
-  cursor: pointer;
-  text-decoration: none;
-  transition:
-    transform 0.1s ease,
-    background 0.15s ease;
-}
+  .loyalty__title {
+    margin: 0;
+    font-weight: 800;
+    font-size: clamp(26px, 3vw, 42px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
 
-.loyalty__btn--primary {
-  padding: 0 24px;
-  border: none;
-  background: #fff;
-  color: var(--primary);
-  box-shadow: 0 8px 20px -8px rgb(0 0 0 / 0.45);
-}
+  .loyalty__pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 
-.loyalty__btn--primary:active {
-  transform: scale(0.97);
-}
+  .loyalty__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    background: rgb(255 255 255 / 0.14);
+    border: 1px solid rgb(255 255 255 / 0.2);
+  }
 
-.loyalty__btn--ghost {
-  padding: 0 20px;
-  border: 1px solid rgb(255 255 255 / 0.55);
-  background: rgb(255 255 255 / 0.1);
-  color: #fff;
-  backdrop-filter: blur(6px);
-}
+  .loyalty__actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
 
-.loyalty__btn--ghost:hover {
-  background: rgb(255 255 255 / 0.22);
-}
+  .loyalty__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 48px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+      transform 0.1s ease,
+      background 0.15s ease;
+  }
 
-.loyalty__card-wrap {
-  position: relative;
-  flex: 0 0 auto;
-}
+  .loyalty__btn--primary {
+    padding: 0 24px;
+    border: none;
+    background: #fff;
+    color: var(--primary);
+    box-shadow: 0 8px 20px -8px rgb(0 0 0 / 0.45);
+  }
 
-.loyalty__card {
-  position: relative;
-  width: clamp(260px, 26vw, 320px);
-  aspect-ratio: 1.6 / 1;
-  border-radius: 22px;
-  background: linear-gradient(140deg, #1657d6 0%, #3b8bff 100%);
-  box-shadow: 0 26px 60px -16px rgb(0 10 40 / 0.6);
-  transform: rotate(-4deg);
-  overflow: hidden;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
+  .loyalty__btn--primary:active {
+    transform: scale(0.97);
+  }
 
-.loyalty__card-sheen {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(125deg, rgb(255 255 255 / 0.4) 0%, rgb(255 255 255 / 0) 42%);
-  pointer-events: none;
-}
+  .loyalty__btn--ghost {
+    padding: 0 20px;
+    border: 1px solid rgb(255 255 255 / 0.55);
+    background: rgb(255 255 255 / 0.1);
+    color: #fff;
+    backdrop-filter: blur(6px);
+  }
 
-.loyalty__card-glow {
-  position: absolute;
-  right: -40px;
-  top: -40px;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgb(255 255 255 / 0.28), transparent 65%);
-  pointer-events: none;
-}
+  .loyalty__btn--ghost:hover {
+    background: rgb(255 255 255 / 0.22);
+  }
 
-.loyalty__card-top {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
+  .loyalty__card-wrap {
+    position: relative;
+    flex: 0 0 auto;
+  }
 
-.loyalty__wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 15px;
-  color: #fff;
-}
+  .loyalty__card {
+    position: relative;
+    width: clamp(260px, 26vw, 320px);
+    aspect-ratio: 1.6 / 1;
+    border-radius: 22px;
+    background: linear-gradient(140deg, #1657d6 0%, #3b8bff 100%);
+    box-shadow: 0 26px 60px -16px rgb(0 10 40 / 0.6);
+    transform: rotate(-4deg);
+    overflow: hidden;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
 
-.loyalty__card-chip {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 5px 11px;
-  font-weight: 800;
-  font-size: 12px;
-  color: #1657d6;
-  background: rgb(255 255 255 / 0.95);
-}
+  .loyalty__card-sheen {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(125deg, rgb(255 255 255 / 0.4) 0%, rgb(255 255 255 / 0) 42%);
+    pointer-events: none;
+  }
 
-.loyalty__card-balance {
-  position: relative;
-}
+  .loyalty__card-glow {
+    position: absolute;
+    right: -40px;
+    top: -40px;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgb(255 255 255 / 0.28), transparent 65%);
+    pointer-events: none;
+  }
 
-.loyalty__card-label {
-  font-weight: 500;
-  font-size: 12px;
-  color: rgb(255 255 255 / 0.75);
-  margin-bottom: 2px;
-}
+  .loyalty__card-top {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
 
-.loyalty__card-amount {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-}
+  .loyalty__wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 15px;
+    color: #fff;
+  }
 
-.loyalty__card-num {
-  font-weight: 800;
-  font-size: 32px;
-  letter-spacing: -0.02em;
-  color: #fff;
-  font-variant-numeric: tabular-nums;
-}
+  .loyalty__card-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 5px 11px;
+    font-weight: 800;
+    font-size: 12px;
+    color: #1657d6;
+    background: rgb(255 255 255 / 0.95);
+  }
 
-.loyalty__card-unit {
-  font-weight: 600;
-  font-size: 14px;
-  color: rgb(255 255 255 / 0.85);
-}
+  .loyalty__card-balance {
+    position: relative;
+  }
 
-.loyalty__card-rate {
-  font-weight: 500;
-  font-size: 11.5px;
-  color: rgb(255 255 255 / 0.7);
-  margin-top: 8px;
-  letter-spacing: 0.04em;
-}
+  .loyalty__card-label {
+    font-weight: 500;
+    font-size: 12px;
+    color: rgb(255 255 255 / 0.75);
+    margin-bottom: 2px;
+  }
 
-.loyalty__card-locked {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  font-size: 11.5px;
-  color: rgb(255 255 255 / 0.92);
-  margin-top: 8px;
+  .loyalty__card-amount {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+
+  .loyalty__card-num {
+    font-weight: 800;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .loyalty__card-unit {
+    font-weight: 600;
+    font-size: 14px;
+    color: rgb(255 255 255 / 0.85);
+  }
+
+  .loyalty__card-rate {
+    font-weight: 500;
+    font-size: 11.5px;
+    color: rgb(255 255 255 / 0.7);
+    margin-top: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .loyalty__card-locked {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 11.5px;
+    color: rgb(255 255 255 / 0.92);
+    margin-top: 8px;
+  }
 }
 </style>

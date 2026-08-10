@@ -210,243 +210,258 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 </template>
 
 <style scoped>
-.csb-bar {
-  /* top:0, not 74px — SiteHeader renders non-sticky on this page
-     (:sticky="false" in layouts/CatalogListing.vue), so nothing fixed sits
-     above this bar to dock under. Transparent + just vertical padding: the
-     bar itself carries no chrome any more, the floating glass capsule below
-     is what's actually visible (matches the updated .dc.html). */
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 90;
-  padding: 10px 0 4px;
+/* Стили ниже намеренно лежат в @layer components.
 
-  /*
-   * Появление — только сдвигом, БЕЗ анимации opacity.
-   * Любое промежуточное значение opacity делает этот элемент новым backdrop
-   * root, и `backdrop-filter` у .csb-capsule внутри перестаёт размывать
-   * страницу: блюр пропадал на все 0.3s перехода, капсула вспыхивала
-   * насквозь прозрачной. Проверено попиксельно — при opacity:.99 сквозь
-   * капсулу читаются названия брендов и бейджи скидок, при opacity:1 они
-   * размыты. Transform на это не влияет, проверялся отдельно.
-   *
-   * Прятать через opacity тут и не нужно: translateY(-130%) уводит панель
-   * за верхний край, а visibility убирает её из чтения скринридером и из
-   * порядка фокуса. Задержка visibility в 0.3s — чтобы панель исчезала
-   * после того, как уедет, а не мгновенно.
-   */
-  transform: translateY(-130%);
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
-    visibility 0s linear 0.3s;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.csb-bar--shown {
-  transform: translateY(0);
-  visibility: visible;
-  pointer-events: auto;
-  transition:
-    transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
-    visibility 0s;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.csb-inner {
-  /* Matches the real page container (carouselContainerVariants({ contained:
-     'always' }) → container max-w-screen-2xl + px-[var(--page-gutter)]), not
-     the .dc.html mockup's own isolated-preview 1360px/clamp() — this bar sits
-     directly above that container's content and must line up with its edges.
-     Отступ берём из той же переменной, а не числом. */
-  max-width: 1536px;
-  margin: 0 auto;
-  padding: 0 var(--page-gutter);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.csb-capsule {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 7px 8px;
-  border-radius: 24px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
-  -webkit-backdrop-filter: blur(24px) saturate(1.9);
-  backdrop-filter: blur(24px) saturate(1.9);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 1px rgba(15, 23, 42, 0.05),
-    0 12px 32px rgba(15, 23, 42, 0.16);
-}
+@layer components {
+  .csb-bar {
+    /* top:0, not 74px — SiteHeader renders non-sticky on this page
+       (:sticky="false" in layouts/CatalogListing.vue), so nothing fixed sits
+       above this bar to dock under. Transparent + just vertical padding: the
+       bar itself carries no chrome any more, the floating glass capsule below
+       is what's actually visible (matches the updated .dc.html). */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 90;
+    padding: 10px 0 4px;
 
-.csb-search {
-  /* Capped, not left to fill all remaining space: at the real container's
-     1536px width (see .csb-inner) an uncapped SiteHeaderSearch (itself
-     flex:1 internally) ballooned to ~900px, swamping the row and reducing
-     Сортировка/Категории/Бренды to a squeezed cluster at the far right.
-     Bounded back to a normal pill-sized search field; the freed-up space
-     flows to the gap before .csb-cart via its own margin-left:auto. */
-  flex: 1 1 320px;
-  min-width: 290px;
-  max-width: 420px;
-}
+    /*
+     * Появление — только сдвигом, БЕЗ анимации opacity.
+     * Любое промежуточное значение opacity делает этот элемент новым backdrop
+     * root, и `backdrop-filter` у .csb-capsule внутри перестаёт размывать
+     * страницу: блюр пропадал на все 0.3s перехода, капсула вспыхивала
+     * насквозь прозрачной. Проверено попиксельно — при opacity:.99 сквозь
+     * капсулу читаются названия брендов и бейджи скидок, при opacity:1 они
+     * размыты. Transform на это не влияет, проверялся отдельно.
+     *
+     * Прятать через opacity тут и не нужно: translateY(-130%) уводит панель
+     * за верхний край, а visibility убирает её из чтения скринридером и из
+     * порядка фокуса. Задержка visibility — чтобы панель исчезала после
+     * того, как уедет, а не мгновенно.
+     */
+    transform: translateY(-130%);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
+      visibility 0s linear 0.3s;
+  }
 
-/* Более явный вид поисковой строки в этой капсуле — стандартный
-   .sh-search--dense рассчитан на мобильную плашку (там фон и так
-   контрастирует, а прямоугольная rounded-12px форма не соседствует с
-   pill-кнопками). Здесь та же полупрозрачность сливалась со стеклянной
-   капсулой, а прямые углы читались как случайный прямоугольник среди
-   круглых .csb-pill — из-за этого поиск не опознавался как часть общего
-   ряда управляющих элементов. Форма и тень теперь буквально повторяют
-   .csb-pill (капсула + тот же 3-слойный inset/drop shadow), просто с
-   непрозрачным белым фоном вместо стеклянного градиента — читается как
-   явный, приподнятый контрол, а не плоский прямоугольник. Переопределяем
-   только для этого потребителя, не трогая CommonSiteHeaderSearch.vue —
-   мобильная плашка использует те же классы. */
-.csb-search :deep(.sh-search--dense) {
-  background: #fff;
-  border-radius: 999px;
-  border-color: rgba(255, 255, 255, 0.9);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(15, 23, 42, 0.06),
-    0 6px 18px rgba(15, 23, 42, 0.1);
-}
+  .csb-bar--shown {
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
+      visibility 0s;
+  }
 
-.csb-pill {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 15px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
-  -webkit-backdrop-filter: blur(14px) saturate(1.7);
-  backdrop-filter: blur(14px) saturate(1.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(15, 23, 42, 0.06),
-    0 6px 18px rgba(15, 23, 42, 0.1);
-  font: 600 13.5px var(--font-sans);
-  color: var(--foreground);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
+  .csb-inner {
+    /* Matches the real page container (carouselContainerVariants({ contained:
+       'always' }) → container max-w-screen-2xl + px-[var(--page-gutter)]), not
+       the .dc.html mockup's own isolated-preview 1360px/clamp() — this bar sits
+       directly above that container's content and must line up with its edges.
+       Отступ берём из той же переменной, а не числом. */
+    max-width: 1536px;
+    margin: 0 auto;
+    padding: 0 var(--page-gutter);
+  }
 
-.csb-pill--active {
-  border-color: var(--primary);
-  background: linear-gradient(150deg, rgba(219, 234, 254, 0.95), rgba(191, 219, 254, 0.6));
-}
+  .csb-capsule {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 8px;
+    border-radius: 24px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
+    -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    backdrop-filter: blur(24px) saturate(1.9);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      inset 0 -1px 1px rgba(15, 23, 42, 0.05),
+      0 12px 32px rgba(15, 23, 42, 0.16);
+  }
 
-.csb-pill-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--primary);
-  color: #fff;
-  font: 700 11px var(--font-sans);
-}
+  .csb-search {
+    /* Capped, not left to fill all remaining space: at the real container's
+       1536px width (see .csb-inner) an uncapped SiteHeaderSearch (itself
+       flex:1 internally) ballooned to ~900px, swamping the row and reducing
+       Сортировка/Категории/Бренды to a squeezed cluster at the far right.
+       Bounded back to a normal pill-sized search field; the freed-up space
+       flows to the gap before .csb-cart via its own margin-left:auto. */
+    flex: 1 1 320px;
+    min-width: 290px;
+    max-width: 420px;
+  }
 
-.csb-chev {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  color: var(--primary);
-  transition: transform 0.2s ease;
-}
+  /* Более явный вид поисковой строки в этой капсуле — стандартный
+     .sh-search--dense рассчитан на мобильную плашку (там фон и так
+     контрастирует, а прямоугольная rounded-12px форма не соседствует с
+     pill-кнопками). Здесь та же полупрозрачность сливалась со стеклянной
+     капсулой, а прямые углы читались как случайный прямоугольник среди
+     круглых .csb-pill — из-за этого поиск не опознавался как часть общего
+     ряда управляющих элементов. Форма и тень теперь буквально повторяют
+     .csb-pill (капсула + тот же 3-слойный inset/drop shadow), просто с
+     непрозрачным белым фоном вместо стеклянного градиента — читается как
+     явный, приподнятый контрол, а не плоский прямоугольник. Переопределяем
+     только для этого потребителя, не трогая CommonSiteHeaderSearch.vue —
+     мобильная плашка использует те же классы. */
+  .csb-search :deep(.sh-search--dense) {
+    background: #fff;
+    border-radius: 999px;
+    border-color: rgba(255, 255, 255, 0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 2px rgba(15, 23, 42, 0.06),
+      0 6px 18px rgba(15, 23, 42, 0.1);
+  }
 
-.csb-chev--open {
-  transform: rotate(180deg);
-}
+  .csb-pill {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 15px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
+    -webkit-backdrop-filter: blur(14px) saturate(1.7);
+    backdrop-filter: blur(14px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 2px rgba(15, 23, 42, 0.06),
+      0 6px 18px rgba(15, 23, 42, 0.1);
+    font: 600 13.5px var(--font-sans);
+    color: var(--foreground);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
 
-.csb-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  text-align: left;
-  padding: 10px 12px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  cursor: pointer;
-  font: 400 14.5px var(--font-sans);
-  color: var(--foreground);
-  white-space: nowrap;
-  transition: background 0.12s ease;
-}
+  .csb-pill--active {
+    border-color: var(--primary);
+    background: linear-gradient(150deg, rgba(219, 234, 254, 0.95), rgba(191, 219, 254, 0.6));
+  }
 
-.csb-item:hover {
-  background: var(--muted);
-}
+  .csb-pill-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fff;
+    font: 700 11px var(--font-sans);
+  }
 
-.csb-item--active {
-  font-weight: 700;
-}
+  .csb-chev {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--primary);
+    transition: transform 0.2s ease;
+  }
 
-.csb-item__label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  .csb-chev--open {
+    transform: rotate(180deg);
+  }
 
-.csb-item__check {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  color: var(--primary);
-}
+  .csb-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    cursor: pointer;
+    font: 400 14.5px var(--font-sans);
+    color: var(--foreground);
+    white-space: nowrap;
+    transition: background 0.12s ease;
+  }
 
-.csb-cart {
-  position: relative;
-  flex: none;
-  margin-left: auto;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 4px 12px rgba(15, 23, 42, 0.1);
-  display: grid;
-  place-content: center;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
+  .csb-item:hover {
+    background: var(--muted);
+  }
 
-.csb-cart:hover {
-  background: rgba(43, 127, 255, 0.12);
-}
+  .csb-item--active {
+    font-weight: 700;
+  }
 
-.csb-cart__icon {
-  width: 20px;
-  height: 20px;
-  color: var(--primary);
-}
+  .csb-item__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-.csb-cart-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #ef4444;
-  color: #fff;
-  font: 700 10.5px var(--font-sans);
-  display: grid;
-  place-content: center;
-  border: 2px solid #fff;
+  .csb-item__check {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--primary);
+  }
+
+  .csb-cart {
+    position: relative;
+    flex: none;
+    margin-left: auto;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 4px 12px rgba(15, 23, 42, 0.1);
+    display: grid;
+    place-content: center;
+    text-decoration: none;
+    transition: background 0.15s ease;
+  }
+
+  .csb-cart:hover {
+    background: rgba(43, 127, 255, 0.12);
+  }
+
+  .csb-cart__icon {
+    width: 20px;
+    height: 20px;
+    color: var(--primary);
+  }
+
+  .csb-cart-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font: 700 10.5px var(--font-sans);
+    display: grid;
+    place-content: center;
+    border: 2px solid #fff;
+  }
 }
 </style>

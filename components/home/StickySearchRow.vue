@@ -89,91 +89,106 @@ function onLogin() {
 </template>
 
 <style scoped>
-/* Боковые отступы задаёт контейнер на .sticky-row__inner — здесь только
-   вертикальные, иначе строка разъедется с секциями страницы. */
-.sticky-row {
-  padding: 16px 0 4px;
-  position: relative;
-  z-index: 1;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.sticky-row__inner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.sticky-row--stuck {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  padding: 10px 0;
-  background: rgb(255 255 255 / 0.86);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  backdrop-filter: blur(20px) saturate(1.4);
-  box-shadow: 0 6px 20px rgb(15 23 42 / 0.1);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.sticky-row__search {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 52px;
-  padding: 0 18px;
-  background: var(--muted);
-  border: none;
-  border-radius: 16px;
-  cursor: pointer;
-  text-align: left;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.sticky-row__placeholder {
-  color: var(--muted-foreground);
-  font-weight: 500;
-  font-size: 16px;
-}
+@layer components {
+  /* Боковые отступы задаёт контейнер на .sticky-row__inner — здесь только
+     вертикальные, иначе строка разъедется с секциями страницы. */
+  .sticky-row {
+    padding: 16px 0 4px;
+    position: relative;
+    z-index: 1;
+  }
 
-.sticky-row__bonus {
-  flex: none;
-  height: 52px;
-  padding: 0 16px;
-  border-radius: 16px;
-  background: var(--bonus-surface);
-  border: 1px solid var(--bonus-border);
-  color: var(--bonus);
-  font-weight: 800;
-  font-size: 15px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
+  .sticky-row__inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
-.sticky-row__login {
-  flex: none;
-  height: 52px;
-  padding: 0 18px;
-  border: none;
-  border-radius: 16px;
-  background: var(--primary);
-  color: #fff;
-  font-weight: 700;
-  font-size: 14px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  transition: background 0.15s ease;
-}
+  .sticky-row--stuck {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 10px 0;
+    background: rgb(255 255 255 / 0.86);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 6px 20px rgb(15 23 42 / 0.1);
+  }
 
-.sticky-row__login:hover {
-  background: var(--brand-hover);
-}
+  .sticky-row__search {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 52px;
+    padding: 0 18px;
+    background: var(--muted);
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    text-align: left;
+  }
 
-:global(.dark) .sticky-row--stuck {
-  background: rgb(20 20 20 / 0.86);
+  .sticky-row__placeholder {
+    color: var(--muted-foreground);
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .sticky-row__bonus {
+    flex: none;
+    height: 52px;
+    padding: 0 16px;
+    border-radius: 16px;
+    background: var(--bonus-surface);
+    border: 1px solid var(--bonus-border);
+    color: var(--bonus);
+    font-weight: 800;
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .sticky-row__login {
+    flex: none;
+    height: 52px;
+    padding: 0 18px;
+    border: none;
+    border-radius: 16px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: background 0.15s ease;
+  }
+
+  .sticky-row__login:hover {
+    background: var(--brand-hover);
+  }
+
+  :global(.dark) .sticky-row--stuck {
+    background: rgb(20 20 20 / 0.86);
+  }
 }
 </style>

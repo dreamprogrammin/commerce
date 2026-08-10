@@ -332,85 +332,104 @@ watch(() => questions.value, (newQuestions) => {
 </template>
 
 <style scoped>
-.pq-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 18px 16px;
-  box-shadow: var(--elevation-card);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-@media (width >= 64rem) {
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
   .pq-card {
-    padding: 24px 26px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 18px 16px;
+    box-shadow: var(--elevation-card);
   }
-}
 
-.pq-title {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
+  @media (width >= 64rem) {
+    .pq-card {
+      padding: 24px 26px;
+    }
+  }
 
-.pq-item {
-  border-radius: 16px;
-  background: var(--muted);
-  border: 1px solid transparent;
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease;
-}
+  .pq-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
 
-.pq-item--open {
-  background: linear-gradient(165deg, color-mix(in oklch, var(--brand-surface) 55%, var(--card)), var(--brand-surface));
-  border-color: rgba(255, 255, 255, 0.75);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 4px 12px rgba(43, 127, 255, 0.1);
-}
+  .pq-item {
+    border-radius: 16px;
+    background: var(--muted);
+    border: 1px solid transparent;
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease;
+  }
 
-.pq-item--highlight {
-  border-color: var(--primary);
-}
+  .pq-item--open {
+    background: linear-gradient(
+      165deg,
+      color-mix(in oklch, var(--brand-surface) 55%, var(--card)),
+      var(--brand-surface)
+    );
+    border-color: rgba(255, 255, 255, 0.75);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 4px 12px rgba(43, 127, 255, 0.1);
+  }
 
-.pq-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 14px 16px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-}
+  .pq-item--highlight {
+    border-color: var(--primary);
+  }
 
-.pq-body {
-  padding: 0 16px 15px;
-}
+  .pq-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
 
-.pq-ask-btn {
-  width: 100%;
-  height: 44px;
-  padding: 0 20px;
-  border-radius: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.62));
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-  backdrop-filter: blur(10px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 5px 14px rgba(43, 127, 255, 0.16);
-  color: var(--primary);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: box-shadow 0.18s ease;
-}
+  .pq-body {
+    padding: 0 16px 15px;
+  }
 
-.pq-ask-btn:hover {
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 8px 20px rgba(43, 127, 255, 0.26);
+  .pq-ask-btn {
+    width: 100%;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.62));
+    -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(10px) saturate(1.6);
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 5px 14px rgba(43, 127, 255, 0.16);
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
+  }
+
+  .pq-ask-btn:hover {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 8px 20px rgba(43, 127, 255, 0.26);
+  }
 }
 </style>

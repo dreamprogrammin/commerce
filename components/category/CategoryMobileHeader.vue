@@ -87,84 +87,99 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 </template>
 
 <style scoped>
-.cmh-bar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  padding: 10px 12px 4px;
-  transition:
-    opacity 0.28s ease,
-    transform 0.28s cubic-bezier(0.32, 0.72, 0.33, 1);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.cmh-bar--hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-140%);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.cmh-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 8px;
-  border-radius: 20px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
-  -webkit-backdrop-filter: blur(24px) saturate(1.9);
-  backdrop-filter: blur(24px) saturate(1.9);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 1px rgba(15, 23, 42, 0.05),
-    0 12px 32px rgba(15, 23, 42, 0.16);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.cmh-logo {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: var(--primary);
-  display: grid;
-  place-content: center;
-  box-shadow: var(--shadow-brand);
-  text-decoration: none;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.cmh-icon-btn {
-  position: relative;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: var(--foreground);
-  cursor: pointer;
-  display: grid;
-  place-content: center;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
+@layer components {
+  .cmh-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    padding: 10px 12px 4px;
+    transition:
+      opacity 0.28s ease,
+      transform 0.28s cubic-bezier(0.32, 0.72, 0.33, 1);
+  }
 
-.cmh-icon-btn--active {
-  background: rgba(43, 127, 255, 0.16);
-  color: var(--primary);
-}
+  .cmh-bar--hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-140%);
+  }
 
-.cmh-icon {
-  width: 19px;
-  height: 19px;
-}
+  .cmh-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 8px;
+    border-radius: 20px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
+    -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    backdrop-filter: blur(24px) saturate(1.9);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      inset 0 -1px 1px rgba(15, 23, 42, 0.05),
+      0 12px 32px rgba(15, 23, 42, 0.16);
+  }
 
-.cmh-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
-  border: 2px solid #fff;
+  .cmh-logo {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--primary);
+    display: grid;
+    place-content: center;
+    box-shadow: var(--shadow-brand);
+    text-decoration: none;
+  }
+
+  .cmh-icon-btn {
+    position: relative;
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: var(--foreground);
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .cmh-icon-btn--active {
+    background: rgba(43, 127, 255, 0.16);
+    color: var(--primary);
+  }
+
+  .cmh-icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .cmh-badge {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+    border: 2px solid #fff;
+  }
 }
 </style>

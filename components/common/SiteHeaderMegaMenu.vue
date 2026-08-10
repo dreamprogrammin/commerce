@@ -177,254 +177,269 @@ watch(() => props.open, (isOpen) => {
 </template>
 
 <style scoped>
-.sh-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 98;
-  background: rgb(15 23 42 / 0.42);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.sh-mega {
-  position: fixed;
-  top: 88px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(1160px, 94vw);
-  height: min(80vh, 720px);
-  z-index: 99;
-  background: var(--popover);
-  border-radius: 20px;
-  box-shadow: 0 30px 70px rgb(15 23 42 / 0.28);
-  overflow: hidden;
-  display: flex;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-/* ---- Рельс ---- */
-.sh-mega__rail {
-  width: 274px;
-  flex: none;
-  border-right: 1px solid var(--border);
-  padding: 16px 12px;
-  overflow-y: auto;
-  background: color-mix(in oklch, var(--muted) 40%, var(--popover));
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.sh-rail {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 14px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 12px;
-  text-align: left;
-  color: var(--foreground);
-  font: 600 15px var(--font-sans);
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.sh-rail--active {
-  background: var(--brand-surface);
-  color: var(--primary);
-  font-weight: 700;
-}
+@layer components {
+  .sh-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 98;
+    background: rgb(15 23 42 / 0.42);
+  }
 
-.sh-rail__icon {
-  flex: none;
-  display: grid;
-  place-content: center;
-  width: 28px;
-  height: 28px;
-}
+  .sh-mega {
+    position: fixed;
+    top: 88px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1160px, 94vw);
+    height: min(80vh, 720px);
+    z-index: 99;
+    background: var(--popover);
+    border-radius: 20px;
+    box-shadow: 0 30px 70px rgb(15 23 42 / 0.28);
+    overflow: hidden;
+    display: flex;
+  }
 
-.sh-rail__thumb {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-  mix-blend-mode: multiply;
-}
+  /* ---- Рельс ---- */
+  .sh-mega__rail {
+    width: 274px;
+    flex: none;
+    border-right: 1px solid var(--border);
+    padding: 16px 12px;
+    overflow-y: auto;
+    background: color-mix(in oklch, var(--muted) 40%, var(--popover));
+  }
 
-.sh-rail__name {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  .sh-rail {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 14px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 12px;
+    text-align: left;
+    color: var(--foreground);
+    font: 600 15px var(--font-sans);
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
+  }
 
-.sh-rail__skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+  .sh-rail--active {
+    background: var(--brand-surface);
+    color: var(--primary);
+    font-weight: 700;
+  }
 
-.sh-rail__skeleton-row {
-  height: 44px;
-  border-radius: 12px;
-  background: var(--muted);
-  animation: sh-pulse 1.2s ease-in-out infinite;
-}
+  .sh-rail__icon {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 28px;
+    height: 28px;
+  }
 
-/* ---- Контент ---- */
-.sh-mega__content {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  padding: 22px 30px 30px;
-}
+  .sh-rail__thumb {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+  }
 
-.sh-mega__title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 4px;
-  font: 700 24px var(--font-sans);
-  letter-spacing: -0.02em;
-  color: var(--foreground);
-  text-decoration: none;
-}
+  .sh-rail__name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-.sh-mega__title:hover {
-  color: var(--primary);
-}
+  .sh-rail__skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
 
-.sh-group {
-  margin-top: 22px;
-}
+  .sh-rail__skeleton-row {
+    height: 44px;
+    border-radius: 12px;
+    background: var(--muted);
+    animation: sh-pulse 1.2s ease-in-out infinite;
+  }
 
-.sh-group__title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 0 13px;
-  font: 700 16px var(--font-sans);
-  color: var(--foreground);
-  text-decoration: none;
-}
+  /* ---- Контент ---- */
+  .sh-mega__content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 22px 30px 30px;
+  }
 
-.sh-group__title:hover {
-  color: var(--primary);
-}
+  .sh-mega__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    font: 700 24px var(--font-sans);
+    letter-spacing: -0.02em;
+    color: var(--foreground);
+    text-decoration: none;
+  }
 
-.sh-group__grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 18px 16px;
-}
+  .sh-mega__title:hover {
+    color: var(--primary);
+  }
 
-@media (max-width: 1100px) {
+  .sh-group {
+    margin-top: 22px;
+  }
+
+  .sh-group__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 0 13px;
+    font: 700 16px var(--font-sans);
+    color: var(--foreground);
+    text-decoration: none;
+  }
+
+  .sh-group__title:hover {
+    color: var(--primary);
+  }
+
   .sh-group__grid {
-    grid-template-columns: repeat(4, 1fr);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 18px 16px;
   }
-}
 
-.sh-card-link {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  text-decoration: none;
-  transition: transform 0.15s ease;
-}
-
-.sh-card-link:hover {
-  transform: translateY(-3px);
-}
-
-.sh-card {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  aspect-ratio: 1.2;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.75);
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.9),
-    inset 0 -12px 20px rgb(15 23 42 / 0.07),
-    0 6px 16px rgb(15 23 42 / 0.09);
-}
-
-.sh-card__img {
-  width: 82%;
-  height: 82%;
-  object-fit: contain;
-  mix-blend-mode: multiply;
-}
-
-.sh-card__caption {
-  font: 600 13px var(--font-sans);
-  color: var(--foreground);
-  line-height: 1.25;
-}
-
-.sh-mega__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 60px 0;
-  color: var(--muted-foreground);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-/* ---- Анимации ---- */
-.sh-scrim-enter-active,
-.sh-scrim-leave-active {
-  transition: opacity 0.22s ease;
-}
-.sh-scrim-enter-from,
-.sh-scrim-leave-to {
-  opacity: 0;
-}
-
-.sh-mega-enter-active {
-  transition:
-    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.sh-mega-leave-active {
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-.sh-mega-enter-from,
-.sh-mega-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(-14px) scale(0.985);
-}
-
-@keyframes sh-pulse {
-  0%,
-  100% {
-    opacity: 1;
+  @media (max-width: 1100px) {
+    .sh-group__grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
   }
-  50% {
-    opacity: 0.5;
-  }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .sh-mega-enter-active,
+  .sh-card-link {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-decoration: none;
+    transition: transform 0.15s ease;
+  }
+
+  .sh-card-link:hover {
+    transform: translateY(-3px);
+  }
+
+  .sh-card {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 1.2;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 0.75);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.9),
+      inset 0 -12px 20px rgb(15 23 42 / 0.07),
+      0 6px 16px rgb(15 23 42 / 0.09);
+  }
+
+  .sh-card__img {
+    width: 82%;
+    height: 82%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+  }
+
+  .sh-card__caption {
+    font: 600 13px var(--font-sans);
+    color: var(--foreground);
+    line-height: 1.25;
+  }
+
+  .sh-mega__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 60px 0;
+    color: var(--muted-foreground);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  /* ---- Анимации ---- */
+  .sh-scrim-enter-active,
+  .sh-scrim-leave-active {
+    transition: opacity 0.22s ease;
+  }
+  .sh-scrim-enter-from,
+  .sh-scrim-leave-to {
+    opacity: 0;
+  }
+
+  .sh-mega-enter-active {
+    transition:
+      opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
   .sh-mega-leave-active {
-    transition: opacity 0.2s ease;
+    transition:
+      opacity 0.16s ease,
+      transform 0.16s ease;
   }
   .sh-mega-enter-from,
   .sh-mega-leave-to {
-    transform: translateX(-50%);
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px) scale(0.985);
   }
-  .sh-card-link:hover {
-    transform: none;
-  }
-}
 
-:global(.dark) .sh-rail__thumb,
-:global(.dark) .sh-card__img {
-  mix-blend-mode: normal;
+  @keyframes sh-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sh-mega-enter-active,
+    .sh-mega-leave-active {
+      transition: opacity 0.2s ease;
+    }
+    .sh-mega-enter-from,
+    .sh-mega-leave-to {
+      transform: translateX(-50%);
+    }
+    .sh-card-link:hover {
+      transform: none;
+    }
+  }
+
+  :global(.dark) .sh-rail__thumb,
+  :global(.dark) .sh-card__img {
+    mix-blend-mode: normal;
+  }
 }
 </style>

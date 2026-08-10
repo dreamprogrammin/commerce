@@ -94,36 +94,51 @@ function sanitizeAndRenderHTML(html: string | null): string {
 </template>
 
 <style scoped>
-.faq-answer :deep(strong) {
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.faq-answer :deep(ul) {
-  list-style-type: disc;
-  list-style-position: inside;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.faq-answer :deep(ul) > * + * {
-  margin-top: 0.25rem;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.faq-answer :deep(li) {
-  color: hsl(var(--muted-foreground));
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.faq-answer :deep(a) {
-  color: hsl(var(--primary));
-  font-weight: 500;
-}
+@layer components {
+  .faq-answer :deep(strong) {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+  }
 
-.faq-answer :deep(a:hover) {
-  text-decoration: underline;
-}
+  .faq-answer :deep(ul) {
+    list-style-type: disc;
+    list-style-position: inside;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
 
-.faq-answer :deep(p) {
-  margin-bottom: 0.5rem;
+  .faq-answer :deep(ul) > * + * {
+    margin-top: 0.25rem;
+  }
+
+  .faq-answer :deep(li) {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .faq-answer :deep(a) {
+    color: hsl(var(--primary));
+    font-weight: 500;
+  }
+
+  .faq-answer :deep(a:hover) {
+    text-decoration: underline;
+  }
+
+  .faq-answer :deep(p) {
+    margin-bottom: 0.5rem;
+  }
 }
 </style>

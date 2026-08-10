@@ -283,254 +283,269 @@ const wrapStyle = computed<CSSProperties>(() => {
 </template>
 
 <style scoped>
-.sh-spacer {
-  height: 74px;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.sh-header {
-  padding: 14px 0;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.sh-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-/* ---- Логотип ---- */
-.sh-logo {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.sh-logo__badge {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 0.2);
-  border: 1px solid rgb(255 255 255 / 0.3);
-  display: grid;
-  place-content: center;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
+@layer components {
+  .sh-spacer {
+    height: 74px;
+  }
 
-.sh-logo__word {
-  font: 800 22px var(--font-display);
-  color: #fff;
-  letter-spacing: -0.02em;
-}
+  .sh-header {
+    padding: 14px 0;
+  }
 
-/* ---- Общая «стеклянная» кнопка (Каталог / иконки) ---- */
-.sh-cat,
-.sh-icon-btn {
-  flex: none;
-  border: 1px solid rgb(255 255 255 / 0.42);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.45),
-    0 4px 14px rgb(0 40 120 / 0.18);
-  color: #fff;
-  cursor: pointer;
-  -webkit-backdrop-filter: blur(14px) saturate(1.6);
-  backdrop-filter: blur(14px) saturate(1.6);
-  background: linear-gradient(150deg, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.12));
-  transition: background 0.2s ease;
-}
+  .sh-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
-.sh-cat:hover,
-.sh-icon-btn:hover,
-.sh-cat--open {
-  background: linear-gradient(150deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0.2));
-}
+  /* ---- Логотип ---- */
+  .sh-logo {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
 
-.sh-cat {
-  height: 46px;
-  padding: 0 18px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font: 600 14px var(--font-sans);
-}
+  .sh-logo__badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: rgb(255 255 255 / 0.2);
+    border: 1px solid rgb(255 255 255 / 0.3);
+    display: grid;
+    place-content: center;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
 
-.sh-icon-btn {
-  position: relative;
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  display: grid;
-  place-content: center;
-  text-decoration: none;
-}
+  .sh-logo__word {
+    font: 800 22px var(--font-display);
+    color: #fff;
+    letter-spacing: -0.02em;
+  }
 
-.sh-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: #ef4444;
-  color: #fff;
-  font: 700 11px var(--font-sans);
-  display: grid;
-  place-content: center;
-  border: 2px solid #fff;
-}
+  /* ---- Общая «стеклянная» кнопка (Каталог / иконки) ---- */
+  .sh-cat,
+  .sh-icon-btn {
+    flex: none;
+    border: 1px solid rgb(255 255 255 / 0.42);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 4px 14px rgb(0 40 120 / 0.18);
+    color: #fff;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(14px) saturate(1.6);
+    backdrop-filter: blur(14px) saturate(1.6);
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.12));
+    transition: background 0.2s ease;
+  }
 
-/* ---- Вход ---- */
-.sh-login {
-  flex: none;
-  height: 46px;
-  padding: 0 18px;
-  border-radius: 999px;
-  background: linear-gradient(150deg, rgb(255 255 255 / 0.98), rgb(255 255 255 / 0.75));
-  color: var(--foreground);
-  font: 700 14px var(--font-sans);
-  border: 1px solid rgb(255 255 255 / 0.9);
-  cursor: pointer;
-  -webkit-backdrop-filter: blur(12px) saturate(1.6);
-  backdrop-filter: blur(12px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 1),
-    0 6px 18px rgb(0 40 120 / 0.22);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: box-shadow 0.2s ease;
-}
+  .sh-cat:hover,
+  .sh-icon-btn:hover,
+  .sh-cat--open {
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0.2));
+  }
 
-.sh-login:hover {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 1),
-    0 8px 22px rgb(0 40 120 / 0.3);
-}
+  .sh-cat {
+    height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: 600 14px var(--font-sans);
+  }
 
-/* ---- Аккаунт ---- */
-.sh-account {
-  flex: none;
-  height: 46px;
-  padding: 0 14px 0 6px;
-  border-radius: 999px;
-  background: #fff;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  text-decoration: none;
-  transition: box-shadow 0.2s ease;
-}
+  .sh-icon-btn {
+    position: relative;
+    width: 46px;
+    height: 46px;
+    border-radius: 999px;
+    display: grid;
+    place-content: center;
+    text-decoration: none;
+  }
 
-.sh-account:hover {
-  box-shadow: 0 6px 16px rgb(15 23 42 / 0.18);
-}
+  .sh-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font: 700 11px var(--font-sans);
+    display: grid;
+    place-content: center;
+    border: 2px solid #fff;
+  }
 
-.sh-account__avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #9333ea, #db2777);
-  color: #fff;
-  display: grid;
-  place-content: center;
-  font: 700 14px var(--font-sans);
-}
+  /* ---- Вход ---- */
+  .sh-login {
+    flex: none;
+    height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.98), rgb(255 255 255 / 0.75));
+    color: var(--foreground);
+    font: 700 14px var(--font-sans);
+    border: 1px solid rgb(255 255 255 / 0.9);
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(12px) saturate(1.6);
+    backdrop-filter: blur(12px) saturate(1.6);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 1),
+      0 6px 18px rgb(0 40 120 / 0.22);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: box-shadow 0.2s ease;
+  }
 
-.sh-account__meta {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.12;
-  text-align: left;
-}
+  .sh-login:hover {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 1),
+      0 8px 22px rgb(0 40 120 / 0.3);
+  }
 
-.sh-account__name {
-  font: 600 13px var(--font-sans);
-  color: var(--foreground);
-  max-width: 130px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  /* ---- Аккаунт ---- */
+  .sh-account {
+    flex: none;
+    height: 46px;
+    padding: 0 14px 0 6px;
+    border-radius: 999px;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    text-decoration: none;
+    transition: box-shadow 0.2s ease;
+  }
 
-.sh-account__bonus {
-  font: 700 12px var(--font-sans);
-  color: var(--bonus);
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
+  .sh-account:hover {
+    box-shadow: 0 6px 16px rgb(15 23 42 / 0.18);
+  }
 
-/* ---- Скелетон аккаунта (SSR/до гидрации) ---- */
-.sh-account--skeleton {
-  cursor: default;
-}
-.sh-account__avatar--skeleton {
-  background: var(--muted);
-}
-.sh-skel {
-  display: block;
-  border-radius: 5px;
-  background: var(--muted);
-}
-.sh-skel--name {
-  width: 76px;
-  height: 11px;
-  margin-bottom: 4px;
-}
-.sh-skel--bonus {
-  width: 48px;
-  height: 10px;
-}
+  .sh-account__avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #9333ea, #db2777);
+    color: #fff;
+    display: grid;
+    place-content: center;
+    font: 700 14px var(--font-sans);
+  }
 
-/* ============ Мобильная плашка ============ */
-.sh-mobile {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--header-bg);
-}
+  .sh-account__meta {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.12;
+    text-align: left;
+  }
 
-.sh-mobile__logo {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: rgb(255 255 255 / 0.18);
-  border: 1px solid rgb(255 255 255 / 0.28);
-  display: grid;
-  place-content: center;
-}
+  .sh-account__name {
+    font: 600 13px var(--font-sans);
+    color: var(--foreground);
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-.sh-mobile__btn {
-  flex: none;
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display: grid;
-  place-content: center;
-  color: #fff;
-  background: rgb(255 255 255 / 0.16);
-  border: 1px solid rgb(255 255 255 / 0.24);
-}
+  .sh-account__bonus {
+    font: 700 12px var(--font-sans);
+    color: var(--bonus);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
 
-.sh-mobile__dot {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #f97316;
-  border: 2px solid var(--header-bg);
+  /* ---- Скелетон аккаунта (SSR/до гидрации) ---- */
+  .sh-account--skeleton {
+    cursor: default;
+  }
+  .sh-account__avatar--skeleton {
+    background: var(--muted);
+  }
+  .sh-skel {
+    display: block;
+    border-radius: 5px;
+    background: var(--muted);
+  }
+  .sh-skel--name {
+    width: 76px;
+    height: 11px;
+    margin-bottom: 4px;
+  }
+  .sh-skel--bonus {
+    width: 48px;
+    height: 10px;
+  }
+
+  /* ============ Мобильная плашка ============ */
+  .sh-mobile {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--header-bg);
+  }
+
+  .sh-mobile__logo {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: rgb(255 255 255 / 0.18);
+    border: 1px solid rgb(255 255 255 / 0.28);
+    display: grid;
+    place-content: center;
+  }
+
+  .sh-mobile__btn {
+    flex: none;
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-content: center;
+    color: #fff;
+    background: rgb(255 255 255 / 0.16);
+    border: 1px solid rgb(255 255 255 / 0.24);
+  }
+
+  .sh-mobile__dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #f97316;
+    border: 2px solid var(--header-bg);
+  }
 }
 </style>

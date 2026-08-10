@@ -154,189 +154,204 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.deal {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  border-radius: 24px;
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.7);
-  box-shadow:
-    0 22px 48px -24px rgb(15 23 42 / 0.45),
-    inset 0 1px 0 rgb(255 255 255 / 0.9),
-    inset 0 -1px 1px rgb(255 255 255 / 0.35);
-  background: linear-gradient(150deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.28));
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.deal__glow {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.deal__glow--1 {
-  top: -54px;
-  left: -34px;
-  width: 210px;
-  height: 210px;
-  background: radial-gradient(circle, rgb(255 150 60 / 0.9), transparent 68%);
-  filter: blur(34px);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.deal__glow--2 {
-  bottom: -64px;
-  right: -24px;
-  width: 230px;
-  height: 230px;
-  background: radial-gradient(circle, rgb(70 140 255 / 0.8), transparent 68%);
-  filter: blur(40px);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.deal__frost {
-  position: absolute;
-  inset: 0;
-  background: rgb(255 255 255 / 0.44);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7);
-  backdrop-filter: blur(22px) saturate(1.7);
-  pointer-events: none;
-}
+@layer components {
+  .deal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 0.7);
+    box-shadow:
+      0 22px 48px -24px rgb(15 23 42 / 0.45),
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      inset 0 -1px 1px rgb(255 255 255 / 0.35);
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.28));
+  }
 
-.deal__sheen {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgb(255 255 255 / 0.7) 0%, rgb(255 255 255 / 0) 34%);
-  pointer-events: none;
-}
+  .deal__glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
 
-.deal__head {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 15px 18px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.5);
-}
+  .deal__glow--1 {
+    top: -54px;
+    left: -34px;
+    width: 210px;
+    height: 210px;
+    background: radial-gradient(circle, rgb(255 150 60 / 0.9), transparent 68%);
+    filter: blur(34px);
+  }
 
-.deal__tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--foreground);
-}
+  .deal__glow--2 {
+    bottom: -64px;
+    right: -24px;
+    width: 230px;
+    height: 230px;
+    background: radial-gradient(circle, rgb(70 140 255 / 0.8), transparent 68%);
+    filter: blur(40px);
+  }
 
-.deal__timer {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgb(220 38 38 / 0.92);
-  color: #fff;
-  border-radius: 999px;
-  padding: 6px 11px;
-  font-weight: 700;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  box-shadow: 0 4px 12px -4px rgb(220 38 38 / 0.6);
-}
+  .deal__frost {
+    position: absolute;
+    inset: 0;
+    background: rgb(255 255 255 / 0.44);
+    -webkit-backdrop-filter: blur(22px) saturate(1.7);
+    backdrop-filter: blur(22px) saturate(1.7);
+    pointer-events: none;
+  }
 
-.deal__body {
-  position: relative;
-  display: flex;
-  gap: 16px;
-  padding: 18px;
-  flex: 1;
-  text-decoration: none;
-  color: inherit;
-}
+  .deal__sheen {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgb(255 255 255 / 0.7) 0%, rgb(255 255 255 / 0) 34%);
+    pointer-events: none;
+  }
 
-.deal__img {
-  flex: 0 0 auto;
-  width: 116px;
-  height: 116px;
-  border-radius: 16px;
-  background: #fff;
-  border: 1px solid var(--border);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  padding: 6px;
-}
+  .deal__head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 18px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.5);
+  }
 
-.deal__img img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
+  .deal__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--foreground);
+  }
 
-.deal__info {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  min-width: 0;
-}
+  .deal__timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgb(220 38 38 / 0.92);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 11px;
+    font-weight: 700;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 4px 12px -4px rgb(220 38 38 / 0.6);
+  }
 
-.deal__line {
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--product-line);
-}
+  .deal__body {
+    position: relative;
+    display: flex;
+    gap: 16px;
+    padding: 18px;
+    flex: 1;
+    text-decoration: none;
+    color: inherit;
+  }
 
-.deal__name {
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+  .deal__img {
+    flex: 0 0 auto;
+    width: 116px;
+    height: 116px;
+    border-radius: 16px;
+    background: #fff;
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: 6px;
+  }
 
-.deal__buy {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
+  .deal__img img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
 
-.deal__price {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
+  .deal__info {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-width: 0;
+  }
 
-.deal__price-old {
-  font-weight: 500;
-  font-size: 12px;
-  color: var(--price-old);
-  text-decoration: line-through;
-}
+  .deal__line {
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--product-line);
+  }
 
-.deal__price-now {
-  font-weight: 800;
-  font-size: 20px;
-  color: var(--foreground);
-}
+  .deal__name {
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
-.deal__add {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--primary);
-  cursor: pointer;
-  display: grid;
-  place-content: center;
-  flex: none;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
+  .deal__buy {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
 
-.deal__add:hover {
-  border-color: var(--primary);
-  background: var(--brand-surface);
+  .deal__price {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+
+  .deal__price-old {
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--price-old);
+    text-decoration: line-through;
+  }
+
+  .deal__price-now {
+    font-weight: 800;
+    font-size: 20px;
+    color: var(--foreground);
+  }
+
+  .deal__add {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--primary);
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    flex: none;
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .deal__add:hover {
+    border-color: var(--primary);
+    background: var(--brand-surface);
+  }
 }
 </style>

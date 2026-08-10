@@ -124,6 +124,47 @@ def util_prop(u):
     return None, state
 
 
+def third_party_hazards(text):
+    """
+    Классы, которые перебивают БЕСЛОЙНЫЙ сторонний CSS — после обёртки они
+    проиграют, потому что беслойное правило бьёт любой слой.
+
+    Живой случай: Nuxt Icon отдаёт `:where(.i-lucide\\:x){width:1em;height:1em}`
+    вне слоёв. Нулевая специфичность у :where() сделана как раз чтобы правило
+    легко перебивали — и scoped-класс с width его перебивал, пока сам был
+    беслойным. После обёртки иконки поехали с 19px на 16px.
+
+    Ловим статически самый частый вид: свой класс на <Icon>, задающий размер.
+
+    Если в nuxt.config задан `icon.cssLayer`, опасности нет: CSS иконок сам
+    лежит в слое и проигрывает и утилитам, и компонентам. Тогда проверка
+    молчит.
+    """
+    cfg = ROOT / 'nuxt.config.ts'
+    if cfg.exists() and re.search(r'^\s*cssLayer:', cfg.read_text(encoding='utf-8'), re.M):
+        return []
+    tmpl = text.split('<style')[0]
+    m = re.search(r'<style[^>]*\bscoped\b[^>]*>(.*?)</style>', text, re.S)
+    if not m:
+        return []
+    css = re.sub(r'/\*.*?\*/', '', m.group(1), flags=re.S)
+    sized = set()
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        if sel.strip().startswith('@'):
+            continue
+        props = {d.split(':')[0].strip().lower() for d in body.split(';') if ':' in d}
+        if props & {'width', 'height', 'font-size'}:
+            for c in re.findall(r'\.([a-zA-Z][\w-]*)', sel):
+                sized.add(c)
+    hits = set()
+    for tag in re.findall(r'<Icon[^>]*>', tmpl, re.S):
+        for attr in re.findall(r'class="([^"]*)"', tag):
+            for c in attr.split():
+                if c in sized:
+                    hits.add(c)
+    return sorted(hits)
+
+
 def analyse(path):
     """-> (конфликты, сложные селекторы, число своих классов, число элементов)"""
     text = pathlib.Path(path).read_text(encoding='utf-8')
@@ -135,6 +176,7 @@ def analyse(path):
 
     # класс -> {состояние -> набор свойств}; состояние None = базовое правило
     rules = collections.defaultdict(lambda: collections.defaultdict(set))
+    descendant = collections.defaultdict(set)
     complex_sel = []
     for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
         sel = sel.strip()
@@ -149,6 +191,17 @@ def analyse(path):
                 continue
             if re.search(r'[\s>+~]', part) or '::' in part or ':deep' in part:
                 complex_sel.append((part, sorted(props)))
+                # Правило вида `.card:hover .icon` применяется к ЭЛЕМЕНТУ .icon,
+                # просто при условии на предке. Значит утилита на самом .icon с
+                # тем же свойством после обёртки его перебьёт — и, в отличие от
+                # обычного случая, перебьёт во всех состояниях сразу.
+                # Псевдоэлементы (::-webkit-scrollbar) сюда не годятся: утилита
+                # в них не попадает, и :deep()/:global тоже пропускаем — там
+                # цель вне разметки этого файла.
+                if '::' not in part and ':deep' not in part and ':global' not in part:
+                    tail = re.split(r'[\s>+~]+', part.strip())[-1]
+                    for c in re.findall(r'\.([a-zA-Z][\w-]*)', tail):
+                        descendant[c] |= props
                 continue
             state = None
             sm = re.search(r':(hover|focus|disabled|focus-within|active)', part)
@@ -171,6 +224,15 @@ def analyse(path):
 
     conflicts = set()
     for toks in elements:
+        # правила «через предка»
+        for o in [t for t in toks if t in descendant]:
+            css_props = {q for p in descendant[o] for q in expand(p)}
+            for t in toks:
+                if t in descendant or t in rules:
+                    continue
+                prop, _ = util_prop(t)
+                if prop and prop in css_props:
+                    conflicts.add((f'.{o} (через правило на предке)', None, t, (prop,)))
         own = [t for t in toks if t in rules]
         if not own:
             continue
@@ -200,19 +262,28 @@ def report_one(path):
         print(f'{path}: scoped-блока нет')
         return 0
     conflicts, complex_sel, n_cls, n_el = res
+    haz = third_party_hazards(pathlib.Path(path).read_text(encoding='utf-8'))
     print(f'=== {path}')
     print(f'своих классов: {n_cls}, элементов с ними: {n_el}')
+    if haz:
+        print('\n!!! ПЕРЕБИВАЕТ СТОРОННИЙ БЕСЛОЙНЫЙ CSS — после обёртки сломается:')
+        for h in haz:
+            print(f'   .{h} задаёт размер <Icon>; Nuxt Icon отдаёт width/height вне слоёв и выиграет')
     if complex_sel:
         print(f'\nСелекторы с потомками/псевдоэлементами — проверить руками ({len(complex_sel)}):')
         for s, p in complex_sel:
             print(f'   {s}  ->  {", ".join(p)}')
     if conflicts:
         print(f'\n!!! КОНФЛИКТЫ ({len(conflicts)}) — обёртка изменит вид:')
-        for o, rstate, t, hit in sorted(conflicts):
-            rs = f':{rstate}' if rstate else ''
-            print(f'   .{o}{rs} спорит с {t} за {", ".join(hit)}')
+        for o, rstate, t, hit in sorted(conflicts, key=lambda c: (c[0], c[2])):
+            label = o if o.startswith('.') else f'.{o}{f":{rstate}" if rstate else ""}'
+            print(f'   {label} спорит с {t} за {", ".join(hit)}')
+    if conflicts or haz:
         return 1
-    print('\nКонфликтов нет: обёртка в @layer components вид не изменит.')
+    print('\nЯвных конфликтов не видно — но это НЕ гарантия. Проверка статическая\n'
+          'и не видит весь сторонний беслойный CSS, который после обёртки начнёт\n'
+          'выигрывать. Обязательно сверить скриншоты до и после:\n'
+          '  node scripts/shot-pages.mjs before  →  обернуть  →  after  →  diff-shots')
     return 0
 
 
@@ -232,6 +303,9 @@ def report_all():
         if res is None:
             continue
         conflicts, complex_sel, _, _ = res
+        if third_party_hazards(text):
+            buckets['конфликт'].append(f'{rel}  (перебивает сторонний CSS)')
+            continue
         if conflicts:
             buckets['конфликт'].append(f'{rel}  ({len(conflicts)})')
         elif complex_sel:

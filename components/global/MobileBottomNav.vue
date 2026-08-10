@@ -137,93 +137,108 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 </template>
 
 <style scoped>
-.mbn-bar {
-  position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  height: 50px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18));
-  -webkit-backdrop-filter: blur(24px) saturate(1.9);
-  backdrop-filter: blur(24px) saturate(1.9);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 22px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 1px rgba(15, 23, 42, 0.05),
-    0 12px 32px rgba(15, 23, 42, 0.18);
-  transition:
-    opacity 0.28s ease,
-    transform 0.28s cubic-bezier(0.32, 0.72, 0.33, 1);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.mbn-bar--hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(140%);
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.mbn-lens {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 20%;
-  height: 100%;
-  display: grid;
-  place-content: center;
-  transition: transform 0.46s cubic-bezier(0.34, 1.12, 0.4, 1);
-  pointer-events: none;
-  z-index: 0;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.mbn-lens__pill {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.5));
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow:
-    inset 0 2px 1px rgba(255, 255, 255, 1),
-    inset 0 -3px 5px rgba(15, 23, 42, 0.09),
-    0 7px 18px rgba(15, 23, 42, 0.22);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.mbn-item {
-  flex: 1;
-  min-width: 0;
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  display: grid;
-  place-content: center;
-}
+@layer components {
+  .mbn-bar {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    height: 50px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18));
+    -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    backdrop-filter: blur(24px) saturate(1.9);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 22px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      inset 0 -1px 1px rgba(15, 23, 42, 0.05),
+      0 12px 32px rgba(15, 23, 42, 0.18);
+    transition:
+      opacity 0.28s ease,
+      transform 0.28s cubic-bezier(0.32, 0.72, 0.33, 1);
+  }
 
-.mbn-icon-wrap {
-  position: relative;
-  display: grid;
-  place-content: center;
-  width: 40px;
-  height: 40px;
-}
+  .mbn-bar--hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(140%);
+  }
 
-.mbn-icon {
-  width: 22px;
-  height: 22px;
-}
+  .mbn-lens {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 20%;
+    height: 100%;
+    display: grid;
+    place-content: center;
+    transition: transform 0.46s cubic-bezier(0.34, 1.12, 0.4, 1);
+    pointer-events: none;
+    z-index: 0;
+  }
 
-.mbn-badge {
-  position: absolute;
-  top: -3px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #ef4444;
-  color: #fff;
-  font: 700 10px var(--font-sans);
-  display: grid;
-  place-content: center;
-  border: 2px solid #fff;
+  .mbn-lens__pill {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.5));
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    box-shadow:
+      inset 0 2px 1px rgba(255, 255, 255, 1),
+      inset 0 -3px 5px rgba(15, 23, 42, 0.09),
+      0 7px 18px rgba(15, 23, 42, 0.22);
+  }
+
+  .mbn-item {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    display: grid;
+    place-content: center;
+  }
+
+  .mbn-icon-wrap {
+    position: relative;
+    display: grid;
+    place-content: center;
+    width: 40px;
+    height: 40px;
+  }
+
+  .mbn-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mbn-badge {
+    position: absolute;
+    top: -3px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font: 700 10px var(--font-sans);
+    display: grid;
+    place-content: center;
+    border: 2px solid #fff;
+  }
 }
 </style>

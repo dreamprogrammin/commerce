@@ -555,361 +555,376 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.mcd-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  background: rgba(15, 23, 42, 0.44);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.mcd-overlay-enter-active,
-.mcd-overlay-leave-active {
-  transition: opacity 0.28s ease;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.mcd-overlay-enter-from,
-.mcd-overlay-leave-to {
-  opacity: 0;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.mcd-aside {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 90;
-  max-height: 86vh;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: rgba(238, 240, 243, 0.8);
-  -webkit-backdrop-filter: blur(26px) saturate(1.8);
-  backdrop-filter: blur(26px) saturate(1.8);
-  border-radius: 22px 22px 0 0;
-  padding: 0 14px 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  box-shadow: 0 -18px 48px rgba(15, 23, 42, 0.22);
-  font-family: var(--font-sans);
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.mcd-aside::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
+@layer components {
+  .mcd-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: rgba(15, 23, 42, 0.44);
+  }
 
-.mcd-aside::-webkit-scrollbar-track {
-  background: transparent;
-  margin: 10px 0;
-}
+  .mcd-overlay-enter-active,
+  .mcd-overlay-leave-active {
+    transition: opacity 0.28s ease;
+  }
 
-.mcd-aside::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 99px;
-}
+  .mcd-overlay-enter-from,
+  .mcd-overlay-leave-to {
+    opacity: 0;
+  }
 
-.mcd-aside--scrolling {
-  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
-}
+  .mcd-aside {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(238, 240, 243, 0.8);
+    -webkit-backdrop-filter: blur(26px) saturate(1.8);
+    backdrop-filter: blur(26px) saturate(1.8);
+    border-radius: 22px 22px 0 0;
+    padding: 0 14px 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-shadow: 0 -18px 48px rgba(15, 23, 42, 0.22);
+    font-family: var(--font-sans);
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
 
-.mcd-aside--scrolling::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.35);
-}
+  .mcd-aside::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
 
-.mcd-sheet-enter-active,
-.mcd-sheet-leave-active {
-  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0.33, 1);
-}
+  .mcd-aside::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 10px 0;
+  }
 
-.mcd-sheet-enter-from,
-.mcd-sheet-leave-to {
-  transform: translateY(103%);
-}
+  .mcd-aside::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 99px;
+  }
 
-.mcd-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  margin: 0 -14px;
-  padding: 9px 20px 10px;
-  background: rgba(238, 240, 243, 0.72);
-  -webkit-backdrop-filter: blur(18px) saturate(1.6);
-  backdrop-filter: blur(18px) saturate(1.6);
-  border-radius: 22px 22px 0 0;
-  display: flex;
-  flex-direction: column;
-}
+  .mcd-aside--scrolling {
+    scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+  }
 
-.mcd-handle {
-  width: 40px;
-  height: 4px;
-  border-radius: 999px;
-  background: #d1d5db;
-  margin: 0 auto 10px;
-}
+  .mcd-aside--scrolling::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.35);
+  }
 
-.mcd-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
+  .mcd-sheet-enter-active,
+  .mcd-sheet-leave-active {
+    transition: transform 0.34s cubic-bezier(0.32, 0.72, 0.33, 1);
+  }
 
-.mcd-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font: 800 18px var(--font-sans);
-  color: var(--foreground);
-}
+  .mcd-sheet-enter-from,
+  .mcd-sheet-leave-to {
+    transform: translateY(103%);
+  }
 
-.mcd-title-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--primary);
-}
+  .mcd-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 0 -14px;
+    padding: 9px 20px 10px;
+    background: rgba(238, 240, 243, 0.72);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+    border-radius: 22px 22px 0 0;
+    display: flex;
+    flex-direction: column;
+  }
 
-.mcd-header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
+  .mcd-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: #d1d5db;
+    margin: 0 auto 10px;
+  }
 
-.mcd-reset {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font: 600 14px var(--font-sans);
-  color: var(--primary);
-  padding: 0;
-}
+  .mcd-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
 
-.mcd-close {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 999px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.6));
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-  backdrop-filter: blur(10px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 3px 10px rgba(15, 23, 42, 0.1);
-  display: grid;
-  place-content: center;
-  cursor: pointer;
-}
+  .mcd-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font: 800 18px var(--font-sans);
+    color: var(--foreground);
+  }
 
-.mcd-close-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--foreground);
-}
+  .mcd-title-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--primary);
+  }
 
-.mcd-card {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 16px 16px 8px;
-}
+  .mcd-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+  }
 
-.mcd-card--tight {
-  padding: 8px;
-}
+  .mcd-reset {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font: 600 14px var(--font-sans);
+    color: var(--primary);
+    padding: 0;
+  }
 
-.mcd-card-title {
-  font: 700 15px var(--font-sans);
-  color: var(--foreground);
-  margin-bottom: 12px;
-}
+  .mcd-close {
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 999px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(224, 233, 247, 0.6));
+    -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(10px) saturate(1.6);
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 3px 10px rgba(15, 23, 42, 0.1);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+  }
 
-.mcd-card--tight .mcd-card-title {
-  margin-bottom: 6px;
-}
+  .mcd-close-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--foreground);
+  }
 
-.mcd-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  border-radius: 12px;
-  cursor: pointer;
-  text-align: left;
-  font: 600 14px var(--font-sans);
-  color: var(--foreground);
-  margin-bottom: 8px;
-}
+  .mcd-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px 16px 8px;
+  }
 
-.mcd-row:last-child {
-  margin-bottom: 0;
-}
+  .mcd-card--tight {
+    padding: 8px;
+  }
 
-.mcd-row--boxed {
-  margin-bottom: 4px;
-  padding: 0 4px;
-}
+  .mcd-card-title {
+    font: 700 15px var(--font-sans);
+    color: var(--foreground);
+    margin-bottom: 12px;
+  }
 
-.mcd-row--active {
-  background: rgba(43, 127, 255, 0.12);
-  color: var(--primary);
-}
+  .mcd-card--tight .mcd-card-title {
+    margin-bottom: 6px;
+  }
 
-.mcd-row-label {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  .mcd-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 10px;
+    border: none;
+    background: transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    font: 600 14px var(--font-sans);
+    color: var(--foreground);
+    margin-bottom: 8px;
+  }
 
-.mcd-row-count {
-  font: 500 12px var(--font-sans);
-  color: var(--muted-foreground);
-}
+  .mcd-row:last-child {
+    margin-bottom: 0;
+  }
 
-.mcd-box {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border);
-  background: #fff;
-  display: grid;
-  place-content: center;
-}
+  .mcd-row--boxed {
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
 
-.mcd-box--active {
-  border-color: var(--primary);
-  background: var(--primary);
-}
+  .mcd-row--active {
+    background: rgba(43, 127, 255, 0.12);
+    color: var(--primary);
+  }
 
-.mcd-box-icon {
-  width: 13px;
-  height: 13px;
-  color: #fff;
-}
+  .mcd-row-label {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-.mcd-price-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-bottom: 16px;
-}
+  .mcd-row-count {
+    font: 500 12px var(--font-sans);
+    color: var(--muted-foreground);
+  }
 
-.mcd-price-input {
-  width: 0;
-  flex: 1;
-  height: 44px;
-  padding: 0 13px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: var(--muted);
-  font: 600 14px var(--font-sans);
-  color: var(--foreground);
-  outline: none;
-}
+  .mcd-box {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: #fff;
+    display: grid;
+    place-content: center;
+  }
 
-.mcd-price-input::placeholder {
-  color: var(--muted-foreground);
-}
+  .mcd-box--active {
+    border-color: var(--primary);
+    background: var(--primary);
+  }
 
-.mcd-price-input:focus {
-  border-color: var(--primary);
-  background: #fff;
-}
+  .mcd-box-icon {
+    width: 13px;
+    height: 13px;
+    color: #fff;
+  }
 
-.mcd-slider-wrap {
-  padding: 2px 4px 12px;
-}
+  .mcd-price-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 16px;
+  }
 
-.mcd-slider-values {
-  display: flex;
-  justify-content: space-between;
-  font: 600 13px var(--font-sans);
-  color: var(--muted-foreground);
-  padding-bottom: 16px;
-}
+  .mcd-price-input {
+    width: 0;
+    flex: 1;
+    height: 44px;
+    padding: 0 13px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: var(--muted);
+    font: 600 14px var(--font-sans);
+    color: var(--foreground);
+    outline: none;
+  }
 
-.mcd-color-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  padding-bottom: 12px;
-}
+  .mcd-price-input::placeholder {
+    color: var(--muted-foreground);
+  }
 
-.mcd-color-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-}
+  .mcd-price-input:focus {
+    border-color: var(--primary);
+    background: #fff;
+  }
 
-.mcd-color-item--active {
-  background: rgba(43, 127, 255, 0.1);
-  box-shadow: 0 0 0 2px var(--primary) inset;
-}
+  .mcd-slider-wrap {
+    padding: 2px 4px 12px;
+  }
 
-.mcd-color-swatch {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 2px solid var(--border);
-}
+  .mcd-slider-values {
+    display: flex;
+    justify-content: space-between;
+    font: 600 13px var(--font-sans);
+    color: var(--muted-foreground);
+    padding-bottom: 16px;
+  }
 
-.mcd-color-item--active .mcd-color-swatch {
-  border-color: var(--primary);
-}
+  .mcd-color-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding-bottom: 12px;
+  }
 
-.mcd-color-label {
-  font: 500 11px var(--font-sans);
-  color: var(--foreground);
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
+  .mcd-color-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    cursor: pointer;
+  }
 
-.mcd-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  margin: 4px -14px 0;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(238, 240, 243, 0) 0%, rgba(238, 240, 243, 0.88) 34%);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
+  .mcd-color-item--active {
+    background: rgba(43, 127, 255, 0.1);
+    box-shadow: 0 0 0 2px var(--primary) inset;
+  }
 
-.mcd-apply {
-  width: 100%;
-  height: 52px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: linear-gradient(150deg, rgba(77, 148, 255, 0.95), rgba(23, 101, 235, 0.85));
-  -webkit-backdrop-filter: blur(12px) saturate(1.7);
-  backdrop-filter: blur(12px) saturate(1.7);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -2px 8px rgba(6, 53, 138, 0.28),
-    0 10px 26px rgba(43, 127, 255, 0.4);
-  color: #fff;
-  font: 700 15px var(--font-sans);
-  cursor: pointer;
-}
+  .mcd-color-swatch {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+  }
 
-.mcd-apply:active {
-  transform: scale(0.98);
+  .mcd-color-item--active .mcd-color-swatch {
+    border-color: var(--primary);
+  }
+
+  .mcd-color-label {
+    font: 500 11px var(--font-sans);
+    color: var(--foreground);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .mcd-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 4px -14px 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(238, 240, 243, 0) 0%, rgba(238, 240, 243, 0.88) 34%);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .mcd-apply {
+    width: 100%;
+    height: 52px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: linear-gradient(150deg, rgba(77, 148, 255, 0.95), rgba(23, 101, 235, 0.85));
+    -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    backdrop-filter: blur(12px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -2px 8px rgba(6, 53, 138, 0.28),
+      0 10px 26px rgba(43, 127, 255, 0.4);
+    color: #fff;
+    font: 700 15px var(--font-sans);
+    cursor: pointer;
+  }
+
+  .mcd-apply:active {
+    transform: scale(0.98);
+  }
 }
 </style>

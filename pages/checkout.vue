@@ -24,6 +24,7 @@ useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
+const supabase = useSupabaseClient()
 const authStore = useAuthStore()
 const cartStore = useCartStore()
 const profileStore = useProfileStore()

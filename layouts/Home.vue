@@ -48,15 +48,30 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
 </template>
 
 <style scoped>
-.home-footer-layer {
-  position: relative;
-  /* Строго между фиксированным героем (z-index: 0) и листом контента
-     `.home-content` (z-index: 6). Ставить 6 нельзя: при равном z-index
-     побеждает тот, кто ниже в DOM, а футер идёт после <main> — он начинал
-     перекрывать липкую строку поиска. Её `.sticky-row--stuck { z-index: 100 }`
-     не спасает: строка заперта в стекинг-контексте `.home-content`, наружу
-     соревнуется весь лист целиком со своим z-index: 6. */
-  z-index: 1;
-  background: var(--background);
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  .home-footer-layer {
+    position: relative;
+    /* Строго между фиксированным героем (z-index: 0) и листом контента
+       `.home-content` (z-index: 6). Ставить 6 нельзя: при равном z-index
+       побеждает тот, кто ниже в DOM, а футер идёт после <main> — он начинал
+       перекрывать липкую строку поиска. Её `.sticky-row--stuck { z-index: 100 }`
+       не спасает: строка заперта в стекинг-контексте `.home-content`, наружу
+       соревнуется весь лист целиком со своим z-index: 6. */
+    z-index: 1;
+    background: var(--background);
+  }
 }
 </style>

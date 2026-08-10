@@ -77,82 +77,97 @@ const deliveryTile = HOME_DELIVERY_TILE
 </template>
 
 <style scoped>
-.tiles {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(14px, 1.6vw, 20px);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.tile {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  border-radius: 20px;
-  padding: 22px;
-  text-decoration: none;
-  transition: transform 0.12s ease;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.tile:hover {
-  transform: translateY(-2px);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.tile--orange {
-  background: linear-gradient(140deg, #fff6ec, #ffe6cc);
-  border: 1px solid #ffd9b0;
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.tile--blue {
-  background: var(--brand-surface);
-  border: 1px solid var(--color-blue-200);
-}
+@layer components {
+  .tiles {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(14px, 1.6vw, 20px);
+  }
 
-.tile__icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 15px;
-  display: grid;
-  place-content: center;
-  flex: none;
-}
+  .tile {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-radius: 20px;
+    padding: 22px;
+    text-decoration: none;
+    transition: transform 0.12s ease;
+  }
 
-.tile__icon--orange {
-  background: var(--color-orange-600);
-  box-shadow: 0 8px 18px -8px rgb(234 120 20 / 0.8);
-}
+  .tile:hover {
+    transform: translateY(-2px);
+  }
 
-.tile__icon--blue {
-  background: var(--primary);
-  box-shadow: 0 8px 18px -8px rgb(43 127 255 / 0.8);
-}
+  .tile--orange {
+    background: linear-gradient(140deg, #fff6ec, #ffe6cc);
+    border: 1px solid #ffd9b0;
+  }
 
-.tile__title {
-  display: block;
-  font-weight: 800;
-  font-size: 24px;
-  letter-spacing: -0.02em;
-}
+  .tile--blue {
+    background: var(--brand-surface);
+    border: 1px solid var(--color-blue-200);
+  }
 
-.tile__title--orange {
-  color: var(--color-orange-600);
-}
+  .tile__icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    display: grid;
+    place-content: center;
+    flex: none;
+  }
 
-.tile__title--blue {
-  color: var(--primary);
-}
+  .tile__icon--orange {
+    background: var(--color-orange-600);
+    box-shadow: 0 8px 18px -8px rgb(234 120 20 / 0.8);
+  }
 
-.tile__sub {
-  font-weight: 500;
-  font-size: 13.5px;
-  line-height: 1.4;
-}
+  .tile__icon--blue {
+    background: var(--primary);
+    box-shadow: 0 8px 18px -8px rgb(43 127 255 / 0.8);
+  }
 
-.tile__sub--orange {
-  color: #8a5a1f;
-}
+  .tile__title {
+    display: block;
+    font-weight: 800;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+  }
 
-.tile__sub--blue {
-  color: var(--muted-foreground);
+  .tile__title--orange {
+    color: var(--color-orange-600);
+  }
+
+  .tile__title--blue {
+    color: var(--primary);
+  }
+
+  .tile__sub {
+    font-weight: 500;
+    font-size: 13.5px;
+    line-height: 1.4;
+  }
+
+  .tile__sub--orange {
+    color: #8a5a1f;
+  }
+
+  .tile__sub--blue {
+    color: var(--muted-foreground);
+  }
 }
 </style>

@@ -210,84 +210,99 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.home-hero {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: min(62vh, 540px);
-  overflow: hidden;
-  background: #dfe7ee;
-  z-index: 0;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.home-hero__skeleton {
-  position: absolute;
-  inset: 0;
-  background: #dfe7ee;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.home-hero__slide {
-  position: absolute;
-  inset: 0;
-  display: block;
-  cursor: pointer;
-  transition: opacity 0.7s ease;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.home-hero__lqip {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: blur(24px);
-  transform: scale(1.1);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.home-hero__img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.home-hero__dots {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 30px;
-  z-index: 6;
-  display: flex;
-  justify-content: center;
-  gap: 7px;
-}
-
-.home-hero__dot {
-  width: 9px;
-  height: 9px;
-  padding: 0;
-  border: none;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.55);
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-.home-hero__dot--active {
-  width: 26px;
-  background: #fff;
-}
-
-@media (min-width: 1024px) {
+@layer components {
   .home-hero {
-    position: relative;
-    height: clamp(560px, 80vh, 760px);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: min(62vh, 540px);
+    overflow: hidden;
+    background: #dfe7ee;
+    z-index: 0;
+  }
+
+  .home-hero__skeleton {
+    position: absolute;
+    inset: 0;
+    background: #dfe7ee;
+  }
+
+  .home-hero__slide {
+    position: absolute;
+    inset: 0;
+    display: block;
+    cursor: pointer;
+    transition: opacity 0.7s ease;
+  }
+
+  .home-hero__lqip {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: blur(24px);
+    transform: scale(1.1);
+  }
+
+  .home-hero__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .home-hero__dots {
-    bottom: clamp(20px, 3vw, 34px);
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 30px;
+    z-index: 6;
+    display: flex;
+    justify-content: center;
+    gap: 7px;
+  }
+
+  .home-hero__dot {
+    width: 9px;
+    height: 9px;
+    padding: 0;
+    border: none;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .home-hero__dot--active {
+    width: 26px;
+    background: #fff;
+  }
+
+  @media (min-width: 1024px) {
+    .home-hero {
+      position: relative;
+      height: clamp(560px, 80vh, 760px);
+    }
+
+    .home-hero__dots {
+      bottom: clamp(20px, 3vw, 34px);
+    }
   }
 }
 </style>

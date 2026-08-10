@@ -228,7 +228,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
         <div class="p-4 sm:p-5 relative">
           <!-- Цветной оверлей при hover (цвет зависит от статуса) -->
           <div
-            class="color-overlay absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-300"
+            class="color-overlay absolute inset-0 pointer-events-none transition-opacity duration-300"
             :class="orderColorScheme.overlay"
           />
 
@@ -246,9 +246,6 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
                       'w-16 h-16 z-30': index === 0,
                       'w-14 h-14 z-20 top-1 left-2 opacity-80': index === 1,
                       'w-12 h-12 z-10 top-2 left-4 opacity-60': index === 2,
-                    }"
-                    :style="{
-                      transform: `translateY(${index * 2}px) scale(${1 - index * 0.1})`,
                     }"
                   >
                     <ProgressiveImage
@@ -334,31 +331,72 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
 </template>
 
 <style scoped>
-/* Hover эффект для стрелки */
-.order-card:hover .chevron-icon {
-  transform: translateX(5px);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-/* Hover эффект для оверлея */
-.order-card:hover .color-overlay {
-  opacity: 1;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-/* Hover эффект для стека изображений */
-.order-card:hover .product-thumbnails-container > div > div:nth-child(1) {
-  transform: translateY(0) scale(1.05) rotate(-2deg);
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.order-card:hover .product-thumbnails-container > div > div:nth-child(2) {
-  transform: translateY(2px) scale(0.95) rotate(2deg);
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.order-card:hover .product-thumbnails-container > div > div:nth-child(3) {
-  transform: translateY(4px) scale(0.85) rotate(-2deg);
-}
+@layer components {
+  /* Hover эффект для стрелки */
+  .order-card:hover .chevron-icon {
+    transform: translateX(5px);
+  }
 
-/* Active эффект (при клике) */
-.order-card:active {
-  transform: scale(0.98) !important;
+  /* Оверлей: прозрачен в покое, проявляется при наведении.
+     Ноль задаётся здесь, а не утилитой opacity-0 в разметке. С утилитой это
+     держалось на том, что scoped-стиль идёт вне слоёв и потому бьёт её. Стоило
+     обернуть файл в @layer components — и opacity-0 начинала выигрывать всегда,
+     а подсветка при наведении переставала работать вовсе. Теперь оба значения
+     в одном месте, и спорить не с чем. */
+  .color-overlay {
+    opacity: 0;
+  }
+
+  .order-card:hover .color-overlay {
+    opacity: 1;
+  }
+
+  /* Стек миниатюр: покой и наведение заданы рядом.
+     Базовые значения раньше стояли инлайновым :style в разметке
+     (`translateY(index*2px) scale(1 - index*0.1)`), а инлайн бьёт любое
+     правило таблицы стилей без !important — из-за этого правила наведения
+     ниже не срабатывали вовсе и стек никогда не шевелился. Теперь оба
+     состояния здесь, и инлайн-стиля на этих элементах нет. */
+  .product-thumbnails-container > div > div:nth-child(1) {
+    transform: translateY(0) scale(1);
+  }
+
+  .product-thumbnails-container > div > div:nth-child(2) {
+    transform: translateY(2px) scale(0.9);
+  }
+
+  .product-thumbnails-container > div > div:nth-child(3) {
+    transform: translateY(4px) scale(0.8);
+  }
+
+  .order-card:hover .product-thumbnails-container > div > div:nth-child(1) {
+    transform: translateY(0) scale(1.05) rotate(-2deg);
+  }
+
+  .order-card:hover .product-thumbnails-container > div > div:nth-child(2) {
+    transform: translateY(2px) scale(0.95) rotate(2deg);
+  }
+
+  .order-card:hover .product-thumbnails-container > div > div:nth-child(3) {
+    transform: translateY(4px) scale(0.85) rotate(-2deg);
+  }
+
+  /* Active эффект (при клике) */
+  .order-card:active {
+    transform: scale(0.98) !important;
+  }
 }
 </style>
