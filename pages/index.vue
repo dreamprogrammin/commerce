@@ -28,7 +28,7 @@ const personalizationStore = usePersonalizationStore()
 const productsStore = useProductsStore()
 const wishlistStore = useWishlistStore()
 const categoriesStore = useCategoriesStore()
-const { slides, isLoading: isLoadingSlides, error: slidesError } = useSlides()
+const { slides, isLoading: isLoadingSlides, error: slidesError, suspense: slidesSuspense } = useSlides()
 
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { isAdmin } = storeToRefs(profileStore)
@@ -59,6 +59,28 @@ useAsyncData(
   },
   { server: true, lazy: true, getCachedData },
 )
+
+/*
+ * Слайды героя ждём на сервере — намеренно НЕ lazy, в отличие от блока выше.
+ *
+ * `useSlides()` это обычный useQuery без ожидания. Из-за этого Hero рисовался
+ * тем состоянием, которое успевало сложиться к его очереди: на холодном
+ * соединении с базой ответ не поспевал и в HTML уходил скелетон, на прогретом
+ * — настоящий герой. При этом payload сериализуется позже рендера и слайды в
+ * нём уже были. Клиент поднимал их из payload, рисовал герой поверх
+ * закешированного скелетона — отсюда «Hydration completed but contains
+ * mismatches» на `/` и мигание скелетоном.
+ *
+ * Бьёт это не по одному посетителю: у `/` стоит `swr: 600`, и случайно
+ * снятый скелетон раздавался всем следующие десять минут.
+ *
+ * Замерено: закешированный ответ давал несовпадение 5 раз из 5, а свежий
+ * рендер (`/?nocache=…`, мимо кеша) — 0 из 5.
+ */
+useAsyncData('home-slides-ssr', async () => {
+  await slidesSuspense()
+  return true
+}, { server: true, getCachedData })
 
 // TanStack Query — рекомендации (лента «Подобрали для вас»)
 const recommendationsQueryKey = computed(() => [
