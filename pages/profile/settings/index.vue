@@ -30,26 +30,32 @@ const profileStore = useProfileStore()
 // `profile` — «чистовик» из стора, источник правды.
 const { profile, isSaving, isLoading } = storeToRefs(profileStore)
 
+/*
+ * Редактируемые поля перечислены один раз. Раньше тот же список стоял в трёх
+ * местах — инициализация черновика, resetForm и hasChanges, — и добавление
+ * четвёртого поля требовало не забыть про все три.
+ */
+const EDITABLE_FIELDS = ['first_name', 'last_name', 'phone'] as const
+type EditableField = typeof EDITABLE_FIELDS[number]
+
 // `editForm` — «черновик», локальная копия для редактирования.
-const editForm = ref<ProfileUpdate>({
-  first_name: '',
-  last_name: '',
-  phone: '',
-})
+const editForm = ref<ProfileUpdate>({})
 
 function resetForm() {
-  if (profile.value) {
-    editForm.value = {
-      first_name: profile.value.first_name,
-      last_name: profile.value.last_name,
-      phone: profile.value.phone,
-    }
-  }
+  if (!profile.value)
+    return
+  editForm.value = Object.fromEntries(
+    EDITABLE_FIELDS.map(field => [field, profile.value![field]]),
+  )
 }
 
-// Следим за «чистовиком»: он меняется после загрузки и после успешного
-// сохранения — черновик обязан идти следом.
-watch(profile, resetForm, { immediate: true, deep: true })
+/*
+ * Следим за «чистовиком»: он меняется после загрузки и после успешного
+ * сохранения — черновик обязан идти следом. `deep` здесь не нужен: стор
+ * всегда присваивает profile.value новый объект и ни разу не правит поля
+ * на месте, так что обычный watch по ссылке ловит все изменения дешевле.
+ */
+watch(profile, resetForm, { immediate: true })
 
 onMounted(() => {
   // onAuthStateChange в authStore уже зовёт loadProfile, это подстраховка
@@ -58,28 +64,23 @@ onMounted(() => {
     profileStore.loadProfile(false, true)
 })
 
-// --- Адаптеры v-model: в базе поля nullable, <Input> null не принимает ---
-const firstName = computed({
-  get: () => editForm.value.first_name ?? '',
-  set: (value: string) => { editForm.value.first_name = value || null },
-})
-const lastName = computed({
-  get: () => editForm.value.last_name ?? '',
-  set: (value: string) => { editForm.value.last_name = value || null },
-})
-const phone = computed({
-  get: () => editForm.value.phone ?? '',
-  set: (value: string) => { editForm.value.phone = value || null },
-})
+// Адаптер v-model: в базе поля nullable, <Input> null не принимает.
+function fieldModel(field: EditableField) {
+  return computed({
+    get: () => editForm.value[field] ?? '',
+    set: (value: string) => { editForm.value[field] = value || null },
+  })
+}
+
+const firstName = fieldModel('first_name')
+const lastName = fieldModel('last_name')
+const phone = fieldModel('phone')
 
 const hasChanges = computed(() => {
-  if (!profile.value)
+  const saved = profile.value
+  if (!saved)
     return false
-  return (
-    editForm.value.first_name !== profile.value.first_name
-    || editForm.value.last_name !== profile.value.last_name
-    || editForm.value.phone !== profile.value.phone
-  )
+  return EDITABLE_FIELDS.some(field => editForm.value[field] !== saved[field])
 })
 
 // Блока «Фото профиля» из макета здесь нет намеренно: загрузка аватара не нужна.
@@ -94,6 +95,26 @@ let savedTimer: ReturnType<typeof setTimeout> | null = null
 onUnmounted(() => {
   if (savedTimer)
     clearTimeout(savedTimer)
+})
+
+/*
+ * Подпись, иконка и цвет кнопки менялись тремя отдельными тернарниками по одним
+ * и тем же двум флагам — состояния легко было рассинхронить. Теперь описание
+ * состояния одно.
+ */
+const saveButton = computed(() => {
+  if (justSaved.value) {
+    return {
+      label: 'Сохранено',
+      icon: 'lucide:check-check',
+      tone: 'bg-gradient-to-b from-green-500 to-green-600 shadow-[0_8px_20px_rgba(0,166,62,0.32)]',
+    }
+  }
+  return {
+    label: isSaving.value ? 'Сохранение...' : 'Сохранить изменения',
+    icon: 'lucide:check',
+    tone: 'bg-gradient-to-b from-blue-400 to-blue-600 shadow-[0_8px_20px_rgba(43,127,255,0.3)]',
+  }
 })
 
 async function handleUpdate() {
@@ -127,16 +148,7 @@ async function handleUpdate() {
       </p>
 
       <ClientOnly>
-        <!-- Загрузка: те же высоты, чтобы карточка не прыгала -->
-        <div v-if="isLoading && !profile" class="animate-pulse">
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div class="h-[74px] rounded-[13px] bg-muted" />
-            <div class="h-[74px] rounded-[13px] bg-muted" />
-          </div>
-          <div class="mt-4 h-[74px] rounded-[13px] bg-muted" />
-          <div class="mt-4 h-[74px] rounded-[13px] bg-muted" />
-          <div class="mt-6 h-12 w-56 rounded-full bg-muted" />
-        </div>
+        <SettingsFormSkeleton v-if="isLoading && !profile" />
 
         <template v-else-if="profile">
           <form @submit.prevent="handleUpdate">
@@ -185,17 +197,15 @@ async function handleUpdate() {
               <button
                 type="submit"
                 class="stg-btn-save"
-                :class="justSaved
-                  ? 'bg-gradient-to-b from-green-500 to-green-600 shadow-[0_8px_20px_rgba(0,166,62,0.32)]'
-                  : 'bg-gradient-to-b from-blue-400 to-blue-600 shadow-[0_8px_20px_rgba(43,127,255,0.3)]'"
+                :class="saveButton.tone"
                 :disabled="isSaving"
               >
                 <Icon
-                  :name="justSaved ? 'lucide:check-check' : 'lucide:check'"
+                  :name="saveButton.icon"
                   class="size-[18px]"
                   :class="isSaving ? 'animate-pulse' : ''"
                 />
-                {{ isSaving ? 'Сохранение...' : justSaved ? 'Сохранено' : 'Сохранить изменения' }}
+                {{ saveButton.label }}
               </button>
               <button
                 type="button"
@@ -224,12 +234,7 @@ async function handleUpdate() {
         </div>
 
         <template #fallback>
-          <div class="animate-pulse">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div class="h-[74px] rounded-[13px] bg-muted" />
-              <div class="h-[74px] rounded-[13px] bg-muted" />
-            </div>
-          </div>
+          <SettingsFormSkeleton />
         </template>
       </ClientOnly>
     </div>

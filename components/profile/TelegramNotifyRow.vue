@@ -3,6 +3,7 @@ import type { Database } from '@/types'
 import { useEventListener } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
+import { useTelegramLink } from '@/composables/profile/useTelegramLink'
 import { useProfileStore } from '@/stores/core/profileStore'
 
 const supabase = useSupabaseClient<Database>()
@@ -10,40 +11,10 @@ const user = useSupabaseUser()
 const profileStore = useProfileStore()
 const { profile } = storeToRefs(profileStore)
 
-const BOT_USERNAME = 'babyShopOfficialStoreKz_bot'
-
-const telegramUrl = ref<string | null>(null)
+const { telegramUrl, prepareLink } = useTelegramLink()
 const isUnlinking = ref(false)
 
 const isLinked = computed(() => !!profile.value?.telegram_chat_id)
-
-async function prepareLink() {
-  if (!user.value)
-    return
-
-  telegramUrl.value = null
-  try {
-    const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
-
-    await supabase
-      .from('telegram_link_codes')
-      .delete()
-      .eq('user_id', user.value.id)
-
-    const { error } = await supabase
-      .from('telegram_link_codes')
-      .insert({ user_id: user.value.id, code })
-
-    if (error)
-      throw error
-
-    telegramUrl.value = `https://t.me/${BOT_USERNAME}?start=${code}`
-  }
-  catch (error: any) {
-    console.error('Error preparing Telegram link:', error)
-    toast.error('Ошибка при создании ссылки', { description: error.message })
-  }
-}
 
 // Ссылка готовится заранее, чтобы переключатель отрисовался нативным <a href>.
 // Иначе window.open() после await режет блокировщик всплывающих окон.
