@@ -255,6 +255,27 @@ const maxBonuses = computed(() =>
   ),
 )
 
+/*
+ * Промокод почти всегда применяют ПОСЛЕ того, как выставили бонусы. maxBonuses
+ * при этом падает, а bonusesToSpend оставался прежним — и уезжал на сервер
+ * как есть.
+ *
+ * Сервер в этом случае режет скидку (`LEAST(p_bonuses_to_spend,
+ * v_total_price - v_promo_discount)`), но списывает с баланса полную
+ * запрошенную сумму. Разница сгорала молча: заказ на 1090 ₸ с промокодом
+ * −327 ₸ и 1090 бонусами давал скидку бонусами 763 ₸, а с баланса уходило
+ * 1090 — проверено запуском create_user_order на локальной базе.
+ *
+ * Здесь закрывается путь через интерфейс. Само списание на сервере тоже
+ * надо чинить — это отдельная миграция.
+ */
+watch(maxBonuses, (limit) => {
+  if (bonusesToSpend.value > limit) {
+    cartStore.setBonusesToSpend(limit)
+    bonusesInput.value = bonusesToSpend.value
+  }
+})
+
 const useBonuses = computed(() => bonusesToSpend.value > 0)
 
 function toggleBonuses() {
