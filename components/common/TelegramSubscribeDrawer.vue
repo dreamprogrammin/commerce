@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Database } from '@/types'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
@@ -10,17 +9,15 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
+import { useTelegramLink } from '@/composables/profile/useTelegramLink'
 import { useModalStore } from '@/stores/modal/useModalStore'
 
-const BOT_USERNAME = 'babyShopOfficialStoreKz_bot'
-
-const supabase = useSupabaseClient<Database>()
 const user = useSupabaseUser()
 const modalStore = useModalStore()
 const { showTelegramModal } = storeToRefs(modalStore)
 
-const telegramUrl = ref<string | null>(null)
-const isPreparing = ref(false)
+// isPreparing не разбираем: в этом компоненте флаг никто не читает
+const { telegramUrl, prepareLink } = useTelegramLink()
 
 const isOpen = computed({
   get: () => showTelegramModal.value,
@@ -33,38 +30,6 @@ const isOpen = computed({
     }
   },
 })
-
-async function prepareLink() {
-  if (!user.value)
-    return
-
-  isPreparing.value = true
-  telegramUrl.value = null
-  try {
-    const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
-
-    await supabase
-      .from('telegram_link_codes')
-      .delete()
-      .eq('user_id', user.value.id)
-
-    const { error } = await supabase
-      .from('telegram_link_codes')
-      .insert({ user_id: user.value.id, code })
-
-    if (error)
-      throw error
-
-    telegramUrl.value = `https://t.me/${BOT_USERNAME}?start=${code}`
-  }
-  catch (error: any) {
-    console.error('Error preparing Telegram link:', error)
-    toast.error('Ошибка при создании ссылки', { description: error.message })
-  }
-  finally {
-    isPreparing.value = false
-  }
-}
 
 // Pre-generate link when drawer opens so the button renders as a native <a href>
 // This avoids popup-blocker issues caused by calling window.open() after await
