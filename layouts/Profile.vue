@@ -25,7 +25,7 @@ useHead({
   <div v-if="isLoggedIn" class="profile-shell min-h-screen">
     <!-- Desktop Header -->
     <div class="hidden lg:block">
-      <CommonHeader />
+      <CommonSiteHeader />
     </div>
 
     <!-- Mobile: общий для сайта таббар (fixed) -->
