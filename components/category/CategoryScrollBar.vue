@@ -236,18 +236,36 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     right: 0;
     z-index: 90;
     padding: 10px 0 4px;
-    opacity: 0;
+
+    /*
+     * Появление — только сдвигом, БЕЗ анимации opacity.
+     * Любое промежуточное значение opacity делает этот элемент новым backdrop
+     * root, и `backdrop-filter` у .csb-capsule внутри перестаёт размывать
+     * страницу: блюр пропадал на все 0.3s перехода, капсула вспыхивала
+     * насквозь прозрачной. Проверено попиксельно — при opacity:.99 сквозь
+     * капсулу читаются названия брендов и бейджи скидок, при opacity:1 они
+     * размыты. Transform на это не влияет, проверялся отдельно.
+     *
+     * Прятать через opacity тут и не нужно: translateY(-130%) уводит панель
+     * за верхний край, а visibility убирает её из чтения скринридером и из
+     * порядка фокуса. Задержка visibility — чтобы панель исчезала после
+     * того, как уедет, а не мгновенно.
+     */
     transform: translateY(-130%);
+    visibility: hidden;
     pointer-events: none;
     transition:
       transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
-      opacity 0.3s ease;
+      visibility 0s linear 0.3s;
   }
 
   .csb-bar--shown {
-    opacity: 1;
     transform: translateY(0);
+    visibility: visible;
     pointer-events: auto;
+    transition:
+      transform 0.3s cubic-bezier(0.32, 0.72, 0.33, 1),
+      visibility 0s;
   }
 
   .csb-inner {
@@ -268,8 +286,8 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     padding: 7px 8px;
     border-radius: 24px;
     background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26));
-    backdrop-filter: blur(24px) saturate(1.9);
     -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    backdrop-filter: blur(24px) saturate(1.9);
     border: 1px solid rgba(255, 255, 255, 0.7);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.85),
@@ -321,8 +339,8 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.9);
     background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(224, 233, 247, 0.55));
-    backdrop-filter: blur(14px) saturate(1.7);
     -webkit-backdrop-filter: blur(14px) saturate(1.7);
+    backdrop-filter: blur(14px) saturate(1.7);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.95),
       inset 0 -1px 2px rgba(15, 23, 42, 0.06),

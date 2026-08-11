@@ -1984,8 +1984,8 @@ watchEffect(() => {
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.45);
     background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
-    backdrop-filter: blur(12px) saturate(1.7);
     -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    backdrop-filter: blur(12px) saturate(1.7);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.55),
       inset 0 -3px 10px rgba(6, 53, 138, 0.3),
@@ -2035,8 +2035,8 @@ watchEffect(() => {
     font-weight: 700;
     border: 1px solid rgba(255, 255, 255, 0.9);
     background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(224, 233, 247, 0.6));
-    backdrop-filter: blur(10px) saturate(1.6);
     -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(10px) saturate(1.6);
     box-shadow:
       inset 0 1px 0 #fff,
       0 5px 14px rgba(15, 23, 42, 0.08);
@@ -2064,8 +2064,8 @@ watchEffect(() => {
     border-radius: 16px;
     background: linear-gradient(150deg, rgba(77, 148, 255, 0.96), rgba(23, 101, 235, 0.9));
     border: 1px solid rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(12px) saturate(1.7);
     -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    backdrop-filter: blur(12px) saturate(1.7);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.5),
       inset 0 -2px 8px rgba(6, 53, 138, 0.28),
@@ -2235,8 +2235,8 @@ watchEffect(() => {
     padding: 9px 14px;
     border-radius: 20px;
     background: linear-gradient(150deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.48));
-    backdrop-filter: blur(24px) saturate(1.9);
     -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    backdrop-filter: blur(24px) saturate(1.9);
     border: 1px solid rgba(255, 255, 255, 0.75);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.9),

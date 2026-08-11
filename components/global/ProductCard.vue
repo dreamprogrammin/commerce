@@ -472,8 +472,8 @@ async function onWish() {
   .pc-stepper {
     border: 1px solid rgb(255 255 255 / 0.45);
     background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-    backdrop-filter: blur(12px) saturate(1.7);
     -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    backdrop-filter: blur(12px) saturate(1.7);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.5),
       inset 0 -2px 8px rgb(6 53 138 / 0.28),
@@ -482,8 +482,8 @@ async function onWish() {
 
   .pc-stepper-btn {
     background: rgb(255 255 255 / 0.26);
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
     color: #fff;
     transition: background 0.12s ease;

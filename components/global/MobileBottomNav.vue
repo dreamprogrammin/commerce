@@ -158,8 +158,8 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     bottom: calc(12px + env(safe-area-inset-bottom));
     height: 50px;
     background: linear-gradient(150deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18));
-    backdrop-filter: blur(24px) saturate(1.9);
     -webkit-backdrop-filter: blur(24px) saturate(1.9);
+    backdrop-filter: blur(24px) saturate(1.9);
     border: 1px solid rgba(255, 255, 255, 0.65);
     border-radius: 22px;
     box-shadow:

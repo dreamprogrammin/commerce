@@ -328,8 +328,8 @@ const wrapStyle = computed<CSSProperties>(() => {
     border: 1px solid rgb(255 255 255 / 0.3);
     display: grid;
     place-content: center;
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
   }
 
   .sh-logo__word {
@@ -348,8 +348,8 @@ const wrapStyle = computed<CSSProperties>(() => {
       0 4px 14px rgb(0 40 120 / 0.18);
     color: #fff;
     cursor: pointer;
-    backdrop-filter: blur(14px) saturate(1.6);
     -webkit-backdrop-filter: blur(14px) saturate(1.6);
+    backdrop-filter: blur(14px) saturate(1.6);
     background: linear-gradient(150deg, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.12));
     transition: background 0.2s ease;
   }
@@ -407,8 +407,8 @@ const wrapStyle = computed<CSSProperties>(() => {
     font: 700 14px var(--font-sans);
     border: 1px solid rgb(255 255 255 / 0.9);
     cursor: pointer;
-    backdrop-filter: blur(12px) saturate(1.6);
     -webkit-backdrop-filter: blur(12px) saturate(1.6);
+    backdrop-filter: blur(12px) saturate(1.6);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 1),
       0 6px 18px rgb(0 40 120 / 0.22);

@@ -928,8 +928,8 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   .cart-mobile-cta__btn {
     border: 1px solid rgb(255 255 255 / 0.45);
     background: linear-gradient(180deg, rgb(59 138 255 / 0.92), rgb(43 127 255 / 0.9));
-    backdrop-filter: blur(22px) saturate(1.6);
     -webkit-backdrop-filter: blur(22px) saturate(1.6);
+    backdrop-filter: blur(22px) saturate(1.6);
     box-shadow:
       0 14px 34px rgb(43 127 255 / 0.36),
       inset 0 1px 0 rgb(255 255 255 / 0.4);
