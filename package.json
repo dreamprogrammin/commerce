@@ -49,15 +49,12 @@
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "context7": "^1.0.3",
     "countup.js": "^2.9.0",
     "debounce": "^2.2.0",
     "dompurify": "^3.3.1",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-vue": "^8.6.0",
-    "googleapis": "^170.0.0",
     "gsap": "^3.13.0",
-    "install": "^0.13.0",
     "lightningcss": "^1.30.2",
     "lodash-es": "^4.17.21",
     "lucide-vue-next": "^0.536.0",
@@ -67,7 +64,6 @@
     "nuxt-schema-org": "^5.0.9",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.5.0",
-    "radix-vue": "^1.9.17",
     "reka-ui": "^2.9.5",
     "shadcn-nuxt": "^2.2.0",
     "slugify": "^1.6.6",
@@ -78,9 +74,9 @@
     "ufo": "^1.6.1",
     "uuid": "^11.1.0",
     "vaul-vue": "^0.4.1",
-    "vue": "latest",
+    "vue": "3.5.39",
     "vue-draggable-next": "^2.3.0",
-    "vue-router": "latest",
+    "vue-router": "5.1.0",
     "vue-sonner": "^2.0.2"
   },
   "devDependencies": {
@@ -117,6 +113,6 @@
   },
   "overrides": {
     "@tanstack/vue-query": "5.62.7",
-    "vue": "latest"
+    "vue": "3.5.39"
   }
 }
