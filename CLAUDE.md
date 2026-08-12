@@ -131,7 +131,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 - `brands` - Brand information
 - `orders` / `order_items` - Order management with guest support
 - `profiles` - User profiles with bonus balance
-- `bonuses` - Bonus transaction history (earned/spent/pending)
+- `bonus_transactions` - Bonus transaction history (earned/spent/pending)
 - `attributes` / `attribute_options` - Dynamic product attributes (size, age, color, etc.)
 - `children` - Child profiles for age-based recommendations
 - `wishlist` - Favorite products per user
@@ -150,7 +150,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 1. User clicks "Sign in with Google"
 2. Supabase Auth handles OAuth flow
 3. On successful auth, `profiles` table trigger auto-creates profile
-4. Profile includes: `full_name`, `avatar_url`, `bonus_balance`, `role`
+4. Profile includes: `full_name`, `avatar_url`, `active_bonus_balance`, `role`
 
 **Middleware** (`/middleware/auth.global.ts`):
 
@@ -162,11 +162,11 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 
 **How it works**:
 
-1. Products have `bonus_points` field (earn on purchase)
-2. Users have `bonus_balance` in `profiles` table
-3. Orders track `bonus_spent` and `bonus_earned`
-4. New bonuses have 14-day activation period (`activated_at` column)
-5. Bonuses can be spent as discount during checkout (tracked in `bonuses` table)
+1. Products have `bonus_points_award` field (earn on purchase)
+2. Users have `active_bonus_balance` and `pending_bonus_balance` in `profiles` table
+3. Orders track `bonuses_spent` and `bonuses_awarded`
+4. New bonuses have 14-day activation period (`activation_date` column)
+5. Bonuses can be spent as discount during checkout (tracked in `bonus_transactions` table)
 
 **Important Logic**:
 
@@ -375,13 +375,21 @@ modalStore.closeModal()
 
 Правила выведены из практики на этом проекте. Каждое стоит на конкретной поломке — они не абстрактные.
 
+> **Сначала инструкция, потом реализация.** По любому промпту первым делом перечитать этот раздел и память по проекту, и только после этого браться за файлы. Что именно из него нужно достать до первой правки: какая ветка заводится под задачу (п. 1), нужна ли миграция и в каком порядке она поедет (п. 3), правится ли что-то на проде (п. 8), чем задача будет проверена (п. 12–15).
+>
+> Правило добавлено 2026-08-11 по просьбе владельца. Раздел вырос до размера, на котором «помню в общих чертах» перестаёт работать, а цена промаха тут не косметическая: одна общая боевая база и живые заказы.
+
 ### Ветки и выкатка
 
 > **Выкатку `dev` → `master` не предлагать. Никогда.** Ни отдельным вопросом, ни строкой «что осталось» в отчёте, ни напоминанием, что работа накопилась и на сайте её ещё нет. Решение о выкатке принимает владелец проекта: для него нужны данные, которых у агента нет, — готовность бизнеса к изменениям, договорённости с людьми, что сейчас происходит с заказами. Выполнять только по прямому недвусмысленному указанию, и даже тогда сначала проверять порядок из пункта 3.
 >
 > Правило стоит на 8 августа 2026: предложение прозвучало в нескольких отчётах подряд, вылилось в мердж, затем откат, force-push, удаление деплоя — и `uhti.kz` отдавал 404, пока это разбирали. Сам факт, что в `dev` что-то лежит невыкаченным, поводом заговорить о выкатке не является.
 
-1. **Ветка на задачу**: `fix/*`, `feat/*`, `test/*` от `dev`. Мердж `--no-ff` в `dev`, потом пуш. Слитые ветки удалять.
+1. **Ветка на задачу**: `fix/*` (баг), `feat/*` (новое), `test/*` (тесты), `refactor/*` (ревью и рефакторинг) — от `dev`. Мердж `--no-ff` в `dev`, потом пуш. Слитые ветки удалять. Ветка заводится **до первой правки файла**, а не после неё.
+   - **`refactor/*` — это правки без изменения поведения**: правки по замечаниям код-ревью, переименования, вынос дублей, разбор длинных компонентов, чистка мёртвого кода. Отсюда и способ проверки: сборка и линтер зелёные не сами по себе, а **страница до и после выглядит и работает одинаково** — сверять глазами в браузере (п. 15), а не рассуждением о том, что смысл сохранён.
+   - Если по дороге в `refactor/*` нашёлся настоящий баг — чинить его **отдельной `fix/*`**, а не заодно. Смешанная ветка не даёт откатить рефакторинг, не откатив заодно фикс, и наоборот.
+   - **Перед мерджем — синхронизация с `origin/dev`.** `git fetch`, посмотреть расхождение в обе стороны и влить `origin/dev` к себе обычным `--no-ff` мерджем. Пока шла работа, туда почти всегда успевают влить чужое. После вливания **пересобрать и перепроверить заново**: чужой коммит бывает глобальным — 11 августа 2026 это оказались `targets` для Lightning CSS, менявшие вывод CSS во всём приложении, и мобильная плашка после них выглядела иначе. Пуш обязан уходить fast-forward.
+   - **Force-push в `dev` — никогда.** Если пуш отвергнут, ветка отстала: синхронизироваться и повторить. Форс затирает чужую работу; на этом проекте один force-push уже клал `uhti.kz` в 404 (см. врезку выше).
 2. **`dev` — это прод-база, но ещё не прод-сайт.** Пуш в `dev` собирает на Vercel превью; `uhti.kz` крутит сборку с `master` (проверено 2026-08-07: домен висит на деплое из `master`). А вот база у превью и у прода **одна и та же, боевая**. Отсюда: миграция из `dev` бьёт по живым покупателям сразу, а фронт доезжает только мерджем `dev` → `master`.
 3. **Порядок выкатки жёсткий**: миграции → эдж-функции → фронт. Обратный порядок кладёт оформление у всех: фронт всегда шлёт новые параметры RPC, и на базе без них падает каждый заказ. В эту же сторону окна нет — живой `master` переживает миграцию, недостающие параметры возьмут `DEFAULT`. Ради этого же параметры добавляются только с `DEFAULT`, а старая сигнатура сносится явным `DROP` (см. п. 10).
 4. **Делить работу по зависимости от базы.** Если часть изменений не требует миграций, выносить её отдельной веткой и выкатывать сразу, не дожидаясь готовности схемы.

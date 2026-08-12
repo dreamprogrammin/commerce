@@ -173,13 +173,13 @@ const WELCOME_STICKER = 'CAACAgIAAxkBAAE...' // ← вставить сюда
 
 ### Frontend
 
-| Файл                                        | Назначение                                               |
-| ------------------------------------------- | -------------------------------------------------------- |
-| `components/profile/TelegramBanner.vue`     | Баннер "Подпишитесь на Telegram" (профиль, после заказа) |
-| `components/profile/TelegramLinkButton.vue` | Кнопка привязки/отвязки в настройках профиля             |
-| `pages/telegram-link.vue`                   | Страница обратной привязки (бот → сайт)                  |
-| `pages/admin/broadcast.vue`                 | Страница рассылки в админке                              |
-| `stores/adminStore/adminBroadcastStore.ts`  | Стор для рассылки                                        |
+| Файл                                       | Назначение                                               |
+| ------------------------------------------ | -------------------------------------------------------- |
+| `components/profile/TelegramBanner.vue`    | Баннер "Подпишитесь на Telegram" (профиль, после заказа) |
+| `components/profile/TelegramNotifyRow.vue` | Переключатель привязки/отвязки в настройках профиля      |
+| `pages/telegram-link.vue`                  | Страница обратной привязки (бот → сайт)                  |
+| `pages/admin/broadcast.vue`                | Страница рассылки в админке                              |
+| `stores/adminStore/adminBroadcastStore.ts` | Стор для рассылки                                        |
 
 ### Миграции
 

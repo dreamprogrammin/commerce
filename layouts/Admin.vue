@@ -59,8 +59,12 @@ const navLinks = [
 </script>
 
 <template>
-  <div class="hidden md:block">
-    <CommonHeader />
+  <!--
+    Брейкпоинт lg, а не md: десктопная строка SiteHeader живёт на ≥lg, ниже
+    он рисует компактную мобильную плашку — в админке она не нужна.
+  -->
+  <div class="hidden lg:block">
+    <CommonSiteHeader />
   </div>
   <div class="flex min-h-screen w-full bg-muted/40">
     <!-- Десктоп сайдбар -->

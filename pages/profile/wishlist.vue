@@ -1,61 +1,117 @@
 <script setup lang="ts">
-import { useAuthStore } from '@/stores/auth'
+import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
 definePageMeta({
   layout: 'profile',
+  profileBare: true, // страница рисует собственные карточки, обёртка layout не нужна
 })
+
+useHead({ title: 'Избранное' })
 
 const wishlistStore = useWishlistStore()
-const authStore = useAuthStore()
-const router = useRouter()
-
 const { wishlistProducts: products, isLoading } = storeToRefs(wishlistStore)
 
-// Загрузка данных избранного при открытии страницы
+/*
+ * Доступ к странице закрывает `middleware/auth.global.ts`: неавторизованного
+ * сюда не пустят, поэтому собственной проверки с редиректом здесь нет.
+ */
 await useAsyncData('user-wishlist-page', async () => {
   await wishlistStore.fetchWishlistProducts()
-  // Нам не нужно возвращать данные, так как они уже в сторе
+  // Данные живут в сторе, возвращать нечего
+  return true
 })
 
-const pageTitle = computed(() => `Избранное (${products.value.length || 0})`)
-
-// Если пользователь не залогинен, перенаправляем (хотя это делает middleware)
-if (!authStore.isLoggedIn) {
-  router.replace('/auth/login')
-}
+const count = computed(() => products.value.length)
 </script>
 
 <template>
-  <div class="container py-12">
-    <h1 class="text-3xl font-bold mb-8">
-      {{ pageTitle }}
-    </h1>
-
-    <!-- Состояние загрузки -->
-    <div v-if="isLoading" class="text-center py-20">
-      Загрузка избранных товаров...
+  <div class="flex flex-col gap-[18px]">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h1
+        class="inline-flex items-center gap-[11px] text-[clamp(24px,2.8vw,30px)] font-extrabold tracking-[-0.025em]"
+      >
+        Избранное
+        <span class="rounded-full bg-blue-50 px-3 py-1 text-[15px] font-extrabold text-primary">
+          {{ count }}
+        </span>
+      </h1>
+      <span v-if="count > 0" class="text-sm font-medium text-muted-foreground">
+        Товары, которые вам понравились
+      </span>
     </div>
 
-    <!-- Состояние, когда избранное пусто -->
-    <div v-else-if="products.length === 0" class="text-center py-20 border-2 border-dashed rounded-lg bg-muted">
-      <h2 class="text-2xl font-semibold">
-        Ваш список избранного пуст
-      </h2>
-      <p class="text-muted-foreground mt-2">
-        Добавляйте товары, чтобы не потерять их!
+    <!-- ⏳ Загрузка: скелетоны в той же сетке, чтобы не прыгала высота -->
+    <div v-if="isLoading" class="wl-grid grid gap-3 md:gap-4">
+      <div
+        v-for="n in 6"
+        :key="`skeleton-${n}`"
+        class="h-[336px] animate-pulse rounded-[20px] border border-border bg-white/70"
+      />
+    </div>
+
+    <!-- 💙 Список товаров -->
+    <div v-else-if="count > 0" class="wl-grid grid gap-3 md:gap-4">
+      <ProductCard
+        v-for="product in products"
+        :key="product.id"
+        :product="product"
+      />
+    </div>
+
+    <!-- 🫙 Пусто -->
+    <div
+      v-else
+      class="rounded-[22px] border border-border bg-white px-6 py-14 text-center shadow-sm"
+    >
+      <span
+        class="mb-4 inline-grid size-[72px] place-content-center rounded-full bg-blue-50 text-primary"
+      >
+        <Icon name="line-md:heart" class="size-[34px]" />
+      </span>
+      <p class="mb-1.5 text-[19px] font-extrabold text-foreground">
+        В избранном пока пусто
       </p>
-      <NuxtLink to="/catalog" class="inline-block mt-4">
-        <Button>Перейти в каталог</Button>
+      <p class="mb-5 text-sm font-medium text-muted-foreground">
+        Добавляйте игрушки, чтобы вернуться к ним позже
+      </p>
+      <NuxtLink
+        to="/catalog"
+        class="inline-flex h-[46px] items-center gap-2 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 px-[22px] text-[15px] font-bold text-white shadow-[0_8px_20px_rgba(43,127,255,0.3)]"
+      >
+        <Icon name="lucide:shopping-bag" class="size-[18px]" />
+        В каталог
       </NuxtLink>
-    </div>
-
-    <!-- Список товаров -->
-    <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-      <div v-for="product in products" :key="product.id">
-        <!-- Используем вашу карточку товара, которая теперь универсальна -->
-        <ProductCard :product="product" class="h-full" />
-      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* Сетка из макета: две колонки на мобильном, дальше — автозаполнение
+     колонками не уже 212px (карточка каталога рассчитана на эту ширину). */
+  .wl-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (width >= 768px) {
+    .wl-grid {
+      grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+    }
+  }
+}
+</style>
