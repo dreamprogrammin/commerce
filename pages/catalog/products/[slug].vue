@@ -72,8 +72,6 @@ const { data: product } = await useAsyncData(`product-${slug.value}`, async () =
   return fetchedProduct
 })
 
-const isProductLoading = ref(false)
-
 const { data: accessories, isLoading: accessoriesLoading } = useQuery({
   queryKey: ['product-accessories', computed(() => product.value?.id)],
   queryFn: async () => {
@@ -196,7 +194,6 @@ const faqSchemaItems = computed(() => {
 })
 
 const digitColumns = ref<HTMLElement[]>([])
-const isLoading = computed(() => isProductLoading.value)
 
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (!product.value)
@@ -1112,215 +1109,227 @@ watchEffect(() => {
 
 <template>
   <div class="pdp-page">
-    <ClientOnly>
-      <ProductDetailSkeleton v-if="isLoading" />
+    <!--
+      Страница целиком рендерится на сервере. Раньше здесь стоял <ClientOnly>
+      вокруг ВСЕГО шаблона: краулер не получал ни <h1>, ни единой картинки —
+      название товара было только в <head>, а LCP-элементом оказывался тот же
+      H1, появляющийся лишь после гидратации (Lighthouse mobile: LCP 6.3s).
 
-      <div v-else-if="product">
-        <!-- Мобильная шапка-пилюля: назад · миниатюра · название · шаринг · избранное -->
-        <ProductMobileHeader
-          :product-id="product.id"
-          :product-name="product.name"
-          :thumb-url="mainThumbUrl"
-          :back-to="categoryLink ?? '/catalog'"
-        />
+      Данные для SSR есть: product, colorVariants и productQuestions приходят
+      через useAsyncData. Под <ClientOnly> убраны только те островки, которые
+      честно зависят от браузера, — корзина и избранное (сторы восстанавливаются
+      из localStorage) и три useQuery без SSR-гидратации (аксессуары, похожие
+      товары, отзывы). Каждый такой островок помечен на месте.
+    -->
+    <div v-if="product">
+      <!-- Мобильная шапка-пилюля: назад · миниатюра · название · шаринг · избранное -->
+      <ProductMobileHeader
+        :product-id="product.id"
+        :product-name="product.name"
+        :thumb-url="mainThumbUrl"
+        :back-to="categoryLink ?? '/catalog'"
+      />
 
-        <div :class="`${containerClass} pt-[18px]`">
-          <!-- Хлебные крошки — только десктоп (на мобильных их роль играет шапка-пилюля) -->
-          <Breadcrumbs :items="breadcrumbs" compact class="hidden lg:block" />
+      <div :class="`${containerClass} pt-[18px]`">
+        <!-- Хлебные крошки — только десктоп (на мобильных их роль играет шапка-пилюля) -->
+        <Breadcrumbs :items="breadcrumbs" compact class="hidden lg:block" />
 
-          <div class="pdp-top">
-            <!-- ГАЛЕРЕЯ -->
-            <div class="pdp-col-main">
-              <ProductGallery
-                v-if="product.product_images && product.product_images.length > 0"
-                :images="product.product_images"
-                :product-name="product.name"
-                :brand-name="product.brands?.name"
-                :line-name="product.product_lines?.name"
-                :discount-percentage="
-                  mainProductPrice.hasDiscount ? product.discount_percentage : null
-                "
-              />
-              <div
-                v-else
-                class="pdp-card flex h-64 items-center justify-center lg:h-96"
-              >
-                <p class="text-muted-foreground">
-                  Изображения отсутствуют
-                </p>
-              </div>
+        <div class="pdp-top">
+          <!-- ГАЛЕРЕЯ -->
+          <div class="pdp-col-main">
+            <ProductGallery
+              v-if="product.product_images && product.product_images.length > 0"
+              :images="product.product_images"
+              :product-name="product.name"
+              :brand-name="product.brands?.name"
+              :line-name="product.product_lines?.name"
+              :discount-percentage="
+                mainProductPrice.hasDiscount ? product.discount_percentage : null
+              "
+            />
+            <div
+              v-else
+              class="pdp-card flex h-64 items-center justify-center lg:h-96"
+            >
+              <p class="text-muted-foreground">
+                Изображения отсутствуют
+              </p>
             </div>
+          </div>
 
-            <!--
+          <!--
               БЛОК ПОКУПКИ. Один и тот же элемент играет две роли: на мобильных
               это инфо-карточка под галереей, на десктопе — липкая колонка справа.
               Дублировать разметку нельзя — в DOM появился бы второй <h1>.
             -->
-            <div class="pdp-buybox-wrap">
-              <div class="pdp-card pdp-buybox">
-                <h1 class="pdp-title">
-                  {{ product.name }}
-                </h1>
+          <div class="pdp-buybox-wrap">
+            <div class="pdp-card pdp-buybox">
+              <h1 class="pdp-title">
+                {{ product.name }}
+              </h1>
 
-                <p
-                  v-if="audienceText || brandName"
-                  class="mb-3 hidden text-[13.5px] font-medium text-muted-foreground lg:block"
-                >
-                  Игрушка {{ audienceText }}
-                  <template v-if="brandName">
-                    от {{ brandName }}
-                  </template>
-                </p>
+              <p
+                v-if="audienceText || brandName"
+                class="mb-3 hidden text-[13.5px] font-medium text-muted-foreground lg:block"
+              >
+                Игрушка {{ audienceText }}
+                <template v-if="brandName">
+                  от {{ brandName }}
+                </template>
+              </p>
 
-                <!-- Бренд -->
-                <NuxtLink
-                  v-if="brandName && brandLink"
-                  :to="brandLink"
-                  class="pdp-brand-pill mb-4 hidden lg:inline-flex"
-                >
-                  <span class="pdp-brand-logo">
-                    <ProgressiveImage
-                      v-if="product.brands?.logo_url"
-                      :src="brandLogoUrl"
-                      :alt="generateBrandLogoAlt(brandName || 'Бренд')"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="size-[18px]"
-                    />
-                    <Icon v-else name="lucide:building-2" class="size-4" />
-                  </span>
-                  <span class="text-[13px] font-bold text-foreground">{{ brandName }}</span>
-                </NuxtLink>
+              <!-- Бренд -->
+              <NuxtLink
+                v-if="brandName && brandLink"
+                :to="brandLink"
+                class="pdp-brand-pill mb-4 hidden lg:inline-flex"
+              >
+                <span class="pdp-brand-logo">
+                  <ProgressiveImage
+                    v-if="product.brands?.logo_url"
+                    :src="brandLogoUrl"
+                    :alt="generateBrandLogoAlt(brandName || 'Бренд')"
+                    object-fit="contain"
+                    placeholder-type="shimmer"
+                    class="size-[18px]"
+                  />
+                  <Icon v-else name="lucide:building-2" class="size-4" />
+                </span>
+                <span class="text-[13px] font-bold text-foreground">{{ brandName }}</span>
+              </NuxtLink>
 
-                <!-- Цена -->
-                <p v-if="hasAccessoriesSelected" class="mb-1 text-xs font-medium text-muted-foreground">
-                  Итого за комплект
-                </p>
-                <div class="mb-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <!-- Флип-счётчик: каждая цифра — барабан 0…9, useFlipCounter
+              <!-- Цена -->
+              <p v-if="hasAccessoriesSelected" class="mb-1 text-xs font-medium text-muted-foreground">
+                Итого за комплект
+              </p>
+              <div class="mb-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <!-- Флип-счётчик: каждая цифра — барабан 0…9, useFlipCounter
                        крутит .digit-ribbon при изменении итоговой суммы.
                        В барабанах лежат все цифры 0-9, поэтому для скринридеров
                        они скрыты, а цена дублируется обычным текстом. -->
-                  <span class="pdp-price">
-                    <span class="sr-only">{{ formatPrice(totalPrice) }} ₸</span>
-                    <span class="pdp-price-reels" aria-hidden="true">
-                      <template v-for="(item, index) in priceChars" :key="index">
-                        <span v-if="item.char === ' '" class="pdp-digit-gap" />
-                        <span
-                          v-else-if="item.isDigit"
-                          :ref="(el) => { if (el) digitColumns[item.digitIndex] = el as HTMLElement }"
-                          class="digit-column"
-                        >
-                          <span class="digit-ribbon">
-                            <span v-for="d in 10" :key="d" class="digit-item">{{ d - 1 }}</span>
-                          </span>
+                <span class="pdp-price">
+                  <span class="sr-only">{{ formatPrice(totalPrice) }} ₸</span>
+                  <span class="pdp-price-reels" aria-hidden="true">
+                    <template v-for="(item, index) in priceChars" :key="index">
+                      <span v-if="item.char === ' '" class="pdp-digit-gap" />
+                      <span
+                        v-else-if="item.isDigit"
+                        :ref="(el) => { if (el) digitColumns[item.digitIndex] = el as HTMLElement }"
+                        class="digit-column"
+                      >
+                        <span class="digit-ribbon">
+                          <span v-for="d in 10" :key="d" class="digit-item">{{ d - 1 }}</span>
                         </span>
-                      </template>
-                      <span class="pdp-currency">₸</span>
-                    </span>
-                  </span>
-                  <template v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected">
-                    <span class="pdp-price-old">{{ formatPrice(mainProductPrice.original) }} ₸</span>
-                    <span class="pdp-discount">−{{ product.discount_percentage }}%</span>
-                  </template>
-                </div>
-
-                <!-- Расшифровка комплекта -->
-                <div
-                  v-if="hasAccessoriesSelected"
-                  class="mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground"
-                >
-                  <span class="max-w-[180px] truncate font-medium">{{ product.name }}</span>
-                  <template v-for="acc in selectedAccessoriesData" :key="acc.id">
-                    <span>+</span>
-                    <span class="font-medium">{{ acc.name }}</span>
-                  </template>
-                </div>
-
-                <span v-if="totalBonuses > 0" class="pdp-bonus">
-                  <Icon name="lucide:gift" class="size-[15px] text-orange-500" />
-                  <span class="pdp-bonus-text">+{{ totalBonuses }} бонусов на счёт</span>
-                </span>
-
-                <!-- Рейтинг и вопросы — плитки только на мобильных -->
-                <div class="mt-3.5 grid grid-cols-2 gap-2.5 lg:hidden">
-                  <a href="#reviews" class="pdp-tile">
-                    <Icon name="gravity-ui:star-fill" class="size-[22px] shrink-0 text-rating" />
-                    <span class="min-w-0">
-                      <span class="block text-base font-extrabold">
-                        {{ (product.avg_rating ?? 0).toFixed(1) }}
                       </span>
-                      <span class="block text-xs font-semibold text-primary">{{ reviewCountLabel }}</span>
-                    </span>
-                  </a>
-                  <a href="#questions" class="pdp-tile">
-                    <Icon name="lucide:message-circle" class="size-[22px] shrink-0 text-primary" />
-                    <span class="min-w-0">
-                      <span class="block text-base font-extrabold">{{ questionsCount }}</span>
-                      <span class="block text-xs font-semibold text-primary">{{ questionsCountLabel }}</span>
-                    </span>
-                  </a>
-                </div>
-
-                <!-- Цветовые варианты -->
-                <div v-if="colorVariants && colorVariants.length > 0" class="mt-4">
-                  <span class="mb-2 block text-[13px] font-semibold text-muted-foreground">
-                    Другие варианты:
+                    </template>
+                    <span class="pdp-currency">₸</span>
                   </span>
-                  <div class="flex flex-wrap gap-2.5">
-                    <span
-                      v-if="product.product_images?.[0]"
-                      class="pdp-variant pdp-variant--active"
-                      aria-current="true"
-                    >
-                      <ProgressiveImage
-                        :src="getVariantUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url, 'sm')"
-                        :blur-data-url="product.product_images[0].blur_placeholder"
-                        :alt="product.name"
-                        object-fit="cover"
-                        placeholder-type="lqip"
-                        class="size-full rounded-[9px]"
-                      />
+                </span>
+                <template v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected">
+                  <span class="pdp-price-old">{{ formatPrice(mainProductPrice.original) }} ₸</span>
+                  <span class="pdp-discount">−{{ product.discount_percentage }}%</span>
+                </template>
+              </div>
+
+              <!-- Расшифровка комплекта -->
+              <div
+                v-if="hasAccessoriesSelected"
+                class="mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground"
+              >
+                <span class="max-w-[180px] truncate font-medium">{{ product.name }}</span>
+                <template v-for="acc in selectedAccessoriesData" :key="acc.id">
+                  <span>+</span>
+                  <span class="font-medium">{{ acc.name }}</span>
+                </template>
+              </div>
+
+              <span v-if="totalBonuses > 0" class="pdp-bonus">
+                <Icon name="lucide:gift" class="size-[15px] text-orange-500" />
+                <span class="pdp-bonus-text">+{{ totalBonuses }} бонусов на счёт</span>
+              </span>
+
+              <!-- Рейтинг и вопросы — плитки только на мобильных -->
+              <div class="mt-3.5 grid grid-cols-2 gap-2.5 lg:hidden">
+                <a href="#reviews" class="pdp-tile">
+                  <Icon name="gravity-ui:star-fill" class="size-[22px] shrink-0 text-rating" />
+                  <span class="min-w-0">
+                    <span class="block text-base font-extrabold">
+                      {{ (product.avg_rating ?? 0).toFixed(1) }}
                     </span>
+                    <span class="block text-xs font-semibold text-primary">{{ reviewCountLabel }}</span>
+                  </span>
+                </a>
+                <a href="#questions" class="pdp-tile">
+                  <Icon name="lucide:message-circle" class="size-[22px] shrink-0 text-primary" />
+                  <span class="min-w-0">
+                    <span class="block text-base font-extrabold">{{ questionsCount }}</span>
+                    <span class="block text-xs font-semibold text-primary">{{ questionsCountLabel }}</span>
+                  </span>
+                </a>
+              </div>
 
-                    <NuxtLink
-                      v-for="variant in colorVariants"
-                      :key="variant.id"
-                      :to="`/catalog/products/${variant.slug}`"
-                      class="pdp-variant"
-                      :class="{ 'pdp-variant--out': variant.stock_quantity <= 0 }"
-                      :aria-label="`Вариант ${variant.slug}`"
-                    >
-                      <ProgressiveImage
-                        v-if="variant.image_url"
-                        :src="getVariantUrl(BUCKET_NAME_PRODUCT, variant.image_url, 'sm')"
-                        :blur-data-url="variant.blur_placeholder"
-                        :alt="`Вариант ${variant.slug}`"
-                        object-fit="cover"
-                        placeholder-type="lqip"
-                        class="size-full rounded-[9px]"
-                      />
-                      <span v-if="variant.stock_quantity <= 0" class="pdp-variant-strike" />
-                    </NuxtLink>
-                  </div>
+              <!-- Цветовые варианты -->
+              <div v-if="colorVariants && colorVariants.length > 0" class="mt-4">
+                <span class="mb-2 block text-[13px] font-semibold text-muted-foreground">
+                  Другие варианты:
+                </span>
+                <div class="flex flex-wrap gap-2.5">
+                  <span
+                    v-if="product.product_images?.[0]"
+                    class="pdp-variant pdp-variant--active"
+                    aria-current="true"
+                  >
+                    <ProgressiveImage
+                      :src="getVariantUrl(BUCKET_NAME_PRODUCT, product.product_images[0].image_url, 'sm')"
+                      :blur-data-url="product.product_images[0].blur_placeholder"
+                      :alt="product.name"
+                      object-fit="cover"
+                      placeholder-type="lqip"
+                      class="size-full rounded-[9px]"
+                    />
+                  </span>
+
+                  <NuxtLink
+                    v-for="variant in colorVariants"
+                    :key="variant.id"
+                    :to="`/catalog/products/${variant.slug}`"
+                    class="pdp-variant"
+                    :class="{ 'pdp-variant--out': variant.stock_quantity <= 0 }"
+                    :aria-label="`Вариант ${variant.slug}`"
+                  >
+                    <ProgressiveImage
+                      v-if="variant.image_url"
+                      :src="getVariantUrl(BUCKET_NAME_PRODUCT, variant.image_url, 'sm')"
+                      :blur-data-url="variant.blur_placeholder"
+                      :alt="`Вариант ${variant.slug}`"
+                      object-fit="cover"
+                      placeholder-type="lqip"
+                      class="size-full rounded-[9px]"
+                    />
+                    <span v-if="variant.stock_quantity <= 0" class="pdp-variant-strike" />
+                  </NuxtLink>
                 </div>
+              </div>
 
-                <!-- Наличие -->
-                <div class="mt-4 flex items-center gap-2 text-sm font-semibold">
-                  <template v-if="product.stock_quantity > 0">
-                    <Icon name="lucide:circle-check-big" class="size-[18px] text-success" />
-                    <span class="text-success">В наличии</span>
-                    <span class="text-[13px] font-medium text-muted-foreground">
-                      · осталось {{ product.stock_quantity }} шт.
-                    </span>
-                  </template>
-                  <template v-else>
-                    <Icon name="lucide:circle-x" class="size-[18px] text-destructive" />
-                    <span class="text-destructive">Нет в наличии</span>
-                  </template>
-                </div>
+              <!-- Наличие -->
+              <div class="mt-4 flex items-center gap-2 text-sm font-semibold">
+                <template v-if="product.stock_quantity > 0">
+                  <Icon name="lucide:circle-check-big" class="size-[18px] text-success" />
+                  <span class="text-success">В наличии</span>
+                  <span class="text-[13px] font-medium text-muted-foreground">
+                    · осталось {{ product.stock_quantity }} шт.
+                  </span>
+                </template>
+                <template v-else>
+                  <Icon name="lucide:circle-x" class="size-[18px] text-destructive" />
+                  <span class="text-destructive">Нет в наличии</span>
+                </template>
+              </div>
 
-                <!-- Покупка. На мобильных её роль играет фиксированная панель внизу -->
+              <!-- Покупка. На мобильных её роль играет фиксированная панель внизу.
+                     ClientOnly: количество в корзине и признак «в избранном»
+                     восстанавливаются из localStorage — на сервере их знать неоткуда. -->
+              <ClientOnly>
                 <div class="mt-[18px] hidden lg:block">
                   <template v-if="product.stock_quantity > 0">
                     <div v-if="mainItemInCart" class="pdp-stepper mb-2.5">
@@ -1368,208 +1377,217 @@ watchEffect(() => {
                     {{ isWishlisted ? 'В избранном' : 'В избранное' }}
                   </button>
                 </div>
+              </ClientOnly>
 
-                <!-- Аксессуары (батарейки и подарочная упаковка) -->
+              <!-- Аксессуары: список приходит через useQuery, без SSR-гидратации -->
+              <ClientOnly>
                 <AccessoriesBlock
                   v-model:selected-ids="selectedAccessoryIds"
                   :accessories="accessories || []"
                   :loading="accessoriesLoading"
                   flat
                 />
+              </ClientOnly>
 
-                <!-- Преимущества магазина -->
-                <div class="mt-3.5 hidden grid-cols-2 gap-2.5 lg:grid">
-                  <div v-for="perk in PERKS" :key="perk.text" class="pdp-perk">
-                    <Icon :name="perk.icon" class="size-5 shrink-0 text-primary" />
-                    <span class="text-[12.5px] font-semibold leading-tight">{{ perk.text }}</span>
-                  </div>
+              <!-- Преимущества магазина -->
+              <div class="mt-3.5 hidden grid-cols-2 gap-2.5 lg:grid">
+                <div v-for="perk in PERKS" :key="perk.text" class="pdp-perk">
+                  <Icon :name="perk.icon" class="size-5 shrink-0 text-primary" />
+                  <span class="text-[12.5px] font-semibold leading-tight">{{ perk.text }}</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            <!-- Способы получения — на десктопе их заменяет блок преимуществ -->
-            <div class="pdp-col-main pdp-card lg:hidden">
-              <h2 class="pdp-card-title mb-1.5">
-                Способы получения
-              </h2>
-              <div v-for="row in PICKUP_ROWS" :key="row.title" class="pdp-pickup-row">
-                <span class="pdp-pickup-icon">
-                  <Icon :name="row.icon" class="size-5 text-primary" />
+          <!-- Способы получения — на десктопе их заменяет блок преимуществ -->
+          <div class="pdp-col-main pdp-card lg:hidden">
+            <h2 class="pdp-card-title mb-1.5">
+              Способы получения
+            </h2>
+            <div v-for="row in PICKUP_ROWS" :key="row.title" class="pdp-pickup-row">
+              <span class="pdp-pickup-icon">
+                <Icon :name="row.icon" class="size-5 text-primary" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm font-bold text-foreground">{{ row.title }}</span>
+                <span class="block text-[12.5px] font-medium text-muted-foreground">{{ row.sub }}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- О ТОВАРЕ -->
+          <div class="pdp-col-main pdp-card">
+            <h2 class="pdp-card-title mb-3">
+              О товаре
+            </h2>
+
+            <div v-if="seoBlocks.length > 0" class="relative">
+              <div :class="isDescriptionExpanded ? '' : 'max-h-[150px] overflow-hidden'">
+                <SEOContentRenderer :blocks="seoBlocks" />
+              </div>
+              <div v-if="!isDescriptionExpanded" class="pdp-desc-fade" />
+              <button
+                type="button"
+                class="pdp-desc-toggle"
+                @click="isDescriptionExpanded = !isDescriptionExpanded"
+              >
+                {{ isDescriptionExpanded ? 'Свернуть' : 'Показать полностью' }}
+                <Icon
+                  :name="isDescriptionExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'"
+                  class="size-4"
+                />
+              </button>
+            </div>
+
+            <!-- Характеристики -->
+            <dl class="mt-5 border-t border-border pt-1.5">
+              <div v-if="brandName" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Бренд
+                </dt>
+                <dd class="pdp-spec-value">
+                  <NuxtLink v-if="brandLink" :to="brandLink" class="text-primary hover:underline">
+                    {{ brandName }}
+                  </NuxtLink>
+                  <span v-else>{{ brandName }}</span>
+                </dd>
+              </div>
+
+              <div v-if="productLineName" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Линейка
+                </dt>
+                <dd class="pdp-spec-value">
+                  <NuxtLink v-if="productLineLink" :to="productLineLink" class="text-primary hover:underline">
+                    {{ productLineName }}
+                  </NuxtLink>
+                  <span v-else>{{ productLineName }}</span>
+                </dd>
+              </div>
+
+              <div v-if="categoryName" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Категория
+                </dt>
+                <dd class="pdp-spec-value">
+                  <NuxtLink v-if="categoryLink" :to="categoryLink" class="text-primary hover:underline">
+                    {{ categoryName }}
+                  </NuxtLink>
+                  <span v-else>{{ categoryName }}</span>
+                </dd>
+              </div>
+
+              <div v-if="ageRangeText" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Рекомендованный возраст
+                </dt>
+                <dd class="pdp-spec-value">
+                  {{ ageRangeText }}
+                </dd>
+              </div>
+
+              <div v-if="product.materials?.name" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Материал
+                </dt>
+                <dd class="pdp-spec-value">
+                  {{ product.materials.name }}
+                </dd>
+              </div>
+
+              <div v-if="product.countries?.name" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Страна производитель
+                </dt>
+                <dd class="pdp-spec-value">
+                  {{ product.countries.name }}
+                </dd>
+              </div>
+
+              <div v-if="hasPieceCountAttribute && product.piece_count" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Количество деталей
+                </dt>
+                <dd class="pdp-spec-value">
+                  {{ product.piece_count }} шт
+                </dd>
+              </div>
+
+              <div v-if="product.sku" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Код товара
+                </dt>
+                <dd class="pdp-spec-value">
+                  {{ product.sku }}
+                </dd>
+              </div>
+
+              <div v-if="product.barcode" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  Штрихкод
+                </dt>
+                <dd class="pdp-spec-value">
+                  {{ product.barcode }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- ЕЩЁ В ЭТИХ КАТЕГОРИЯХ -->
+          <div v-if="moreCategories.length" class="pdp-col-main pdp-card">
+            <h2 class="pdp-card-title mb-3.5">
+              Ещё в этих категориях
+            </h2>
+            <div class="flex flex-col gap-2">
+              <NuxtLink
+                v-for="row in moreCategories"
+                :key="row.key"
+                :to="row.to"
+                class="pdp-more-row"
+              >
+                <span class="pdp-more-icon">
+                  <ProgressiveImage
+                    v-if="row.image"
+                    :src="row.image"
+                    :alt="row.title"
+                    object-fit="contain"
+                    placeholder-type="shimmer"
+                    class="size-[38px]"
+                  />
+                  <Icon v-else :name="row.icon" class="size-5 text-muted-foreground" />
                 </span>
                 <span class="min-w-0 flex-1">
-                  <span class="block text-sm font-bold text-foreground">{{ row.title }}</span>
-                  <span class="block text-[12.5px] font-medium text-muted-foreground">{{ row.sub }}</span>
+                  <span class="block text-[14.5px] font-bold text-foreground">{{ row.title }}</span>
+                  <span class="block text-[12.5px] font-medium text-muted-foreground">{{ row.subtitle }}</span>
                 </span>
-              </div>
+                <Icon name="lucide:chevron-right" class="size-[18px] text-muted-foreground" />
+              </NuxtLink>
             </div>
+          </div>
 
-            <!-- О ТОВАРЕ -->
-            <div class="pdp-col-main pdp-card">
-              <h2 class="pdp-card-title mb-3">
-                О товаре
-              </h2>
-
-              <div v-if="seoBlocks.length > 0" class="relative">
-                <div :class="isDescriptionExpanded ? '' : 'max-h-[150px] overflow-hidden'">
-                  <SEOContentRenderer :blocks="seoBlocks" />
-                </div>
-                <div v-if="!isDescriptionExpanded" class="pdp-desc-fade" />
-                <button
-                  type="button"
-                  class="pdp-desc-toggle"
-                  @click="isDescriptionExpanded = !isDescriptionExpanded"
-                >
-                  {{ isDescriptionExpanded ? 'Свернуть' : 'Показать полностью' }}
-                  <Icon
-                    :name="isDescriptionExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'"
-                    class="size-4"
-                  />
-                </button>
-              </div>
-
-              <!-- Характеристики -->
-              <dl class="mt-5 border-t border-border pt-1.5">
-                <div v-if="brandName" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Бренд
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    <NuxtLink v-if="brandLink" :to="brandLink" class="text-primary hover:underline">
-                      {{ brandName }}
-                    </NuxtLink>
-                    <span v-else>{{ brandName }}</span>
-                  </dd>
-                </div>
-
-                <div v-if="productLineName" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Линейка
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    <NuxtLink v-if="productLineLink" :to="productLineLink" class="text-primary hover:underline">
-                      {{ productLineName }}
-                    </NuxtLink>
-                    <span v-else>{{ productLineName }}</span>
-                  </dd>
-                </div>
-
-                <div v-if="categoryName" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Категория
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    <NuxtLink v-if="categoryLink" :to="categoryLink" class="text-primary hover:underline">
-                      {{ categoryName }}
-                    </NuxtLink>
-                    <span v-else>{{ categoryName }}</span>
-                  </dd>
-                </div>
-
-                <div v-if="ageRangeText" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Рекомендованный возраст
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    {{ ageRangeText }}
-                  </dd>
-                </div>
-
-                <div v-if="product.materials?.name" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Материал
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    {{ product.materials.name }}
-                  </dd>
-                </div>
-
-                <div v-if="product.countries?.name" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Страна производитель
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    {{ product.countries.name }}
-                  </dd>
-                </div>
-
-                <div v-if="hasPieceCountAttribute && product.piece_count" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Количество деталей
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    {{ product.piece_count }} шт
-                  </dd>
-                </div>
-
-                <div v-if="product.sku" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Код товара
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    {{ product.sku }}
-                  </dd>
-                </div>
-
-                <div v-if="product.barcode" class="pdp-spec-row">
-                  <dt class="pdp-spec-label">
-                    Штрихкод
-                  </dt>
-                  <dd class="pdp-spec-value">
-                    {{ product.barcode }}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <!-- ЕЩЁ В ЭТИХ КАТЕГОРИЯХ -->
-            <div v-if="moreCategories.length" class="pdp-col-main pdp-card">
-              <h2 class="pdp-card-title mb-3.5">
-                Ещё в этих категориях
-              </h2>
-              <div class="flex flex-col gap-2">
-                <NuxtLink
-                  v-for="row in moreCategories"
-                  :key="row.key"
-                  :to="row.to"
-                  class="pdp-more-row"
-                >
-                  <span class="pdp-more-icon">
-                    <ProgressiveImage
-                      v-if="row.image"
-                      :src="row.image"
-                      :alt="row.title"
-                      object-fit="contain"
-                      placeholder-type="shimmer"
-                      class="size-[38px]"
-                    />
-                    <Icon v-else :name="row.icon" class="size-5 text-muted-foreground" />
-                  </span>
-                  <span class="min-w-0 flex-1">
-                    <span class="block text-[14.5px] font-bold text-foreground">{{ row.title }}</span>
-                    <span class="block text-[12.5px] font-medium text-muted-foreground">{{ row.subtitle }}</span>
-                  </span>
-                  <Icon name="lucide:chevron-right" class="size-[18px] text-muted-foreground" />
-                </NuxtLink>
-              </div>
-            </div>
-
-            <!-- ОТЗЫВЫ -->
-            <div class="pdp-col-main">
+          <!-- ОТЗЫВЫ. ClientOnly: список тянется useQuery уже в браузере -->
+          <div class="pdp-col-main">
+            <ClientOnly>
               <ProductReviews
                 v-if="product.id"
                 :product-id="product.id"
                 :avg-rating="product.avg_rating ?? 0"
                 :review-count="product.review_count ?? 0"
               />
-            </div>
-
-            <!-- ВОПРОСЫ -->
-            <div class="pdp-col-main">
-              <ProductQuestions v-if="product.id" :product-id="product.id" />
-            </div>
+            </ClientOnly>
           </div>
 
-          <!-- ПОХОЖИЕ ТОВАРЫ -->
+          <!-- ВОПРОСЫ. Тоже useQuery внутри -->
+          <div class="pdp-col-main">
+            <ClientOnly>
+              <ProductQuestions v-if="product.id" :product-id="product.id" />
+            </ClientOnly>
+          </div>
+        </div>
+
+        <!-- ПОХОЖИЕ ТОВАРЫ. ClientOnly: similarProducts приходит useQuery,
+               на сервере пусто, и без обёртки разметка разъезжается при гидратации -->
+        <ClientOnly>
           <div v-if="similarProductsLoading || similarGridProducts.length" class="mt-9">
             <div class="mb-[18px] flex items-baseline gap-3">
               <h2 class="text-[22px] font-extrabold tracking-tight lg:text-3xl">
@@ -1598,9 +1616,12 @@ watchEffect(() => {
               </div>
             </div>
           </div>
-        </div>
+        </ClientOnly>
+      </div>
 
-        <!-- Фиксированная панель покупки (мобильные) -->
+      <!-- Фиксированная панель покупки (мобильные).
+             ClientOnly: содержимое зависит от корзины, она из localStorage -->
+      <ClientOnly>
         <div
           class="pdp-buybar flex items-center gap-3 lg:hidden"
           :class="{ 'pdp-buybar--down': !isNavVisible }"
@@ -1655,24 +1676,20 @@ watchEffect(() => {
             <StockAlertButton :product-id="product.id" />
           </div>
         </div>
-      </div>
+      </ClientOnly>
+    </div>
 
-      <div v-else class="text-center py-20">
-        <h1 class="text-2xl font-bold">
-          Товар не найден
-        </h1>
-        <p class="text-muted-foreground mt-2">
-          Возможно, товар был удален или ссылка неверна.
-        </p>
-        <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
-          ← Вернуться в каталог
-        </NuxtLink>
-      </div>
-
-      <template #fallback>
-        <ProductDetailSkeleton />
-      </template>
-    </ClientOnly>
+    <div v-else class="text-center py-20">
+      <h1 class="text-2xl font-bold">
+        Товар не найден
+      </h1>
+      <p class="text-muted-foreground mt-2">
+        Возможно, товар был удален или ссылка неверна.
+      </p>
+      <NuxtLink to="/catalog" class="inline-block mt-4 text-primary hover:underline">
+        ← Вернуться в каталог
+      </NuxtLink>
+    </div>
   </div>
 </template>
 
