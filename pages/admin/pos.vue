@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { OfflineSaleResult, PosProduct } from '@/stores/adminStore/adminPosStore'
 import { useDebounceFn } from '@vueuse/core'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminPosStore } from '@/stores/adminStore/adminPosStore'
 
 definePageMeta({
   layout: 'admin',
 })
+
+const { getVariantUrl } = useSupabaseStorage()
 
 const store = useAdminPosStore()
 const {
@@ -64,10 +68,14 @@ function formatPrice(price: number) {
   return `${new Intl.NumberFormat('ru-RU').format(price)} ₸`
 }
 
+/*
+ * Вариант `sm`, а не голый public URL: в `image_url` (он приезжает из
+ * `product_images` через search_products_for_pos) лежит путь без расширения,
+ * самого файла по нему в бакете нет — залиты только `_sm/_md/_lg.webp`.
+ * Прежняя ссылка отдавала 400, и в кассе вместо товаров были заглушки.
+ */
 function getImageUrl(product: PosProduct): string | null {
-  return product.image_url
-    ? useSupabaseClient().storage.from('product-images').getPublicUrl(product.image_url).data.publicUrl
-    : null
+  return getVariantUrl(BUCKET_NAME_PRODUCT, product.image_url, 'sm')
 }
 </script>
 
