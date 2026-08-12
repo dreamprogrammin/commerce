@@ -422,7 +422,11 @@ function getImageAlt(image: ProductImageRow, index: number): string {
     cursor: grab;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    touch-action: pan-y pinch-zoom;
+    /* pan-x обязателен: без него браузер отдаёт тач только вертикали, и
+       свайп по кадру не листает галерею (ленту двигает нативный скролл —
+       onPointerDown намеренно выходит на pointerType === 'touch').
+       pan-y остаётся, иначе кадр во весь экран запирает прокрутку страницы. */
+    touch-action: pan-x pan-y pinch-zoom;
   }
 
   .pg-slider::-webkit-scrollbar {
