@@ -101,20 +101,35 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
    Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
 @layer components {
+  /*
+   * Прячется только сдвигом, БЕЗ анимации opacity.
+   * Стекло живёт на потомке .cmh-pill, а любое промежуточное значение opacity
+   * у этого родителя делает его новым backdrop root — и `backdrop-filter`
+   * внутри перестаёт размывать страницу на все 0.28s перехода. Пилюля
+   * вспыхивала насквозь прозрачной при каждом появлении.
+   *
+   * Ровно та же поломка была у CategoryScrollBar (.csb-bar → .csb-capsule)
+   * и чинится так же: translateY уводит панель за край, visibility снимает
+   * её с фокуса и со скринридера.
+   */
   .cmh-bar {
     position: sticky;
     top: 0;
     z-index: 40;
     padding: 10px 12px 4px;
+    visibility: visible;
     transition:
-      opacity 0.28s ease,
-      transform 0.28s cubic-bezier(0.32, 0.72, 0.33, 1);
+      transform 0.28s cubic-bezier(0.32, 0.72, 0.33, 1),
+      visibility 0s;
   }
 
   .cmh-bar--hidden {
-    opacity: 0;
     pointer-events: none;
     transform: translateY(-140%);
+    visibility: hidden;
+    transition:
+      transform 0.28s cubic-bezier(0.32, 0.72, 0.33, 1),
+      visibility 0s linear 0.28s;
   }
 
   .cmh-pill {
