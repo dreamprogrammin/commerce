@@ -128,7 +128,7 @@ const { data: popularProducts } = useAsyncData('footer-popular-products', async 
             </li>
             <li>
               <NuxtLink
-                to="/profile/favorites"
+                to="/profile/wishlist"
                 class="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Избранное
