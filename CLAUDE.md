@@ -131,7 +131,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 - `brands` - Brand information
 - `orders` / `order_items` - Order management with guest support
 - `profiles` - User profiles with bonus balance
-- `bonuses` - Bonus transaction history (earned/spent/pending)
+- `bonus_transactions` - Bonus transaction history (earned/spent/pending)
 - `attributes` / `attribute_options` - Dynamic product attributes (size, age, color, etc.)
 - `children` - Child profiles for age-based recommendations
 - `wishlist` - Favorite products per user
@@ -150,7 +150,7 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 1. User clicks "Sign in with Google"
 2. Supabase Auth handles OAuth flow
 3. On successful auth, `profiles` table trigger auto-creates profile
-4. Profile includes: `full_name`, `avatar_url`, `bonus_balance`, `role`
+4. Profile includes: `full_name`, `avatar_url`, `active_bonus_balance`, `role`
 
 **Middleware** (`/middleware/auth.global.ts`):
 
@@ -162,11 +162,11 @@ All stores use `pinia-plugin-persistedstate` for localStorage persistence.
 
 **How it works**:
 
-1. Products have `bonus_points` field (earn on purchase)
-2. Users have `bonus_balance` in `profiles` table
-3. Orders track `bonus_spent` and `bonus_earned`
-4. New bonuses have 14-day activation period (`activated_at` column)
-5. Bonuses can be spent as discount during checkout (tracked in `bonuses` table)
+1. Products have `bonus_points_award` field (earn on purchase)
+2. Users have `active_bonus_balance` and `pending_bonus_balance` in `profiles` table
+3. Orders track `bonuses_spent` and `bonuses_awarded`
+4. New bonuses have 14-day activation period (`activation_date` column)
+5. Bonuses can be spent as discount during checkout (tracked in `bonus_transactions` table)
 
 **Important Logic**:
 
