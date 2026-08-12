@@ -446,6 +446,37 @@ export default defineNuxtConfig({
               // страницах (в т.ч. на LCP-критичной главной) не нужен.
               if (id.includes('vue-draggable-next') || id.includes('sortablejs'))
                 return 'vendor-admin-dnd'
+
+              // Ниже — только ЛИСТОВЫЕ библиотеки: их никто не импортирует на
+              // старте приложения, и от порядка инициализации ядра они не
+              // зависят. Именно поэтому их можно безопасно вынести, в отличие
+              // от vue / vue-router / pinia / supabase / reka-ui, попытка
+              // раздробить которые и приводила к ReferenceError (см. ниже).
+              // Каждая нужна одному-двум маршрутам, а лежала в общем чанке и
+              // ехала на все страницы, включая главную.
+
+              // Сжатие картинок при загрузке — только админка (utils/imageOptimizer.ts)
+              if (id.includes('browser-image-compression'))
+                return 'vendor-admin-image'
+              // Работа с таблицами — только админка (components/ui/table)
+              if (id.includes('@tanstack/vue-table'))
+                return 'vendor-admin-table'
+              // lodash-es — только admin/products/ProductForm.vue
+              if (id.includes('lodash'))
+                return 'vendor-admin-lodash'
+              // Транслитерация slug — только админка (utils/slugify.ts)
+              if (id.includes('transliteration') || id.includes('slugify'))
+                return 'vendor-admin-slug'
+              // Конфетти — одна страница: pages/order/success/[id].vue
+              if (id.includes('canvas-confetti'))
+                return 'vendor-confetti'
+              // Маски телефонов — формы чекаута и профиля, не каталог
+              if (id.includes('maska'))
+                return 'vendor-forms'
+              // Санитайзер HTML — composables/useSafeHtml.ts
+              if (id.includes('dompurify'))
+                return 'vendor-sanitize'
+
               // Остальное оставляем в общем вендоре или основном чанке
               // чтобы избежать проблем с порядком инициализации core-библиотек
               return 'vendor'
