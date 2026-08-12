@@ -156,3 +156,35 @@ const STEP_BY_STATUS: Record<OrderStatus, number> = {
 export function orderStatusToStep(status: string): number {
   return STEP_BY_STATUS[normalize(status)] ?? 0
 }
+
+/**
+ * Плашка статуса в списке заказов: короткая подпись, иконка и тон.
+ *
+ * Тонов четыре — столько же, сколько состояний различает макет «Мои заказы»:
+ * отменён, выполнен, доставляется и всё остальное как «в обработке». По тону
+ * же список фильтруется вкладками, поэтому отдельного маппинга под фильтр нет.
+ */
+export type OrderBadgeTone = 'cancelled' | 'done' | 'shipping' | 'processing'
+
+export interface OrderBadge {
+  label: string
+  icon: string
+  tone: OrderBadgeTone
+}
+
+const BADGE_BY_STATUS: Record<OrderStatus, OrderBadge> = {
+  pending: { label: 'В обработке', icon: 'lucide:clock', tone: 'processing' },
+  new: { label: 'В обработке', icon: 'lucide:clock', tone: 'processing' },
+  // «Подтверждён» тон делит с обработкой, но подпись своя: покупателю важно
+  // видеть, что заказ приняли, а не просто «крутится где-то в системе».
+  confirmed: { label: 'Подтверждён', icon: 'lucide:clock', tone: 'processing' },
+  processing: { label: 'В обработке', icon: 'lucide:clock', tone: 'processing' },
+  shipped: { label: 'Доставляется', icon: 'lucide:truck', tone: 'shipping' },
+  delivered: { label: 'Выполнен', icon: 'lucide:check-circle', tone: 'done' },
+  completed: { label: 'Выполнен', icon: 'lucide:check-circle', tone: 'done' },
+  cancelled: { label: 'Отменён', icon: 'lucide:x-circle', tone: 'cancelled' },
+}
+
+export function orderStatusBadge(status: string): OrderBadge {
+  return BADGE_BY_STATUS[normalize(status)] ?? BADGE_BY_STATUS.new
+}

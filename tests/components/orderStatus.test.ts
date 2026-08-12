@@ -5,6 +5,7 @@ import OrderTracker from '@/components/order/OrderTracker.vue'
 import {
   ORDER_STEPS,
   ORDER_TRACK_LABELS,
+  orderStatusBadge,
   orderStatusInfo,
   orderStatusToSegment,
   orderStatusToStep,
@@ -50,6 +51,29 @@ describe('представление статуса заказа', () => {
       expect(orderStatusInfo('completed')).toEqual(orderStatusInfo('delivered'))
       expect(orderStatusToSegment('pending')).toBe(orderStatusToSegment('new'))
       expect(orderStatusToStep('completed')).toBe(orderStatusToStep('delivered'))
+    })
+  })
+
+  describe('плашка в списке заказов', () => {
+    it('тон отделяет отменённые, выполненные и доставку от обработки', () => {
+      expect(orderStatusBadge('cancelled').tone).toBe('cancelled')
+      expect(orderStatusBadge('delivered').tone).toBe('done')
+      expect(orderStatusBadge('shipped').tone).toBe('shipping')
+
+      // По этим тонам вкладка «Активные» собирает свой список
+      for (const status of ['new', 'pending', 'confirmed', 'processing'])
+        expect(orderStatusBadge(status).tone, status).toBe('processing')
+    })
+
+    it('«Подтверждён» не сливается с «В обработке» по подписи', () => {
+      expect(orderStatusBadge('confirmed').label).toBe('Подтверждён')
+      expect(orderStatusBadge('processing').label).toBe('В обработке')
+    })
+
+    it('синонимы статусов дают одну плашку, неизвестный не роняет', () => {
+      expect(orderStatusBadge('completed')).toEqual(orderStatusBadge('delivered'))
+      expect(orderStatusBadge('pending')).toEqual(orderStatusBadge('new'))
+      expect(orderStatusBadge('какая-то-ерунда').tone).toBe('processing')
     })
   })
 
