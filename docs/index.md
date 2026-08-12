@@ -35,21 +35,22 @@
 
 ### SEO и оптимизация
 
-| Документ                                                                 | Описание                                 | Статус       |
-| ------------------------------------------------------------------------ | ---------------------------------------- | ------------ |
-| **[IMAGE_SEO_COMPLETE.md](./IMAGE_SEO_COMPLETE.md)**                     | Полная документация по SEO изображений   | ⭐ Основной  |
-| [IMAGE_SEO_QUICKSTART.md](./IMAGE_SEO_QUICKSTART.md)                     | Быстрый старт (2 минуты)                 | 📝 Гайд      |
-| [IMAGE_SEO_CHECKLIST.md](./IMAGE_SEO_CHECKLIST.md)                       | Чеклист внедрения                        | ✅ Чеклист   |
-| [IMAGE_SEO_FINAL_CHECKLIST.md](./IMAGE_SEO_FINAL_CHECKLIST.md)           | Финальный чеклист                        | ✅ Чеклист   |
-| [IMAGE_SEO_TEST_REPORT.md](./IMAGE_SEO_TEST_REPORT.md)                   | Отчет о тестировании                     | 📊 Отчет     |
-| [IMAGE_SEO_DEPLOYMENT_READY.md](./IMAGE_SEO_DEPLOYMENT_READY.md)         | Готовность к деплою                      | 🚀 Статус    |
-| **[SEO_AUTOMATION.md](./SEO_AUTOMATION.md)**                             | Автоматизация SEO для категорий + бренды | 🤖 Основной  |
-| [SEO_AUTOMATION_QUICKSTART.md](./SEO_AUTOMATION_QUICKSTART.md)           | Быстрый старт (2 минуты)                 | 📝 Гайд      |
-| [SEO_BRAND_AUTOMATION_CHANGELOG.md](./SEO_BRAND_AUTOMATION_CHANGELOG.md) | Полный Changelog - Что сделано           | 📋 Changelog |
-| **[SEO_TEXT_PROTECTION.md](./SEO_TEXT_PROTECTION.md)**                   | Защита уникальных SEO-текстов            | 🛡️ Важно     |
-| [SEO_TEXT_PROTECTION_CHANGELOG.md](./SEO_TEXT_PROTECTION_CHANGELOG.md)   | Changelog защиты текстов                 | 📋 Changelog |
-| [SEO_TEXT_PROTECTION_QUICKSTART.md](./SEO_TEXT_PROTECTION_QUICKSTART.md) | Быстрый старт защиты                     | 📝 Гайд      |
-| [SEO_TEXT_PROTECTION_SUMMARY.md](./SEO_TEXT_PROTECTION_SUMMARY.md)       | Краткая сводка                           | 📄 Сводка    |
+| Документ                                                                 | Описание                                               | Статус       |
+| ------------------------------------------------------------------------ | ------------------------------------------------------ | ------------ |
+| **[SEO_AUDIT_2026_08_12.md](./SEO_AUDIT_2026_08_12.md)**                 | Аудит dev.uhti.kz: находки, что починено, что осталось | 📊 Отчет     |
+| **[IMAGE_SEO_COMPLETE.md](./IMAGE_SEO_COMPLETE.md)**                     | Полная документация по SEO изображений                 | ⭐ Основной  |
+| [IMAGE_SEO_QUICKSTART.md](./IMAGE_SEO_QUICKSTART.md)                     | Быстрый старт (2 минуты)                               | 📝 Гайд      |
+| [IMAGE_SEO_CHECKLIST.md](./IMAGE_SEO_CHECKLIST.md)                       | Чеклист внедрения                                      | ✅ Чеклист   |
+| [IMAGE_SEO_FINAL_CHECKLIST.md](./IMAGE_SEO_FINAL_CHECKLIST.md)           | Финальный чеклист                                      | ✅ Чеклист   |
+| [IMAGE_SEO_TEST_REPORT.md](./IMAGE_SEO_TEST_REPORT.md)                   | Отчет о тестировании                                   | 📊 Отчет     |
+| [IMAGE_SEO_DEPLOYMENT_READY.md](./IMAGE_SEO_DEPLOYMENT_READY.md)         | Готовность к деплою                                    | 🚀 Статус    |
+| **[SEO_AUTOMATION.md](./SEO_AUTOMATION.md)**                             | Автоматизация SEO для категорий + бренды               | 🤖 Основной  |
+| [SEO_AUTOMATION_QUICKSTART.md](./SEO_AUTOMATION_QUICKSTART.md)           | Быстрый старт (2 минуты)                               | 📝 Гайд      |
+| [SEO_BRAND_AUTOMATION_CHANGELOG.md](./SEO_BRAND_AUTOMATION_CHANGELOG.md) | Полный Changelog - Что сделано                         | 📋 Changelog |
+| **[SEO_TEXT_PROTECTION.md](./SEO_TEXT_PROTECTION.md)**                   | Защита уникальных SEO-текстов                          | 🛡️ Важно     |
+| [SEO_TEXT_PROTECTION_CHANGELOG.md](./SEO_TEXT_PROTECTION_CHANGELOG.md)   | Changelog защиты текстов                               | 📋 Changelog |
+| [SEO_TEXT_PROTECTION_QUICKSTART.md](./SEO_TEXT_PROTECTION_QUICKSTART.md) | Быстрый старт защиты                                   | 📝 Гайд      |
+| [SEO_TEXT_PROTECTION_SUMMARY.md](./SEO_TEXT_PROTECTION_SUMMARY.md)       | Краткая сводка                                         | 📄 Сводка    |
 
 ### Производительность и кеширование
 
