@@ -28,6 +28,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+import { buildProductTitle } from '@/utils/seoTitle'
 
 definePageMeta({ layout: 'product-detail' })
 
@@ -472,27 +473,11 @@ const metaTitle = computed(() => {
   if (product.value.seo_title)
     return product.value.seo_title
 
-  // Генерируем умный title: [Товар] [свойство] — от [цена] ₸ | Uhti.kz
-  const parts = []
-
-  // 1. Название товара
-  let name = product.value.name
-
-  // 2. Добавляем ключевое свойство (материал)
-  if (product.value.materials?.name) {
-    name += ` ${product.value.materials.name.toLowerCase()}`
-  }
-
-  parts.push(name)
-
-  // 3. Цена
-  const price = product.value.final_price || product.value.price
-  parts.push(`от ${formatPrice(price)} ₸`)
-
-  // 4. Бренд
-  parts.push('Uhti.kz')
-
-  return parts.join(' — ')
+  // Раньше здесь склеивалось «[название] [материал] — от [цена] ₸ — Uhti.kz»,
+  // и ни один из 172 товаров не помещался в 60 знаков: средняя длина 125,
+  // максимум 162. В выдаче обрезалось больше половины, включая модель.
+  // Теперь — обрезанное по слову название и бренд, см. utils/seoTitle.ts.
+  return buildProductTitle(product.value.name)
 })
 
 const ageRangeText = computed(() => {
