@@ -2,16 +2,32 @@
 // BreadcrumbList JSON-LD
 useBreadcrumbSchema([{ name: 'О нас' }])
 
-useHead({
-  title: 'О нас — uhti.kz',
-  meta: [
-    {
-      name: 'description',
-      content:
-        'Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.',
-    },
-    { name: 'robots', content: 'index, follow' },
-  ],
+// Страница отдавала только title, description и robots — ни одного og-тега.
+// При шаринге в мессенджеры и соцсети карточка выходила пустой: ни заголовка,
+// ни картинки. Остальные статические страницы (returns.vue, privacy-policy.vue)
+// уже описаны через useSeoMeta, здесь то же самое плюс og:image.
+const TITLE = 'О нас — uhti.kz'
+const DESCRIPTION
+  = 'Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.'
+
+// og:image здесь намеренно не объявляется. Генератор картинок сейчас отдаёт
+// 500 на всём сайте (satori падает на разметке components/OgImage/*), так что
+// ссылка вела бы на битый файл. Разбирается отдельной веткой; как починится —
+// сюда добавится defineOgImageComponent.
+
+useSeoMeta({
+  title: TITLE,
+  description: DESCRIPTION,
+  ogTitle: TITLE,
+  ogDescription: DESCRIPTION,
+  ogType: 'website',
+  ogUrl: 'https://uhti.kz/about',
+  ogSiteName: 'Ухтышка',
+  ogLocale: 'ru_RU',
+  twitterCard: 'summary',
+  twitterTitle: TITLE,
+  twitterDescription: DESCRIPTION,
+  robots: 'index, follow',
 })
 </script>
 
