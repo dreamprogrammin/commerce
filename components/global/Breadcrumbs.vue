@@ -57,9 +57,23 @@ const currentItem = computed(() => {
             <span>Главная</span>
           </NuxtLink>
         </li>
-        <li v-for="item in items" :key="item.id" class="flex items-center">
+        <li v-for="(item, index) in items" :key="item.id" class="flex items-center">
           <ChevronRight class="h-4 w-4 mx-1 text-muted-foreground/50" />
-          <NuxtLink :to="item.href" class="hover:text-primary transition-colors">
+
+          <!-- Последняя крошка — текущая страница, ссылкой быть не должна.
+               На карточке товара href у неё не задан вовсе ([slug].vue пушит
+               `{ id, name }` без href), и в разметку уходил <a> без адреса:
+               Lighthouse валил «Links are not crawlable», SEO 92 вместо 100.
+               Мобильная ветка ниже отдавала <span> с самого начала. -->
+          <span
+            v-if="index === items.length - 1"
+            aria-current="page"
+            class="text-foreground font-medium"
+          >
+            {{ item.name }}
+          </span>
+
+          <NuxtLink v-else :to="item.href" class="hover:text-primary transition-colors">
             {{ item.name }}
           </NuxtLink>
         </li>
@@ -110,6 +124,7 @@ const currentItem = computed(() => {
             <!-- Последняя категория (текущая) -->
             <span
               v-if="index === items.length - 1"
+              aria-current="page"
               class="text-foreground/80 font-medium whitespace-nowrap"
             >
               {{ item.name }}
