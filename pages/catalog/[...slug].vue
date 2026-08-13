@@ -1390,7 +1390,6 @@ const ogImageDescription = computed(() => {
 defineOgImageComponent('OgImageCatalog', {
   title: title.value,
   description: ogImageDescription.value,
-  categoryImage: categoryOgImageUrl.value,
   productsCount: displayedProducts.value.length || undefined,
 })
 

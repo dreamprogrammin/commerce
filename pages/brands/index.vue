@@ -63,8 +63,15 @@ useSeoMeta({
   description: 'Широкий выбор брендов детских игрушек и товаров для детей. LEGO, Mattel, Hasbro и другие популярные производители. Доставка по Казахстану.',
   ogTitle: `Все бренды игрушек | ${siteName}`,
   ogDescription: 'Широкий выбор брендов детских игрушек и товаров для детей. LEGO, Mattel, Hasbro и другие популярные производители.',
-  ogImage: `${siteUrl}/og-brands.jpeg`,
   ogUrl: `${siteUrl}/brands`,
+})
+
+// Прежде тут стояла ссылка на /og-brands.jpeg, которого в public/ нет —
+// отдавался 404. Картинку рисует тот же генератор, что и для категорий.
+defineOgImageComponent('OgImageCatalog', {
+  title: 'Все бренды игрушек',
+  description: 'LEGO, Mattel, Hasbro и другие производители',
+  kicker: 'БРЕНДЫ',
 })
 
 useSchemaOrg([
