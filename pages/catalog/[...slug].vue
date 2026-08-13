@@ -2128,12 +2128,13 @@ else {
 
     <!-- Отзывы категории -->
     <ClientOnly>
+      <!-- Показывать или нет — решает сам компонент: у него есть данные по всей
+           категории, а categoryStats считает только по текущей странице выдачи,
+           из-за чего блок то появлялся, то исчезал при смене страницы -->
       <CategoryReviews
-        v-if="currentCategory && categoryStats.reviews > 0"
+        v-if="currentCategory"
         :category-id="currentCategory.id"
         :category-name="currentCategory.name"
-        :total-reviews="categoryStats.reviews"
-        :average-rating="categoryStats.rating"
         class="mt-8"
       />
     </ClientOnly>

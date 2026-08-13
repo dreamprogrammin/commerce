@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '#components'
+import { formatAverageRating, summarizeRatingDistribution } from '@/utils/ratingDistribution'
 
 interface CategoryReview {
   review_id: string
@@ -11,11 +12,17 @@ interface CategoryReview {
   product_slug: string
 }
 
+/*
+ * totalReviews и averageRating сюда больше не передают. Раньше они приходили
+ * из categoryStats родителя — суммы review_count по товарам ТЕКУЩЕЙ страницы
+ * выдачи. Из-за этого блок то показывался, то исчезал при смене страницы или
+ * фильтра, а проценты в распределении считались от страничного числа при
+ * категорийном числителе. Теперь и итог, и средняя выводятся из того же
+ * распределения, что рисует шкалу, — источник один.
+ */
 interface Props {
   categoryId: string
   categoryName: string
-  totalReviews: number
-  averageRating: string
 }
 
 const props = defineProps<Props>()
@@ -80,26 +87,24 @@ watch(
   },
 )
 
-// Распределение оценок (реальные данные из базы)
-const ratingDistribution = computed(() => {
-  const total = props.totalReviews
-  if (total === 0)
-    return []
+// Сводка по всей категории: и шкала, и итог, и средняя — из одного массива
+const summary = computed(() => summarizeRatingDistribution(ratingDistributionData.value))
+const ratingDistribution = computed(() => summary.value.buckets)
+const totalReviews = computed(() => summary.value.total)
+const averageRating = computed(() => formatAverageRating(summary.value.average))
 
-  // Создаем массив для всех оценок от 5 до 1
-  const distribution = [5, 4, 3, 2, 1].map((stars) => {
-    const item = ratingDistributionData.value.find(d => d.stars === stars)
-    const count = item?.count || 0
-    const percentage = total > 0 ? Math.round((count / total) * 100) : 0
-    return { stars, count, percentage }
-  })
-
-  return distribution
-})
+/*
+ * Пусто ли — решает сам компонент, а не родитель: только здесь есть
+ * категорийные данные. Пока грузим, ничего не показываем, чтобы блок
+ * не мигал на страницах без отзывов.
+ */
+const hasReviews = computed(() => !isLoading.value && totalReviews.value > 0)
 </script>
 
 <template>
-  <section class="bg-white dark:bg-card rounded-xl p-6 lg:p-8 border shadow-sm">
+  <!-- v-if внутри компонента, а не у родителя: категорийные данные есть
+       только здесь, родитель знал лишь про текущую страницу выдачи -->
+  <section v-if="hasReviews" class="bg-white dark:bg-card rounded-xl p-6 lg:p-8 border shadow-sm">
     <h2 class="text-2xl font-bold mb-6">
       Отзывы о товарах в категории "{{ categoryName }}"
     </h2>
