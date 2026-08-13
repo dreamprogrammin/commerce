@@ -70,10 +70,26 @@ onMounted(async () => {
     shouldMountModals.value = true
   })
 
-  // Откладываем подписку на realtime — не критично при первом рендере
-  requestIdleCallback(() => {
-    subscribeAll()
-  })
+  /*
+   * Realtime заказов нужен только администратору, поэтому ждём, пока станет
+   * известна роль, а не подписываемся сразу. Профиль подгружается отложенно
+   * (см. onAuthStateChange выше), так что на момент mount роль ещё неизвестна
+   * даже у вошедшего админа — отсюда watch, а не разовая проверка.
+   *
+   * `wasAdmin` в условии не для красоты: с immediate первый вызов приходит с
+   * undefined, и без этой проверки каждый гость на каждой странице получал бы
+   * отписку от каналов, которых у него нет.
+   */
+  watch(
+    () => profileStore.isAdmin,
+    (isAdmin, wasAdmin) => {
+      if (isAdmin)
+        requestIdleCallback(() => subscribeAll())
+      else if (wasAdmin)
+        unsubscribe()
+    },
+    { immediate: true },
+  )
 
   // Defer telegram modal check
   requestIdleCallback(() => {
