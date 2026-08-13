@@ -240,11 +240,18 @@ function getCategoryColor(index: number): string {
          ========================================== -->
     <div class="hidden lg:block pb-20">
       <!-- Шапка -->
+      <!-- Заголовок этой шапки намеренно не первого уровня: единственный
+           такой заголовок страницы живёт в CatalogMobileSections. Оба блока
+           рендерятся в разметку всегда (прячет их CSS, а не v-if), поэтому
+           прежде краулер получал два одинаковых «Каталог» на одной странице.
+           Оставлен видимый мобильный: заголовок, совпадающий с тем, что
+           человек видит на экране, — сигнал сильнее скрытого. Сама шапка
+           под sr-only с редизайна, так что на вид ничего не меняется. -->
       <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b sr-only">
         <div class="px-4 py-3">
-          <h1 class="text-2xl font-bold">
+          <p class="text-2xl font-bold">
             Каталог
-          </h1>
+          </p>
         </div>
       </div>
 
