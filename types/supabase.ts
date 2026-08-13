@@ -2818,7 +2818,7 @@ export interface Database {
           product_name: string
           product_slug: string
           rating: number
-          review_id: number
+          review_id: string
           text: string
           user_name: string
         }[]
