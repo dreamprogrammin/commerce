@@ -34,6 +34,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { clampDescription, composeCategoryLead } from '@/utils/seoDescription'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
 // DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
@@ -1077,39 +1078,15 @@ const metaDescription = computed(() => {
   }
 
   if (currentCategory.value?.meta_description) {
-    let cleanText = currentCategory.value.meta_description
-      .replace(/<[^>]*>/g, '')
-      .trim()
-
-    const hasBrandMentions = topBrands.value.some(brand =>
-      cleanText.toLowerCase().includes(brand.toLowerCase()),
+    // Вводная часть: текст категории плюс ходовые бренды. Раньше тут стояли
+    // две обрезки через substring, и обе рубили посреди слова — в выдаче это
+    // читалось как «…оружие и транспорт дл», «…широкий выбо», «…помощники в ».
+    // Логика с тестами лежит в utils/seoDescription.ts.
+    // Хвостовая точка снимается там же, отдельная проверка больше не нужна.
+    const cleanText = composeCategoryLead(
+      currentCategory.value.meta_description,
+      topBrands.value,
     )
-
-    if (!hasBrandMentions && topBrands.value.length > 0) {
-      const firstSentenceEnd = cleanText.search(/[.!?]\s/)
-      if (firstSentenceEnd > 0 && firstSentenceEnd < 60) {
-        const firstPart = cleanText.substring(0, firstSentenceEnd + 1)
-        const brandsText = ` (${topBrands.value.join(', ')})`
-        cleanText
-          = firstPart + brandsText + cleanText.substring(firstSentenceEnd + 1)
-      }
-      else {
-        cleanText = `${cleanText.substring(0, 50)} (${topBrands.value.join(', ')})`
-      }
-    }
-
-    const maxBaseLength = 80
-    if (cleanText.length > maxBaseLength) {
-      const cutPoint = cleanText.lastIndexOf(' ', maxBaseLength)
-      cleanText
-        = cutPoint > 50
-          ? cleanText.substring(0, cutPoint)
-          : cleanText.substring(0, maxBaseLength)
-    }
-
-    if (cleanText.endsWith('.')) {
-      cleanText = cleanText.slice(0, -1)
-    }
 
     const parts = [cleanText]
 
@@ -1131,8 +1108,7 @@ const metaDescription = computed(() => {
 
     parts.push('Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!')
 
-    const result = parts.join('. ')
-    return result.length > 165 ? `${result.substring(0, 162)}...` : result
+    return clampDescription(parts.join('. '))
   }
 
   if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {

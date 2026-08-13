@@ -1,5 +1,6 @@
 import type { Database } from '@/types'
 import { FREE_SHIPPING_LABEL } from '@/constants/homePlaceholders'
+import { clampDescription } from '@/utils/seoDescription'
 
 interface SeoTemplateData {
   brandName: string
@@ -88,10 +89,8 @@ export function useSeoTemplates() {
     // Доставка
     parts.push(`Доставка ${city} за 1 день`)
 
-    const snippet = parts.join('. ')
-
-    // Обрезаем до 165 символов
-    return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
+    // Обрезка до 165 знаков — по границе слова, см. utils/seoDescription.ts
+    return clampDescription(parts.join('. '))
   }
 
   /**
@@ -117,8 +116,7 @@ export function useSeoTemplates() {
     // Доставка и призыв
     parts.push(`Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы!`)
 
-    const result = parts.join('. ')
-    return result.length > 165 ? `${result.substring(0, 162)}...` : result
+    return clampDescription(parts.join('. '))
   }
 
   /**
