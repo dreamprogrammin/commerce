@@ -125,15 +125,20 @@ useHead(() => {
       { property: 'og:type', content: 'website' },
       { property: 'og:site_name', content: siteName },
       { property: 'og:locale', content: 'ru_RU' },
-      { property: 'og:image', content: `${siteUrl}/og-catalog.jpeg` },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: metaTitle },
       { name: 'twitter:description', content: metaDescription },
-      { name: 'twitter:image', content: `${siteUrl}/og-catalog.jpeg` },
       { name: 'robots', content: 'index, follow' },
     ],
     script: schemas,
   }
+})
+
+// Картинку для шаринга рисует генератор. Прежде здесь стояла ссылка на
+// /og-catalog.jpeg, которого в public/ нет вовсе — отдавался 404.
+defineOgImageComponent('OgImageCatalog', {
+  title: 'Каталог игрушек',
+  description: 'Конструкторы, куклы, машинки, развивающие игры и творчество',
 })
 
 useRobotsRule({

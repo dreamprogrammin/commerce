@@ -10,10 +10,11 @@ const TITLE = 'О нас — uhti.kz'
 const DESCRIPTION
   = 'Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.'
 
-// og:image здесь намеренно не объявляется. Генератор картинок сейчас отдаёт
-// 500 на всём сайте (satori падает на разметке components/OgImage/*), так что
-// ссылка вела бы на битый файл. Разбирается отдельной веткой; как починится —
-// сюда добавится defineOgImageComponent.
+defineOgImageComponent('OgImageCatalog', {
+  title: 'О нас',
+  description: 'Локальный магазин игрушек в Алматы со своим складом',
+  kicker: 'О КОМПАНИИ',
+})
 
 useSeoMeta({
   title: TITLE,
@@ -24,7 +25,7 @@ useSeoMeta({
   ogUrl: 'https://uhti.kz/about',
   ogSiteName: 'Ухтышка',
   ogLocale: 'ru_RU',
-  twitterCard: 'summary',
+  twitterCard: 'summary_large_image',
   twitterTitle: TITLE,
   twitterDescription: DESCRIPTION,
   robots: 'index, follow',
