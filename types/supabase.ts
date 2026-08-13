@@ -2883,6 +2883,22 @@ export interface Database {
           slug: string
         }[]
       }
+      get_product_reviews: {
+        Args: { p_product_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_published: boolean
+          order_id: string
+          product_id: string
+          profiles: Json
+          rating: number
+          review_images: Json
+          text: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       get_profile_by_phone: {
         Args: { p_phone: string }
         Returns: {
