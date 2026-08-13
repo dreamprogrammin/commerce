@@ -2,7 +2,7 @@
 import { Icon } from '#components'
 
 interface CategoryReview {
-  review_id: number
+  review_id: string
   rating: number
   text: string
   created_at: string
