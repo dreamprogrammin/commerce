@@ -2,13 +2,28 @@ import type { IProductFilters, ProductWithGallery } from '@/types'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
-export function useCatalogQuery(
+/**
+ * Товары каталога с префетчем на сервере.
+ *
+ * Функция асинхронная намеренно: без `await` SSR не работает вовсе. Раньше
+ * здесь стоял `useAsyncData(...)` без ожидания, а `ssrData.value` читался
+ * следующей строкой — синхронно, когда промис ещё не разрешился. Поэтому
+ * `setQueryData` не вызывался ни разу, `initialData` оставалась undefined,
+ * и сервер отдавал страницу категории со скелетонами.
+ *
+ * Данные при этом добывались: они лежали в payload (441 КБ на /catalog/boys),
+ * просто в разметку не попадали. Клиент запрашивал их заново, и на мобильном
+ * соединении сетка появлялась только к 10-й секунде — RPC стартовал на 7.9 с,
+ * потому что до него нужно было скачать и разобрать 273 КБ JS.
+ */
+export async function useCatalogQuery(
   filters: Ref<IProductFilters>,
   currentPage: Ref<number>,
   pageSize: number = 12,
 ) {
   const productStore = useProductsStore()
   const queryClient = useQueryClient()
+  const nuxtApp = useNuxtApp()
 
   const queryKey = computed(() => {
     const f = unref(filters)
@@ -37,18 +52,31 @@ export function useCatalogQuery(
     )
   }
 
-  // 🔥 SSR prefetch: на сервере дожидаемся данных и кладём в кеш TanStack Query
-  // Без этого на сервере query.data.value === undefined и ItemList не рендерится
-  if (import.meta.server) {
-    const ssrKey = computed(() => `ssr-catalog-${JSON.stringify(queryKey.value)}`)
+  // SSR: сначала дожидаемся данных и кладём их в кеш, и только потом создаём
+  // запрос. Порядок принципиален в обе стороны, оба варианта проверены:
+  //
+  //  • посев ПОСЛЕ useQuery не работает — на сервере vue-query не подписывает
+  //    наблюдателя на кеш, и setQueryData в отрисовку уже не попадает;
+  //  • `await` перед useQuery ломает инъекцию: внутри useQuery вызывается
+  //    useQueryClient(), а после ожидания контекст потерян, и страница
+  //    отдаёт 500 — «vue-query hooks can only be used inside setup()».
+  //
+  // Отсюда решение: клиент берём синхронно выше и передаём в useQuery вторым
+  // аргументом, чтобы тот не искал его через инъекцию.
+  // Условие охватывает и клиент во время гидратации. Иначе браузер начинал бы
+  // с пустого кеша, рисовал скелетон поверх пришедшей с сервера сетки и давал
+  // рассинхрон гидратации. При гидратации useAsyncData поднимает значение из
+  // payload и повторного запроса не делает; на последующих переходах по сайту
+  // условие ложно, и данными занимается уже сам useQuery.
+  if (import.meta.server || nuxtApp.isHydrating) {
+    const ssrKey = `ssr-catalog-${JSON.stringify(queryKey.value)}`
 
-    const { data: ssrData } = useAsyncData(
-      ssrKey.value,
+    const { data: ssrData } = await useAsyncData(
+      ssrKey,
       () => queryFn(),
       { server: true },
     )
 
-    // Кладём SSR-данные в кеш TanStack Query чтобы useQuery взял их синхронно
     if (ssrData.value) {
       queryClient.setQueryData(queryKey.value, ssrData.value)
     }
@@ -63,11 +91,7 @@ export function useCatalogQuery(
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',
     refetchOnReconnect: false,
-    // На сервере берём данные из кеша (setQueryData выше)
-    initialData: import.meta.server
-      ? queryClient.getQueryData(queryKey.value)
-      : undefined,
-  })
+  }, queryClient)
 
   const products = computed<ProductWithGallery[]>(() =>
     query.data.value?.products || [],
