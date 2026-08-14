@@ -16,6 +16,29 @@ import type {
 } from '@/types'
 import { toast } from 'vue-sonner'
 
+/**
+ * Оставить base64-заглушку только у первой картинки галереи.
+ *
+ * В карточке сетки галерея — свайп-лента, но слайды кроме первого вообще
+ * не рендерятся, пока по ним не проведут: `v-if="visitedSlideIndexes.has(index)"`
+ * в ProductCard.vue. Их заглушки на первой отрисовке не нужны никому,
+ * а в payload уезжают все.
+ *
+ * Цифры со страницы категории: 135 объектов product_images при 12 товарах
+ * на экране, заглушки по 1.4 КБ медианой — 182 КБ payload на заглушках.
+ *
+ * Размен: если посетитель пролистает карточку, второй и последующие кадры
+ * появятся без размытой подложки — просто по готовности. Эффект виден доли
+ * секунды и только при свайпе.
+ */
+function trimGalleryBlur<T extends { blur_placeholder?: string | null }>(
+  images: T[],
+): T[] {
+  return images.map((img, index) =>
+    index === 0 ? img : { ...img, blur_placeholder: null },
+  )
+}
+
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
@@ -497,7 +520,7 @@ export const useProductsStore = defineStore('productsStore', () => {
         return {
           ...p,
           product_images: Array.isArray(p.product_images)
-            ? p.product_images
+            ? trimGalleryBlur(p.product_images)
             : [],
           brands: p.brand_name
             ? ({
