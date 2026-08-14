@@ -452,7 +452,7 @@ const {
   hasMore,
   isLoading: isLoadingProducts,
   isFetching,
-} = useCatalogQuery(catalogFilters, currentPage, PAGE_SIZE)
+} = await useCatalogQuery(catalogFilters, currentPage, PAGE_SIZE)
 
 const displayedProducts = computed<CatalogProduct[]>(() => {
   if (currentPage.value === 1) {
@@ -2022,89 +2022,88 @@ else {
           </div>
         </div>
 
-        <!-- Контент с плавным переходом -->
-        <ClientOnly>
-          <Transition
-            enter-active-class="transition-opacity duration-200"
-            leave-active-class="transition-opacity duration-150"
-            enter-from-class="opacity-0"
-            leave-to-class="opacity-0"
-            mode="out-in"
-          >
-            <div :key="isLoading ? 'loading' : 'content'">
-              <ProductGridSkeleton
-                v-if="isLoading && displayedProducts.length === 0"
-              />
+        <!-- Контент с плавным переходом.
+             ClientOnly здесь больше нет: под ним сетка товаров не попадала
+             в разметку вовсе, сервер отдавал 68 скелетонов, и LCP на мобиле
+             доходил до 10 с — картинки начинали грузиться только после того,
+             как браузер скачает и разберёт JS и заново сходит за товарами.
+             Данные для сервера даёт useCatalogQuery. -->
+        <Transition
+          enter-active-class="transition-opacity duration-200"
+          leave-active-class="transition-opacity duration-150"
+          enter-from-class="opacity-0"
+          leave-to-class="opacity-0"
+          mode="out-in"
+        >
+          <div :key="isLoading ? 'loading' : 'content'">
+            <ProductGridSkeleton
+              v-if="isLoading && displayedProducts.length === 0"
+            />
 
-              <div v-else-if="displayedProducts.length > 0" class="space-y-8">
-                <ProductGrid :products="displayedProducts" />
+            <div v-else-if="displayedProducts.length > 0" class="space-y-8">
+              <ProductGrid :products="displayedProducts" />
 
-                <div v-if="hasMore" class="text-center">
-                  <button
-                    type="button"
-                    class="cf-glass-btn cf-glass-btn--lg inline-flex"
-                    :disabled="isFetching"
-                    @click="loadMoreProducts"
-                  >
-                    <span v-if="isFetching">Загрузка...</span>
-                    <template v-else>
-                      <span>Показать ещё</span>
-                      <Icon name="lucide:chevron-down" class="w-4 h-4" />
-                    </template>
-                  </button>
-                </div>
-
-                <div
-                  v-if="isFetching && currentPage > 1"
-                  class="text-center text-sm text-muted-foreground"
+              <div v-if="hasMore" class="text-center">
+                <button
+                  type="button"
+                  class="cf-glass-btn cf-glass-btn--lg inline-flex"
+                  :disabled="isFetching"
+                  @click="loadMoreProducts"
                 >
-                  Загрузка товаров...
-                </div>
+                  <span v-if="isFetching">Загрузка...</span>
+                  <template v-else>
+                    <span>Показать ещё</span>
+                    <Icon name="lucide:chevron-down" class="w-4 h-4" />
+                  </template>
+                </button>
               </div>
 
               <div
-                v-else
-                class="text-center py-16 bg-white dark:bg-card border border-border rounded-[22px]"
+                v-if="isFetching && currentPage > 1"
+                class="text-center text-sm text-muted-foreground"
               >
-                <div
-                  class="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4"
-                >
-                  <Icon
-                    name="lucide:package-open"
-                    class="w-7 h-7 text-muted-foreground"
-                  />
-                </div>
-                <h3 class="text-xl font-bold">
-                  {{
-                    hasActiveFilters
-                      ? "Товары не найдены"
-                      : "Скоро здесь появятся товары"
-                  }}
-                </h3>
-                <p class="mt-2 text-sm text-muted-foreground">
-                  {{
-                    hasActiveFilters
-                      ? "Попробуйте изменить фильтры или выбрать другую категорию."
-                      : "Мы работаем над наполнением этой категории. Загляните позже!"
-                  }}
-                </p>
-                <button
-                  v-if="hasActiveFilters"
-                  type="button"
-                  class="cf-glass-btn cf-glass-btn--primary mt-5 inline-flex"
-                  @click="resetAllFilters"
-                >
-                  <Icon name="lucide:x" class="w-4 h-4" />
-                  Сбросить все фильтры
-                </button>
+                Загрузка товаров...
               </div>
             </div>
-          </Transition>
 
-          <template #fallback>
-            <ProductGridSkeleton />
-          </template>
-        </ClientOnly>
+            <div
+              v-else
+              class="text-center py-16 bg-white dark:bg-card border border-border rounded-[22px]"
+            >
+              <div
+                class="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4"
+              >
+                <Icon
+                  name="lucide:package-open"
+                  class="w-7 h-7 text-muted-foreground"
+                />
+              </div>
+              <h3 class="text-xl font-bold">
+                {{
+                  hasActiveFilters
+                    ? "Товары не найдены"
+                    : "Скоро здесь появятся товары"
+                }}
+              </h3>
+              <p class="mt-2 text-sm text-muted-foreground">
+                {{
+                  hasActiveFilters
+                    ? "Попробуйте изменить фильтры или выбрать другую категорию."
+                    : "Мы работаем над наполнением этой категории. Загляните позже!"
+                }}
+              </p>
+              <button
+                v-if="hasActiveFilters"
+                type="button"
+                class="cf-glass-btn cf-glass-btn--primary mt-5 inline-flex"
+                @click="resetAllFilters"
+              >
+                <Icon name="lucide:x" class="w-4 h-4" />
+                Сбросить все фильтры
+              </button>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 
