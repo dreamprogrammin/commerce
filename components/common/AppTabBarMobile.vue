@@ -82,9 +82,12 @@ onUnmounted(() => {
         </Button>
         <SearchDrawer v-model:is-open="isSearchOpen" />
 
-        <!-- Кнопка "Каталог" -->
+        <!-- Кнопка "Каталог".
+             bg-primary, а не bg-blue-500: сырой цвет палитры мимо токена не
+             последовал за притемнением темы, и белая надпись на нём осталась
+             единственным провалом контраста на /about и /brands (3.76:1) -->
         <button
-          class="group flex items-center justify-center gap-2 hover:bg-blue-600 h-11 px-6 rounded-lg transition-colors bg-blue-500"
+          class="group flex items-center justify-center gap-2 hover:bg-primary/90 h-11 px-6 rounded-lg transition-colors bg-primary"
           @click="openCatalog"
         >
           <Icon name="lucide:layout-grid" class="w-5 h-5 text-white" />
