@@ -261,6 +261,41 @@ const activeBrand = computed(() => {
   )
 })
 
+/**
+ * Название бренда для мета-тегов — отдельным точечным запросом.
+ *
+ * `activeBrand` выше резолвится через `availableBrands`, а это обычный
+ * `ref([])`, который наполняется только на клиенте. На сервере он пуст,
+ * поэтому ветка с брендом в `metaTitle` не срабатывала, и страница
+ * `?brand=play-smart` отдавала краулеру тот же заголовок, что и категория
+ * без фильтра. Обход sitemap 14 августа нашёл так две группы дублей:
+ * конструкторы мальчикам (`play-smart`, `mg-toys`) и автотреки (`soba`).
+ *
+ * Запрос на одну строку и только когда фильтр по бренду вообще выставлен.
+ */
+const { data: activeBrandSeoName } = await useAsyncData(
+  () => `brand-seo-name-${activeBrandSlug.value ?? 'none'}`,
+  async () => {
+    const slug = activeBrandSlug.value
+    if (!slug)
+      return null
+
+    const { data } = await supabase
+      .from('brands')
+      .select('name')
+      .eq('slug', slug)
+      .maybeSingle()
+
+    return (data as { name: string | null } | null)?.name ?? null
+  },
+  { watch: [activeBrandSlug] },
+)
+
+/** Имя бренда, доступное и на сервере, и после гидратации. */
+const activeBrandName = computed(
+  () => activeBrand.value?.name || activeBrandSeoName.value || null,
+)
+
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (currentCategorySlug.value === 'all') {
     return [{ id: 'all', name: 'Все товары', href: '/catalog/all' }]
@@ -1157,12 +1192,14 @@ const metaDescription = computed(() => {
 })
 
 const metaTitle = computed(() => {
-  if (activeBrand.value) {
+  // activeBrandName, а не activeBrand: последний на сервере всегда null,
+  // и заголовок страницы с фильтром совпадал с заголовком категории.
+  if (activeBrandName.value) {
     if (categoryBrandSeo.value?.seo_title) {
       return categoryBrandSeo.value.seo_title
     }
     const catName = categoryName.value
-    const brandName = activeBrand.value.name
+    const brandName = activeBrandName.value
     const prefix
       = catName.toLowerCase() === brandName.toLowerCase()
         ? catName
