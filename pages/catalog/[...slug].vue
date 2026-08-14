@@ -1418,8 +1418,50 @@ useBreadcrumbSchema(
   ),
 )
 
+/**
+ * Preload картинки первого товара.
+ *
+ * LCP страницы категории — это именно она. Сетка теперь приходит в разметке,
+ * но браузер добирается до её <img> только дочитав тело страницы, а тело
+ * конкурирует за канал с двумя десятками modulepreload из <head>. Ссылка
+ * в самой голове даёт запросу стартовать раньше.
+ *
+ * srcset и sizes повторяют то, что объявляет карточка (ProductCard.vue ->
+ * ProgressiveImage): иначе браузер выберет другой кандидат и скачает лишний
+ * файл вместо нужного.
+ */
+const lcpImageVariants = computed(() => {
+  const imageUrl = displayedProducts.value?.[0]?.product_images?.[0]?.image_url
+  if (!imageUrl)
+    return null
+
+  return {
+    sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm'),
+    md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'md'),
+    lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'lg'),
+  }
+})
+
 useHead(() => {
   const links: any[] = [{ rel: 'canonical', href: canonicalUrl.value }]
+
+  const lcp = lcpImageVariants.value
+  if (lcp?.sm) {
+    links.push({
+      rel: 'preload',
+      as: 'image',
+      href: lcp.sm,
+      imagesrcset: [
+        lcp.sm ? `${lcp.sm} 400w` : null,
+        lcp.md ? `${lcp.md} 800w` : null,
+        lcp.lg ? `${lcp.lg} 1440w` : null,
+      ]
+        .filter(Boolean)
+        .join(', '),
+      imagesizes: '(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw',
+      fetchpriority: 'high',
+    })
+  }
 
   return {
     meta: [{ name: 'keywords', content: metaKeywords.value || '' }],
