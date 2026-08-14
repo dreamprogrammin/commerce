@@ -1212,12 +1212,43 @@ const metaKeywords = computed(() => {
   return null
 })
 
+/**
+ * SEO-текст текущей категории — точечным запросом, одной строкой.
+ *
+ * В `categoriesStore` это поле намеренно не выбирается: оно весит 76 КБ
+ * на все 64 категории и раздувало payload на каждой странице сайта.
+ * Но выбросить его совсем нельзя — на странице категории оно рисует
+ * SEO-блок и попадает в `articleBody` разметки Schema.org.
+ *
+ * Именно это я и сломал коммитом c8e77b5: убрал поле из общей выборки,
+ * не заметив здешнего потребителя. На превью пропали три заголовка
+ * и `articleBody`, текста на странице стало 2620 знаков против 4913
+ * на проде. Тут — восстановление, но уже без общего раздувания.
+ */
+const { data: currentCategorySeoText } = await useAsyncData(
+  () => `category-seo-text-${currentCategorySlug.value}`,
+  async () => {
+    const slug = currentCategorySlug.value
+    if (!slug || slug === 'all')
+      return null
+
+    const { data } = await supabase
+      .from('categories')
+      .select('seo_text')
+      .eq('slug', slug)
+      .maybeSingle()
+
+    return (data as { seo_text: string | null } | null)?.seo_text ?? null
+  },
+  { watch: [currentCategorySlug] },
+)
+
 const seoText = computed(() => {
   if (activeBrand.value && categoryBrandSeo.value?.seo_text) {
     return sanitizeHtml(categoryBrandSeo.value.seo_text)
   }
 
-  const text = currentCategory.value?.seo_text
+  const text = currentCategorySeoText.value
   return text ? sanitizeHtml(text) : null
 })
 
