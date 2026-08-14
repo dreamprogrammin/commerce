@@ -158,6 +158,14 @@ const isLoadingMainBlock = computed(
   () => showRecommendationsSkeleton.value || showPopularSkeleton.value,
 )
 
+// Скелетон главной ленты держится, пока карусель не смонтируется по-настоящему.
+// Сами карусели ленивые: между снятием скелетона и появлением их разметки
+// проходит время загрузки чанка, и раньше в этот зазор блок схлопывался.
+const isMainCarouselMounted = ref(false)
+function onMainCarouselMounted() {
+  isMainCarouselMounted.value = true
+}
+
 const showWishlistCarousel = computed(
   () => isLoggedIn.value && wishlistProducts.value.length > 0,
 )
@@ -169,6 +177,14 @@ const showPopularFallbackCarousel = computed(
     !showRecommendedCarousel.value
     && popularProducts.value
     && popularProducts.value.length > 0,
+)
+
+/** Есть ли вообще что показывать в главной ленте. */
+const hasMainCarousel = computed(
+  () =>
+    showWishlistCarousel.value
+    || showRecommendedCarousel.value
+    || showPopularFallbackCarousel.value,
 )
 
 // --- Быстрые чипы: статические ссылки + корневые категории из menuTree ---
@@ -199,6 +215,23 @@ onMounted(() => {
     shouldRenderLowerBlocks.value = true
   }, 1000)
 })
+
+/**
+ * Скелетон главной ленты. Снимается ровно в двух случаях:
+ *  • карусель смонтировалась — место занято настоящей разметкой;
+ *  • данные догрузились и показывать нечего — тогда блока и не должно быть.
+ * Во всех остальных состояниях он держит высоту, чтобы не двигать соседей.
+ *
+ * Объявлено здесь, а не рядом с остальными флагами, потому что зависит от
+ * shouldRenderLowerBlocks выше.
+ */
+const showMainCarouselSkeleton = computed(
+  () =>
+    !isMainCarouselMounted.value
+    && (isLoadingMainBlock.value
+      || !shouldRenderLowerBlocks.value
+      || hasMainCarousel.value),
+)
 
 // --- «Перейти к покупкам» → скролл к ленте товаров ---
 const shopSectionRef = ref<HTMLElement | null>(null)
@@ -440,16 +473,24 @@ useRobotsRule({ index: true, follow: true })
            контейнера здесь быть НЕ должно: он давал двойной padding.
            ProductCarouselSectionSkeleton повторяет их отступы 1-в-1. -->
       <ClientOnly>
-        <template v-if="isLoadingMainBlock || !shouldRenderLowerBlocks">
-          <ProductCarouselSectionSkeleton />
-        </template>
-        <template v-else>
+        <!-- Скелетон снимается не по таймеру, а по факту монтирования карусели.
+             Раньше его убирал `!shouldRenderLowerBlocks` — а это setTimeout на
+             1000 мс, не состояние загрузки. Компоненты ниже ленивые, и в момент
+             снятия скелетона их чанк ещё грузился: блок схлопывался и через
+             ~800 мс разворачивался обратно. Замер на превью (390px, Slow 4G,
+             CPU ×4) показывал ровно это: заголовок «Популярные категории»
+             уезжал с y=1213 на 707 и возвращался на 1225. Два сдвига по ~0.12
+             и составляли почти весь CLS главной — 0.244 при пороге 0.1. -->
+        <ProductCarouselSectionSkeleton v-if="showMainCarouselSkeleton" />
+
+        <template v-if="shouldRenderLowerBlocks && !isLoadingMainBlock">
           <LazyProductsCarousel
             v-if="showWishlistCarousel"
             :is-loading="isFetchingRecommendations"
             :products="wishlistProducts"
             title="Ваше избранное"
             see-all-link="/profile/wishlist"
+            @vue:mounted="onMainCarouselMounted"
           />
           <LazyProductsCarousel
             v-if="showRecommendedCarousel"
@@ -457,6 +498,7 @@ useRobotsRule({ index: true, follow: true })
             :products="recommendedProducts"
             title="Подобрали для вас"
             see-all-link="/catalog/all?recommended=true"
+            @vue:mounted="onMainCarouselMounted"
           />
           <LazyProductsCarousel
             v-else-if="showPopularFallbackCarousel"
@@ -464,6 +506,7 @@ useRobotsRule({ index: true, follow: true })
             :products="popularProducts"
             title="Подобрали для вас"
             see-all-link="/catalog/all?sort_by=popularity"
+            @vue:mounted="onMainCarouselMounted"
           />
         </template>
         <template #fallback>
