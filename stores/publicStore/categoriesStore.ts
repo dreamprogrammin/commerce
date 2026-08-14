@@ -1,5 +1,50 @@
 import type { AdditionalMenuItem, CategoryMenuItem, CategoryRow, Database } from '@/types'
 
+/**
+ * Колонки категорий для публичной части — всё, кроме `seo_text`.
+ *
+ * Раньше здесь стоял `select('*')`, и на КАЖДУЮ страницу сайта уезжали
+ * SEO-тексты всех 64 категорий: 76 КБ в базе, а в payload Nuxt — 115 КБ
+ * (63 строки вида `<h2 data-icon=…>` примерно по 1.8 КБ). Публично это поле
+ * не выводится нигде: единственный его читатель — форма в админке, а она
+ * работает через adminCategoriesStore со своим запросом.
+ *
+ * Перечислено списком, а не вычитанием: PostgREST не умеет «всё кроме», а
+ * `select('*')` вернул бы поле обратно при любом изменении схемы.
+ */
+const PUBLIC_CATEGORY_COLUMNS = [
+  'id',
+  'name',
+  'slug',
+  'href',
+  'description',
+  'parent_id',
+  'is_root_category',
+  'display_in_menu',
+  'display_order',
+  'image_url',
+  'icon_name',
+  'created_at',
+  'updated_at',
+  'is_featured',
+  'featured_order',
+  'blur_placeholder',
+  'seo_title',
+  'seo_h1',
+  'seo_keywords',
+  'allowed_brand_ids',
+  'allowed_product_line_ids',
+  'meta_title',
+  'meta_description',
+  'meta_keywords',
+  'seo_description',
+  'canonical_url',
+  'og_title',
+  'og_description',
+  'og_image',
+  'blur_data_url',
+].join(', ')
+
 export const useCategoriesStore = defineStore('categories', () => {
   const supabase = useSupabaseClient<Database>()
 
@@ -36,7 +81,10 @@ export const useCategoriesStore = defineStore('categories', () => {
       return allCategories.value
     isLoading.value = true
     try {
-      const { data, error } = await supabase.from('categories').select('*').order('display_order')
+      const { data, error } = await supabase
+        .from('categories')
+        .select(PUBLIC_CATEGORY_COLUMNS)
+        .order('display_order')
       if (error)
         throw error
 
