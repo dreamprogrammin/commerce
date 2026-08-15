@@ -34,6 +34,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { isWholeRange } from '@/utils/catalogFilterRange'
 import { clampDescription, composeCategoryLead } from '@/utils/seoDescription'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
@@ -449,6 +450,30 @@ const catalogFilters = computed<IProductFilters>(() => {
       maxValue: range[1],
     }))
 
+  /*
+   * Цена и число деталей попадают в фильтр только когда пользователь реально
+   * сузил диапазон. Причина не косметическая.
+   *
+   * Диапазон категории грузится асинхронно (`loadFilters` ->
+   * `fetchPriceRangeForCategory`) уже ПОСЛЕ того, как `useCatalogQuery`
+   * посеял кеш на сервере. Пока он не пришёл, здесь стоит заглушка
+   * [0, 50000]; когда пришёл — реальные границы категории. То есть ключ
+   * запроса меняется под ногами: посев лёг под старый ключ, а `useQuery`
+   * при отрисовке читает уже новый, не находит данных и отдаёт скелетоны —
+   * при том, что товары к этому моменту лежат в payload.
+   *
+   * Так терялась вся сетка: на превью пустыми приходили 4 обхода из 12,
+   * локально — 9 из 12. Пустой рендер попадал в SWR-кеш маршрута и
+   * раздавался оттуда полчаса, в том числе поисковому роботу.
+   *
+   * Сравнение с самим диапазоном устойчиво в обоих состояниях: до загрузки
+   * значение равно заглушке диапазона, после — реальным границам. Ключ
+   * получается один и тот же, и посев попадает туда, откуда его читают.
+   */
+  const pieceCount = activeFilters.value.pieceCount
+  const priceIsWholeRange = isWholeRange(activeFilters.value.price, priceRange.value)
+  const pieceCountIsWholeRange = isWholeRange(pieceCount, pieceCountRange.value)
+
   return {
     categorySlug: currentCategorySlug.value,
     sortBy: activeFilters.value.sortBy,
@@ -472,10 +497,10 @@ const catalogFilters = computed<IProductFilters>(() => {
       activeFilters.value.countryIds.length > 0
         ? activeFilters.value.countryIds
         : undefined,
-    priceMin: activeFilters.value.price[0],
-    priceMax: activeFilters.value.price[1],
-    pieceCountMin: activeFilters.value.pieceCount?.[0],
-    pieceCountMax: activeFilters.value.pieceCount?.[1],
+    priceMin: priceIsWholeRange ? undefined : activeFilters.value.price[0],
+    priceMax: priceIsWholeRange ? undefined : activeFilters.value.price[1],
+    pieceCountMin: pieceCountIsWholeRange ? undefined : pieceCount?.[0],
+    pieceCountMax: pieceCountIsWholeRange ? undefined : pieceCount?.[1],
     attributes: attributeFilters.length > 0 ? attributeFilters : undefined,
     numericAttributes:
       numericAttributeFilters.length > 0 ? numericAttributeFilters : undefined,
