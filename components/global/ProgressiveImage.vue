@@ -56,6 +56,23 @@ const {
   onError,
 } = useImageState(imageUrl, { eager: props.eager })
 
+/**
+ * Eager-картинку показываем сразу, не дожидаясь isLoaded.
+ *
+ * isLoaded поднимается обработчиком @load, то есть только в браузере и только
+ * после гидратации. До этого картинка стоит с opacity: 0 — а элемент с нулевой
+ * прозрачностью не может стать LCP. На категории это стоило метрике всё:
+ * файл первой карточки скачивался к 6-й секунде, а LCP фиксировался на 14-й,
+ * когда догружался и разбирался главный чанк в 273 КБ. Сетка при этом честно
+ * приходила с сервера — толку от неё не было никакого.
+ *
+ * Для eager это переключение и не нужно: такие картинки над сгибом, они
+ * рисуются по мере декодирования, а до этого сквозь прозрачную <img> виден
+ * LQIP-слой под ней. Плавное проявление остаётся у ленивых картинок, где
+ * оно и заметно.
+ */
+const revealImmediately = computed(() => props.eager)
+
 const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
 
 /**
@@ -300,8 +317,13 @@ const isDev = computed(() => import.meta.env.DEV)
       </div>
     </div>
 
-    <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ -->
-    <picture>
+    <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ.
+         relative нужен из-за порядка отрисовки: плейсхолдер выше по разметке,
+         но он absolute, а позиционированные элементы рисуются поверх обычного
+         потока. Пока <img> стояла с opacity: 0, это было не видно; теперь
+         eager-картинка проявляется сразу и без этого оказалась бы под размытым
+         слоем. display не меняется, раскладка прежняя. -->
+    <picture class="relative">
       <!-- 📱 Art Direction: мобильный вариант (показывается при media-запросе) -->
       <source
         v-if="mobileSrcsetValue"
@@ -333,7 +355,7 @@ const isDev = computed(() => import.meta.env.DEV)
         :height="height || undefined"
         class="w-full h-full"
         :class="[
-          isLoaded ? 'opacity-100' : 'opacity-0',
+          isLoaded || revealImmediately ? 'opacity-100' : 'opacity-0',
           objectFitClass,
           objectPositionClass,
           zoomOnHover ? 'hover:scale-105' : '',
