@@ -1,6 +1,36 @@
 import process from 'node:process'
 import tailwindcss from '@tailwindcss/vite'
 
+/**
+ * Превью (`dev.uhti.kz`) — не боевой сайт, и в индексе ему не место.
+ *
+ * `VERCEL_ENV` платформа выставляет сама: `production` на боевом деплое,
+ * `preview` на всех остальных. Локально переменной нет вовсе, поэтому
+ * `isPreview` там ложно и сборка ведёт себя как боевая.
+ *
+ * Работает здесь robots.txt, и он же — настоящий запрет: закрытые в нём
+ * адреса робот просто не запрашивает.
+ *
+ * Заголовок `X-Robots-Tag` ниже добавлен как вторая линия, но закрывает он
+ * НЕ ВСЁ, и это надо знать. Одиннадцать страниц прописывают мета-тег
+ * `robots` руками, модуль `@nuxtjs/robots` собирает заголовок из него при
+ * отрисовке и перебивает значение из правил маршрута. Проверено запуском:
+ * на сборке превью `noindex` доезжает только до `/about` — единственной
+ * страницы, которая свой `robots` не переопределяет; `/`, `/catalog/**` и
+ * карточки товара остаются с `index, follow`. Тем же способом были
+ * испробованы и отброшены серверный плагин на хуке `request`, и на
+ * `render:response` — результат одинаковый.
+ *
+ * Чтобы закрыть заголовок полностью, нужно приучить эти одиннадцать страниц
+ * спрашивать `site.indexable` вместо жёсткого `index, follow`. Это отдельная
+ * задача; на запрет обхода она не влияет, robots.txt закрывает превью и так.
+ *
+ * Следствие, о котором важно помнить: сборка превью несёт запрет внутри
+ * себя. Если такую сборку продвинуть в продакшн через `vercel promote`,
+ * боевой сайт уедет с `Disallow: /`. Продвигать нужно сборку с `master`.
+ */
+const isPreview = !!process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
@@ -97,6 +127,11 @@ export default defineNuxtConfig({
   },
 
   site: {
+    // Отсюда `@nuxtjs/robots` берёт решение по robots.txt: на превью он
+    // отдаёт `Disallow: /`. Это и есть настоящий запрет — закрытые здесь
+    // адреса робот просто не запрашивает. Заголовок выше — вторая линия,
+    // на случай если robots.txt проигнорируют.
+    indexable: !isPreview,
     url: 'https://uhti.kz',
     name: 'Ухтышка',
     description: 'Интернет-магазин с широким ассортиментом игрушек.',
@@ -239,6 +274,9 @@ export default defineNuxtConfig({
       // т.к. на сайте используются сторонние origin'ы (Supabase Storage, Google Fonts, GTM/GA).
       '/**': {
         headers: {
+          // Только на превью; на боевой сборке ключа здесь нет вовсе.
+          // Доезжает не до всех страниц — почему, см. комментарий к isPreview.
+          ...(isPreview ? { 'X-Robots-Tag': 'noindex, nofollow' } : {}),
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'SAMEORIGIN',
           'Referrer-Policy': 'strict-origin-when-cross-origin',
