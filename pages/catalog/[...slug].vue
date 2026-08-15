@@ -1356,6 +1356,38 @@ const [{ data: _categoriesData }, { data: _filterPayload }] = await Promise.all(
   ],
 )
 
+/*
+ * Несуществующая категория обязана отвечать 404.
+ *
+ * До этой проверки `/catalog/qwerty-zzz-999` отдавал HTTP 200, заголовок
+ * собирался из самого слага («qwerty zzz 999 купить в интернет-магазине…»),
+ * а в мете стояло `robots: index, follow`. То есть сайт сам порождал
+ * неограниченное число индексируемых страниц-пустышек: любая опечатка в
+ * ссылке, любой битый адрес из чужой выдачи становился отдельной тонкой
+ * страницей. У карточек товара такой дыры нет — там `createError` стоит
+ * с самого начала.
+ *
+ * Условие на непустой список принципиально. Пустой список означает не
+ * «категорий нет», а «загрузка не удалась», и превращать сбой в 404 нельзя:
+ * маршрут `/catalog` кешируется SWR на 30 минут, и разовый сбой раздавался
+ * бы как 404 всем, включая робота. По этой же причине проверка стоит после
+ * `await` загрузки категорий, а не рядом с `currentCategory`.
+ *
+ * `all` — не категория, а весь каталог: и `/catalog`, и `/catalog/all`
+ * приходят сюда именно с этим слагом.
+ */
+if (
+  currentCategorySlug.value !== 'all'
+  && categoriesStore.allCategories.length > 0
+  && !currentCategory.value
+) {
+  throw createError({
+    statusCode: 404,
+    statusMessage: 'Категория не найдена',
+    fatal: true,
+  })
+}
+
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
   availableProductLines.value = _filterPayload.value.productLines
