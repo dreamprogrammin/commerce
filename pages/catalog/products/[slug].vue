@@ -61,17 +61,38 @@ await useAsyncData('product-categories', async () => {
   return true
 })
 
-const { data: product } = await useAsyncData(`product-${slug.value}`, async () => {
-  const fetchedProduct = await productsStore.fetchProductBySlug(slug.value)
-  if (!fetchedProduct) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'Товар не найден',
-      fatal: true,
-    })
-  }
-  return fetchedProduct
-})
+const { data: product, error: productError } = await useAsyncData(
+  `product-${slug.value}`,
+  () => productsStore.fetchProductBySlug(slug.value),
+)
+
+/*
+ * Проверка стоит здесь, а не внутри обработчика, хотя раньше `createError`
+ * бросался именно там. Так он не работал: `throw` внутри `useAsyncData`
+ * Nuxt перехватывает и кладёт в `error`, рендер продолжается. В итоге
+ * `/catalog/products/<любой-мусор>` отдавал HTTP 200 с заголовком
+ * «Товар | Ухтышка» — мягкий 404, который Google просит не делать.
+ * Спасал только `noindex` в мете, но статус всё равно обязан быть 404.
+ *
+ * Пустой ответ и ошибка запроса разведены намеренно: товара нет — 404,
+ * а вот сбой обращения к базе 404-ем объявлять нельзя, иначе временный
+ * сбой осядет в SWR-кеше карточки на час.
+ */
+if (productError.value) {
+  throw createError({
+    statusCode: 503,
+    statusMessage: 'Не удалось загрузить товар',
+    fatal: true,
+  })
+}
+
+if (!product.value) {
+  throw createError({
+    statusCode: 404,
+    statusMessage: 'Товар не найден',
+    fatal: true,
+  })
+}
 
 const { data: accessories, isLoading: accessoriesLoading } = useQuery({
   queryKey: ['product-accessories', computed(() => product.value?.id)],
