@@ -138,7 +138,12 @@ function onLogin() {
     position: relative;
     overflow: hidden;
     border-radius: 24px;
-    background: linear-gradient(120deg, #0f52d9 0%, #2b7fff 52%, #5aa0ff 100%);
+    /* Градиент притемнён: белым по прежнему светлому концу (#5aa0ff) выходило
+       2.66:1 при пороге 4.5. Замер по пикселям под каждой надписью показывал
+       до 1.77 — фон осветляли ещё и полупрозрачные белые подложки чипов.
+       Теперь самый светлый конец даёт 4.59:1, а он же и худший случай:
+       промежуточные точки градиента темнее. */
+    background: linear-gradient(120deg, #0b3f9e 0%, #1e5cc4 52%, #3573d6 100%);
     color: #fff;
     padding: clamp(26px, 3vw, 44px);
     display: flex;
@@ -189,7 +194,10 @@ function onLogin() {
     padding: 7px 15px;
     font-weight: 700;
     font-size: 12.5px;
-    background: rgb(255 255 255 / 0.16);
+    /* Чипы теперь затемняют фон, а не осветляют: белая полупрозрачность
+       поднимала светлоту подложки и роняла контраст надписи до 2.28:1.
+       Стеклянный вид держится на светлой рамке, она к тексту не относится. */
+    background: rgb(0 0 0 / 0.18);
     border: 1px solid rgb(255 255 255 / 0.32);
     backdrop-filter: blur(6px);
   }
@@ -217,7 +225,7 @@ function onLogin() {
     padding: 8px 14px;
     font-weight: 600;
     font-size: 13px;
-    background: rgb(255 255 255 / 0.14);
+    background: rgb(0 0 0 / 0.18);
     border: 1px solid rgb(255 255 255 / 0.2);
   }
 
@@ -259,13 +267,15 @@ function onLogin() {
   .loyalty__btn--ghost {
     padding: 0 20px;
     border: 1px solid rgb(255 255 255 / 0.55);
-    background: rgb(255 255 255 / 0.1);
+    background: rgb(0 0 0 / 0.18);
     color: #fff;
     backdrop-filter: blur(6px);
   }
 
   .loyalty__btn--ghost:hover {
-    background: rgb(255 255 255 / 0.22);
+    /* Наведение затемняет, а не осветляет: прежние 22% белого давали
+       по замеру 3.14:1, то есть кнопка теряла читаемость под курсором. */
+    background: rgb(0 0 0 / 0.28);
   }
 
   .loyalty__card-wrap {
@@ -278,7 +288,9 @@ function onLogin() {
     width: clamp(260px, 26vw, 320px);
     aspect-ratio: 1.6 / 1;
     border-radius: 22px;
-    background: linear-gradient(140deg, #1657d6 0%, #3b8bff 100%);
+    /* Карточка притемнена по той же причине: по её светлому концу белым
+       выходило 3.32:1, а надписи баланса — 3.39-3.95:1. */
+    background: linear-gradient(140deg, #0e3a84 0%, #215ab4 100%);
     box-shadow: 0 26px 60px -16px rgb(0 10 40 / 0.6);
     transform: rotate(-4deg);
     overflow: hidden;
@@ -291,7 +303,10 @@ function onLogin() {
   .loyalty__card-sheen {
     position: absolute;
     inset: 0;
-    background: linear-gradient(125deg, rgb(255 255 255 / 0.4) 0%, rgb(255 255 255 / 0) 42%);
+    /* Блик ослаблен с 40% до 16%: он приходился ровно на словомарку в левом
+       верхнем углу и в самом светлом месте давал контраст 1.00 — белое по
+       белому. Блеск карточки остаётся, но читаемость важнее. */
+    background: linear-gradient(125deg, rgb(255 255 255 / 0.16) 0%, rgb(255 255 255 / 0) 42%);
     pointer-events: none;
   }
 
