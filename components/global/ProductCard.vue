@@ -12,9 +12,37 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import { formatPrice } from '@/utils/formatPrice'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   product: BaseProduct
-}>()
+  /**
+   * Позиция карточки в сетке. Нужна ровно для одного: решить, грузить ли
+   * первый кадр галереи сразу.
+   *
+   * Раньше `eager` стоял у первого кадра КАЖДОЙ карточки, то есть у всех
+   * двенадцати на странице, и каждая уходила в сеть с `fetchpriority="high"`.
+   * Замер категории на Slow 4G: до момента LCP скачивается 608 КБ, из них
+   * 162 КБ — эти самые двенадцать картинок. Они отбирают канал у CSS, без
+   * которого не красится вообще ничего: FCP приходил на 4.9 с.
+   *
+   * По умолчанию 99 — то есть карточка вне сетки (похожие товары, слайдеры)
+   * ведёт себя как раньше: ленивая загрузка, без высокого приоритета.
+   *
+   * Имя `position`, а не `index`: внутри шаблона `index` уже занят счётчиком
+   * кадров галереи, и одноимённый проп его затенял бы.
+   */
+  position?: number
+}>(), {
+  position: 99,
+})
+
+/*
+ * Сколько карточек считаем «над сгибом». На 390px сетка в две колонки,
+ * высота карточки ~330px при экране 844 — видно две строки. На десктопе
+ * четыре колонки, то есть первая строка целиком. Четыре покрывает оба
+ * случая; остальные догрузятся лениво, когда до них доскроллят.
+ */
+const EAGER_CARDS = 4
+const isAboveTheFold = computed(() => props.position < EAGER_CARDS)
 
 const cartStore = useCartStore()
 const wishlistStore = useWishlistStore()
@@ -240,7 +268,7 @@ async function onWish() {
               object-fit="contain"
               placeholder-type="lqip"
               :blur-data-url="image.blur_placeholder"
-              :eager="index === 0"
+              :eager="index === 0 && isAboveTheFold"
             />
             <div v-else class="h-full w-full animate-pulse bg-muted" aria-hidden="true" />
           </div>
