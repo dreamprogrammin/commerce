@@ -82,7 +82,7 @@ useHead({
     { name: 'twitter:description', content: metaDescription },
 
     // Robots
-    { name: 'robots', content: 'index, follow' },
+    { name: 'robots', content: useRobotsContent('index, follow') },
   ],
 })
 </script>
