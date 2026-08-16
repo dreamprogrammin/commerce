@@ -276,7 +276,7 @@ useSeoMeta({
   twitterTitle: metaTitle,
   twitterDescription: metaDescription,
   twitterImage: ogImageSrc,
-  robots: 'index, follow',
+  robots: useRobotsContent('index, follow'),
 })
 
 useBreadcrumbSchema(

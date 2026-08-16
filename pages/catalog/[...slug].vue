@@ -1320,6 +1320,14 @@ const seoBlocks = computed(() => {
   return parseHTMLToBlocks(seoText.value)
 })
 
+/*
+ * Оба значения берутся здесь, в setup, а не внутри computed: композабл
+ * читает runtimeConfig, а вычисляемое свойство может пересчитаться уже вне
+ * контекста Nuxt. На превью оба превращаются в noindex, nofollow.
+ */
+const robotsIndexable = useRobotsContent('index, follow')
+const robotsNoindexFollow = useRobotsContent('noindex, follow')
+
 const robotsRule = computed(() => {
   const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
 
@@ -1530,7 +1538,7 @@ useSeoMeta({
   twitterTitle: metaTitle,
   twitterDescription: metaDescription,
   robots: computed(() =>
-    robotsRule.value.noindex ? 'noindex, follow' : 'index, follow',
+    robotsRule.value.noindex ? robotsNoindexFollow : robotsIndexable,
   ),
 })
 

@@ -28,7 +28,7 @@ useSeoMeta({
   twitterCard: 'summary_large_image',
   twitterTitle: TITLE,
   twitterDescription: DESCRIPTION,
-  robots: 'index, follow',
+  robots: useRobotsContent('index, follow'),
 })
 </script>
 

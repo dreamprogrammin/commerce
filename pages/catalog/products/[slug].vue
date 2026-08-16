@@ -798,6 +798,14 @@ const schemaAdditionalProperties = computed(() => {
   return properties
 })
 
+/*
+ * Оба значения берутся здесь, в setup, а не внутри computed: композабл
+ * читает runtimeConfig, а вычисляемое свойство может пересчитаться уже вне
+ * контекста Nuxt. На превью оба превращаются в noindex, nofollow.
+ */
+const robotsIndexable = useRobotsContent('index, follow')
+const robotsNoindexFollow = useRobotsContent('noindex, follow')
+
 const robotsRule = computed(() => {
   if (!product.value)
     return { noindex: true, nofollow: true }
@@ -882,7 +890,7 @@ useSeoMeta({
   twitterDescription: metaDescription,
   twitterImage: ogImageUrl,
   robots: computed(() =>
-    robotsRule.value.noindex ? 'noindex, follow' : 'index, follow',
+    robotsRule.value.noindex ? robotsNoindexFollow : robotsIndexable,
   ),
 })
 

@@ -10,7 +10,7 @@ useHead({
       content:
         'Условия использования интернет-магазина uhti.kz. Правила покупки, доставки и возврата товаров.',
     },
-    { name: 'robots', content: 'index, follow' },
+    { name: 'robots', content: useRobotsContent('index, follow') },
   ],
 })
 </script>

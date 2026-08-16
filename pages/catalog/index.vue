@@ -128,7 +128,7 @@ useHead(() => {
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: metaTitle },
       { name: 'twitter:description', content: metaDescription },
-      { name: 'robots', content: 'index, follow' },
+      { name: 'robots', content: useRobotsContent('index, follow') },
     ],
     script: schemas,
   }
