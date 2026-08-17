@@ -156,7 +156,8 @@ defineOgImageComponent('OgImageCatalog', {
   description: 'Конструкторы, куклы, машинки, развивающие игры и творчество',
 })
 
-useRobotsRule({
+// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+useIndexableRobotsRule({
   index: true,
   follow: true,
 })

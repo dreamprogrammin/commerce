@@ -845,7 +845,8 @@ const seoContentText = computed(() => {
     .substring(0, 500) // Google рекомендует до 500 символов
 })
 
-useRobotsRule(robotsRule)
+// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+useIndexableRobotsRule(robotsRule)
 
 const ogImageUrl = computed(() => {
   if (!product.value?.product_images?.[0]?.image_url)

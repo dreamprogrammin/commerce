@@ -1521,7 +1521,8 @@ watchDebounced(
   { debounce: 300 },
 )
 
-useRobotsRule(robotsRule)
+// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+useIndexableRobotsRule(robotsRule)
 
 const isLoading = computed(
   () =>
