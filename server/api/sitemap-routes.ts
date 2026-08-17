@@ -1,5 +1,6 @@
 import type { Database } from '@/types'
 import { serverSupabaseClient } from '#supabase/server'
+import { buildBrandLandingPath } from '~/utils/brandLanding'
 
 interface SitemapImage {
   loc: string
@@ -238,7 +239,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       })
     }
 
-    // --- BRAND LANDING PAGES (?brand=slug) ---
+    // --- BRAND LANDING PAGES (/catalog/<категория>/brand/<бренд>) ---
     // ⚠️ Включаем в sitemap ТОЛЬКО те пары категория+бренд, для которых реально
     // существует уникальный SEO-контент (category_brand_seo) — именно от него
     // зависит index/noindex в pages/catalog/[...slug].vue (см. robotsRule).
@@ -273,7 +274,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
           return
         seen.add(key)
         sitemapRoutes.push({
-          loc: `${categoryPath}?brand=${brand.slug}`,
+          loc: buildBrandLandingPath(categoryPath, brand.slug),
           lastmod: item.updated_at ?? new Date().toISOString(),
           changefreq: 'weekly',
           priority: 0.65,

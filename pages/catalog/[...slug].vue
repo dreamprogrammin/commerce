@@ -34,6 +34,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { buildBrandLandingPath, parseCatalogSlug } from '@/utils/brandLanding'
 import { isWholeRange } from '@/utils/catalogFilterRange'
 import { clampDescription, composeCategoryLead } from '@/utils/seoDescription'
 
@@ -136,12 +137,22 @@ function cleanDescription(html: string | null, maxLength = 200): string {
 }
 
 // --- 1.5. Brand Landing ---
-const activeBrandSlug = computed(() => {
-  const brandParam = route.query.brand
-  if (!brandParam || Array.isArray(brandParam))
-    return null
-  return brandParam as string
-})
+/*
+ * Бренд и категория разбираются из пути: `/catalog/boys/brand/mattel`.
+ *
+ * Раньше бренд приходил параметром `?brand=`, и из-за этого нельзя было
+ * включить кеш страниц категорий: vercel-пресет подменяет query-строку в
+ * маршруте ISR-функции, и бренд-лендинг отдавал всю категорию. Подробности
+ * и цифры — в комментарии к `routeRules` в nuxt.config.ts.
+ *
+ * Старые адреса с параметром не забыты: их редиректит на новый путь
+ * `server/middleware/brand-query-redirect.ts`, постоянным 301.
+ */
+const catalogSlugParts = computed(() =>
+  parseCatalogSlug(route.params.slug as string[] | undefined),
+)
+
+const activeBrandSlug = computed(() => catalogSlugParts.value.brandSlug)
 
 const categoryBrandSeo = ref<{
   brand_id: string
@@ -251,7 +262,7 @@ const filteredProductLines = computed(() => {
 
 // --- 3. Вычисляемые свойства ---
 const currentCategorySlug = computed(
-  () => (route.params.slug as string[] | undefined)?.slice(-1)[0] ?? 'all',
+  () => catalogSlugParts.value.categorySegments.slice(-1)[0] ?? 'all',
 )
 
 const activeBrand = computed(() => {
@@ -442,7 +453,7 @@ const canonicalUrl = computed(() => {
   const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
 
   if (hasUniqueSeoContent) {
-    return `${baseUrl}${basePath}?brand=${activeBrandSlug.value}`
+    return `${baseUrl}${buildBrandLandingPath(basePath, activeBrandSlug.value)}`
   }
 
   return `${baseUrl}${basePath}`
@@ -674,8 +685,16 @@ async function loadFilterData(slug: string) {
     accumulatedProducts.value = []
 
     // ── ШАГ 2: Brand SEO — нужен для H1/title, грузим если есть brand в URL ─
-    const brandSlugParam = route.query.brand
-    if (brandSlugParam && !Array.isArray(brandSlugParam)) {
+    /*
+     * Бренд берётся из пути, а не из `route.query.brand`. Это же значение
+     * решает, покажется ли уникальный SEO-текст пары категория+бренд и
+     * встанет ли canonical на бренд-лендинг вместо категории — при чтении
+     * из query после переезда на путь обе вещи молча ломались.
+     */
+    const brandSlugParam = parseCatalogSlug(
+      route.params.slug as string[] | undefined,
+    ).brandSlug
+    if (brandSlugParam) {
       brandSeoLoading.value = true
       try {
         const { data: seoData } = await supabase.rpc('get_category_brand_seo', {
@@ -774,11 +793,7 @@ async function loadFilterData(slug: string) {
 
       // Резолвим brand id по slug теперь, когда есть список брендов
       let resolvedBrandIdsWithSlug = getArrayFromQuery(route.query.brands)
-      if (
-        brandSlugParam
-        && !Array.isArray(brandSlugParam)
-        && availableBrands.value.length > 0
-      ) {
+      if (brandSlugParam && availableBrands.value.length > 0) {
         const brandBySlug = availableBrands.value.find(
           b => b.slug === brandSlugParam,
         )
@@ -1439,6 +1454,27 @@ if (
   })
 }
 
+/*
+ * Несуществующий бренд в пути — тоже 404.
+ *
+ * `/catalog/boys/brand/net-takogo-brenda` иначе отдавал бы 200 и полную
+ * категорию под её собственным заголовком: тот же мягкий 404, что чинился
+ * для категорий, только с новой формой адреса. Раз путь индексируемый,
+ * мусор по нему порождать нельзя.
+ *
+ * Проверяется по `activeBrandSeo` — запросу, который ждётся выше и уже
+ * резолвит бренд по слагу. Пустой ответ означает именно «такого бренда
+ * нет»; ошибка запроса сюда не попадает, `useAsyncData` вернул бы её
+ * отдельно, и 404 из сбоя базы не сделается.
+ */
+if (activeBrandSlug.value && !activeBrandSeo.value) {
+  throw createError({
+    statusCode: 404,
+    statusMessage: 'Бренд не найден',
+    fatal: true,
+  })
+}
+
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
   availableProductLines.value = _filterPayload.value.productLines
@@ -1702,7 +1738,7 @@ const schemaData = computed(() => {
   const brandParts = availableBrands.value.slice(0, 6).map(brand => ({
     '@type': 'WebPage',
     'name': `${categoryName.value} ${brand.name}`,
-    'url': `https://uhti.kz${currentCategory.value?.href}?brand=${brand.slug}`,
+    'url': `https://uhti.kz${buildBrandLandingPath(currentCategory.value?.href ?? '', brand.slug)}`,
   }))
   const navParts = [...subcatParts, ...brandParts]
   if (navParts.length > 0) {

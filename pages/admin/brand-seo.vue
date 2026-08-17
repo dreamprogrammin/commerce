@@ -3,6 +3,7 @@ import type { Database } from '@/types/supabase'
 import { Plus, Save, Search, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useSeoTemplates } from '@/composables/useSeoTemplates'
+import { buildBrandLandingPath } from '@/utils/brandLanding'
 
 definePageMeta({ layout: 'admin' })
 
@@ -274,7 +275,7 @@ const previewUrl = computed(() => {
   const cat = categories.value.find(c => c.id === form.value.category_id)
   const brand = brands.value.find(b => b.id === form.value.brand_id)
   if (cat && brand) {
-    return `/catalog/${cat.slug}?brand=${brand.slug}`
+    return buildBrandLandingPath(`/catalog/${cat.slug}`, brand.slug)
   }
   return null
 })
@@ -381,7 +382,7 @@ const previewUrl = computed(() => {
             </td>
             <td class="p-3">
               <code class="text-xs bg-muted px-1.5 py-0.5 rounded">
-                /catalog/{{ entry.category_slug }}?brand={{ entry.brand_slug }}
+                /catalog/{{ entry.category_slug }}/brand/{{ entry.brand_slug }}
               </code>
             </td>
             <td class="p-3 text-right">
