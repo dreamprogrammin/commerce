@@ -15,23 +15,41 @@ interface SitemapRoute {
 
 const SUPABASE_STORAGE_URL = 'https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/product-images'
 
+/**
+ * Даты последней правки страниц, чьё содержимое живёт в коде, а не в базе.
+ *
+ * Зачем вообще. Инспекция всех 309 адресов через Search Console 17 августа
+ * показала: шесть страниц уходили в sitemap БЕЗ `lastmod` — `/about`,
+ * `/privacy-policy`, `/returns`, `/terms`, `/catalog/new`, `/catalog/promotions`.
+ * Две из них Google не переобходил с апреля и до сих пор считает `/about`
+ * несуществующей (Not found 404 по обходу от 5 апреля), хотя страница живая
+ * и отдаёт 200. Без `lastmod` у робота нет повода вернуться.
+ *
+ * Даты взяты из истории git по самим файлам страниц — то есть отражают, когда
+ * текст действительно менялся.
+ *
+ * ВАЖНО: правите текст такой страницы — обновите дату здесь же. Забыть не
+ * страшно (робот просто не получит подсказку), но смысл поля именно в этом.
+ */
+const STATIC_PAGE_LASTMOD: Record<string, string> = {
+  '/about': '2026-08-16T11:15:06+05:00',
+  '/terms': '2026-08-16T11:15:06+05:00',
+  '/returns': '2026-05-25T12:05:55+05:00',
+  '/privacy-policy': '2026-03-18T15:33:05+05:00',
+}
+
 export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
   const client = await serverSupabaseClient<Database>(event)
   const sitemapRoutes: SitemapRoute[] = []
 
   try {
-    // --- СТАТИЧЕСКИЕ СТРАНИЦЫ ---
-    const staticPages = [
-      { loc: '/', priority: 1.0, changefreq: 'daily' as const, lastmod: new Date().toISOString() },
-      { loc: '/catalog', priority: 0.9, changefreq: 'daily' as const, lastmod: new Date().toISOString() },
-      // ❌ '/brand/all' убран: страница возвращает 404 — pages/brand/[slug].vue
-      // не обрабатывает "all" как валидный слаг, а страница со списком всех
-      // брендов живёт на /brands (уже исключена из sitemap в nuxt.config.ts).
-    ]
-
-    staticPages.forEach((page) => {
-      sitemapRoutes.push(page)
-    })
+    // Статические страницы добавляются НИЖЕ, после загрузки товаров: датой
+    // листингов служит время правки самого свежего товара, а его надо сперва
+    // узнать. Раньше здесь стоял `new Date()` — см. пояснение у STATIC_PAGES.
+    //
+    // ❌ '/brand/all' убран: страница возвращает 404 — pages/brand/[slug].vue
+    // не обрабатывает "all" как валидный слаг, а страница со списком всех
+    // брендов живёт на /brands (уже исключена из sitemap в nuxt.config.ts).
 
     // --- ТОВАРЫ (с изображениями для Google Images) ---
     const { data: products, error: productsError } = await client
@@ -70,6 +88,45 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     else {
       console.warn('⚠️ Товары не найдены в базе данных')
     }
+
+    /*
+     * --- СТРАНИЦЫ-ЛИСТИНГИ И СТАТИКА ---
+     *
+     * Датой листингов служит время правки самого свежего товара: именно этим
+     * их содержимое и меняется. Прежде здесь стоял `new Date()`, то есть
+     * `lastmod` менялся на КАЖДЫЙ запрос sitemap. Это хуже, чем не указывать
+     * его вовсе: Google перестаёт доверять полю, которое всегда «только что».
+     *
+     * Товары приходят отсортированными по created_at, поэтому максимум по
+     * updated_at считаем отдельно.
+     */
+    const newestProductLastmod = (products ?? []).reduce<string | null>(
+      (max, p: any) => {
+        const value = p.updated_at
+        if (!value)
+          return max
+        return !max || value > max ? value : max
+      },
+      null,
+    ) ?? new Date().toISOString()
+
+    const listingPages: SitemapRoute[] = [
+      { loc: '/', priority: 1.0, changefreq: 'daily', lastmod: newestProductLastmod },
+      { loc: '/catalog', priority: 0.9, changefreq: 'daily', lastmod: newestProductLastmod },
+      { loc: '/catalog/new', priority: 0.7, changefreq: 'daily', lastmod: newestProductLastmod },
+      { loc: '/catalog/promotions', priority: 0.7, changefreq: 'daily', lastmod: newestProductLastmod },
+    ]
+
+    const legalPages: SitemapRoute[] = Object.entries(STATIC_PAGE_LASTMOD).map(
+      ([loc, lastmod]) => ({
+        loc,
+        lastmod,
+        changefreq: 'yearly',
+        priority: 0.3,
+      }),
+    )
+
+    sitemapRoutes.push(...listingPages, ...legalPages)
 
     // --- КАТЕГОРИИ ---
     const { data: categories, error: categoriesError } = await client
