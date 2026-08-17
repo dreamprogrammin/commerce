@@ -274,8 +274,23 @@ const activeBrand = computed(() => {
  *
  * Запрос на одну строку и только когда фильтр по бренду вообще выставлен.
  */
-const { data: activeBrandSeoName } = await useAsyncData(
-  () => `brand-seo-name-${activeBrandSlug.value ?? 'none'}`,
+/*
+ * Бренд из адреса резолвится здесь, до выборки товаров, и берётся не только
+ * имя, но и id.
+ *
+ * Раньше id приходил из `availableBrands`, а тот наполняется в
+ * `loadFilterData` — то есть ПОСЛЕ того, как товары уже запрошены. На сервере
+ * это означало, что бренд-лендинг отдавал роботу всю категорию: на
+ * `/catalog/boys?brand=mattel` было 12 карточек вместо одной, при том что
+ * заголовок и H1 бренд показывали правильно. Таких адресов 14 в sitemap —
+ * это единственные страницы с фильтром, которые вообще задуманы для индекса.
+ *
+ * Ключ запроса от этого не разъезжается: `loadFilterData` позже поставит в
+ * `activeFilters.brandIds` тот же самый id, и `catalogFilters` останется
+ * прежним — ни повторной выборки, ни рассинхрона гидратации.
+ */
+const { data: activeBrandSeo } = await useAsyncData(
+  () => `brand-seo-${activeBrandSlug.value ?? 'none'}`,
   async () => {
     const slug = activeBrandSlug.value
     if (!slug)
@@ -283,14 +298,19 @@ const { data: activeBrandSeoName } = await useAsyncData(
 
     const { data } = await supabase
       .from('brands')
-      .select('name')
+      .select('id, name')
       .eq('slug', slug)
       .maybeSingle()
 
-    return (data as { name: string | null } | null)?.name ?? null
+    return (data as { id: string, name: string | null } | null) ?? null
   },
   { watch: [activeBrandSlug] },
 )
+
+const activeBrandSeoName = computed(() => activeBrandSeo.value?.name ?? null)
+
+/** id бренда из адреса — известен до первой выборки товаров. */
+const activeBrandIdFromQuery = computed(() => activeBrandSeo.value?.id ?? null)
 
 /** Имя бренда, доступное и на сервере, и после гидратации. */
 const activeBrandName = computed(
@@ -481,10 +501,17 @@ const catalogFilters = computed<IProductFilters>(() => {
       activeFilters.value.subCategoryIds.length > 0
         ? activeFilters.value.subCategoryIds
         : undefined,
+    /*
+     * Пока `loadFilterData` не наполнил `availableBrands`, бренд берём из
+     * адреса: иначе первая — и на сервере единственная — выборка товаров
+     * уходит без фильтра, и бренд-лендинг отдаёт всю категорию.
+     */
     brandIds:
       activeFilters.value.brandIds.length > 0
         ? activeFilters.value.brandIds
-        : undefined,
+        : activeBrandIdFromQuery.value
+          ? [activeBrandIdFromQuery.value]
+          : undefined,
     productLineIds:
       activeFilters.value.productLineIds.length > 0
         ? activeFilters.value.productLineIds
