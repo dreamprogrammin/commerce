@@ -50,6 +50,22 @@ const { data: catalogData, pending } = useAsyncData(
   },
 )
 
+// LQIP-подложки категорий в общей выборке не приходят: они весили половину
+// сжатого документа, а в разметке SSR не участвуют — картинки сетки ниже
+// рисуются внутри ClientOnly и только при `!isMobile`. Догружаем их ровно
+// тогда, когда эта ветка действительно рисуется, включая переход
+// мобильной ширины в десктопную ресайзом.
+if (import.meta.client) {
+  watch(
+    isMobile,
+    (mobile) => {
+      if (!mobile)
+        void categoriesStore.loadCategoryBlurPlaceholders()
+    },
+    { immediate: true },
+  )
+}
+
 // Получаем подкатегории второго уровня
 const secondLevelCategories = computed<CategoryRow[]>(() => {
   const allCats = catalogData.value?.categories || []
@@ -196,9 +212,27 @@ function getCategoryImageVariants(category: CategoryRow) {
   }
 }
 
+/**
+ * Подложки берём из стора, а не из объекта категории.
+ *
+ * Категории для сетки приходят снимком `useAsyncData` (`catalogData`), а
+ * подложки догружаются отдельным клиентским запросом уже в стор. После
+ * гидратации снимок — самостоятельная копия, и правка стора до него не
+ * доезжает: сверка в браузере показала 0 карточек с LQIP при том, что
+ * запрос подложек уходил.
+ */
+const categoryBlurById = computed(() => {
+  const map = new Map<string, string>()
+  for (const category of categoriesStore.allCategories) {
+    if (category.blur_placeholder)
+      map.set(category.id, category.blur_placeholder)
+  }
+  return map
+})
+
 // Безопасное получение blur placeholder
 function getCategoryBlurUrl(category: CategoryRow): string | null {
-  const blur = category.blur_placeholder
+  const blur = categoryBlurById.value.get(category.id) ?? category.blur_placeholder
   return blur && blur.trim() !== '' ? blur : null
 }
 
