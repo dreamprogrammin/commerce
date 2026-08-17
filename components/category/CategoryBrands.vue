@@ -2,6 +2,7 @@
 import type { BrandForFilter } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
+import { buildBrandLandingPath } from '@/utils/brandLanding'
 
 const props = defineProps<{
   brands: BrandForFilter[]
@@ -21,7 +22,7 @@ function getBrandLogoUrl(logoUrl: string | null): string | null {
 
 function getBrandLink(brand: BrandForFilter): string {
   if (props.categorySlug) {
-    return `${route.path}?brand=${brand.slug}`
+    return buildBrandLandingPath(route.path, brand.slug)
   }
   return `/brand/${brand.slug}`
 }

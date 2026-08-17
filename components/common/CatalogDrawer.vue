@@ -6,6 +6,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { buildBrandLandingPath } from '@/utils/brandLanding'
 
 const modelValue = defineModel<boolean>({ default: false })
 
@@ -123,7 +124,7 @@ function closeDrawer() {
                   <!-- Бренды -->
                   <li v-for="brand in childItem.brands" :key="brand.id">
                     <NuxtLink
-                      :to="`${childItem.href}?brand=${brand.slug}`"
+                      :to="buildBrandLandingPath(childItem.href, brand.slug)"
                       class="flex items-center gap-2 px-8 py-2 text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
                       @click="closeDrawer"
                     >
