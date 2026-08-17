@@ -270,7 +270,14 @@ async function onWish() {
               :blur-data-url="image.blur_placeholder"
               :eager="index === 0 && isAboveTheFold"
             />
-            <div v-else class="h-full w-full animate-pulse bg-muted" aria-hidden="true" />
+            <!-- Подложка непосещённого слайда — БЕЗ animate-pulse.
+                 Пульсация означает «идёт загрузка», а здесь ничего не грузится:
+                 слайд просто не запрошен, пока по нему не провели. Посетитель
+                 листает карточки редко, поэтому такие подложки жили на странице
+                 вечно и всё это время анимировались. Замер на главной: 91 штука
+                 в непрерывной анимации и на 3-й секунде, и на 12-й — счётчик
+                 не менялся вовсе. Статичная плашка держит ту же геометрию. -->
+            <div v-else class="h-full w-full bg-muted" aria-hidden="true" />
           </div>
         </div>
 
