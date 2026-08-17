@@ -398,7 +398,9 @@ useSchemaOrg([
   },
 ])
 
-useRobotsRule({ index: true, follow: true })
+// Через useIndexableRobotsRule, а не напрямую: на превью правило должно
+// становиться noindex по флагу site.indexable, см. composables/useRobotsContent.ts
+useIndexableRobotsRule({ index: true, follow: true })
 </script>
 
 <template>

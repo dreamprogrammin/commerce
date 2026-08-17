@@ -501,7 +501,8 @@ useHead({
   ],
 })
 
-useRobotsRule({ index: true, follow: true })
+// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+useIndexableRobotsRule({ index: true, follow: true })
 </script>
 
 <template>
