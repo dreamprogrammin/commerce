@@ -5,6 +5,20 @@
       "schedule": "0 0 * * 0"
     }
   ],
+  "redirects": [
+    {
+      "source": "/catalog/:path*",
+      "has": [
+        {
+          "type": "query",
+          "key": "brand",
+          "value": "(?<brandSlug>.*)"
+        }
+      ],
+      "destination": "/catalog/:path*/brand/:brandSlug",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/_nuxt/(.*)",
@@ -89,4 +103,3 @@
     }
   ]
 }
-
