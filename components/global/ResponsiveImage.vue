@@ -32,7 +32,18 @@ const {
   onError,
 } = useImageState(imageUrl, { eager: props.eager })
 
-const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
+/*
+ * Проверка `hasSource` — та же, что в ProgressiveImage.vue, и по той же
+ * причине: у `<img>` без `src` браузер ставит `complete: true`, но не
+ * запускает ни `load`, ни `error`. Без неё `animate-pulse` крутится вечно
+ * на элементах, где загружать нечего. Подробный разбор — в комментарии
+ * того файла.
+ */
+const hasSource = computed(() => Boolean(props.src))
+
+const showPlaceholder = computed(
+  () => hasSource.value && !isLoaded.value && !isError.value,
+)
 
 const aspectRatioClass = computed(() => {
   switch (props.aspectRatio) {
