@@ -70,6 +70,21 @@ useBreadcrumbSchema([
 ])
 
 // SEO - Динамические мета-теги + structured data с категориями
+/**
+ * Значение robots вычисляется ЗДЕСЬ, в setup, а не внутри колбэка useHead ниже.
+ *
+ * Колбэк у useHead ленивый: unhead зовёт его при сборке тегов, уже вне
+ * setup-контекста. `useRobotsContent` внутри доходит до `useSiteConfig` ->
+ * `useRequestEvent` -> `useNuxtApp`, и тот падает с «A composable that requires
+ * access to the Nuxt instance was called outside of a plugin, Nuxt hook, Nuxt
+ * middleware, or Vue setup function». Страница /catalog отдавала из-за этого
+ * ровный 500 — и на превью тоже.
+ *
+ * Остальные страницы, перешедшие на этот композабл, зовут его в обычном
+ * объекте useHead/useSeoMeta, то есть синхронно в setup, — там всё в порядке.
+ */
+const robotsContent = useRobotsContent('index, follow')
+
 useHead(() => {
   const schemas = [
     {
@@ -128,7 +143,7 @@ useHead(() => {
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: metaTitle },
       { name: 'twitter:description', content: metaDescription },
-      { name: 'robots', content: useRobotsContent('index, follow') },
+      { name: 'robots', content: robotsContent },
     ],
     script: schemas,
   }
