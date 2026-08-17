@@ -25,7 +25,7 @@ import {
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useCatalogQuery } from '@/composables/useCatalogQuery'
+import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { useSeoTemplates } from '@/composables/useSeoTemplates'
 import { IMAGE_SIZES } from '@/config/images'
@@ -507,12 +507,28 @@ const catalogFilters = computed<IProductFilters>(() => {
   }
 })
 
+/*
+ * Ожидание стоит ЗДЕСЬ, а не внутри композабла, и это принципиально.
+ *
+ * Верхнеуровневый await в <script setup> компилятор оборачивает
+ * в withAsyncContext, поэтому после него живы и контекст Nuxt, и активный
+ * effect scope. Когда тот же await лежал внутри useCatalogQuery, scope
+ * терялся: в консоли висели «useQuery() should only be used inside setup()»
+ * и «onScopeDispose() is called when there is no active effect scope»,
+ * а страница категории получала рассинхрон гидратации.
+ */
+const catalogSsrData = await useCatalogSsrData(
+  catalogFilters,
+  currentPage,
+  PAGE_SIZE,
+)
+
 const {
   products: currentPageProducts,
   hasMore,
   isLoading: isLoadingProducts,
   isFetching,
-} = await useCatalogQuery(catalogFilters, currentPage, PAGE_SIZE)
+} = useCatalogQuery(catalogFilters, currentPage, PAGE_SIZE, catalogSsrData)
 
 const displayedProducts = computed<CatalogProduct[]>(() => {
   if (currentPage.value === 1) {
