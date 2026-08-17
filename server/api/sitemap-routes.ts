@@ -178,6 +178,34 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
           priority: 0.75,
         })
       })
+
+      /*
+       * Страница-хаб со списком всех брендов.
+       *
+       * Именно через неё робот попадает на страницы брендов: других ссылок
+       * на них в разметке почти нет. Пока /brands был исключён из sitemap
+       * (см. nuxt.config.ts), Google заходил туда раз в два с половиной
+       * месяца, и раздаваемые ею ссылки терялись.
+       *
+       * Дата — время правки самого свежего бренда: список меняется вместе
+       * с ними.
+       */
+      const newestBrandLastmod = brands.reduce<string | null>(
+        (max, b) => {
+          const value = b.updated_at
+          if (!value)
+            return max
+          return !max || value > max ? value : max
+        },
+        null,
+      ) ?? new Date().toISOString()
+
+      sitemapRoutes.push({
+        loc: '/brands',
+        lastmod: newestBrandLastmod,
+        changefreq: 'weekly',
+        priority: 0.6,
+      })
     }
     else {
       console.warn('⚠️ Бренды не найдены в базе данных')
