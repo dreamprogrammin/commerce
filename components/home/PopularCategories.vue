@@ -27,9 +27,15 @@ const isMobile = useIsMobile(1023)
 
 // menuTree наполняется на SSR через useAsyncData('home-ssr-critical') в index.vue;
 // подстраховка на клиенте, если стор пуст.
-onMounted(() => {
+//
+// Заодно догружаем LQIP-подложки: в общей выборке категорий их нет (весили
+// половину сжатого документа), а этот блок и так монтируется только на
+// клиенте — index.vue поднимает shouldRenderSecondaryBlocks по
+// requestIdleCallback, так что в SSR-разметке плиток нет вовсе.
+onMounted(async () => {
   if (!categoriesStore.menuTree.length)
-    categoriesStore.fetchCategoryData()
+    await categoriesStore.fetchCategoryData()
+  void categoriesStore.loadCategoryBlurPlaceholders()
 })
 
 const roots = computed<CategoryMenuItem[]>(() =>
