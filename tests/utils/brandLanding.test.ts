@@ -58,6 +58,38 @@ describe('buildBrandLandingPath', () => {
     expect(buildBrandLandingPath('/catalog/boys/', 'mattel')).toBe('/catalog/boys/brand/mattel')
   })
 
+  /*
+   * Смена бренда прямо на бренд-лендинге.
+   *
+   * `CategoryBrands` строит ссылки от текущего пути (`route.path`), а на
+   * бренд-лендинге там уже есть хвост `/brand/<слаг>`. Без защиты получалось
+   * `/catalog/boys/brand/mattel/brand/hstar` — на проде это 404 на КАЖДОМ
+   * чипе бренда, и Nuxt ещё и префетчил под них `_payload.json`.
+   */
+  it('не удваивает хвост, если он уже есть в пути', () => {
+    expect(buildBrandLandingPath('/catalog/boys/brand/mattel', 'hstar'))
+      .toBe('/catalog/boys/brand/hstar')
+  })
+
+  it('тот же бренд на бренд-лендинге даёт тот же путь, а не вложенный', () => {
+    expect(buildBrandLandingPath('/catalog/boys/brand/mattel', 'mattel'))
+      .toBe('/catalog/boys/brand/mattel')
+  })
+
+  it('вложенная категория с хвостом тоже разбирается верно', () => {
+    expect(buildBrandLandingPath('/catalog/girls/kukly/brand/barbie/', 'lol'))
+      .toBe('/catalog/girls/kukly/brand/lol')
+  })
+
+  /*
+   * Категория со слагом `brand` — не хвост бренд-лендинга. Одинокий `brand`
+   * в конце пути трогать нельзя, иначе сломается обычная категория.
+   */
+  it('одинокий сегмент brand в конце не считается хвостом', () => {
+    expect(buildBrandLandingPath('/catalog/brand', 'mattel'))
+      .toBe('/catalog/brand/brand/mattel')
+  })
+
   /* Собранный путь обязан разбираться обратно — иначе ссылка ведёт в 404. */
   it('обратим: что собрали, то и разбирается', () => {
     const path = buildBrandLandingPath('/catalog/girls/kukly', 'barbie')

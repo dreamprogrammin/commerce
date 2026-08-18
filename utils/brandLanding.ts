@@ -47,10 +47,30 @@ export function parseCatalogSlug(
 /**
  * Путь бренд-лендинга. `categoryPath` — адрес категории (`/catalog/boys`),
  * ведущий и хвостовой слеши не важны.
+ *
+ * Если на входе УЖЕ бренд-лендинг, прежний хвост снимается, а не наращивается.
+ * Это не теоретическая аккуратность: `CategoryBrands` строит ссылки от
+ * `route.path`, и на самом бренд-лендинге получалось
+ * `/catalog/boys/brand/mattel/brand/hstar`. На превью такой адрес отдавал
+ * 404 — то есть КАЖДЫЙ чип бренда на бренд-лендинге вёл в никуда, и Nuxt
+ * ещё и префетчил под эти адреса `_payload.json`, ловя 404 в консоли.
+ *
+ * Хвост опознаётся только целиком (`…/brand/<slug>`) — то же правило, что в
+ * `parseCatalogSlug`: одинокий `brand` в конце это обычная категория с таким
+ * слагом, и трогать её нельзя.
  */
 export function buildBrandLandingPath(
   categoryPath: string,
   brandSlug: string,
 ): string {
-  return `${categoryPath.replace(/\/+$/, '')}/${BRAND_SEGMENT}/${brandSlug}`
+  const trimmed = categoryPath.replace(/\/+$/, '')
+  const segments = trimmed.split('/')
+  const at = segments.length - 2
+
+  const base
+    = at >= 0 && segments[at] === BRAND_SEGMENT && segments[at + 1]
+      ? segments.slice(0, at).join('/')
+      : trimmed
+
+  return `${base}/${BRAND_SEGMENT}/${brandSlug}`
 }
