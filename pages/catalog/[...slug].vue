@@ -42,7 +42,7 @@ import { clampDescription, composeCategoryLead } from '@/utils/seoDescription'
 // DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
 // Script Evaluation 1459ms на мобилке. Грузим только когда нужны.
 const DynamicFilters = defineAsyncComponent(
-  () => import('@/components/global/DynamicFilters.vue'),
+  () => import('@/components/DynamicFilters.vue'),
 )
 const MobileCatalogDrawer = defineAsyncComponent(
   () => import('@/components/category/MobileCatalogDrawer.vue'),
