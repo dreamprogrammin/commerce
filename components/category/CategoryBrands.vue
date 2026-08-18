@@ -22,6 +22,13 @@ function getBrandLogoUrl(logoUrl: string | null): string | null {
 
 function getBrandLink(brand: BrandForFilter): string {
   if (props.categorySlug) {
+    /*
+     * Именно `route.path`, а не `categorySlug`: у вложенных категорий путь
+     * многосегментный (`/catalog/girls/kukly`), а в пропе лежит только
+     * последний слаг. Хвост `/brand/<слаг>` с текущего пути снимает сам
+     * `buildBrandLandingPath` — иначе на бренд-лендинге ссылки удваивались
+     * и каждый чип вёл в 404.
+     */
     return buildBrandLandingPath(route.path, brand.slug)
   }
   return `/brand/${brand.slug}`
