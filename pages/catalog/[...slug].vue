@@ -1066,10 +1066,19 @@ function updateQueryParams() {
     const matchedBrand = availableBrands.value.find(
       b => b.id === activeFilters.value.brandIds[0],
     )
-    if (matchedBrand && matchedBrand.slug === activeBrandSlug.value) {
-      query.brand = activeBrandSlug.value
-    }
-    else {
+    /*
+     * Бренд лендинга уже лежит в ПУТИ (`activeBrandSlug` читается из
+     * `catalogSlugParts`), поэтому в query его дублировать нечем и незачем.
+     * Раньше здесь писалось `query.brand`, и адрес получался
+     * `/catalog/boys/brand/mattel?brand=mattel` — остаток от времён, когда
+     * бренд жил в параметре. Такие адреса пользователи копируют и
+     * пересылают, а до починки правила в vercel.json любой заход по ним
+     * уходил в бесконечный редирект.
+     *
+     * Если же выбранный бренд не тот, что в пути, — это уже обычный фильтр,
+     * и он едет списком `brands`.
+     */
+    if (!matchedBrand || matchedBrand.slug !== activeBrandSlug.value) {
       query.brands = activeFilters.value.brandIds
     }
   }
