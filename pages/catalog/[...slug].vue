@@ -2449,18 +2449,21 @@ else {
       />
     </ClientOnly>
 
-    <!-- Отзывы категории -->
-    <ClientOnly>
-      <!-- Показывать или нет — решает сам компонент: у него есть данные по всей
-           категории, а categoryStats считает только по текущей странице выдачи,
-           из-за чего блок то появлялся, то исчезал при смене страницы -->
-      <CategoryReviews
-        v-if="currentCategory"
-        :category-id="currentCategory.id"
-        :category-name="currentCategory.name"
-        class="mt-8"
-      />
-    </ClientOnly>
+    <!-- Отзывы категории — рисуются НА СЕРВЕРЕ.
+
+         Показывать или нет — решает сам компонент: у него есть данные по всей
+         категории, а categoryStats считает только по текущей странице выдачи,
+         из-за чего блок то появлялся, то исчезал при смене страницы.
+
+         `ClientOnly` снят намеренно: пока он стоял, тексты отзывов не попадали
+         в серверную разметку и для поисковика их не существовало. Данные
+         компонент берёт через useAsyncData, обращений к DOM у него нет. -->
+    <CategoryReviews
+      v-if="currentCategory"
+      :category-id="currentCategory.id"
+      :category-name="currentCategory.name"
+      class="mt-8"
+    />
 
     <!-- Мобильные компоненты -->
     <ClientOnly>
