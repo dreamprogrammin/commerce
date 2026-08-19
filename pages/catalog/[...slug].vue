@@ -2397,6 +2397,40 @@ else {
       </div>
     </div>
 
+    <!-- Другие бренды внизу (показываем только когда бренд уже выбран) -->
+    <CategoryBrands
+      v-if="availableBrands.length > 1 && activeBrandSlug"
+      :brands="availableBrands"
+      :category-slug="currentCategorySlug"
+      :category-name="categoryName || undefined"
+      :active-brand-slug="activeBrandSlug"
+    />
+
+    <!-- Линейки продуктов в категории -->
+    <CategoryProductLines
+      v-if="availableProductLines.length > 0"
+      :product-lines="availableProductLines"
+      :brands="availableBrands"
+    />
+
+    <!-- ─── Отложенные блоки ─────────────────────────────────────────────
+         Всё, что ниже, рисуется ТОЛЬКО на клиенте и появляется через
+         несколько секунд после первой отрисовки. Поэтому эти блоки стоят
+         в самом конце — после серверных «Других брендов» и «Линеек».
+
+         Порядок здесь не вкусовщина, а починка CLS. Раньше они шли ВЫШЕ
+         серверных блоков, и появление отзывов на 6-й секунде выталкивало
+         уже отрисованное: высота страницы прыгала 3178 → 3850 → 4928, а
+         «Другие бренды» уезжали с y645 на y2396. Lighthouse давал
+         бренд-лендингу CLS 0.2464, пассивные прогоны браузера — 0.2468 и
+         0.4672 при пороге Google 0.1.
+
+         Теперь вставка происходит ниже сгиба и видимого контента не
+         двигает. Настоящее решение — отдавать эти блоки с сервера: тогда
+         вставки не будет вовсе, а тексты отзывов и FAQ станут видны
+         поисковику. Это отдельная работа: нужны их данные в SSR.
+    ─────────────────────────────────────────────────────────────────── -->
+
     <!-- SEO текст категории -->
     <ClientOnly>
       <SEOContentRenderer
@@ -2427,22 +2461,6 @@ else {
         class="mt-8"
       />
     </ClientOnly>
-
-    <!-- Другие бренды внизу (показываем только когда бренд уже выбран) -->
-    <CategoryBrands
-      v-if="availableBrands.length > 1 && activeBrandSlug"
-      :brands="availableBrands"
-      :category-slug="currentCategorySlug"
-      :category-name="categoryName || undefined"
-      :active-brand-slug="activeBrandSlug"
-    />
-
-    <!-- Линейки продуктов в категории -->
-    <CategoryProductLines
-      v-if="availableProductLines.length > 0"
-      :product-lines="availableProductLines"
-      :brands="availableBrands"
-    />
 
     <!-- Мобильные компоненты -->
     <ClientOnly>
