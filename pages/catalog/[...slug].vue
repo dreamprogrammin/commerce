@@ -2471,14 +2471,18 @@ else {
       class="mt-8"
     />
 
-    <!-- FAQ блок для категории -->
-    <ClientOnly>
-      <CategoryQuestions
-        v-if="currentCategory"
-        :category-id="currentCategory.id"
-        :category-name="currentCategory.name"
-      />
-    </ClientOnly>
+    <!-- FAQ блок для категории — рисуется НА СЕРВЕРЕ.
+
+         `ClientOnly` снят: пока он стоял, вопросы и ответы не попадали в
+         серверную разметку, хотя FAQ — ровно тот контент, который Google
+         показывает расширенными сниппетами. Данные компонент берёт через
+         useAsyncData, а санитайзер в нём переведён с DOM на регулярки —
+         иначе серверный рендер был бы невозможен. -->
+    <CategoryQuestions
+      v-if="currentCategory"
+      :category-id="currentCategory.id"
+      :category-name="currentCategory.name"
+    />
 
     <!-- Отзывы категории — рисуются НА СЕРВЕРЕ.
 
