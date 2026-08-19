@@ -91,10 +91,18 @@ function selectSort(value: string) {
     </PopoverContent>
   </Popover>
 
-  <!-- Мобилка: только кнопка для открытия Drawer -->
+  <!-- Мобилка: только кнопка для открытия Drawer.
+
+       aria-label обязателен: внутри одна иконка, и без подписи кнопка
+       остаётся безымянной для скринридера. Lighthouse ловил это на
+       странице бренда как «Buttons do not have an accessible name» —
+       проверка с весом 10, из-за неё балл доступности там был 89 против
+       98-100 на остальных страницах. Десктопный близнец выше подписан
+       текстом `currentLabel`, поэтому вопросов не вызывал. -->
   <Button
     v-if="!hideMobileTrigger"
     :variant="isActive ? 'default' : 'outline'"
+    aria-label="Сортировка товаров"
     class="h-11 w-11 p-0 shrink-0 transition-colors lg:hidden"
     :class="[
       isActive
