@@ -200,8 +200,34 @@ interface CatalogProduct {
 const currentPage = ref(1)
 const PAGE_SIZE = 12
 const availableFilters = ref<FilterAttribute[]>([])
-const availableBrands = ref<BrandForFilter[]>([])
-const availableProductLines = ref<ProductLine[]>([])
+
+/*
+ * Бренды и линейки живут в `useState`, а не в обычном `ref`, — иначе блоки,
+ * которые ими управляются, схлопываются сразу после гидратации.
+ *
+ * Механизм. Наполняет их `loadFilterData`, а он вызывается внутри
+ * `useAsyncData('catalog-filters-…', { server: true })`. На клиенте
+ * обработчик при гидратации НЕ выполняется: payload по ключу уже есть.
+ * Обычный `ref` в payload не попадает, поэтому на сервере список был, а на
+ * клиенте становился пустым — и `v-if="availableBrands.length > 1"` снимал
+ * блок «Другие бренды» вместе с его 211 пикселями.
+ *
+ * Во что это обходилось: CLS бренд-лендинга 0.2468 и 0.4672 в двух
+ * пассивных прогонах браузера при пороге Google 0.1. В отличие от CLS
+ * категории (тот оказался лабораторным, см. аудит) этот сдвиг настоящий и
+ * воспроизводится.
+ *
+ * `useState` Nuxt сериализует сам, поэтому значения переживают гидратацию и
+ * пустого окна не возникает. Ключ постоянный, без слага: при переходе в
+ * другую категорию `loadFilterData` перезапишет списки — ровно так же, как
+ * это делали обычные `ref`.
+ *
+ * Остальные списки (материалы, страны, атрибуты) оставлены обычными `ref`:
+ * они управляют содержимым фильтров, а те до открытия скрыты, и их
+ * заполнение ничего в потоке страницы не двигает.
+ */
+const availableBrands = useState<BrandForFilter[]>('catalog-brands', () => [])
+const availableProductLines = useState<ProductLine[]>('catalog-lines', () => [])
 const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
