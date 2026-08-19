@@ -28,14 +28,30 @@ interface Props {
 const props = defineProps<Props>()
 
 const supabase = useSupabaseClient()
-const reviews = ref<CategoryReview[]>([])
-const ratingDistributionData = ref<{ stars: number, count: number }[]>([])
-const isLoading = ref(true)
 
-// Загрузка отзывов и распределения оценок
-async function loadReviews() {
-  isLoading.value = true
-  try {
+/*
+ * Загрузка идёт через `useAsyncData`, а не в `onMounted`, и обработчик
+ * ВОЗВРАЩАЕТ данные, а не раскладывает их по `ref`.
+ *
+ * Зачем на сервере. С `onMounted` блок появлялся только на клиенте, через
+ * несколько секунд после первой отрисовки, и это стоило дважды: тексты
+ * отзывов не попадали в серверную разметку вовсе (для поисковика их не
+ * существовало), а поздняя вставка выталкивала вниз уже нарисованное — на
+ * бренд-лендинге высота страницы прыгала 3178 → 4928, CLS доходил до 0.4672
+ * при пороге 0.1.
+ *
+ * Почему именно `return`, а не присваивание в `ref`. Обычный `ref` в payload
+ * не попадает: сервер бы его наполнил, а клиент при гидратации получил
+ * пустоту и блок мигнул бы — ровно та ошибка, на которой я попался с
+ * `availableBrands` в `pages/catalog/[...slug].vue`. Возвращённое значение
+ * `useAsyncData` сериализует сам, и повторного запроса на клиенте нет.
+ *
+ * Обращений к DOM в компоненте нет — проверено перед переносом, иначе
+ * серверный рендер бы упал.
+ */
+const { data, pending } = await useAsyncData(
+  () => `category-reviews-${props.categoryId}`,
+  async () => {
     const [reviewsResult, distributionResult] = await Promise.all([
       supabase.rpc('get_latest_category_reviews', {
         p_category_id: props.categoryId,
@@ -51,18 +67,21 @@ async function loadReviews() {
     if (distributionResult.error)
       throw distributionResult.error
 
-    reviews.value = reviewsResult.data || []
-    ratingDistributionData.value = distributionResult.data || []
-  }
-  catch (error) {
-    console.error('Error loading category reviews:', error)
-    reviews.value = []
-    ratingDistributionData.value = []
-  }
-  finally {
-    isLoading.value = false
-  }
-}
+    return {
+      reviews: (reviewsResult.data || []) as CategoryReview[],
+      distribution: (distributionResult.data || []) as { stars: number, count: number }[],
+    }
+  },
+  {
+    watch: [() => props.categoryId],
+    // Пустой блок лучше падения страницы: категория без отзывов — норма.
+    default: () => ({ reviews: [] as CategoryReview[], distribution: [] as { stars: number, count: number }[] }),
+  },
+)
+
+const reviews = computed<CategoryReview[]>(() => data.value?.reviews ?? [])
+const ratingDistributionData = computed(() => data.value?.distribution ?? [])
+const isLoading = computed(() => pending.value)
 
 // Форматирование даты
 function formatDate(dateString: string) {
@@ -73,19 +92,6 @@ function formatDate(dateString: string) {
     year: 'numeric',
   }).format(date)
 }
-
-// Загрузка при монтировании
-onMounted(() => {
-  loadReviews()
-})
-
-// Перезагрузка при изменении категории
-watch(
-  () => props.categoryId,
-  () => {
-    loadReviews()
-  },
-)
 
 // Сводка по всей категории: и шкала, и итог, и средняя — из одного массива
 const summary = computed(() => summarizeRatingDistribution(ratingDistributionData.value))
