@@ -61,6 +61,38 @@ function trimGalleryBlur<T extends { blur_placeholder?: string | null }>(
  */
 const BLUR_PRODUCTS_LIMIT = 4
 
+/**
+ * Описание товара в списках обрезается до короткой выжимки.
+ *
+ * Целиком оно не нужно ни одному потребителю `fetchProducts`: карточка сетки
+ * его не рисует вовсе, бестселлеры на главной и страницы брендов тоже.
+ * Единственный читатель — разметка Schema.org на странице категории, а она
+ * зовёт `cleanDescription(html, 200)`: снимает теги и обрезает до 200 знаков,
+ * причём только у первых десяти товаров. То есть в payload ехал полный текст
+ * ради двухсот знаков.
+ *
+ * Замер на превью (`/catalog/boys`): 39.9 КБ payload в 69 длинных текстах при
+ * 12 товарах на странице — описания приезжали и для товаров из рекомендаций.
+ *
+ * Здесь делается ровно то же преобразование, что и в `cleanDescription`,
+ * поэтому разметка Schema.org не меняется: повторный вызов на уже очищенной
+ * строке даёт тот же результат.
+ *
+ * Полное описание живёт на странице товара, и она берёт его своим запросом —
+ * этот путь правку не затрагивает.
+ */
+const DESCRIPTION_SNIPPET_LIMIT = 200
+
+function trimDescription(html: string | null | undefined): string | null {
+  if (!html)
+    return html ?? null
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, DESCRIPTION_SNIPPET_LIMIT)
+}
+
 /** Снять заглушки у товаров ниже сгиба целиком. */
 function trimBelowFoldBlur<T extends { product_images?: { blur_placeholder?: string | null }[] }>(
   products: T[],
@@ -557,6 +589,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       const newProducts = (rpcResponse || []).map((p) => {
         return {
           ...p,
+          description: trimDescription(p.description),
           product_images: Array.isArray(p.product_images)
             ? trimGalleryBlur(p.product_images)
             : [],
