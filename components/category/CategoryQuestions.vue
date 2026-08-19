@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useQuery } from '@tanstack/vue-query'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 
 const props = defineProps<{
@@ -9,12 +8,27 @@ const props = defineProps<{
 
 const questionsStore = useCategoryQuestionsStore()
 
-const { data: questions, isLoading } = useQuery({
-  queryKey: ['category-questions', () => props.categoryId],
-  queryFn: () => questionsStore.fetchQuestions(props.categoryId),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-})
+/*
+ * `useAsyncData`, а не `useQuery`.
+ *
+ * `useQuery` из TanStack на сервере не выполняется, поэтому вопросы и
+ * ответы не попадали в серверную разметку: для поисковика их не
+ * существовало, хотя FAQ — ровно тот контент, который он показывает
+ * расширенными сниппетами.
+ *
+ * `useAsyncData` отрабатывает на сервере и переносит результат в payload,
+ * так что повторного запроса на клиенте нет. Ключ включает id категории,
+ * `watch` перезапрашивает при переходе в другую категорию — прежний
+ * `queryKey` делал то же самое.
+ */
+const { data: questions, pending: isLoading } = await useAsyncData(
+  () => `category-questions-${props.categoryId}`,
+  () => questionsStore.fetchQuestions(props.categoryId),
+  {
+    watch: [() => props.categoryId],
+    default: () => [],
+  },
+)
 
 const displayedQuestions = computed(() => {
   if (!questions.value)
@@ -30,14 +44,29 @@ function formatDate(dateStr: string) {
   })
 }
 
+/*
+ * Санитайзер на регулярках, а не на DOM.
+ *
+ * Раньше здесь был `document.createElement` — на сервере DOM нет, и с ним
+ * серверный рендер этого блока был невозможен в принципе.
+ *
+ * Правило осталось прежним: вырезаем `<script>` и `<style>`, остальное
+ * пропускаем. Это НЕ полноценный санитайзер и никогда им не был —
+ * DOM-версия тоже не трогала атрибуты вроде `onclick`. Текст ответов пишет
+ * администратор через свою панель, источник доверенный.
+ *
+ * Важно, что версия одна на обе стороны: если бы сервер отдавал сырой
+ * HTML, а клиент чистил его иначе, разметка бы разошлась и Vue сообщил бы
+ * о рассинхроне гидратации. Именно поэтому здесь не используется
+ * `useSafeHtml` — он на сервере намеренно возвращает строку как есть, а на
+ * клиенте прогоняет через DOMPurify, то есть даёт РАЗНЫЙ результат.
+ */
 function sanitizeAndRenderHTML(html: string | null): string {
   if (!html)
     return ''
-  const tempDiv = document.createElement('div')
-  tempDiv.innerHTML = html
-  const scripts = tempDiv.querySelectorAll('script, style')
-  scripts.forEach(s => s.remove())
-  return tempDiv.innerHTML
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '')
 }
 </script>
 
@@ -94,36 +123,51 @@ function sanitizeAndRenderHTML(html: string | null): string {
 </template>
 
 <style scoped>
-.faq-answer :deep(strong) {
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.faq-answer :deep(ul) {
-  list-style-type: disc;
-  list-style-position: inside;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.faq-answer :deep(ul) > * + * {
-  margin-top: 0.25rem;
-}
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
 
-.faq-answer :deep(li) {
-  color: hsl(var(--muted-foreground));
-}
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
-.faq-answer :deep(a) {
-  color: hsl(var(--primary));
-  font-weight: 500;
-}
+@layer components {
+  .faq-answer :deep(strong) {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+  }
 
-.faq-answer :deep(a:hover) {
-  text-decoration: underline;
-}
+  .faq-answer :deep(ul) {
+    list-style-type: disc;
+    list-style-position: inside;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
 
-.faq-answer :deep(p) {
-  margin-bottom: 0.5rem;
+  .faq-answer :deep(ul) > * + * {
+    margin-top: 0.25rem;
+  }
+
+  .faq-answer :deep(li) {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .faq-answer :deep(a) {
+    color: hsl(var(--primary));
+    font-weight: 500;
+  }
+
+  .faq-answer :deep(a:hover) {
+    text-decoration: underline;
+  }
+
+  .faq-answer :deep(p) {
+    margin-bottom: 0.5rem;
+  }
 }
 </style>

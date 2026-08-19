@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/vue-query'
 export function useSlides() {
   const supabase = useSupabaseClient<Database>()
 
-  const { data, isLoading, isFetching, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch, suspense } = useQuery({
     queryKey: ['global-slides'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -105,6 +105,13 @@ ${data.map((slide, i) => `  ${i + 1}. ${slide.title}
 
     // 🔄 Методы
     refresh,
+
+    /**
+     * Дождаться запроса. Нужно на сервере: без ожидания Hero успевал
+     * отрисоваться раньше ответа и попадал в HTML скелетоном, тогда как
+     * payload к моменту сериализации уже содержал слайды. См. pages/index.vue.
+     */
+    suspense,
 
     // 🎯 Утилиты
     isEmpty: computed(() => (data.value?.length || 0) === 0),

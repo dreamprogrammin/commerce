@@ -5,6 +5,7 @@
  * инвалидирует кеш товаров при подтверждении заказа
  */
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { useProfileStore } from '@/stores/core/profileStore'
 import { useProductCacheInvalidation } from './useProductCacheInvalidation'
 
 // ✅ Глобальные переменные на уровне модуля
@@ -236,9 +237,25 @@ export function useOrderRealtime() {
   }
 
   /**
-   * Подписаться на все необходимые каналы
+   * Подписаться на все необходимые каналы.
+   *
+   * Только администратору. Раньше вызывалось безусловно, и WebSocket с двумя
+   * подписками открывался у каждого гостя на каждой странице.
+   *
+   * Гостю эти каналы не дают ничего: RLS у `orders` и `guest_checkouts` не
+   * отдаёт анониму ни одной строки (REST на обе таблицы отвечает пустым
+   * массивом), а `postgres_changes` применяет ту же RLS к каждому подписчику.
+   * То есть соединение висит, а событие не придёт никогда.
+   *
+   * Подписка при этом не падала — канал отвечает `status: ok`, в консоли
+   * `✅ Subscribed to orders channel`. Так что чинится здесь не ошибка,
+   * а бесполезная работа: одно постоянное WSS-соединение на посетителя
+   * и подписчик на стороне Supabase.
    */
   function subscribeAll() {
+    if (!useProfileStore().isAdmin)
+      return
+
     subscribeToOrders()
     subscribeToGuestCheckouts()
     // Опционально: подписка на изменения продуктов

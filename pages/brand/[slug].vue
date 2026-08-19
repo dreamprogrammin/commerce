@@ -270,7 +270,7 @@ useSeoMeta({
   twitterTitle: metaTitle,
   twitterDescription: metaDescription,
   twitterImage: ogImageSrc,
-  robots: 'index, follow',
+  robots: useRobotsContent('index, follow'),
 })
 
 // BreadcrumbList JSON-LD
@@ -552,7 +552,8 @@ useHead({
 // ⚠️ Раньше индексация была жёстко захардкожена в index:true — из-за этого
 // бренды без единого товара в наличии (напр. /brand/air-blaster) оставались
 // индексируемыми "пустыми полками" (см. SEO-аудит, находка SXO-2 / Content-1).
-useRobotsRule(
+// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+useIndexableRobotsRule(
   computed(() => ({ index: brandHasStock.value !== false, follow: true })),
 )
 </script>

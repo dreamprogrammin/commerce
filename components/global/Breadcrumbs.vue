@@ -57,9 +57,23 @@ const currentItem = computed(() => {
             <span>Главная</span>
           </NuxtLink>
         </li>
-        <li v-for="item in items" :key="item.id" class="flex items-center">
+        <li v-for="(item, index) in items" :key="item.id" class="flex items-center">
           <ChevronRight class="h-4 w-4 mx-1 text-muted-foreground/50" />
-          <NuxtLink :to="item.href" class="hover:text-primary transition-colors">
+
+          <!-- Последняя крошка — текущая страница, ссылкой быть не должна.
+               На карточке товара href у неё не задан вовсе ([slug].vue пушит
+               `{ id, name }` без href), и в разметку уходил <a> без адреса:
+               Lighthouse валил «Links are not crawlable», SEO 92 вместо 100.
+               Мобильная ветка ниже отдавала <span> с самого начала. -->
+          <span
+            v-if="index === items.length - 1"
+            aria-current="page"
+            class="text-foreground font-medium"
+          >
+            {{ item.name }}
+          </span>
+
+          <NuxtLink v-else :to="item.href" class="hover:text-primary transition-colors">
             {{ item.name }}
           </NuxtLink>
         </li>
@@ -110,16 +124,21 @@ const currentItem = computed(() => {
             <!-- Последняя категория (текущая) -->
             <span
               v-if="index === items.length - 1"
+              aria-current="page"
               class="text-foreground/80 font-medium whitespace-nowrap"
             >
               {{ item.name }}
             </span>
 
             <!-- Промежуточные категории -->
+            <!-- Без модификатора прозрачности: `text-muted-foreground/60`
+                 давал #a6a6a6 на белом, контраст 2.43 при норме WCAG AA 4.5.
+                 Lighthouse ловил это на странице бренда как провал проверки
+                 контраста с весом 7. Ссылка стала темнее — так и задумано. -->
             <NuxtLink
               v-else
               :to="item.href"
-              class="text-muted-foreground/60 hover:text-primary transition-colors whitespace-nowrap"
+              class="text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
             >
               {{ item.name }}
             </NuxtLink>
@@ -131,13 +150,28 @@ const currentItem = computed(() => {
 </template>
 
 <style scoped>
-/* Скрываем scrollbar для горизонтального скролла */
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* Скрываем scrollbar для горизонтального скролла */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
 </style>

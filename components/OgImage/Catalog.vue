@@ -1,119 +1,103 @@
 <script setup lang="ts">
-defineProps<{
+/**
+ * Картинка для шаринга страниц каталога.
+ *
+ * Стили здесь ИНЛАЙНОВЫЕ, а не классами Tailwind, и это не вкусовщина.
+ * Картинку рисует satori, и утилиты Tailwind этого проекта (v4) его
+ * препроцессор не разбирает: в SVG уходили `width="NaN"`, `stdDeviation="NaN"`
+ * и прочее, после чего растеризатор resvg падал с паникой
+ * («called Option::unwrap() on a None value»), а /__og-image__/…/og.png
+ * отдавал 500 на всех страницах категорий — и на проде тоже.
+ *
+ * Проверено подстановкой: тот же макет на инлайновых стилях даёт ноль NaN
+ * и PNG 200. Правила, выведенные из этих проверок:
+ *   • только inline-стили, никаких классов;
+ *   • у каждого контейнера с несколькими детьми явный display: flex —
+ *     satori других раскладок не знает и падает с ошибкой про display;
+ *   • никаких blur / backdrop-filter / drop-shadow: satori считает размытие
+ *     в NaN, и на этом падает уже растеризатор;
+ *   • никаких эмодзи: satori подставляет их картинкой с width="NaN" —
+ *     ровно тот же обрыв;
+ *   • размеры в пикселях, без процентов и grid.
+ *
+ * Макет намеренно одноколоночный. Горизонтальные ряды у satori разъезжаются:
+ * даже при явном flex-direction: row (проверено — в HTML он доходит) элементы
+ * всё равно встают друг под другом. Спорить с этим ради OG-картинки незачем,
+ * поэтому здесь только вертикальный поток.
+ *
+ * Фоновая картинка категории убрана: она шла под градиентом на opacity-20,
+ * то есть почти не читалась, а тянула удалённый файл на каждый рендер.
+ */
+withDefaults(defineProps<{
   title: string
   description?: string
-  categoryImage?: string
   productsCount?: number
-}>()
+  /** Надстрочная подпись. По умолчанию — для страниц категорий. */
+  kicker?: string
+}>(), { kicker: 'КАТАЛОГ' })
+
+const WHITE_SOFT = 'rgba(255,255,255,0.86)'
 </script>
 
 <template>
-  <div class="w-full h-full relative overflow-hidden">
-    <!-- Градиентный фон -->
-    <div class="absolute inset-0 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600" />
-
-    <!-- Картинка категории как фон (если есть) -->
-    <div v-if="categoryImage" class="absolute inset-0">
-      <img
-        :src="categoryImage"
-        alt=""
-        class="w-full h-full object-cover opacity-20 blur-sm"
-      >
-      <div class="absolute inset-0 bg-gradient-to-br from-blue-500/80 via-blue-600/80 to-purple-600/80" />
+  <div
+    :style="{
+      width: '1200px',
+      height: '630px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      padding: '80px',
+      background: 'linear-gradient(135deg, #3b82f6 0%, #4f46e5 55%, #7c3aed 100%)',
+    }"
+  >
+    <div
+      :style="{
+        display: 'flex',
+        color: WHITE_SOFT,
+        fontSize: '26px',
+        fontWeight: 600,
+        letterSpacing: '2px',
+      }"
+    >
+      УХТЫШКА · {{ kicker }}
     </div>
 
-    <!-- Декоративные элементы -->
-    <div class="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
-    <div class="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+    <div
+      :style="{
+        display: 'flex',
+        color: '#fff',
+        fontSize: '78px',
+        fontWeight: 900,
+        lineHeight: 1.05,
+        marginTop: '28px',
+      }"
+    >
+      {{ title }}
+    </div>
 
-    <!-- Основной контент -->
-    <div class="relative h-full flex flex-col justify-between p-16">
-      <!-- Верхняя часть: Логотип + название магазина -->
-      <div class="flex items-center gap-6">
-        <div class="w-20 h-20 rounded-3xl bg-white/20 backdrop-blur-xl flex items-center justify-center border border-white/30 shadow-2xl">
-          <div class="text-5xl">
-            🛍️
-          </div>
-        </div>
-        <div class="space-y-1">
-          <div class="text-white text-3xl font-bold tracking-tight">
-            Ваш магазин
-          </div>
-          <div class="text-white/70 text-xl font-medium">
-            Интернет-магазин
-          </div>
-        </div>
-      </div>
+    <div
+      v-if="description"
+      :style="{
+        display: 'flex',
+        color: WHITE_SOFT,
+        fontSize: '30px',
+        lineHeight: 1.3,
+        marginTop: '24px',
+      }"
+    >
+      {{ description }}
+    </div>
 
-      <!-- Центральная часть: Заголовок -->
-      <div class="space-y-6 max-w-4xl">
-        <div class="inline-block px-6 py-3 bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20">
-          <span class="text-white/90 text-2xl font-semibold">Каталог</span>
-        </div>
-        <h1 class="text-8xl font-black text-white leading-tight drop-shadow-2xl">
-          {{ title }}
-        </h1>
-        <p v-if="description" class="text-3xl text-white/90 font-medium leading-relaxed">
-          {{ description }}
-        </p>
-      </div>
-
-      <!-- Нижняя часть: Статистика -->
-      <div class="flex items-center gap-6">
-        <!-- Количество товаров -->
-        <div
-          v-if="productsCount && productsCount > 0"
-          class="flex items-center gap-4 bg-white/10 backdrop-blur-xl rounded-3xl px-8 py-5 border border-white/20 shadow-2xl"
-        >
-          <div class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-            <div class="text-4xl">
-              📦
-            </div>
-          </div>
-          <div class="text-white">
-            <div class="text-xl opacity-90 font-medium">
-              Товаров в наличии
-            </div>
-            <div class="text-4xl font-black">
-              {{ productsCount }}+
-            </div>
-          </div>
-        </div>
-
-        <!-- Доставка -->
-        <div class="flex items-center gap-4 bg-white/10 backdrop-blur-xl rounded-3xl px-8 py-5 border border-white/20 shadow-2xl">
-          <div class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-            <div class="text-4xl">
-              ⚡
-            </div>
-          </div>
-          <div class="text-white">
-            <div class="text-xl opacity-90 font-medium">
-              Быстрая доставка
-            </div>
-            <div class="text-2xl font-bold">
-              По всему Казахстану
-            </div>
-          </div>
-        </div>
-
-        <!-- Гарантия качества -->
-        <div class="flex items-center gap-4 bg-white/10 backdrop-blur-xl rounded-3xl px-8 py-5 border border-white/20 shadow-2xl">
-          <div class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-            <div class="text-4xl">
-              ✨
-            </div>
-          </div>
-          <div class="text-white">
-            <div class="text-xl opacity-90 font-medium">
-              Гарантия
-            </div>
-            <div class="text-2xl font-bold">
-              100%
-            </div>
-          </div>
-        </div>
-      </div>
+    <div
+      :style="{
+        display: 'flex',
+        color: WHITE_SOFT,
+        fontSize: '26px',
+        marginTop: '44px',
+      }"
+    >
+      {{ productsCount ? `${productsCount}+ товаров · ` : '' }}Доставка по Алматы за 1 день
     </div>
   </div>
 </template>

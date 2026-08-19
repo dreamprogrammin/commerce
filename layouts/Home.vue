@@ -6,25 +6,72 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
 
 <template>
   <div class="flex flex-col" style="min-height: 100dvh">
-    <!-- Header только на десктопе -->
+    <!--
+      Шапка только на десктопе, в режиме overlay: прозрачная поверх героя,
+      стекло при скролле. На мобильном шапки нет вовсе (как в дизайне) —
+      её роль играют фиксированный герой + липкая строка поиска + нижняя
+      навигация. NotificationBell перенесён в липкую строку поиска.
+    -->
     <div class="hidden lg:block">
-      <CommonHeader />
+      <CommonSiteHeader variant="overlay" />
     </div>
 
-    <!-- Мобильная версия с mobile header -->
-    <div class="lg:hidden">
-      <!-- Mobile Header - статичный -->
-      <CommonMobileHeader />
-    </div>
-
-    <!-- Main без padding-top, т.к. mobile header статичный -->
-    <main
-      class="flex-1 pt-[65px] lg:pt-0 lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]"
-    >
+    <!--
+      Мобильный герой фиксирован (position:fixed) и начинается от y=0,
+      поэтому pt-* здесь быть НЕ должно. pb-* здесь тоже быть не должно:
+      резерв под нижнюю навигацию переехал на футер (см. ниже).
+    -->
+    <main class="flex-1">
       <slot />
     </main>
 
-    <!-- Footer — ленивый -->
-    <LazyCommonFooter />
+    <!--
+      Футер — ленивый, и обязан лежать в собственном слое.
+      Он рендерится ВНЕ <main>, поэтому белый лист `.home-content` (z-index: 6)
+      его не накрывает. Сам футер не спозиционирован, а мобильный герой —
+      `position: fixed; z-index: 0` (Hero.vue:214), поэтому без этого слоя футер
+      рисуется ПОД героем: внизу страницы герой просвечивал сквозь
+      полупрозрачный `bg-muted/30`. Фон обязан быть непрозрачным — одного
+      z-index мало. `mt-auto` переехал с самого <footer> на обёртку, иначе
+      он потерял бы flex-родителя.
+
+      Резерв под глобальную нижнюю навигацию (app.vue) висит ЗДЕСЬ, а не на
+      <main>. На <main> он давал 64px прозрачной полосы между листом контента
+      и футером, сквозь которую светил герой, и при этом не работал по
+      назначению: футер идёт после <main>, так что навигация всё равно
+      перекрывала его низ. Резерв должен стоять в самом конце документа.
+    -->
+    <div class="home-footer-layer mt-auto pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <LazyCommonFooter />
+    </div>
   </div>
 </template>
+
+<style scoped>
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  .home-footer-layer {
+    position: relative;
+    /* Строго между фиксированным героем (z-index: 0) и листом контента
+       `.home-content` (z-index: 6). Ставить 6 нельзя: при равном z-index
+       побеждает тот, кто ниже в DOM, а футер идёт после <main> — он начинал
+       перекрывать липкую строку поиска. Её `.sticky-row--stuck { z-index: 100 }`
+       не спасает: строка заперта в стекинг-контексте `.home-content`, наружу
+       соревнуется весь лист целиком со своим z-index: 6. */
+    z-index: 1;
+    background: var(--background);
+  }
+}
+</style>

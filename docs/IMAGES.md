@@ -1059,7 +1059,7 @@ slides-images/
 
 **Фронтенд — все компоненты используют `getVariantUrl`/`getVariantUrlWide`:**
 
-- Категории: `PopularCategories`, `AppTabBar`, `CategoryDescription`, каталог
+- Категории: `PopularCategories`, `AppTabBar`, каталог
 - Бренды: `BrandsCarousel`, `ProductCard` (лого), `/brands`, `/brand/[slug]`
 - Линейки: `CategoryProductLines`, `/brand/[brandSlug]/[lineSlug]`
 - Слайды: `AppCarousel` → `getVariantUrlWide('lg'/'sm')`

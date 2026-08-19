@@ -1,6 +1,15 @@
 import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
+import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
+import {
+  buildDeliveryDates,
+  clampIndex,
+  DELIVERY_DATE_COUNT,
+  DELIVERY_SLOTS,
+} from '@/utils/deliverySlots'
 import { useProfileStore } from '../core/profileStore'
+
+export type DeliveryMethod = 'pickup' | 'courier'
 
 const CART_STORAGE_KEY = 'uhti-cart-v1'
 
@@ -20,22 +29,125 @@ export const useCartStore = defineStore(
     const items = ref<ICartItem[]>([])
     const isProcessing = ref(false)
     const bonusesToSpend = ref(0)
+
+    /**
+     * Способ получения — общий для корзины и оформления.
+     *
+     * Раньше он жил только в orderForm на /checkout со значением 'pickup', а
+     * /cart считала доставку по курьеру. Покупатель видел в корзине «Итого» с
+     * доставкой, переходил дальше и получал сумму на 1000 ₸ меньше. Теперь
+     * значение одно на оба шага, как S.fulfill в макете, и по умолчанию —
+     * курьер (в макете `fulfill:'delivery'`).
+     */
+    const deliveryMethod = ref<DeliveryMethod>('courier')
+
+    /**
+     * Адрес доставки — тоже общий, а не локальное поле формы оформления.
+     * Его показывает мобильная локейшн-панель, которая живёт в layout и
+     * видна на обоих шагах, а вводится он на /checkout. В макете это ровно
+     * так же: S.address — одно поле состояния на всю корзину.
+     */
+    const deliveryAddress = ref({ city: 'Алматы', line1: '' })
+
+    /**
+     * Желаемые дата и интервал доставки — индексами, а не значениями.
+     * Почему индексами, см. utils/deliverySlots.ts: индекс 0 всегда «сегодня»,
+     * поэтому сохранённый выбор не протухает. Абсолютные значения считаются
+     * ниже, в момент отправки заказа.
+     */
+    /**
+     * Выбранный пункт самовывоза. Как и способ получения, живёт в корзине:
+     * его показывает локейшн-панель из layout, а выбирают на /checkout.
+     */
+    const pickupPointId = ref<string | null>(null)
+
+    const deliveryDateIndex = ref(0)
+    const deliverySlotIndex = ref(0)
+
+    /**
+     * Когда оформлен последний заказ — только чтобы показать дату гостю.
+     *
+     * Гостевой заказ лежит в guest_checkouts, а RLS отдаёт эту таблицу лишь
+     * админам: покупатель-гость не может прочитать даже собственный заказ и
+     * узнать время его создания. Запоминаем момент оформления на клиенте.
+     *
+     * Храним вместе с id: иначе, оформив два заказа и вернувшись по ссылке на
+     * первый, покупатель увидел бы дату второго.
+     *
+     * Время клиентское, а не серверное — при сбитых часах разойдётся с тем,
+     * что записано в базе. Для справочной строки это приемлемо, для чего-то
+     * большего брать её отсюда нельзя.
+     */
+    const lastOrder = ref<{ id: string, at: string } | null>(null)
+
+    const deliveryDateIso = computed(
+      () => buildDeliveryDates()[clampIndex(deliveryDateIndex.value, DELIVERY_DATE_COUNT)]?.iso ?? null,
+    )
+
+    const deliverySlotLabel = computed(
+      () => DELIVERY_SLOTS[clampIndex(deliverySlotIndex.value, DELIVERY_SLOTS.length)] ?? null,
+    )
     const isAddingItem = ref(false) // Флаг для предотвращения race condition
     const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
     const isMergingFromServer = ref(false) // Блокирует sync→server пока грузим данные с сервера
     const isCartOpen = ref(false) // 🔥 Управление состоянием шторки корзины
     const hasMergedOnLogin = ref(false) // Флаг для предотвращения повторного мерджа
 
+    /**
+     * Количество позиции числом. Корзина восстанавливается из localStorage
+     * (persist), поэтому там может лежать что угодно, включая записи от старой
+     * версии схемы. Любое нечисло здесь превращало итог в NaN.
+     */
+    function itemQuantity(item: ICartItem): number {
+      const quantity = Number(item.quantity)
+      return Number.isFinite(quantity) ? quantity : 0
+    }
+
+    /**
+     * Цена позиции за штуку.
+     *
+     * final_price — generated-колонка БД и в типах помечена обязательной, но
+     * в корзину товар может приехать из localStorage от версии, где её ещё не
+     * было, или из выборки, которая её не запросила. Тогда undefined * qty
+     * давало NaN, и он утекал дальше: в total, в maxBonusesForOrder и в
+     * total_amount, который уходит на сервер при синхронизации заказа.
+     *
+     * Фолбэк на price — та же конвенция, что уже используется на карточке
+     * товара и в ProductCard (`final_price || price`).
+     */
+    function itemUnitPrice(item: ICartItem): number {
+      const price = Number(item.product?.final_price ?? item.product?.price)
+      return Number.isFinite(price) ? price : 0
+    }
+
     const totalItems = computed(() =>
-      items.value.reduce((sum: number, item) => sum + item.quantity, 0),
+      items.value.reduce((sum: number, item) => sum + itemQuantity(item), 0),
     )
 
     const subtotal = computed(() =>
-      items.value.reduce((sum: number, item) => {
-        // 🔥 Используем final_price из базы данных (с округлением)
-        return sum + item.product.final_price * item.quantity
-      }, 0),
+      items.value.reduce(
+        (sum: number, item) => sum + itemUnitPrice(item) * itemQuantity(item),
+        0,
+      ),
     )
+
+    /**
+     * Стоимость доставки. Самовывоз бесплатен всегда, курьер — от порога.
+     * Считается от subtotal (до промокода и бонусов), как в calc() макета.
+     */
+    const deliveryCost = computed(() => {
+      if (deliveryMethod.value === 'pickup')
+        return 0
+      return subtotal.value >= FREE_SHIPPING_THRESHOLD
+        ? 0
+        : COURIER_DELIVERY_COST
+    })
+
+    const isFreeShipping = computed(() => deliveryCost.value === 0)
+
+    function setDeliveryMethod(method: DeliveryMethod) {
+      deliveryMethod.value = method
+    }
 
     const discountAmount = computed(() => {
       // Только для авторизованных пользователей
@@ -400,6 +512,8 @@ export const useCartStore = defineStore(
           quantity: i.quantity,
         }))
 
+        const isCourierOrder = orderData.deliveryMethod === 'courier'
+
         let orderId: string | null = null
 
         // Определяем: гость или авторизованный пользователь
@@ -423,6 +537,17 @@ export const useCartStore = defineStore(
             p_payment_method: orderData.paymentMethod,
             p_promo_code: orderData.promoCode || null,
             p_delivery_cost: orderData.deliveryCost || 0,
+            // Комментарий к адресу (подъезд, этаж, домофон). Форма собирала
+            // его и раньше, но до RPC он не доезжал и терялся молча.
+            // Для авторизованных заказов пока не передаём: у create_user_order
+            // такого параметра нет, см. 20260805100000_guest_checkout_comment.
+            p_comment: orderData.comment || null,
+            // Дату и слот шлём только для курьера: у самовывоза их нет.
+            p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
+            p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
+            // Пункт нужен только самовывозу; при курьере сервер его всё равно
+            // отбросит, но не шлём и отсюда — так понятнее в логах.
+            p_pickup_point_id: isCourierOrder ? null : pickupPointId.value,
           })
 
           if (error)
@@ -447,6 +572,10 @@ export const useCartStore = defineStore(
             p_contact_name: orderData.contactName || null,
             p_contact_phone: orderData.contactPhone || null,
             p_delivery_cost: orderData.deliveryCost || 0,
+            p_comment: orderData.comment || null,
+            p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
+            p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
+            p_pickup_point_id: isCourierOrder ? null : pickupPointId.value,
           })
 
           if (error)
@@ -493,6 +622,9 @@ export const useCartStore = defineStore(
           clearCart()
         }
 
+        if (orderId)
+          lastOrder.value = { id: orderId, at: new Date().toISOString() }
+
         // Редирект на страницу успеха
         await router.push(`/order/success/${orderId}`)
       }
@@ -515,6 +647,17 @@ export const useCartStore = defineStore(
       isCartOpen,
       totalItems,
       subtotal,
+      deliveryMethod,
+      deliveryAddress,
+      pickupPointId,
+      deliveryDateIndex,
+      deliverySlotIndex,
+      deliveryDateIso,
+      deliverySlotLabel,
+      lastOrder,
+      deliveryCost,
+      isFreeShipping,
+      setDeliveryMethod,
       discountAmount,
       total,
       bonusesToAward,
@@ -531,7 +674,20 @@ export const useCartStore = defineStore(
   {
     persist: {
       key: CART_STORAGE_KEY,
-      pick: ['items', 'bonusesToSpend'],
+      // deliveryMethod персистим вместе с корзиной: выбранный на /checkout
+      // самовывоз должен пережить возврат на /cart, иначе «Итого» снова
+      // разъедется. deliveryAddress — по той же причине: локейшн-панель
+      // показывает его на обоих шагах.
+      pick: [
+        'items',
+        'bonusesToSpend',
+        'deliveryMethod',
+        'deliveryAddress',
+        'pickupPointId',
+        'deliveryDateIndex',
+        'deliverySlotIndex',
+        'lastOrder',
+      ],
       storage: piniaPluginPersistedstate.localStorage(),
     },
   },

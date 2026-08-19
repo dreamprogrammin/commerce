@@ -32,7 +32,18 @@ const {
   onError,
 } = useImageState(imageUrl, { eager: props.eager })
 
-const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
+/*
+ * Проверка `hasSource` — та же, что в ProgressiveImage.vue, и по той же
+ * причине: у `<img>` без `src` браузер ставит `complete: true`, но не
+ * запускает ни `load`, ни `error`. Без неё `animate-pulse` крутится вечно
+ * на элементах, где загружать нечего. Подробный разбор — в комментарии
+ * того файла.
+ */
+const hasSource = computed(() => Boolean(props.src))
+
+const showPlaceholder = computed(
+  () => hasSource.value && !isLoaded.value && !isError.value,
+)
 
 const aspectRatioClass = computed(() => {
   switch (props.aspectRatio) {
@@ -193,21 +204,36 @@ const isDev = computed(() => import.meta.env.DEV)
 </template>
 
 <style scoped>
-img {
-  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  img {
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  50% {
-    opacity: 0.7;
+
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 }
 </style>

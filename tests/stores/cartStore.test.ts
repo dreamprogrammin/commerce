@@ -1,6 +1,7 @@
 import type { ProductWithImages } from '@/types'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useProfileStore } from '@/stores/core/profileStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { mockQueryBuilder, mockSupabaseClient, mockToast } from '../setup'
 
@@ -222,7 +223,7 @@ describe('cartStore', () => {
 
     it('должен правильно вычислить bonusesToAward', async () => {
       // ✅ Устанавливаем авторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({
+      globalThis.useSupabaseUser = vi.fn(() => ({
         value: { id: 'user-123', email: 'test@example.com' },
       }))
 
@@ -239,14 +240,181 @@ describe('cartStore', () => {
     })
   })
 
+  /**
+   * Способ получения и стоимость доставки переехали в стор из-за бага:
+   * /cart считала доставку по курьеру, а orderForm на /checkout стартовала
+   * с 'pickup', и «Итого» на двух шагах отличалось на цену доставки.
+   */
+  describe('доставка', () => {
+    async function fillCart(store: ReturnType<typeof useCartStore>, price: number) {
+      mockQueryBuilder.single.mockResolvedValueOnce({
+        data: { ...mockProduct, price, final_price: price },
+        error: null,
+      })
+      await store.addItem('product-1', 1)
+    }
+
+    it('по умолчанию выбран курьер — как fulfill:delivery в макете', () => {
+      const store = useCartStore()
+
+      expect(store.deliveryMethod).toBe('courier')
+    })
+
+    it('берёт 1000 ₸ за курьера, пока корзина не добила до порога', async () => {
+      const store = useCartStore()
+      await fillCart(store, 5000)
+
+      expect(store.deliveryCost).toBe(1000)
+      expect(store.isFreeShipping).toBe(false)
+    })
+
+    it('везёт бесплатно от 15 000 ₸', async () => {
+      const store = useCartStore()
+      await fillCart(store, 15000)
+
+      expect(store.deliveryCost).toBe(0)
+      expect(store.isFreeShipping).toBe(true)
+    })
+
+    it('обнуляет доставку при самовывозе даже ниже порога', async () => {
+      const store = useCartStore()
+      await fillCart(store, 5000)
+
+      store.setDeliveryMethod('pickup')
+
+      expect(store.deliveryCost).toBe(0)
+    })
+
+    it('даёт корзине и оформлению одну и ту же сумму доставки', async () => {
+      const store = useCartStore()
+      await fillCart(store, 5000)
+
+      // Обе страницы читают одно и то же поле стора, поэтому «Итого»
+      // не может разойтись: смена способа видна сразу на обоих шагах.
+      const totalOnCart = store.subtotal + store.deliveryCost
+      store.setDeliveryMethod('pickup')
+      const totalOnCheckout = store.subtotal + store.deliveryCost
+
+      expect(totalOnCart).toBe(6000)
+      expect(totalOnCheckout).toBe(5000)
+      expect(store.deliveryMethod).toBe('pickup')
+    })
+  })
+
+  /**
+   * Комментарий к адресу («подъезд, этаж, домофон») форма собирала и раньше,
+   * но checkout() его не передавал — поле молча терялось между страницей и
+   * RPC. Тест держит именно это звено: колонка и вывод в Telegram давно были.
+   */
+  describe('checkout: комментарий к адресу', () => {
+    // Тест bonusesToAward выше подменяет useSupabaseUser на залогиненного и
+    // назад не возвращает, поэтому гостя объявляем сами, а не полагаемся на
+    // порядок выполнения: иначе checkout уходит в ветку create_user_order.
+    beforeEach(() => {
+      globalThis.useSupabaseUser = () => ({ value: null })
+    })
+
+    function guestOrder(comment?: string) {
+      return {
+        deliveryMethod: 'courier' as const,
+        paymentMethod: 'kaspi',
+        deliveryAddress: { city: 'Алматы', line1: 'Абая 150' },
+        guestInfo: {
+          name: 'Проба',
+          email: 'probe@test.local',
+          phone: '+77770000000',
+        },
+        deliveryCost: 1000,
+        comment,
+      }
+    }
+
+    function guestRpcParams() {
+      const call = mockSupabaseClient.rpc.mock.calls.find(
+        ([name]) => name === 'create_guest_checkout',
+      )
+      expect(call, 'create_guest_checkout не вызывался').toBeDefined()
+      return call![1]
+    }
+
+    async function fillCart(store: ReturnType<typeof useCartStore>) {
+      mockQueryBuilder.single.mockResolvedValueOnce({
+        data: mockProduct,
+        error: null,
+      })
+      await store.addItem('product-1', 1)
+    }
+
+    it('доносит комментарий до create_guest_checkout', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      await store.checkout(guestOrder('подъезд 2, этаж 5, домофон 1234'))
+
+      expect(guestRpcParams().p_comment).toBe('подъезд 2, этаж 5, домофон 1234')
+    })
+
+    it('без комментария шлёт null, а не undefined', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      await store.checkout(guestOrder())
+
+      // undefined в теле запроса PostgREST означает «параметр не передан»,
+      // и функция подставила бы DEFAULT — совпадает по результату, но null
+      // выражает намерение явно и переживёт смену дефолта.
+      expect(guestRpcParams().p_comment).toBeNull()
+    })
+
+    it('шлёт желаемые дату и интервал при курьерской доставке', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      store.deliveryDateIndex = 1
+      store.deliverySlotIndex = 2
+
+      await store.checkout(guestOrder())
+
+      const params = guestRpcParams()
+      // Индекс 1 — «завтра»: дата считается от сегодняшней, а не берётся
+      // из хранилища, поэтому сохранённый выбор не может оказаться в прошлом.
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+
+      expect(params.p_delivery_date).toBe(iso)
+      expect(params.p_delivery_slot).toBe('16:00–18:00')
+    })
+
+    it('не шлёт дату и интервал при самовывозе', async () => {
+      const store = useCartStore()
+      await fillCart(store)
+      mockSupabaseClient.rpc.mockResolvedValue({ data: 'order-1', error: null })
+
+      await store.checkout({ ...guestOrder(), deliveryMethod: 'pickup' })
+
+      const params = guestRpcParams()
+      expect(params.p_delivery_date).toBeNull()
+      expect(params.p_delivery_slot).toBeNull()
+    })
+  })
+
   describe('clearCart', () => {
     it('должен очистить корзину и бонусы', async () => {
       // ✅ Устанавливаем авторизованного пользователя
-      global.useSupabaseUser = vi.fn(() => ({
+      globalThis.useSupabaseUser = vi.fn(() => ({
         value: { id: 'user-123', email: 'test@example.com' },
       }))
 
       const store = useCartStore()
+
+      // Списание бонусов зажато балансом профиля и суммой заказа:
+      // без реального баланса setBonusesToSpend честно обнулит сумму.
+      const profileStore = useProfileStore()
+      profileStore.profile = { active_bonus_balance: 500 } as never
 
       mockQueryBuilder.single.mockResolvedValueOnce({
         data: mockProduct,

@@ -1,101 +1,133 @@
 <script setup lang="ts">
-import type { CarouselApi } from '../ui/carousel'
 import type { BaseProduct } from '@/types'
 import { computed, ref } from 'vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
-import { Button } from '@/components/ui/button'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSeoAltText } from '@/composables/useSeoAltText'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useAuthStore } from '@/stores/auth'
+import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import { formatPrice } from '@/utils/formatPrice'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   product: BaseProduct
-}>()
-
-const cartStore = useCartStore()
-const { getImageUrl, getVariantUrl } = useSupabaseStorage()
-const { triggerHaptic } = useHaptic()
-const { trackAddToCart } = useEcommerceTracking()
-const { generateProductImageAlt, generateBrandLogoAlt } = useSeoAltText()
-
-// --- DEVICE DETECTION ---
-const isTouchDevice = ref(false)
-onMounted(() => {
-  isTouchDevice.value
-    = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+  /**
+   * Позиция карточки в сетке. Нужна ровно для одного: решить, грузить ли
+   * первый кадр галереи сразу.
+   *
+   * Раньше `eager` стоял у первого кадра КАЖДОЙ карточки, то есть у всех
+   * двенадцати на странице, и каждая уходила в сеть с `fetchpriority="high"`.
+   * Замер категории на Slow 4G: до момента LCP скачивается 608 КБ, из них
+   * 162 КБ — эти самые двенадцать картинок. Они отбирают канал у CSS, без
+   * которого не красится вообще ничего: FCP приходил на 4.9 с.
+   *
+   * По умолчанию 99 — то есть карточка вне сетки (похожие товары, слайдеры)
+   * ведёт себя как раньше: ленивая загрузка, без высокого приоритета.
+   *
+   * Имя `position`, а не `index`: внутри шаблона `index` уже занят счётчиком
+   * кадров галереи, и одноимённый проп его затенял бы.
+   */
+  position?: number
+}>(), {
+  position: 99,
 })
 
-// --- CAROUSEL STATE (для мобилы) ---
-const emblaMobileApi = ref<CarouselApi>()
-const mobileSelectedIndex = ref(0)
+/*
+ * Сколько карточек считаем «над сгибом». На 390px сетка в две колонки,
+ * высота карточки ~330px при экране 844 — видно две строки. На десктопе
+ * четыре колонки, то есть первая строка целиком. Четыре покрывает оба
+ * случая; остальные догрузятся лениво, когда до них доскроллят.
+ */
+const EAGER_CARDS = 4
+const isAboveTheFold = computed(() => props.position < EAGER_CARDS)
+
+const cartStore = useCartStore()
+const wishlistStore = useWishlistStore()
+const authStore = useAuthStore()
+const modalStore = useModalStore()
+const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const { triggerHaptic } = useHaptic()
+const { trackAddToCart, trackRemoveFromCart } = useEcommerceTracking()
+const { generateProductImageAlt } = useSeoAltText()
+
+// --- ГАЛЕРЕЯ: единая scroll-snap лента (нативный свайп на тач, наведение мышью на десктопе) ---
+const scrollerRef = ref<HTMLElement | null>(null)
+const activeIndex = ref(0)
+
+const galleryImages = computed(() => props.product.product_images ?? [])
+const hasMultipleImages = computed(() => galleryImages.value.length > 1)
 
 /**
- * 🔑 Индексы слайдов, которые уже были показаны.
- * Изначально только [0] — первый слайд грузится сразу.
- * При свайпе добавляем текущий + следующий (предзагрузка на 1 вперёд).
+ * Индексы слайдов, для которых уже рендерим настоящую картинку (соседние тоже).
+ * Остальные — скелетон, чтобы не грузить всю галерею разом.
  */
 const visitedSlideIndexes = ref<Set<number>>(new Set([0]))
 
-function onMobileSelect() {
-  if (!emblaMobileApi.value)
-    return
-  const index = emblaMobileApi.value.selectedScrollSnap()
-  mobileSelectedIndex.value = index
-
+function markVisited(index: number) {
   visitedSlideIndexes.value.add(index)
-
-  // Предзагружаем следующий слайд
-  const nextIndex = index + 1
-  if (nextIndex < (props.product.product_images?.length ?? 0)) {
-    visitedSlideIndexes.value.add(nextIndex)
-  }
+  if (index - 1 >= 0)
+    visitedSlideIndexes.value.add(index - 1)
+  if (index + 1 < galleryImages.value.length)
+    visitedSlideIndexes.value.add(index + 1)
 }
 
-watch(emblaMobileApi, (api) => {
-  if (api) {
-    onMobileSelect()
-    api.on('select', onMobileSelect)
-    api.on('reInit', onMobileSelect)
+function onScroll(e: Event) {
+  const el = e.currentTarget as HTMLElement
+  if (!el || !el.clientWidth)
+    return
+
+  const index = Math.round(el.scrollLeft / el.clientWidth)
+  if (index !== activeIndex.value) {
+    activeIndex.value = index
   }
-})
-
-// --- CART STATE ---
-const itemInCart = computed(() => {
-  return cartStore.items.find(item => item.product.id === props.product.id)
-})
-
-const quantityInCart = computed(() => {
-  return itemInCart.value ? itemInCart.value.quantity : 0
-})
-
-// --- IMAGE STATE ---
-const activeImageIndex = ref(0)
-
-const hasMultipleImages = computed(
-  () =>
-    Array.isArray(props.product.product_images)
-    && props.product.product_images.length > 1,
-)
+  markVisited(index)
+}
 
 /**
- * Получить URL изображения по индексу
+ * Дэстоп: позиция курсора над картинкой напрямую управляет слайдом —
+ * ширина делится на количество фото, без клика и перетаскивания (как в WB/Ozon).
  */
+function onGalleryMouseMove(e: MouseEvent) {
+  const el = scrollerRef.value
+  if (!el || !hasMultipleImages.value)
+    return
+
+  const rect = el.getBoundingClientRect()
+  if (!rect.width)
+    return
+
+  const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 0.999)
+  const index = Math.floor(ratio * galleryImages.value.length)
+
+  markVisited(index)
+  if (index !== activeIndex.value) {
+    activeIndex.value = index
+  }
+  el.scrollLeft = index * el.clientWidth
+}
+
+function onGalleryMouseLeave() {
+  const el = scrollerRef.value
+  if (!el || !hasMultipleImages.value)
+    return
+
+  activeIndex.value = 0
+  el.scrollLeft = 0
+}
+
 function getImageUrlByIndex(index: number): string | null {
-  const imageUrl = props.product.product_images?.[index]?.image_url
+  const imageUrl = galleryImages.value[index]?.image_url
   if (!imageUrl)
     return null
 
   return getImageUrl(BUCKET_NAME_PRODUCT, imageUrl, IMAGE_SIZES.CARD)
 }
 
-/**
- * Получить URL вариантов изображения (sm/md/lg) для srcset
- */
 function getVariantUrls(index: number) {
-  const imageUrl = props.product.product_images?.[index]?.image_url
+  const imageUrl = galleryImages.value[index]?.image_url
   if (!imageUrl)
     return {}
   return {
@@ -105,437 +137,281 @@ function getVariantUrls(index: number) {
   }
 }
 
-/**
- * SEO-оптимизированный alt текст для изображений
- */
 function getImageAlt(index: number): string {
-  const totalImages = props.product.product_images?.length || 1
+  const totalImages = galleryImages.value.length || 1
 
   return generateProductImageAlt({
     productName: props.product.name,
     brandName: props.product.brands?.name,
     lineName: props.product.product_line_name,
-    categoryName: props.product.categories?.name,
     index,
     totalImages,
   })
 }
 
-/**
- * Получить URL логотипа бренда
- */
-function getBrandLogoUrl(): string | null {
-  const logoUrl = props.product.brands?.logo_url
-  if (!logoUrl)
-    return null
-
-  return getVariantUrl(BUCKET_NAME_BRANDS, logoUrl, 'sm')
-}
-
-/**
- * Активное изображение для десктопа (наведение мышью)
- */
-const activeImageUrl = computed(() => {
-  return getImageUrlByIndex(activeImageIndex.value)
-})
-
-// --- MOUSE INTERACTION (только для десктопа) ---
-function handleMouseMove(event: MouseEvent) {
-  if (
-    !hasMultipleImages.value
-    || isTouchDevice.value
-    || !props.product.product_images
-  ) {
-    return
-  }
-
-  const target = event.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const width = rect.width
-
-  if (width === 0)
-    return
-
-  const segmentWidth = width / props.product.product_images.length
-  const newIndex = Math.min(
-    Math.floor(x / segmentWidth),
-    props.product.product_images.length - 1,
-  )
-
-  if (newIndex !== activeImageIndex.value) {
-    activeImageIndex.value = newIndex
-  }
-}
-
-function handleMouseLeave() {
-  activeImageIndex.value = 0
-}
-
-// --- PRICE CALCULATION ---
+// --- ЦЕНА ---
 const priceDetails = computed(() => {
   const originalPrice = Number(props.product.price)
   const discountPercent = Number(props.product.discount_percentage)
-
   const hasDiscount = discountPercent > 0 && discountPercent <= 100
 
-  if (!hasDiscount) {
-    return {
-      hasDiscount: false,
-      finalPrice: originalPrice,
-    }
-  }
-
-  // 🔥 ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ: final_price из базы данных (generated column)
-  // База автоматически применяет психологическое округление
-  const finalPrice = props.product.final_price
+  // 🔥 ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ: final_price из базы данных (generated column,
+  // применяет психологическое округление)
+  const finalPrice = hasDiscount && props.product.final_price
     ? Number(props.product.final_price)
     : originalPrice
 
   return {
-    hasDiscount: true,
+    hasDiscount,
     finalPrice,
     originalPrice,
-    percent: Math.round(discountPercent),
+    percent: hasDiscount ? Math.round(discountPercent) : 0,
   }
 })
+
+const ratingLabel = computed(() => {
+  const rating = props.product.avg_rating
+  return rating != null ? rating.toFixed(1).replace('.', ',') : ''
+})
+
+const bonusLabel = computed(() => `+${formatPrice(props.product.bonus_points_award || 0)} бонусов`)
+
+const hasRating = computed(() =>
+  Boolean(props.product.review_count && props.product.review_count > 0 && props.product.avg_rating),
+)
+
+const hasBonus = computed(() =>
+  Boolean(props.product.bonus_points_award && props.product.bonus_points_award > 0),
+)
+
+const inStock = computed(() => Boolean(props.product.stock_quantity && props.product.stock_quantity > 0))
+
+// --- КОРЗИНА ---
+const itemInCart = computed(() => cartStore.items.find(item => item.product.id === props.product.id))
+const quantityInCart = computed(() => itemInCart.value?.quantity ?? 0)
+const maxAvailableQuantity = computed(() => Math.max(1, Math.floor((props.product.stock_quantity || 0) * 0.8)))
+
+function onAdd() {
+  cartStore.addItem(props.product as BaseProduct, 1)
+  trackAddToCart({ id: props.product.id, name: props.product.name, price: priceDetails.value.finalPrice })
+  triggerHaptic('medium')
+}
+
+function onInc() {
+  const next = quantityInCart.value + 1
+  if (next > maxAvailableQuantity.value)
+    return
+  cartStore.updateQuantity(props.product.id, next)
+  triggerHaptic('light')
+}
+
+function onDec() {
+  const next = quantityInCart.value - 1
+  if (next <= 0) {
+    trackRemoveFromCart({
+      id: props.product.id,
+      name: props.product.name,
+      price: priceDetails.value.finalPrice,
+      quantity: quantityInCart.value,
+    })
+  }
+  // updateQuantity сам удаляет позицию из корзины, если quantity <= 0
+  cartStore.updateQuantity(props.product.id, next)
+  triggerHaptic('light')
+}
+
+// --- ИЗБРАННОЕ ---
+const isWishlisted = computed(() => wishlistStore.isProductInWishlist(props.product.id))
+
+async function onWish() {
+  if (!authStore.isLoggedIn) {
+    modalStore.openLoginModal()
+    return
+  }
+  await wishlistStore.toggleWishlist(props.product.id, props.product.name)
+}
 </script>
 
 <template>
   <div
-    class="bg-white border rounded-xl overflow-hidden group transition-all hover:shadow-xl flex flex-col h-full"
+    class="pc-card flex h-full flex-col rounded-[20px] bg-white p-2.5"
+    :class="quantityInCart > 0 ? 'pc-card--active' : ''"
   >
     <!-- 🖼️ ГАЛЕРЕЯ ИЗОБРАЖЕНИЙ -->
-    <div
-      class="relative bg-white aspect-square overflow-hidden"
-      @mousemove="handleMouseMove"
-      @mouseleave="handleMouseLeave"
-    >
-      <!-- 🏷️ БЕЙДЖ СКИДКИ -->
-      <div v-if="priceDetails.hasDiscount" class="absolute top-3 right-3 z-10">
-        <Badge
-          variant="destructive"
-          class="font-bold text-xs px-2.5 py-1 shadow-lg"
+    <div class="relative aspect-square overflow-hidden rounded-xl bg-white">
+      <NuxtLink
+        :to="`/catalog/products/${product.slug}`"
+        class="absolute inset-0 block"
+      >
+        <div
+          v-if="galleryImages.length"
+          ref="scrollerRef"
+          class="pc-scroll flex h-full w-full select-none overflow-x-auto overflow-y-hidden [scroll-snap-type:x_mandatory] [touch-action:pan-x]"
+          @scroll="onScroll"
+          @mousemove="onGalleryMouseMove"
+          @mouseleave="onGalleryMouseLeave"
         >
-          -{{ priceDetails.percent }}%
-        </Badge>
-      </div>
-
-      <!-- 🚫 БЕЙДЖ "НЕТ В НАЛИЧИИ" -->
-      <div v-else-if="!product.stock_quantity || product.stock_quantity <= 0" class="absolute top-3 right-3 z-10">
-        <Badge
-          variant="secondary"
-          class="font-bold text-xs px-2.5 py-1 shadow-lg bg-gray-500 text-white"
-        >
-          Нет в наличии
-        </Badge>
-      </div>
-
-      <!-- ❤️ КНОПКА ДОБАВЛЕНИЯ В ИЗБРАННОЕ -->
-      <div class="absolute top-3 left-3 z-10">
-        <ProductWishlistButton
-          :product-id="product.id"
-          :product-name="product.name"
-        />
-      </div>
-
-      <ClientOnly>
-        <!-- 🖥️ ДЕСКТОП: Наведение мышью меняет изображение -->
-        <template v-if="!isTouchDevice">
-          <NuxtLink
-            :to="`/catalog/products/${product.slug}`"
-            class="block h-full p-4"
+          <div
+            v-for="(image, index) in galleryImages"
+            :key="`slide-${index}`"
+            class="h-full w-full shrink-0 [scroll-snap-align:center]"
           >
             <ProgressiveImage
-              :src="activeImageUrl"
-              :src-sm="getVariantUrls(activeImageIndex).sm"
-              :src-md="getVariantUrls(activeImageIndex).md"
-              :src-lg="getVariantUrls(activeImageIndex).lg"
+              v-if="visitedSlideIndexes.has(index)"
+              :src="getImageUrlByIndex(index)"
+              :src-sm="getVariantUrls(index).sm"
+              :src-md="getVariantUrls(index).md"
+              :src-lg="getVariantUrls(index).lg"
               sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              :alt="getImageAlt(activeImageIndex)"
-              aspect-ratio="1/1"
+              :alt="getImageAlt(index)"
+              aspect-ratio="square"
               object-fit="contain"
               placeholder-type="lqip"
-              :blur-data-url="
-                product.product_images?.[activeImageIndex]?.blur_placeholder
-              "
-              eager
-              zoom-on-hover
+              :blur-data-url="image.blur_placeholder"
+              :eager="index === 0 && isAboveTheFold"
             />
-          </NuxtLink>
-        </template>
+            <!-- Подложка непосещённого слайда — БЕЗ animate-pulse.
+                 Пульсация означает «идёт загрузка», а здесь ничего не грузится:
+                 слайд просто не запрошен, пока по нему не провели. Посетитель
+                 листает карточки редко, поэтому такие подложки жили на странице
+                 вечно и всё это время анимировались. Замер на главной: 91 штука
+                 в непрерывной анимации и на 3-й секунде, и на 12-й — счётчик
+                 не менялся вовсе. Статичная плашка держит ту же геометрию. -->
+            <div v-else class="h-full w-full bg-muted" aria-hidden="true" />
+          </div>
+        </div>
 
-        <!-- 📱 МОБИЛ: Карусель изображений -->
-        <template v-else>
-          <Carousel
-            v-if="hasMultipleImages"
-            class="w-full h-full"
-            :opts="{ loop: true, align: 'start' }"
-            @touchstart.stop
-            @touchmove.stop
-            @touchend.stop
-            @init-api="(val) => (emblaMobileApi = val)"
-          >
-            <CarouselContent>
-              <CarouselItem
-                v-for="(image, index) in product.product_images"
-                :key="`carousel-${index}`"
-              >
-                <NuxtLink
-                  :to="`/catalog/products/${product.slug}`"
-                  class="block h-full aspect-square p-4"
-                >
-                  <!--
-                    🔑 ЛЕНИВАЯ ЗАГРУЗКА КАРУСЕЛИ:
-                    Рендерим ProgressiveImage только для посещённых слайдов.
-                    visitedSlideIndexes изначально = [0], при свайпе добавляем
-                    текущий + следующий индекс.
-                    Непосещённые слайды — лёгкий скелетон без сетевых запросов.
-                  -->
-                  <ProgressiveImage
-                    v-if="visitedSlideIndexes.has(index)"
-                    :src="getImageUrlByIndex(index)"
-                    :src-sm="getVariantUrls(index).sm"
-                    :src-md="getVariantUrls(index).md"
-                    :src-lg="getVariantUrls(index).lg"
-                    sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    :alt="getImageAlt(index)"
-                    aspect-ratio="1/1"
-                    object-fit="contain"
-                    placeholder-type="lqip"
-                    :blur-data-url="image.blur_placeholder"
-                    :eager="index === 0"
-                    zoom-on-hover
-                  />
+        <div v-else class="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+          📷 Нет фото
+        </div>
+      </NuxtLink>
 
-                  <!-- Скелетон для ещё не посещённых слайдов -->
-                  <div
-                    v-else
-                    class="w-full h-full bg-muted animate-pulse rounded-lg"
-                    aria-hidden="true"
-                  />
-                </NuxtLink>
-              </CarouselItem>
-            </CarouselContent>
-          </Carousel>
+      <!-- 🆕 Новинка -->
+      <Badge
+        v-if="product.is_new"
+        variant="secondary"
+        class="pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full border-transparent bg-success px-2.5 py-1 text-[11.5px] font-bold text-white shadow-lg"
+      >
+        Новинка
+      </Badge>
 
-          <!-- 📷 Одно изображение на мобилке -->
-          <NuxtLink
-            v-else
-            :to="`/catalog/products/${product.slug}`"
-            class="block h-full p-4"
-          >
-            <ProgressiveImage
-              v-if="activeImageUrl"
-              :src="activeImageUrl"
-              :src-sm="getVariantUrls(0).sm"
-              :src-md="getVariantUrls(0).md"
-              :src-lg="getVariantUrls(0).lg"
-              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              :alt="getImageAlt(0)"
-              aspect-ratio="1/1"
-              object-fit="contain"
-              placeholder-type="shimmer"
-              eager
-              zoom-on-hover
-            />
-            <div
-              v-else
-              class="w-full h-full flex items-center justify-center text-muted-foreground text-sm"
-            >
-              📷 Нет фото
-            </div>
-          </NuxtLink>
-        </template>
+      <!-- 🏷️ Скидка -->
+      <Badge
+        v-if="priceDetails.hasDiscount"
+        variant="destructive"
+        class="pointer-events-none absolute bottom-2.5 left-2.5 z-10 rounded-full px-[11px] py-[5px] text-[13px] font-extrabold shadow-lg"
+      >
+        −{{ priceDetails.percent }}%
+      </Badge>
 
-        <!-- ⚙️ Fallback для SSR -->
-        <template #fallback>
-          <NuxtLink
-            :to="`/catalog/products/${product.slug}`"
-            class="block h-full p-4"
-          >
-            <ProgressiveImage
-              v-if="activeImageUrl"
-              :src="activeImageUrl"
-              :src-sm="getVariantUrls(0).sm"
-              :src-md="getVariantUrls(0).md"
-              :src-lg="getVariantUrls(0).lg"
-              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              :alt="getImageAlt(0)"
-              aspect-ratio="1/1"
-              object-fit="contain"
-              placeholder-type="shimmer"
-              eager
-              zoom-on-hover
-            />
-            <div
-              v-else
-              class="w-full h-full flex items-center justify-center text-muted-foreground text-sm"
-            >
-              📷 Нет фото
-            </div>
-          </NuxtLink>
-        </template>
-      </ClientOnly>
+      <!-- ❤️ Избранное -->
+      <button
+        type="button"
+        aria-label="В избранное"
+        class="pc-wish absolute right-2 top-2 z-[3] grid size-[38px] place-content-center rounded-full"
+        @click.stop.prevent="onWish"
+      >
+        <Icon
+          :name="isWishlisted ? 'line-md:heart-filled' : 'line-md:heart'"
+          class="size-[21px]"
+          :class="isWishlisted ? 'text-red-500' : 'text-muted-foreground'"
+        />
+      </button>
 
-      <!-- 🔵 ИНДИКАТОРЫ-ТОЧКИ -->
+      <!-- 🔵 Индикаторы -->
       <div
         v-if="hasMultipleImages"
-        class="absolute bottom-3 left-0 right-0 flex justify-center items-center gap-1.5 pointer-events-none"
+        class="pointer-events-none absolute inset-x-0 bottom-[9px] z-[2] flex items-center justify-center gap-[5px]"
       >
-        <ClientOnly>
-          <!-- Десктоп индикаторы -->
-          <template v-if="!isTouchDevice">
-            <div
-              v-for="(_, index) in product.product_images"
-              :key="`dot-desktop-${index}`"
-              class="rounded-full transition-all"
-              :class="
-                index === activeImageIndex
-                  ? 'w-5 h-1.5 bg-gray-600'
-                  : 'w-1.5 h-1.5 bg-gray-300'
-              "
-            />
-          </template>
-
-          <!-- Мобил индикаторы -->
-          <template v-else>
-            <div
-              v-for="(_, index) in product.product_images"
-              :key="`dot-mobile-${index}`"
-              class="rounded-full transition-all"
-              :class="
-                index === mobileSelectedIndex
-                  ? 'w-5 h-1.5 bg-gray-600'
-                  : 'w-1.5 h-1.5 bg-gray-300'
-              "
-            />
-          </template>
-        </ClientOnly>
+        <span
+          v-for="(_, index) in galleryImages"
+          :key="`dot-${index}`"
+          class="h-1.5 rounded-full shadow-[0_1px_3px_rgb(0_0_0_/_0.3)] transition-[width] duration-200"
+          :class="index === activeIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/60'"
+        />
       </div>
     </div>
 
     <!-- 📋 ИНФОРМАЦИЯ О ТОВАРЕ -->
-    <div class="p-4 space-y-3 flex-grow flex flex-col">
-      <!-- 🏢 Бренд -->
-      <div v-if="product.brands" class="min-h-[16px]">
-        <NuxtLink
-          :to="`/brand/${product.brands.slug}`"
-          class="flex items-center gap-2 group"
-          @click.stop
-        >
-          <!-- Логотип бренда -->
-          <div
-            v-if="getBrandLogoUrl()"
-            class="w-8 h-8 flex items-center justify-center rounded border border-border/50 group-hover:border-primary/30 transition-colors bg-background overflow-hidden flex-shrink-0"
-          >
-            <ProgressiveImage
-              :src="getBrandLogoUrl()!"
-              :alt="generateBrandLogoAlt(product.brands.name)"
-              object-fit="contain"
-              placeholder-type="shimmer"
-              class="w-full h-full p-0.5"
-            />
-          </div>
-          <!-- Название бренда -->
-          <span
-            class="text-xs text-muted-foreground group-hover:text-primary transition-colors font-medium line-clamp-1"
-          >
-            {{ product.brands.name }}
-          </span>
-        </NuxtLink>
-      </div>
-
-      <!-- 📦 Серия -->
-      <span
-        v-if="product.product_line_name"
-        class="text-[11px] text-pink-600 font-medium"
-      >
-        {{ product.product_line_name }}
-      </span>
-
-      <!-- 📝 Название товара -->
+    <div class="flex flex-1 flex-col gap-[7px] px-[5px] pb-[3px] pt-[11px]">
+      <!-- 📝 Название -->
       <NuxtLink :to="`/catalog/products/${product.slug}`" class="block">
-        <h3
-          class="font-semibold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors"
-        >
+        <h3 class="line-clamp-2 min-h-[38px] text-[14px] font-normal leading-[1.35] text-foreground">
           {{ product.name }}
         </h3>
       </NuxtLink>
 
-      <!-- 💰 Цена и бонусы -->
-      <div class="space-y-1 mt-auto">
-        <div class="flex items-baseline gap-2">
-          <p class="text-xl font-bold text-primary">
-            {{ formatPrice(priceDetails.finalPrice) }} ₸
-          </p>
-          <p
-            v-if="priceDetails.hasDiscount"
-            class="text-sm text-muted-foreground line-through"
-          >
-            {{ formatPrice(priceDetails.originalPrice) }} ₸
-          </p>
-        </div>
-
-        <!-- Бонусы -->
-        <Badge
-          v-if="product.bonus_points_award && product.bonus_points_award > 0"
-          variant="secondary"
-          class="inline-flex items-center gap-1 bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200"
-        >
-          <Icon name="lucide:gift" class="w-3 h-3" />
-          <span>+{{ product.bonus_points_award }} бонусов</span>
-        </Badge>
+      <!-- ⭐ Рейтинг -->
+      <div v-if="hasRating" class="flex items-center gap-[5px] text-[13px] font-bold text-foreground">
+        <Icon name="gravity-ui:star-fill" class="size-3.5 shrink-0 text-rating" />
+        <span>{{ ratingLabel }}</span>
+        <span class="font-medium text-muted-foreground">· {{ product.review_count }}</span>
       </div>
 
-      <!-- 🛒 КНОПКА ДОБАВЛЕНИЯ В КОРЗИНУ -->
-      <div class="pt-3 space-y-2">
-        <!-- ⭐ Рейтинг и отзывы (Marketplace Style) -->
-        <div
-          v-if="
-            product.review_count
-              && product.review_count > 0
-              && product.avg_rating
-          "
-          class="flex items-center gap-1.5"
-        >
-          <!-- ✨ Новая стилизованная иконка -->
-          <Icon
-            name="gravity-ui:star-fill"
-            class="w-3.5 h-3.5 shrink-0 text-yellow-400"
-          />
+      <!-- 🎁 Бонусы -->
+      <div
+        v-if="hasBonus"
+        class="inline-flex items-center gap-[7px] self-start rounded-lg bg-gradient-to-r from-orange-50 to-orange-100 px-[11px] py-[7px] text-[13px] font-bold"
+      >
+        <Icon name="lucide:gift" class="size-3.5 shrink-0 text-orange-500" />
+        <span class="bg-gradient-to-r from-orange-400 to-pink-600 bg-clip-text text-transparent">
+          {{ bonusLabel }}
+        </span>
+      </div>
 
-          <!-- Оценка через запятую -->
-          <span class="text-sm font-bold text-foreground leading-none pt-0.5">
-            {{ product.avg_rating.toFixed(1).replace(".", ",") }}
-          </span>
-
-          <!-- Количество отзывов через точку -->
-          <span class="text-xs text-muted-foreground leading-none pt-0.5">
-            <span class="mx-0.5 opacity-50">·</span>{{ product.review_count }}
-          </span>
-        </div>
-
+      <!-- 🛒 ПОКУПКА -->
+      <div class="mt-auto pt-[5px]">
         <ClientOnly>
-          <template v-if="product.stock_quantity && product.stock_quantity > 0">
-            <Button
-              v-if="!itemInCart"
-              class="w-full h-10 font-semibold"
-              @click="() => { 
-                cartStore.addItem(product as BaseProduct, 1); 
-                trackAddToCart({ id: product.id, name: product.name, price: priceDetails.finalPrice });
-                triggerHaptic('medium'); 
-              }"
+          <template v-if="inStock">
+            <div
+              v-if="quantityInCart > 0"
+              class="pc-stepper flex h-[52px] items-center justify-between rounded-full px-[7px]"
             >
-              <Icon name="lucide:shopping-cart" class="w-4 h-4 mr-2" />
-              В корзину
-            </Button>
+              <button
+                type="button"
+                aria-label="Уменьшить количество"
+                class="pc-stepper-btn grid size-[38px] place-content-center rounded-full"
+                @click="onDec"
+              >
+                <Icon name="lucide:minus" class="size-[17px]" />
+              </button>
+              <span class="flex-1 text-center text-[15px] font-extrabold text-white">{{ quantityInCart }} шт</span>
+              <button
+                type="button"
+                aria-label="Увеличить количество"
+                class="pc-stepper-btn grid size-[38px] place-content-center rounded-full"
+                @click="onInc"
+              >
+                <Icon name="lucide:plus" class="size-[17px]" />
+              </button>
+            </div>
 
-            <QuantitySelector
-              v-else
-              :product="product"
-              :quantity="quantityInCart"
-            />
+            <div v-else class="flex h-[52px] items-center justify-between gap-2 rounded-full bg-muted pl-4 pr-[5px]">
+              <!-- whitespace-nowrap: иначе «15 890 ₸» переносится по пробелу
+                   и знак тенге уезжает на вторую строку (узкая колонка на мобильных) -->
+              <span class="flex flex-col justify-center leading-tight">
+                <span
+                  v-if="priceDetails.hasDiscount"
+                  class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
+                >
+                  {{ formatPrice(priceDetails.originalPrice) }} ₸
+                </span>
+                <span
+                  class="whitespace-nowrap text-[17px] font-extrabold"
+                  :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
+                >
+                  {{ formatPrice(priceDetails.finalPrice) }} ₸
+                </span>
+              </span>
+              <button
+                type="button"
+                aria-label="В корзину"
+                class="pc-add grid size-11 shrink-0 place-content-center rounded-full"
+                @click="onAdd"
+              >
+                <Icon name="lucide:plus" class="size-[26px]" />
+              </button>
+            </div>
           </template>
 
           <template v-else>
@@ -543,13 +419,112 @@ const priceDetails = computed(() => {
           </template>
 
           <template #fallback>
-            <Button class="w-full h-10" disabled>
-              <Icon name="lucide:loader-2" class="w-4 h-4 mr-2 animate-spin" />
-              Загрузка...
-            </Button>
+            <div class="h-[52px] animate-pulse rounded-full bg-muted" />
           </template>
         </ClientOnly>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  .pc-card {
+    border: 1px solid rgb(255 255 255 / 0.92);
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      inset 0 0 0 1px rgb(255 255 255 / 0.5),
+      0 1px 0 rgb(15 23 42 / 0.05);
+    transition:
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+  .pc-card--active {
+    border-color: var(--primary);
+    box-shadow:
+      inset 0 0 0 1px var(--primary),
+      inset 0 1.5px 0 rgb(255 255 255 / 0.98),
+      inset 0 -2px 4px rgb(15 23 42 / 0.07),
+      inset 0 0 0 1px rgb(255 255 255 / 0.5),
+      0 1px 0 rgb(15 23 42 / 0.05);
+  }
+
+  .pc-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .pc-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ВНИМАНИЕ: у .pc-wish и .pc-add НЕТ backdrop-filter — и добавлять его сюда нельзя.
+     Карточка живёт в каруселях и сетках по 18+ штук на экран, а backdrop-filter
+     заставляет браузер переснимать и блюрить подложку на каждом кадре. Замер на
+     главной (390px, CPU ×6): с блюром медиана кадра 47.6ms / 42% кадров >50ms,
+     без него — 24.9ms / 11%. При быстром скролле секции успевали «пропасть и
+     появиться». Непрозрачность градиента ниже и так 85–95%, размытия за ним
+     почти не видно. Стекло оставлено только там, где оно читается: шапка,
+     липкая строка, нижняя навигация, deal-карточка. */
+  .pc-wish {
+    border: 1px solid rgb(255 255 255 / 0.8);
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.7));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 4px 12px rgb(15 23 42 / 0.14);
+    transition: transform 0.12s ease;
+  }
+  .pc-wish:hover {
+    transform: scale(1.1);
+  }
+
+  .pc-add {
+    border: 1px solid rgb(255 255 255 / 0.9);
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.97), rgb(224 233 247 / 0.85));
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 4px 12px rgb(43 127 255 / 0.2);
+    color: var(--primary);
+    transition: background 0.12s ease;
+  }
+  .pc-add:hover {
+    background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.75));
+  }
+
+  .pc-stepper {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
+    -webkit-backdrop-filter: blur(12px) saturate(1.7);
+    backdrop-filter: blur(12px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 8px rgb(6 53 138 / 0.28),
+      0 8px 20px rgb(43 127 255 / 0.3);
+  }
+
+  .pc-stepper-btn {
+    background: rgb(255 255 255 / 0.26);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
+    color: #fff;
+    transition: background 0.12s ease;
+  }
+  .pc-stepper-btn:hover {
+    background: rgb(255 255 255 / 0.38);
+  }
+}
+</style>

@@ -7,7 +7,7 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
   <div class="flex flex-col" style="min-height: 100dvh">
     <!-- Header только на десктопе -->
     <div class="hidden lg:block">
-      <CommonHeader />
+      <CommonSiteHeader />
     </div>
 
     <!-- Таббар только на мобильных -->

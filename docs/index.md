@@ -8,11 +8,12 @@
 
 ### Основные документы
 
-| Документ                                         | Описание                                 | Размер |
-| ------------------------------------------------ | ---------------------------------------- | ------ |
-| **[AI_CHEATSHEET.md](./AI_CHEATSHEET.md)**       | ⚡ Быстрая шпаргалка для быстрого старта | ~8 KB  |
-| **[AI_DOCUMENTATION.md](./AI_DOCUMENTATION.md)** | 📖 Единая полная документация проекта    | ~45 KB |
-| **[AI_CODE_PATTERNS.md](./AI_CODE_PATTERNS.md)** | 🎨 Практические примеры кода и паттерны  | ~35 KB |
+| Документ                                         | Описание                                                                                                             | Размер |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------ |
+| **[HANDOFF.md](./HANDOFF.md)**                   | 🔄 Состояние незакрытых работ: на чём остановились, что уже опровергнуто, ловушки окружения. Читать до первой правки | живой  |
+| **[AI_CHEATSHEET.md](./AI_CHEATSHEET.md)**       | ⚡ Быстрая шпаргалка для быстрого старта                                                                             | ~8 KB  |
+| **[AI_DOCUMENTATION.md](./AI_DOCUMENTATION.md)** | 📖 Единая полная документация проекта                                                                                | ~45 KB |
+| **[AI_CODE_PATTERNS.md](./AI_CODE_PATTERNS.md)** | 🎨 Практические примеры кода и паттерны                                                                              | ~35 KB |
 
 **Рекомендация:** Начните с `AI_CHEATSHEET.md` для быстрого старта, затем изучите `AI_DOCUMENTATION.md` для полного понимания проекта.
 
@@ -22,11 +23,11 @@
 
 ### Архитектура
 
-| Документ                                                 | Описание                                | Размер |
-| -------------------------------------------------------- | --------------------------------------- | ------ |
-| **[PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md)** | Полная техническая архитектура проекта  | 73 KB  |
-| **[OVERVIEW.md](./OVERVIEW.md)**                         | Бизнес-обзор и ключевые функции         | 28 KB  |
-| **[../CLAUDE.md](../CLAUDE.md)**                         | Инструкции для Claude AI при разработке | 13 KB  |
+| Документ                                                 | Описание                                      | Размер |
+| -------------------------------------------------------- | --------------------------------------------- | ------ |
+| **[PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md)** | Полная техническая архитектура проекта        | 73 KB  |
+| **[OVERVIEW.md](./OVERVIEW.md)**                         | Бизнес-обзор и ключевые функции               | 28 KB  |
+| **[../CLAUDE.md](../CLAUDE.md)**                         | Инструкции для Claude AI при разработке       | 13 KB  |
 | [CLAUDE_SETUP.md](./CLAUDE_SETUP.md)                     | Плагины и скиллы Claude Code для новой машины | 2 KB   |
 
 ---
@@ -35,21 +36,22 @@
 
 ### SEO и оптимизация
 
-| Документ                                                                 | Описание                                 | Статус       |
-| ------------------------------------------------------------------------ | ---------------------------------------- | ------------ |
-| **[IMAGE_SEO_COMPLETE.md](./IMAGE_SEO_COMPLETE.md)**                     | Полная документация по SEO изображений   | ⭐ Основной  |
-| [IMAGE_SEO_QUICKSTART.md](./IMAGE_SEO_QUICKSTART.md)                     | Быстрый старт (2 минуты)                 | 📝 Гайд      |
-| [IMAGE_SEO_CHECKLIST.md](./IMAGE_SEO_CHECKLIST.md)                       | Чеклист внедрения                        | ✅ Чеклист   |
-| [IMAGE_SEO_FINAL_CHECKLIST.md](./IMAGE_SEO_FINAL_CHECKLIST.md)           | Финальный чеклист                        | ✅ Чеклист   |
-| [IMAGE_SEO_TEST_REPORT.md](./IMAGE_SEO_TEST_REPORT.md)                   | Отчет о тестировании                     | 📊 Отчет     |
-| [IMAGE_SEO_DEPLOYMENT_READY.md](./IMAGE_SEO_DEPLOYMENT_READY.md)         | Готовность к деплою                      | 🚀 Статус    |
-| **[SEO_AUTOMATION.md](./SEO_AUTOMATION.md)**                             | Автоматизация SEO для категорий + бренды | 🤖 Основной  |
-| [SEO_AUTOMATION_QUICKSTART.md](./SEO_AUTOMATION_QUICKSTART.md)           | Быстрый старт (2 минуты)                 | 📝 Гайд      |
-| [SEO_BRAND_AUTOMATION_CHANGELOG.md](./SEO_BRAND_AUTOMATION_CHANGELOG.md) | Полный Changelog - Что сделано           | 📋 Changelog |
-| **[SEO_TEXT_PROTECTION.md](./SEO_TEXT_PROTECTION.md)**                   | Защита уникальных SEO-текстов            | 🛡️ Важно     |
-| [SEO_TEXT_PROTECTION_CHANGELOG.md](./SEO_TEXT_PROTECTION_CHANGELOG.md)   | Changelog защиты текстов                 | 📋 Changelog |
-| [SEO_TEXT_PROTECTION_QUICKSTART.md](./SEO_TEXT_PROTECTION_QUICKSTART.md) | Быстрый старт защиты                     | 📝 Гайд      |
-| [SEO_TEXT_PROTECTION_SUMMARY.md](./SEO_TEXT_PROTECTION_SUMMARY.md)       | Краткая сводка                           | 📄 Сводка    |
+| Документ                                                                 | Описание                                               | Статус       |
+| ------------------------------------------------------------------------ | ------------------------------------------------------ | ------------ |
+| **[SEO_AUDIT_2026_08_12.md](./SEO_AUDIT_2026_08_12.md)**                 | Аудит dev.uhti.kz: находки, что починено, что осталось | 📊 Отчет     |
+| **[IMAGE_SEO_COMPLETE.md](./IMAGE_SEO_COMPLETE.md)**                     | Полная документация по SEO изображений                 | ⭐ Основной  |
+| [IMAGE_SEO_QUICKSTART.md](./IMAGE_SEO_QUICKSTART.md)                     | Быстрый старт (2 минуты)                               | 📝 Гайд      |
+| [IMAGE_SEO_CHECKLIST.md](./IMAGE_SEO_CHECKLIST.md)                       | Чеклист внедрения                                      | ✅ Чеклист   |
+| [IMAGE_SEO_FINAL_CHECKLIST.md](./IMAGE_SEO_FINAL_CHECKLIST.md)           | Финальный чеклист                                      | ✅ Чеклист   |
+| [IMAGE_SEO_TEST_REPORT.md](./IMAGE_SEO_TEST_REPORT.md)                   | Отчет о тестировании                                   | 📊 Отчет     |
+| [IMAGE_SEO_DEPLOYMENT_READY.md](./IMAGE_SEO_DEPLOYMENT_READY.md)         | Готовность к деплою                                    | 🚀 Статус    |
+| **[SEO_AUTOMATION.md](./SEO_AUTOMATION.md)**                             | Автоматизация SEO для категорий + бренды               | 🤖 Основной  |
+| [SEO_AUTOMATION_QUICKSTART.md](./SEO_AUTOMATION_QUICKSTART.md)           | Быстрый старт (2 минуты)                               | 📝 Гайд      |
+| [SEO_BRAND_AUTOMATION_CHANGELOG.md](./SEO_BRAND_AUTOMATION_CHANGELOG.md) | Полный Changelog - Что сделано                         | 📋 Changelog |
+| **[SEO_TEXT_PROTECTION.md](./SEO_TEXT_PROTECTION.md)**                   | Защита уникальных SEO-текстов                          | 🛡️ Важно     |
+| [SEO_TEXT_PROTECTION_CHANGELOG.md](./SEO_TEXT_PROTECTION_CHANGELOG.md)   | Changelog защиты текстов                               | 📋 Changelog |
+| [SEO_TEXT_PROTECTION_QUICKSTART.md](./SEO_TEXT_PROTECTION_QUICKSTART.md) | Быстрый старт защиты                                   | 📝 Гайд      |
+| [SEO_TEXT_PROTECTION_SUMMARY.md](./SEO_TEXT_PROTECTION_SUMMARY.md)       | Краткая сводка                                         | 📄 Сводка    |
 
 ### Производительность и кеширование
 
@@ -94,18 +96,19 @@
 
 ### UI/UX компоненты
 
-| Документ                                                       | Описание                         | Статус       |
-| -------------------------------------------------------------- | -------------------------------- | ------------ |
-| [CHECKOUT_STEPPER.md](./CHECKOUT_STEPPER.md)                   | Stepper для checkout             | 🛒 Компонент |
-| [CHECKOUT_CONTACT_INFO.md](./CHECKOUT_CONTACT_INFO.md)         | Контактная информация в checkout | 📞 Компонент |
-| [CHECKOUT_REDESIGN_REPORT.md](./CHECKOUT_REDESIGN_REPORT.md)   | Редизайн checkout                | 🎨 Отчет     |
-| [SMART_SIDEBAR_REPORT.md](./SMART_SIDEBAR_REPORT.md)           | Умный сайдбар                    | 📊 Отчет     |
-| [SMART_CART_IMPLEMENTATION.md](./SMART_CART_IMPLEMENTATION.md) | Реализация умной корзины         | 🛒 Функция   |
-| [SMART_BUNDLE_REPORT.md](./SMART_BUNDLE_REPORT.md)             | Умные бандлы                     | 📦 Отчет     |
-| [CART_PERSISTENCE_REPORT.md](./CART_PERSISTENCE_REPORT.md)     | Персистентность корзины          | 💾 Отчет     |
-| [CART_SYNC_AUDIT_REPORT.md](./CART_SYNC_AUDIT_REPORT.md)       | Аудит синхронизации корзины      | 📊 Аудит     |
-| [MOBILE_STICKY_PANEL.md](./MOBILE_STICKY_PANEL.md)             | Sticky панель для мобильных      | 📱 Компонент |
-| [CONFETTI_FEATURE.md](./CONFETTI_FEATURE.md)                   | Конфетти эффект                  | 🎉 Функция   |
+| Документ                                                               | Описание                                                     | Статус       |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------ | ------------ |
+| [CHECKOUT_STEPPER.md](./CHECKOUT_STEPPER.md)                           | Stepper для checkout                                         | 🛒 Компонент |
+| [CHECKOUT_CONTACT_INFO.md](./CHECKOUT_CONTACT_INFO.md)                 | Контактная информация в checkout                             | 📞 Компонент |
+| [CHECKOUT_REDESIGN_REPORT.md](./CHECKOUT_REDESIGN_REPORT.md)           | Редизайн checkout                                            | 🎨 Отчет     |
+| [SMART_SIDEBAR_REPORT.md](./SMART_SIDEBAR_REPORT.md)                   | Умный сайдбар                                                | 📊 Отчет     |
+| [SMART_CART_IMPLEMENTATION.md](./SMART_CART_IMPLEMENTATION.md)         | Реализация умной корзины                                     | 🛒 Функция   |
+| [SMART_BUNDLE_REPORT.md](./SMART_BUNDLE_REPORT.md)                     | Умные бандлы                                                 | 📦 Отчет     |
+| [CART_PERSISTENCE_REPORT.md](./CART_PERSISTENCE_REPORT.md)             | Персистентность корзины                                      | 💾 Отчет     |
+| [CART_SYNC_AUDIT_REPORT.md](./CART_SYNC_AUDIT_REPORT.md)               | Аудит синхронизации корзины                                  | 📊 Аудит     |
+| [MOBILE_STICKY_PANEL.md](./MOBILE_STICKY_PANEL.md)                     | Sticky панель для мобильных                                  | 📱 Компонент |
+| [CONFETTI_FEATURE.md](./CONFETTI_FEATURE.md)                           | Конфетти эффект                                              | 🎉 Функция   |
+| [SCOPED_STYLES_TAILWIND_LAYERS.md](./SCOPED_STYLES_TAILWIND_LAYERS.md) | Scoped-стили глушат утилиты Tailwind: причина, скрипты, план | 🧩 Гайд      |
 
 ### Уведомления и интеграции
 

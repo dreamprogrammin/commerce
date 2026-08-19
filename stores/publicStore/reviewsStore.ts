@@ -30,6 +30,11 @@ export interface ProductReview {
   } | null
 }
 
+/*
+ * Используется только там, где отзыв читает его собственный автор: свою строку
+ * в profiles ему отдаёт политика «Users can view own profile». Публичный
+ * список так читать нельзя — см. fetchReviews.
+ */
 const REVIEW_SELECT = 'id, product_id, user_id, order_id, rating, text, is_published, created_at, updated_at, profiles!product_reviews_profile_id_fkey(first_name, last_name, avatar_url), review_images(id, image_url, blur_placeholder, display_order)'
 
 export const useReviewsStore = defineStore('reviewsStore', () => {
@@ -39,13 +44,22 @@ export const useReviewsStore = defineStore('reviewsStore', () => {
   const reviews = ref<ProductReview[]>([])
   const isLoading = ref(false)
 
+  /*
+   * Через RPC, а не через .from('product_reviews'), из-за имени автора.
+   * У profiles нет политики чтения для анонимов, поэтому вложение
+   * profiles!product_reviews_profile_id_fkey гостю всегда возвращало null,
+   * и под каждым отзывом стояло «Покупатель». Открывать таблицу политикой
+   * нельзя — в строке лежат телефон и бонусный баланс, а RLS открывает
+   * строку целиком. Имя отдаёт SECURITY DEFINER-функция
+   * (20260813120000_review_author_names.sql), сама таблица остаётся закрытой.
+   *
+   * Состав полей и порядок сортировки функция повторяет один в один, поэтому
+   * форма ответа прежняя и компоненты не менялись.
+   */
   async function fetchReviews(productId: string): Promise<ProductReview[]> {
-    const { data, error } = await supabase
-      .from('product_reviews')
-      .select(REVIEW_SELECT)
-      .eq('product_id', productId)
-      .eq('is_published', true)
-      .order('created_at', { ascending: false })
+    const { data, error } = await supabase.rpc('get_product_reviews', {
+      p_product_id: productId,
+    })
 
     if (error)
       throw error

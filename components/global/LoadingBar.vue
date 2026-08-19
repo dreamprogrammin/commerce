@@ -1,5 +1,24 @@
 <script setup lang="ts">
-import { Progress } from '@/components/ui/progress'
+/*
+ * Полоска нарисована своей разметкой, а НЕ обёрткой `components/ui/progress`.
+ *
+ * Причина не в красоте, а в весе. Этот компонент лежит в `components/global/`
+ * и рисуется прямо в `app.vue`, то есть он жадный на каждой странице. Через
+ * `@/components/ui/progress` он импортировал бочку `reka-ui` — а она статически
+ * реэкспортирует ВСЮ библиотеку. Граф импортов, снятый плагином Rollup на
+ * `generateBundle`, показал: из 81 импортёра бочки в жадном чанке был ровно
+ * один — вот этот путь. И он затаскивал туда 157 модулей reka-ui на 309.5 КБ
+ * (134.2 КБ после минификации), включая Select, Slider, Listbox и Menu, нужные
+ * только админке и фильтрам.
+ *
+ * Разметка ниже повторяет то, что рисовал `Progress`: внешний контейнер с
+ * `overflow-hidden` и индикатор, сдвигаемый `translateX`. Роль
+ * `progressbar` и aria-атрибуты сохранены — их ставил `ProgressRoot`.
+ *
+ * Сама обёртка `components/ui/progress` жива и используется в
+ * `components/common/AppLoader.vue` — там она в ленивом чанке и никому не
+ * мешает. Трогать её не нужно.
+ */
 
 interface Props {
   loading: boolean
@@ -163,78 +182,102 @@ onUnmounted(() => {
         :style="`width: ${progress}%; transition: width 0.5s ease-out;`"
       />
 
-      <Progress
-        :model-value="progress"
-        class="rounded-none border-none bg-transparent"
+      <div
+        role="progressbar"
+        aria-label="Загрузка страницы"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-valuenow="Math.round(progress)"
+        class="relative w-full overflow-hidden rounded-none border-none bg-transparent"
         :class="heightConfig[props.height]"
-        :indicator-class="indicatorClass"
       >
-        <!-- Основной shimmer эффект -->
         <div
-          v-if="showShimmer"
-          class="absolute inset-0 bg-gradient-to-r animate-shimmer-smooth"
-          :class="currentColorConfig.shimmer"
-        />
+          class="h-full w-full"
+          :class="indicatorClass"
+          :style="`transform: translateX(-${100 - progress}%);`"
+        >
+          <!-- Основной shimmer эффект -->
+          <div
+            v-if="showShimmer"
+            class="absolute inset-0 bg-gradient-to-r animate-shimmer-smooth"
+            :class="currentColorConfig.shimmer"
+          />
 
-        <!-- Дополнительные искорки -->
-        <div
-          v-if="showShimmer"
-          class="absolute inset-0 bg-gradient-to-r animate-sparkle"
-          :class="currentColorConfig.shimmer"
-        />
+          <!-- Дополнительные искорки -->
+          <div
+            v-if="showShimmer"
+            class="absolute inset-0 bg-gradient-to-r animate-sparkle"
+            :class="currentColorConfig.shimmer"
+          />
 
-        <!-- Пульсирующее свечение на конце -->
-        <div
-          v-if="showGlow && progress < 100"
-          class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/60 to-transparent animate-pulse-glow"
-        />
-      </Progress>
+          <!-- Пульсирующее свечение на конце -->
+          <div
+            v-if="showGlow && progress < 100"
+            class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/60 to-transparent animate-pulse-glow"
+          />
+        </div>
+      </div>
     </div>
   </Transition>
 </template>
 
 <style scoped>
-@keyframes shimmer-smooth {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(200%);
-  }
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-@keyframes sparkle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translateX(-100%) scale(0.5);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(100%) scale(1.5);
-  }
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-@keyframes pulse-glow {
-  0%,
-  100% {
-    opacity: 0.4;
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  @keyframes shimmer-smooth {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(200%);
+    }
   }
-  50% {
-    opacity: 0.8;
+
+  @keyframes sparkle {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translateX(-100%) scale(0.5);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(100%) scale(1.5);
+    }
   }
-}
 
-.animate-shimmer-smooth {
-  animation: shimmer-smooth 1.8s ease-in-out infinite;
-}
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
 
-.animate-sparkle {
-  animation: sparkle 2.5s ease-in-out infinite;
-  animation-delay: 0.3s;
-}
+  .animate-shimmer-smooth {
+    animation: shimmer-smooth 1.8s ease-in-out infinite;
+  }
 
-.animate-pulse-glow {
-  animation: pulse-glow 1.2s ease-in-out infinite;
+  .animate-sparkle {
+    animation: sparkle 2.5s ease-in-out infinite;
+    animation-delay: 0.3s;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 1.2s ease-in-out infinite;
+  }
 }
 </style>

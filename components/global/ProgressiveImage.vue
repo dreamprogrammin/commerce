@@ -56,7 +56,45 @@ const {
   onError,
 } = useImageState(imageUrl, { eager: props.eager })
 
-const showPlaceholder = computed(() => !isLoaded.value && !isError.value)
+/**
+ * Eager-картинку показываем сразу, не дожидаясь isLoaded.
+ *
+ * isLoaded поднимается обработчиком @load, то есть только в браузере и только
+ * после гидратации. До этого картинка стоит с opacity: 0 — а элемент с нулевой
+ * прозрачностью не может стать LCP. На категории это стоило метрике всё:
+ * файл первой карточки скачивался к 6-й секунде, а LCP фиксировался на 14-й,
+ * когда догружался и разбирался главный чанк в 273 КБ. Сетка при этом честно
+ * приходила с сервера — толку от неё не было никакого.
+ *
+ * Для eager это переключение и не нужно: такие картинки над сгибом, они
+ * рисуются по мере декодирования, а до этого сквозь прозрачную <img> виден
+ * LQIP-слой под ней. Плавное проявление остаётся у ленивых картинок, где
+ * оно и заметно.
+ */
+const revealImmediately = computed(() => props.eager)
+
+/**
+ * Есть ли вообще что загружать.
+ *
+ * Без этой проверки подложка анимировалась вечно. Механика: у `<img>` без
+ * `src` браузер сразу ставит `complete: true`, но НЕ запускает ни `load`,
+ * ни `error`. Значит `isLoaded` и `isError` навсегда остаются ложными,
+ * условие ниже — истинным, и `animate-pulse` крутится до ухода со страницы.
+ *
+ * Замер на превью 17 августа, страница категории: шесть таких подложек,
+ * две из них в первом экране, живут с 6.7 до 20.6 секунды (весь срок
+ * наблюдения) — у всех шести `src` пустой, `naturalWidth` ноль. Пульсация
+ * означает «идёт загрузка», а здесь загружать нечего: у товара или
+ * категории просто нет картинки.
+ *
+ * Обёртка компонента и без подложки даёт нейтральный серый фон (`bg-muted`),
+ * то есть пустое состояние выглядит ровно так же, только не мигает.
+ */
+const hasSource = computed(() => Boolean(props.src || props.srcSm))
+
+const showPlaceholder = computed(
+  () => hasSource.value && !isLoaded.value && !isError.value,
+)
 
 /**
  * Оптимизированный URL (кешированный, стабильный)
@@ -300,8 +338,13 @@ const isDev = computed(() => import.meta.env.DEV)
       </div>
     </div>
 
-    <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ -->
-    <picture>
+    <!-- 🖼️ ОСНОВНОЕ ИЗОБРАЖЕНИЕ.
+         relative нужен из-за порядка отрисовки: плейсхолдер выше по разметке,
+         но он absolute, а позиционированные элементы рисуются поверх обычного
+         потока. Пока <img> стояла с opacity: 0, это было не видно; теперь
+         eager-картинка проявляется сразу и без этого оказалась бы под размытым
+         слоем. display не меняется, раскладка прежняя. -->
+    <picture class="relative">
       <!-- 📱 Art Direction: мобильный вариант (показывается при media-запросе) -->
       <source
         v-if="mobileSrcsetValue"
@@ -333,7 +376,7 @@ const isDev = computed(() => import.meta.env.DEV)
         :height="height || undefined"
         class="w-full h-full"
         :class="[
-          isLoaded ? 'opacity-100' : 'opacity-0',
+          isLoaded || revealImmediately ? 'opacity-100' : 'opacity-0',
           objectFitClass,
           objectPositionClass,
           zoomOnHover ? 'hover:scale-105' : '',
@@ -372,23 +415,38 @@ const isDev = computed(() => import.meta.env.DEV)
 </template>
 
 <style scoped>
-img {
-  transition:
-    opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  img {
+    transition:
+      opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  50% {
-    opacity: 0.7;
+
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 }
 </style>

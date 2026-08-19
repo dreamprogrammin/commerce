@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { CategoryRow } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { promoEmoji, promoGradientClass, promoSubtitle } from '@/utils/promoTiles'
 
 definePageMeta({ layout: 'catalog' })
 
@@ -18,6 +20,10 @@ const metaDescription = 'Полный каталог детских игруше
 
 const categoriesStore = useCategoriesStore()
 const { getVariantUrl } = useSupabaseStorage()
+
+// Тот же порог, что у шапки и таббара в layouts/Catalog.vue: ниже lg страница
+// целиком в мобильном обвесе. На SSR всегда false — см. useIsMobile.
+const isMobile = useIsMobile(1023)
 
 // Оптимизированный useAsyncData: неблокирующий + SSR + кеширование
 const { data: catalogData, pending } = useAsyncData(
@@ -44,6 +50,22 @@ const { data: catalogData, pending } = useAsyncData(
   },
 )
 
+// LQIP-подложки категорий в общей выборке не приходят: они весили половину
+// сжатого документа, а в разметке SSR не участвуют — картинки сетки ниже
+// рисуются внутри ClientOnly и только при `!isMobile`. Догружаем их ровно
+// тогда, когда эта ветка действительно рисуется, включая переход
+// мобильной ширины в десктопную ресайзом.
+if (import.meta.client) {
+  watch(
+    isMobile,
+    (mobile) => {
+      if (!mobile)
+        void categoriesStore.loadCategoryBlurPlaceholders()
+    },
+    { immediate: true },
+  )
+}
+
 // Получаем подкатегории второго уровня
 const secondLevelCategories = computed<CategoryRow[]>(() => {
   const allCats = catalogData.value?.categories || []
@@ -64,6 +86,21 @@ useBreadcrumbSchema([
 ])
 
 // SEO - Динамические мета-теги + structured data с категориями
+/**
+ * Значение robots вычисляется ЗДЕСЬ, в setup, а не внутри колбэка useHead ниже.
+ *
+ * Колбэк у useHead ленивый: unhead зовёт его при сборке тегов, уже вне
+ * setup-контекста. `useRobotsContent` внутри доходит до `useSiteConfig` ->
+ * `useRequestEvent` -> `useNuxtApp`, и тот падает с «A composable that requires
+ * access to the Nuxt instance was called outside of a plugin, Nuxt hook, Nuxt
+ * middleware, or Vue setup function». Страница /catalog отдавала из-за этого
+ * ровный 500 — и на превью тоже.
+ *
+ * Остальные страницы, перешедшие на этот композабл, зовут его в обычном
+ * объекте useHead/useSeoMeta, то есть синхронно в setup, — там всё в порядке.
+ */
+const robotsContent = useRobotsContent('index, follow')
+
 useHead(() => {
   const schemas = [
     {
@@ -119,24 +156,31 @@ useHead(() => {
       { property: 'og:type', content: 'website' },
       { property: 'og:site_name', content: siteName },
       { property: 'og:locale', content: 'ru_RU' },
-      { property: 'og:image', content: `${siteUrl}/og-catalog.jpeg` },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: metaTitle },
       { name: 'twitter:description', content: metaDescription },
-      { name: 'twitter:image', content: `${siteUrl}/og-catalog.jpeg` },
-      { name: 'robots', content: 'index, follow' },
+      { name: 'robots', content: robotsContent },
     ],
     script: schemas,
   }
 })
 
-useRobotsRule({
+// Картинку для шаринга рисует генератор. Прежде здесь стояла ссылка на
+// /og-catalog.jpeg, которого в public/ нет вовсе — отдавался 404.
+defineOgImageComponent('OgImageCatalog', {
+  title: 'Каталог игрушек',
+  description: 'Конструкторы, куклы, машинки, развивающие игры и творчество',
+})
+
+// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+useIndexableRobotsRule({
   index: true,
   follow: true,
 })
 
 const showSkeleton = computed(() => pending.value && !catalogData.value)
 const additionalItems = computed(() => catalogData.value?.additional || [])
+const allCategories = computed<CategoryRow[]>(() => catalogData.value?.categories || [])
 
 // Определяем размер карточки
 function getCategorySize(category: CategoryRow): 'small' | 'medium' | 'large' {
@@ -168,9 +212,27 @@ function getCategoryImageVariants(category: CategoryRow) {
   }
 }
 
+/**
+ * Подложки берём из стора, а не из объекта категории.
+ *
+ * Категории для сетки приходят снимком `useAsyncData` (`catalogData`), а
+ * подложки догружаются отдельным клиентским запросом уже в стор. После
+ * гидратации снимок — самостоятельная копия, и правка стора до него не
+ * доезжает: сверка в браузере показала 0 карточек с LQIP при том, что
+ * запрос подложек уходил.
+ */
+const categoryBlurById = computed(() => {
+  const map = new Map<string, string>()
+  for (const category of categoriesStore.allCategories) {
+    if (category.blur_placeholder)
+      map.set(category.id, category.blur_placeholder)
+  }
+  return map
+})
+
 // Безопасное получение blur placeholder
 function getCategoryBlurUrl(category: CategoryRow): string | null {
-  const blur = category.blur_placeholder
+  const blur = categoryBlurById.value.get(category.id) ?? category.blur_placeholder
   return blur && blur.trim() !== '' ? blur : null
 }
 
@@ -196,217 +258,283 @@ function getCategoryColor(index: number): string {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background pb-20">
-    <!-- Шапка -->
-    <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b sr-only">
-      <div class="px-4 py-3">
-        <h1 class="text-2xl font-bold">
-          Каталог
-        </h1>
+  <div class="min-h-screen bg-background">
+    <!-- ==========================================
+         Мобильная версия (<lg) — порт Каталог.dc.html:
+         секции по корневым категориям вместо плоской masonry-сетки.
+         Нижний отступ живёт внутри компонента: вместе с pb-16 у <main>
+         в layouts/Catalog.vue выходят те самые 110px из прототипа.
+         ========================================== -->
+    <div class="lg:hidden">
+      <div v-if="showSkeleton" class="px-[var(--page-gutter)] pt-2.5 pb-[46px]">
+        <Skeleton class="h-9 w-40 mb-3.5 rounded-lg" />
+        <div class="grid grid-cols-2 gap-2.5 mb-2">
+          <Skeleton class="h-[50px] rounded-2xl" />
+          <Skeleton class="h-[50px] rounded-2xl" />
+        </div>
+        <div v-for="section in 3" :key="section" class="mt-[30px]">
+          <Skeleton class="h-8 w-48 mb-4 rounded-lg" />
+          <div class="grid grid-cols-3 gap-x-2.5 gap-y-5">
+            <div v-for="tile in 6" :key="tile" class="flex flex-col gap-2">
+              <Skeleton class="w-full aspect-square rounded-2xl" />
+              <Skeleton class="h-[35px] rounded-md" />
+            </div>
+          </div>
+        </div>
       </div>
+
+      <CatalogMobileSections
+        v-else
+        :categories="allCategories"
+        :promos="additionalItems"
+      />
     </div>
 
-    <!-- Основной контент -->
-    <div class="px-3 py-4 md:px-6 lg:px-8 max-w-6xl mx-auto">
-      <!-- Скелетон -->
-      <div v-if="showSkeleton" class="space-y-3">
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
-          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Skeleton class="w-full aspect-square rounded-2xl row-span-2" />
-          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
-          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
-          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
-          <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+    <!-- ==========================================
+         Десктоп (lg+) — прежняя раскладка, дизайн её не трогал.
+         ========================================== -->
+    <div class="hidden lg:block pb-20">
+      <!-- Шапка -->
+      <!-- Заголовок этой шапки намеренно не первого уровня: единственный
+           такой заголовок страницы живёт в CatalogMobileSections. Оба блока
+           рендерятся в разметку всегда (прячет их CSS, а не v-if), поэтому
+           прежде краулер получал два одинаковых «Каталог» на одной странице.
+           Оставлен видимый мобильный: заголовок, совпадающий с тем, что
+           человек видит на экране, — сигнал сильнее скрытого. Сама шапка
+           под sr-only с редизайна, так что на вид ничего не меняется. -->
+      <div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b sr-only">
+        <div class="px-4 py-3">
+          <p class="text-2xl font-bold">
+            Каталог
+          </p>
         </div>
       </div>
 
-      <!-- Контент -->
-      <div v-else class="space-y-3">
-        <!-- Акции и Новинки -->
-        <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-3">
-          <NuxtLink
-            v-for="item in additionalItems"
-            :key="item.id"
-            :to="item.href"
-            class="promo-card relative block overflow-hidden rounded-2xl active:scale-[0.97] transition-transform duration-200 group"
-            :class="item.id === 'sale'
-              ? 'bg-gradient-to-br from-amber-400 via-orange-400 to-red-400'
-              : 'bg-gradient-to-br from-blue-400 via-indigo-400 to-violet-400'"
-          >
-            <div class="relative aspect-[4/3] flex flex-col justify-between p-4">
-              <!-- Декор -->
-              <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/15 blur-xl" />
-              <div class="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-lg" />
-
-              <!-- Иконка -->
-              <div class="relative z-10">
-                <span class="text-5xl md:text-6xl drop-shadow-lg">
-                  {{ item.id === 'sale' ? '🏷️' : '✨' }}
-                </span>
-              </div>
-
-              <!-- Текст -->
-              <div class="relative z-10">
-                <h3 class="text-lg md:text-xl font-bold text-white leading-tight drop-shadow-md">
-                  {{ item.name }}
-                </h3>
-                <p class="text-xs md:text-sm text-white/80 mt-0.5">
-                  {{ item.id === 'sale' ? 'Скидки до 50%' : 'Новые поступления' }}
-                </p>
-              </div>
-            </div>
-          </NuxtLink>
+      <!-- Основной контент -->
+      <div class="px-3 py-4 md:px-6 lg:px-8 max-w-6xl mx-auto">
+        <!-- Скелетон -->
+        <div v-if="showSkeleton" class="space-y-3">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+            <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Skeleton class="w-full aspect-square rounded-2xl row-span-2" />
+            <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+            <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+            <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+            <Skeleton class="w-full aspect-[4/3] rounded-2xl" />
+          </div>
         </div>
 
-        <!-- Сетка категорий -->
-        <div
-          v-if="secondLevelCategories.length > 0"
-          class="catalog-grid"
-        >
-          <NuxtLink
-            v-for="(category, index) in secondLevelCategories"
-            :key="category.id"
-            :to="category.href"
-            class="category-card relative block overflow-hidden rounded-2xl active:scale-[0.97] transition-all duration-200 group"
-            :class="[
-              getCategoryColor(index),
-              getCategorySize(category) === 'large' ? 'catalog-card-large'
-              : getCategorySize(category) === 'medium' ? 'catalog-card-medium'
-                : 'catalog-card-small',
-            ]"
-            :style="{ '--animation-delay': `${Math.min(index * 40, 400)}ms` }"
-          >
-            <!-- Изображение -->
-            <div
-              v-if="category.image_url"
-              class="absolute bottom-0 right-0 w-[70%] h-[80%] flex items-end justify-end"
+        <!-- Контент -->
+        <div v-else class="space-y-3">
+          <!-- Акции и Новинки -->
+          <div v-if="additionalItems.length > 0" class="grid grid-cols-2 gap-3">
+            <NuxtLink
+              v-for="item in additionalItems"
+              :key="item.id"
+              :to="item.href"
+              class="promo-card relative block overflow-hidden rounded-2xl active:scale-[0.97] transition-transform duration-200 group"
+              :class="promoGradientClass(item.id)"
             >
-              <ProgressiveImage
-                :src="getCategoryImageUrl(category)"
-                :src-sm="getCategoryImageVariants(category).sm"
-                :src-md="getCategoryImageVariants(category).md"
-                :src-lg="getCategoryImageVariants(category).lg"
-                :alt="category.name"
-                :blur-data-url="getCategoryBlurUrl(category)"
-                aspect-ratio="square"
-                object-fit="contain"
-                :placeholder-type="getCategoryBlurUrl(category) ? 'lqip' : 'shimmer'"
-                eager
-              />
-            </div>
+              <div class="relative aspect-[4/3] flex flex-col justify-between p-4">
+                <!-- Декор -->
+                <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/15 blur-xl" />
+                <div class="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-lg" />
 
-            <!-- Фоллбэк -->
-            <div v-else class="absolute bottom-0 right-0 w-[70%] h-[70%] flex items-end justify-center opacity-20">
-              <Icon
-                :name="category.icon_name || 'lucide:package'"
-                class="w-20 h-20 text-muted-foreground"
-              />
-            </div>
+                <!-- Иконка -->
+                <div class="relative z-10">
+                  <span class="text-5xl md:text-6xl drop-shadow-lg">
+                    {{ promoEmoji(item.id) }}
+                  </span>
+                </div>
 
-            <!-- Название -->
-            <div class="absolute top-0 left-0 p-3 md:p-4 max-w-[65%] z-10">
-              <h3 class="font-bold text-foreground leading-snug text-sm md:text-base">
-                {{ category.name }}
-              </h3>
-            </div>
+                <!-- Текст -->
+                <div class="relative z-10">
+                  <h3 class="text-lg md:text-xl font-bold text-white leading-tight drop-shadow-md">
+                    {{ item.name }}
+                  </h3>
+                  <p class="text-xs md:text-sm text-white/80 mt-0.5">
+                    {{ promoSubtitle(item.id) }}
+                  </p>
+                </div>
+              </div>
+            </NuxtLink>
+          </div>
 
-            <!-- Стрелка при наведении (десктоп) -->
-            <div class="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm items-center justify-center shadow-sm hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity">
-              <Icon name="lucide:arrow-right" class="w-4 h-4 text-foreground" />
-            </div>
-          </NuxtLink>
+          <!-- Сетка категорий -->
+          <div
+            v-if="secondLevelCategories.length > 0"
+            class="catalog-grid"
+          >
+            <NuxtLink
+              v-for="(category, index) in secondLevelCategories"
+              :key="category.id"
+              :to="category.href"
+              class="category-card relative block overflow-hidden rounded-2xl active:scale-[0.97] transition-all duration-200 group"
+              :class="[
+                getCategoryColor(index),
+                getCategorySize(category) === 'large' ? 'catalog-card-large'
+                : getCategorySize(category) === 'medium' ? 'catalog-card-medium'
+                  : 'catalog-card-small',
+              ]"
+              :style="{ '--animation-delay': `${Math.min(index * 40, 400)}ms` }"
+            >
+              <!-- Изображение — только на клиенте и только на широком экране.
+                   display:none загрузку картинок НЕ отменяет: пока эта ветка
+                   рендерилась на сервере, телефон качал все 27 десктопных
+                   файлов вхолостую (≈460 КБ поверх мобильных). ClientOnly
+                   убирает их из SSR-разметки, а isMobile — из мобильного
+                   клиента. Ценой того, что на десктопе картинки появляются
+                   после гидрации; ссылки, названия и раскладка карточек
+                   в SSR остаются. -->
+              <div
+                v-if="category.image_url"
+                class="absolute bottom-0 right-0 w-[70%] h-[80%] flex items-end justify-end"
+              >
+                <ClientOnly>
+                  <ProgressiveImage
+                    v-if="!isMobile"
+                    :src="getCategoryImageUrl(category)"
+                    :src-sm="getCategoryImageVariants(category).sm"
+                    :src-md="getCategoryImageVariants(category).md"
+                    :src-lg="getCategoryImageVariants(category).lg"
+                    :alt="category.name"
+                    :blur-data-url="getCategoryBlurUrl(category)"
+                    aspect-ratio="square"
+                    object-fit="contain"
+                    :placeholder-type="getCategoryBlurUrl(category) ? 'lqip' : 'shimmer'"
+                    eager
+                  />
+                </ClientOnly>
+              </div>
+
+              <!-- Фоллбэк -->
+              <div v-else class="absolute bottom-0 right-0 w-[70%] h-[70%] flex items-end justify-center opacity-20">
+                <Icon
+                  :name="category.icon_name || 'lucide:package'"
+                  class="w-20 h-20 text-muted-foreground"
+                />
+              </div>
+
+              <!-- Название -->
+              <div class="absolute top-0 left-0 p-3 md:p-4 max-w-[65%] z-10">
+                <h3 class="font-bold text-foreground leading-snug text-sm md:text-base">
+                  {{ category.name }}
+                </h3>
+              </div>
+
+              <!-- Стрелка при наведении (десктоп) -->
+              <div class="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm items-center justify-center shadow-sm hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity">
+                <Icon name="lucide:arrow-right" class="w-4 h-4 text-foreground" />
+              </div>
+            </NuxtLink>
+          </div>
+
+          <!-- Пустое состояние -->
+          <Card v-else class="flex flex-col items-center justify-center py-16 text-center">
+            <Icon name="lucide:package-open" class="w-16 h-16 text-muted-foreground mb-4" />
+            <CardTitle class="mb-2">
+              Категории не найдены
+            </CardTitle>
+            <CardDescription>
+              Попробуйте обновить страницу или вернуться позже
+            </CardDescription>
+          </Card>
         </div>
-
-        <!-- Пустое состояние -->
-        <Card v-else class="flex flex-col items-center justify-center py-16 text-center">
-          <Icon name="lucide:package-open" class="w-16 h-16 text-muted-foreground mb-4" />
-          <CardTitle class="mb-2">
-            Категории не найдены
-          </CardTitle>
-          <CardDescription>
-            Попробуйте обновить страницу или вернуться позже
-          </CardDescription>
-        </Card>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Анимация появления */
-@keyframes fadeInUp {
-  from {
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* Анимация появления */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .category-card {
+    animation: fadeInUp 0.4s ease-out forwards;
     opacity: 0;
-    transform: translateY(16px);
+    animation-delay: var(--animation-delay, 0ms);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .promo-card {
+    animation: fadeInUp 0.4s ease-out forwards;
   }
-}
 
-.category-card {
-  animation: fadeInUp 0.4s ease-out forwards;
-  opacity: 0;
-  animation-delay: var(--animation-delay, 0ms);
-}
-
-.promo-card {
-  animation: fadeInUp 0.4s ease-out forwards;
-}
-
-/* ==========================================
-   Сетка каталога — mobile: 2 колонки, desktop: 3 колонки
-   Masonry-подобная сетка с row-span для больших карточек
-   ========================================== */
-.catalog-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: minmax(130px, auto);
-  gap: 0.75rem;
-}
-
-/* Маленькая карточка: 1 ряд */
-.catalog-card-small {
-  grid-row: span 1;
-  min-height: 130px;
-}
-
-/* Средняя карточка: 2 ряда */
-.catalog-card-medium {
-  grid-row: span 2;
-  min-height: 268px;
-}
-
-/* Большая карточка: 2 ряда */
-.catalog-card-large {
-  grid-row: span 2;
-  min-height: 268px;
-}
-
-/* Desktop: 3 колонки с увеличенными высотами */
-@media (min-width: 768px) {
+  /* ==========================================
+     Сетка каталога — mobile: 2 колонки, desktop: 3 колонки
+     Masonry-подобная сетка с row-span для больших карточек
+     ========================================== */
   .catalog-grid {
-    grid-template-columns: repeat(3, 1fr);
-    grid-auto-rows: minmax(160px, auto);
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: minmax(130px, auto);
+    gap: 0.75rem;
   }
 
+  /* Маленькая карточка: 1 ряд */
   .catalog-card-small {
-    min-height: 160px;
+    grid-row: span 1;
+    min-height: 130px;
   }
 
+  /* Средняя карточка: 2 ряда */
   .catalog-card-medium {
     grid-row: span 2;
-    min-height: 330px;
+    min-height: 268px;
   }
 
+  /* Большая карточка: 2 ряда */
   .catalog-card-large {
     grid-row: span 2;
-    min-height: 330px;
+    min-height: 268px;
+  }
+
+  /* Desktop: 3 колонки с увеличенными высотами */
+  @media (min-width: 768px) {
+    .catalog-grid {
+      grid-template-columns: repeat(3, 1fr);
+      grid-auto-rows: minmax(160px, auto);
+      gap: 1rem;
+    }
+
+    .catalog-card-small {
+      min-height: 160px;
+    }
+
+    .catalog-card-medium {
+      grid-row: span 2;
+      min-height: 330px;
+    }
+
+    .catalog-card-large {
+      grid-row: span 2;
+      min-height: 330px;
+    }
   }
 }
 </style>

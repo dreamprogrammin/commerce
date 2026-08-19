@@ -9,6 +9,8 @@ export const useCategoriesStore = defineStore('categories', () => {
   const isLoading = ref(false)
   const brandsLoading = ref(false)
   const brandsLoadedForMenu = ref(false)
+  const blurLoading = ref(false)
+  const blurLoaded = ref(false)
 
   const categoriesById = computed(() => new Map(allCategories.value.map(cat => [cat.id, cat])))
   const categoriesBySlug = computed(() => new Map(allCategories.value.map(cat => [cat.slug, cat])))
@@ -36,11 +38,17 @@ export const useCategoriesStore = defineStore('categories', () => {
       return allCategories.value
     isLoading.value = true
     try {
-      const { data, error } = await supabase.from('categories').select('*').order('display_order')
-      if (error)
-        throw error
-
-      const fetchedCategories = data || []
+      /*
+       * Через собственный /api/categories, а не напрямую в Supabase.
+       * Этот запрос делается на каждый рендер — его зовут главная,
+       * `/catalog`, страница категории, карточка товара, мега-меню и
+       * мобильная панель, — и стоит 97 КБ и около полутора секунд, из
+       * которых 400-650 мс это просто круг до Supabase. Категорий 64 и
+       * меняются они раз в месяц, поэтому выборка кешируется на сервере
+       * (server/api/categories.get.ts). На сервере вызов внутренний, без
+       * сетевого круга вовсе.
+       */
+      const fetchedCategories = (await $fetch<CategoryRow[]>('/api/categories')) || []
       allCategories.value = fetchedCategories
 
       const menuItems = fetchedCategories.filter(c => c.display_in_menu)
@@ -69,6 +77,68 @@ export const useCategoriesStore = defineStore('categories', () => {
     }
     finally {
       isLoading.value = false
+    }
+  }
+
+  /**
+   * Догрузка LQIP-подложек категорий. Только на клиенте и только по запросу
+   * того, кто их правда рисует.
+   *
+   * Из общей выборки поле убрано намеренно (см. комментарий к
+   * PUBLIC_CATEGORY_COLUMNS): в SSR-разметке подложки категорий не
+   * участвуют ни на одной странице, а весили половину документа.
+   *
+   * Патчатся ОБА хранилища. `menuTree` собирается из копий строк
+   * (`{ ...item, children: [] }`), поэтому правка `allCategories` до него
+   * не доезжает, а `HomePopularCategories` читает подложку именно из дерева.
+   */
+  async function loadCategoryBlurPlaceholders() {
+    if (import.meta.server)
+      return
+    if (blurLoaded.value || blurLoading.value)
+      return
+
+    blurLoading.value = true
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, blur_placeholder')
+        .not('blur_placeholder', 'is', null)
+      if (error)
+        throw error
+
+      const blurById = new Map(
+        (data || []).map(row => [row.id, row.blur_placeholder]),
+      )
+      if (blurById.size === 0) {
+        blurLoaded.value = true
+        return
+      }
+
+      allCategories.value = allCategories.value.map(category =>
+        blurById.has(category.id)
+          ? { ...category, blur_placeholder: blurById.get(category.id)! }
+          : category,
+      )
+
+      const patchTree = (items: CategoryMenuItem[]) => {
+        for (const item of items) {
+          if (blurById.has(item.id))
+            item.blur_placeholder = blurById.get(item.id)!
+          if (item.children?.length)
+            patchTree(item.children)
+        }
+      }
+      patchTree(menuTree.value)
+
+      blurLoaded.value = true
+    }
+    catch (e) {
+      // Не критично: ProgressiveImage сам откатится на shimmer.
+      console.error('Не удалось загрузить LQIP-подложки категорий:', e)
+    }
+    finally {
+      blurLoading.value = false
     }
   }
 
@@ -160,6 +230,9 @@ export const useCategoriesStore = defineStore('categories', () => {
     allCategories.value = []
     additionalMenuItems.value = []
     brandsLoadedForMenu.value = false
+    // Иначе после перезагрузки списка подложки уже не догрузятся:
+    // флаг остался бы поднятым, а сами значения ушли вместе со строками.
+    blurLoaded.value = false
     await Promise.all([
       fetchCategoryData(),
       fetchAdditionalMenuItems(),
@@ -187,6 +260,7 @@ export const useCategoriesStore = defineStore('categories', () => {
     fetchCategoryData,
     fetchAdditionalMenuItems,
     loadBrandsForMenuCategories,
+    loadCategoryBlurPlaceholders,
     forceRefetch,
   }
 })

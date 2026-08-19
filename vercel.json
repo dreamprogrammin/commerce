@@ -5,6 +5,20 @@
       "schedule": "0 0 * * 0"
     }
   ],
+  "redirects": [
+    {
+      "source": "/catalog/:path((?!.*/brand/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "brand",
+          "value": "(?<brandSlug>.*)"
+        }
+      ],
+      "destination": "/catalog/:path/brand/:brandSlug",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/_nuxt/(.*)",
@@ -52,16 +66,7 @@
       ]
     },
     {
-      "source": "/og-:path*.jpeg",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=604800, stale-while-revalidate=2592000"
-        }
-      ]
-    },
-    {
-      "source": "/og-:path*.png",
+      "source": "/og-(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -98,4 +103,3 @@
     }
   ]
 }
-

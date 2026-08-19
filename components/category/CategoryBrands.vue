@@ -2,6 +2,7 @@
 import type { BrandForFilter } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
+import { buildBrandLandingPath } from '@/utils/brandLanding'
 
 const props = defineProps<{
   brands: BrandForFilter[]
@@ -21,7 +22,14 @@ function getBrandLogoUrl(logoUrl: string | null): string | null {
 
 function getBrandLink(brand: BrandForFilter): string {
   if (props.categorySlug) {
-    return `${route.path}?brand=${brand.slug}`
+    /*
+     * Именно `route.path`, а не `categorySlug`: у вложенных категорий путь
+     * многосегментный (`/catalog/girls/kukly`), а в пропе лежит только
+     * последний слаг. Хвост `/brand/<слаг>` с текущего пути снимает сам
+     * `buildBrandLandingPath` — иначе на бренд-лендинге ссылки удваивались
+     * и каждый чип вёл в 404.
+     */
+    return buildBrandLandingPath(route.path, brand.slug)
   }
   return `/brand/${brand.slug}`
 }
@@ -149,11 +157,26 @@ const isNavigationMode = computed(() => !props.activeBrandSlug)
 </template>
 
 <style scoped>
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+/* Стили ниже намеренно лежат в @layer components.
+
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
+
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 </style>

@@ -25,7 +25,7 @@ useHead({
   <div v-if="isLoggedIn" class="profile-shell min-h-screen">
     <!-- Desktop Header -->
     <div class="hidden lg:block">
-      <CommonHeader />
+      <CommonSiteHeader />
     </div>
 
     <!-- Mobile: общий для сайта таббар (fixed) -->
@@ -78,18 +78,33 @@ useHead({
 </template>
 
 <style scoped>
-/* Фон из макета: blue-50 сверху, уходящий в нейтральный к 320px */
-.profile-shell {
-  overflow-x: clip;
-  background: linear-gradient(180deg, var(--color-blue-50, oklch(0.97 0.014 254.604)), #f5f6f9 320px);
-}
+/* Стили ниже намеренно лежат в @layer components.
 
-.profile-scroll {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+   Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
+   Tailwind живут в @layer utilities. Беслойное правило бьёт слой независимо
+   от специфичности, поэтому свой класс молча отменял бы утилиту на том же
+   элементе (так на проекте умирали `hidden`, `lg:flex` и `gap-[...]`).
 
-.profile-scroll::-webkit-scrollbar {
-  display: none;
+   Внутри слоя порядок нормальный: components объявлен раньше utilities, и
+   утилита всегда перебивает класс. Значит раскладку можно править классом
+   в разметке, не трогая этот блок.
+
+   Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
+
+@layer components {
+  /* Фон из макета: blue-50 сверху, уходящий в нейтральный к 320px */
+  .profile-shell {
+    overflow-x: clip;
+    background: linear-gradient(180deg, var(--color-blue-50, oklch(0.97 0.014 254.604)), #f5f6f9 320px);
+  }
+
+  .profile-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .profile-scroll::-webkit-scrollbar {
+    display: none;
+  }
 }
 </style>

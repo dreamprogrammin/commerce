@@ -44,7 +44,7 @@ INSERT INTO public.categories
     (name, slug, href, description, is_root_category, display_in_menu, display_order, icon_name)
 VALUES
     ('Мальчикам', 'boys', '/catalog/boys', 'Игрушки и товары для мальчиков', TRUE, TRUE, 10, 'lucide:user'),
-    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, TRUE, 20, 'lucide:female'),
+    ('Девочкам', 'girls', '/catalog/girls', 'Куклы, игрушки и мечты для девочек', TRUE, TRUE, 20, 'lucide:user-round'),
     ('Малышам', 'kiddy', '/catalog/kiddy', 'Безопасные и развивающие игрушки 0-3', TRUE, TRUE, 30, 'lucide:baby'),
     ('Конструкторы', 'constructors-root', '/catalog/constructors-root', 'Конструкторы для детей всех возрастов', TRUE, TRUE, 40, 'lucide:blocks'),
     ('Игры', 'games', '/catalog/games', 'Настольные игры и пазлы для всей семьи', TRUE, TRUE, 50, 'lucide:gamepad-2'),
@@ -145,6 +145,29 @@ BEGIN
         RAISE NOTICE 'Пожалуйста, сначала зарегистрируйтесь с этим email, а затем выполните `supabase db reset` еще раз.';
     END IF;
 END $$;
+
+
+-- =================================================================
+-- ==       ПРАВА ДОСТУПА ДЛЯ ЛОКАЛЬНОЙ БАЗЫ                      ==
+-- =================================================================
+-- Новые образы Supabase Postgres создают таблицы в схеме `public` без
+-- привилегий SELECT/INSERT/UPDATE/DELETE для ролей `anon` и `authenticated`
+-- (остаются только TRUNCATE/REFERENCES/TRIGGER). Из-за этого локальный
+-- каталог падает с ошибкой 42501 `permission denied for table`.
+-- На проде база создавалась под старыми, разрешительными дефолтами,
+-- поэтому там гранты уже есть — и этот файл до прода не доезжает.
+-- Доступ к строкам по-прежнему определяется политиками RLS.
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+-- Те же права для таблиц, которые появятся позже.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
 
 
 -- Финальное сообщение

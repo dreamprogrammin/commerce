@@ -1,7 +1,7 @@
 <template>
   <div>
-    <div class="hidden md:block">
-      <CommonHeader />
+    <div class="hidden lg:block">
+      <CommonSiteHeader />
     </div>
     <!-- Sticky таббар для мобильных -->
     <div class="lg:hidden sticky top-0 z-40">

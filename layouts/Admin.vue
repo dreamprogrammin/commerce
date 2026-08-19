@@ -46,6 +46,7 @@ const navLinks = [
   { to: '/admin/questions', label: 'Вопросы', badge: () => adminQuestionsStore.unansweredCount },
   { to: '/admin/reviews', label: 'Отзывы', badge: () => adminReviewsStore.unpublishedCount },
   { to: '/admin/suppliers', label: 'Поставщики' },
+  { to: '/admin/pickup-points', label: 'Пункты самовывоза' },
   { to: '/admin/restock', label: 'К закупке' },
   { to: '/admin/pos', label: 'Оффлайн касса' },
   { to: '/admin/returns', label: 'Возвраты' },
@@ -58,8 +59,12 @@ const navLinks = [
 </script>
 
 <template>
-  <div class="hidden md:block">
-    <CommonHeader />
+  <!--
+    Брейкпоинт lg, а не md: десктопная строка SiteHeader живёт на ≥lg, ниже
+    он рисует компактную мобильную плашку — в админке она не нужна.
+  -->
+  <div class="hidden lg:block">
+    <CommonSiteHeader />
   </div>
   <div class="flex min-h-screen w-full bg-muted/40">
     <!-- Десктоп сайдбар -->

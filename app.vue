@@ -8,6 +8,16 @@ import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import 'vue-sonner/style.css'
 
+/*
+ * Toaster импортируется статически, и это проверено, а не по недосмотру.
+ *
+ * Асинхронная загрузка пробовалась и НЕ дала ничего: `toast` из vue-sonner
+ * импортируют ещё 75 файлов, так что библиотека (22.7 КБ собранного кода)
+ * остаётся в жадном чанке независимо от того, как подключён сам Toaster.
+ * Чтобы её оттуда убрать, пришлось бы прятать за ленивую обёртку все 75
+ * вызовов — работа несоразмерная выигрышу.
+ */
+
 // Polyfill for requestIdleCallback
 const requestIdleCallback = globalThis.requestIdleCallback || ((cb: IdleRequestCallback) => setTimeout(cb, 1))
 
@@ -70,10 +80,26 @@ onMounted(async () => {
     shouldMountModals.value = true
   })
 
-  // Откладываем подписку на realtime — не критично при первом рендере
-  requestIdleCallback(() => {
-    subscribeAll()
-  })
+  /*
+   * Realtime заказов нужен только администратору, поэтому ждём, пока станет
+   * известна роль, а не подписываемся сразу. Профиль подгружается отложенно
+   * (см. onAuthStateChange выше), так что на момент mount роль ещё неизвестна
+   * даже у вошедшего админа — отсюда watch, а не разовая проверка.
+   *
+   * `wasAdmin` в условии не для красоты: с immediate первый вызов приходит с
+   * undefined, и без этой проверки каждый гость на каждой странице получал бы
+   * отписку от каналов, которых у него нет.
+   */
+  watch(
+    () => profileStore.isAdmin,
+    (isAdmin, wasAdmin) => {
+      if (isAdmin)
+        requestIdleCallback(() => subscribeAll())
+      else if (wasAdmin)
+        unsubscribe()
+    },
+    { immediate: true },
+  )
 
   // Defer telegram modal check
   requestIdleCallback(() => {
@@ -239,19 +265,25 @@ useSchemaOrg([
       <MobileBottomNav v-if="!route.path.startsWith('/admin')" />
     </ClientOnly>
 
-    <!-- Авторизация: Drawer на мобильных, Modal на десктопе -->
+    <!-- Авторизация: Drawer на мобильных, Modal на десктопе.
+
+         Префикс Lazy обязателен. `shouldMountModals` поднимается по
+         requestIdleCallback и откладывает только монтирование — код
+         автоимпортированного компонента без Lazy всё равно лежит в жадном
+         чанке и разбирается до первого экрана. С Lazy он уезжает в
+         отдельный чанк и грузится вместе с самой модалкой. -->
     <ClientOnly>
       <template v-if="shouldMountModals">
-        <AuthLoginDrawer v-if="isMobile" />
-        <AuthLoginModal v-else />
+        <LazyAuthLoginDrawer v-if="isMobile" />
+        <LazyAuthLoginModal v-else />
       </template>
     </ClientOnly>
 
     <!-- Telegram-подписка: Drawer на мобильных, Dialog на десктопе -->
     <ClientOnly>
       <template v-if="shouldMountModals">
-        <CommonTelegramSubscribeDrawer v-if="isMobile" />
-        <CommonTelegramSubscribeDialog v-else />
+        <LazyCommonTelegramSubscribeDrawer v-if="isMobile" />
+        <LazyCommonTelegramSubscribeDialog v-else />
       </template>
     </ClientOnly>
   </div>

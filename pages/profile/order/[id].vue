@@ -16,6 +16,8 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+// Цена берётся из заказа, а не из товара: товар мог подорожать после покупки.
+import { orderItemUnitPrice } from '@/utils/orderItems'
 
 const route = useRoute()
 const router = useRouter()
@@ -67,8 +69,7 @@ async function fetchOrder() {
         bonuses_spent,
         bonuses_awarded,
         order_items(
-          id,
-          quantity,
+          *,
           product:products(
             id,
             name,
@@ -190,6 +191,15 @@ onUnmounted(() => {
 })
 
 // Форматирование адреса доставки
+/*
+ * Адрес приходит как `{ city, line1 }` — так его пишет оформление
+ * (`pages/checkout.vue`) и так же читает страница успеха заказа.
+ *
+ * Здесь разбирались поля `street`, `building` и `apartment`, которых не
+ * пишет никто: покупатель в кабинете видел один город без улицы и дома.
+ * Прежние поля оставлены запасным вариантом — колонка это свободный JSON,
+ * и за содержимое старых строк в боевой базе поручиться нельзя.
+ */
 function formatAddress(address: any) {
   if (!address)
     return 'Не указан'
@@ -199,6 +209,8 @@ function formatAddress(address: any) {
   const parts = []
   if (address.city)
     parts.push(address.city)
+  if (address.line1)
+    parts.push(address.line1)
   if (address.street)
     parts.push(address.street)
   if (address.building)
@@ -210,19 +222,33 @@ function formatAddress(address: any) {
 }
 
 // Метод доставки
+/*
+ * Курьерская доставка хранится как `courier`, а НЕ `delivery`.
+ *
+ * Канон задан типом в корзине: `type DeliveryMethod = 'pickup' | 'courier'`
+ * (`stores/publicStore/cartStore.ts`), его же пишет оформление и по нему же
+ * ветвится страница успеха заказа. Здесь ветка была на `delivery`, которого
+ * не пишет никто, и покупатель в кабинете видел сырое слово «courier».
+ *
+ * `delivery` оставлен синонимом на случай старых строк в боевой базе:
+ * колонка это свободный TEXT без CHECK-ограничения, так что поручиться за
+ * её содержимое нельзя.
+ */
+const isCourierDelivery = computed(() => {
+  const method = order.value?.delivery_method
+  return method === 'courier' || method === 'delivery'
+})
+
 const deliveryMethodLabel = computed(() => {
   if (!order.value)
     return ''
 
-  const method = order.value.delivery_method
-  switch (method) {
-    case 'delivery':
-      return 'Доставка курьером'
-    case 'pickup':
-      return 'Самовывоз'
-    default:
-      return method
-  }
+  if (isCourierDelivery.value)
+    return 'Доставка курьером'
+  if (order.value.delivery_method === 'pickup')
+    return 'Самовывоз'
+
+  return order.value.delivery_method
 })
 
 // Метод оплаты
@@ -314,10 +340,12 @@ useHead({
     <div v-else-if="order" class="space-y-6">
       <!-- ✅ Lottie Animation Tracker -->
       <Card>
-        <CardContent class="p-0">
-          <OrderTrackerLottie
-            :status="order.status as 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'"
-          />
+        <!-- Полоса прогресса переехала из OrderTrackerLottie в отдельный
+             компонент, поэтому собираем блок здесь; отступы тоже перешли
+             к обёртке, раньше их приносил сам трекер. -->
+        <CardContent class="flex flex-col items-center gap-6 py-8">
+          <OrderTrackerLottie :status="order.status" />
+          <OrderProgressBar :status="order.status" class="max-w-md" />
         </CardContent>
       </Card>
 
@@ -363,9 +391,11 @@ useHead({
               </div>
             </div>
 
-            <!-- Адрес -->
+            <!-- Адрес. Условие на `courier`, а не на `delivery`: с прежним
+                 значением блок не показывался вовсе, и покупатель не видел,
+                 куда едет его заказ. -->
             <div
-              v-if="order.delivery_method === 'delivery'"
+              v-if="isCourierDelivery"
               class="flex items-start gap-3"
             >
               <MapPin class="w-5 h-5 text-muted-foreground mt-0.5" />
@@ -489,7 +519,7 @@ useHead({
                 <p class="text-sm text-muted-foreground">
                   {{
                     (
-                      item.product.final_price || item.product.price
+                      orderItemUnitPrice(item)
                     ).toLocaleString("ru-RU")
                   }}
                   ₸ × {{ item.quantity }}
@@ -525,8 +555,7 @@ useHead({
                 <p class="font-semibold">
                   {{
                     (
-                      (item.product.final_price || item.product.price)
-                      * item.quantity
+                      orderItemUnitPrice(item) * item.quantity
                     ).toLocaleString("ru-RU")
                   }}
                   ₸

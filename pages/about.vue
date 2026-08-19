@@ -2,16 +2,34 @@
 // BreadcrumbList JSON-LD
 useBreadcrumbSchema([{ name: 'О нас' }])
 
-useHead({
-  title: 'О нас — uhti.kz',
-  meta: [
-    {
-      name: 'description',
-      content:
-        'Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.',
-    },
-    { name: 'robots', content: 'index, follow' },
-  ],
+// Страница отдавала только title, description и robots — ни одного og-тега.
+// При шаринге в мессенджеры и соцсети карточка выходила пустой: ни заголовка,
+// ни картинки. Остальные статические страницы (returns.vue, privacy-policy.vue)
+// уже описаны через useSeoMeta, здесь то же самое плюс og:image.
+// «Ухтышка» — единое наименование по всему сайту, см. pages/index.vue
+const TITLE = 'О нас — Ухтышка'
+const DESCRIPTION
+  = 'Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.'
+
+defineOgImageComponent('OgImageCatalog', {
+  title: 'О нас',
+  description: 'Локальный магазин игрушек в Алматы со своим складом',
+  kicker: 'О КОМПАНИИ',
+})
+
+useSeoMeta({
+  title: TITLE,
+  description: DESCRIPTION,
+  ogTitle: TITLE,
+  ogDescription: DESCRIPTION,
+  ogType: 'website',
+  ogUrl: 'https://uhti.kz/about',
+  ogSiteName: 'Ухтышка',
+  ogLocale: 'ru_RU',
+  twitterCard: 'summary_large_image',
+  twitterTitle: TITLE,
+  twitterDescription: DESCRIPTION,
+  robots: useRobotsContent('index, follow'),
 })
 </script>
 

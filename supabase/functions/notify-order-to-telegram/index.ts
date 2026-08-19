@@ -66,6 +66,11 @@ interface OrderData {
   customer_name: string | null
   customer_phone: string | null
   comment: string | null
+  delivery_date: string | null
+  delivery_slot: string | null
+  promo_code: string | null
+  promo_discount: number | null
+  pickup_point: { name: string, address: string } | null
   profile: OrderProfile | null
   order_items: OrderItem[]
 }
@@ -83,6 +88,11 @@ interface GuestCheckoutData {
   status: string
   source: 'online' | 'offline' | null
   comment: string | null
+  delivery_date: string | null
+  delivery_slot: string | null
+  promo_code: string | null
+  promo_discount: number | null
+  pickup_point: { name: string, address: string } | null
   guest_checkout_items: GuestCheckoutItem[]
 }
 
@@ -154,6 +164,8 @@ Deno.serve(async (req) => {
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, guest_name, guest_phone, guest_email, status, source, comment,
+          delivery_date, delivery_slot, promo_code, promo_discount,
+          pickup_point:pickup_points(name, address),
           guest_checkout_items(
             quantity, 
             product_id,
@@ -194,6 +206,11 @@ Deno.serve(async (req) => {
           bonuses_awarded: 0, // У гостей нет бонусов
           bonuses_spent: 0,   // У гостей нет бонусов
           comment: guestData.comment,
+          delivery_date: guestData.delivery_date,
+          delivery_slot: guestData.delivery_slot,
+          promo_code: guestData.promo_code,
+          promo_discount: guestData.promo_discount,
+          pickup_point: guestData.pickup_point,
           profile: null,
           order_items: guestData.guest_checkout_items.map(item => ({
             quantity: item.quantity,
@@ -212,7 +229,9 @@ Deno.serve(async (req) => {
         .select(`
           id, final_amount, created_at, delivery_method, payment_method,
           delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
-          customer_name, customer_phone, comment,
+          customer_name, customer_phone, comment, delivery_date, delivery_slot,
+          promo_code, promo_discount,
+          pickup_point:pickup_points(name, address),
           order_items(
             quantity,
             product_id,
@@ -379,6 +398,16 @@ Deno.serve(async (req) => {
       timeZone: 'Asia/Almaty'
     })
 
+    // Желаемая дата приходит из колонки DATE — как «2026-08-07», без времени.
+    // Разбираем строку сами, а не через Date: календарной дате незачем зависеть
+    // от часового пояса. Date разберёт её как полночь UTC, и при показе в зоне
+    // с отрицательным смещением получился бы предыдущий день; для Алматы (+05)
+    // сейчас совпадает, но это совпадение, а не гарантия.
+    const formatDeliveryDate = (isoDate: string): string => {
+      const [year, month, day] = isoDate.split('-')
+      return day && month && year ? `${day}.${month}.${year}` : isoDate
+    }
+
     // Собираем информацию о товарах с изображениями
     const productsWithImages: Array<{
       text: string
@@ -442,6 +471,12 @@ Deno.serve(async (req) => {
     })
 
     messageText += `*Итого:* ${typedOrderData.final_amount} ₸\n`
+
+    // Промокод показываем под итогом: иначе оператор видит сумму ниже
+    // стоимости позиций и не понимает почему.
+    if (typedOrderData.promo_code && Number(typedOrderData.promo_discount) > 0) {
+      messageText += `🏷 *Промокод* ${escapeMarkdown(typedOrderData.promo_code)}: −${typedOrderData.promo_discount} ₸\n`
+    }
     
     // Бонусы показываем ТОЛЬКО для зарегистрированных пользователей
     if (typedOrderData.user_id && tableName === 'orders') {
@@ -456,10 +491,30 @@ Deno.serve(async (req) => {
     messageText += `*Оплата:* ${escapeMarkdown(typedOrderData.payment_method) || 'Не указано'}\n`
     messageText += `*Доставка:* ${typedOrderData.delivery_method === 'courier' ? 'Курьер' : 'Самовывоз'}\n`
 
+    // При самовывозе адрес доставки пуст, вместо него — куда ехать за заказом.
+    if (typedOrderData.delivery_method !== 'courier' && typedOrderData.pickup_point) {
+      const pp = typedOrderData.pickup_point
+      messageText += `*Пункт выдачи:* ${escapeMarkdown(pp.name)} — ${escapeMarkdown(pp.address)}\n`
+    }
+
     if (typedOrderData.delivery_method === 'courier' && typedOrderData.delivery_address) {
       const city = escapeMarkdown(typedOrderData.delivery_address.city)
       const line1 = escapeMarkdown(typedOrderData.delivery_address.line1)
       messageText += `*Адрес:* ${city}, ${line1}\n`
+    }
+
+    // Желаемое время — прямо под адресом: оператору оно нужно раньше
+    // комментария, по нему планируется маршрут курьера. Дата и интервал
+    // независимы: покупатель мог выбрать только одно из двух.
+    const desiredWhen = [
+      typedOrderData.delivery_date
+        ? formatDeliveryDate(typedOrderData.delivery_date)
+        : null,
+      typedOrderData.delivery_slot,
+    ].filter(Boolean).join(', ')
+
+    if (desiredWhen) {
+      messageText += `*Желаемое время:* ${escapeMarkdown(desiredWhen)}\n`
     }
 
     if (typedOrderData.comment) {

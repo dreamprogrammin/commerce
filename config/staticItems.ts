@@ -27,7 +27,7 @@ export const staticMainMenuItems: IStaticMainMenuItem[] = [
     title: 'Девочкам',
     href: '/catalog/girls',
     isTrigger: true,
-    iconName: 'lucide:female',
+    iconName: 'lucide:user-round',
   },
   {
     slug: 'kiddy',

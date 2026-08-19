@@ -7,6 +7,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Фирменные шрифты. Обычный @theme (не inline) — переменные должны попасть
+   в CSS, т.к. портированная вёрстка ссылается на var(--font-sans) напрямую. */
+@theme {
+  --font-sans:
+    'Nunito', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  --font-display: 'Montserrat Alternates', var(--font-sans);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -44,6 +53,22 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Утилиты для фирменных токенов: text-bonus, bg-brand-surface, … */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-surface: var(--brand-surface);
+  --color-price: var(--price);
+  --color-price-old: var(--price-old);
+  --color-discount: var(--discount);
+  --color-sold-out: var(--sold-out);
+  --color-bonus: var(--bonus);
+  --color-bonus-surface: var(--bonus-surface);
+  --color-bonus-border: var(--bonus-border);
+  --color-rating: var(--rating);
+  --color-rating-empty: var(--rating-empty);
+  --color-product-line: var(--product-line);
+  --color-success: var(--success);
 }
 
 :root {
@@ -53,12 +78,21 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(62.3% 0.214 259.815);
+  /* Было oklch(62.3% ...) = #2b7fff (blue-500). Не проходило WCAG AA ни в
+     одной из двух ролей: ссылкой по белому 3.76:1, по подложкам плиток
+     («5 категорий» на #e3edfb) 3.18:1, и белым текстом по самой кнопке
+     тоже 3.76:1 — при пороге 4.5. Светлота опущена на 9 п.п., оттенок и
+     насыщенность прежние: #1163df, худший случай 4.59:1, белым по нему 5.42. */
+  --primary: oklch(53.3% 0.203 259.815);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* Было oklch(0.556 0 0) = #737373 (neutral-500). Самый массовый провал
+     контраста: 149 файлов используют text-muted-foreground, а на серых
+     подложках выходило 4.04–4.35:1 при пороге 4.5. Опущено на 3 п.п. до
+     #6a6a6a — на глаз неотличимо, худший случай 4.61:1. */
+  --muted-foreground: oklch(52.6% 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -80,6 +114,53 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ============================================================
+     Фирменные семантические токены (дизайн-система Ухтышка).
+     ВАЖНО: значения записаны литералами, а НЕ через var(--color-*).
+     Tailwind 4 выкидывает переменную темы, если для неё не сгенерирована
+     ни одна утилита, — ссылка на такую переменную работает в dev
+     и молча ломается в проде.
+     ============================================================ */
+  --brand: oklch(62.3% 0.214 259.815); /* blue-500 */
+  --brand-hover: oklch(54.6% 0.245 262.881); /* blue-600 */
+  --brand-active: oklch(48.8% 0.243 264.376); /* blue-700 */
+  --brand-surface: oklch(97% 0.014 254.604); /* blue-50 */
+  --header-bg: oklch(62.3% 0.214 259.815);
+
+  --price: oklch(62.3% 0.214 259.815);
+  --price-old: var(--muted-foreground);
+  /* Было oklch(57.7% ...) = #e7000b (red-600): цена со скидкой на подложке
+     карточки #f5f5f5 давала 4.37:1. Опущено на 1.5 п.п. до #e10003 — 4.58:1. */
+  --discount: oklch(56.2% 0.243 27.325); /* red-600, притемнён под WCAG AA */
+  --sold-out: oklch(55.1% 0.027 264.364); /* gray-500 */
+
+  --bonus: oklch(64.6% 0.222 41.116); /* orange-600 */
+  --bonus-surface: oklch(98% 0.016 73.684); /* orange-50 */
+  --bonus-border: oklch(90.1% 0.076 70.697); /* orange-200 */
+
+  --rating: oklch(85.2% 0.199 91.936); /* yellow-400 */
+  --rating-empty: oklch(87.2% 0.01 258.338); /* gray-300 */
+  --product-line: oklch(59.2% 0.249 0.584); /* pink-600 */
+  /* Было oklch(72.3% ...) = #00c950 (green-500) — худший контраст на сайте:
+     «В наличии» по белому давало 2.21:1 при пороге 4.5, то есть текст был
+     нечитаем. Тот же цвет служит подложкой бейджа в ProductCard, и белым по
+     нему выходило 2.22:1 — обе роли не проходили. Опущено на 21 п.п. до
+     #008217: текстом 4.99:1, белым по нему тоже 4.99:1.
+     Изменение заметное — зелёный стал глубоким вместо салатового. */
+  --success: oklch(51.3% 0.194 149.579); /* green-500, притемнён под WCAG AA */
+
+  /* Холодная «бумага» под карточками контента (карточка товара).
+     Прототип Claude Design задаёт её литералом #eef0f3. */
+  --page-surface: oklch(94.6% 0.005 264.5);
+
+  /* Литерал повторяет --primary и вслед за ним притемнён: свечение под
+     кнопкой светлее самой кнопки читается как чужой ореол. */
+  --shadow-brand: 0 8px 18px -8px rgb(17 99 223 / 0.8);
+  --shadow-brand-strong: 0 20px 46px -20px rgb(43 127 255 / 0.7);
+  --shadow-glass: 0 10px 30px rgb(15 23 42 / 0.2);
+  --elevation-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --elevation-card-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 .dark {
@@ -115,6 +196,58 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+
+  /* Зеркалим только «почти белые» поверхности — на тёмном фоне они
+     нечитаемы. Константы бренда (--brand, --price, --bonus и т.п.)
+     намеренно остаются едиными для обеих тем. */
+  --brand-surface: oklch(37.9% 0.146 265.522); /* blue-900 */
+  --bonus-surface: oklch(26.6% 0.079 36.259); /* orange-950 */
+  --bonus-border: oklch(47.3% 0.137 46.201); /* orange-800 */
+  --rating-empty: oklch(37.3% 0.034 259.733); /* gray-700 */
+  --sold-out: oklch(70.7% 0.022 261.325); /* gray-400 */
+  --page-surface: oklch(17.5% 0.006 264.5);
+  --elevation-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --elevation-card-hover: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+}
+
+/* ============================================================
+   Горизонтальный ритм страницы — ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ.
+
+   --page-gutter — боковой отступ контента от края экрана. На него
+   обязаны ссылаться ВСЕ, кто задаёт ширину контента:
+     • carouselContainerVariants в lib/variants.ts (always / desktop / false);
+     • .app-container ниже;
+     • edge-bleed рельсы в scoped-стилях компонентов —
+       margin-inline: calc(-1 * var(--page-gutter));
+       padding-inline: var(--page-gutter);
+
+   НЕ хардкодьте отступ числом и не пишите свой clamp(): рельсы, которые
+   вылезают за контейнер, дают горизонтальный скролл всей страницы, а
+   секции с «почти таким же» отступом визуально разъезжаются.
+
+   Значения = шкала Tailwind 4/6/8/12 (16/24/32/48px) на брейкпоинтах
+   sm/md/lg — именно так исторически был свёрстан .app-container.
+   ============================================================ */
+:root {
+  --page-gutter: 1rem; /* < 640px → 16px */
+}
+
+@media (width >= 40rem) {
+  :root {
+    --page-gutter: 1.5rem; /* sm → 24px */
+  }
+}
+
+@media (width >= 48rem) {
+  :root {
+    --page-gutter: 2rem; /* md → 32px */
+  }
+}
+
+@media (width >= 64rem) {
+  :root {
+    --page-gutter: 3rem; /* lg+ → 48px */
+  }
 }
 
 /* Базовые стили - ТОЛЬКО ЗДЕСЬ, удалите из app.vue */
@@ -130,8 +263,10 @@
       'calt' 1;
   }
 
+  /* Легаси-алиас для carouselContainerVariants({ contained: 'always' }).
+     В новом коде используйте вариант из lib/variants.ts. */
   .app-container {
-    @apply container max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12;
+    @apply container max-w-screen-2xl mx-auto px-[var(--page-gutter)];
   }
 
   .sr-only {
