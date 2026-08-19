@@ -154,13 +154,23 @@ const catalogSlugParts = computed(() =>
 
 const activeBrandSlug = computed(() => catalogSlugParts.value.brandSlug)
 
-const categoryBrandSeo = ref<{
+/*
+ * `useState`, а не `ref`: значение обязано пережить гидратацию.
+ *
+ * Наполняет его `loadFilterData` внутри `useAsyncData(..., { server: true })`,
+ * а на клиенте этот обработчик при гидратации не выполняется — payload по
+ * ключу уже есть. Обычный `ref` в payload не попадает, поэтому на сервере
+ * бренд-SEO был, а на клиенте становился null. Пока SEO-блок рисовался
+ * только на клиенте, это было незаметно; теперь он серверный, и расхождение
+ * дало бы рассинхрон гидратации — разный текст на сервере и на клиенте.
+ */
+const categoryBrandSeo = useState<{
   brand_id: string
   seo_h1: string | null
   seo_title: string | null
   seo_description: string | null
   seo_text: string | null
-} | null>(null)
+} | null>('catalog-brand-seo', () => null)
 const brandSeoLoading = ref(false)
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
@@ -1407,8 +1417,22 @@ const seoText = computed(() => {
   return text ? sanitizeHtml(text) : null
 })
 
+/*
+ * Раньше здесь стояла заглушка `import.meta.server → []`, из-за которой
+ * SEO-текст категории не попадал в серверную разметку вовсе: для поисковика
+ * этого текста не существовало, хотя ради него он и написан.
+ *
+ * Технических препятствий у серверного разбора нет — проверено:
+ * `parseHTMLToBlocks` работает регулярками, без DOM, а `sanitizeHtml` из
+ * `useSafeHtml` на сервере сам возвращает строку как есть, не трогая
+ * DOMPurify.
+ *
+ * Чтобы серверная и клиентская ветки совпадали, `categoryBrandSeo` выше
+ * переведён в `useState` — иначе на клиенте он был бы null и текст
+ * подменился бы категорийным.
+ */
 const seoBlocks = computed(() => {
-  if (!seoText.value || import.meta.server)
+  if (!seoText.value)
     return []
   return parseHTMLToBlocks(seoText.value)
 })
@@ -2431,14 +2455,21 @@ else {
          поисковику. Это отдельная работа: нужны их данные в SSR.
     ─────────────────────────────────────────────────────────────────── -->
 
-    <!-- SEO текст категории -->
-    <ClientOnly>
-      <SEOContentRenderer
-        v-if="seoBlocks.length > 0 && !hasActiveFilters"
-        :blocks="seoBlocks"
-        class="mt-8"
-      />
-    </ClientOnly>
+    <!-- SEO текст категории — рисуется НА СЕРВЕРЕ.
+
+         `ClientOnly` снят вместе с заглушкой в `seoBlocks`: пока они стояли,
+         текст не попадал в серверную разметку и поисковик его не видел.
+
+         Условие `!hasActiveFilters` оставлено: на отфильтрованной выдаче
+         категорийный текст не к месту. На таких адресах блок может исчезнуть
+         после гидратации (ISR срезает query, и сервер считает фильтры
+         пустыми), но они закрыты `noindex`, а сам блок стоит ниже сгиба —
+         видимого сдвига это не даёт. -->
+    <SEOContentRenderer
+      v-if="seoBlocks.length > 0 && !hasActiveFilters"
+      :blocks="seoBlocks"
+      class="mt-8"
+    />
 
     <!-- FAQ блок для категории -->
     <ClientOnly>
