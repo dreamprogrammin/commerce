@@ -39,6 +39,44 @@ function trimGalleryBlur<T extends { blur_placeholder?: string | null }>(
   )
 }
 
+/**
+ * Сколько ПЕРВЫХ товаров списка получают заглушку вообще.
+ *
+ * Совпадает с `EAGER_CARDS` в `components/global/ProductCard.vue`: там ровно
+ * столько карточек считаются «над сгибом» и грузят картинку жадно. Ниже
+ * сгиба заглушка бесполезна — к моменту, когда до карточки долистают,
+ * картинка давно загружена, а `ProgressiveImage` в её отсутствие честно
+ * показывает shimmer.
+ *
+ * Цена вопроса, замер на превью (`/catalog/boys`): 34 data:URI на 43.5 КБ
+ * сырьём, это 10.4 КБ по проводу и 21% всего документа. Из них подложки
+ * первых четырёх карточек — малая часть.
+ *
+ * Почему не перекодировать сами заглушки помельче: проверено на боевых
+ * данных, предел кодировщика WebP в Chromium около 770 байт независимо от
+ * размера картинки (у формата фиксированный заголовок, плюс треть сверху
+ * даёт base64). При нынешней медиане 1559 байт это дало бы экономию вдвое,
+ * а не вчетверо, и потребовало бы переписать 1046 строк в боевой базе.
+ * Здесь выигрыш больше и без записи в прод.
+ */
+const BLUR_PRODUCTS_LIMIT = 4
+
+/** Снять заглушки у товаров ниже сгиба целиком. */
+function trimBelowFoldBlur<T extends { product_images?: { blur_placeholder?: string | null }[] }>(
+  products: T[],
+): T[] {
+  return products.map((product, index) => {
+    if (index < BLUR_PRODUCTS_LIMIT || !Array.isArray(product.product_images))
+      return product
+    return {
+      ...product,
+      product_images: product.product_images.map(img =>
+        img.blur_placeholder ? { ...img, blur_placeholder: null } : img,
+      ),
+    }
+  })
+}
+
 export const useProductsStore = defineStore('productsStore', () => {
   const supabase = useSupabaseClient<Database>()
 
@@ -532,8 +570,11 @@ export const useProductsStore = defineStore('productsStore', () => {
         }
       }) as unknown as ProductWithGallery[]
 
-      const hasMore = newProducts.length === pageSize
-      return { products: newProducts, hasMore }
+      // Заглушки оставляем только карточкам над сгибом — см. BLUR_PRODUCTS_LIMIT.
+      const trimmed = trimBelowFoldBlur(newProducts)
+
+      const hasMore = trimmed.length === pageSize
+      return { products: trimmed, hasMore }
     }
     catch (error: any) {
       toast.error('Ошибка при загрузке товаров', {
