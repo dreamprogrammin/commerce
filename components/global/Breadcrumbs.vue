@@ -131,10 +131,14 @@ const currentItem = computed(() => {
             </span>
 
             <!-- Промежуточные категории -->
+            <!-- Без модификатора прозрачности: `text-muted-foreground/60`
+                 давал #a6a6a6 на белом, контраст 2.43 при норме WCAG AA 4.5.
+                 Lighthouse ловил это на странице бренда как провал проверки
+                 контраста с весом 7. Ссылка стала темнее — так и задумано. -->
             <NuxtLink
               v-else
               :to="item.href"
-              class="text-muted-foreground/60 hover:text-primary transition-colors whitespace-nowrap"
+              class="text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
             >
               {{ item.name }}
             </NuxtLink>
