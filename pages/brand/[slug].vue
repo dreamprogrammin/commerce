@@ -4,9 +4,12 @@ import { ArrowLeft, Package } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 import {
+  BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS,
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
+  SITE_LOGO_URL,
+  SITE_OG_IMAGE_URL,
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -62,28 +65,44 @@ if (!brand.value && !brandPending.value) {
   throw createError({ statusCode: 404, statusMessage: 'Brand not found', fatal: true })
 }
 
-// Загружаем линейки бренда
-const brandProductLines = ref<ProductLine[]>([])
+/*
+ * Линейки бренда. Обработчик ВОЗВРАЩАЕТ данные, а не раскладывает их по `ref`.
+ *
+ * Раньше здесь был обычный `ref`, который наполнял `watchEffect`. Обычный
+ * `ref` в payload не попадает, поэтому блок «Коллекции» отсутствовал в
+ * серверной разметке ЦЕЛИКОМ и вставлялся только после гидратации.
+ *
+ * Чего это стоило (замер на проде 20 августа, `/brand/mattel`, 412 px):
+ * вставка на третьей секунде толкала заголовок «Каталог товаров» с y=402 на
+ * y=573 и давала сдвиг 0.0952 при пороге CLS 0.1. Заодно из JSON-LD выпадал
+ * `subOrganization` (в разметке прода его не было ни на одном бренде), а
+ * ссылки на страницы линеек не видел поисковик — при том что сами эти
+ * страницы в карте сайта есть.
+ *
+ * `default` нужен, чтобы тип остался `Ref<ProductLine[]>`: значение уходит в
+ * `useBrandPageFilters`, а тот ждёт именно его, не `ComputedRef`.
+ */
+const { data: brandProductLines } = await useAsyncData(
+  `brand-lines-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return []
 
-async function loadProductLines() {
-  if (!brand.value)
-    return
-
-  try {
     const { data, error } = await supabase
       .from('product_lines')
       .select('*')
       .eq('brand_id', brand.value.id)
       .order('name', { ascending: true })
 
-    if (!error && data) {
-      brandProductLines.value = data as ProductLine[]
+    if (error) {
+      console.error('Error loading product lines:', error)
+      return []
     }
-  }
-  catch (err) {
-    console.error('Error loading product lines:', err)
-  }
-}
+
+    return (data ?? []) as ProductLine[]
+  },
+  { watch: [brand], default: (): ProductLine[] => [] },
+)
 
 // Загружаем агрегированную статистику бренда
 const brandStats = ref<{
@@ -122,13 +141,21 @@ const filterState = useBrandPageFilters({
   brandProductLines,
 })
 
-// ─── SEO: наличие товаров у бренда (SSR-safe) ────────────────────────────────
-// ⚠️ filterState.products грузится клиентским useQuery (TanStack) и на SSR
-// всегда пуст — на нём нельзя строить robots/JSON-LD решения без риска
-// случайно noindex-нуть страницы брендов, у которых на самом деле есть товар.
-// Поэтому считаем наличие товара отдельным лёгким SSR-safe запросом.
-const { data: brandHasStock } = await useAsyncData(
-  `brand-has-stock-${brandSlug}`,
+/*
+ * SEO: есть ли у бренда товар вообще (SSR-safe).
+ *
+ * ⚠️ `filterState.products` грузится клиентским `useQuery` (TanStack) и на SSR
+ * всегда пуст — на нём нельзя строить robots/JSON-LD решения без риска
+ * случайно noindex-нуть страницы брендов, у которых на самом деле есть товар.
+ * Поэтому считаем наличие товара отдельным лёгким SSR-safe запросом.
+ *
+ * Условие «есть активный товар», а НЕ «есть товар в наличии», как было до
+ * 20 августа 2026. Разница важна: у распроданного бренда страница остаётся
+ * осмысленной, а привязка к остатку заставляла бы индекс то открываться, то
+ * закрываться вслед за складом.
+ */
+const { data: brandHasProducts } = await useAsyncData(
+  `brand-has-products-${brandSlug}`,
   async () => {
     if (!brand.value)
       return true // fail-open: не блокируем индексацию из-за отсутствия данных
@@ -137,7 +164,6 @@ const { data: brandHasStock } = await useAsyncData(
       .select('id', { count: 'exact', head: true })
       .eq('brand_id', brand.value.id)
       .eq('is_active', true)
-      .gt('stock_quantity', 0)
     if (error)
       return true // fail-open: не noindex-им страницу из-за ошибки запроса
     return (count ?? 0) > 0
@@ -147,7 +173,6 @@ const { data: brandHasStock } = await useAsyncData(
 
 watchEffect(() => {
   if (brand.value) {
-    loadProductLines()
     loadBrandStats()
     filterState.loadProducts()
     filterState.loadFilterData()
@@ -208,10 +233,17 @@ const metaDescription = computed(() => {
     return `Товары бренда в ${siteName}`
   if (brand.value.meta_description)
     return brand.value.meta_description
+  /*
+   * `seo_description` — это ВЁРСТКА страницы бренда, а не мета-описание.
+   * Раньше она уходила в `<meta name="description">` как есть, и на проде
+   * 20 августа `/brand/hstar` отдавал в описании две тысячи знаков HTML
+   * (`<h2 data-icon="…">`, списки, абзацы). Поле заполнено разметкой только
+   * у одного бренда из 32, поэтому дефект и дожил незамеченным.
+   */
   if (brand.value.seo_description)
-    return brand.value.seo_description
+    return plainExcerpt(brand.value.seo_description, 160)
   if (brand.value.description) {
-    return `${brand.value.description.substring(0, 140)}. Доставка по Казахстану.`
+    return `${plainExcerpt(brand.value.description, 140)}. Доставка по Казахстану.`
   }
   return `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
@@ -225,7 +257,7 @@ const metaKeywords = computed(() => {
 })
 
 const ogImageSrc = computed(
-  () => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+  () => brandLogoUrl.value || SITE_OG_IMAGE_URL,
 )
 
 const seoBlocks = computed(() => {
@@ -301,8 +333,8 @@ useHead({
         'name': brand.value.name, // FIX: чистое название без дублирования
         'description': seoContentText.value || metaDescription.value,
         'url': brandUrl.value,
-        'logo': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
-        'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+        'logo': brandLogoUrl.value || SITE_OG_IMAGE_URL,
+        'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         ...(brand.value.seo_keywords?.length && {
           keywords: brand.value.seo_keywords.join(', '),
         }),
@@ -522,7 +554,7 @@ useHead({
         '@type': 'Article',
         'headline': `${brand.value.name} - Обзор бренда и каталог товаров`,
         'description': metaDescription.value,
-        'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+        'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         'author': {
           '@type': 'Organization',
           'name': siteName,
@@ -534,7 +566,7 @@ useHead({
           'url': siteUrl,
           'logo': {
             '@type': 'ImageObject',
-            'url': `${siteUrl}/logo.png`,
+            'url': SITE_LOGO_URL,
           },
         },
         'datePublished': brand.value.created_at || new Date().toISOString(),
@@ -549,12 +581,41 @@ useHead({
   ].filter(Boolean)),
 })
 
-// ⚠️ Раньше индексация была жёстко захардкожена в index:true — из-за этого
-// бренды без единого товара в наличии (напр. /brand/air-blaster) оставались
-// индексируемыми "пустыми полками" (см. SEO-аудит, находка SXO-2 / Content-1).
-// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+/*
+ * Индексируемость бренд-страницы.
+ *
+ * Здесь стояло `{ index: brandHasStock.value !== false, follow: true }`, и оно
+ * НЕ РАБОТАЛО. `@nuxtjs/robots` собирает строку перебором ключей правила и
+ * пропускает всё, чему присвоено `false` (видно в
+ * node_modules/@nuxtjs/robots/dist/runtime/app/composables/useRobotsRule.js:
+ * `if (value === false || value === null || value === undefined) continue`).
+ * Поэтому `{ index: false, follow: true }` разворачивалось просто в `follow`,
+ * а `follow` без `noindex` робот читает как разрешение индексировать.
+ * Проверено на проде 20 августа: десять бренд-страниц, которые код считал
+ * закрытыми, отдавали `x-robots-tag: follow` и лежали в индексе.
+ *
+ * Закрывать надо явным `noindex: true`, а не отрицанием `index`.
+ *
+ * Второе изменение — само условие. Закрываются бренды БЕЗ АКТИВНОГО ТОВАРА,
+ * кроме перечисленных в BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS: у тех есть
+ * поисковый спрос на собственном SEO-тексте, и закрывать их значит выбросить
+ * рабочие входы. Цифры и обоснование — в комментарии к константе.
+ *
+ * `follow: true` в обоих случаях: даже с закрытой страницы ссылки на бренды и
+ * категории должны передаваться дальше.
+ *
+ * см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+ */
+const keepIndexableWithoutProducts = computed(
+  () => BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS.includes(brandSlug),
+)
+
 useIndexableRobotsRule(
-  computed(() => ({ index: brandHasStock.value !== false, follow: true })),
+  computed(() =>
+    brandHasProducts.value === false && !keepIndexableWithoutProducts.value
+      ? { noindex: true, follow: true }
+      : { index: true, follow: true },
+  ),
 )
 </script>
 

@@ -1,5 +1,6 @@
 import type { Database } from '@/types'
 import { serverSupabaseClient } from '#supabase/server'
+import { BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS } from '@/constants'
 import { buildBrandLandingPath } from '~/utils/brandLanding'
 
 interface SitemapImage {
@@ -55,7 +56,10 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // --- ТОВАРЫ (с изображениями для Google Images) ---
     const { data: products, error: productsError } = await client
       .from('products')
-      .select('slug, updated_at, product_images(image_url, display_order)')
+      // `is_new` нужен не карточкам, а листингу `/catalog/new` — см. ниже,
+      // где он решает, попадёт ли страница в карту вообще. `brand_id` — там же
+      // ниже, чтобы отсеять бренды без товара, закрытые `noindex`.
+      .select('slug, updated_at, is_new, brand_id, product_images(image_url, display_order)')
       .eq('is_active', true)
       .not('slug', 'is', null)
       .order('created_at', { ascending: false })
@@ -111,10 +115,27 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       null,
     ) ?? new Date().toISOString()
 
+    /*
+     * `/catalog/new` попадает в карту, ТОЛЬКО если новинки существуют.
+     *
+     * На 20 августа 2026 в базе не было ни одного товара с `is_new`, страница
+     * показывала «Пока нет новинок», а в карте сайта при этом лежала.
+     * Search Console отвечала по ней ровно тем, чего и следовало ждать:
+     * «Crawled — currently not indexed», последний обход 10 апреля.
+     *
+     * Пустой адрес в карте — это не безобидная строка: карта заявляет
+     * «страница стоит обхода», робот приходит и ничего не находит, и доверие
+     * к остальным 309 адресам от этого не растёт. Как только товар пометят
+     * новинкой, страница вернётся в карту сама.
+     */
+    const hasNewProducts = (products ?? []).some((p: any) => p.is_new === true)
+
     const listingPages: SitemapRoute[] = [
       { loc: '/', priority: 1.0, changefreq: 'daily', lastmod: newestProductLastmod },
       { loc: '/catalog', priority: 0.9, changefreq: 'daily', lastmod: newestProductLastmod },
-      { loc: '/catalog/new', priority: 0.7, changefreq: 'daily', lastmod: newestProductLastmod },
+      ...(hasNewProducts
+        ? [{ loc: '/catalog/new', priority: 0.7, changefreq: 'daily' as const, lastmod: newestProductLastmod }]
+        : []),
       { loc: '/catalog/promotions', priority: 0.7, changefreq: 'daily', lastmod: newestProductLastmod },
     ]
 
@@ -159,7 +180,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // --- БРЕНДЫ (БЕЗ query параметров) ---
     const { data: brands, error: brandsError } = await client
       .from('brands')
-      .select('slug, updated_at')
+      .select('id, slug, updated_at')
       .not('slug', 'is', null)
       .limit(1000) // ✅ Явно указываем лимит
 
@@ -171,7 +192,40 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     console.log(`✅ Sitemap: Загружено ${brands?.length || 0} брендов`)
 
     if (brands && brands.length > 0) {
-      brands.forEach((brand) => {
+      /*
+       * Карта обязана согласовываться с мета-тегом страницы: закрытый
+       * `noindex` адрес в карте — это прямое противоречие, робот тратит обход
+       * и получает запрет.
+       *
+       * Условие повторяет pages/brand/[slug].vue: закрыт бренд без единого
+       * активного товара, кроме перечисленных в
+       * BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS. Держать два места в согласии
+       * помогает общая константа — она одна и та же для страницы и для карты.
+       *
+       * До 20 августа 2026 расхождение было: все десять пустых брендов лежали
+       * в карте, а код на странице считал их закрытыми (и не закрывал, но это
+       * отдельная история — см. комментарий к правилу на самой странице).
+       */
+      const brandIdsWithProducts = new Set(
+        (products ?? [])
+          .map((p: any) => p.brand_id)
+          .filter((id: string | null): id is string => !!id),
+      )
+
+      const indexableBrands = brands.filter(
+        brand =>
+          brandIdsWithProducts.has(brand.id)
+          || BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS.includes(brand.slug!),
+      )
+
+      const skipped = brands.length - indexableBrands.length
+      if (skipped > 0) {
+        console.warn(
+          `⚠️ Sitemap: ${skipped} брендов без товаров закрыты noindex и в карту не попали`,
+        )
+      }
+
+      indexableBrands.forEach((brand) => {
         sitemapRoutes.push({
           loc: `/brand/${brand.slug}`,
           lastmod: brand.updated_at ?? new Date().toISOString(),

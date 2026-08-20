@@ -23,6 +23,63 @@ export const COURIER_DELIVERY_COST = 1000
  */
 export const TELEGRAM_BOT_USERNAME = 'babyShopOfficialStoreKz_bot'
 
+/**
+ * Картинки сайта для разметки и соцсетей — АБСОЛЮТНЫМИ адресами.
+ *
+ * Заведены константами, потому что этот тип ошибки на проекте повторялся:
+ * в разметке стояли ссылки на файлы, которых в `public/` нет. На 20 августа
+ * 2026 `https://uhti.kz/logo.png` и `https://uhti.kz/og-brand.jpeg` отдавали
+ * `404`, причём первый — из узла `Organization`, то есть Google не мог
+ * получить логотип магазина вообще. Раньше тем же способом сломалась
+ * `/og-brands.jpeg` на `pages/brands/index.vue` (там об этом есть отметка).
+ *
+ * Если меняете значение — сначала проверьте, что файл лежит в `public/`.
+ */
+export const SITE_LOGO_URL = 'https://uhti.kz/android-chrome-512x512.png'
+export const SITE_LOGO_SIZE = 512
+export const SITE_OG_IMAGE_URL = 'https://uhti.kz/og-home-toys.jpeg'
+export const SITE_OG_IMAGE_SIZE = 1024
+
+/**
+ * Бренды без единого активного товара, которые всё равно остаются в индексе.
+ *
+ * Правило по умолчанию: у бренда нет активных товаров — страница закрывается
+ * `noindex` и не попадает в карту сайта. Смысл понятен: пустая полка.
+ *
+ * Но у части таких страниц уже есть поисковый спрос на собственном SEO-тексте,
+ * и закрывать их — значит выбросить рабочие входы. Данные Search Console за
+ * 90 дней (21 мая — 18 августа 2026), все десять брендов с нулём товаров:
+ *
+ *   mg-toys          2 клика, 41 показ,  позиция 2.6
+ *   eva-puzzle       1 клик,  90 показов, позиция 6.0
+ *   koala-diary      0 кликов, 15 показов, позиция 6.2
+ *   bowa             0 кликов, 11 показов, позиция 2.8
+ *   fivestar-toys    0 кликов, 11 показов, позиция 9.2
+ *   soba             0 кликов,  2 показа,  позиция 6.5
+ *   rc-toys          0 кликов,  1 показ,   позиция 6.0
+ *   shantou-yisheng  0 кликов,  1 показ,   позиция 8.0
+ *   air-blaster      показов нет вовсе
+ *   polese           показов нет вовсе
+ *
+ * Отсюда список: восемь верхних остаются открытыми, `air-blaster` и `polese`
+ * закрываются. Решение владельца от 20 августа 2026.
+ *
+ * ЭТО СНИМОК ДАННЫХ, А НЕ ВЕЧНАЯ ИСТИНА. Список стоит пересматривать, когда
+ * снова будете смотреть Search Console: у бренда мог появиться товар (тогда
+ * строка тут просто перестаёт что-либо значить) или, наоборот, спрос мог
+ * пропасть. Проверяется отчётом по страницам с фильтром `/brand/`.
+ */
+export const BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS: readonly string[] = [
+  'bowa',
+  'eva-puzzle',
+  'fivestar-toys',
+  'koala-diary',
+  'mg-toys',
+  'rc-toys',
+  'shantou-yisheng',
+  'soba',
+]
+
 export const BANNER_PLACEMENTS = {
   HOMEPAGE_HERO: 'homepage_hero',
   HOMEPAGE_GENDER: 'homepage_gender',
