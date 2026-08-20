@@ -1776,16 +1776,23 @@ const schemaData = computed(() => {
     ...(displayedProducts.value.length > 0 && {
       numberOfItems: displayedProducts.value.length,
     }),
-    ...(categoryRatingData.value
-      && categoryRatingData.value.total_reviews > 0 && {
-      aggregateRating: {
-        '@type': 'AggregateRating',
-        'ratingValue': categoryRatingData.value.avg_rating,
-        'reviewCount': categoryRatingData.value.total_reviews,
-        'bestRating': 5,
-        'worstRating': 1,
-      },
-    }),
+    /*
+     * `aggregateRating` здесь БЫТЬ НЕ ДОЛЖЕН, и это не вкусовщина.
+     *
+     * Search Console по адресу
+     * /catalog/constructors-root/konstruktory-malchikam/brand/mg-toys отдаёт
+     * вердикт FAIL и ошибку «Invalid object type for field "<parent_node>"»
+     * для Review snippets: `CollectionPage` не входит в список типов, которым
+     * Google разрешает сниппет с отзывами. Разметка была, а звёзд в выдаче по
+     * ней не появлялось — страница просто числилась с ошибкой. На 20 августа
+     * такой узел стоял на 11 адресах, и число росло вместе с отзывами.
+     *
+     * Звёзды в выдаче даёт не этот узел, а рейтинги отдельных товаров внутри
+     * ItemList — они на месте и не тронуты.
+     *
+     * `categoryRatingData` не удалён: он же питает блок рейтинга на самой
+     * странице (`showCategoryRating`) и описание в мета-теге.
+     */
   })
 
   // SiteNavigationElement
