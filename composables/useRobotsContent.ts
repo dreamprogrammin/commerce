@@ -19,12 +19,41 @@ import type { MaybeRefOrGetter } from 'vue'
 
 const NOINDEX = 'noindex, nofollow'
 
+/**
+ * Директивы предпросмотра для индексируемых страниц.
+ *
+ * Зачем. Без них Google показывает в выдаче маленькую квадратную миниатюру
+ * вместо крупной картинки, режет сниппет и не берёт видео. Для магазина
+ * игрушек, где продаёт именно картинка, это прямая потеря.
+ *
+ * Почему добавляется здесь, а не по страницам. Значение по умолчанию у
+ * `@nuxtjs/robots` (`robotsEnabledValue`) эти директивы УЖЕ содержит, поэтому
+ * страницы, которые про robots не объявляют ничего, получали правильную
+ * строку: на 20 августа это были ровно `/brands`, `/privacy-policy` и
+ * `/returns`. А остальные 307 адресов объявляли `'index, follow'` — и своим
+ * объявлением значение по умолчанию УХУДШАЛИ. Проверено переобходом карты:
+ * три адреса с директивами против 307 без них.
+ *
+ * Поэтому строка и правило собираются в одном месте: страницы по-прежнему
+ * говорят «индексировать», а чем именно это разворачивается — решается тут.
+ */
+const PREVIEW_SUFFIX = 'max-image-preview:large, max-snippet:-1, max-video-preview:-1'
+
+const PREVIEW_RULE = {
+  'max-image-preview': 'large',
+  'max-snippet': -1,
+  'max-video-preview': -1,
+} as const
+
 /** Правило в форме, которую принимает `useRobotsRule`. */
 export interface RobotsRule {
-  index?: boolean
-  noindex?: boolean
-  follow?: boolean
-  nofollow?: boolean
+  'index'?: boolean
+  'noindex'?: boolean
+  'follow'?: boolean
+  'nofollow'?: boolean
+  'max-image-preview'?: 'none' | 'standard' | 'large'
+  'max-snippet'?: number
+  'max-video-preview'?: number
 }
 
 const NOINDEX_RULE: RobotsRule = { noindex: true, nofollow: true }
@@ -44,7 +73,18 @@ function isSiteIndexable(): boolean {
 
 /** Значение мета-тега `robots` для `useHead`/`useSeoMeta`. */
 export function useRobotsContent(whenIndexable: string): string {
-  return isSiteIndexable() ? whenIndexable : NOINDEX
+  if (!isSiteIndexable())
+    return NOINDEX
+
+  // Закрытым страницам предпросмотр не нужен, и `noindex` с
+  // `max-image-preview` в одной строке выглядит противоречиво.
+  if (whenIndexable.includes('noindex'))
+    return whenIndexable
+
+  if (whenIndexable.includes('max-image-preview'))
+    return whenIndexable
+
+  return `${whenIndexable}, ${PREVIEW_SUFFIX}`
 }
 
 /**
@@ -64,5 +104,15 @@ export function useRobotsContent(whenIndexable: string): string {
 export function useIndexableRobotsRule(rule: MaybeRefOrGetter<RobotsRule>): void {
   const indexable = isSiteIndexable()
 
-  useRobotsRule(computed(() => (indexable ? toValue(rule) : NOINDEX_RULE)))
+  useRobotsRule(computed(() => {
+    if (!indexable)
+      return NOINDEX_RULE
+
+    const value = toValue(rule)
+
+    // Именно это правило побеждает и в мета-теге, и в заголовке, поэтому
+    // директивы предпросмотра дописываются здесь же — иначе строка из
+    // `useRobotsContent` будет перебита урезанной.
+    return value.noindex ? value : { ...value, ...PREVIEW_RULE }
+  }))
 }
