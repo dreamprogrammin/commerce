@@ -473,8 +473,12 @@ const PERKS = [
 const productSku = computed(() => {
   if (!product.value)
     return undefined
-  if (product.value.sku)
-    return product.value.sku
+  // `.trim()` не косметика: в базе артикулы лежат с висячим пробелом, и в
+  // разметке на проде 20 августа стояло `"sku": "HiH02 "`. Google сверяет
+  // артикул строкой, лишний пробел делает его другим товаром.
+  const sku = product.value.sku?.trim()
+  if (sku)
+    return sku
   return product.value.id
     ? product.value.id.replace(/-/g, '').substring(0, 10).toUpperCase()
     : undefined
@@ -833,7 +837,7 @@ const seoContentText = computed(() => {
   if (!seoBlocks.value.length)
     return metaDescription.value
 
-  return seoBlocks.value
+  const joined = seoBlocks.value
     .map((block) => {
       if (block.type === 'ul') {
         return block.items.map(item => item.text).join(' ')
@@ -842,7 +846,10 @@ const seoContentText = computed(() => {
     })
     .filter(Boolean)
     .join(' ')
-    .substring(0, 500) // Google рекомендует до 500 символов
+  // По границе слова, а не по счётчику: раньше описание в разметке `Product`
+  // обрывалось посреди слова — «…доставим по вс». Google берёт его в сниппет
+  // как есть. 500 знаков — рекомендация Google.
+  return truncateAtWord(joined, 500)
 })
 
 // см. composables/useRobotsContent.ts — на превью правило закрывается флагом

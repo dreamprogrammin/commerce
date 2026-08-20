@@ -233,10 +233,17 @@ const metaDescription = computed(() => {
     return `Товары бренда в ${siteName}`
   if (brand.value.meta_description)
     return brand.value.meta_description
+  /*
+   * `seo_description` — это ВЁРСТКА страницы бренда, а не мета-описание.
+   * Раньше она уходила в `<meta name="description">` как есть, и на проде
+   * 20 августа `/brand/hstar` отдавал в описании две тысячи знаков HTML
+   * (`<h2 data-icon="…">`, списки, абзацы). Поле заполнено разметкой только
+   * у одного бренда из 32, поэтому дефект и дожил незамеченным.
+   */
   if (brand.value.seo_description)
-    return brand.value.seo_description
+    return plainExcerpt(brand.value.seo_description, 160)
   if (brand.value.description) {
-    return `${brand.value.description.substring(0, 140)}. Доставка по Казахстану.`
+    return `${plainExcerpt(brand.value.description, 140)}. Доставка по Казахстану.`
   }
   return `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
