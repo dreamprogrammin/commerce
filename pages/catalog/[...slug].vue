@@ -29,7 +29,7 @@ import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuer
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { useSeoTemplates } from '@/composables/useSeoTemplates'
 import { IMAGE_SIZES } from '@/config/images'
-import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT } from '@/constants'
+import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
@@ -1822,7 +1822,7 @@ const schemaData = computed(() => {
       mainEntity: {
         '@type': 'Article',
         'headline': title.value,
-        'image': 'https://uhti.kz/logo.png',
+        'image': SITE_OG_IMAGE_URL,
         'articleBody': cleanDescription(seoText.value, 500),
         'author': {
           '@type': 'Organization',

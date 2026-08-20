@@ -24,6 +24,23 @@ export const COURIER_DELIVERY_COST = 1000
 export const TELEGRAM_BOT_USERNAME = 'babyShopOfficialStoreKz_bot'
 
 /**
+ * Картинки сайта для разметки и соцсетей — АБСОЛЮТНЫМИ адресами.
+ *
+ * Заведены константами, потому что этот тип ошибки на проекте повторялся:
+ * в разметке стояли ссылки на файлы, которых в `public/` нет. На 20 августа
+ * 2026 `https://uhti.kz/logo.png` и `https://uhti.kz/og-brand.jpeg` отдавали
+ * `404`, причём первый — из узла `Organization`, то есть Google не мог
+ * получить логотип магазина вообще. Раньше тем же способом сломалась
+ * `/og-brands.jpeg` на `pages/brands/index.vue` (там об этом есть отметка).
+ *
+ * Если меняете значение — сначала проверьте, что файл лежит в `public/`.
+ */
+export const SITE_LOGO_URL = 'https://uhti.kz/android-chrome-512x512.png'
+export const SITE_LOGO_SIZE = 512
+export const SITE_OG_IMAGE_URL = 'https://uhti.kz/og-home-toys.jpeg'
+export const SITE_OG_IMAGE_SIZE = 1024
+
+/**
  * Бренды без единого активного товара, которые всё равно остаются в индексе.
  *
  * Правило по умолчанию: у бренда нет активных товаров — страница закрывается

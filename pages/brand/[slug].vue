@@ -8,6 +8,8 @@ import {
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
+  SITE_LOGO_URL,
+  SITE_OG_IMAGE_URL,
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
@@ -248,7 +250,7 @@ const metaKeywords = computed(() => {
 })
 
 const ogImageSrc = computed(
-  () => brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+  () => brandLogoUrl.value || SITE_OG_IMAGE_URL,
 )
 
 const seoBlocks = computed(() => {
@@ -324,8 +326,8 @@ useHead({
         'name': brand.value.name, // FIX: чистое название без дублирования
         'description': seoContentText.value || metaDescription.value,
         'url': brandUrl.value,
-        'logo': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
-        'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+        'logo': brandLogoUrl.value || SITE_OG_IMAGE_URL,
+        'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         ...(brand.value.seo_keywords?.length && {
           keywords: brand.value.seo_keywords.join(', '),
         }),
@@ -545,7 +547,7 @@ useHead({
         '@type': 'Article',
         'headline': `${brand.value.name} - Обзор бренда и каталог товаров`,
         'description': metaDescription.value,
-        'image': brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+        'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         'author': {
           '@type': 'Organization',
           'name': siteName,
@@ -557,7 +559,7 @@ useHead({
           'url': siteUrl,
           'logo': {
             '@type': 'ImageObject',
-            'url': `${siteUrl}/logo.png`,
+            'url': SITE_LOGO_URL,
           },
         },
         'datePublished': brand.value.created_at || new Date().toISOString(),
