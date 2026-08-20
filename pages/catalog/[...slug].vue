@@ -1534,6 +1534,64 @@ if (activeBrandSlug.value && !activeBrandSeo.value) {
   })
 }
 
+/*
+ * Неверный родительский путь — 301 на канонический, а не 200.
+ *
+ * Категория ищется по ПОСЛЕДНЕМУ сегменту, а остальные не проверяются вовсе.
+ * Из-за этого одна и та же категория отдавалась по любому пути. Замер на
+ * проде 20 августа:
+ *
+ *   /catalog/constructors-root/konstruktory-malchikam       200
+ *   /catalog/constructors/konstruktory-malchikam            200
+ *   /catalog/vydumannaya-kategoriya/konstruktory-malchikam  200
+ *   /catalog/boys/konstruktory-malchikam                    200
+ *   /catalog/konstruktory-malchikam                         200
+ *
+ * `canonical` у всех указывал на верный путь, поэтому дублей в индексе не
+ * возникало. Но робот скачивал каждый такой адрес целиком (медиана документа
+ * тут 242 КБ), чтобы затем его выбросить, и пространство таких адресов
+ * бесконечно. И это не теория: в Search Console показы получает
+ * `/catalog/constructors/konstruktory-malchikam?brand=cada` — сегмента
+ * `constructors` в базе нет вовсе.
+ *
+ * Почему цель берётся из `href`, а не из `canonical_url`: `canonical_url`
+ * может указывать на ЧУЖУЮ страницу, и редирект туда увёл бы посетителя не
+ * туда, куда он шёл. Канонический адрес самой категории — это `href`.
+ *
+ * Бренд-хвост сохраняется: `/catalog/boys/brand/mattel` — законный адрес,
+ * правится только категорийная часть пути.
+ *
+ * ЗАЩИТА ОТ ПЕТЛИ. Редирект срабатывает, только если цель — неподвижная
+ * точка этой же проверки, то есть последний сегмент `href` совпадает со
+ * слагом найденной категории. На боевых данных это верно у всех 64 категорий,
+ * но проверка стоит: если однажды заведут категорию с рассогласованным
+ * `href`, страница просто отдаст 200 без редиректа, а не уйдёт в цикл. На
+ * этом проекте петля редиректов уже случалась (см. комментарий к
+ * `server/middleware/brand-query-redirect.ts`), второй раз незачем.
+ *
+ * Только на сервере: внутри сайта переходы делает роутер, туда битые пути не
+ * попадают, а лишний клиентский переход дал бы мигание выдачи.
+ */
+if (
+  import.meta.server
+    && currentCategorySlug.value !== 'all'
+    && currentCategory.value?.href
+) {
+  const categoryHref = currentCategory.value.href.replace(/\/+$/, '')
+  const expectedPath = activeBrandSlug.value
+    ? buildBrandLandingPath(categoryHref, activeBrandSlug.value)
+    : categoryHref
+
+  const targetSlug = categoryHref.split('/').filter(Boolean).at(-1) ?? null
+
+  if (expectedPath !== route.path && targetSlug === currentCategorySlug.value) {
+    await navigateTo(
+      { path: expectedPath, query: route.query },
+      { redirectCode: 301, replace: true },
+    )
+  }
+}
+
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
   availableProductLines.value = _filterPayload.value.productLines
