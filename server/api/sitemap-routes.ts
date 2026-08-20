@@ -55,7 +55,9 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // --- ТОВАРЫ (с изображениями для Google Images) ---
     const { data: products, error: productsError } = await client
       .from('products')
-      .select('slug, updated_at, product_images(image_url, display_order)')
+      // `is_new` нужен не карточкам, а листингу `/catalog/new` — см. ниже,
+      // где он решает, попадёт ли страница в карту вообще.
+      .select('slug, updated_at, is_new, product_images(image_url, display_order)')
       .eq('is_active', true)
       .not('slug', 'is', null)
       .order('created_at', { ascending: false })
@@ -111,10 +113,27 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       null,
     ) ?? new Date().toISOString()
 
+    /*
+     * `/catalog/new` попадает в карту, ТОЛЬКО если новинки существуют.
+     *
+     * На 20 августа 2026 в базе не было ни одного товара с `is_new`, страница
+     * показывала «Пока нет новинок», а в карте сайта при этом лежала.
+     * Search Console отвечала по ней ровно тем, чего и следовало ждать:
+     * «Crawled — currently not indexed», последний обход 10 апреля.
+     *
+     * Пустой адрес в карте — это не безобидная строка: карта заявляет
+     * «страница стоит обхода», робот приходит и ничего не находит, и доверие
+     * к остальным 309 адресам от этого не растёт. Как только товар пометят
+     * новинкой, страница вернётся в карту сама.
+     */
+    const hasNewProducts = (products ?? []).some((p: any) => p.is_new === true)
+
     const listingPages: SitemapRoute[] = [
       { loc: '/', priority: 1.0, changefreq: 'daily', lastmod: newestProductLastmod },
       { loc: '/catalog', priority: 0.9, changefreq: 'daily', lastmod: newestProductLastmod },
-      { loc: '/catalog/new', priority: 0.7, changefreq: 'daily', lastmod: newestProductLastmod },
+      ...(hasNewProducts
+        ? [{ loc: '/catalog/new', priority: 0.7, changefreq: 'daily' as const, lastmod: newestProductLastmod }]
+        : []),
       { loc: '/catalog/promotions', priority: 0.7, changefreq: 'daily', lastmod: newestProductLastmod },
     ]
 
