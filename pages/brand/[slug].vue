@@ -4,6 +4,7 @@ import { ArrowLeft, Package } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 import {
+  BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS,
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
@@ -138,13 +139,21 @@ const filterState = useBrandPageFilters({
   brandProductLines,
 })
 
-// ─── SEO: наличие товаров у бренда (SSR-safe) ────────────────────────────────
-// ⚠️ filterState.products грузится клиентским useQuery (TanStack) и на SSR
-// всегда пуст — на нём нельзя строить robots/JSON-LD решения без риска
-// случайно noindex-нуть страницы брендов, у которых на самом деле есть товар.
-// Поэтому считаем наличие товара отдельным лёгким SSR-safe запросом.
-const { data: brandHasStock } = await useAsyncData(
-  `brand-has-stock-${brandSlug}`,
+/*
+ * SEO: есть ли у бренда товар вообще (SSR-safe).
+ *
+ * ⚠️ `filterState.products` грузится клиентским `useQuery` (TanStack) и на SSR
+ * всегда пуст — на нём нельзя строить robots/JSON-LD решения без риска
+ * случайно noindex-нуть страницы брендов, у которых на самом деле есть товар.
+ * Поэтому считаем наличие товара отдельным лёгким SSR-safe запросом.
+ *
+ * Условие «есть активный товар», а НЕ «есть товар в наличии», как было до
+ * 20 августа 2026. Разница важна: у распроданного бренда страница остаётся
+ * осмысленной, а привязка к остатку заставляла бы индекс то открываться, то
+ * закрываться вслед за складом.
+ */
+const { data: brandHasProducts } = await useAsyncData(
+  `brand-has-products-${brandSlug}`,
   async () => {
     if (!brand.value)
       return true // fail-open: не блокируем индексацию из-за отсутствия данных
@@ -153,7 +162,6 @@ const { data: brandHasStock } = await useAsyncData(
       .select('id', { count: 'exact', head: true })
       .eq('brand_id', brand.value.id)
       .eq('is_active', true)
-      .gt('stock_quantity', 0)
     if (error)
       return true // fail-open: не noindex-им страницу из-за ошибки запроса
     return (count ?? 0) > 0
@@ -564,12 +572,41 @@ useHead({
   ].filter(Boolean)),
 })
 
-// ⚠️ Раньше индексация была жёстко захардкожена в index:true — из-за этого
-// бренды без единого товара в наличии (напр. /brand/air-blaster) оставались
-// индексируемыми "пустыми полками" (см. SEO-аудит, находка SXO-2 / Content-1).
-// см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+/*
+ * Индексируемость бренд-страницы.
+ *
+ * Здесь стояло `{ index: brandHasStock.value !== false, follow: true }`, и оно
+ * НЕ РАБОТАЛО. `@nuxtjs/robots` собирает строку перебором ключей правила и
+ * пропускает всё, чему присвоено `false` (видно в
+ * node_modules/@nuxtjs/robots/dist/runtime/app/composables/useRobotsRule.js:
+ * `if (value === false || value === null || value === undefined) continue`).
+ * Поэтому `{ index: false, follow: true }` разворачивалось просто в `follow`,
+ * а `follow` без `noindex` робот читает как разрешение индексировать.
+ * Проверено на проде 20 августа: десять бренд-страниц, которые код считал
+ * закрытыми, отдавали `x-robots-tag: follow` и лежали в индексе.
+ *
+ * Закрывать надо явным `noindex: true`, а не отрицанием `index`.
+ *
+ * Второе изменение — само условие. Закрываются бренды БЕЗ АКТИВНОГО ТОВАРА,
+ * кроме перечисленных в BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS: у тех есть
+ * поисковый спрос на собственном SEO-тексте, и закрывать их значит выбросить
+ * рабочие входы. Цифры и обоснование — в комментарии к константе.
+ *
+ * `follow: true` в обоих случаях: даже с закрытой страницы ссылки на бренды и
+ * категории должны передаваться дальше.
+ *
+ * см. composables/useRobotsContent.ts — на превью правило закрывается флагом
+ */
+const keepIndexableWithoutProducts = computed(
+  () => BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS.includes(brandSlug),
+)
+
 useIndexableRobotsRule(
-  computed(() => ({ index: brandHasStock.value !== false, follow: true })),
+  computed(() =>
+    brandHasProducts.value === false && !keepIndexableWithoutProducts.value
+      ? { noindex: true, follow: true }
+      : { index: true, follow: true },
+  ),
 )
 </script>
 
