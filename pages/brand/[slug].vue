@@ -62,28 +62,44 @@ if (!brand.value && !brandPending.value) {
   throw createError({ statusCode: 404, statusMessage: 'Brand not found', fatal: true })
 }
 
-// Загружаем линейки бренда
-const brandProductLines = ref<ProductLine[]>([])
+/*
+ * Линейки бренда. Обработчик ВОЗВРАЩАЕТ данные, а не раскладывает их по `ref`.
+ *
+ * Раньше здесь был обычный `ref`, который наполнял `watchEffect`. Обычный
+ * `ref` в payload не попадает, поэтому блок «Коллекции» отсутствовал в
+ * серверной разметке ЦЕЛИКОМ и вставлялся только после гидратации.
+ *
+ * Чего это стоило (замер на проде 20 августа, `/brand/mattel`, 412 px):
+ * вставка на третьей секунде толкала заголовок «Каталог товаров» с y=402 на
+ * y=573 и давала сдвиг 0.0952 при пороге CLS 0.1. Заодно из JSON-LD выпадал
+ * `subOrganization` (в разметке прода его не было ни на одном бренде), а
+ * ссылки на страницы линеек не видел поисковик — при том что сами эти
+ * страницы в карте сайта есть.
+ *
+ * `default` нужен, чтобы тип остался `Ref<ProductLine[]>`: значение уходит в
+ * `useBrandPageFilters`, а тот ждёт именно его, не `ComputedRef`.
+ */
+const { data: brandProductLines } = await useAsyncData(
+  `brand-lines-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return []
 
-async function loadProductLines() {
-  if (!brand.value)
-    return
-
-  try {
     const { data, error } = await supabase
       .from('product_lines')
       .select('*')
       .eq('brand_id', brand.value.id)
       .order('name', { ascending: true })
 
-    if (!error && data) {
-      brandProductLines.value = data as ProductLine[]
+    if (error) {
+      console.error('Error loading product lines:', error)
+      return []
     }
-  }
-  catch (err) {
-    console.error('Error loading product lines:', err)
-  }
-}
+
+    return (data ?? []) as ProductLine[]
+  },
+  { watch: [brand], default: (): ProductLine[] => [] },
+)
 
 // Загружаем агрегированную статистику бренда
 const brandStats = ref<{
@@ -147,7 +163,6 @@ const { data: brandHasStock } = await useAsyncData(
 
 watchEffect(() => {
   if (brand.value) {
-    loadProductLines()
     loadBrandStats()
     filterState.loadProducts()
     filterState.loadFilterData()
