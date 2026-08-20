@@ -37,13 +37,20 @@ function selectSort(value: string) {
   <!-- Десктоп: Popover -->
   <Popover v-if="!hideDesktopTrigger" v-model:open="isPopoverOpen">
     <PopoverTrigger as-child>
+      <!-- Заливка blue-600, а не blue-500: белый текст на blue-500 даёт
+           контраст 3.7 при норме 4.5 для 14px. Lighthouse ловил это на
+           бренд-странице («Background and foreground colors do not have a
+           sufficient contrast ratio», доступность 96 против 100). Именно
+           там — потому что сортировка по умолчанию `newest`, то есть кнопка
+           активна и залита синим сразу, а на категории по умолчанию
+           `popularity` и заливки нет. На blue-600 контраст 5.2. -->
       <Button
         :variant="isActive ? 'default' : 'outline'"
         class="h-11 gap-2 shrink-0 transition-colors hidden lg:flex"
         :class="[
           isActive
-            ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500'
-            : 'hover:bg-blue-500 hover:text-white hover:border-blue-500',
+            ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+            : 'hover:bg-blue-600 hover:text-white hover:border-blue-600',
         ]"
       >
         <Icon :name="currentIcon" class="w-4 h-4" />

@@ -131,10 +131,15 @@ function close() {
       ? 'mt-[18px] rounded-2xl bg-muted p-3.5'
       : 'bg-white rounded-xl p-4 shadow-sm border mt-4'"
   >
-    <h3 class="font-bold text-base mb-3 flex items-center gap-2">
+    <!-- Именно h2, а не h3: блок стоит первым после h1 и на карточке товара,
+         и в корзине. С h3 уровень перепрыгивался через один, и Lighthouse
+         ловил это как «Heading elements are not in a sequentially-descending
+         order» (доступность карточки 98 вместо 100). Размер задают классы,
+         поэтому внешне ничего не меняется. -->
+    <h2 class="font-bold text-base mb-3 flex items-center gap-2">
       <Icon name="lucide:plus-circle" class="w-6 h-6 text-primary" mode="svg" />
       С этим покупают
-    </h3>
+    </h2>
 
     <!-- Skeleton -->
     <div v-if="loading" class="grid grid-cols-1 gap-2">

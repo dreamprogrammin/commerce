@@ -61,10 +61,16 @@ onUnmounted(() => {
       v-show="isVisible"
       class="fixed top-0 left-0 right-0 z-40 flex items-center gap-2 border-b bg-white/80 p-2 backdrop-blur-lg dark:bg-gray-900/80 dark:border-gray-800 lg:hidden"
     >
-      <!-- Кнопка "Назад" -->
+      <!-- Кнопка "Назад".
+           `aria-label` обязателен: внутри только иконка, и без него кнопка
+           остаётся безымянной. Lighthouse ловил это на /catalog как
+           «Buttons do not have an accessible name» (доступность 94 против
+           100 на остальных страницах), а экранный диктор читал бы «кнопка».
+           Та же ошибка уже чинилась в CatalogHeader — здесь другой компонент. -->
       <Button
         variant="ghost"
         size="icon"
+        aria-label="Назад"
         class="h-10 w-10 shrink-0 rounded-full"
         @click="goBack"
       >
