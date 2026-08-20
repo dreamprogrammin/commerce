@@ -155,28 +155,20 @@ export default defineNuxtConfig({
     fonts: ['Inter:400', 'Inter:700', 'Inter:900'],
   },
 
-  schemaOrg: {
-    identity: {
-      type: 'Organization',
-      name: 'Ухтышка',
-      url: 'https://uhti.kz',
-      logo: 'https://uhti.kz/logo.png',
-      description:
-        'Интернет-магазин с широким ассортиментом качественных игрушек.',
-      address: {
-        addressCountry: 'KZ',
-        addressLocality: 'Алматы',
-        streetAddress: 'мкр. Шапагат, ул. Амангельды',
-        postalCode: '050058',
-      },
-      contactPoint: {
-        telephone: '+7-702-537-94-73',
-        contactType: 'customer service',
-        availableLanguage: ['ru', 'kk'],
-      },
-      sameAs: [],
-    },
-  },
+  /*
+   * `schemaOrg.identity` намеренно НЕ задан.
+   *
+   * Модуль строит из него отдельный узел `Organization` с `@id` вида
+   * `.../#identity`, а свой, полный, узел организации у нас объявлен в
+   * `app.vue` под `@id` `.../#organization` — с логотипом, `legalName`,
+   * `foundingDate` и `sameAs` на Instagram. На него же ссылаются
+   * `WebSite.publisher` и `WebPage.about`.
+   *
+   * Пока identity был задан здесь, в разметке КАЖДОЙ страницы лежали два
+   * узла `Organization` про один и тот же бизнес, причём узел от модуля был
+   * беднее: `sameAs: []`, ни логотипа, ни телефона, и на него не ссылался
+   * никто. Проверено переобходом прода 20 августа 2026.
+   */
 
   sitemap: {
     sources: ['/api/sitemap-routes'],

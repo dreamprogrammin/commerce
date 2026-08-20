@@ -14,6 +14,7 @@ import {
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
+  SITE_OG_IMAGE_URL,
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
@@ -231,7 +232,7 @@ const metaKeywords = computed(() => {
 })
 
 const ogImageSrc = computed(
-  () => lineLogoUrl.value || brandLogoUrl.value || `${siteUrl}/og-brand.jpeg`,
+  () => lineLogoUrl.value || brandLogoUrl.value || SITE_OG_IMAGE_URL,
 )
 
 const seoBlocks = computed(() => {

@@ -2,6 +2,12 @@
 import { Toaster } from 'vue-sonner'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { useOrderRealtime } from '@/composables/useOrderRealtime'
+import {
+  SITE_LOGO_SIZE,
+  SITE_LOGO_URL,
+  SITE_OG_IMAGE_SIZE,
+  SITE_OG_IMAGE_URL,
+} from '@/constants'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -176,6 +182,20 @@ useHead({
       { rel: 'alternate', hreflang: 'x-default', href: currentUrl },
     ]
   },
+  /*
+   * Картинка для соцсетей по умолчанию.
+   *
+   * Страница со своим `og:image` это значение перебивает — её `useSeoMeta`
+   * выполняется позже. Значение нужно тем страницам, у которых своего нет:
+   * на 20 августа 2026 это `/terms`, `/privacy-policy` и `/returns` —
+   * ссылка на них в мессенджере приходила голым текстом без картинки.
+   */
+  meta: [
+    { property: 'og:image', content: SITE_OG_IMAGE_URL },
+    { property: 'og:image:width', content: String(SITE_OG_IMAGE_SIZE) },
+    { property: 'og:image:height', content: String(SITE_OG_IMAGE_SIZE) },
+    { name: 'twitter:image', content: SITE_OG_IMAGE_URL },
+  ],
 })
 
 useSchemaOrg([
@@ -188,10 +208,12 @@ useSchemaOrg([
     'logo': {
       '@type': 'ImageObject',
       '@id': `${siteUrl}/#logo`,
-      'url': `${siteUrl}/logo.png`,
-      'contentUrl': `${siteUrl}/logo.png`,
-      'width': 250,
-      'height': 60,
+      // Было `${siteUrl}/logo.png` — файла в public/ нет, прод отдавал 404.
+      // То есть логотип организации Google не мог получить вовсе.
+      'url': SITE_LOGO_URL,
+      'contentUrl': SITE_LOGO_URL,
+      'width': SITE_LOGO_SIZE,
+      'height': SITE_LOGO_SIZE,
       'caption': siteName,
     },
     'image': { '@id': `${siteUrl}/#logo` },
