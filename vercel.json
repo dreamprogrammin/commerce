@@ -7,6 +7,17 @@
   ],
   "redirects": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "^.*\\.vercel\\.app$"
+        }
+      ],
+      "destination": "https://uhti.kz/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [
         {

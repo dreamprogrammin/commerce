@@ -5,13 +5,29 @@
 `?brand=`, которое описано в `server/middleware/brand-query-redirect.ts`.
 
 ```json
-{
-  "source": "/:path*",
-  "has": [{ "type": "host", "value": "^.*\\.vercel\\.app$" }],
-  "destination": "https://uhti.kz/:path*",
-  "permanent": true
-}
+{ "source": "/",       "has": [хост], "destination": "https://uhti.kz/",       "permanent": true }
+{ "source": "/:path*", "has": [хост], "destination": "https://uhti.kz/:path*", "permanent": true }
 ```
+
+где `хост` — `{ "type": "host", "value": "^.*\\.vercel\\.app$" }`.
+
+**ПРАВИЛА ДВА, И ЭТО НЕ ИЗБЫТОЧНОСТЬ.** `"/:path*"` НЕ совпадает с голым
+корнем — проверено на боевом 21 августа сразу после выкатки:
+
+```
+/catalog                        308 → https://uhti.kz/catalog
+/catalog/boys?sort_by=price_asc 308 → https://uhti.kz/catalog/boys?sort_by=price_asc
+/about                          308 → https://uhti.kz/about
+/index.html                     308 → https://uhti.kz/index.html
+/                               200  ← не сработало
+```
+
+Что это не кеш, проверено отдельно: `/?x=1` даёт промах кеша и всё равно 200.
+То есть без отдельного правила открытой оставалась ровно главная страница
+копии — самая заметная из всех.
+
+Платформа отдаёт **308**, а не 301. Оба постоянные; 308 дополнительно
+сохраняет метод запроса.
 
 ## Что оно чинит
 
@@ -81,7 +97,7 @@ commerce-8e2o0m9ne-…vercel.app         200 | то же самое, но сбо
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code} → %{redirect_url}\n' https://commerce-eta-wheat.vercel.app/
-# ожидается: 301 → https://uhti.kz/
+# ожидается: 308 → https://uhti.kz/   ← корень проверять ОБЯЗАТЕЛЬНО отдельно
 
 curl -sS -o /dev/null -w '%{http_code}\n' https://uhti.kz/
 # ожидается: 200, петли нет
