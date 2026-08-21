@@ -24,7 +24,10 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
  */
 const categoriesStore = useCategoriesStore()
 const { getVariantUrl } = useSupabaseStorage()
-const isMobile = useIsMobile(1023)
+// Прототип разводит раскладки по 768 (`mob = vw < 768`), а не по 1024:
+// с 768 и выше показывается бенто, ниже — двухрядный рельс. Та же граница
+// продублирована в медиазапросе в конце файла — их нельзя разводить.
+const isMobile = useIsMobile(767)
 
 // menuTree наполняется на SSR через useAsyncData('home-ssr-critical') в index.vue;
 // подстраховка на клиенте, если стор пуст.
@@ -158,7 +161,7 @@ const seeAllHref = '/catalog/all'
 <template>
   <section :class="sectionSpacingVariants({ size: 'xs' })">
     <div class="flex items-baseline justify-between gap-3 mb-4">
-      <h2 class="m-0 font-bold tracking-tight text-[clamp(22px,3vw,32px)]">
+      <h2 class="m-0 font-bold tracking-[-0.02em] text-[clamp(22px,3vw,32px)]">
         Популярные категории
       </h2>
       <NuxtLink
@@ -192,9 +195,6 @@ const seeAllHref = '/catalog/all'
       </div>
 
       <!-- BENTO (десктоп, таб «Всё») -->
-      <!-- `img-shadow="0"`: тени под картинкой у этих плиток не было и до
-           переезда на CategoryTile, а в прототипе она включена по умолчанию.
-           Оставляем как было — включать её отдельным решением. -->
       <div v-if="showBento" class="cats-bento">
         <CategoryTile
           v-for="tile in bentoBig"
@@ -206,7 +206,6 @@ const seeAllHref = '/catalog/all'
           :meta="tile.countLabel"
           layout="corner"
           size="lg"
-          :img-shadow="0"
           interaction="lift"
         />
 
@@ -220,7 +219,6 @@ const seeAllHref = '/catalog/all'
             :tint="tile.tint"
             layout="corner"
             size="md"
-            :img-shadow="0"
             interaction="lift"
           />
         </div>
@@ -238,7 +236,6 @@ const seeAllHref = '/catalog/all'
             :tint="tile.tint"
             layout="corner"
             size="md"
-            :img-shadow="0"
             interaction="lift"
           />
         </div>
@@ -267,8 +264,20 @@ const seeAllHref = '/catalog/all'
     align-items: center;
     gap: 8px;
     overflow-x: auto;
-    padding-bottom: 6px;
+    /* Верхние 2px — запас под кромку таба: без них она срезалась
+       переполнением по горизонтали. */
+    padding: 2px 0 8px;
     margin-bottom: 18px;
+  }
+
+  /* Рельс табов уходит под края экрана (в прототипе — класс rail-bleed).
+     Отступ строго из --page-gutter, см. assets/css/tailwind.css: свой clamp
+     здесь разъедется с контейнером секции. */
+  @media (max-width: 767px) {
+    .cats-tabs {
+      margin-inline: calc(-1 * var(--page-gutter));
+      padding-inline: var(--page-gutter);
+    }
   }
 
   .cats-tab {
@@ -276,11 +285,11 @@ const seeAllHref = '/catalog/all'
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    height: 38px;
-    padding: 0 15px;
-    border: none;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: var(--muted);
+    background: #fff;
     color: var(--foreground);
     font-weight: 600;
     font-size: 14px;
@@ -292,6 +301,7 @@ const seeAllHref = '/catalog/all'
   }
 
   .cats-tab--active {
+    border-color: transparent;
     background: var(--primary);
     color: #fff;
   }
@@ -347,8 +357,10 @@ const seeAllHref = '/catalog/all'
     }
   }
 
-  /* Мобильный focus-grid — двухрядный горизонтальный скролл (< lg). */
-  @media (max-width: 1023px) {
+  /* Мобильный focus-grid — двухрядный горизонтальный скролл.
+     Граница 767/768 обязана совпадать с useIsMobile(767) выше: раскладку
+     выбирает скрипт, а рельс рисует этот медиазапрос. */
+  @media (max-width: 767px) {
     /* Edge-bleed: отступ строго из --page-gutter (см. assets/css/tailwind.css),
        иначе рельс не совпадает с контейнером секции. */
     .cats-focus-scroll {
