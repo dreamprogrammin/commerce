@@ -50,7 +50,6 @@ const authStore = useAuthStore()
 const modalStore = useModalStore()
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { triggerHaptic } = useHaptic()
-const { trackAddToCart, trackRemoveFromCart } = useEcommerceTracking()
 const { generateProductImageAlt } = useSeoAltText()
 
 // --- ГАЛЕРЕЯ: единая scroll-snap лента (нативный свайп на тач, наведение мышью на десктопе) ---
@@ -192,8 +191,9 @@ const quantityInCart = computed(() => itemInCart.value?.quantity ?? 0)
 const maxAvailableQuantity = computed(() => Math.max(1, Math.floor((props.product.stock_quantity || 0) * 0.8)))
 
 function onAdd() {
+  // Событие add_to_cart отправляет сам `cartStore.addItem` — раньше оно
+  // висело здесь, и потому считались только добавления из карточки в списке.
   cartStore.addItem(props.product as BaseProduct, 1)
-  trackAddToCart({ id: props.product.id, name: props.product.name, price: priceDetails.value.finalPrice })
   triggerHaptic('medium')
 }
 
@@ -207,15 +207,8 @@ function onInc() {
 
 function onDec() {
   const next = quantityInCart.value - 1
-  if (next <= 0) {
-    trackRemoveFromCart({
-      id: props.product.id,
-      name: props.product.name,
-      price: priceDetails.value.finalPrice,
-      quantity: quantityInCart.value,
-    })
-  }
-  // updateQuantity сам удаляет позицию из корзины, если quantity <= 0
+  // remove_from_cart отправляет сам стор: `updateQuantity` при нуле зовёт
+  // `removeItem`, а тот и шлёт событие.
   cartStore.updateQuantity(props.product.id, next)
   triggerHaptic('light')
 }

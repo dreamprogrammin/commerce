@@ -172,6 +172,41 @@ export const useCartStore = defineStore(
       )
     })
 
+    /*
+     * Отправка событий корзины в GA4 живёт ЗДЕСЬ, а не в компонентах.
+     *
+     * Раньше `trackAddToCart` звал только `ProductCard`, то есть карточка в
+     * списке. Главная кнопка «В корзину» на странице товара, аксессуары,
+     * «товар дня» и повтор заказа из кабинета не отправляли ничего. В GA4 это
+     * выглядело так (28 дней, замер 21 августа 2026):
+     *
+     *   view_item 42 → add_to_cart 1 → begin_checkout 10 → purchase 4
+     *
+     * Добавлений меньше, чем начатых оформлений, — цифра невозможная, и
+     * переход «каталог → корзина» измерить было нельзя вовсе.
+     *
+     * В сторе это ловится один раз и навсегда: любой путь добавления проходит
+     * через `addItem`, а удаления — через `removeItem`. Компонент, добавленный
+     * завтра, попадёт в статистику сам, без напоминания.
+     *
+     * Почему тут безопасно: `addItem` — исключительно действие покупателя, он
+     * показывает тост и открывает корзину. Восстановление корзины из
+     * localStorage идёт мимо него, через `persist`, поэтому ложных событий на
+     * загрузке страницы не будет.
+     *
+     * Цена берётся как `final_price || price` — та же формула, что уже
+     * используется здесь для `purchase`, иначе события разошлись бы в деньгах.
+     */
+    function trackAdded(product: ProductWithImages, quantity: number) {
+      const { trackAddToCart } = useEcommerceTracking()
+      trackAddToCart({
+        id: product.id,
+        name: product.name,
+        price: product.final_price || product.price,
+        quantity,
+      })
+    }
+
     async function addItem(
       productIdOrObject: string | { id: string },
       quantity: number = 1,
@@ -206,6 +241,7 @@ export const useCartStore = defineStore(
         isCartOpen.value = true
         // 🔥 Сбрасываем бонусы при изменении корзины
         bonusesToSpend.value = 0
+        trackAdded(existingItem.product, quantity)
         return
       }
 
@@ -245,6 +281,7 @@ export const useCartStore = defineStore(
           isCartOpen.value = true
           // 🔥 Сбрасываем бонусы при изменении корзины
           bonusesToSpend.value = 0
+          trackAdded(fullProduct as ProductWithImages, quantity)
         }
         else {
           toast.error('Товар не найден')
@@ -260,10 +297,32 @@ export const useCartStore = defineStore(
     }
 
     function removeItem(productId: string) {
+      // Ищем ДО фильтрации: после неё имени и цены для события уже не будет.
+      const removed = items.value.find(i => i.product.id === productId)
+
       items.value = items.value.filter(i => i.product.id !== productId)
       toast.info('Товар удален из корзины')
       // 🔥 Сбрасываем бонусы при изменении корзины
       bonusesToSpend.value = 0
+
+      /*
+       * Та же история, что с добавлением: `trackRemoveFromCart` звали только
+       * `ProductCard` и `QuantitySelector`, а удаление из корзины и из
+       * слайд-панели не отправляло ничего.
+       *
+       * `clearCart` сюда не заходит — он обнуляет `items` напрямую. И это
+       * правильно: очистка после оформления заказа не должна выглядеть как
+       * отказ покупателя от товаров.
+       */
+      if (removed) {
+        const { trackRemoveFromCart } = useEcommerceTracking()
+        trackRemoveFromCart({
+          id: removed.product.id,
+          name: removed.product.name,
+          price: removed.product.final_price || removed.product.price,
+          quantity: removed.quantity,
+        })
+      }
     }
 
     function updateQuantity(productId: string, quantity: number) {
