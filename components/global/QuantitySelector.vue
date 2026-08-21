@@ -9,7 +9,6 @@ const props = defineProps<{
 const isOpen = ref(false)
 const cartStore = useCartStore()
 const { triggerHaptic } = useHaptic()
-const { trackRemoveFromCart } = useEcommerceTracking()
 
 // ✅ Медиа-запрос инициализируем на клиенте чтобы избежать hydration mismatch
 const isDesktop = ref(false)
@@ -58,18 +57,13 @@ function updateQuantity(newQuantity: number | string) {
   if (Number.isNaN(numQuantity))
     return
   const finalQuantity = Math.min(numQuantity, maxAvailableQuantity.value)
-  
+
   if (finalQuantity > 0) {
     cartStore.updateQuantity(props.product.id, finalQuantity)
     triggerHaptic('light')
   }
   else {
-    trackRemoveFromCart({ 
-      id: props.product.id, 
-      name: props.product.name, 
-      price: props.product.final_price || props.product.price,
-      quantity: props.quantity,
-    })
+    // remove_from_cart отправляет сам `cartStore.removeItem`.
     cartStore.removeItem(props.product.id)
   }
   isOpen.value = false // Закрываем окно после выбора
