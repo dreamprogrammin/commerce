@@ -667,6 +667,19 @@ export default defineNuxtConfig({
               // Санитайзер HTML — composables/useSafeHtml.ts
               if (id.includes('dompurify'))
                 return 'vendor-sanitize'
+              /*
+               * Метрики реальных посетителей — `plugins/web-vitals.client.ts`,
+               * динамический импорт после `load` и в простое.
+               *
+               * Своя строка ОБЯЗАТЕЛЬНА, иначе всё падает в общий `vendor`
+               * ниже, а он жадный: библиотека уехала бы на каждую страницу до
+               * гидратации, и ленивость импорта ничего бы не изменила. Ровно
+               * это описано выше для `reka-ui`, и на этом же я споткнулся при
+               * первой сборке — 15 КБ attribution-сборки оказались внутри
+               * жадного чанка.
+               */
+              if (id.includes('web-vitals'))
+                return 'vendor-web-vitals'
 
               /*
                * vaul-vue отдаём на откуп Rollup — возврат undefined значит
