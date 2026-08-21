@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CategoryMenuItem } from '@/types'
+import CategoryTile from '@/components/category/CategoryTile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
@@ -191,55 +192,55 @@ const seeAllHref = '/catalog/all'
       </div>
 
       <!-- BENTO (десктоп, таб «Всё») -->
+      <!-- `img-shadow="0"`: тени под картинкой у этих плиток не было и до
+           переезда на CategoryTile, а в прототипе она включена по умолчанию.
+           Оставляем как было — включать её отдельным решением. -->
       <div v-if="showBento" class="cats-bento">
-        <NuxtLink
+        <CategoryTile
           v-for="tile in bentoBig"
           :key="tile.id"
-          :to="tile.href"
-          class="cats-tile cats-tile--big"
-          :style="{ background: tile.tint }"
-        >
-          <span class="cats-tile__title cats-tile__title--big">{{ tile.name }}</span>
-          <span class="cats-tile__count">
-            {{ tile.countLabel }}
-            <Icon name="lucide:arrow-right" class="size-4" />
-          </span>
-          <span class="cats-tile__img cats-tile__img--big">
-            <img v-if="tile.image" :src="tile.image" :alt="tile.name" loading="lazy">
-          </span>
-        </NuxtLink>
+          :name="tile.name"
+          :href="tile.href"
+          :src="tile.image"
+          :tint="tile.tint"
+          :meta="tile.countLabel"
+          layout="corner"
+          size="lg"
+          :img-shadow="0"
+          interaction="lift"
+        />
 
         <div class="cats-bento__small">
-          <NuxtLink
+          <CategoryTile
             v-for="tile in bentoSmall"
             :key="tile.id"
-            :to="tile.href"
-            class="cats-tile cats-tile--small"
-            :style="{ background: tile.tint }"
-          >
-            <span class="cats-tile__title">{{ tile.name }}</span>
-            <span class="cats-tile__img cats-tile__img--small">
-              <img v-if="tile.image" :src="tile.image" :alt="tile.name" loading="lazy">
-            </span>
-          </NuxtLink>
+            :name="tile.name"
+            :href="tile.href"
+            :src="tile.image"
+            :tint="tile.tint"
+            layout="corner"
+            size="md"
+            :img-shadow="0"
+            interaction="lift"
+          />
         </div>
       </div>
 
       <!-- FOCUS GRID (мобилка / конкретный таб) -->
       <div v-else class="cats-focus-scroll">
         <div class="cats-focus-grid">
-          <NuxtLink
+          <CategoryTile
             v-for="tile in focusTiles"
             :key="tile.id"
-            :to="tile.href"
-            class="cats-tile cats-tile--small"
-            :style="{ background: tile.tint }"
-          >
-            <span class="cats-tile__title">{{ tile.name }}</span>
-            <span class="cats-tile__img cats-tile__img--small">
-              <img v-if="tile.image" :src="tile.image" :alt="tile.name" loading="lazy">
-            </span>
-          </NuxtLink>
+            :name="tile.name"
+            :href="tile.href"
+            :src="tile.image"
+            :tint="tile.tint"
+            layout="corner"
+            size="md"
+            :img-shadow="0"
+            interaction="lift"
+          />
         </div>
       </div>
     </template>
@@ -323,106 +324,8 @@ const seeAllHref = '/catalog/all'
     gap: 14px;
   }
 
-  /* --- tiles --- */
-  .cats-tile {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    width: 100%;
-    height: 100%;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    text-decoration: none;
-    overflow: hidden;
-    transition:
-      transform 0.16s ease,
-      box-shadow 0.16s ease;
-  }
-
-  .cats-tile--big {
-    min-height: 180px;
-    border-radius: 22px;
-    padding: 24px 22px 0;
-  }
-
-  .cats-tile--small {
-    min-height: 150px;
-    border-radius: 18px;
-    padding: 15px 10px 0;
-  }
-
-  .cats-tile--big:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .cats-tile--small:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .cats-tile__title {
-    position: relative;
-    z-index: 2;
-    display: block;
-    max-width: 100%;
-    padding-right: 6px;
-    color: var(--foreground);
-    font-weight: 700;
-    font-size: clamp(11px, 1.1vw, 14px);
-    line-height: 1.2;
-    text-wrap: balance;
-  }
-
-  .cats-tile__title--big {
-    max-width: 72%;
-    font-weight: 800;
-    font-size: clamp(22px, 1.9vw, 30px);
-    line-height: 1.08;
-    letter-spacing: -0.02em;
-  }
-
-  .cats-tile__count {
-    position: relative;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 11px;
-    color: var(--primary);
-    font-weight: 600;
-    font-size: 13.5px;
-  }
-
-  .cats-tile__img {
-    position: absolute;
-    z-index: 1;
-  }
-
-  .cats-tile__img img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    object-position: right bottom;
-    display: block;
-  }
-
-  .cats-tile__img--big {
-    right: 0;
-    bottom: 0;
-    width: 82%;
-    height: 62%;
-  }
-
-  .cats-tile__img--small {
-    right: 2px;
-    bottom: 2px;
-    width: 76%;
-    height: 62%;
-  }
+  /* Вёрстка самих плиток — в components/category/CategoryTile.vue.
+     Здесь остаётся только раскладка сетки вокруг них. */
 
   /* --- skeleton --- */
   .cats-skeleton {

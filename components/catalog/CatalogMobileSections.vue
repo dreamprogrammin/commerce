@@ -8,14 +8,16 @@
  *    поля под цвет нет, поэтому оттенок берётся из карты по slug корня, а для
  *    незнакомого корня — циклом по той же палитре (иначе новая категория в
  *    админке приезжала бы без фона).
- *  • Картинка тайла в прототипе — background-image; здесь честный <img> с
- *    srcset и lazy, потому что файлы лежат в Supabase Storage вариантами
- *    sm/md, а `background-image` их не умеет выбирать.
  *  • LQIP тут намеренно нет: тайл ~112px, вариант `sm` (400px) прилетает
  *    мгновенно, а размытый плейсхолдер под `mix-blend-mode: multiply`
  *    проступает сквозь прозрачный PNG грязным пятном.
+ *
+ * Сами плитки рисует `CategoryTile` — общий порт `CategoryTile.dc.html`.
+ * Раскладка тут stack + подпись снизу; про `blend`, `sourceMedia` и
+ * несовместимость наложения с тенью написано в шапке того компонента.
  */
 import type { AdditionalMenuItem, CategoryRow } from '@/types'
+import CategoryTile from '@/components/category/CategoryTile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { isDiscountPromo } from '@/utils/promoTiles'
@@ -26,9 +28,6 @@ const props = defineProps<{
 }>()
 
 const { getVariantUrl } = useSupabaseStorage()
-
-/** Прозрачный 1×1 GIF — заглушка в <img src>, см. комментарий в разметке. */
-const BLANK_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
 /**
  * Пастельные подложки секций из прототипа. Ключ — slug корневой категории.
@@ -119,44 +118,32 @@ function buildSrcset(imageUrl: string | null): string | undefined {
       v-for="section in sections"
       :key="section.id"
       class="cat-mob__section"
-      :style="{ '--tile-tint': section.tint }"
     >
       <NuxtLink :to="section.href" class="cat-mob__section-title">
         {{ section.name }}
       </NuxtLink>
 
       <div class="cat-mob__grid">
-        <NuxtLink
+        <CategoryTile
           v-for="item in section.items"
           :key="item.id"
-          :to="item.href"
-          class="cat-mob__cell"
-        >
-          <span class="cat-surface cat-mob__tile">
-            <!-- Картинка живёт в <source media>, а у <img> в src прозрачный
-                 пиксель. Ниже lg источник совпадает и грузится настоящий файл,
-                 на десктопе (где блок скрыт через display:none) не совпадает —
-                 и браузер не качает ничего. Без этого десктоп тянул бы все
-                 27 картинок мобильной вёрстки вхолостую: display:none
-                 загрузку не отменяет. -->
-            <picture v-if="item.src" class="cat-mob__pic">
-              <source
-                media="(max-width: 1023.98px)"
-                :srcset="item.srcset || item.src"
-                sizes="(max-width: 767px) 33vw, 180px"
-              >
-              <img
-                :src="BLANK_PIXEL"
-                alt=""
-                loading="lazy"
-                decoding="async"
-                class="cat-mob__img"
-              >
-            </picture>
-            <Icon v-else :name="item.icon" class="cat-mob__fallback" />
-          </span>
-          <span class="cat-mob__name">{{ item.name }}</span>
-        </NuxtLink>
+          :name="item.name"
+          :href="item.href"
+          :src="item.src"
+          :srcset="item.srcset"
+          sizes="(max-width: 767px) 33vw, 180px"
+          source-media="(max-width: 1023.98px)"
+          :fallback-icon="item.icon"
+          :tint="section.tint"
+          :flat="false"
+          :radius="16"
+          :img-scale="78"
+          :img-shadow="0"
+          blend
+          :label-size="13.5"
+          :label-weight="500"
+          interaction="press"
+        />
       </div>
     </section>
   </div>
@@ -193,8 +180,9 @@ function buildSrcset(imageUrl: string | null): string | undefined {
     }
   }
 
-  /* Общая «стеклянная» подложка плиток: светлый градиент от --tile-tint,
-     белая кромка и внутренние тени, дающие объём. */
+  /* «Стеклянная» подложка промо-плиток: светлый градиент от --tile-tint,
+     белая кромка и внутренние тени, дающие объём. Плитки категорий несут
+     свою — её задаёт CategoryTile при `:flat="false"`. */
   .cat-surface {
     background: linear-gradient(165deg, color-mix(in oklch, var(--tile-tint) 55%, #fff), var(--tile-tint));
     border: 1px solid rgb(255 255 255 / 0.75);
@@ -267,66 +255,7 @@ function buildSrcset(imageUrl: string | null): string | undefined {
     gap: 20px 10px;
   }
 
-  .cat-mob__cell {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .cat-mob__tile {
-    display: grid;
-    place-items: center;
-    width: 100%;
-    aspect-ratio: 1;
-    overflow: hidden;
-    /* mix-blend-mode картинки обязан смешиваться с градиентом самой плитки,
-       а не с тем, что под ней на странице. */
-    isolation: isolate;
-    transition: transform 0.2s ease;
-  }
-
-  .cat-mob__cell:active .cat-mob__tile {
-    transform: scale(0.96);
-  }
-
-  /* Коробка под картинку — 78% от плитки, как в прототипе. Размер задаётся
-     через ширину и aspect-ratio, а не через height:78%: процентная высота
-     внутри грид-ячейки, чья высота сама выведена из aspect-ratio, не
-     резолвится, и картинка вытягивалась по своим пропорциям (портретные
-     обрезались бы краем плитки). Плитка квадратная, так что 78% ширины =
-     78% высоты. */
-  .cat-mob__pic {
-    display: block;
-    width: 78%;
-    aspect-ratio: 1;
-  }
-
-  .cat-mob__img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    /* Картинки категорий — PNG с белым ореолом по краю; multiply сажает их
-       на подложку без видимой рамки. */
-    mix-blend-mode: multiply;
-  }
-
-  .cat-mob__fallback {
-    width: 40%;
-    height: 40%;
-    color: var(--muted-foreground);
-    opacity: 0.45;
-  }
-
-  .cat-mob__name {
-    display: -webkit-box;
-    min-height: 35px;
-    overflow: hidden;
-    font-size: 13.5px;
-    font-weight: 500;
-    line-height: 1.3;
-    color: var(--foreground);
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
+  /* Вёрстка самих плиток — в components/category/CategoryTile.vue.
+     Здесь остаётся только раскладка сетки вокруг них. */
 }
 </style>
