@@ -6,7 +6,7 @@ import type {
   ProductWithGallery,
   SortByType,
 } from '@/types'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
 export type BrandPageContext = 'brand' | 'line'
@@ -16,6 +16,97 @@ interface UseBrandPageFiltersOptions {
   productLineId?: Ref<string | undefined>
   context: BrandPageContext
   brandProductLines?: Ref<ProductLine[]>
+  /**
+   * Товары, добытые до отрисовки (см. `useBrandPageSsrProducts`). Кладутся в
+   * кеш ДО создания запроса, иначе в серверную разметку они не попадут.
+   */
+  ssrProducts?: ProductWithGallery[] | null
+}
+
+/** Сколько товаров тянем за раз — и в префетче, и в самом запросе. */
+const BRAND_PAGE_SIZE = 200
+
+/**
+ * Ключ запроса. Вынесен наружу, чтобы префетч и сам запрос считали его
+ * одинаково: разойдись они хоть в одном поле — посев кеша не найдёт
+ * наблюдатель, и сервер отдаст пустую сетку.
+ */
+function buildBrandQueryKey(context: BrandPageContext, f: IProductFilters): unknown[] {
+  return [
+    'brand-page-products',
+    context,
+    f.brandIds?.join(',') || '',
+    f.productLineIds?.join(',') || '',
+    f.sortBy,
+    f.materialIds?.join(',') || '',
+    f.countryIds?.join(',') || '',
+    `${f.priceMin ?? 0}-${f.priceMax ?? 0}`,
+  ]
+}
+
+/**
+ * Товары бренд-страницы для первой отрисовки.
+ *
+ * Зовётся ТОЛЬКО верхнеуровневым `await` из `<script setup>` — компилятор
+ * оборачивает такой await в `withAsyncContext`, и после него живы и контекст
+ * Nuxt, и активный effect scope. Внутри обычной async-функции этого не
+ * происходит; на странице категории попытка ждать внутри композабла стоила
+ * рассинхрона гидратации (см. пояснение в `useCatalogQuery.ts`).
+ *
+ * Зачем вообще. До 22 августа товары бренд-страницы грузились только
+ * клиентским `useQuery`, и в серверной разметке их не было НИ ОДНОГО —
+ * при 14 активных товарах у LEGO и 8 у ZURU. Google это заметил: инспекция
+ * показывала `Soft 404` у `/brand/lego/lego-dc`, `Crawled - currently not
+ * indexed` у `/brand/mattel` и `/brand/lego/lego-friends`. Робот видел
+ * страницу с одним заголовком и отказывался её индексировать, хотя для
+ * человека она была полной.
+ */
+export async function useBrandPageSsrProducts(
+  brandId: Ref<string | undefined>,
+  productLineId?: Ref<string | undefined>,
+): Promise<ProductWithGallery[] | null> {
+  const nuxtApp = useNuxtApp()
+
+  // На переходах внутри сайта данными занимается сам useQuery: там уже есть
+  // и кеш, и рабочий клиент. Префетч нужен серверу и первой отрисовке в
+  // браузере, иначе клиент стартовал бы с пустым кешем и рисовал скелетон
+  // поверх пришедшей с сервера сетки.
+  if (!import.meta.server && !nuxtApp.isHydrating)
+    return null
+
+  if (!brandId.value)
+    return null
+
+  const productsStore = useProductsStore()
+  const lineId = productLineId?.value
+
+  const { data } = await useAsyncData(
+    `ssr-brand-products-${brandId.value}-${lineId ?? 'all'}`,
+    async () => {
+      const result = await productsStore.fetchProducts(
+        {
+          /*
+           * `categorySlug: 'all'` обязателен, и это не косметика: RPC
+           * `get_filtered_products` объявлен с параметром `p_category_slug`,
+           * и без него PostgREST отвечает PGRST202 «функция не найдена» —
+           * запрос падает целиком, а не возвращает пустой список. Ровно то
+           * же значение подставляет клиентский путь ниже (`catalogFilters`),
+           * иначе ключ запроса разойдётся с посевом.
+           */
+          categorySlug: 'all',
+          brandIds: [brandId.value!],
+          ...(lineId ? { productLineIds: [lineId] } : {}),
+          sortBy: 'newest',
+        } as IProductFilters,
+        1,
+        BRAND_PAGE_SIZE,
+      )
+      return result.products
+    },
+    { server: true },
+  )
+
+  return data.value ?? null
 }
 
 export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
@@ -84,30 +175,38 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
   })
 
   // ── TanStack Query для кеширования товаров ──
-  const queryKey = computed(() => {
-    const f = catalogFilters.value
-    return [
-      'brand-page-products',
-      options.context,
-      f.brandIds?.join(',') || '',
-      f.productLineIds?.join(',') || '',
-      f.sortBy,
-      f.materialIds?.join(',') || '',
-      f.countryIds?.join(',') || '',
-      `${f.priceMin ?? 0}-${f.priceMax ?? 0}`,
-    ]
-  })
+  const queryKey = computed(() => buildBrandQueryKey(options.context, catalogFilters.value))
+
+  /*
+   * Посев кеша ДО создания запроса — иначе на сервере vue-query не подпишет
+   * наблюдателя, и `setQueryData` в отрисовку не попадёт.
+   */
+  const queryClient = useQueryClient()
+  if (options.ssrProducts)
+    queryClient.setQueryData(queryKey.value, options.ssrProducts)
 
   const queryEnabled = computed(() => !!options.brandId.value)
 
   const query = useQuery({
     queryKey,
+    /*
+     * `initialData`, а не только посев кеша. Ниже стоят два `watch` с
+     * `immediate: true`, которые синхронизируют `products` и `isLoading` из
+     * запроса, — и они срабатывают ПОСЛЕ создания `useQuery`, затирая всё,
+     * что положено раньше. С `initialData` запрос сразу отдаёт данные и
+     * `isLoading === false`, поэтому синхронизация переносит в состояние уже
+     * правильные значения, а не пустую сетку со скелетоном.
+     *
+     * Проверено запуском: с одним лишь `setQueryData` серверная разметка
+     * оставалась со скелетоном и «0 товара» в счётчике.
+     */
+    initialData: options.ssrProducts ?? undefined,
     queryFn: async () => {
       // ✅ Загружаем товары с рейтингами (avg_rating, review_count)
       const result = await productsStore.fetchProducts(
         catalogFilters.value,
         1,
-        200,
+        BRAND_PAGE_SIZE,
       )
       return result.products
     },
@@ -116,7 +215,13 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
     gcTime: 10 * 60 * 1000, // 10 минут в памяти
     retry: false,
     refetchOnWindowFocus: true,
-    refetchOnMount: 'always',
+    /*
+     * `true`, а не `'always'`: с `'always'` запрос уходит сразу после
+     * монтирования, хотя те же данные только что пришли с сервера. На
+     * категории это давало рассинхрон гидратации — сервер рисовал кнопку
+     * обычной, клиент к моменту гидратации уже был в состоянии загрузки.
+     */
+    refetchOnMount: true,
     refetchOnReconnect: false,
   })
 

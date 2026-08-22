@@ -7,7 +7,9 @@ import { toast } from 'vue-sonner'
 import RecursiveMenuItemFormNode from '@/components/admin/categories/RecursiveMenuItemFormNode.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useCategoryImageUpload } from '@/composables/admin/useCategoryImageUpload'
 import { useCategoryQuestions } from '@/composables/useCategoryQuestions'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
 
@@ -21,6 +23,38 @@ const selectedRootCategory = ref<EditableCategory | null>(null)
 const formTree = reactive<EditableCategory[]>([])
 const isSaving = ref(false)
 const isGeneratingAll = ref(false)
+
+/**
+ * Картинка корневого раздела.
+ *
+ * Рекурсивным узлом рисуются только ПОТОМКИ выбранного корня, поэтому поле
+ * загрузки у самого корня отсутствовало — и все восемь разделов в базе
+ * стояли с пустым `image_url`, из-за чего большие плитки бенто на главной
+ * оставались без картинки. Обработка общая с узлом, см. композабл.
+ */
+const {
+  isProcessing: isProcessingRootImage,
+  optimizationInfo: rootOptimizationInfo,
+  buildPatchFromEvent: buildRootImagePatch,
+  buildClearPatch: buildRootImageClearPatch,
+} = useCategoryImageUpload()
+
+async function handleRootImageChange(event: Event) {
+  if (!selectedRootCategory.value)
+    return
+  const patch = await buildRootImagePatch(event)
+  if (patch)
+    Object.assign(selectedRootCategory.value, patch)
+}
+
+function removeRootImage() {
+  if (!selectedRootCategory.value)
+    return
+  Object.assign(
+    selectedRootCategory.value,
+    buildRootImageClearPatch(selectedRootCategory.value),
+  )
+}
 
 async function handleGenerateAllQuestions() {
   isGeneratingAll.value = true
@@ -159,6 +193,17 @@ async function saveAllChanges() {
     categoryToUpdate.meta_title = selectedRootCategory.value.meta_title
     categoryToUpdate.meta_description = selectedRootCategory.value.meta_description
     categoryToUpdate.meta_keywords = selectedRootCategory.value.meta_keywords
+
+    // Картинка раздела. Переносить обязательно: `finalTreeState` собирается
+    // заново из стора и о правках формы не знает — без этих пяти строк
+    // выбранный файл молча терялся бы при сохранении. Дальше `saveChanges`
+    // обходится с корнем так же, как с любым узлом дерева: соберёт варианты
+    // sm/md/lg, зальёт их и удалит старые.
+    categoryToUpdate._imageFile = selectedRootCategory.value._imageFile
+    categoryToUpdate._imagePreview = selectedRootCategory.value._imagePreview
+    categoryToUpdate._blurPlaceholder = selectedRootCategory.value._blurPlaceholder
+    categoryToUpdate.image_url = selectedRootCategory.value.image_url
+    categoryToUpdate.blur_placeholder = selectedRootCategory.value.blur_placeholder
   }
   else {
     toast.error('Критическая ошибка: не удалось найти корневую категорию.')
@@ -270,6 +315,68 @@ function handleRemove(itemToRemove: EditableCategory) {
 
       <main class="lg:col-span-3">
         <div v-if="selectedRootCategory" class="space-y-6">
+          <!-- ИЗОБРАЖЕНИЕ КОРНЕВОЙ КАТЕГОРИИ -->
+          <div class="bg-card p-6 rounded-lg shadow-md space-y-4">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <Icon name="lucide:image" class="w-5 h-5 text-primary" />
+              Изображение раздела: <span class="text-primary">{{ selectedRootCategory.name }}</span>
+            </h2>
+            <p class="text-sm text-muted-foreground">
+              Показывается на большой плитке раздела в блоке «Популярные категории»
+              на главной. При сохранении из файла собираются три размера
+              (400 / 800 / 1440 px) и подложка-заглушка — так же, как у подкатегорий.
+              Лучше всего подходит PNG с прозрачным фоном.
+            </p>
+
+            <div class="space-y-2">
+              <Label for="root-category-image">
+                Файл
+                <span v-if="isProcessingRootImage" class="text-xs text-muted-foreground ml-2">
+                  {{ rootOptimizationInfo.icon }} Обработка...
+                </span>
+              </Label>
+              <Input
+                id="root-category-image"
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                :disabled="isProcessingRootImage"
+                @change="handleRootImageChange"
+              />
+
+              <p
+                v-if="selectedRootCategory._blurPlaceholder"
+                class="text-xs text-green-600 flex items-center gap-1"
+              >
+                <Icon name="lucide:check-circle" class="w-3 h-3" />
+                Подложка-заглушка снята
+              </p>
+
+              <!-- Свежий выбор показываем: это blob из браузера, трафик
+                   Storage он не тратит. Уже сохранённую картинку не тянем —
+                   ровно как в карточке подкатегории, где превью намеренно
+                   скрыто ради экономии Egress. -->
+              <div v-if="selectedRootCategory._imagePreview" class="flex items-center gap-3 pt-1">
+                <img
+                  :src="selectedRootCategory._imagePreview"
+                  alt=""
+                  class="h-20 w-20 rounded-md border object-contain bg-muted"
+                >
+                <Button variant="destructive" size="sm" type="button" @click="removeRootImage">
+                  Убрать
+                </Button>
+              </div>
+              <div
+                v-else-if="selectedRootCategory.image_url"
+                class="inline-flex items-center gap-2 border p-2 rounded-md bg-muted"
+              >
+                <span class="text-xs text-muted-foreground">Картинка загружена</span>
+                <Button variant="destructive" size="sm" type="button" @click="removeRootImage">
+                  Убрать
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <!-- SEO ПОЛЯ КОРНЕВОЙ КАТЕГОРИИ -->
           <div class="bg-card p-6 rounded-lg shadow-md space-y-4">
             <h2 class="text-xl font-bold flex items-center gap-2">

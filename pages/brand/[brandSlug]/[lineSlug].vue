@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
+import { useBrandPageFilters, useBrandPageSsrProducts } from '@/composables/useBrandPageFilters'
 import {
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
@@ -120,10 +120,19 @@ if (brand.value && !productLine.value && !linePending.value) {
 // ─── 3. Smart Sidebar ───────────────────────────────────────────────────────
 const brandId = computed(() => brand.value?.id)
 const productLineId = computed(() => productLine.value?.id)
+/*
+ * Ожидание на уровне страницы — см. пояснение в `useBrandPageSsrProducts`.
+ * Страницы линеек страдали тем же: `/brand/lego/lego-dc` Google пометил
+ * `Soft 404`, `/brand/lego/lego-friends` — «обойдено, не проиндексировано»,
+ * потому что в серверной разметке не было ни одного товара.
+ */
+const lineSsrProducts = await useBrandPageSsrProducts(brandId, productLineId)
+
 const filterState = useBrandPageFilters({
   brandId,
   productLineId,
   context: 'line',
+  ssrProducts: lineSsrProducts,
 })
 
 // Статистика линейки
@@ -503,7 +512,32 @@ useHead({
 })
 
 // см. composables/useRobotsContent.ts — на превью правило закрывается флагом
-useIndexableRobotsRule({ index: true, follow: true })
+/*
+ * Пустая линейка закрывается от индексации.
+ *
+ * Google уже отреагировал сам: инспекция показывала `Soft 404` у
+ * `/brand/lego/lego-dc` и «обойдено, не проиндексировано» у
+ * `/brand/lego/lego-friends`. Первую вылечил серверный рендер товаров — в
+ * ней их два, — а вторая пуста по-настоящему, и держать её открытой значит
+ * тратить краулинговый бюджет на страницу без содержимого.
+ *
+ * Считаем по данным префетча, а не по `filterState.products`: тот наполняется
+ * клиентским запросом и на сервере пуст, так что закрыл бы вообще все линейки.
+ *
+ * `noindex: true`, а НЕ `{ index: false }`: модуль `@nuxtjs/robots` пропускает
+ * ключи со значением `false` при сборке строки, и отрицание молча теряется —
+ * ровно на этом 20 августа десять бренд-страниц оказались в индексе.
+ *
+ * `follow: true` в обоих случаях: ссылки с закрытой страницы должны
+ * передаваться дальше.
+ */
+useIndexableRobotsRule(
+  computed(() =>
+    lineSsrProducts && lineSsrProducts.length === 0
+      ? { noindex: true, follow: true }
+      : { index: true, follow: true },
+  ),
+)
 </script>
 
 <template>

@@ -95,17 +95,22 @@ export const HOME_STATIC_CHIPS = [
 export const HOME_CHIPS_CATEGORY_LIMIT = 5
 
 /**
- * Тинты плиток категорий (Homepage.dc.html: CATCOL).
+ * Тинты плиток категорий (PopularCategories.dc.html: CATCOL).
  * Ключи — позиция корневой категории в menuTree, а не её slug:
  * slug'и в проде отличаются от прототипа, привязка по индексу устойчивее.
+ *
+ * Значения обновлены по PopularCategories.dc.html. Прежний набор
+ * (#e3edfb, #f8ebf1, #fbf0d1, #e5f2ea, #ede7fa, #fce8db) приехал из более
+ * раннего Homepage.dc.html и был заметно бледнее — плитки читались почти
+ * белыми. Порядок тот же, так что соответствие категориям не съехало.
  */
 export const CATEGORY_TILE_TINTS = [
-  '#e3edfb', // мальчикам
-  '#f8ebf1', // девочкам
-  '#fbf0d1', // малышам
-  '#e5f2ea', // конструкторы
-  '#ede7fa', // творчество
-  '#fce8db', // активный отдых
+  '#9fd3ea', // мальчикам
+  '#f6c3cc', // девочкам
+  '#f7d08a', // малышам
+  '#b4dfb9', // конструкторы
+  '#cfc3ee', // творчество
+  '#a3ddd8', // активный отдых
 ] as const
 
 export const CATEGORY_TILE_TINT_FALLBACK

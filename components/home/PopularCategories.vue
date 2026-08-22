@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CategoryMenuItem } from '@/types'
+import CategoryTile from '@/components/category/CategoryTile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
@@ -23,7 +24,10 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
  */
 const categoriesStore = useCategoriesStore()
 const { getVariantUrl } = useSupabaseStorage()
-const isMobile = useIsMobile(1023)
+// Прототип разводит раскладки по 768 (`mob = vw < 768`), а не по 1024:
+// с 768 и выше показывается бенто, ниже — двухрядный рельс. Та же граница
+// продублирована в медиазапросе в конце файла — их нельзя разводить.
+const isMobile = useIsMobile(767)
 
 // menuTree наполняется на SSR через useAsyncData('home-ssr-critical') в index.vue;
 // подстраховка на клиенте, если стор пуст.
@@ -157,7 +161,7 @@ const seeAllHref = '/catalog/all'
 <template>
   <section :class="sectionSpacingVariants({ size: 'xs' })">
     <div class="flex items-baseline justify-between gap-3 mb-4">
-      <h2 class="m-0 font-bold tracking-tight text-[clamp(22px,3vw,32px)]">
+      <h2 class="m-0 font-bold tracking-[-0.02em] text-[clamp(22px,3vw,32px)]">
         Популярные категории
       </h2>
       <NuxtLink
@@ -192,54 +196,48 @@ const seeAllHref = '/catalog/all'
 
       <!-- BENTO (десктоп, таб «Всё») -->
       <div v-if="showBento" class="cats-bento">
-        <NuxtLink
+        <CategoryTile
           v-for="tile in bentoBig"
           :key="tile.id"
-          :to="tile.href"
-          class="cats-tile cats-tile--big"
-          :style="{ background: tile.tint }"
-        >
-          <span class="cats-tile__title cats-tile__title--big">{{ tile.name }}</span>
-          <span class="cats-tile__count">
-            {{ tile.countLabel }}
-            <Icon name="lucide:arrow-right" class="size-4" />
-          </span>
-          <span class="cats-tile__img cats-tile__img--big">
-            <img v-if="tile.image" :src="tile.image" :alt="tile.name" loading="lazy">
-          </span>
-        </NuxtLink>
+          :name="tile.name"
+          :href="tile.href"
+          :src="tile.image"
+          :tint="tile.tint"
+          :meta="tile.countLabel"
+          layout="corner"
+          size="lg"
+          interaction="lift"
+        />
 
         <div class="cats-bento__small">
-          <NuxtLink
+          <CategoryTile
             v-for="tile in bentoSmall"
             :key="tile.id"
-            :to="tile.href"
-            class="cats-tile cats-tile--small"
-            :style="{ background: tile.tint }"
-          >
-            <span class="cats-tile__title">{{ tile.name }}</span>
-            <span class="cats-tile__img cats-tile__img--small">
-              <img v-if="tile.image" :src="tile.image" :alt="tile.name" loading="lazy">
-            </span>
-          </NuxtLink>
+            :name="tile.name"
+            :href="tile.href"
+            :src="tile.image"
+            :tint="tile.tint"
+            layout="corner"
+            size="md"
+            interaction="lift"
+          />
         </div>
       </div>
 
       <!-- FOCUS GRID (мобилка / конкретный таб) -->
       <div v-else class="cats-focus-scroll">
         <div class="cats-focus-grid">
-          <NuxtLink
+          <CategoryTile
             v-for="tile in focusTiles"
             :key="tile.id"
-            :to="tile.href"
-            class="cats-tile cats-tile--small"
-            :style="{ background: tile.tint }"
-          >
-            <span class="cats-tile__title">{{ tile.name }}</span>
-            <span class="cats-tile__img cats-tile__img--small">
-              <img v-if="tile.image" :src="tile.image" :alt="tile.name" loading="lazy">
-            </span>
-          </NuxtLink>
+            :name="tile.name"
+            :href="tile.href"
+            :src="tile.image"
+            :tint="tile.tint"
+            layout="corner"
+            size="md"
+            interaction="lift"
+          />
         </div>
       </div>
     </template>
@@ -266,8 +264,20 @@ const seeAllHref = '/catalog/all'
     align-items: center;
     gap: 8px;
     overflow-x: auto;
-    padding-bottom: 6px;
+    /* Верхние 2px — запас под кромку таба: без них она срезалась
+       переполнением по горизонтали. */
+    padding: 2px 0 8px;
     margin-bottom: 18px;
+  }
+
+  /* Рельс табов уходит под края экрана (в прототипе — класс rail-bleed).
+     Отступ строго из --page-gutter, см. assets/css/tailwind.css: свой clamp
+     здесь разъедется с контейнером секции. */
+  @media (max-width: 767px) {
+    .cats-tabs {
+      margin-inline: calc(-1 * var(--page-gutter));
+      padding-inline: var(--page-gutter);
+    }
   }
 
   .cats-tab {
@@ -275,11 +285,11 @@ const seeAllHref = '/catalog/all'
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    height: 38px;
-    padding: 0 15px;
-    border: none;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: var(--muted);
+    background: #fff;
     color: var(--foreground);
     font-weight: 600;
     font-size: 14px;
@@ -291,6 +301,7 @@ const seeAllHref = '/catalog/all'
   }
 
   .cats-tab--active {
+    border-color: transparent;
     background: var(--primary);
     color: #fff;
   }
@@ -323,106 +334,8 @@ const seeAllHref = '/catalog/all'
     gap: 14px;
   }
 
-  /* --- tiles --- */
-  .cats-tile {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    width: 100%;
-    height: 100%;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    text-decoration: none;
-    overflow: hidden;
-    transition:
-      transform 0.16s ease,
-      box-shadow 0.16s ease;
-  }
-
-  .cats-tile--big {
-    min-height: 180px;
-    border-radius: 22px;
-    padding: 24px 22px 0;
-  }
-
-  .cats-tile--small {
-    min-height: 150px;
-    border-radius: 18px;
-    padding: 15px 10px 0;
-  }
-
-  .cats-tile--big:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .cats-tile--small:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .cats-tile__title {
-    position: relative;
-    z-index: 2;
-    display: block;
-    max-width: 100%;
-    padding-right: 6px;
-    color: var(--foreground);
-    font-weight: 700;
-    font-size: clamp(11px, 1.1vw, 14px);
-    line-height: 1.2;
-    text-wrap: balance;
-  }
-
-  .cats-tile__title--big {
-    max-width: 72%;
-    font-weight: 800;
-    font-size: clamp(22px, 1.9vw, 30px);
-    line-height: 1.08;
-    letter-spacing: -0.02em;
-  }
-
-  .cats-tile__count {
-    position: relative;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 11px;
-    color: var(--primary);
-    font-weight: 600;
-    font-size: 13.5px;
-  }
-
-  .cats-tile__img {
-    position: absolute;
-    z-index: 1;
-  }
-
-  .cats-tile__img img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    object-position: right bottom;
-    display: block;
-  }
-
-  .cats-tile__img--big {
-    right: 0;
-    bottom: 0;
-    width: 82%;
-    height: 62%;
-  }
-
-  .cats-tile__img--small {
-    right: 2px;
-    bottom: 2px;
-    width: 76%;
-    height: 62%;
-  }
+  /* Вёрстка самих плиток — в components/category/CategoryTile.vue.
+     Здесь остаётся только раскладка сетки вокруг них. */
 
   /* --- skeleton --- */
   .cats-skeleton {
@@ -444,8 +357,10 @@ const seeAllHref = '/catalog/all'
     }
   }
 
-  /* Мобильный focus-grid — двухрядный горизонтальный скролл (< lg). */
-  @media (max-width: 1023px) {
+  /* Мобильный focus-grid — двухрядный горизонтальный скролл.
+     Граница 767/768 обязана совпадать с useIsMobile(767) выше: раскладку
+     выбирает скрипт, а рельс рисует этот медиазапрос. */
+  @media (max-width: 767px) {
     /* Edge-bleed: отступ строго из --page-gutter (см. assets/css/tailwind.css),
        иначе рельс не совпадает с контейнером секции. */
     .cats-focus-scroll {
