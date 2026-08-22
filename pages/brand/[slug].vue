@@ -135,10 +135,19 @@ async function loadBrandStats() {
 
 // Smart Sidebar
 const brandId = computed(() => brand.value?.id)
+/*
+ * Ожидание — здесь, на уровне страницы, а не внутри композабла: верхнеуровневый
+ * await в `<script setup>` компилятор оборачивает в `withAsyncContext`, и после
+ * него живы контекст Nuxt и effect scope. Подробности — в комментарии к
+ * `useBrandPageSsrProducts`.
+ */
+const brandSsrProducts = await useBrandPageSsrProducts(brandId)
+
 const filterState = useBrandPageFilters({
   brandId,
   context: 'brand',
   brandProductLines,
+  ssrProducts: brandSsrProducts,
 })
 
 /*
