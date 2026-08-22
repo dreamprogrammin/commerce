@@ -130,6 +130,61 @@ not indexed` у `/brand/mattel` и `/brand/lego/lego-friends`. Причина о
 Пустые линейки закрыты `noindex` — по данным префетча, а не по
 `filterState.products`: тот на сервере пуст и закрыл бы все линейки подряд.
 
+### ОТЛОЖЕННАЯ ПРОВЕРКА: Search Console, 29 августа или позже
+
+Выкатка 22 августа должна изменить статус трёх страниц. Google переобходит
+не мгновенно — раньше 29 августа смотреть бессмысленно, позже можно в любой
+день.
+
+Что было до выкатки (инспекция 22 августа):
+
+```
+/brand/lego/lego-dc        Soft 404                        ждём: Submitted and indexed
+/brand/lego/lego-friends   Crawled - currently not indexed ждём: остаётся закрытой (noindex)
+/brand/mattel              Crawled - currently not indexed ждём: Submitted and indexed
+```
+
+`lego-friends` — единственная, что должна ОСТАТЬСЯ вне индекса: она пуста
+по-настоящему и закрыта `noindex` намеренно. Если она вдруг окажется
+проиндексированной — значит правило не доехало.
+
+Заодно посмотреть, растёт ли доля показываемых страниц: 22 августа было
+**207 из 307**.
+
+Как проверить — самодельный JWT, сторонних пакетов не нужно:
+
+```js
+import { createSign } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+
+const sa = JSON.parse(readFileSync('service-account.json', 'utf8'))
+const now = Math.floor(Date.now() / 1000)
+const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url')
+const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({
+  iss: sa.client_email,
+  scope: 'https://www.googleapis.com/auth/webmasters.readonly',
+  aud: 'https://oauth2.googleapis.com/token',
+  exp: now + 3600,
+  iat: now,
+})}`
+const sig = createSign('RSA-SHA256').update(unsigned).sign(sa.private_key, 'base64url')
+const { access_token } = await (await fetch('https://oauth2.googleapis.com/token', {
+  method: 'POST',
+  headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    assertion: `${unsigned}.${sig}`,
+  }),
+})).json()
+
+// дальше — POST на
+// https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
+// { inspectionUrl, siteUrl: 'sc-domain:uhti.kz' }
+// смотреть inspectionResult.indexStatusResult.{verdict,coverageState}
+```
+
+Скрипт класть в корень репозитория и удалять после работы.
+
 **Чем проверять при следующем касании:** число карточек в SSR против числа
 активных товаров бренда в базе. Совпадать должно точно. Заголовок и H1
 показываются правильно даже когда сетка пуста — глазами не видно.
