@@ -73,6 +73,8 @@ const props = withDefaults(defineProps<{
   /** false — «стеклянная» подложка: градиент, кромка и внутренние тени. */
   flat?: boolean
   blend?: boolean
+  /** Белая скруглённая подложка под картинкой (раскладка corner). */
+  plate?: boolean
 
   labelPlacement?: 'below' | 'inside' | 'none'
   labelSize?: number
@@ -97,6 +99,7 @@ const props = withDefaults(defineProps<{
   imgShadow: 30,
   flat: true,
   blend: false,
+  plate: false,
   labelPlacement: 'below',
   labelSize: 13,
   labelWeight: 400,
@@ -181,6 +184,7 @@ const imageAlt = computed(() =>
         'ct--glass': isGlass,
         'ct--photo': isPhoto,
         'ct--blend': blend,
+        'ct--plate': plate,
         'ct--label-inside': showInside,
       },
     ]"
@@ -398,6 +402,35 @@ const imageAlt = computed(() =>
      на подложку без видимой рамки. */
   .ct--blend .ct__img {
     mix-blend-mode: multiply;
+  }
+
+  /* Своя подложка под картинкой в раскладке corner.
+
+     Без неё выбор был из двух плохих: либо PNG с непрозрачным фоном ложится
+     на тинт белым прямоугольником с острыми углами, либо `multiply` красит
+     картинку в цвет плитки, и она теряет собственные цвета — синее яйцо
+     сливалось с голубой плиткой.
+
+     Белая скруглённая панель снимает и то, и другое: фон PNG совпадает с
+     ней и границы не видно, а сама картинка остаётся в своих цветах.
+     Прозрачным PNG панель тоже к лицу — они читаются как предмет на
+     карточке, а не парят над заливкой.
+
+     Скругление только сверху и слева: панель прижата к правому нижнему
+     углу плитки и повторяет её форму. */
+  .ct--corner.ct--plate .ct__media {
+    background: #fff;
+    border-radius: 18px 0 var(--ct-radius) 0;
+    box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.04);
+  }
+
+  .ct--corner.ct--plate.ct--lg .ct__media {
+    border-radius: 24px 0 var(--ct-radius) 0;
+  }
+
+  /* Под белой панелью умножать не с чем — картинка и так на белом. */
+  .ct--plate .ct__img {
+    mix-blend-mode: normal;
   }
 
   .ct__fallback {
