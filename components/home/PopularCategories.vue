@@ -21,6 +21,19 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
  *     корневой таб на десктопе): плитки = подкатегории выбранного корня.
  * Подпись-счётчик у больших плиток = число дочерних категорий
  * (в прототипе cnt:10/12 совпадали с длиной CATSUB — это дети, не товары).
+ *
+ * Плиткам передаётся `blend` вместе с `img-shadow="0"`.
+ *
+ * Картинки категорий в боевой базе — PNG, и у части из них фон непрозрачный.
+ * Без `mix-blend-mode: multiply` такой файл ложился на пастельную подложку
+ * белым прямоугольником: на проде это было видно у «Мальчикам» — яйцо
+ * Rainbocorns в белой рамке поверх голубой плитки. Соседние плитки с
+ * прозрачными PNG («Машинки», «Игрушечное оружие») выглядели правильно,
+ * поэтому дефект читался как «картинка не отображается».
+ *
+ * `img-shadow="0"` обязателен рядом: тень тоже попадает под умножение и
+ * расплывается грязным пятном. Обе оговорки — в шапке CategoryTile.vue,
+ * и мобильный каталог (`CatalogMobileSections`) передаёт ту же пару.
  */
 const categoriesStore = useCategoriesStore()
 const { getVariantUrl } = useSupabaseStorage()
@@ -204,6 +217,8 @@ const seeAllHref = '/catalog/all'
           :src="tile.image"
           :tint="tile.tint"
           :meta="tile.countLabel"
+          :img-shadow="0"
+          blend
           layout="corner"
           size="lg"
           interaction="lift"
@@ -217,6 +232,8 @@ const seeAllHref = '/catalog/all'
             :href="tile.href"
             :src="tile.image"
             :tint="tile.tint"
+            :img-shadow="0"
+            blend
             layout="corner"
             size="md"
             interaction="lift"
@@ -234,6 +251,8 @@ const seeAllHref = '/catalog/all'
             :href="tile.href"
             :src="tile.image"
             :tint="tile.tint"
+            :img-shadow="0"
+            blend
             layout="corner"
             size="md"
             interaction="lift"
