@@ -209,11 +209,31 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         throw featuredResult.error
       if (notFeaturedResult.error)
         throw notFeaturedResult.error
+
+      await invalidatePublicCache()
       return true
     }
     catch (error: any) {
       toast.error('Ошибка при сохранении популярных категорий', { description: error.message })
       return false
+    }
+  }
+
+  /*
+   * Сброс серверного кеша категорий.
+   *
+   * Публичная витрина читает категории через кешированный `/api/categories`
+   * (10 минут, до часа устаревшее в фоне). Без сброса замена картинки
+   * оборачивается битым изображением: прежний файл удалён, а кеш ещё отдаёт
+   * его путь. Ошибку глушим — она не должна ронять само сохранение, данные
+   * в базе уже верные, кеш дойдёт по истечении срока.
+   */
+  async function invalidatePublicCache() {
+    try {
+      await $fetch('/api/categories/invalidate', { method: 'POST' })
+    }
+    catch (e) {
+      console.warn('Не удалось сбросить кеш категорий:', e)
     }
   }
 
@@ -354,6 +374,7 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         notifySearchEngines(changedSlugs)
       }
 
+      await invalidatePublicCache()
       return true
     }
     catch (e: any) {
