@@ -5,7 +5,7 @@ const PROD = 'https://gvsdevsvzgcivpphcuai.supabase.co'
 const b = await chromium.launch()
 const ctx = await b.newContext({
   viewport: isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
-  deviceScaleFactor: 2, isMobile, hasTouch: isMobile,
+  deviceScaleFactor: Number(process.env.DPR || 2), isMobile, hasTouch: isMobile, ignoreHTTPSErrors: true,
 })
 await ctx.route('**/storage/v1/object/public/**', async (route) => {
   const path = new globalThis.URL(route.request().url()).pathname

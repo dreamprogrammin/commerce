@@ -23,7 +23,7 @@ const targets = process.argv.slice(3).map((a) => {
 const browser = await chromium.launch()
 
 async function once(url) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, ignoreHTTPSErrors: true })
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: Number(process.env.DPR || 3), ignoreHTTPSErrors: true })
   const page = await ctx.newPage()
   const cdp = await ctx.newCDPSession(page)
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 })
