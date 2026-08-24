@@ -203,14 +203,20 @@ const chipItems = computed(() => {
   ]
 })
 
-// --- Progressive Loading ---
-const shouldRenderSecondaryBlocks = ref(false)
+/*
+ * --- Progressive Loading ---
+ *
+ * `shouldRenderSecondaryBlocks` (поднимался по requestIdleCallback) убран:
+ * его ждали «Популярные категории» и «Популярные бренды», а обе секции теперь
+ * приезжают из SSR и прятать их не от чего.
+ *
+ * `shouldRenderLowerBlocks` пока остаётся — за ним «Акции и бонусы» и главная
+ * лента. Это setTimeout, а не состояние загрузки, и он же задерживает запросы
+ * тех блоков, которые грузятся из onMounted.
+ */
 const shouldRenderLowerBlocks = ref(false)
 
 onMounted(() => {
-  requestIdleCallback(() => {
-    shouldRenderSecondaryBlocks.value = true
-  })
   setTimeout(() => {
     shouldRenderLowerBlocks.value = true
   }, 1000)
@@ -527,16 +533,18 @@ useIndexableRobotsRule({ index: true, follow: true })
         </template>
       </ClientOnly>
 
-      <!-- Популярные категории -->
+      <!-- Популярные категории.
+           Без гейта: данные (menuTree) уже приезжают в SSR-payload, а выбор
+           раскладки переехал с useIsMobile на медиазапрос — рисовать можно
+           прямо на сервере. LQIP-подложки плиток по-прежнему догружаются
+           на клиенте, они необязательные. -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <HomePopularCategories v-if="shouldRenderSecondaryBlocks" />
+        <HomePopularCategories />
       </div>
 
-      <!-- Популярные бренды -->
+      <!-- Популярные бренды: данные берутся на сервере, гейт не нужен -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <ClientOnly>
-          <HomeBrandsRail v-if="shouldRenderSecondaryBlocks" />
-        </ClientOnly>
+        <HomeBrandsRail />
       </div>
 
       <!-- Акции и бонусы -->
@@ -564,11 +572,12 @@ useIndexableRobotsRule({ index: true, follow: true })
         </ClientOnly>
       </div>
 
-      <!-- Хиты продаж -->
+      <!-- Хиты продаж.
+           Ни ClientOnly, ни таймера: первая страница товаров приезжает из SSR
+           (почему — в комментарии внутри BestsellersGrid.vue). Прятать нечего,
+           а скелетон здесь только удлинял путь до контента. -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <ClientOnly>
-          <HomeBestsellersGrid v-if="shouldRenderLowerBlocks" />
-        </ClientOnly>
+        <HomeBestsellersGrid />
       </div>
 
       <!-- SEO-блок (сохранён).
