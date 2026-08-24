@@ -131,32 +131,49 @@ const showRecommendationsSkeleton = computed(
         && mainPersonalData.value.wishlist.length === 0)),
 )
 
-// TanStack Query — популярные товары (fallback ленты для гостей)
-const popularQuery = useQuery<ProductWithGallery[]>({
-  queryKey: ['home-popular'],
-  queryFn: () => productsStore.fetchPopularProducts(10),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 15 * 60 * 1000,
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
+/*
+ * Лента для гостя — НОВИНКИ, и берётся она на сервере.
+ *
+ * Было: fallback ленты показывал популярные товары тем же самым запросом
+ * (categorySlug 'all', sortBy 'popularity'), что и «Хиты продаж» ниже по
+ * странице. Хиты — первые 8 той же выдачи, то есть строгое подмножество
+ * ленты. Проверено на uhti.kz 24 августа: 8 совпадений из 8. Гость
+ * пролистывал десять игрушек в ленте и ниже видел восемь тех же самых.
+ *
+ * Теперь секции разведены по смыслу: вверху «что нового», ниже «что берут».
+ * Побочно это и разблокировало SSR ленты: дублировать в разметке 70 КБ
+ * почти одинаковых карточек смысла не было.
+ */
+const GUEST_FEED_SIZE = 10
+
+const { data: guestFeedProducts } = await useAsyncData(
+  'home-guest-feed',
+  async () => {
+    const { products } = await productsStore.fetchProducts(
+      { categorySlug: 'all', sortBy: 'newest' },
+      1,
+      GUEST_FEED_SIZE,
+    )
+    return products
+  },
+  { default: () => [] as ProductWithGallery[] },
+)
+
+/*
+ * Персональные рекомендации подменяют серверную ленту только ПОСЛЕ
+ * монтирования.
+ *
+ * Без этого флага клиент на гидрации мог бы нарисовать не то, что уехало с
+ * сервера: ответ рекомендаций иногда успевает попасть в дегидрированный
+ * payload TanStack Query до его сериализации — та же гонка, что описана выше
+ * про слайды.
+ */
+const hasMounted = ref(false)
+onMounted(() => {
+  hasMounted.value = true
 })
 
-const popularProductsData = popularQuery.data
-const isFetchingPopular = popularQuery.isFetching
-
-const popularProducts = computed<ProductWithGallery[]>(
-  () => popularProductsData.value || [],
-)
-
-const showPopularSkeleton = computed(
-  () =>
-    (popularQuery.isLoading.value || popularQuery.isFetching.value)
-    && !popularProductsData.value,
-)
-
-const isLoadingMainBlock = computed(
-  () => showRecommendationsSkeleton.value || showPopularSkeleton.value,
-)
+const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value)
 
 // Скелетон главной ленты держится, пока карусель не смонтируется по-настоящему.
 // Сами карусели ленивые: между снятием скелетона и появлением их разметки
@@ -170,13 +187,12 @@ const showWishlistCarousel = computed(
   () => isLoggedIn.value && wishlistProducts.value.length > 0,
 )
 const showRecommendedCarousel = computed(
-  () => recommendedProducts.value && recommendedProducts.value.length > 0,
+  () => hasMounted.value && recommendedProducts.value.length > 0,
 )
-const showPopularFallbackCarousel = computed(
-  () =>
-    !showRecommendedCarousel.value
-    && popularProducts.value
-    && popularProducts.value.length > 0,
+
+/** Серверная лента новинок. Уступает место персональным рекомендациям. */
+const showGuestFeedCarousel = computed(
+  () => !showRecommendedCarousel.value && guestFeedProducts.value.length > 0,
 )
 
 /** Есть ли вообще что показывать в главной ленте. */
@@ -184,7 +200,7 @@ const hasMainCarousel = computed(
   () =>
     showWishlistCarousel.value
     || showRecommendedCarousel.value
-    || showPopularFallbackCarousel.value,
+    || showGuestFeedCarousel.value,
 )
 
 // --- Быстрые чипы: статические ссылки + корневые категории из menuTree ---
@@ -235,7 +251,8 @@ const chipItems = computed(() => {
  */
 const showMainCarouselSkeleton = computed(
   () =>
-    !isMainCarouselMounted.value
+    !showGuestFeedCarousel.value
+    && !isMainCarouselMounted.value
     && (isLoadingMainBlock.value || hasMainCarousel.value),
 )
 
@@ -491,6 +508,17 @@ useIndexableRobotsRule({ index: true, follow: true })
            лента — контейнер 'desktop' + отступ внутри ленты), поэтому внешнего
            контейнера здесь быть НЕ должно: он давал двойной padding.
            ProductCarouselSectionSkeleton повторяет их отступы 1-в-1. -->
+      <!-- Серверная лента новинок. Вне ClientOnly: она есть в разметке сразу,
+           без ожидания гидрации и запроса. Уступает место персональным
+           рекомендациям, когда те приезжают (только после монтирования). -->
+      <HomeProductsCarousel
+        v-if="showGuestFeedCarousel"
+        :products="guestFeedProducts"
+        :is-loading="false"
+        title="Подобрали для вас"
+        see-all-link="/catalog/all?sort_by=newest"
+      />
+
       <ClientOnly>
         <!-- Скелетон снимается не по таймеру, а по факту монтирования карусели.
              Когда-то его убирал флаг `shouldRenderLowerBlocks` (уже удалён)
@@ -519,17 +547,11 @@ useIndexableRobotsRule({ index: true, follow: true })
             see-all-link="/catalog/all?recommended=true"
             @vue:mounted="onMainCarouselMounted"
           />
-          <LazyProductsCarousel
-            v-else-if="showPopularFallbackCarousel"
-            :is-loading="isFetchingPopular"
-            :products="popularProducts"
-            title="Подобрали для вас"
-            see-all-link="/catalog/all?sort_by=popularity"
-            @vue:mounted="onMainCarouselMounted"
-          />
         </template>
         <template #fallback>
-          <ProductCarouselSectionSkeleton />
+          <!-- Скелетон нужен только если серверной ленты нет: иначе он встанет
+               прямо под ней вторым блоком. -->
+          <ProductCarouselSectionSkeleton v-if="!showGuestFeedCarousel" />
         </template>
       </ClientOnly>
 
