@@ -98,10 +98,37 @@ function tintFor(index: number): string {
     ?? CATEGORY_TILE_TINT_FALLBACK
 }
 
+/*
+ * Плитке нужен `sm`, а не `md`, и обязательно `srcset` с `sizes`.
+ *
+ * Было: `md` без srcset и без sizes. То есть на плитку шириной 150 CSS-пикселей
+ * уезжала картинка на 800 пикселей. Замер 24 августа на главной (390px,
+ * CPU ×4, Slow 4G): шесть таких плиток — 319 КБ, 43% всего, что скачивается
+ * до DOMContentLoaded. Раньше это было незаметно, потому что секция
+ * рисовалась на клиенте и в критический путь не попадала.
+ *
+ * Идиома взята из CatalogMobileSections: `src` = sm, `srcset` = sm 400w +
+ * md 800w, `sizes` — по фактической ширине КАРТИНКИ, а не плитки. Разница
+ * решающая: при layout="corner" картинка занимает 132px в плитке 150px, и
+ * на экране с DPR 3 это 396px против порога варианта sm в 400px. Объяви
+ * здесь 150px — и браузер возьмёт md на 800px, то есть впятеро тяжелее.
+ * Замерено в браузере: 132×111 в плитке 150×150 на 390px; на 1440px
+ * 278×315 в большой плитке и 147×144 в малой.
+ */
 function imageOf(item: CategoryMenuItem): string | null {
   if (!item.image_url)
     return null
-  return getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'md') || null
+  return getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'sm') || null
+}
+
+function srcsetOf(item: CategoryMenuItem): string | undefined {
+  if (!item.image_url)
+    return undefined
+  const sm = getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'sm')
+  const md = getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'md')
+  if (!sm || !md || sm === md)
+    return undefined
+  return `${sm} 400w, ${md} 800w`
 }
 
 function hrefOf(item: CategoryMenuItem): string {
@@ -123,6 +150,7 @@ interface Tile {
   name: string
   href: string
   image: string | null
+  srcset?: string
   blur: string | null
   tint: string
   countLabel?: string
@@ -135,6 +163,7 @@ function toTile(item: CategoryMenuItem, tintIndex: number, withCount = false): T
     name: item.name,
     href: hrefOf(item),
     image: imageOf(item),
+    srcset: srcsetOf(item),
     blur: item.blur_placeholder,
     tint: tintFor(tintIndex),
     countLabel: withCount
@@ -228,6 +257,8 @@ const seeAllHref = '/catalog/all'
           :name="tile.name"
           :href="tile.href"
           :src="tile.image"
+          :srcset="tile.srcset"
+          sizes="(min-width: 1280px) 280px, 22vw"
           :tint="tile.tint"
           :meta="tile.countLabel"
           layout="corner"
@@ -242,6 +273,8 @@ const seeAllHref = '/catalog/all'
             :name="tile.name"
             :href="tile.href"
             :src="tile.image"
+            :srcset="tile.srcset"
+            sizes="(min-width: 1280px) 150px, 14vw"
             :tint="tile.tint"
             layout="corner"
             size="md"
@@ -260,6 +293,8 @@ const seeAllHref = '/catalog/all'
             :name="tile.name"
             :href="tile.href"
             :src="tile.image"
+            :srcset="tile.srcset"
+            sizes="(max-width: 767px) 132px, 190px"
             :tint="tile.tint"
             layout="corner"
             size="md"
