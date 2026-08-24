@@ -2,7 +2,6 @@
 import type { CategoryMenuItem } from '@/types'
 import CategoryTile from '@/components/category/CategoryTile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import {
   CATEGORY_TILE_TINT_FALLBACK,
@@ -41,10 +40,21 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
  */
 const categoriesStore = useCategoriesStore()
 const { getVariantUrl } = useSupabaseStorage()
-// Прототип разводит раскладки по 768 (`mob = vw < 768`), а не по 1024:
-// с 768 и выше показывается бенто, ниже — двухрядный рельс. Та же граница
-// продублирована в медиазапросе в конце файла — их нельзя разводить.
-const isMobile = useIsMobile(767)
+/*
+ * Раскладки разведены по 768 (в прототипе `mob = vw < 768`), а не по 1024:
+ * с 768 и выше бенто, ниже — двухрядный рельс. Граница живёт ТОЛЬКО в
+ * медиазапросах в конце файла.
+ *
+ * Раньше её знал ещё и JS: `useIsMobile(767)`. На сервере он всегда false,
+ * то есть SSR нарисовал бы десктопное бенто, а мобильный клиент после
+ * гидрации перекинул бы на рельс — расхождение и сдвиг. Из-за этого секцию
+ * и держали за `requestIdleCallback` в index.vue, и в серверную разметку она
+ * не попадала вовсе (замер прода 24 августа: появлялась на 4641 мс).
+ *
+ * На табе «Всё» обе раскладки показывают одни и те же 10 плиток
+ * (`focusTiles` = bentoBig + bentoSmall), поэтому их можно держать в разметке
+ * разом и прятать медиазапросом. JS о ширине окна больше не знает.
+ */
 
 // menuTree наполняется на SSR через useAsyncData('home-ssr-critical') в index.vue;
 // подстраховка на клиенте, если стор пуст.
@@ -82,7 +92,6 @@ const tabs = computed(() => {
 })
 
 const isAllTab = computed(() => activeTab.value === 'all')
-const showBento = computed(() => isAllTab.value && !isMobile.value)
 
 function tintFor(index: number): string {
   return CATEGORY_TILE_TINTS[index % CATEGORY_TILE_TINTS.length]
@@ -211,8 +220,8 @@ const seeAllHref = '/catalog/all'
         </button>
       </div>
 
-      <!-- BENTO (десктоп, таб «Всё») -->
-      <div v-if="showBento" class="cats-bento">
+      <!-- BENTO (таб «Всё»); ниже 768px скрыт медиазапросом -->
+      <div v-if="isAllTab" class="cats-bento">
         <CategoryTile
           v-for="tile in bentoBig"
           :key="tile.id"
@@ -241,8 +250,9 @@ const seeAllHref = '/catalog/all'
         </div>
       </div>
 
-      <!-- FOCUS GRID (мобилка / конкретный таб) -->
-      <div v-else class="cats-focus-scroll">
+      <!-- FOCUS GRID (мобилка / конкретный таб).
+           На табе «Всё» дублирует плитки бенто и скрывается с 768px. -->
+      <div class="cats-focus-scroll" :class="{ 'cats-focus-scroll--all': isAllTab }">
         <div class="cats-focus-grid">
           <CategoryTile
             v-for="tile in focusTiles"
@@ -329,6 +339,20 @@ const seeAllHref = '/catalog/all'
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 2.7fr);
     gap: 14px;
     height: 404px;
+  }
+
+  /* Переключение раскладок. Обе лежат в разметке, видна ровно одна.
+     Граница 768 — та же, что у рельса ниже; разводить их нельзя. */
+  @media (max-width: 767px) {
+    .cats-bento {
+      display: none;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .cats-focus-scroll--all {
+      display: none;
+    }
   }
 
   .cats-bento__small {

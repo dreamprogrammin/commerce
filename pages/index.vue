@@ -527,9 +527,13 @@ useIndexableRobotsRule({ index: true, follow: true })
         </template>
       </ClientOnly>
 
-      <!-- Популярные категории -->
+      <!-- Популярные категории.
+           Без гейта: данные (menuTree) уже приезжают в SSR-payload, а выбор
+           раскладки переехал с useIsMobile на медиазапрос — рисовать можно
+           прямо на сервере. LQIP-подложки плиток по-прежнему догружаются
+           на клиенте, они необязательные. -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <HomePopularCategories v-if="shouldRenderSecondaryBlocks" />
+        <HomePopularCategories />
       </div>
 
       <!-- Популярные бренды -->
