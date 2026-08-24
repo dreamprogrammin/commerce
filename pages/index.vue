@@ -203,14 +203,20 @@ const chipItems = computed(() => {
   ]
 })
 
-// --- Progressive Loading ---
-const shouldRenderSecondaryBlocks = ref(false)
+/*
+ * --- Progressive Loading ---
+ *
+ * `shouldRenderSecondaryBlocks` (поднимался по requestIdleCallback) убран:
+ * его ждали «Популярные категории» и «Популярные бренды», а обе секции теперь
+ * приезжают из SSR и прятать их не от чего.
+ *
+ * `shouldRenderLowerBlocks` пока остаётся — за ним «Акции и бонусы» и главная
+ * лента. Это setTimeout, а не состояние загрузки, и он же задерживает запросы
+ * тех блоков, которые грузятся из onMounted.
+ */
 const shouldRenderLowerBlocks = ref(false)
 
 onMounted(() => {
-  requestIdleCallback(() => {
-    shouldRenderSecondaryBlocks.value = true
-  })
   setTimeout(() => {
     shouldRenderLowerBlocks.value = true
   }, 1000)
@@ -536,11 +542,9 @@ useIndexableRobotsRule({ index: true, follow: true })
         <HomePopularCategories />
       </div>
 
-      <!-- Популярные бренды -->
+      <!-- Популярные бренды: данные берутся на сервере, гейт не нужен -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <ClientOnly>
-          <HomeBrandsRail v-if="shouldRenderSecondaryBlocks" />
-        </ClientOnly>
+        <HomeBrandsRail />
       </div>
 
       <!-- Акции и бонусы -->

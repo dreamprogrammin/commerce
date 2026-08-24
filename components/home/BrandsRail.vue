@@ -28,7 +28,21 @@ const { data: brands } = await useAsyncData(
     }
     return data ?? []
   },
-  { server: false, lazy: true, default: () => [] },
+  /*
+   * Грузим на СЕРВЕРЕ и без `lazy`.
+   *
+   * Было `{ server: false, lazy: true }`: запрос уходил только с клиента, да
+   * ещё и из-под `ClientOnly` + `requestIdleCallback` в index.vue. Замер
+   * прода 24 августа (390px, CPU ×4, Slow 4G): запрос за брендами уходил на
+   * 4885 мс.
+   *
+   * `lazy` здесь нельзя вернуть даже вместе с `server: true`: он не даёт
+   * рендеру дождаться данных, разметка уедет пустой, а payload досериализуется
+   * уже с брендами — ровно та гонка, из-за которой на `/` ловили
+   * «Hydration completed but contains mismatches» на слайдах (см. комментарий
+   * в pages/index.vue).
+   */
+  { default: () => [] },
 )
 
 function logoOf(logoUrl: string | null): string | null {
