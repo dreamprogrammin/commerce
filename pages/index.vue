@@ -564,11 +564,12 @@ useIndexableRobotsRule({ index: true, follow: true })
         </ClientOnly>
       </div>
 
-      <!-- Хиты продаж -->
+      <!-- Хиты продаж.
+           Ни ClientOnly, ни таймера: первая страница товаров приезжает из SSR
+           (почему — в комментарии внутри BestsellersGrid.vue). Прятать нечего,
+           а скелетон здесь только удлинял путь до контента. -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <ClientOnly>
-          <HomeBestsellersGrid v-if="shouldRenderLowerBlocks" />
-        </ClientOnly>
+        <HomeBestsellersGrid />
       </div>
 
       <!-- SEO-блок (сохранён).

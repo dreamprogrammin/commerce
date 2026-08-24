@@ -15,9 +15,30 @@ const PAGE_SIZE = 8
 
 const productsStore = useProductsStore()
 
-const products = ref<ProductWithGallery[]>([])
-const page = ref(0)
-const hasMore = ref(true)
+/*
+ * Первая страница берётся на СЕРВЕРЕ, а не в onMounted.
+ *
+ * Раньше запрос уходил из onMounted, а сам компонент был спрятан за
+ * `shouldRenderLowerBlocks` в index.vue — то есть за `setTimeout(…, 1000)`.
+ * Замер прода 24 августа (390px, CPU ×4, Slow 4G): запрос за хитами уходил
+ * на 5746 мс, секция появлялась на 5595 мс, а первые 4.5 секунды к базе не
+ * уходило вообще ничего. Теперь товары приезжают в SSR-разметке.
+ *
+ * Догрузка по кнопке осталась клиентской — это уже действие пользователя.
+ */
+const { data: firstPage } = await useAsyncData(
+  'home-bestsellers-first',
+  () =>
+    productsStore.fetchProducts(
+      { categorySlug: 'all', sortBy: 'popularity' },
+      1,
+      PAGE_SIZE,
+    ),
+)
+
+const products = ref<ProductWithGallery[]>([...(firstPage.value?.products ?? [])])
+const page = ref(firstPage.value ? 1 : 0)
+const hasMore = ref(firstPage.value?.hasMore ?? true)
 const isLoading = ref(false)
 
 async function loadMore() {
@@ -49,7 +70,11 @@ const countLabel = computed(() =>
   products.value.length ? `${products.value.length}+ товаров` : '',
 )
 
-onMounted(loadMore)
+// Подстраховка: если серверный запрос не удался, добираем на клиенте.
+onMounted(() => {
+  if (!products.value.length)
+    void loadMore()
+})
 </script>
 
 <template>
