@@ -206,21 +206,22 @@ const chipItems = computed(() => {
 /*
  * --- Progressive Loading ---
  *
- * `shouldRenderSecondaryBlocks` (поднимался по requestIdleCallback) убран:
- * его ждали «Популярные категории» и «Популярные бренды», а обе секции теперь
- * приезжают из SSR и прятать их не от чего.
+ * Убран целиком.
  *
- * `shouldRenderLowerBlocks` пока остаётся — за ним «Акции и бонусы» и главная
- * лента. Это setTimeout, а не состояние загрузки, и он же задерживает запросы
- * тех блоков, которые грузятся из onMounted.
+ * Было два флага-таймера. `shouldRenderSecondaryBlocks` (по
+ * requestIdleCallback) ушёл вместе с переездом «Популярных категорий» и
+ * «Популярных брендов» в SSR. Теперь уходит и `shouldRenderLowerBlocks` —
+ * `setTimeout(…, 1000)`, за которым стояли «Акции и бонусы» и главная лента.
+ *
+ * Это был таймер, а не состояние загрузки, и держал он не только отрисовку:
+ * DealOfTheDayCard, PromoBenefitTiles и LoyaltyBanner грузят данные из
+ * onMounted, то есть их запросы не могли уйти раньше, чем через секунду после
+ * гидрации. Замер прода 24 августа (390px, CPU ×4, Slow 4G): вторая волна
+ * запросов уходила на 5618–5768 мс, ровно на секунду позже первой.
+ *
+ * Высоту ленты по-прежнему держит скелетон ниже — он снимается по факту
+ * монтирования карусели, а не по таймеру.
  */
-const shouldRenderLowerBlocks = ref(false)
-
-onMounted(() => {
-  setTimeout(() => {
-    shouldRenderLowerBlocks.value = true
-  }, 1000)
-})
 
 /**
  * Скелетон главной ленты. Снимается ровно в двух случаях:
@@ -228,15 +229,14 @@ onMounted(() => {
  *  • данные догрузились и показывать нечего — тогда блока и не должно быть.
  * Во всех остальных состояниях он держит высоту, чтобы не двигать соседей.
  *
- * Объявлено здесь, а не рядом с остальными флагами, потому что зависит от
- * shouldRenderLowerBlocks выше.
+ * Третьим условием тут был `!shouldRenderLowerBlocks` — «первую секунду
+ * показывать скелетон всегда». Флаг убран, а с ним и это условие: оно ничего
+ * не добавляло к двум случаям выше, только удлиняло путь до контента.
  */
 const showMainCarouselSkeleton = computed(
   () =>
     !isMainCarouselMounted.value
-    && (isLoadingMainBlock.value
-      || !shouldRenderLowerBlocks.value
-      || hasMainCarousel.value),
+    && (isLoadingMainBlock.value || hasMainCarousel.value),
 )
 
 // --- «Перейти к покупкам» → скролл к ленте товаров ---
@@ -493,8 +493,8 @@ useIndexableRobotsRule({ index: true, follow: true })
            ProductCarouselSectionSkeleton повторяет их отступы 1-в-1. -->
       <ClientOnly>
         <!-- Скелетон снимается не по таймеру, а по факту монтирования карусели.
-             Раньше его убирал `!shouldRenderLowerBlocks` — а это setTimeout на
-             1000 мс, не состояние загрузки. Компоненты ниже ленивые, и в момент
+             Когда-то его убирал флаг `shouldRenderLowerBlocks` (уже удалён)
+             — а это был setTimeout на 1000 мс, не состояние загрузки. Компоненты ниже ленивые, и в момент
              снятия скелетона их чанк ещё грузился: блок схлопывался и через
              ~800 мс разворачивался обратно. Замер на превью (390px, Slow 4G,
              CPU ×4) показывал ровно это: заголовок «Популярные категории»
@@ -502,7 +502,7 @@ useIndexableRobotsRule({ index: true, follow: true })
              и составляли почти весь CLS главной — 0.244 при пороге 0.1. -->
         <ProductCarouselSectionSkeleton v-if="showMainCarouselSkeleton" />
 
-        <template v-if="shouldRenderLowerBlocks && !isLoadingMainBlock">
+        <template v-if="!isLoadingMainBlock">
           <LazyProductsCarousel
             v-if="showWishlistCarousel"
             :is-loading="isFetchingRecommendations"
@@ -559,7 +559,7 @@ useIndexableRobotsRule({ index: true, follow: true })
           </span>
         </div>
         <ClientOnly>
-          <template v-if="shouldRenderLowerBlocks">
+          <template #default>
             <HomeLoyaltyBanner class="mb-4" />
             <div class="home-promo-grid">
               <HomeDealOfTheDayCard />
