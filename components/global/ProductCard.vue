@@ -411,8 +411,46 @@ async function onWish() {
             <StockAlertButton :product-id="product.id" size="sm" />
           </template>
 
+          <!-- Серверная разметка (и первый кадр до гидрации).
+               Здесь был пульсирующий прямоугольник — из-за него цена товара
+               не попадала в SSR-HTML вообще: весь блок покупки, вместе с
+               ценой, лежит под ClientOnly ради quantityInCart из корзины.
+               Замер 24 августа: в серверной разметке главной 8 товаров и ноль
+               знаков ₸; на бренд-страницах, которым 22 августа включили SSR
+               товаров, — та же дыра.
+
+               Цена и наличие считаются из props и на сервере известны, так
+               что заглушка повторяет строку с ценой один в один. Отличие
+               одно: вместо <button> здесь <span> — до гидрации нажимать
+               нечего, и фокусируемой кнопки-пустышки быть не должно.
+               Высота та же, 52px, поэтому сдвига при подмене нет. -->
           <template #fallback>
-            <div class="h-[52px] animate-pulse rounded-full bg-muted" />
+            <div
+              v-if="inStock"
+              class="flex h-[52px] items-center justify-between gap-2 rounded-full bg-muted pl-4 pr-[5px]"
+            >
+              <span class="flex flex-col justify-center leading-tight">
+                <span
+                  v-if="priceDetails.hasDiscount"
+                  class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
+                >
+                  {{ formatPrice(priceDetails.originalPrice) }} ₸
+                </span>
+                <span
+                  class="whitespace-nowrap text-[17px] font-extrabold"
+                  :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
+                >
+                  {{ formatPrice(priceDetails.finalPrice) }} ₸
+                </span>
+              </span>
+              <span
+                class="pc-add grid size-11 shrink-0 place-content-center rounded-full"
+                aria-hidden="true"
+              >
+                <Icon name="lucide:plus" class="size-[26px]" />
+              </span>
+            </div>
+            <div v-else class="h-[52px] animate-pulse rounded-full bg-muted" />
           </template>
         </ClientOnly>
       </div>
