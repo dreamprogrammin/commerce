@@ -128,8 +128,8 @@ onUnmounted(() => {
         <b class="deal__name">{{ product.name }}</b>
         <div class="deal__buy" @click.prevent>
           <span class="deal__price">
-            <span v-if="priceOld" class="deal__price-old">{{ fmt(priceOld) }} ₸</span>
-            <span class="deal__price-now">{{ fmt(priceNow) }} ₸</span>
+            <span v-if="priceOld" class="deal__price-old">{{ fmt(priceOld) }}&nbsp;₸</span>
+            <span class="deal__price-now">{{ fmt(priceNow) }}&nbsp;₸</span>
           </span>
           <ClientOnly>
             <QuantitySelector

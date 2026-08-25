@@ -177,7 +177,7 @@ onMounted(loadBonusHistory)
           <span
             class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-[13px] py-[7px] text-[13px] font-bold text-white backdrop-blur-[6px]"
           >
-            1 бонус = 1 ₸ · кешбэк до 10%
+            1 бонус = 1&nbsp;₸ · кешбэк до 10%
           </span>
         </div>
       </div>

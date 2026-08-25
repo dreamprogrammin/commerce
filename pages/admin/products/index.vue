@@ -185,7 +185,7 @@ function formatPrice(value: number): string {
                 <TableCell class="text-muted-foreground">
                   {{ product.categories?.name || 'Без категории' }}
                 </TableCell>
-                <TableCell>{{ formatPrice(product.price) }} ₸</TableCell>
+                <TableCell>{{ formatPrice(product.price) }}&nbsp;₸</TableCell>
                 <TableCell>
                   <Badge :variant="product.stock_quantity <= 2 ? 'destructive' : 'secondary'">
                     {{ product.stock_quantity }} шт
@@ -255,7 +255,7 @@ function formatPrice(value: number): string {
                 </p>
                 <div class="flex items-center gap-3 mt-2">
                   <span class="text-sm font-semibold">
-                    {{ formatPrice(product.price) }} ₸
+                    {{ formatPrice(product.price) }}&nbsp;₸
                   </span>
                   <Badge :variant="product.stock_quantity <= 2 ? 'destructive' : 'secondary'" class="text-[10px]">
                     {{ product.stock_quantity }} шт

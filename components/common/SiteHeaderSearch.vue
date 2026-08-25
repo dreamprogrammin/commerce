@@ -323,13 +323,13 @@ function formatPrice(price: number, discount?: number) {
                     class="text-sm font-bold"
                     :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-destructive' : 'text-foreground'"
                   >
-                    {{ formatPrice(product.price, product.discount_percentage).final }} ₸
+                    {{ formatPrice(product.price, product.discount_percentage).final }}&nbsp;₸
                   </span>
                   <span
                     v-if="formatPrice(product.price, product.discount_percentage).hasDiscount"
                     class="text-xs text-muted-foreground line-through"
                   >
-                    {{ formatPrice(product.price, product.discount_percentage).original }} ₸
+                    {{ formatPrice(product.price, product.discount_percentage).original }}&nbsp;₸
                   </span>
                 </div>
               </div>

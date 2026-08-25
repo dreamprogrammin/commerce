@@ -484,7 +484,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               </p>
               <p v-else class="text-[13px] text-muted-foreground">
                 До бесплатной доставки
-                <b class="font-bold text-primary">{{ formatPrice(remainingForFreeShipping) }} ₸</b>
+                <b class="font-bold text-primary">{{ formatPrice(remainingForFreeShipping) }}&nbsp;₸</b>
               </p>
               <Progress :model-value="shippingProgress" class="mt-2 h-1.5" />
             </div>
@@ -572,13 +572,13 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                       v-if="isDiscounted(item.product)"
                       class="whitespace-nowrap text-[13px] font-medium text-price-old line-through"
                     >
-                      {{ formatPrice(item.product.price * item.quantity) }} ₸
+                      {{ formatPrice(item.product.price * item.quantity) }}&nbsp;₸
                     </span>
                     <b
                       class="whitespace-nowrap text-[17px] font-extrabold"
                       :class="isDiscounted(item.product) ? 'text-discount' : 'text-foreground'"
                     >
-                      {{ formatPrice(lineTotal(item)) }} ₸
+                      {{ formatPrice(lineTotal(item)) }}&nbsp;₸
                     </b>
                   </span>
 
@@ -678,7 +678,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <div class="flex flex-col gap-[11px] text-sm font-medium">
             <div class="flex items-center justify-between">
               <span class="text-muted-foreground">Товары, {{ totalItems }} шт</span>
-              <span>{{ formatPrice(subtotal) }} ₸</span>
+              <span>{{ formatPrice(subtotal) }}&nbsp;₸</span>
             </div>
 
             <div
@@ -687,7 +687,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               class="flex items-center justify-between gap-2 text-primary"
             >
               <span class="line-clamp-1">{{ acc.name }}</span>
-              <span class="shrink-0">+{{ formatPrice(acc.final_price || acc.price) }} ₸</span>
+              <span class="shrink-0">+{{ formatPrice(acc.final_price || acc.price) }}&nbsp;₸</span>
             </div>
 
             <div class="flex items-center justify-between">
@@ -699,7 +699,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 v-if="isFreeShipping"
                 class="font-semibold text-success"
               >Бесплатно</span>
-              <span v-else>{{ formatPrice(deliveryCost) }} ₸</span>
+              <span v-else>{{ formatPrice(deliveryCost) }}&nbsp;₸</span>
             </div>
           </div>
 

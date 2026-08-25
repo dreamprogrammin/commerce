@@ -109,7 +109,7 @@ function cleanDescription(html: string | null): string {
 
             <div class="mt-auto space-y-2">
               <p class="text-lg font-bold" :class="isSelected(accessory.id) ? 'text-primary' : ''">
-                + {{ formatPrice(accessory.price) }} ₸
+                + {{ formatPrice(accessory.price) }}&nbsp;₸
               </p>
 
               <!-- Bonus points -->

@@ -110,7 +110,7 @@ const { state } = props
                       От
                     </div>
                     <div class="font-semibold text-xs">
-                      {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[0])) }} ₸
+                      {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[0])) }}&nbsp;₸
                     </div>
                   </div>
                   <span class="text-muted-foreground text-xs">—</span>
@@ -119,7 +119,7 @@ const { state } = props
                       До
                     </div>
                     <div class="font-semibold text-xs">
-                      {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[1])) }} ₸
+                      {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[1])) }}&nbsp;₸
                     </div>
                   </div>
                 </div>

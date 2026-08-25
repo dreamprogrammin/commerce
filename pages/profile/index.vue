@@ -352,7 +352,7 @@ useHead({
               {{ getStatusLabel(order.status) }}
             </span>
             <span class="text-[15px] font-extrabold whitespace-nowrap">
-              {{ formatPrice(order.final_amount) }} ₸
+              {{ formatPrice(order.final_amount) }}&nbsp;₸
             </span>
           </span>
         </NuxtLink>
@@ -464,7 +464,7 @@ useHead({
             class="text-[15px] font-extrabold whitespace-nowrap"
             :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'"
           >
-            {{ tx.amount > 0 ? '+' : '−' }}{{ formatPrice(Math.abs(tx.amount)) }} ₸
+            {{ tx.amount > 0 ? '+' : '−' }}{{ formatPrice(Math.abs(tx.amount)) }}&nbsp;₸
           </span>
         </div>
       </div>

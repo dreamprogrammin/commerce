@@ -435,7 +435,7 @@ useHead({
               class="flex justify-between items-center text-lg font-semibold"
             >
               <span>Итого:</span>
-              <span>{{ order.final_amount.toLocaleString("ru-RU") }} ₸</span>
+              <span>{{ order.final_amount.toLocaleString("ru-RU") }}&nbsp;₸</span>
             </div>
 
             <!-- Бонусы -->

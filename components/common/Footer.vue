@@ -92,7 +92,7 @@ const { data: popularProducts } = useAsyncData('footer-popular-products', async 
               >
                 <span class="truncate">{{ product.name }}</span>
                 <span class="text-xs whitespace-nowrap font-medium">
-                  {{ formatPrice(product.final_price || product.price) }} ₸
+                  {{ formatPrice(product.final_price || product.price) }}&nbsp;₸
                 </span>
               </NuxtLink>
             </li>

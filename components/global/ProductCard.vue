@@ -387,13 +387,13 @@ async function onWish() {
                   v-if="priceDetails.hasDiscount"
                   class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
                 >
-                  {{ formatPrice(priceDetails.originalPrice) }} ₸
+                  {{ formatPrice(priceDetails.originalPrice) }}&nbsp;₸
                 </span>
                 <span
                   class="whitespace-nowrap text-[17px] font-extrabold"
                   :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
                 >
-                  {{ formatPrice(priceDetails.finalPrice) }} ₸
+                  {{ formatPrice(priceDetails.finalPrice) }}&nbsp;₸
                 </span>
               </span>
               <button
@@ -434,13 +434,13 @@ async function onWish() {
                   v-if="priceDetails.hasDiscount"
                   class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
                 >
-                  {{ formatPrice(priceDetails.originalPrice) }} ₸
+                  {{ formatPrice(priceDetails.originalPrice) }}&nbsp;₸
                 </span>
                 <span
                   class="whitespace-nowrap text-[17px] font-extrabold"
                   :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
                 >
-                  {{ formatPrice(priceDetails.finalPrice) }} ₸
+                  {{ formatPrice(priceDetails.finalPrice) }}&nbsp;₸
                 </span>
               </span>
               <span
