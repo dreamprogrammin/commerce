@@ -303,7 +303,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
                 <!-- Стоимость -->
                 <div class="flex items-center gap-1.5">
                   <Icon name="lucide:wallet" class="w-3.5 h-3.5" />
-                  <span class="font-semibold text-gray-900">{{ totalAmount }} ₸</span>
+                  <span class="font-semibold text-gray-900">{{ totalAmount }}&nbsp;₸</span>
                 </div>
 
                 <!-- Количество товаров -->

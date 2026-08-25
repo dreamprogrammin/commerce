@@ -402,7 +402,7 @@ function formatDate(dateStr: string) {
                     {{ product.name }}
                   </td>
                   <td class="p-3 text-right">
-                    {{ formatPrice(product.price) }} ₸
+                    {{ formatPrice(product.price) }}&nbsp;₸
                   </td>
                   <td class="p-3 text-right">
                     <span v-if="product.discount_percentage > 0" class="text-orange-600">
@@ -411,7 +411,7 @@ function formatDate(dateStr: string) {
                     <span v-else class="text-muted-foreground">—</span>
                   </td>
                   <td class="p-3 text-right font-semibold text-green-600">
-                    {{ formatPrice(previewPrice(product.price)) }} ₸
+                    {{ formatPrice(previewPrice(product.price)) }}&nbsp;₸
                     <span class="text-xs text-muted-foreground ml-1">(-{{ discountPercentage }}%)</span>
                   </td>
                 </tr>

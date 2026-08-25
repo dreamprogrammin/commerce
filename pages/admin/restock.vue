@@ -317,7 +317,7 @@ async function assignSupplier(productId: string, supplierId: string) {
                     </span>
                   </TableCell>
                   <TableCell class="text-right text-muted-foreground">
-                    {{ formatPrice(product.price) }} ₸
+                    {{ formatPrice(product.price) }}&nbsp;₸
                   </TableCell>
                   <TableCell v-if="!group.supplier_id">
                     <Select
@@ -373,7 +373,7 @@ async function assignSupplier(productId: string, supplierId: string) {
                     {{ product.name }}
                   </p>
                   <p class="text-xs text-muted-foreground">
-                    {{ formatPrice(product.price) }} ₸
+                    {{ formatPrice(product.price) }}&nbsp;₸
                   </p>
                 </div>
 

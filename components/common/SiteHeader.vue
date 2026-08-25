@@ -224,7 +224,7 @@ const wrapStyle = computed<CSSProperties>(() => {
                   <span class="sh-account__name">{{ fullName }}</span>
                   <span class="sh-account__bonus">
                     <Icon name="lucide:coins" class="size-3" />
-                    {{ formattedBonus }} ₸
+                    {{ formattedBonus }}&nbsp;₸
                   </span>
                 </span>
               </NuxtLink>

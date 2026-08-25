@@ -493,8 +493,8 @@ onUnmounted(() => {
             />
           </div>
           <div class="df-slider-values">
-            <span>{{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[0])) }} ₸</span>
-            <span>{{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[1])) }} ₸</span>
+            <span>{{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[0])) }}&nbsp;₸</span>
+            <span>{{ new Intl.NumberFormat('ru-RU').format(Math.round(localPrice[1])) }}&nbsp;₸</span>
           </div>
         </template>
       </div>

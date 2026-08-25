@@ -46,7 +46,7 @@ function handleClose() {
               1000 бонусов
             </p>
             <p class="text-sm text-muted-foreground">
-              после подтверждения первого заказа = 1000 ₸ скидки
+              после подтверждения первого заказа = 1000&nbsp;₸ скидки
             </p>
           </div>
         </div>
@@ -70,7 +70,7 @@ function handleClose() {
 
             <div class="flex items-start gap-2 text-xs text-muted-foreground">
               <span class="font-bold text-primary">3.</span>
-              <span>1 бонус = 1 ₸ скидки на следующие покупки</span>
+              <span>1 бонус = 1&nbsp;₸ скидки на следующие покупки</span>
             </div>
           </div>
 

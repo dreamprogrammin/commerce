@@ -106,7 +106,7 @@ function onLogin() {
           </div>
           <ClientOnly>
             <div v-if="isLoggedIn" class="loyalty__card-rate">
-              1 БОНУС = 1 ₸
+              1 БОНУС = 1&nbsp;₸
             </div>
             <div v-else class="loyalty__card-locked">
               <Icon name="lucide:lock" class="size-3" />

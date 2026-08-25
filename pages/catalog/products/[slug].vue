@@ -1230,7 +1230,7 @@ watchEffect(() => {
                        В барабанах лежат все цифры 0-9, поэтому для скринридеров
                        они скрыты, а цена дублируется обычным текстом. -->
                 <span class="pdp-price">
-                  <span class="sr-only">{{ formatPrice(totalPrice) }} ₸</span>
+                  <span class="sr-only">{{ formatPrice(totalPrice) }}&nbsp;₸</span>
                   <span class="pdp-price-reels" aria-hidden="true">
                     <template v-for="(item, index) in priceChars" :key="index">
                       <span v-if="item.char === ' '" class="pdp-digit-gap" />
@@ -1248,7 +1248,7 @@ watchEffect(() => {
                   </span>
                 </span>
                 <template v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected">
-                  <span class="pdp-price-old">{{ formatPrice(mainProductPrice.original) }} ₸</span>
+                  <span class="pdp-price-old">{{ formatPrice(mainProductPrice.original) }}&nbsp;₸</span>
                   <span class="pdp-discount">−{{ product.discount_percentage }}%</span>
                 </template>
               </div>
@@ -1653,11 +1653,11 @@ watchEffect(() => {
               v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected"
               class="whitespace-nowrap text-xs font-medium text-price-old line-through"
             >
-              {{ formatPrice(mainProductPrice.original) }} ₸
+              {{ formatPrice(mainProductPrice.original) }}&nbsp;₸
             </span>
             <span class="inline-flex items-center gap-1.5">
               <span class="whitespace-nowrap text-[19px] font-extrabold tracking-tight text-primary">
-                {{ formatPrice(totalPrice) }} ₸
+                {{ formatPrice(totalPrice) }}&nbsp;₸
               </span>
               <span
                 v-if="mainProductPrice.hasDiscount && !hasAccessoriesSelected"
