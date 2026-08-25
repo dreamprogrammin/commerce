@@ -59,7 +59,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
     const baseSeoName = generateSeoFileName(file, seoName).replace(/\.[^.]+$/, '')
 
     const uploadResults = await Promise.all(
-      (['sm', 'md', 'lg'] as const).map(variant =>
+      (['sm', 'card', 'md', 'lg'] as const).map(variant =>
         uploadFile(variants[variant], {
           bucketName: BUCKET_NAME_BRANDS,
           customFileName: `${baseSeoName}${IMAGE_VARIANTS[variant].suffix}.webp`,
