@@ -523,7 +523,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
 
             // Загружаем 3 файла параллельно
             const uploadResults = await Promise.all(
-              (['sm', 'md', 'lg'] as const).map(variant =>
+              (['sm', 'card', 'md', 'lg'] as const).map(variant =>
                 uploadFile(variants[variant], {
                   bucketName: BUCKET_NAME_PRODUCT,
                   filePathPrefix,

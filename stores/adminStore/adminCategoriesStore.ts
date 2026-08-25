@@ -276,7 +276,7 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
               const baseSeoName = generateSeoFileName(item._imageFile, seoName).replace(/\.[^.]+$/, '')
 
               const uploadResults = await Promise.all(
-                (['sm', 'md', 'lg'] as const).map(variant =>
+                (['sm', 'card', 'md', 'lg'] as const).map(variant =>
                   uploadFile(variants[variant], {
                     bucketName: 'category-images',
                     filePathPrefix,

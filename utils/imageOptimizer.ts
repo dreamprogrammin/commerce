@@ -43,21 +43,37 @@ export interface VariantResult {
 }
 
 /**
+ * Стандартные варианты товаров: к трём ступеням добавлена `card` на 480px.
+ * У широких изображений (баннеры, слайды) её нет — там своя лестница.
+ */
+export interface StandardVariantResult extends VariantResult {
+  card: File
+}
+
+/**
  * 🎯 Генерирует 3 варианта изображения (sm/md/lg) + LQIP blur placeholder
  *
  * Используется при загрузке товаров для адаптивных изображений (srcset).
  * Все варианты генерируются параллельно для скорости.
  */
-export async function generateImageVariants(file: File): Promise<VariantResult> {
+export async function generateImageVariants(file: File): Promise<StandardVariantResult> {
   const originalSize = file.size
 
-  const [smCompressed, mdCompressed, lgCompressed, blurResult] = await Promise.all([
+  const [smCompressed, cardCompressed, mdCompressed, lgCompressed, blurResult] = await Promise.all([
     imageCompression(file, {
       maxSizeMB: 0.05,
       maxWidthOrHeight: IMAGE_VARIANTS.sm.maxWidthOrHeight,
       useWebWorker: true,
       fileType: 'image/webp',
       initialQuality: IMAGE_VARIANTS.sm.quality,
+    }),
+    // 480px — рабочий размер карточки товара, см. комментарий в config/images.ts
+    imageCompression(file, {
+      maxSizeMB: 0.08,
+      maxWidthOrHeight: IMAGE_VARIANTS.card.maxWidthOrHeight,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: IMAGE_VARIANTS.card.quality,
     }),
     imageCompression(file, {
       maxSizeMB: 0.15,
@@ -79,11 +95,13 @@ export async function generateImageVariants(file: File): Promise<VariantResult> 
   const baseName = file.name.replace(/\.[^.]+$/, '')
 
   const sm = new File([smCompressed], `${baseName}_sm.webp`, { type: 'image/webp' })
+  const card = new File([cardCompressed], `${baseName}_card.webp`, { type: 'image/webp' })
   const md = new File([mdCompressed], `${baseName}_md.webp`, { type: 'image/webp' })
   const lg = new File([lgCompressed], `${baseName}_lg.webp`, { type: 'image/webp' })
 
   return {
     sm,
+    card,
     md,
     lg,
     blurPlaceholder: blurResult?.dataUrl,
