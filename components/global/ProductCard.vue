@@ -131,6 +131,7 @@ function getVariantUrls(index: number) {
     return {}
   return {
     sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm'),
+    card: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'card'),
     md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'md'),
     lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'lg'),
   }
@@ -249,13 +250,20 @@ async function onWish() {
             :key="`slide-${index}`"
             class="h-full w-full shrink-0 [scroll-snap-align:center]"
           >
+            <!-- sizes объявлен по ФАКТИЧЕСКОЙ ширине картинки, а не колонки:
+                 замер 25 августа 2026 — 153px на экране 390px и 222px на 1440px.
+                 Объявишь больше — браузер возьмёт следующую ступеньку srcset и
+                 притащит лишний вес. Ступенька 480w (`src-card`) заведена ровно
+                 под эти 153px на экране с DPR 3: нужно 459, `md` на 800 давал
+                 вдвое больше, чем экран способен показать. -->
             <ProgressiveImage
               v-if="visitedSlideIndexes.has(index)"
               :src="getImageUrlByIndex(index)"
               :src-sm="getVariantUrls(index).sm"
+              :src-card="getVariantUrls(index).card"
               :src-md="getVariantUrls(index).md"
               :src-lg="getVariantUrls(index).lg"
-              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              sizes="(max-width: 767px) 153px, (max-width: 1024px) 30vw, 222px"
               :alt="getImageAlt(index)"
               aspect-ratio="square"
               object-fit="contain"
