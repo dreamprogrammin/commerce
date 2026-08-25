@@ -86,7 +86,7 @@ const isOpen = computed({
                   От
                 </div>
                 <div class="font-semibold text-sm">
-                  {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[0])) }} ₸
+                  {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[0])) }}&nbsp;₸
                 </div>
               </div>
               <span class="text-muted-foreground">—</span>
@@ -95,7 +95,7 @@ const isOpen = computed({
                   До
                 </div>
                 <div class="font-semibold text-sm">
-                  {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[1])) }} ₸
+                  {{ new Intl.NumberFormat('ru-RU').format(Math.round(state.localPrice.value[1])) }}&nbsp;₸
                 </div>
               </div>
             </div>

@@ -157,8 +157,8 @@ function copyFeedUrl() {
                 {{ row.stock_quantity }}
               </span>
             </TableCell>
-            <TableCell class="font-semibold">{{ row.final_price }} ₸</TableCell>
-            <TableCell class="font-semibold text-orange-600">{{ row.kaspi_price }} ₸</TableCell>
+            <TableCell class="font-semibold">{{ row.final_price }}&nbsp;₸</TableCell>
+            <TableCell class="font-semibold text-orange-600">{{ row.kaspi_price }}&nbsp;₸</TableCell>
             <TableCell>
               <Switch 
                 :model-value="row.export_to_kaspi" 

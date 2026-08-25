@@ -61,12 +61,48 @@ function formatDate(dateStr: string) {
  * `useSafeHtml` — он на сервере намеренно возвращает строку как есть, а на
  * клиенте прогоняет через DOMPurify, то есть даёт РАЗНЫЙ результат.
  */
+/*
+ * Символы, которых нет в подмножествах шрифта, — в свой span с системным
+ * стеком. Это не косметика, это килобайты.
+ *
+ * Тексты ответов пишет функция `generate_category_questions` в базе, и во
+ * всех 191 записи есть стрелка `→` (U+2192), а в 42 ещё и `🔥` (U+1F525).
+ * Ни того, ни другого нет ни в `latin`, ни в `cyrillic`, ни в `latin-ext`.
+ * Браузер обязан взять грань, которая символ покрывает, а покрывают только
+ * несокращённые легаси-`.woff` от @nuxt/fonts — и тянет их целиком.
+ * Замер 25 августа 2026: категорийная страница везла 199 КБ шрифтов против
+ * 93 КБ у `/catalog/all`, разница ровно в этих 105 КБ.
+ *
+ * Вид при этом НЕ меняется: глифов этих символов в Nunito нет вовсе
+ * (проверено — Google по `text=→` и `text=🔥` отдаёт пустой woff2 на 31
+ * байт), они и сегодня рисуются системным шрифтом. Просто теперь браузер
+ * узнаёт об этом сразу, а не после 52 КБ загрузки.
+ *
+ * Правка временная, до исправления генератора в базе: он продолжит писать
+ * стрелки. См. docs/HANDOFF.md.
+ */
+// Символ плюс необязательный селектор варианта U+FE0F (он делает эмодзи
+// цветным и в класс символов не входит — иначе линтер справедливо ругается).
+const OUTSIDE_FONT_SUBSETS
+  = /(?:[\u2190-\u21FF\u2300-\u27BF\u2B00-\u2BFF\u{1F000}-\u{1FAFF}]\uFE0F?)+/gu
+
+function wrapOutsideGlyphs(text: string): string {
+  return text.replace(
+    OUTSIDE_FONT_SUBSETS,
+    match => `<span class="glyph-fallback">${match}</span>`,
+  )
+}
+
 function sanitizeAndRenderHTML(html: string | null): string {
   if (!html)
     return ''
   return html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '')
+    // Оборачиваем только ТЕКСТ, не трогая теги и их атрибуты.
+    .split(/(<[^>]*>)/)
+    .map(part => (part.startsWith('<') ? part : wrapOutsideGlyphs(part)))
+    .join('')
 }
 </script>
 
@@ -137,6 +173,12 @@ function sanitizeAndRenderHTML(html: string | null): string {
    Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
 @layer components {
+  /* Символы вне подмножеств шрифта — системным стеком, минуя Nunito.
+     Почему — см. комментарий к wrapOutsideGlyphs выше. */
+  .faq-answer :deep(.glyph-fallback) {
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', system-ui, sans-serif;
+  }
+
   .faq-answer :deep(strong) {
     font-weight: 600;
     color: hsl(var(--foreground));

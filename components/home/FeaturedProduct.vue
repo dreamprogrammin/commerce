@@ -256,7 +256,7 @@ function formatPrice(price: number) {
                           <p
                             class="text-xs font-bold text-primary"
                           >
-                            +{{ product.bonus_points_award }} ₸
+                            +{{ product.bonus_points_award }}&nbsp;₸
                           </p>
                         </div>
                       </div>

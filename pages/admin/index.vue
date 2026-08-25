@@ -164,10 +164,10 @@ function getProductImage(imageUrl: string | null): string | undefined {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">
-              {{ formatPrice(stats.revenue_month) }} ₸
+              {{ formatPrice(stats.revenue_month) }}&nbsp;₸
             </div>
             <p class="text-xs text-muted-foreground mt-1">
-              Всего: {{ formatPrice(stats.revenue_total) }} ₸
+              Всего: {{ formatPrice(stats.revenue_total) }}&nbsp;₸
             </p>
           </CardContent>
         </Card>
@@ -218,7 +218,7 @@ function getProductImage(imageUrl: string | null): string | undefined {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">
-              {{ formatPrice(stats.avg_order_month) }} ₸
+              {{ formatPrice(stats.avg_order_month) }}&nbsp;₸
             </div>
             <p class="text-xs text-muted-foreground mt-1">
               За текущий месяц

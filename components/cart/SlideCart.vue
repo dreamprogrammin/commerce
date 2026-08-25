@@ -157,12 +157,12 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
               Бесплатная доставка!
             </span>
             <span v-if="!hasFreeShipping" class="font-semibold text-primary">
-              {{ formatPrice(remainingForFreeShipping) }} ₸
+              {{ formatPrice(remainingForFreeShipping) }}&nbsp;₸
             </span>
           </div>
           <Progress :model-value="shippingProgress" class="h-2" />
           <p v-if="!hasFreeShipping" class="text-xs text-muted-foreground">
-            Добавьте товаров на {{ formatPrice(remainingForFreeShipping) }} ₸
+            Добавьте товаров на {{ formatPrice(remainingForFreeShipping) }}&nbsp;₸
             для бесплатной доставки 🚚
           </p>
           <p v-else class="text-xs text-green-600">
@@ -231,7 +231,7 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
               <!-- Цена -->
               <div class="flex items-center gap-2 mb-2">
                 <span class="font-semibold text-primary">
-                  {{ formatPrice(item.product.price) }} ₸
+                  {{ formatPrice(item.product.price) }}&nbsp;₸
                 </span>
                 <span
                   v-if="item.quantity > 1"
@@ -327,7 +327,7 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
                   {{ acc.name }}
                 </p>
                 <p class="text-xs text-muted-foreground">
-                  {{ formatPrice(acc.price) }} ₸
+                  {{ formatPrice(acc.price) }}&nbsp;₸
                 </p>
               </div>
 
@@ -358,7 +358,7 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
         <div class="space-y-2">
           <div class="flex items-center justify-between text-sm">
             <span class="text-muted-foreground">Товары ({{ cartStore.totalItems }})</span>
-            <span>{{ formatPrice(cartStore.subtotal) }} ₸</span>
+            <span>{{ formatPrice(cartStore.subtotal) }}&nbsp;₸</span>
           </div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-muted-foreground">Доставка</span>
@@ -368,7 +368,7 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
           <Separator />
           <div class="flex items-center justify-between text-lg font-bold">
             <span>Итого</span>
-            <span class="text-primary">{{ formatPrice(cartStore.total) }} ₸</span>
+            <span class="text-primary">{{ formatPrice(cartStore.total) }}&nbsp;₸</span>
           </div>
         </div>
 

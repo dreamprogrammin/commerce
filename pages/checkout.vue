@@ -859,7 +859,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <span class="inline-flex items-center gap-2 text-sm">
                   <Icon name="lucide:badge-check" class="size-[15px] text-success" />
                   <b class="font-bold">{{ appliedPromoCode }}</b>
-                  <span class="text-muted-foreground">— скидка {{ formatPrice(promoDiscount) }} ₸</span>
+                  <span class="text-muted-foreground">— скидка {{ formatPrice(promoDiscount) }}&nbsp;₸</span>
                 </span>
                 <button
                   type="button"
@@ -903,11 +903,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span class="text-sm font-bold">Списать бонусы</span>
                   <span class="text-xs text-muted-foreground">
-                    Доступно {{ formatPrice(bonusBalance) }} бонусов · 1 бонус = 1 ₸
+                    Доступно {{ formatPrice(bonusBalance) }} бонусов · 1 бонус = 1&nbsp;₸
                   </span>
                 </span>
                 <span class="text-[15px] font-extrabold text-bonus">
-                  −{{ formatPrice(bonusesToSpend) }} ₸
+                  −{{ formatPrice(bonusesToSpend) }}&nbsp;₸
                 </span>
               </button>
 
@@ -990,33 +990,33 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <div class="flex flex-col gap-[11px] text-sm font-medium">
             <div class="flex items-center justify-between">
               <span class="text-muted-foreground">Товары, {{ totalItems }} шт</span>
-              <span>{{ formatPrice(subtotal) }} ₸</span>
+              <span>{{ formatPrice(subtotal) }}&nbsp;₸</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-muted-foreground">Доставка</span>
               <span v-if="deliveryCost === 0" class="font-semibold text-success">Бесплатно</span>
-              <span v-else>{{ formatPrice(deliveryCost) }} ₸</span>
+              <span v-else>{{ formatPrice(deliveryCost) }}&nbsp;₸</span>
             </div>
             <div
               v-if="promoDiscount > 0"
               class="flex items-center justify-between text-destructive"
             >
               <span>Промокод</span>
-              <span>−{{ formatPrice(promoDiscount) }} ₸</span>
+              <span>−{{ formatPrice(promoDiscount) }}&nbsp;₸</span>
             </div>
             <div
               v-if="discountAmount > 0"
               class="flex items-center justify-between text-bonus"
             >
               <span>Списание бонусов</span>
-              <span>−{{ formatPrice(discountAmount) }} ₸</span>
+              <span>−{{ formatPrice(discountAmount) }}&nbsp;₸</span>
             </div>
             <div
               v-if="isCourier && subtotal < FREE_SHIPPING_THRESHOLD"
               class="text-xs text-muted-foreground"
             >
               Добавьте товаров на
-              {{ formatPrice(FREE_SHIPPING_THRESHOLD - subtotal) }} ₸ для бесплатной доставки 🚚
+              {{ formatPrice(FREE_SHIPPING_THRESHOLD - subtotal) }}&nbsp;₸ для бесплатной доставки 🚚
             </div>
           </div>
 
@@ -1024,7 +1024,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 
           <div class="mb-4 flex items-baseline justify-between">
             <span class="text-base font-bold">Итого</span>
-            <b class="text-[22px] font-extrabold">{{ formatPrice(orderTotal) }} ₸</b>
+            <b class="text-[22px] font-extrabold">{{ formatPrice(orderTotal) }}&nbsp;₸</b>
           </div>
 
           <div
@@ -1102,7 +1102,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             {{ isProcessing ? 'Оформляем…' : 'Оформить заказ' }}
           </span>
           <span class="flex flex-col items-end leading-[1.12]">
-            <b class="text-[17px] font-extrabold">{{ formatPrice(orderTotal) }} ₸</b>
+            <b class="text-[17px] font-extrabold">{{ formatPrice(orderTotal) }}&nbsp;₸</b>
             <span
               v-if="potentialBonuses > 0"
               class="inline-flex items-center gap-1 text-[11px] font-semibold opacity-90"

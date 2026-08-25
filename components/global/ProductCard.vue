@@ -131,6 +131,7 @@ function getVariantUrls(index: number) {
     return {}
   return {
     sm: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm'),
+    card: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'card'),
     md: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'md'),
     lg: getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'lg'),
   }
@@ -249,13 +250,20 @@ async function onWish() {
             :key="`slide-${index}`"
             class="h-full w-full shrink-0 [scroll-snap-align:center]"
           >
+            <!-- sizes объявлен по ФАКТИЧЕСКОЙ ширине картинки, а не колонки:
+                 замер 25 августа 2026 — 153px на экране 390px и 222px на 1440px.
+                 Объявишь больше — браузер возьмёт следующую ступеньку srcset и
+                 притащит лишний вес. Ступенька 480w (`src-card`) заведена ровно
+                 под эти 153px на экране с DPR 3: нужно 459, `md` на 800 давал
+                 вдвое больше, чем экран способен показать. -->
             <ProgressiveImage
               v-if="visitedSlideIndexes.has(index)"
               :src="getImageUrlByIndex(index)"
               :src-sm="getVariantUrls(index).sm"
+              :src-card="getVariantUrls(index).card"
               :src-md="getVariantUrls(index).md"
               :src-lg="getVariantUrls(index).lg"
-              sizes="(max-width: 767px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              sizes="(max-width: 767px) 153px, (max-width: 1024px) 30vw, 222px"
               :alt="getImageAlt(index)"
               aspect-ratio="square"
               object-fit="contain"
@@ -387,13 +395,13 @@ async function onWish() {
                   v-if="priceDetails.hasDiscount"
                   class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
                 >
-                  {{ formatPrice(priceDetails.originalPrice) }} ₸
+                  {{ formatPrice(priceDetails.originalPrice) }}&nbsp;₸
                 </span>
                 <span
                   class="whitespace-nowrap text-[17px] font-extrabold"
                   :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
                 >
-                  {{ formatPrice(priceDetails.finalPrice) }} ₸
+                  {{ formatPrice(priceDetails.finalPrice) }}&nbsp;₸
                 </span>
               </span>
               <button
@@ -411,8 +419,46 @@ async function onWish() {
             <StockAlertButton :product-id="product.id" size="sm" />
           </template>
 
+          <!-- Серверная разметка (и первый кадр до гидрации).
+               Здесь был пульсирующий прямоугольник — из-за него цена товара
+               не попадала в SSR-HTML вообще: весь блок покупки, вместе с
+               ценой, лежит под ClientOnly ради quantityInCart из корзины.
+               Замер 24 августа: в серверной разметке главной 8 товаров и ноль
+               знаков ₸; на бренд-страницах, которым 22 августа включили SSR
+               товаров, — та же дыра.
+
+               Цена и наличие считаются из props и на сервере известны, так
+               что заглушка повторяет строку с ценой один в один. Отличие
+               одно: вместо <button> здесь <span> — до гидрации нажимать
+               нечего, и фокусируемой кнопки-пустышки быть не должно.
+               Высота та же, 52px, поэтому сдвига при подмене нет. -->
           <template #fallback>
-            <div class="h-[52px] animate-pulse rounded-full bg-muted" />
+            <div
+              v-if="inStock"
+              class="flex h-[52px] items-center justify-between gap-2 rounded-full bg-muted pl-4 pr-[5px]"
+            >
+              <span class="flex flex-col justify-center leading-tight">
+                <span
+                  v-if="priceDetails.hasDiscount"
+                  class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
+                >
+                  {{ formatPrice(priceDetails.originalPrice) }}&nbsp;₸
+                </span>
+                <span
+                  class="whitespace-nowrap text-[17px] font-extrabold"
+                  :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
+                >
+                  {{ formatPrice(priceDetails.finalPrice) }}&nbsp;₸
+                </span>
+              </span>
+              <span
+                class="pc-add grid size-11 shrink-0 place-content-center rounded-full"
+                aria-hidden="true"
+              >
+                <Icon name="lucide:plus" class="size-[26px]" />
+              </span>
+            </div>
+            <div v-else class="h-[52px] animate-pulse rounded-full bg-muted" />
           </template>
         </ClientOnly>
       </div>

@@ -31,8 +31,23 @@ const props = defineProps<{
             {{ props.title }}
           </h2>
           <Button v-if="products.length > 4" as-child variant="link">
-            <NuxtLink :to="props.seeAllLink">
-              Смотреть все &rarr;
+            <!--
+              Стрелка — ИКОНКА, а не символ `&rarr;` (U+2192).
+
+              Этого символа нет ни в одном подключённом подмножестве шрифта:
+              в `latin` у Google есть U+2191 и U+2193 (↑ и ↓), а U+2192 (→) —
+              нет. Единственные грани Nunito, которые его покрывают, —
+              несокращённые легаси-`.woff`, и браузер тянул их целиком ради
+              одной стрелки. Замер 25 августа 2026 на главной: 106 КБ из
+              188 КБ всех шрифтов уходило на это, при том что глифа там всё
+              равно нет и стрелка рисовалась системным шрифтом.
+
+              Иконка Lucide — та же, что в «Все категории» у
+              PopularCategories.
+            -->
+            <NuxtLink :to="props.seeAllLink" class="inline-flex items-center gap-1.5">
+              Смотреть все
+              <Icon name="lucide:arrow-right" class="size-4" />
             </NuxtLink>
           </Button>
         </div>

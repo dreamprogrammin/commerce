@@ -429,7 +429,7 @@ onMounted(async () => {
             </div>
             <div class="mb-3.5 flex items-baseline justify-between">
               <span class="text-[15px] font-bold">Итого</span>
-              <b class="text-[22px] font-extrabold">{{ formatPrice(order.final_amount) }} ₸</b>
+              <b class="text-[22px] font-extrabold">{{ formatPrice(order.final_amount) }}&nbsp;₸</b>
             </div>
             <div
               v-if="order.bonuses_awarded > 0"

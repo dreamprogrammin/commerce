@@ -2,7 +2,6 @@
 import type { CategoryMenuItem } from '@/types'
 import CategoryTile from '@/components/category/CategoryTile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import {
   CATEGORY_TILE_TINT_FALLBACK,
@@ -41,10 +40,21 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
  */
 const categoriesStore = useCategoriesStore()
 const { getVariantUrl } = useSupabaseStorage()
-// Прототип разводит раскладки по 768 (`mob = vw < 768`), а не по 1024:
-// с 768 и выше показывается бенто, ниже — двухрядный рельс. Та же граница
-// продублирована в медиазапросе в конце файла — их нельзя разводить.
-const isMobile = useIsMobile(767)
+/*
+ * Раскладки разведены по 768 (в прототипе `mob = vw < 768`), а не по 1024:
+ * с 768 и выше бенто, ниже — двухрядный рельс. Граница живёт ТОЛЬКО в
+ * медиазапросах в конце файла.
+ *
+ * Раньше её знал ещё и JS: `useIsMobile(767)`. На сервере он всегда false,
+ * то есть SSR нарисовал бы десктопное бенто, а мобильный клиент после
+ * гидрации перекинул бы на рельс — расхождение и сдвиг. Из-за этого секцию
+ * и держали за `requestIdleCallback` в index.vue, и в серверную разметку она
+ * не попадала вовсе (замер прода 24 августа: появлялась на 4641 мс).
+ *
+ * На табе «Всё» обе раскладки показывают одни и те же 10 плиток
+ * (`focusTiles` = bentoBig + bentoSmall), поэтому их можно держать в разметке
+ * разом и прятать медиазапросом. JS о ширине окна больше не знает.
+ */
 
 // menuTree наполняется на SSR через useAsyncData('home-ssr-critical') в index.vue;
 // подстраховка на клиенте, если стор пуст.
@@ -82,17 +92,43 @@ const tabs = computed(() => {
 })
 
 const isAllTab = computed(() => activeTab.value === 'all')
-const showBento = computed(() => isAllTab.value && !isMobile.value)
 
 function tintFor(index: number): string {
   return CATEGORY_TILE_TINTS[index % CATEGORY_TILE_TINTS.length]
     ?? CATEGORY_TILE_TINT_FALLBACK
 }
 
+/*
+ * Плитке нужен `sm`, а не `md`, и обязательно `srcset` с `sizes`.
+ *
+ * Было: `md` без srcset и без sizes. То есть на плитку шириной 150 CSS-пикселей
+ * уезжала картинка на 800 пикселей. Замер 24 августа на главной (390px,
+ * CPU ×4, Slow 4G): шесть таких плиток — 319 КБ, 43% всего, что скачивается
+ * до DOMContentLoaded. Раньше это было незаметно, потому что секция
+ * рисовалась на клиенте и в критический путь не попадала.
+ *
+ * Идиома взята из CatalogMobileSections: `src` = sm, `srcset` = sm 400w +
+ * md 800w, `sizes` — по фактической ширине КАРТИНКИ, а не плитки. Разница
+ * решающая: при layout="corner" картинка занимает 132px в плитке 150px, и
+ * на экране с DPR 3 это 396px против порога варианта sm в 400px. Объяви
+ * здесь 150px — и браузер возьмёт md на 800px, то есть впятеро тяжелее.
+ * Замерено в браузере: 132×111 в плитке 150×150 на 390px; на 1440px
+ * 278×315 в большой плитке и 147×144 в малой.
+ */
 function imageOf(item: CategoryMenuItem): string | null {
   if (!item.image_url)
     return null
-  return getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'md') || null
+  return getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'sm') || null
+}
+
+function srcsetOf(item: CategoryMenuItem): string | undefined {
+  if (!item.image_url)
+    return undefined
+  const sm = getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'sm')
+  const md = getVariantUrl(BUCKET_NAME_CATEGORY, item.image_url, 'md')
+  if (!sm || !md || sm === md)
+    return undefined
+  return `${sm} 400w, ${md} 800w`
 }
 
 function hrefOf(item: CategoryMenuItem): string {
@@ -114,6 +150,7 @@ interface Tile {
   name: string
   href: string
   image: string | null
+  srcset?: string
   blur: string | null
   tint: string
   countLabel?: string
@@ -126,6 +163,7 @@ function toTile(item: CategoryMenuItem, tintIndex: number, withCount = false): T
     name: item.name,
     href: hrefOf(item),
     image: imageOf(item),
+    srcset: srcsetOf(item),
     blur: item.blur_placeholder,
     tint: tintFor(tintIndex),
     countLabel: withCount
@@ -211,14 +249,16 @@ const seeAllHref = '/catalog/all'
         </button>
       </div>
 
-      <!-- BENTO (десктоп, таб «Всё») -->
-      <div v-if="showBento" class="cats-bento">
+      <!-- BENTO (таб «Всё»); ниже 768px скрыт медиазапросом -->
+      <div v-if="isAllTab" class="cats-bento">
         <CategoryTile
           v-for="tile in bentoBig"
           :key="tile.id"
           :name="tile.name"
           :href="tile.href"
           :src="tile.image"
+          :srcset="tile.srcset"
+          sizes="(min-width: 1280px) 280px, 22vw"
           :tint="tile.tint"
           :meta="tile.countLabel"
           layout="corner"
@@ -233,6 +273,8 @@ const seeAllHref = '/catalog/all'
             :name="tile.name"
             :href="tile.href"
             :src="tile.image"
+            :srcset="tile.srcset"
+            sizes="(min-width: 1280px) 150px, 14vw"
             :tint="tile.tint"
             layout="corner"
             size="md"
@@ -241,8 +283,9 @@ const seeAllHref = '/catalog/all'
         </div>
       </div>
 
-      <!-- FOCUS GRID (мобилка / конкретный таб) -->
-      <div v-else class="cats-focus-scroll">
+      <!-- FOCUS GRID (мобилка / конкретный таб).
+           На табе «Всё» дублирует плитки бенто и скрывается с 768px. -->
+      <div class="cats-focus-scroll" :class="{ 'cats-focus-scroll--all': isAllTab }">
         <div class="cats-focus-grid">
           <CategoryTile
             v-for="tile in focusTiles"
@@ -250,6 +293,8 @@ const seeAllHref = '/catalog/all'
             :name="tile.name"
             :href="tile.href"
             :src="tile.image"
+            :srcset="tile.srcset"
+            sizes="(max-width: 767px) 132px, 190px"
             :tint="tile.tint"
             layout="corner"
             size="md"
@@ -329,6 +374,20 @@ const seeAllHref = '/catalog/all'
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 2.7fr);
     gap: 14px;
     height: 404px;
+  }
+
+  /* Переключение раскладок. Обе лежат в разметке, видна ровно одна.
+     Граница 768 — та же, что у рельса ниже; разводить их нельзя. */
+  @media (max-width: 767px) {
+    .cats-bento {
+      display: none;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .cats-focus-scroll--all {
+      display: none;
+    }
   }
 
   .cats-bento__small {

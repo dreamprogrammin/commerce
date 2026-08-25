@@ -11,6 +11,21 @@ import { sectionSpacingVariants } from '@/lib/variants'
  * (метрики популярности у брендов нет; алфавит + limit — существующий
  * продовый компромисс, тот же, что в BrandsCollapsible).
  */
+/*
+ * Двенадцать логотипов, а не двадцать.
+ *
+ * После переезда секции в SSR логотипы попали в критический путь: замер
+ * 24 августа (390px, CPU ×4, Slow 4G) — 14 штук и 155 КБ скачиваются до
+ * DOMContentLoaded при DPR 3, 20 штук и 228 КБ при DPR 2. Лента
+ * горизонтальная, на 390px видно три-четыре, до двадцатого никто не
+ * доскроллит.
+ *
+ * Карточки товаров так урезать смысла НЕТ, проверено: сколько бы их ни было
+ * в разметке, до DCL успевают одни и те же пять — остальные ниже сгиба или
+ * за краем карусели. Поэтому «Хиты продаж» и лента остаются как есть.
+ */
+const BRANDS_LIMIT = 12
+
 const supabase = useSupabaseClient<Database>()
 const { getVariantUrl } = useSupabaseStorage()
 
@@ -21,14 +36,28 @@ const { data: brands } = await useAsyncData(
       .from('brands')
       .select('id, name, slug, logo_url, blur_placeholder')
       .order('name')
-      .limit(20)
+      .limit(BRANDS_LIMIT)
     if (error) {
       console.error('❌ Не удалось загрузить бренды:', error)
       return []
     }
     return data ?? []
   },
-  { server: false, lazy: true, default: () => [] },
+  /*
+   * Грузим на СЕРВЕРЕ и без `lazy`.
+   *
+   * Было `{ server: false, lazy: true }`: запрос уходил только с клиента, да
+   * ещё и из-под `ClientOnly` + `requestIdleCallback` в index.vue. Замер
+   * прода 24 августа (390px, CPU ×4, Slow 4G): запрос за брендами уходил на
+   * 4885 мс.
+   *
+   * `lazy` здесь нельзя вернуть даже вместе с `server: true`: он не даёт
+   * рендеру дождаться данных, разметка уедет пустой, а payload досериализуется
+   * уже с брендами — ровно та гонка, из-за которой на `/` ловили
+   * «Hydration completed but contains mismatches» на слайдах (см. комментарий
+   * в pages/index.vue).
+   */
+  { default: () => [] },
 )
 
 function logoOf(logoUrl: string | null): string | null {

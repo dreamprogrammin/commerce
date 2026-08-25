@@ -1237,7 +1237,7 @@ const seoKeywordsString = computed({
             <!-- Цена продажи -->
             <div class="flex justify-between">
               <span class="text-muted-foreground">Цена продажи:</span>
-              <span class="font-medium">{{ formatPrice(priceBreakdown.price) }} ₸</span>
+              <span class="font-medium">{{ formatPrice(priceBreakdown.price) }}&nbsp;₸</span>
             </div>
             <!-- Скидка -->
             <div
@@ -1245,7 +1245,7 @@ const seoKeywordsString = computed({
               class="flex justify-between text-destructive"
             >
               <span>Скидка ({{ formData.discount_percentage }}%):</span>
-              <span class="font-medium">-{{ formatPrice(priceBreakdown.discountAmount) }} ₸</span>
+              <span class="font-medium">-{{ formatPrice(priceBreakdown.discountAmount) }}&nbsp;₸</span>
             </div>
             <!-- Цена после скидки -->
             <div
@@ -1253,28 +1253,28 @@ const seoKeywordsString = computed({
               class="flex justify-between font-semibold border-t pt-2"
             >
               <span>Цена со скидкой:</span>
-              <span>{{ formatPrice(priceBreakdown.sellingPrice) }} ₸</span>
+              <span>{{ formatPrice(priceBreakdown.sellingPrice) }}&nbsp;₸</span>
             </div>
             <!-- Разделитель расходов -->
             <div class="border-t pt-2 mt-1 space-y-2">
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Себестоимость:</span>
-                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.costPrice) }} ₸</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.costPrice) }}&nbsp;₸</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">ИПН (4%):</span>
-                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.tax) }} ₸</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.tax) }}&nbsp;₸</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Эквайринг ({{ acquiringRate }}%):</span>
-                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.acquiring) }} ₸</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.acquiring) }}&nbsp;₸</span>
               </div>
               <div
                 v-if="priceBreakdown.bonusPoints > 0"
                 class="flex justify-between"
               >
                 <span class="text-muted-foreground">Бонусы клиенту ({{ selectedBonusPercent }}%):</span>
-                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.bonusPoints) }} ₸</span>
+                <span class="font-medium text-destructive">-{{ formatPrice(priceBreakdown.bonusPoints) }}&nbsp;₸</span>
               </div>
             </div>
             <!-- Итого расходы -->
@@ -1299,7 +1299,7 @@ const seoKeywordsString = computed({
               "
             >
               <span>Чистая прибыль:</span>
-              <span>{{ formatPrice(priceBreakdown.netProfit) }} ₸ ({{
+              <span>{{ formatPrice(priceBreakdown.netProfit) }}&nbsp;₸ ({{
                 priceBreakdown.netMargin
               }}%)</span>
             </div>
@@ -1350,7 +1350,7 @@ const seoKeywordsString = computed({
                 {{ formData.bonus_points_award || 0 }} бонусов
               </span>
               <span v-if="discountedPrice" class="text-xs">
-                (от цены со скидкой {{ formatPrice(discountedPrice) }} ₸)
+                (от цены со скидкой {{ formatPrice(discountedPrice) }}&nbsp;₸)
               </span>
             </p>
           </div>
@@ -1471,7 +1471,7 @@ const seoKeywordsString = computed({
                 @click="addAccessory(product)"
               >
                 <span>{{ product.name }}</span>
-                <span class="text-xs text-muted-foreground">{{ product.price }} ₸</span>
+                <span class="text-xs text-muted-foreground">{{ product.price }}&nbsp;₸</span>
               </div>
             </div>
           </div>
