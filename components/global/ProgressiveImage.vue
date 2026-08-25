@@ -17,6 +17,8 @@ interface Props {
   useTransform?: boolean
   eager?: boolean
   srcSm?: string | null
+  /** 480px — ступенька под карточку товара, см. config/images.ts */
+  srcCard?: string | null
   srcMd?: string | null
   srcLg?: string | null
   sizes?: string
@@ -166,6 +168,8 @@ const srcsetValue = computed(() => {
   const parts: string[] = []
   if (props.srcSm)
     parts.push(`${props.srcSm} 400w`)
+  if (props.srcCard)
+    parts.push(`${props.srcCard} 480w`)
   if (props.srcMd)
     parts.push(`${props.srcMd} 800w`)
   if (props.srcLg)

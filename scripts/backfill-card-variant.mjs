@@ -80,9 +80,18 @@ async function makeCard(srcUrl) {
   const dataUrl = await page.evaluate(async (src) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
+    // Таймаут обязателен: без него одна не отдавшаяся картинка вешает
+    // весь прогон навсегда, а не пропускается.
     await new Promise((ok, no) => {
-      img.onload = ok
-      img.onerror = () => no(new Error('image load failed'))
+      const timer = setTimeout(() => no(new Error('timeout 30s')), 30000)
+      img.onload = () => {
+        clearTimeout(timer)
+        ok()
+      }
+      img.onerror = () => {
+        clearTimeout(timer)
+        no(new Error('image load failed'))
+      }
       img.src = src
     })
     const k = 480 / Math.max(img.naturalWidth, img.naturalHeight)
