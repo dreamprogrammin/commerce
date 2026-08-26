@@ -25,7 +25,30 @@ const { getImageUrl } = useSupabaseStorage()
  */
 const reserve = useHomeReserve()
 const cardEl = ref<HTMLElement | null>(null)
+const cardLinkEl = ref<{ $el?: HTMLElement } | HTMLElement | null>(null)
 const hasHeightHint = ref(false)
+
+/**
+ * Сколько места карточка занимает в секции.
+ *
+ * Не offsetHeight обёртки: у карточки есть mb-4, и пока у слота нет min-height,
+ * этот отступ схлопывается наружу — обёртка его не считает, а место он занимает.
+ * Подсказка выходила на 16px меньше реальной, и блок подрастал ровно в момент
+ * появления скелетона (поймано на десктопе: контейнер 140 → 156 на 6179 мс,
+ * и всё ниже уезжало на 16px).
+ *
+ * Отступ читается из вычисленного стиля, а не зашит числом: класс на карточке
+ * могут поменять, и молча разъехаться это не должно.
+ */
+function measureCardSpace(): number {
+  const box = cardEl.value?.offsetHeight ?? 0
+  if (box <= 0)
+    return 0
+  const link = cardLinkEl.value
+  const el = link && '$el' in link ? link.$el : (link as HTMLElement | null)
+  const margin = el ? Number.parseFloat(getComputedStyle(el).marginBottom || '0') : 0
+  return box + (Number.isFinite(margin) ? margin : 0)
+}
 
 // Подписка на обновления заказов
 let channel: any = null
@@ -186,7 +209,7 @@ watch(isCardVisible, async (visible) => {
   if (!visible)
     return
   await nextTick()
-  const px = cardEl.value?.offsetHeight ?? 0
+  const px = measureCardSpace()
   if (px > 0) {
     reserve.save('order', px)
     hasHeightHint.value = true
@@ -280,6 +303,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
     >
       <NuxtLink
         v-if="isCardVisible"
+        ref="cardLinkEl"
         :to="`/profile/order/${displayOrder!.id}`"
         class="block mb-4"
       >
