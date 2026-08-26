@@ -6,6 +6,10 @@ import type {
 import { useQuery } from '@tanstack/vue-query'
 import { useSlides } from '@/composables/slides/useSlides'
 import {
+  ACTIVE_ORDER_HEIGHT_HINT_KEY,
+  ACTIVE_ORDER_HEIGHT_HINT_TTL,
+} from '@/constants'
+import {
   HOME_CHIPS_CATEGORY_LIMIT,
   HOME_STATIC_CHIPS,
 } from '@/constants/homePlaceholders'
@@ -173,6 +177,28 @@ onMounted(() => {
   hasMounted.value = true
 })
 
+/*
+ * Уборка резерва места под карточку заказа.
+ *
+ * Подсказку о высоте ставит инлайн-скрипт в <head> (см. useHead ниже), а снимает
+ * её обычно сам HomeActiveOrderStatus, когда активного заказа не нашлось. Но у
+ * гостя и у админа этот компонент не монтируется вовсе — у первого нет
+ * isLoggedIn, у второго на его месте плашка админки, — и снять подсказку там
+ * некому. Без этой уборки после логаута (или у админа, заходившего когда-то
+ * покупателем) на главной осталась бы пустая полоса.
+ */
+watch([isLoggedIn, isAdmin], ([loggedIn, admin]) => {
+  // Только на клиенте: на сервере ни localStorage, ни document нет, а с
+  // immediate этот обработчик отрабатывает уже в setup.
+  if (import.meta.server || (loggedIn && !admin))
+    return
+  try {
+    localStorage.removeItem(ACTIVE_ORDER_HEIGHT_HINT_KEY)
+  }
+  catch {}
+  document.documentElement.style.removeProperty('--active-order-reserve')
+}, { immediate: true })
+
 const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value)
 
 // Скелетон главной ленты держится, пока карусель не смонтируется по-настоящему.
@@ -190,16 +216,52 @@ const showRecommendedCarousel = computed(
   () => hasMounted.value && recommendedProducts.value.length > 0,
 )
 
+/*
+ * Персональная лента подменяет серверную только пока пользователь до неё не
+ * долистал.
+ *
+ * Обе секции называются «Подобрали для вас» и стоят на одном месте: у гостя там
+ * новинки из SSR, у залогиненного — рекомендации, которые приезжают отдельным
+ * запросом уже после гидрации. На медленной связи это секунды, и подмена
+ * заставала владельца прямо на этой секции: десять карточек менялись разом под
+ * рукой. Высоту секция при этом не меняет, то есть в CLS это не видно вовсе —
+ * только глазами.
+ *
+ * Решение — не трогать ровно то, на что человек смотрит прямо сейчас: подмена
+ * запрещается, только если он уже листал страницу И лента в этот момент на
+ * экране. Пока он не тронул страницу (обычный случай: рекомендации приезжают
+ * раньше первого скролла) или лента ещё ниже экрана / уже выше него — меняем
+ * как раньше. Правило намеренно узкое: рекомендации это деньги, и отменять их
+ * показ шире, чем нужно, нельзя.
+ */
+const feedSectionRef = ref<HTMLElement | null>(null)
+const isFeedSwapAllowed = ref(true)
+
+watch(showRecommendedCarousel, (canSwap) => {
+  if (!canSwap || !feedSectionRef.value)
+    return
+
+  // flush 'sync': решение принимается по разметке ДО подмены, то есть по
+  // положению серверной ленты, которую человек и видит.
+  const { top, bottom } = feedSectionRef.value.getBoundingClientRect()
+  const onScreen = bottom > 0 && top < window.innerHeight
+  isFeedSwapAllowed.value = window.scrollY === 0 || !onScreen
+}, { flush: 'sync' })
+
+const showRecommendedFeed = computed(
+  () => showRecommendedCarousel.value && isFeedSwapAllowed.value,
+)
+
 /** Серверная лента новинок. Уступает место персональным рекомендациям. */
 const showGuestFeedCarousel = computed(
-  () => !showRecommendedCarousel.value && guestFeedProducts.value.length > 0,
+  () => !showRecommendedFeed.value && guestFeedProducts.value.length > 0,
 )
 
 /** Есть ли вообще что показывать в главной ленте. */
 const hasMainCarousel = computed(
   () =>
     showWishlistCarousel.value
-    || showRecommendedCarousel.value
+    || showRecommendedFeed.value
     || showGuestFeedCarousel.value,
 )
 
@@ -387,6 +449,25 @@ useHead({
     { rel: 'dns-prefetch', href: 'https://gvsdevsvzgcivpphcuai.supabase.co' },
   ],
   script: [
+    /*
+     * Резерв места под карточку активного заказа — ДО гидрации.
+     *
+     * Карточка живёт в ClientOnly: SSR-разметка главной общая для всех и лежит
+     * в ISR-кеше, персонального в ней быть не может. Из-за этого блок вырастал
+     * с нуля до ~128px уже после гидрации и толкал вниз всю страницу. Замер на
+     * стенде (390px, Slow 4G, CPU ×4): сдвиг 0.042 на 9108 мс — почти весь CLS
+     * залогиненного (0.048 против 0.006 у гостя). Владелец описал это как
+     * «пользователь скролит, и контент внезапно появляется».
+     *
+     * Высоту прошлой карточки компонент кладёт в localStorage; скрипт читает её
+     * до первой отрисовки и ставит переменную на <html>. Ни у гостя, ни у того,
+     * у кого активного заказа нет, подсказки нет — резерв равен нулю, дыры не
+     * появляется. Скрипт обязан быть блокирующим и без defer, иначе он отработает
+     * уже после первой отрисовки и смысла в нём не будет.
+     */
+    {
+      innerHTML: `try{var h=JSON.parse(localStorage.getItem('${ACTIVE_ORDER_HEIGHT_HINT_KEY}')||'null');if(h&&h.px>0&&Date.now()-h.at<${ACTIVE_ORDER_HEIGHT_HINT_TTL})document.documentElement.style.setProperty('--active-order-reserve',h.px+'px')}catch(e){}`,
+    },
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify(storeSchema),
@@ -473,27 +554,32 @@ useIndexableRobotsRule({ index: true, follow: true })
         <HomeStickySearchRow />
       </div>
 
-      <!-- Статус активного заказа -->
+      <!-- Статус активного заказа.
+           active-order-slot держит высоту прошлой карточки (переменную ставит
+           инлайн-скрипт в useHead выше), чтобы блок не вырастал из нуля после
+           гидрации. -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <ClientOnly>
-          <div v-if="isLoggedIn">
-            <div
-              v-if="isAdmin"
-              class="p-4 bg-blue-50 border border-blue-200 rounded-md"
-            >
-              <NuxtLink
-                to="/admin"
-                class="font-semibold text-primary hover:underline"
+        <div class="active-order-slot">
+          <ClientOnly>
+            <div v-if="isLoggedIn">
+              <div
+                v-if="isAdmin"
+                class="p-4 bg-blue-50 border border-blue-200 rounded-md"
               >
-                Перейти в панель администратора
-              </NuxtLink>
+                <NuxtLink
+                  to="/admin"
+                  class="font-semibold text-primary hover:underline"
+                >
+                  Перейти в панель администратора
+                </NuxtLink>
+              </div>
+              <HomeActiveOrderStatus v-else />
             </div>
-            <HomeActiveOrderStatus v-else />
-          </div>
-          <template #fallback>
-            <div class="h-0" />
-          </template>
-        </ClientOnly>
+            <template #fallback>
+              <div class="h-0" />
+            </template>
+          </ClientOnly>
+        </div>
       </div>
 
       <!-- Быстрые чипы -->
@@ -511,16 +597,17 @@ useIndexableRobotsRule({ index: true, follow: true })
       <!-- Серверная лента новинок. Вне ClientOnly: она есть в разметке сразу,
            без ожидания гидрации и запроса. Уступает место персональным
            рекомендациям, когда те приезжают (только после монтирования). -->
-      <HomeProductsCarousel
-        v-if="showGuestFeedCarousel"
-        :products="guestFeedProducts"
-        :is-loading="false"
-        title="Подобрали для вас"
-        see-all-link="/catalog/all?sort_by=newest"
-      />
+      <div ref="feedSectionRef">
+        <HomeProductsCarousel
+          v-if="showGuestFeedCarousel"
+          :products="guestFeedProducts"
+          :is-loading="false"
+          title="Подобрали для вас"
+          see-all-link="/catalog/all?sort_by=newest"
+        />
 
-      <ClientOnly>
-        <!-- Скелетон снимается не по таймеру, а по факту монтирования карусели.
+        <ClientOnly>
+          <!-- Скелетон снимается не по таймеру, а по факту монтирования карусели.
              Когда-то его убирал флаг `shouldRenderLowerBlocks` (уже удалён)
              — а это был setTimeout на 1000 мс, не состояние загрузки. Компоненты ниже ленивые, и в момент
              снятия скелетона их чанк ещё грузился: блок схлопывался и через
@@ -528,32 +615,33 @@ useIndexableRobotsRule({ index: true, follow: true })
              CPU ×4) показывал ровно это: заголовок «Популярные категории»
              уезжал с y=1213 на 707 и возвращался на 1225. Два сдвига по ~0.12
              и составляли почти весь CLS главной — 0.244 при пороге 0.1. -->
-        <ProductCarouselSectionSkeleton v-if="showMainCarouselSkeleton" />
+          <ProductCarouselSectionSkeleton v-if="showMainCarouselSkeleton" />
 
-        <template v-if="!isLoadingMainBlock">
-          <LazyProductsCarousel
-            v-if="showWishlistCarousel"
-            :is-loading="isFetchingRecommendations"
-            :products="wishlistProducts"
-            title="Ваше избранное"
-            see-all-link="/profile/wishlist"
-            @vue:mounted="onMainCarouselMounted"
-          />
-          <LazyProductsCarousel
-            v-if="showRecommendedCarousel"
-            :is-loading="isFetchingRecommendations"
-            :products="recommendedProducts"
-            title="Подобрали для вас"
-            see-all-link="/catalog/all?recommended=true"
-            @vue:mounted="onMainCarouselMounted"
-          />
-        </template>
-        <template #fallback>
-          <!-- Скелетон нужен только если серверной ленты нет: иначе он встанет
-               прямо под ней вторым блоком. -->
-          <ProductCarouselSectionSkeleton v-if="!showGuestFeedCarousel" />
-        </template>
-      </ClientOnly>
+          <template v-if="!isLoadingMainBlock">
+            <LazyProductsCarousel
+              v-if="showWishlistCarousel"
+              :is-loading="isFetchingRecommendations"
+              :products="wishlistProducts"
+              title="Ваше избранное"
+              see-all-link="/profile/wishlist"
+              @vue:mounted="onMainCarouselMounted"
+            />
+            <LazyProductsCarousel
+              v-if="showRecommendedFeed"
+              :is-loading="isFetchingRecommendations"
+              :products="recommendedProducts"
+              title="Подобрали для вас"
+              see-all-link="/catalog/all?recommended=true"
+              @vue:mounted="onMainCarouselMounted"
+            />
+          </template>
+          <template #fallback>
+            <!-- Скелетон нужен только если серверной ленты нет: иначе он встанет
+                 прямо под ней вторым блоком. -->
+            <ProductCarouselSectionSkeleton v-if="!showGuestFeedCarousel" />
+          </template>
+        </ClientOnly>
+      </div>
 
       <!-- Популярные категории.
            Без гейта: данные (menuTree) уже приезжают в SSR-payload, а выбор
@@ -702,6 +790,15 @@ useIndexableRobotsRule({ index: true, follow: true })
 </template>
 
 <style scoped>
+@layer components {
+  /* Резерв места под карточку активного заказа. Значение ставит инлайн-скрипт
+     из useHead по подсказке прошлого визита; по умолчанию 0 — у гостя и у того,
+     у кого активного заказа нет, никакой полосы не появляется. */
+  .active-order-slot {
+    min-height: var(--active-order-reserve, 0px);
+  }
+}
+
 /* Стили ниже намеренно лежат в @layer components.
 
    Scoped-стиль в SFC по умолчанию компилируется ВНЕ слоёв, а утилиты
