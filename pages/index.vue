@@ -4,11 +4,8 @@ import type {
   RecommendedProduct,
 } from '@/types'
 import { useQuery } from '@tanstack/vue-query'
+import { homeReserveInlineScript, useHomeReserve } from '@/composables/home/useHomeReserve'
 import { useSlides } from '@/composables/slides/useSlides'
-import {
-  ACTIVE_ORDER_HEIGHT_HINT_KEY,
-  ACTIVE_ORDER_HEIGHT_HINT_TTL,
-} from '@/constants'
 import {
   HOME_CHIPS_CATEGORY_LIMIT,
   HOME_STATIC_CHIPS,
@@ -177,27 +174,7 @@ onMounted(() => {
   hasMounted.value = true
 })
 
-/*
- * Уборка резерва места под карточку заказа.
- *
- * Подсказку о высоте ставит инлайн-скрипт в <head> (см. useHead ниже), а снимает
- * её обычно сам HomeActiveOrderStatus, когда активного заказа не нашлось. Но у
- * гостя и у админа этот компонент не монтируется вовсе — у первого нет
- * isLoggedIn, у второго на его месте плашка админки, — и снять подсказку там
- * некому. Без этой уборки после логаута (или у админа, заходившего когда-то
- * покупателем) на главной осталась бы пустая полоса.
- */
-watch([isLoggedIn, isAdmin], ([loggedIn, admin]) => {
-  // Только на клиенте: на сервере ни localStorage, ни document нет, а с
-  // immediate этот обработчик отрабатывает уже в setup.
-  if (import.meta.server || (loggedIn && !admin))
-    return
-  try {
-    localStorage.removeItem(ACTIVE_ORDER_HEIGHT_HINT_KEY)
-  }
-  catch {}
-  document.documentElement.style.removeProperty('--active-order-reserve')
-}, { immediate: true })
+const reserve = useHomeReserve()
 
 const isLoadingMainBlock = computed(() => showRecommendationsSkeleton.value)
 
@@ -212,9 +189,95 @@ function onMainCarouselMounted() {
 const showWishlistCarousel = computed(
   () => isLoggedIn.value && wishlistProducts.value.length > 0,
 )
+
+/*
+ * Резерв места под «Ваше избранное».
+ *
+ * Секция целиком клиентская и приезжает поздно: на стенде (390px, Slow 4G,
+ * CPU ×4) она вставлялась на 11095 мс и уводила «Подобрали для вас» с y=839 на
+ * 1357, а «Популярные категории» — с 1337 на 1855; страница росла с 7392 до
+ * 7910px. В CLS этого не видно вовсе — вставка происходит ниже экрана, а сдвиги
+ * за пределами вьюпорта в метрику не попадают. Видно только глазами при скролле,
+ * ровно как и описал владелец.
+ *
+ * Резерв ставится по прошлому визиту, а пока данные едут, место занимает
+ * ProductCarouselSectionSkeleton — он специально подогнан под готовую секцию по
+ * отступам и геометрии ленты.
+ */
+const wishlistEl = ref<HTMLElement | null>(null)
+const hasWishlistHint = ref(false)
+
+/** Заглушка держит зарезервированное место, пока избранное едет. */
+const showWishlistSkeleton = computed(
+  () => hasWishlistHint.value && !showWishlistCarousel.value,
+)
+
+onMounted(() => {
+  hasWishlistHint.value = reserve.has('wishlist')
+})
+
+/*
+ * Высота снимается наблюдателем, а не разово на nextTick: карусель ленивая, и в
+ * момент, когда showWishlistCarousel становится true, её чанк ещё грузится —
+ * offsetHeight равен нулю, и подсказка молча не записывалась (поймано замером).
+ * Наблюдатель висит на внутренней обёртке, а не на слоте: у слота есть
+ * min-height, и измерять его значило бы каждый раз переписывать подсказку самой
+ * же подсказкой.
+ */
+let wishlistSizeObserver: ResizeObserver | null = null
+
+watch(showWishlistCarousel, (visible) => {
+  wishlistSizeObserver?.disconnect()
+  wishlistSizeObserver = null
+
+  if (!visible || !wishlistEl.value)
+    return
+
+  wishlistSizeObserver = new ResizeObserver(() => {
+    const px = wishlistEl.value?.offsetHeight ?? 0
+    if (px > 0) {
+      reserve.save('wishlist', px)
+      hasWishlistHint.value = true
+    }
+  })
+  wishlistSizeObserver.observe(wishlistEl.value)
+})
+
+onBeforeUnmount(() => wishlistSizeObserver?.disconnect())
+
+// Избранное опустело — резерв надо снять, иначе на главной останется пустая
+// полоса, и не только в этот визит, но и в следующие. Момент ловится по приходу
+// данных, а не по showWishlistCarousel: тот и так всё время false, watch по нему
+// в этом случае не сработает ни разу.
+watch(mainPersonalData, (data) => {
+  if (!data || data.wishlist.length > 0)
+    return
+  reserve.drop('wishlist')
+  hasWishlistHint.value = false
+})
+
 const showRecommendedCarousel = computed(
   () => hasMounted.value && recommendedProducts.value.length > 0,
 )
+
+/*
+ * Уборка резерва места под персональные секции.
+ *
+ * Подсказки о высоте ставит инлайн-скрипт в <head> (см. useHead ниже), а снимают
+ * их обычно те, кто их и записал: HomeActiveOrderStatus — когда активного заказа
+ * не нашлось, страница — когда избранное оказалось пустым. Но у гостя и у админа
+ * персональных секций нет вовсе (у первого нет isLoggedIn, у второго на месте
+ * карточки заказа плашка админки), и снять подсказки там некому. Без этой уборки
+ * после логаута на главной остались бы две пустые полосы.
+ */
+watch([isLoggedIn, isAdmin], ([loggedIn, admin]) => {
+  // Только на клиенте: на сервере ни localStorage, ни document нет, а с
+  // immediate этот обработчик отрабатывает уже в setup.
+  if (import.meta.server || (loggedIn && !admin))
+    return
+  reserve.dropAll()
+  hasWishlistHint.value = false
+}, { immediate: true })
 
 /*
  * Персональная лента подменяет серверную только пока пользователь до неё не
@@ -450,23 +513,11 @@ useHead({
   ],
   script: [
     /*
-     * Резерв места под карточку активного заказа — ДО гидрации.
-     *
-     * Карточка живёт в ClientOnly: SSR-разметка главной общая для всех и лежит
-     * в ISR-кеше, персонального в ней быть не может. Из-за этого блок вырастал
-     * с нуля до ~128px уже после гидрации и толкал вниз всю страницу. Замер на
-     * стенде (390px, Slow 4G, CPU ×4): сдвиг 0.042 на 9108 мс — почти весь CLS
-     * залогиненного (0.048 против 0.006 у гостя). Владелец описал это как
-     * «пользователь скролит, и контент внезапно появляется».
-     *
-     * Высоту прошлой карточки компонент кладёт в localStorage; скрипт читает её
-     * до первой отрисовки и ставит переменную на <html>. Ни у гостя, ни у того,
-     * у кого активного заказа нет, подсказки нет — резерв равен нулю, дыры не
-     * появляется. Скрипт обязан быть блокирующим и без defer, иначе он отработает
-     * уже после первой отрисовки и смысла в нём не будет.
+     * Резерв места под персональные секции — ДО гидрации.
+     * Зачем именно так и какие были замеры — в useHomeReserve.
      */
     {
-      innerHTML: `try{var h=JSON.parse(localStorage.getItem('${ACTIVE_ORDER_HEIGHT_HINT_KEY}')||'null');if(h&&h.px>0&&Date.now()-h.at<${ACTIVE_ORDER_HEIGHT_HINT_TTL})document.documentElement.style.setProperty('--active-order-reserve',h.px+'px')}catch(e){}`,
+      innerHTML: homeReserveInlineScript(),
     },
     {
       type: 'application/ld+json',
@@ -597,6 +648,31 @@ useIndexableRobotsRule({ index: true, follow: true })
       <!-- Серверная лента новинок. Вне ClientOnly: она есть в разметке сразу,
            без ожидания гидрации и запроса. Уступает место персональным
            рекомендациям, когда те приезжают (только после монтирования). -->
+      <!-- Ваше избранное.
+           Свой слот, а не общий с лентой: он есть в SSR-разметке всегда и держит
+           высоту по подсказке прошлого визита (переменную ставит инлайн-скрипт в
+           useHead). Раньше секция вставлялась в поток на 11-й секунде и уводила
+           вниз всё, что ниже, на 518px — в CLS этого не видно, потому что вставка
+           происходит ниже экрана. -->
+      <div class="wishlist-slot">
+        <div ref="wishlistEl">
+          <ClientOnly>
+            <LazyProductsCarousel
+              v-if="showWishlistCarousel"
+              :is-loading="isFetchingRecommendations"
+              :products="wishlistProducts"
+              title="Ваше избранное"
+              see-all-link="/profile/wishlist"
+              @vue:mounted="onMainCarouselMounted"
+            />
+            <ProductCarouselSectionSkeleton
+              v-else-if="showWishlistSkeleton"
+              title="Ваше избранное"
+            />
+          </ClientOnly>
+        </div>
+      </div>
+
       <div ref="feedSectionRef">
         <HomeProductsCarousel
           v-if="showGuestFeedCarousel"
@@ -618,14 +694,6 @@ useIndexableRobotsRule({ index: true, follow: true })
           <ProductCarouselSectionSkeleton v-if="showMainCarouselSkeleton" />
 
           <template v-if="!isLoadingMainBlock">
-            <LazyProductsCarousel
-              v-if="showWishlistCarousel"
-              :is-loading="isFetchingRecommendations"
-              :products="wishlistProducts"
-              title="Ваше избранное"
-              see-all-link="/profile/wishlist"
-              @vue:mounted="onMainCarouselMounted"
-            />
             <LazyProductsCarousel
               v-if="showRecommendedFeed"
               :is-loading="isFetchingRecommendations"
@@ -796,6 +864,11 @@ useIndexableRobotsRule({ index: true, follow: true })
      у кого активного заказа нет, никакой полосы не появляется. */
   .active-order-slot {
     min-height: var(--active-order-reserve, 0px);
+  }
+
+  /* То же самое для секции «Ваше избранное». */
+  .wishlist-slot {
+    min-height: var(--wishlist-reserve, 0px);
   }
 }
 

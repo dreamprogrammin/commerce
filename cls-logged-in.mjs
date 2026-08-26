@@ -57,7 +57,7 @@ async function run(label) {
   const r = await page.evaluate(() => ({
     cls: +window.__cls.toFixed(4),
     shifts: window.__shifts,
-    hint: localStorage.getItem('uhti:active-order-height'),
+    hint: localStorage.getItem('uhti:home-reserve'),
     reserve: getComputedStyle(document.documentElement).getPropertyValue('--active-order-reserve'),
   }))
   console.log(`\n### ${label}`)
