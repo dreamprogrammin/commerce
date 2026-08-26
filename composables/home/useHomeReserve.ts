@@ -73,17 +73,21 @@ export function useHomeReserve() {
     document.documentElement.style.removeProperty(HOME_RESERVE_PARTS[part])
   }
 
-  /** Снять резерв целиком: гость, логаут или админ — персональных секций не будет. */
-  function dropAll() {
-    try {
-      localStorage.removeItem(HOME_RESERVE_HINT_KEY)
-    }
-    catch {}
-    for (const cssVar of Object.values(HOME_RESERVE_PARTS))
-      document.documentElement.style.removeProperty(cssVar)
+  /**
+   * Части, которых у гостя (и у админа на главной) не бывает.
+   *
+   * Баннер лояльности сюда НЕ входит: он показывается всем, и стирать его
+   * подсказку у гостя значило бы лишить резерва как раз самую массовую аудиторию.
+   */
+  const PERSONAL_PARTS: ReservePart[] = ['order', 'wishlist']
+
+  /** Снять резерв персональных секций: гость, логаут или админ. */
+  function dropPersonal() {
+    for (const part of PERSONAL_PARTS)
+      drop(part)
   }
 
-  return { has, save, drop, dropAll }
+  return { has, save, drop, dropPersonal }
 }
 
 /**

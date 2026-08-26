@@ -261,6 +261,30 @@ const showRecommendedCarousel = computed(
 )
 
 /*
+ * Резерв места под баннер лояльности.
+ *
+ * Баннер показывается всем — и гостю, и залогиненному, — поэтому снимать этот
+ * резерв не нужно никогда: случая «секции не оказалось» тут просто нет. Но
+ * высота зависит и от ширины экрана, и от состояния входа, так что её
+ * приходится мерить, а не зашивать.
+ */
+const loyaltyEl = ref<HTMLElement | null>(null)
+let loyaltySizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (!loyaltyEl.value)
+    return
+  loyaltySizeObserver = new ResizeObserver(() => {
+    const px = loyaltyEl.value?.offsetHeight ?? 0
+    if (px > 0)
+      reserve.save('loyalty', px)
+  })
+  loyaltySizeObserver.observe(loyaltyEl.value)
+})
+
+onBeforeUnmount(() => loyaltySizeObserver?.disconnect())
+
+/*
  * Уборка резерва места под персональные секции.
  *
  * Подсказки о высоте ставит инлайн-скрипт в <head> (см. useHead ниже), а снимают
@@ -275,7 +299,7 @@ watch([isLoggedIn, isAdmin], ([loggedIn, admin]) => {
   // immediate этот обработчик отрабатывает уже в setup.
   if (import.meta.server || (loggedIn && !admin))
     return
-  reserve.dropAll()
+  reserve.dropPersonal()
   hasWishlistHint.value = false
 }, { immediate: true })
 
@@ -686,37 +710,6 @@ useIndexableRobotsRule({ index: true, follow: true })
         </ClientOnly>
       </div>
 
-      <!-- Ваше избранное.
-           Стоит ПОД лентой намеренно. Секция целиком клиентская и приезжает
-           поздно (на стенде — около 9-й секунды), а место вставки под лентой
-           лежит ниже первого экрана: на 390×844 это y≈1357 при высоте экрана 844.
-           Пока подсказки о высоте нет — то есть в самый первый визит — сдвиг
-           происходит там, где его никто не видит. Выше ленты он приходился ровно
-           на нижнюю кромку экрана и стоил 0.041 CLS.
-
-           Слот свой, а не общий с лентой: он есть в SSR-разметке всегда и держит
-           высоту по подсказке прошлого визита (переменную ставит инлайн-скрипт в
-           useHead), иначе при скролле секция выталкивала бы вниз всё, что под
-           ней, на 518px. -->
-      <div class="wishlist-slot">
-        <div ref="wishlistEl">
-          <ClientOnly>
-            <LazyProductsCarousel
-              v-if="showWishlistCarousel"
-              :is-loading="isFetchingRecommendations"
-              :products="wishlistProducts"
-              title="Ваше избранное"
-              see-all-link="/profile/wishlist"
-              @vue:mounted="onMainCarouselMounted"
-            />
-            <ProductCarouselSectionSkeleton
-              v-else-if="showWishlistSkeleton"
-              title="Ваше избранное"
-            />
-          </ClientOnly>
-        </div>
-      </div>
-
       <!-- Популярные категории.
            Без гейта: данные (menuTree) уже приезжают в SSR-payload, а выбор
            раскладки переехал с useIsMobile на медиазапрос — рисовать можно
@@ -742,18 +735,60 @@ useIndexableRobotsRule({ index: true, follow: true })
             Выгода каждый день
           </span>
         </div>
-        <ClientOnly>
-          <template #default>
-            <HomeLoyaltyBanner class="mb-4" />
-            <div class="home-promo-grid">
-              <HomeDealOfTheDayCard />
-              <HomePromoBenefitTiles />
-            </div>
-          </template>
-          <template #fallback>
-            <Skeleton class="h-64 w-full rounded-3xl" />
-          </template>
-        </ClientOnly>
+        <!-- Баннер лояльности — единственное персональное в блоке (кнопка входа и
+             число бонусов), поэтому он остаётся клиентским. Слот держит его высоту
+             по подсказке прошлого визита: у гостя баннер 644px, у залогиненного 586
+             (на 390px кнопки у гостя переносятся на вторую строку), так что одной
+             цифрой это не зашить — только замером.
+
+             Раньше здесь на весь блок стоял `Skeleton h-64`, то есть 256px там, где
+             содержимое занимает 922. Блок рос с 373 до 1039, а затем до 1285px и
+             двигал вниз всё, что ниже, — включая «Ваше избранное» и «Хиты продаж».
+             Замер на стенде 390px / Slow 4G / CPU ×4. -->
+        <div class="loyalty-slot mb-4">
+          <div ref="loyaltyEl">
+            <ClientOnly>
+              <HomeLoyaltyBanner />
+            </ClientOnly>
+          </div>
+        </div>
+
+        <!-- Карточка дня и плитки: данные публичные, персонального в них нет —
+             рисуются на сервере и в разметке есть сразу. -->
+        <div class="home-promo-grid">
+          <HomeDealOfTheDayCard />
+          <HomePromoBenefitTiles />
+        </div>
+      </div>
+
+      <!-- Ваше избранное.
+           Место выбрано владельцем: секция стоит перед «Хитами продаж». Заодно
+           это лучшее место и по механике — секция целиком клиентская и приезжает
+           поздно (на стенде около 9-й секунды), а её точка вставки лежит глубоко
+           за первым экраном. Пока подсказки о высоте нет (самый первый визит),
+           сдвиг происходит там, где его никто не видит. Когда секция стояла над
+           лентой, он приходился ровно на нижнюю кромку экрана и стоил 0.041 CLS.
+
+           Слот свой: он есть в SSR-разметке всегда и держит высоту по подсказке
+           прошлого визита (переменную ставит инлайн-скрипт в useHead), иначе при
+           скролле секция выталкивала бы вниз всё, что под ней, на 518px. -->
+      <div class="wishlist-slot">
+        <div ref="wishlistEl">
+          <ClientOnly>
+            <LazyProductsCarousel
+              v-if="showWishlistCarousel"
+              :is-loading="isFetchingRecommendations"
+              :products="wishlistProducts"
+              title="Ваше избранное"
+              see-all-link="/profile/wishlist"
+              @vue:mounted="onMainCarouselMounted"
+            />
+            <ProductCarouselSectionSkeleton
+              v-else-if="showWishlistSkeleton"
+              title="Ваше избранное"
+            />
+          </ClientOnly>
+        </div>
       </div>
 
       <!-- Хиты продаж.
@@ -875,6 +910,11 @@ useIndexableRobotsRule({ index: true, follow: true })
   /* То же самое для секции «Ваше избранное». */
   .wishlist-slot {
     min-height: var(--wishlist-reserve, 0px);
+  }
+
+  /* И для баннера лояльности внутри «Акций и бонусов». */
+  .loyalty-slot {
+    min-height: var(--loyalty-reserve, 0px);
   }
 }
 

@@ -109,4 +109,5 @@ export const HOME_RESERVE_HINT_TTL = 7 * 24 * 60 * 60 * 1000
 export const HOME_RESERVE_PARTS = {
   order: '--active-order-reserve',
   wishlist: '--wishlist-reserve',
+  loyalty: '--loyalty-reserve',
 } as const

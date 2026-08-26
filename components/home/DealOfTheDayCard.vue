@@ -19,12 +19,22 @@ const cartStore = useCartStore()
 const { getVariantUrl } = useSupabaseStorage()
 const { items } = storeToRefs(cartStore)
 
-const product = ref<FullProduct | null>(null)
-
-onMounted(async () => {
-  const featured = await productsStore.fetchFeaturedProducts(1)
-  product.value = featured?.[0] ?? null
-})
+/*
+ * Товар берётся на сервере, а не в onMounted.
+ *
+ * Данные тут ничьи персонально — обычная публичная выборка is_featured, — а
+ * из-за onMounted карточка появлялась только на 7372 мс и растила блок «Акции
+ * и бонусы» с 262 до 508px, толкая вниз всё, что ниже. Замер на стенде
+ * (390px, Slow 4G, CPU ×4).
+ */
+const { data: product } = await useAsyncData(
+  'home-deal-of-the-day',
+  async () => {
+    const featured = await productsStore.fetchFeaturedProducts(1)
+    return (featured?.[0] ?? null) as FullProduct | null
+  },
+  { default: () => null },
+)
 
 const line = computed(() =>
   product.value?.product_lines?.name
@@ -67,7 +77,13 @@ function addOne() {
 }
 
 // --- обратный отсчёт до конца суток ---
-const countdown = ref('')
+/*
+ * Заглушка, а не пустая строка: при `v-if="countdown"` таймер не рисовался на
+ * сервере и появлялся только на гидрации, добавляя карточке 14px. Настоящее
+ * значение на сервере не годится — главная лежит в ISR-кеше, и оттуда приехало
+ * бы время многочасовой давности.
+ */
+const countdown = ref('--:--:--')
 let timer: ReturnType<typeof setInterval> | null = null
 
 function tick() {
