@@ -276,7 +276,9 @@ const priceChars = computed(() => {
   const formatted = formatPrice(totalPrice.value)
   let digitIndex = 0
   return formatted.split('').map((char) => {
-    const isDigit = !Number.isNaN(Number(char)) && char !== ' '
+    // См. комментарий в pages/cart.vue: сравнение с обычным пробелом
+    // ломалось о неразрывный, который теперь отдаёт formatPrice.
+    const isDigit = /\d/.test(char)
     const result = { char, isDigit, digitIndex: isDigit ? digitIndex : -1 }
     if (isDigit)
       digitIndex++
@@ -1233,7 +1235,7 @@ watchEffect(() => {
                   <span class="sr-only">{{ formatPrice(totalPrice) }}&nbsp;₸</span>
                   <span class="pdp-price-reels" aria-hidden="true">
                     <template v-for="(item, index) in priceChars" :key="index">
-                      <span v-if="item.char === ' '" class="pdp-digit-gap" />
+                      <span v-if="!item.isDigit" class="pdp-digit-gap" />
                       <span
                         v-else-if="item.isDigit"
                         :ref="(el) => { if (el) digitColumns[item.digitIndex] = el as HTMLElement }"
