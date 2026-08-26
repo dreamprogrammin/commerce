@@ -686,37 +686,6 @@ useIndexableRobotsRule({ index: true, follow: true })
         </ClientOnly>
       </div>
 
-      <!-- Ваше избранное.
-           Стоит ПОД лентой намеренно. Секция целиком клиентская и приезжает
-           поздно (на стенде — около 9-й секунды), а место вставки под лентой
-           лежит ниже первого экрана: на 390×844 это y≈1357 при высоте экрана 844.
-           Пока подсказки о высоте нет — то есть в самый первый визит — сдвиг
-           происходит там, где его никто не видит. Выше ленты он приходился ровно
-           на нижнюю кромку экрана и стоил 0.041 CLS.
-
-           Слот свой, а не общий с лентой: он есть в SSR-разметке всегда и держит
-           высоту по подсказке прошлого визита (переменную ставит инлайн-скрипт в
-           useHead), иначе при скролле секция выталкивала бы вниз всё, что под
-           ней, на 518px. -->
-      <div class="wishlist-slot">
-        <div ref="wishlistEl">
-          <ClientOnly>
-            <LazyProductsCarousel
-              v-if="showWishlistCarousel"
-              :is-loading="isFetchingRecommendations"
-              :products="wishlistProducts"
-              title="Ваше избранное"
-              see-all-link="/profile/wishlist"
-              @vue:mounted="onMainCarouselMounted"
-            />
-            <ProductCarouselSectionSkeleton
-              v-else-if="showWishlistSkeleton"
-              title="Ваше избранное"
-            />
-          </ClientOnly>
-        </div>
-      </div>
-
       <!-- Популярные категории.
            Без гейта: данные (menuTree) уже приезжают в SSR-payload, а выбор
            раскладки переехал с useIsMobile на медиазапрос — рисовать можно
@@ -754,6 +723,36 @@ useIndexableRobotsRule({ index: true, follow: true })
             <Skeleton class="h-64 w-full rounded-3xl" />
           </template>
         </ClientOnly>
+      </div>
+
+      <!-- Ваше избранное.
+           Место выбрано владельцем: секция стоит перед «Хитами продаж». Заодно
+           это лучшее место и по механике — секция целиком клиентская и приезжает
+           поздно (на стенде около 9-й секунды), а её точка вставки лежит глубоко
+           за первым экраном. Пока подсказки о высоте нет (самый первый визит),
+           сдвиг происходит там, где его никто не видит. Когда секция стояла над
+           лентой, он приходился ровно на нижнюю кромку экрана и стоил 0.041 CLS.
+
+           Слот свой: он есть в SSR-разметке всегда и держит высоту по подсказке
+           прошлого визита (переменную ставит инлайн-скрипт в useHead), иначе при
+           скролле секция выталкивала бы вниз всё, что под ней, на 518px. -->
+      <div class="wishlist-slot">
+        <div ref="wishlistEl">
+          <ClientOnly>
+            <LazyProductsCarousel
+              v-if="showWishlistCarousel"
+              :is-loading="isFetchingRecommendations"
+              :products="wishlistProducts"
+              title="Ваше избранное"
+              see-all-link="/profile/wishlist"
+              @vue:mounted="onMainCarouselMounted"
+            />
+            <ProductCarouselSectionSkeleton
+              v-else-if="showWishlistSkeleton"
+              title="Ваше избранное"
+            />
+          </ClientOnly>
+        </div>
       </div>
 
       <!-- Хиты продаж.
