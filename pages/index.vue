@@ -261,6 +261,30 @@ const showRecommendedCarousel = computed(
 )
 
 /*
+ * Резерв места под баннер лояльности.
+ *
+ * Баннер показывается всем — и гостю, и залогиненному, — поэтому снимать этот
+ * резерв не нужно никогда: случая «секции не оказалось» тут просто нет. Но
+ * высота зависит и от ширины экрана, и от состояния входа, так что её
+ * приходится мерить, а не зашивать.
+ */
+const loyaltyEl = ref<HTMLElement | null>(null)
+let loyaltySizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (!loyaltyEl.value)
+    return
+  loyaltySizeObserver = new ResizeObserver(() => {
+    const px = loyaltyEl.value?.offsetHeight ?? 0
+    if (px > 0)
+      reserve.save('loyalty', px)
+  })
+  loyaltySizeObserver.observe(loyaltyEl.value)
+})
+
+onBeforeUnmount(() => loyaltySizeObserver?.disconnect())
+
+/*
  * Уборка резерва места под персональные секции.
  *
  * Подсказки о высоте ставит инлайн-скрипт в <head> (см. useHead ниже), а снимают
@@ -275,7 +299,7 @@ watch([isLoggedIn, isAdmin], ([loggedIn, admin]) => {
   // immediate этот обработчик отрабатывает уже в setup.
   if (import.meta.server || (loggedIn && !admin))
     return
-  reserve.dropAll()
+  reserve.dropPersonal()
   hasWishlistHint.value = false
 }, { immediate: true })
 
@@ -711,18 +735,30 @@ useIndexableRobotsRule({ index: true, follow: true })
             Выгода каждый день
           </span>
         </div>
-        <ClientOnly>
-          <template #default>
-            <HomeLoyaltyBanner class="mb-4" />
-            <div class="home-promo-grid">
-              <HomeDealOfTheDayCard />
-              <HomePromoBenefitTiles />
-            </div>
-          </template>
-          <template #fallback>
-            <Skeleton class="h-64 w-full rounded-3xl" />
-          </template>
-        </ClientOnly>
+        <!-- Баннер лояльности — единственное персональное в блоке (кнопка входа и
+             число бонусов), поэтому он остаётся клиентским. Слот держит его высоту
+             по подсказке прошлого визита: у гостя баннер 644px, у залогиненного 586
+             (на 390px кнопки у гостя переносятся на вторую строку), так что одной
+             цифрой это не зашить — только замером.
+
+             Раньше здесь на весь блок стоял `Skeleton h-64`, то есть 256px там, где
+             содержимое занимает 922. Блок рос с 373 до 1039, а затем до 1285px и
+             двигал вниз всё, что ниже, — включая «Ваше избранное» и «Хиты продаж».
+             Замер на стенде 390px / Slow 4G / CPU ×4. -->
+        <div class="loyalty-slot mb-4">
+          <div ref="loyaltyEl">
+            <ClientOnly>
+              <HomeLoyaltyBanner />
+            </ClientOnly>
+          </div>
+        </div>
+
+        <!-- Карточка дня и плитки: данные публичные, персонального в них нет —
+             рисуются на сервере и в разметке есть сразу. -->
+        <div class="home-promo-grid">
+          <HomeDealOfTheDayCard />
+          <HomePromoBenefitTiles />
+        </div>
       </div>
 
       <!-- Ваше избранное.
@@ -874,6 +910,11 @@ useIndexableRobotsRule({ index: true, follow: true })
   /* То же самое для секции «Ваше избранное». */
   .wishlist-slot {
     min-height: var(--wishlist-reserve, 0px);
+  }
+
+  /* И для баннера лояльности внутри «Акций и бонусов». */
+  .loyalty-slot {
+    min-height: var(--loyalty-reserve, 0px);
   }
 }
 
