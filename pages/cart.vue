@@ -89,7 +89,13 @@ const priceChars = computed(() => {
   const formatted = formatPrice(orderTotal.value)
   let digitIndex = 0
   return formatted.split('').map((char) => {
-    const isDigit = !Number.isNaN(Number(char)) && char !== ' '
+    // Цифра — это цифра, а не «всё, что не пробел». Прежняя проверка
+    // сравнивала с обычным пробелом U+0020, и когда formatPrice перешёл на
+    // неразрывный U+00A0, разделитель разрядов стал считаться ЦИФРОЙ и
+    // барабан рисовал вместо него лишний столбец: «31 170 ₸» в липкой панели
+    // превращалось в «311700₸». Проверка по регулярке от вида пробела не
+    // зависит вовсе.
+    const isDigit = /\d/.test(char)
     const result = { char, isDigit, digitIndex: isDigit ? digitIndex : -1 }
     if (isDigit)
       digitIndex++
@@ -712,7 +718,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             <div class="flex items-center gap-1">
               <div class="flex text-[22px] font-extrabold">
                 <template v-for="(char, index) in priceChars" :key="index">
-                  <span v-if="char.char === ' '" class="w-1.5 shrink-0" />
+                  <span v-if="!char.isDigit" class="w-1.5 shrink-0" />
                   <div
                     v-else-if="char.isDigit"
                     :ref="(el) => { if (el) digitColumns[char.digitIndex] = el as HTMLElement }"
@@ -794,7 +800,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <span class="flex flex-col items-end leading-[1.12]">
             <b class="flex items-center text-[17px] font-extrabold">
               <template v-for="(char, index) in priceChars" :key="`mobile-${index}`">
-                <span v-if="char.char === ' '" class="w-1 shrink-0" />
+                <span v-if="!char.isDigit" class="w-1 shrink-0" />
                 <span
                   v-else-if="char.isDigit"
                   :ref="(el) => { if (el) mobileDigitColumns[char.digitIndex] = el as HTMLElement }"
