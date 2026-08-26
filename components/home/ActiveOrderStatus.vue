@@ -1,12 +1,9 @@
 <script setup lang="ts">
+import { useHomeReserve } from '@/composables/home/useHomeReserve'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
-import {
-  ACTIVE_ORDER_HEIGHT_HINT_KEY,
-  ACTIVE_ORDER_HEIGHT_HINT_TTL,
-  BUCKET_NAME_PRODUCT,
-} from '@/constants'
+import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const user = useSupabaseUser()
 
@@ -24,53 +21,21 @@ const { getImageUrl } = useSupabaseStorage()
 
 /*
  * Резерв места под карточку — чтобы она не выталкивала страницу вниз.
- *
- * Компонент рисуется только на клиенте (в SSR-разметке персонального быть не
- * может: она общая и лежит в ISR-кеше), поэтому раньше блок вырастал из нуля
- * уже после гидрации. Здесь ведётся подсказка о высоте прошлой карточки:
- * записывает её этот компонент, а читает — инлайн-скрипт в <head> главной,
- * до первой отрисовки. Пока данные едут, зарезервированное место занимает
- * скелетон, чтобы это не выглядело пустой полосой.
+ * Механизм и замеры — в useHomeReserve.
  */
+const reserve = useHomeReserve()
 const cardEl = ref<HTMLElement | null>(null)
 const hasHeightHint = ref(false)
-
-function readHeightHint(): number | null {
-  try {
-    const raw = JSON.parse(localStorage.getItem(ACTIVE_ORDER_HEIGHT_HINT_KEY) || 'null')
-    if (raw && raw.px > 0 && Date.now() - raw.at < ACTIVE_ORDER_HEIGHT_HINT_TTL)
-      return raw.px
-  }
-  catch {}
-  return null
-}
-
-function writeHeightHint(px: number) {
-  try {
-    localStorage.setItem(ACTIVE_ORDER_HEIGHT_HINT_KEY, JSON.stringify({ px, at: Date.now() }))
-  }
-  catch {}
-  document.documentElement.style.setProperty('--active-order-reserve', `${px}px`)
-  hasHeightHint.value = true
-}
-
-function dropHeightHint() {
-  try {
-    localStorage.removeItem(ACTIVE_ORDER_HEIGHT_HINT_KEY)
-  }
-  catch {}
-  document.documentElement.style.removeProperty('--active-order-reserve')
-  hasHeightHint.value = false
-}
 
 // Подписка на обновления заказов
 let channel: any = null
 
 onMounted(async () => {
-  hasHeightHint.value = readHeightHint() !== null
+  hasHeightHint.value = reserve.has('order')
 
   if (!user.value) {
-    dropHeightHint()
+    reserve.drop('order')
+    hasHeightHint.value = false
     return
   }
 
@@ -79,8 +44,10 @@ onMounted(async () => {
 
   // Заказ закрылся (или его и не было) — резерв надо снять, иначе на главной
   // останется пустая полоса, и не только в этот визит, но и в следующие.
-  if (!activeOrder.value)
-    dropHeightHint()
+  if (!activeOrder.value) {
+    reserve.drop('order')
+    hasHeightHint.value = false
+  }
 })
 
 onUnmounted(() => {
@@ -220,8 +187,10 @@ watch(isCardVisible, async (visible) => {
     return
   await nextTick()
   const px = cardEl.value?.offsetHeight ?? 0
-  if (px > 0)
-    writeHeightHint(px)
+  if (px > 0) {
+    reserve.save('order', px)
+    hasHeightHint.value = true
+  }
 }, { immediate: true })
 
 // Флаг блокировки обновления displayOrder (когда показываем финальный статус)
