@@ -11,7 +11,11 @@ const jar = []
 const sb = createServerClient(env.SUPABASE_URL, env.SUPABASE_KEY, { cookieOptions: { name: 'sb-127-auth-token' }, cookies: { getAll: () => [], setAll: c => jar.push(...c) } })
 await sb.auth.setSession({ access_token: sess.access_token, refresh_token: sess.refresh_token })
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true })
+const isDesktop = process.argv.includes('--desktop')
+const ctx = await browser.newContext(isDesktop
+  ? { viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: true }
+  : { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true })
+console.log(isDesktop ? 'десктоп 1280×900' : 'мобилка 390×844')
 await ctx.addCookies(jar.map(c => ({ name: c.name, value: c.value, domain: 'localhost', path: '/' })))
 await ctx.addInitScript(() => {
   try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())) } catch {}
