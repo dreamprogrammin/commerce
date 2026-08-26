@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useHomeReserve } from '@/composables/home/useHomeReserve'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
 import { IMAGE_SIZES } from '@/config/images'
@@ -18,13 +19,57 @@ const {
 
 const { getImageUrl } = useSupabaseStorage()
 
+/*
+ * Резерв места под карточку — чтобы она не выталкивала страницу вниз.
+ * Механизм и замеры — в useHomeReserve.
+ */
+const reserve = useHomeReserve()
+const cardEl = ref<HTMLElement | null>(null)
+const cardLinkEl = ref<{ $el?: HTMLElement } | HTMLElement | null>(null)
+const hasHeightHint = ref(false)
+
+/**
+ * Сколько места карточка занимает в секции.
+ *
+ * Не offsetHeight обёртки: у карточки есть mb-4, и пока у слота нет min-height,
+ * этот отступ схлопывается наружу — обёртка его не считает, а место он занимает.
+ * Подсказка выходила на 16px меньше реальной, и блок подрастал ровно в момент
+ * появления скелетона (поймано на десктопе: контейнер 140 → 156 на 6179 мс,
+ * и всё ниже уезжало на 16px).
+ *
+ * Отступ читается из вычисленного стиля, а не зашит числом: класс на карточке
+ * могут поменять, и молча разъехаться это не должно.
+ */
+function measureCardSpace(): number {
+  const box = cardEl.value?.offsetHeight ?? 0
+  if (box <= 0)
+    return 0
+  const link = cardLinkEl.value
+  const el = link && '$el' in link ? link.$el : (link as HTMLElement | null)
+  const margin = el ? Number.parseFloat(getComputedStyle(el).marginBottom || '0') : 0
+  return box + (Number.isFinite(margin) ? margin : 0)
+}
+
 // Подписка на обновления заказов
 let channel: any = null
 
 onMounted(async () => {
-  if (user.value) {
-    await fetchOrders()
-    channel = subscribeToOrderUpdates()
+  hasHeightHint.value = reserve.has('order')
+
+  if (!user.value) {
+    reserve.drop('order')
+    hasHeightHint.value = false
+    return
+  }
+
+  await fetchOrders()
+  channel = subscribeToOrderUpdates()
+
+  // Заказ закрылся (или его и не было) — резерв надо снять, иначе на главной
+  // останется пустая полоса, и не только в этот визит, но и в следующие.
+  if (!activeOrder.value) {
+    reserve.drop('order')
+    hasHeightHint.value = false
   }
 })
 
@@ -149,6 +194,28 @@ const shouldShowCard = ref(true)
 // 🎯 Локальная копия заказа для отображения (чтобы показывать отмененный заказ 5 секунд)
 const displayOrder = ref<typeof activeOrder.value>(null)
 
+/** Карточка готова к показу. */
+const isCardVisible = computed(
+  () => !isLoading.value && !!displayOrder.value && shouldShowCard.value && !!orderColorScheme.value,
+)
+
+/** Скелетон держит зарезервированное место, пока карточка едет. */
+const showReservedSkeleton = computed(() => hasHeightHint.value && !isCardVisible.value)
+
+// Высоту снимаем с уже отрисованной карточки: считать её из отступов и размеров
+// значков бессмысленно — строка со статусом переносится по-разному в зависимости
+// от длины подписи и ширины экрана.
+watch(isCardVisible, async (visible) => {
+  if (!visible)
+    return
+  await nextTick()
+  const px = measureCardSpace()
+  if (px > 0) {
+    reserve.save('order', px)
+    hasHeightHint.value = true
+  }
+}, { immediate: true })
+
 // Флаг блокировки обновления displayOrder (когда показываем финальный статус)
 const isShowingFinalStatus = ref(false)
 
@@ -207,127 +274,147 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
 </script>
 
 <template>
-  <!-- 🔥 Красивая карточка активного заказа в стиле детских карточек -->
-  <Transition
-    enter-active-class="transition duration-300 ease-out"
-    enter-from-class="opacity-0 scale-95"
-    enter-to-class="opacity-100 scale-100"
-    leave-active-class="transition duration-300 ease-in"
-    leave-from-class="opacity-100 scale-100"
-    leave-to-class="opacity-0 scale-95"
-  >
-    <NuxtLink
-      v-if="!isLoading && displayOrder && shouldShowCard && orderColorScheme"
-      :to="`/profile/order/${displayOrder.id}`"
-      class="block mb-4"
-    >
-      <Card
-        class="order-card cursor-pointer overflow-hidden p-0 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg border-2"
-        :class="orderColorScheme.border"
-      >
-        <div class="p-4 sm:p-5 relative">
-          <!-- Цветной оверлей при hover (цвет зависит от статуса) -->
-          <div
-            class="color-overlay absolute inset-0 pointer-events-none transition-opacity duration-300"
-            :class="orderColorScheme.overlay"
-          />
-
-          <div class="flex items-center gap-4 relative z-10">
-            <!-- Миниатюры товаров вместо аватара -->
-            <div class="relative flex-shrink-0">
-              <div class="product-thumbnails-container">
-                <!-- Стек из 3 изображений с эффектом глубины -->
-                <div class="relative w-16 h-16">
-                  <div
-                    v-for="(thumbnail, index) in productThumbnails.slice(0, 3)"
-                    :key="thumbnail.id"
-                    class="absolute rounded-xl overflow-hidden bg-white shadow-md transition-transform duration-300"
-                    :class="{
-                      'w-16 h-16 z-30': index === 0,
-                      'w-14 h-14 z-20 top-1 left-2 opacity-80': index === 1,
-                      'w-12 h-12 z-10 top-2 left-4 opacity-60': index === 2,
-                    }"
-                  >
-                    <ProgressiveImage
-                      v-if="thumbnail.imageUrl"
-                      :src="thumbnail.imageUrl"
-                      :blur-data-url="thumbnail.blurPlaceholder"
-                      :alt="thumbnail.name"
-                      object-fit="contain"
-                      placeholder-type="lqip"
-                      aspect-ratio="square"
-                      class="w-full h-full"
-                    />
-                    <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
-                      <Icon name="lucide:package" class="w-4 h-4 text-gray-400" />
-                    </div>
-                  </div>
-
-                  <!-- Индикатор дополнительных товаров (цвет зависит от статуса) -->
-                  <div
-                    v-if="displayOrder.order_items.length > 3"
-                    class="absolute -bottom-1 -right-1 z-40 w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shadow-lg ring-2 ring-white"
-                    :class="orderColorScheme.indicator"
-                  >
-                    +{{ displayOrder.order_items.length - 3 }}
-                  </div>
-                </div>
-              </div>
+  <div ref="cardEl">
+    <!-- Заглушка в зарезервированном месте: высота приходит из подсказки
+         прошлого визита, так что подмена скелетона карточкой ничего не сдвигает. -->
+    <div v-if="showReservedSkeleton" class="mb-4">
+      <Card class="p-0 border-2 border-transparent">
+        <div class="p-4 sm:p-5">
+          <div class="flex items-center gap-4">
+            <Skeleton class="size-16 shrink-0 rounded-xl" />
+            <div class="flex-grow min-w-0 space-y-2">
+              <Skeleton class="h-4 w-40 max-w-full rounded-full" />
+              <Skeleton class="h-3 w-52 max-w-full rounded-full" />
             </div>
-
-            <!-- Информация о заказе -->
-            <div class="flex-grow min-w-0">
-              <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                <!-- Статус -->
-                <Badge
-                  :class="getStatusColor(displayOrder.status)"
-                  class="text-[11px] px-2.5 py-0.5 rounded-full font-medium"
-                >
-                  {{ getStatusLabel(displayOrder.status) }}
-                </Badge>
-
-                <!-- Номер заказа -->
-                <h3 class="font-bold text-sm text-card-foreground">
-                  №{{ displayOrder.id.slice(-6) }}
-                </h3>
-              </div>
-
-              <!-- Дата и метрики -->
-              <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <!-- Дата заказа -->
-                <div class="flex items-center gap-1.5">
-                  <Icon name="lucide:calendar" class="w-3.5 h-3.5" />
-                  <span class="font-medium">{{ orderDate }}</span>
-                </div>
-
-                <!-- Стоимость -->
-                <div class="flex items-center gap-1.5">
-                  <Icon name="lucide:wallet" class="w-3.5 h-3.5" />
-                  <span class="font-semibold text-gray-900">{{ totalAmount }}&nbsp;₸</span>
-                </div>
-
-                <!-- Количество товаров -->
-                <Badge variant="secondary" class="text-[10px] px-2 py-0.5">
-                  {{ totalItems }} {{ totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров' }}
-                </Badge>
-              </div>
-            </div>
-
-            <!-- Стрелка (цвет зависит от статуса) -->
-            <div class="flex-shrink-0">
-              <div class="w-10 h-10 rounded-full flex items-center justify-center" :class="orderColorScheme.badge">
-                <Icon
-                  name="lucide:chevron-right"
-                  class="chevron-icon w-5 h-5 transition-transform duration-300"
-                  :class="orderColorScheme.icon"
-                />
-              </div>
-            </div>
+            <Skeleton class="size-10 shrink-0 rounded-full" />
           </div>
         </div>
       </Card>
-    </NuxtLink>
-  </Transition>
+    </div>
+
+    <!-- 🔥 Красивая карточка активного заказа в стиле детских карточек -->
+    <Transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-300 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <NuxtLink
+        v-if="isCardVisible"
+        ref="cardLinkEl"
+        :to="`/profile/order/${displayOrder!.id}`"
+        class="block mb-4"
+      >
+        <Card
+          class="order-card cursor-pointer overflow-hidden p-0 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg border-2"
+          :class="orderColorScheme.border"
+        >
+          <div class="p-4 sm:p-5 relative">
+            <!-- Цветной оверлей при hover (цвет зависит от статуса) -->
+            <div
+              class="color-overlay absolute inset-0 pointer-events-none transition-opacity duration-300"
+              :class="orderColorScheme.overlay"
+            />
+
+            <div class="flex items-center gap-4 relative z-10">
+              <!-- Миниатюры товаров вместо аватара -->
+              <div class="relative flex-shrink-0">
+                <div class="product-thumbnails-container">
+                  <!-- Стек из 3 изображений с эффектом глубины -->
+                  <div class="relative w-16 h-16">
+                    <div
+                      v-for="(thumbnail, index) in productThumbnails.slice(0, 3)"
+                      :key="thumbnail.id"
+                      class="absolute rounded-xl overflow-hidden bg-white shadow-md transition-transform duration-300"
+                      :class="{
+                        'w-16 h-16 z-30': index === 0,
+                        'w-14 h-14 z-20 top-1 left-2 opacity-80': index === 1,
+                        'w-12 h-12 z-10 top-2 left-4 opacity-60': index === 2,
+                      }"
+                    >
+                      <ProgressiveImage
+                        v-if="thumbnail.imageUrl"
+                        :src="thumbnail.imageUrl"
+                        :blur-data-url="thumbnail.blurPlaceholder"
+                        :alt="thumbnail.name"
+                        object-fit="contain"
+                        placeholder-type="lqip"
+                        aspect-ratio="square"
+                        class="w-full h-full"
+                      />
+                      <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
+                        <Icon name="lucide:package" class="w-4 h-4 text-gray-400" />
+                      </div>
+                    </div>
+
+                    <!-- Индикатор дополнительных товаров (цвет зависит от статуса) -->
+                    <div
+                      v-if="displayOrder.order_items.length > 3"
+                      class="absolute -bottom-1 -right-1 z-40 w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shadow-lg ring-2 ring-white"
+                      :class="orderColorScheme.indicator"
+                    >
+                      +{{ displayOrder.order_items.length - 3 }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Информация о заказе -->
+              <div class="flex-grow min-w-0">
+                <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <!-- Статус -->
+                  <Badge
+                    :class="getStatusColor(displayOrder.status)"
+                    class="text-[11px] px-2.5 py-0.5 rounded-full font-medium"
+                  >
+                    {{ getStatusLabel(displayOrder.status) }}
+                  </Badge>
+
+                  <!-- Номер заказа -->
+                  <h3 class="font-bold text-sm text-card-foreground">
+                    №{{ displayOrder.id.slice(-6) }}
+                  </h3>
+                </div>
+
+                <!-- Дата и метрики -->
+                <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <!-- Дата заказа -->
+                  <div class="flex items-center gap-1.5">
+                    <Icon name="lucide:calendar" class="w-3.5 h-3.5" />
+                    <span class="font-medium">{{ orderDate }}</span>
+                  </div>
+
+                  <!-- Стоимость -->
+                  <div class="flex items-center gap-1.5">
+                    <Icon name="lucide:wallet" class="w-3.5 h-3.5" />
+                    <span class="font-semibold text-gray-900">{{ totalAmount }}&nbsp;₸</span>
+                  </div>
+
+                  <!-- Количество товаров -->
+                  <Badge variant="secondary" class="text-[10px] px-2 py-0.5">
+                    {{ totalItems }} {{ totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров' }}
+                  </Badge>
+                </div>
+              </div>
+
+              <!-- Стрелка (цвет зависит от статуса) -->
+              <div class="flex-shrink-0">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center" :class="orderColorScheme.badge">
+                  <Icon
+                    name="lucide:chevron-right"
+                    class="chevron-icon w-5 h-5 transition-transform duration-300"
+                    :class="orderColorScheme.icon"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </NuxtLink>
+    </Transition>
+  </div>
 </template>
 
 <style scoped>

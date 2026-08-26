@@ -88,3 +88,25 @@ export const BANNER_PLACEMENTS = {
   PRODUCT_PAGE: 'product_page',
   CHECKOUT: 'checkout',
 } as const
+
+/**
+ * Ключ подсказки о высоте персональных секций главной.
+ *
+ * Персональное рисуется только на клиенте (SSR-разметка главной общая для всех
+ * и лежит в ISR-кеше), поэтому место под него резервируется по прошлому визиту:
+ * страница и компоненты кладут сюда измеренные высоты, а инлайн-скрипт в <head>
+ * читает их до первой отрисовки. У гостя и у того, у кого этих секций нет,
+ * подсказки нет — и резерв равен нулю.
+ *
+ * Формат: `{ order?: number, wishlist?: number, at: number }`, значения в px.
+ */
+export const HOME_RESERVE_HINT_KEY = 'uhti:home-reserve'
+
+/** Подсказка живёт неделю: за это время и заказ закрывается, и избранное меняется. */
+export const HOME_RESERVE_HINT_TTL = 7 * 24 * 60 * 60 * 1000
+
+/** Части главной, под которые резервируется место, и переменные CSS для них. */
+export const HOME_RESERVE_PARTS = {
+  order: '--active-order-reserve',
+  wishlist: '--wishlist-reserve',
+} as const
