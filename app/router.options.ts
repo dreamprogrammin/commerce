@@ -1,0 +1,85 @@
+import type { RouterConfig } from '@nuxt/schema'
+import { useNuxtApp } from '#app/nuxt'
+
+/**
+ * Своё поведение скролла при переходах.
+ *
+ * Штатная реализация Nuxt делает две вещи, которые вместе давали баг, описанный
+ * владельцем как «при входе в товар или категорию скролл начинается снизу и
+ * резко идёт наверх»:
+ *
+ *  1. Она возвращает промис и резолвит его только после `page:loading:end` и
+ *     промиса транзишена. К этому моменту новая страница уже отрисована — на
+ *     СТАРОМ смещении. Замер на стенде (390px, CPU ×4), переход из каталога,
+ *     прокрученного до y=2500, в категорию:
+ *
+ *       363 мс  y=2538  /catalog/boys/mashinki   ← открылась на середине
+ *       644 мс  y=3908                           ← и уехала ещё ниже
+ *
+ *  2. Позицию она возвращает без `behavior`, а в глобальных стилях у `html`
+ *     стоит `scroll-behavior: smooth`. Поэтому сброс наверх не мгновенный, а
+ *     анимированный — в том же замере он занял 1.1 секунды:
+ *
+ *       731…1772 мс  3899 → 3841 → 3757 → 3514 → 3382 → 3212 → 1115 → 51 → 0
+ *
+ * Здесь обычный переход на новую страницу скроллится наверх сразу и мгновенно:
+ * `behavior: 'instant'` бьёт CSS-плавность, а немедленный возврат значения
+ * означает, что скролл случится ещё до отрисовки новой страницы.
+ *
+ * Ожидание отрисовки сохранено там, где оно действительно нужно: при переходе
+ * назад/вперёд (иначе браузер обрежет восстановленную позицию по ещё короткой
+ * странице) и при переходе на якорь чужой страницы (элемента ещё нет в DOM).
+ *
+ * Остальная семантика повторяет штатную: тот же путь — позицию не трогаем,
+ * `to.meta.scrollToTop === false` уважаем.
+ */
+
+/** Отступ якоря: scroll-margin самого элемента плюс scroll-padding страницы. */
+function hashOffset(selector: string): number {
+  try {
+    const el = document.querySelector(selector)
+    if (el) {
+      return (Number.parseFloat(getComputedStyle(el).scrollMarginTop) || 0)
+        + (Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0)
+    }
+  }
+  catch {}
+  return 0
+}
+
+export default <RouterConfig>{
+  scrollBehavior(to, from, savedPosition) {
+    const nuxtApp = useNuxtApp()
+
+    // Тот же путь: поменялись только hash или query.
+    if (to.path.replace(/\/$/, '') === from.path.replace(/\/$/, '')) {
+      if (from.hash && !to.hash)
+        return { left: 0, top: 0 }
+      if (to.hash)
+        return { el: to.hash, top: hashOffset(to.hash), behavior: 'smooth' }
+      return false
+    }
+
+    const allowsScrollToTop = typeof to.meta.scrollToTop === 'function'
+      ? to.meta.scrollToTop(to, from)
+      : to.meta.scrollToTop
+    if (allowsScrollToTop === false)
+      return false
+
+    // Ждать отрисовки нужно только этим двум случаям.
+    if (savedPosition || to.hash) {
+      return new Promise((resolve) => {
+        nuxtApp.hooks.hookOnce('page:loading:end', () => {
+          requestAnimationFrame(() => {
+            resolve(
+              savedPosition
+              ?? { el: to.hash, top: hashOffset(to.hash), behavior: 'smooth' },
+            )
+          })
+        })
+      })
+    }
+
+    return { left: 0, top: 0, behavior: 'instant' }
+  },
+}
