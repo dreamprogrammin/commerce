@@ -1,5 +1,6 @@
 import type { RouterConfig } from '@nuxt/schema'
 import { useNuxtApp } from '#app/nuxt'
+import { recallScrollPosition } from '@/utils/scrollPositions'
 
 /**
  * Своё поведение скролла при переходах.
@@ -26,6 +27,13 @@ import { useNuxtApp } from '#app/nuxt'
  * `behavior: 'instant'` бьёт CSS-плавность, а немедленный возврат значения
  * означает, что скролл случится ещё до отрисовки новой страницы.
  *
+ * ВАЖНО: этого мало. Для части переходов (каталог → карточка товара) роутер
+ * `scrollBehavior` не вызывает вовсе — проверено замером, там не срабатывает и
+ * `afterEach`, хотя адрес и currentRoute уже на товаре. Поэтому сам сброс
+ * наверх делает plugins/scrollPosition.client.ts в `beforeEach`, который
+ * срабатывает всегда. Здесь он остаётся подстраховкой и обработчиком двух
+ * случаев, до которых плагин не касается: возврата назад и якорей.
+ *
  * Ожидание отрисовки сохранено там, где оно действительно нужно: при переходе
  * назад/вперёд (иначе браузер обрежет восстановленную позицию по ещё короткой
  * странице) и при переходе на якорь чужой страницы (элемента ещё нет в DOM).
@@ -45,6 +53,29 @@ function hashOffset(selector: string): number {
   }
   catch {}
   return 0
+}
+
+/**
+ * Ждём, пока документ дорастёт до нужной позиции.
+ *
+ * Список товаров каталога дорисовывается после `page:loading:end`, и без
+ * ожидания браузер обрезал бы восстановленную позицию по ещё короткой странице.
+ * Ограничение по времени обязательно: страница может и не дорасти (товар из
+ * выдачи убрали), и тогда просто прокрутимся куда получится.
+ */
+function waitForHeight(top: number, timeout = 1200): Promise<void> {
+  return new Promise((resolve) => {
+    const deadline = performance.now() + timeout
+    const check = () => {
+      const enough = document.documentElement.scrollHeight >= top + window.innerHeight
+      if (enough || performance.now() > deadline) {
+        resolve()
+        return
+      }
+      requestAnimationFrame(check)
+    }
+    check()
+  })
 }
 
 export default <RouterConfig>{
@@ -68,11 +99,22 @@ export default <RouterConfig>{
 
     // Ждать отрисовки нужно только этим двум случаям.
     if (savedPosition || to.hash) {
+      /*
+       * savedPosition от vue-router приезжает нулевым: он вычисляет позицию
+       * уже после размонтирования старой страницы. Свою мы записали в
+       * beforeEach, когда скролл был настоящий (см. utils/scrollPositions.ts).
+       */
+      const target = savedPosition
+        ? recallScrollPosition(to.fullPath) ?? savedPosition
+        : null
+
       return new Promise((resolve) => {
-        nuxtApp.hooks.hookOnce('page:loading:end', () => {
+        nuxtApp.hooks.hookOnce('page:loading:end', async () => {
+          if (target)
+            await waitForHeight(target.top)
           requestAnimationFrame(() => {
             resolve(
-              savedPosition
+              target
               ?? { el: to.hash, top: hashOffset(to.hash), behavior: 'smooth' },
             )
           })
