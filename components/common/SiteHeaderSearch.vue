@@ -469,6 +469,22 @@ function formatPrice(price: number, discount?: number) {
     font-size: 14px;
   }
 
+  /* Safari на iOS зумит страницу при фокусе в поле, у которого font-size
+     меньше 16px, и сам обратно не отзумливает — покупатель дозаполняет форму
+     на увеличенном экране и вынужден сводить его пальцами. Единственный способ
+     это выключить — дать полю ровно 16px и больше; `user-scalable=no` в
+     viewport Safari игнорирует с iOS 10, а отключать масштабирование страницы
+     нельзя и по доступности.
+
+     Условие по pointer, а не только по ширине: на планшете в альбомной
+     ориентации ширина десктопная, а зум при фокусе всё равно есть. */
+  @media (pointer: coarse), (max-width: 1023px) {
+    .sh-search__input,
+    .sh-search--dense .sh-search__input {
+      font-size: 16px;
+    }
+  }
+
   /* Убираем нативный крестик у type=search */
   .sh-search__input::-webkit-search-decoration,
   .sh-search__input::-webkit-search-cancel-button {
