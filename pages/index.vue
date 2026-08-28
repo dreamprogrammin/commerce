@@ -715,17 +715,29 @@ useIndexableRobotsRule({ index: true, follow: true })
            раскладки переехал с useIsMobile на медиазапрос — рисовать можно
            прямо на сервере. LQIP-подложки плиток по-прежнему догружаются
            на клиенте, они необязательные. -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
+      <HomeDeferredSection
+        :h="532"
+        :h-lg="600"
+        :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]"
+      >
         <HomePopularCategories />
-      </div>
+      </HomeDeferredSection>
 
       <!-- Популярные бренды: данные берутся на сервере, гейт не нужен -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
+      <HomeDeferredSection
+        :h="511"
+        :h-lg="430"
+        :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]"
+      >
         <HomeBrandsRail />
-      </div>
+      </HomeDeferredSection>
 
       <!-- Акции и бонусы -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'md' })]">
+      <HomeDeferredSection
+        :h="1285"
+        :h-lg="744"
+        :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'md' })]"
+      >
         <div class="flex items-baseline justify-between gap-3 mb-5">
           <h2 class="m-0 font-bold tracking-tight text-[clamp(22px,3vw,32px)]">
             Акции и бонусы
@@ -759,7 +771,7 @@ useIndexableRobotsRule({ index: true, follow: true })
           <HomeDealOfTheDayCard />
           <HomePromoBenefitTiles />
         </div>
-      </div>
+      </HomeDeferredSection>
 
       <!-- Ваше избранное.
            Место выбрано владельцем: секция стоит перед «Хитами продаж». Заодно
@@ -795,16 +807,25 @@ useIndexableRobotsRule({ index: true, follow: true })
            Ни ClientOnly, ни таймера: первая страница товаров приезжает из SSR
            (почему — в комментарии внутри BestsellersGrid.vue). Прятать нечего,
            а скелетон здесь только удлинял путь до контента. -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
+      <HomeDeferredSection
+        :h="1531"
+        :h-lg="978"
+        :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]"
+      >
         <HomeBestsellersGrid />
-      </div>
+      </HomeDeferredSection>
 
       <!-- SEO-блок (сохранён).
            Нижнего отступа здесь быть НЕ должно: блок последний в `.home-content`,
            и его padding-bottom давал белую полосу между листом и футером.
            Поэтому вместо sectionSpacingVariants({ size: 'lg' }) — только верхний
            отступ, теми же значениями (py-12 md:py-16 → pt-12 md:pt-16). -->
-      <div :class="alwaysContainedClass" class="border-t pt-12 md:pt-16">
+      <HomeDeferredSection
+        :h="1031"
+        :h-lg="667"
+        :class="alwaysContainedClass"
+        class="border-t pt-12 md:pt-16"
+      >
         <div class="prose prose-lg max-w-none">
           <h2 class="text-2xl md:text-3xl font-bold mb-6">
             Интернет-магазин детских игрушек {{ siteName }} в Алматы
@@ -893,7 +914,7 @@ useIndexableRobotsRule({ index: true, follow: true })
             </div>
           </div>
         </div>
-      </div>
+      </HomeDeferredSection>
     </div>
   </div>
 </template>
