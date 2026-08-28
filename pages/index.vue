@@ -715,17 +715,17 @@ useIndexableRobotsRule({ index: true, follow: true })
            раскладки переехал с useIsMobile на медиазапрос — рисовать можно
            прямо на сервере. LQIP-подложки плиток по-прежнему догружаются
            на клиенте, они необязательные. -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]" class="home-defer home-defer--categories">
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
         <HomePopularCategories />
       </div>
 
       <!-- Популярные бренды: данные берутся на сервере, гейт не нужен -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]" class="home-defer home-defer--brands">
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
         <HomeBrandsRail />
       </div>
 
       <!-- Акции и бонусы -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'md' })]" class="home-defer home-defer--promo">
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'md' })]">
         <div class="flex items-baseline justify-between gap-3 mb-5">
           <h2 class="m-0 font-bold tracking-tight text-[clamp(22px,3vw,32px)]">
             Акции и бонусы
@@ -795,7 +795,7 @@ useIndexableRobotsRule({ index: true, follow: true })
            Ни ClientOnly, ни таймера: первая страница товаров приезжает из SSR
            (почему — в комментарии внутри BestsellersGrid.vue). Прятать нечего,
            а скелетон здесь только удлинял путь до контента. -->
-      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]" class="home-defer home-defer--bestsellers">
+      <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
         <HomeBestsellersGrid />
       </div>
 
@@ -804,7 +804,7 @@ useIndexableRobotsRule({ index: true, follow: true })
            и его padding-bottom давал белую полосу между листом и футером.
            Поэтому вместо sectionSpacingVariants({ size: 'lg' }) — только верхний
            отступ, теми же значениями (py-12 md:py-16 → pt-12 md:pt-16). -->
-      <div :class="alwaysContainedClass" class="home-defer home-defer--seo border-t pt-12 md:pt-16">
+      <div :class="alwaysContainedClass" class="border-t pt-12 md:pt-16">
         <div class="prose prose-lg max-w-none">
           <h2 class="text-2xl md:text-3xl font-bold mb-6">
             Интернет-магазин детских игрушек {{ siteName }} в Алматы
@@ -915,63 +915,6 @@ useIndexableRobotsRule({ index: true, follow: true })
   /* И для баннера лояльности внутри «Акций и бонусов». */
   .loyalty-slot {
     min-height: var(--loyalty-reserve, 0px);
-  }
-
-  /*
-   * Секции ниже первого экрана: браузер пропускает их вёрстку и отрисовку, пока
-   * до них не долистали. Правка нацелена на возврат нижней навигацией — главная
-   * пересобирается на клиенте целиком, и в замере это 936 мс занятого главного
-   * потока (390px, CPU ×4).
-   *
-   * Ожидаемые высоты подогнаны по факту, а не сняты со страницы без этой правки:
-   * под `content-visibility` секция получает `contain: layout`, из-за чего
-   * отступы внутри неё перестают схлопываться наружу и высота меняется. Замер
-   * без подгонки: страница стартовала с 7484px и оседала до 7338, «Хиты продаж»
-   * уезжали на 64px, SEO-блок на 96px. С этими значениями — ноль сдвигов,
-   * высота 7388 → 7338 (остаток ниже последней секции, он ничего не двигает).
-   *
-   * `auto` в значении означает, что после первой отрисовки браузер запомнит
-   * настоящий размер и дальше будет пользоваться им. Проверка при изменении
-   * секций — scroll-jump.mjs в корне: он ловит именно такие сдвиги.
-   */
-  .home-defer {
-    content-visibility: auto;
-  }
-  .home-defer--categories {
-    contain-intrinsic-size: auto 532px;
-  }
-  .home-defer--brands {
-    contain-intrinsic-size: auto 511px;
-  }
-  .home-defer--promo {
-    contain-intrinsic-size: auto 1221px;
-  }
-  .home-defer--bestsellers {
-    contain-intrinsic-size: auto 1499px;
-  }
-  .home-defer--seo {
-    contain-intrinsic-size: auto 981px;
-  }
-
-  /* На широком экране те же секции заметно короче — значения свои, иначе
-     страница стартует на полторы тысячи пикселей выше нужного и оседает
-     рывком (замер без этого блока: 6660 → 5155, «Хиты продаж» уезжали на 573). */
-  @media (min-width: 1024px) {
-    .home-defer--categories {
-      contain-intrinsic-size: auto 600px;
-    }
-    .home-defer--brands {
-      contain-intrinsic-size: auto 430px;
-    }
-    .home-defer--promo {
-      contain-intrinsic-size: auto 648px;
-    }
-    .home-defer--bestsellers {
-      contain-intrinsic-size: auto 946px;
-    }
-    .home-defer--seo {
-      contain-intrinsic-size: auto 602px;
-    }
   }
 }
 
