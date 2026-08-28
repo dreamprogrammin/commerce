@@ -21,9 +21,12 @@ const go = async (href) => {
   await p.locator(sel).nth(Math.max(i, 0)).click({ timeout: 20000 })
   await p.waitForFunction(h => location.pathname === h, href, { timeout: 30000 }).catch(() => {})
 }
-await go(DESK ? '/catalog/all' : '/catalog')
-await p.waitForTimeout(5000)
-await go('/')
+// --first: без перехода, смотрим прокрутку сразу после первой загрузки.
+if (!process.argv.includes('--first')) {
+  await go(DESK ? '/catalog/all' : '/catalog')
+  await p.waitForTimeout(5000)
+  await go('/')
+}
 await p.waitForTimeout(2500)
 
 const snap = () => p.evaluate(() => {
