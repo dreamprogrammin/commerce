@@ -29,7 +29,9 @@ const requestIdleCallback = globalThis.requestIdleCallback || ((cb: IdleRequestC
 
 const nuxtApp = useNuxtApp()
 const isMobile = useIsMobile(1023)
-const isPageLoading = ref(false)
+// Признак вынесен в общее состояние: нижняя навигация зажигает полоску сразу
+// по нажатию, не дожидаясь хука роутера (см. composables/usePageLoading.ts).
+const isPageLoading = usePageLoading()
 const modalStore = useModalStore()
 const profileStore = useProfileStore()
 const cartStore = useCartStore()
