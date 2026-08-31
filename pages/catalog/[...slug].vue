@@ -68,7 +68,7 @@ const SEOContentRenderer = defineAsyncComponent(
   () => import('@/components/category/SEOContentRenderer.vue'),
 )
 
-definePageMeta({ layout: 'catalog-listing' })
+definePageMeta({ layout: 'shell' })
 
 // --- 1. Инициализация ---
 const route = useRoute()

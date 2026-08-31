@@ -13,7 +13,10 @@ await p.waitForTimeout(13000)
 
 const mark = await p.evaluate(() => {
   const page = document.querySelector('.home-content')
-  const layout = document.querySelector('.home-footer-layer') || document.querySelector('main')?.parentElement
+  // Метку ставим на КОРЕНЬ оболочки, а не на подвал: подвал переключается
+  // через v-if и на /catalog его нет вовсе — метка исчезла бы и при живом
+  // макете.
+  const layout = document.querySelector('main')?.parentElement
   if (page) page.dataset.probe = 'страница'
   if (layout) layout.dataset.probeLayout = 'макет'
   return `страница ${page ? 'да' : 'нет'}, макет ${layout ? layout.className.slice(0, 30) : 'нет'}`
@@ -27,7 +30,7 @@ await p.waitForTimeout(5000)
 
 const after = await p.evaluate(() => {
   const el = document.querySelector('.home-content')
-  const layout = document.querySelector('.home-footer-layer') || document.querySelector('main')?.parentElement
+  const layout = document.querySelector('main')?.parentElement
   return {
     survived: el?.dataset.probe === 'страница',
     layoutSurvived: layout?.dataset.probeLayout === 'макет',

@@ -53,7 +53,20 @@ function measureCardSpace(): number {
 // Подписка на обновления заказов
 let channel: any = null
 
-onMounted(async () => {
+/*
+ * Заказы перечитываются и при возврате на страницу.
+ *
+ * Главная удерживается в памяти, поэтому onMounted отрабатывает один раз за
+ * сессию. Подписка на обновления заказов при этом остаётся живой и обычно
+ * держит карточку свежей сама — но не всегда: realtime отключается флагом
+ * NUXT_PUBLIC_DISABLE_REALTIME (useOrderRealtime.ts:27), а соединение может
+ * оборваться. Перечитывание при возврате — дешёвая страховка от того, чтобы
+ * покупатель видел статус своего заказа устаревшим.
+ *
+ * Подписка оформляется ровно один раз: повторный вызов создал бы второй канал
+ * на каждый возврат.
+ */
+useRefreshOnReturn(async (isReturn) => {
   hasHeightHint.value = reserve.has('order')
 
   if (!user.value) {
@@ -63,7 +76,8 @@ onMounted(async () => {
   }
 
   await fetchOrders()
-  channel = subscribeToOrderUpdates()
+  if (!isReturn)
+    channel = subscribeToOrderUpdates()
 
   // Заказ закрылся (или его и не было) — резерв надо снять, иначе на главной
   // останется пустая полоса, и не только в этот визит, но и в следующие.

@@ -10,6 +10,7 @@ import {
   HOME_CHIPS_CATEGORY_LIMIT,
   HOME_STATIC_CHIPS,
 } from '@/constants/homePlaceholders'
+import { homeShell } from '@/lib/shell'
 import { carouselContainerVariants, sectionSpacingVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { usePersonalizationStore } from '@/stores/core/personalizationStore'
@@ -17,6 +18,7 @@ import { useProfileStore } from '@/stores/core/profileStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
+
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 
 // Ленивая загрузка некритичных блоков
@@ -36,7 +38,18 @@ const { isAdmin } = storeToRefs(profileStore)
 const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
 
 definePageMeta({
-  layout: 'home',
+  layout: 'shell',
+  shell: homeShell,
+  /*
+   * Страница удерживается в памяти между переходами: при возврате она не
+   * пересобирается, а оживает. Замер 31 августа (390px, CPU ×4): занятость
+   * потока при возврате 847 → 183 мс, время до содержимого ~1500 → ~377 мс.
+   *
+   * Работает только потому, что главная и каталог теперь на одном макете:
+   * NuxtPage лежит внутри NuxtLayout, и смена макета уничтожила бы страницу
+   * вместе с ним.
+   */
+  keepalive: true,
 })
 
 const nuxtApp = useNuxtApp()
