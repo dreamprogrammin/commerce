@@ -34,6 +34,8 @@
  */
 const args = process.argv.slice(2)
 const APPLY = args.includes('--apply')
+/** Сверка постфактум: какие заголовки реально отдаются сейчас. */
+const CHECK = args.includes('--check')
 const HOURLY = args.includes('--hourly')
 const LIMIT = Number(args.find(a => a.startsWith('--limit='))?.slice(8) || 0)
 const BUCKET = args.find(a => a.startsWith('--bucket='))?.slice(9) || 'product-images'
@@ -45,7 +47,14 @@ if (!URL_BASE || !KEY) {
   process.exit(1)
 }
 
-/** Год и пометка «не перепроверять»: путь неизменяем по построению имени. */
+/**
+ * Год и «не перепроверять»: путь неизменяем по построению имени.
+ *
+ * Строка отдаётся дословно — проверено на проде 31 августа, файл с этим
+ * заголовком возвращает его целиком, вместе с `immutable`. Проверять надо
+ * СПУСТЯ минуту-две: сразу после заливки край сети ещё отдаёт прежнее
+ * значение, и это уже один раз увело меня в ложный вывод.
+ */
 const TARGET = 'public, max-age=31536000, immutable'
 /** Что чиним: по умолчанию только сломанные, с --hourly — часовые. */
 const BROKEN = HOURLY ? 'max-age=3600' : 'no-cache'
@@ -79,6 +88,21 @@ async function collect() {
   return found
 }
 
+/** Все объекты бакета с метаданными — для сверки постфактум. */
+async function collectAll() {
+  const found = []
+  const walk = async (prefix, depth) => {
+    if (depth > 4) return
+    for (const o of await list(prefix)) {
+      const path = prefix ? `${prefix}/${o.name}` : o.name
+      if (!o.metadata) { await walk(path, depth + 1); continue }
+      if (/_card\.\w+$/.test(path)) found.push({ path, size: o.metadata.size })
+    }
+  }
+  await walk('', 0)
+  return found
+}
+
 async function fixOne(o) {
   const get = await fetch(`${URL_BASE}/storage/v1/object/${BUCKET}/${o.path}`, { headers: H })
   if (!get.ok) throw new Error(`скачивание: ${get.status}`)
@@ -102,11 +126,36 @@ async function fixOne(o) {
   // Сверяем, что заголовок изменился И файл не покалечен: перед 1046 файлами
   // на проде мало убедиться, что заголовок правильный, — надо ещё знать, что
   // под ним лежат те же байты.
-  const head = await fetch(`${URL_BASE}/storage/v1/object/public/${BUCKET}/${o.path}`, { method: 'HEAD' })
-  const len = Number(head.headers.get('content-length') || 0)
-  if (o.size && len !== o.size)
-    throw new Error(`после заливки размер ${len}, а был ${o.size}`)
-  return head.headers.get('cache-control')
+  //
+  // ВАЖНО: именно GET. На HEAD этот эндпоинт ВСЕГДА отвечает `no-cache`,
+  // независимо от того, что лежит в метаданных. Проверено на проде 31 августа:
+  // у одного и того же файла GET даёт `public, max-age=3600`, а HEAD —
+  // `no-cache`. Проверка через HEAD показывала, что правка не сработала, хотя
+  // она срабатывала.
+  //
+  // Заголовок сразу после заливки ОТСТАЁТ: у края сети он обновляется не
+  // мгновенно, и первые секунды возвращается прежнее значение. Поэтому здесь
+  // он только показывается, а решение о провале принимается лишь по размеру.
+  // Настоящая сверка — отдельным прогоном с флагом --check.
+  const check = await fetch(`${URL_BASE}/storage/v1/object/public/${BUCKET}/${o.path}?v=${Date.now()}`)
+  const back = Buffer.from(await check.arrayBuffer())
+  if (o.size && back.length !== o.size)
+    throw new Error(`после заливки размер ${back.length}, а был ${o.size}`)
+  return check.headers.get('cache-control')
+}
+
+if (CHECK) {
+  const objs = await collectAll()
+  const sample = objs.sort(() => Math.random() - 0.5).slice(0, Number(args.find(a => a.startsWith('--limit='))?.slice(8) || 30))
+  const seen = new Map()
+  for (const o of sample) {
+    const r = await fetch(`${URL_BASE}/storage/v1/object/public/${BUCKET}/${o.path}?v=${Date.now()}`)
+    const cc = r.headers.get('cache-control') || '(нет)'
+    seen.set(cc, (seen.get(cc) || 0) + 1)
+  }
+  console.log(`сверка ${sample.length} случайных объектов бакета ${BUCKET} (GET, мимо кэша):`)
+  for (const [cc, n] of [...seen.entries()].sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(4)} × ${cc}`)
+  process.exit(0)
 }
 
 console.log(`бакет ${BUCKET}, чиним объекты с «${BROKEN}» → «${TARGET}»`)
