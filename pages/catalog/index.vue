@@ -8,7 +8,7 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 import { promoEmoji, promoGradientClass, promoSubtitle } from '@/utils/promoTiles'
 
-definePageMeta({ layout: 'shell', shell: catalogRootShell })
+definePageMeta({ layout: 'shell', shell: catalogRootShell, keepalive: true })
 
 // ========================================
 // SEO META TAGS

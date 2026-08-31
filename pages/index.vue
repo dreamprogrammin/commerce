@@ -40,6 +40,16 @@ const { trigger: personalizationTrigger } = storeToRefs(personalizationStore)
 definePageMeta({
   layout: 'shell',
   shell: homeShell,
+  /*
+   * Страница удерживается в памяти между переходами: при возврате она не
+   * пересобирается, а оживает. Замер 31 августа (390px, CPU ×4): занятость
+   * потока при возврате 847 → 183 мс, время до содержимого ~1500 → ~377 мс.
+   *
+   * Работает только потому, что главная и каталог теперь на одном макете:
+   * NuxtPage лежит внутри NuxtLayout, и смена макета уничтожила бы страницу
+   * вместе с ним.
+   */
+  keepalive: true,
 })
 
 const nuxtApp = useNuxtApp()
