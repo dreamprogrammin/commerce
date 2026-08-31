@@ -99,8 +99,13 @@ async function fixOne(o) {
   })
   if (!put.ok) throw new Error(`загрузка: ${put.status} ${await put.text()}`)
 
-  // Сверяем, что заголовок реально изменился.
+  // Сверяем, что заголовок изменился И файл не покалечен: перед 1046 файлами
+  // на проде мало убедиться, что заголовок правильный, — надо ещё знать, что
+  // под ним лежат те же байты.
   const head = await fetch(`${URL_BASE}/storage/v1/object/public/${BUCKET}/${o.path}`, { method: 'HEAD' })
+  const len = Number(head.headers.get('content-length') || 0)
+  if (o.size && len !== o.size)
+    throw new Error(`после заливки размер ${len}, а был ${o.size}`)
   return head.headers.get('cache-control')
 }
 
