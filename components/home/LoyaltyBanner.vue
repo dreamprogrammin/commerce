@@ -20,8 +20,20 @@ const modalStore = useModalStore()
 const { isLoggedIn, user } = storeToRefs(authStore)
 const { bonusBalance } = storeToRefs(profileStore)
 
-onMounted(() => {
-  if (user.value && !profileStore.profile)
+/*
+ * Профиль перечитывается и при возврате на страницу: главная удерживается в
+ * памяти, поэтому onMounted отрабатывает один раз за сессию, и баланс бонусов
+ * иначе застывал бы на значении первого захода.
+ *
+ * При возврате нужен именно `force`: у loadProfile есть ранний выход, если
+ * профиль уже загружен, и обычный вызов не сделал бы ничего.
+ */
+useRefreshOnReturn((isReturn) => {
+  if (!user.value)
+    return
+  if (isReturn)
+    profileStore.loadProfile(true)
+  else if (!profileStore.profile)
     profileStore.loadProfile()
 })
 
