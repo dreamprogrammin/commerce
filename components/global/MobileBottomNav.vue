@@ -26,6 +26,7 @@ const cartStore = useCartStore()
 const wishlistStore = useWishlistStore()
 const authStore = useAuthStore()
 const modalStore = useModalStore()
+const isPageLoading = usePageLoading()
 
 const { isLoggedIn } = storeToRefs(authStore)
 const { totalItems: cartCount } = storeToRefs(cartStore)
@@ -38,7 +39,40 @@ function isActivePath(path: string) {
   return route.path.startsWith(path)
 }
 
-const activeIndex = computed(() => NAV_ITEMS.findIndex(item => isActivePath(item.path)))
+/*
+ * Путь, на который только что нажали.
+ *
+ * Подсветка считается от адреса роутера, а он обновляется поздно: замер
+ * 31 августа (390px, CPU ×4) — от нажатия до первого признака перехода
+ * 812 мс полной тишины, и полоска загрузки появлялась одновременно с новой
+ * страницей. Человек в это время не понимает, засчиталось ли нажатие.
+ *
+ * Поэтому подсветка едет сразу по нажатию, а адрес роутера её потом
+ * подтверждает. Если переход не случился (отменён гейтом авторизации,
+ * упал), признак снимается по таймеру — иначе подсветка соврала бы навсегда.
+ */
+const pendingPath = ref<string | null>(null)
+let pendingTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearPending() {
+  pendingPath.value = null
+  if (pendingTimer) {
+    clearTimeout(pendingTimer)
+    pendingTimer = null
+  }
+}
+
+watch(() => route.path, clearPending)
+onUnmounted(clearPending)
+
+const activeIndex = computed(() => {
+  const byTap = pendingPath.value
+    ? NAV_ITEMS.findIndex(item => item.path === pendingPath.value)
+    : -1
+  if (byTap !== -1)
+    return byTap
+  return NAV_ITEMS.findIndex(item => isActivePath(item.path))
+})
 
 const displayItems = computed(() => NAV_ITEMS.map((item, index) => {
   const count = item.badge === 'cart' ? cartCount.value : item.badge === 'wish' ? wishCount.value : 0
@@ -64,6 +98,19 @@ function handleItemClick(event: MouseEvent, item: NavItem, navigate: (e?: MouseE
     modalStore.openLoginModal()
     return
   }
+
+  // Нажатие по текущей странице — не переход, отклик не нужен.
+  if (!isActivePath(item.path)) {
+    clearPending()
+    pendingPath.value = item.path
+    isPageLoading.value = true
+    // Страховка: если переход почему-то не состоялся, отклик надо снять.
+    pendingTimer = setTimeout(() => {
+      clearPending()
+      isPageLoading.value = false
+    }, 5000)
+  }
+
   navigate(event)
 }
 

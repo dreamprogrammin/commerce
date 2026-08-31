@@ -127,13 +127,19 @@ function onVisibility() {
   paused.value = document.hidden
 }
 
+/*
+ * Автопрокрутка останавливается на время ухода со страницы. Главная
+ * удерживается в памяти, и без этого слайды продолжали бы меняться, пока
+ * человек в каталоге, — он вернулся бы не на тот слайд, с которого уходил.
+ */
+useResumableEffect(start, stop)
+
 onMounted(() => {
-  start()
   document.addEventListener('visibilitychange', onVisibility)
 })
 
 onUnmounted(() => {
-  stop()
+  // Остановкой автопрокрутки владеет useResumableEffect — здесь только слушатель.
   document.removeEventListener('visibilitychange', onVisibility)
 })
 </script>

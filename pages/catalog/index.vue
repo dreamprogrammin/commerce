@@ -3,10 +3,12 @@ import type { CategoryRow } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { catalogRootShell } from '@/lib/shell'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+
 import { promoEmoji, promoGradientClass, promoSubtitle } from '@/utils/promoTiles'
 
-definePageMeta({ layout: 'catalog' })
+definePageMeta({ layout: 'shell', shell: catalogRootShell, keepalive: true })
 
 // ========================================
 // SEO META TAGS

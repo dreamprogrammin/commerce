@@ -106,15 +106,23 @@ function tick() {
   countdown.value = `${pad(h)}:${pad(m)}:${pad(s)}`
 }
 
-onMounted(() => {
-  tick()
-  timer = setInterval(tick, 1000)
-})
-
-onUnmounted(() => {
-  if (timer)
-    clearInterval(timer)
-})
+/*
+ * Отсчёт останавливается на время ухода со страницы: главная удерживается в
+ * памяти, поэтому onUnmounted при переходе не вызывается, и секундный таймер
+ * иначе тикал бы, пока человек ходит по другим страницам.
+ */
+useResumableEffect(
+  () => {
+    tick()
+    timer = setInterval(tick, 1000)
+  },
+  () => {
+    if (timer) {
+      clearInterval(timer)
+      timer = null
+    }
+  },
+)
 </script>
 
 <template>

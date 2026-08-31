@@ -29,7 +29,9 @@ const requestIdleCallback = globalThis.requestIdleCallback || ((cb: IdleRequestC
 
 const nuxtApp = useNuxtApp()
 const isMobile = useIsMobile(1023)
-const isPageLoading = ref(false)
+// Признак вынесен в общее состояние: нижняя навигация зажигает полоску сразу
+// по нажатию, не дожидаясь хука роутера (см. composables/usePageLoading.ts).
+const isPageLoading = usePageLoading()
 const modalStore = useModalStore()
 const profileStore = useProfileStore()
 const cartStore = useCartStore()
@@ -266,7 +268,18 @@ useSchemaOrg([
     />
 
     <NuxtLayout>
-      <NuxtPage />
+      <!--
+        Предел на число удержанных страниц. Удержание включается самой
+        страницей (`definePageMeta({ keepalive: true })`), сейчас это только
+        главная и /catalog — но без предела кэш рос бы по мере того, как флаг
+        будут ставить новым страницам, и в длинной сессии держал бы в памяти
+        всё пройденное. При переполнении вытесняется та, на которой не были
+        дольше всех.
+
+        Три, а не два: пара «главная + каталог» плюс запас на одну страницу,
+        чтобы добавление третьей не вытесняло сразу.
+      -->
+      <NuxtPage :keepalive="{ max: 3 }" />
 
       <!-- ✅ ИСПРАВЛЕНИЕ: Toaster только на клиенте -->
       <ClientOnly>
