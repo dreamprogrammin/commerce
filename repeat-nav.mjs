@@ -9,7 +9,7 @@ import { chromium } from 'playwright'
 const B = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'https://uhti.kz'
 const ROUNDS = Number(process.argv.find(a => a.startsWith('--rounds='))?.slice(9) || 4)
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true })
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true })
 await ctx.addInitScript(() => {
   try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())); sessionStorage.setItem('guest_bonus_modal_seen', 'true') } catch {}
   window.__lt = []
