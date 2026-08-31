@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { Database } from '@/types'
+import { catalogRootShell } from '@/lib/shell'
+
 import { carouselContainerVariants } from '@/lib/variants'
 
-definePageMeta({ layout: 'catalog' })
+definePageMeta({ layout: 'shell', shell: catalogRootShell })
 
 const supabase = useSupabaseClient<Database>()
 const containerClass = carouselContainerVariants({ contained: 'always' })
