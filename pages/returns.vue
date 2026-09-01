@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { pageShell } from '@/lib/shell'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
+
 useSeoMeta({
   title: 'Условия возврата и обмена товаров | Ухтышка',
   description:

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { pageShell } from '@/lib/shell'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
+
 // BreadcrumbList JSON-LD
 useBreadcrumbSchema([
   { name: 'Политика конфиденциальности' },

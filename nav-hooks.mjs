@@ -8,7 +8,7 @@ const p = await ctx.newPage()
 const cdp = await ctx.newCDPSession(p)
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 })
 let tag = ''
-p.on('console', (m) => { const t = m.text(); if (t.startsWith('[nav]')) console.log(`   ${tag}  ${t.slice(6)}`) })
+p.on('console', (m) => { const t = m.text(); if (t.startsWith('[nav]') || t.startsWith('[hook]')) console.log(`   ${tag}  ${t.replace(/^\[(nav|hook)\] /, '')}`) })
 
 await p.goto(B + '/', { waitUntil: 'domcontentloaded', timeout: 180000 })
 await p.waitForTimeout(12000)

@@ -57,6 +57,11 @@ const headerSticky = computed(() => shell.value.header !== 'static')
       <CommonCatalogMobileHeader />
     </div>
 
+    <!-- Общий мобильный таббар: страницы без собственного заголовка. -->
+    <div v-else-if="shell.mobileHeader === 'app'" class="lg:hidden">
+      <CommonAppTabBarMobile />
+    </div>
+
     <!-- Обвязка флоу оформления: шаги и локейшн-панель. Отдельным
          компонентом, чтобы оболочка не знала про заказы. -->
     <OrderCheckoutChrome v-if="shell.chrome === 'checkout'" />
@@ -67,7 +72,8 @@ const headerSticky = computed(() => shell.value.header !== 'static')
     <main
       :class="[
         shell.grow ? 'flex-1' : '',
-        shell.padTop ? 'pt-[56px] lg:pt-0' : '',
+        shell.padTop === 76 ? 'pt-[76px] lg:pt-0' : '',
+        shell.padTop === 56 ? 'pt-[56px] lg:pt-0' : '',
         shell.padBottom ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : '',
       ]"
     >

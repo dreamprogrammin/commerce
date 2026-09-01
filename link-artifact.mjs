@@ -23,6 +23,9 @@ await p.waitForTimeout(14000)
 // при этом остаётся прокрученной вниз — именно этот случай описал владелец.
 const SEL0 = process.argv.find(a => a.startsWith('--sel='))?.slice(6) || 'a[href="/brands"]'
 await p.evaluate((sel) => {
+  // Сначала к секции — ссылка появляется только когда секция отрисована.
+  const h = [...document.querySelectorAll('h2')].find(el => el.textContent.includes('Популярные бренды'))
+  if (h) h.scrollIntoView({ block: 'start' })
   const a = document.querySelector(sel)
   if (a) a.scrollIntoView({ block: 'center' })
 }, SEL0)

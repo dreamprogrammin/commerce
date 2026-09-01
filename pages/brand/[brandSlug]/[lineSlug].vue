@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { pageShell } from '@/lib/shell'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
+
 import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
 import {
   ArrowLeft,
