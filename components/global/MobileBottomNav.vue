@@ -8,17 +8,26 @@ import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 interface NavItem {
   path: string
   icon: string
+  /**
+   * Залитая версия для активного пункта.
+   *
+   * Контурная иконка на белой линзе читалась слабо — владелец так и сказал,
+   * «не видно». Приём тот же, что в iOS: неактивные пункты контурные,
+   * выбранный — залитый. Все залитые взяты из одного набора (mdi), иначе
+   * пропорции у выбранного пункта прыгали бы от вкладки к вкладке.
+   */
+  iconActive: string
   label: string
   badge?: 'cart' | 'wish'
   requiresAuth?: boolean
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { path: '/', icon: 'gravity-ui:house', label: 'Главная' },
-  { path: '/catalog', icon: 'lucide:layout-grid', label: 'Каталог' },
-  { path: '/profile/wishlist', icon: 'gravity-ui:heart', label: 'Избранное', badge: 'wish', requiresAuth: true },
-  { path: '/profile', icon: 'gravity-ui:person', label: 'Профиль', requiresAuth: true },
-  { path: '/cart', icon: 'gravity-ui:shopping-bag', label: 'Корзина', badge: 'cart' },
+  { path: '/', icon: 'gravity-ui:house', iconActive: 'mdi:home', label: 'Главная' },
+  { path: '/catalog', icon: 'lucide:layout-grid', iconActive: 'mdi:view-grid', label: 'Каталог' },
+  { path: '/profile/wishlist', icon: 'gravity-ui:heart', iconActive: 'mdi:heart', label: 'Избранное', badge: 'wish', requiresAuth: true },
+  { path: '/profile', icon: 'gravity-ui:person', iconActive: 'mdi:account', label: 'Профиль', requiresAuth: true },
+  { path: '/cart', icon: 'gravity-ui:shopping-bag', iconActive: 'mdi:shopping', label: 'Корзина', badge: 'cart' },
 ]
 
 const route = useRoute()
@@ -291,7 +300,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
       >
         <span class="mbn-icon-wrap">
           <Icon
-            :name="item.icon"
+            :name="item.isActive || item.isPressed ? item.iconActive : item.icon"
             mode="svg"
             class="mbn-icon transition-[transform,color] duration-300 ease-out"
             :class="[
