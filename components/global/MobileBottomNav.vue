@@ -74,18 +74,125 @@ const activeIndex = computed(() => {
   return NAV_ITEMS.findIndex(item => isActivePath(item.path))
 })
 
+/*
+ * Линзу можно водить пальцем.
+ *
+ * Это ВОЗМОЖНОСТЬ, а не обязанность: обычное нажатие по пункту работает
+ * ровно как раньше, через NuxtLink. Перетаскивание — второй способ для тех,
+ * кто его нащупает.
+ *
+ * Устройство. `pressed` — палец на панели: линза и иконка под ней немного
+ * подрастают. `dragAt` — дробная позиция линзы под пальцем, чтобы она
+ * следовала непрерывно, а не прыгала по пунктам. Переход случается на
+ * отпускании и только если палец реально проехал: короткое касание должно
+ * остаться обычным нажатием, иначе мы сломали бы привычное поведение.
+ */
+const DRAG_THRESHOLD = 12
+const pressed = ref(false)
+const dragAt = ref<number | null>(null)
+const barEl = ref<HTMLElement | null>(null)
+let startX = 0
+let moved = false
+let pointerId: number | null = null
+
+/** Ближайший пункт под пальцем. */
+const dragIndex = computed(() =>
+  dragAt.value === null ? -1 : Math.round(dragAt.value),
+)
+
+/** Куда смотрит линза: под пальцем, если ведут, иначе на активном пункте. */
+const lensAt = computed(() =>
+  dragAt.value !== null ? dragAt.value : Math.max(activeIndex.value, 0),
+)
+
+const lensStyle = computed(() => ({
+  transform: `translateY(-50%) translateX(${lensAt.value * 100}%)`,
+  transition: dragAt.value !== null ? 'none' : undefined,
+}))
+
+/** Доля позиции внутри панели, 0…(кол-во пунктов − 1). */
+function positionFromEvent(e: PointerEvent): number | null {
+  const el = barEl.value
+  if (!el)
+    return null
+  const r = el.getBoundingClientRect()
+  const шаг = r.width / NAV_ITEMS.length
+  const raw = (e.clientX - r.left) / шаг - 0.5
+  return Math.min(Math.max(raw, 0), NAV_ITEMS.length - 1)
+}
+
+function onPointerDown(e: PointerEvent) {
+  if (e.pointerType === 'mouse' && e.button !== 0)
+    return
+  pointerId = e.pointerId
+  startX = e.clientX
+  moved = false
+  pressed.value = true
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!pressed.value || e.pointerId !== pointerId)
+    return
+  if (!moved && Math.abs(e.clientX - startX) < DRAG_THRESHOLD)
+    return
+  if (!moved) {
+    /*
+     * Захват берём только когда движение НАЧАЛОСЬ, а не на нажатии. С
+     * захватом на нажатии ссылка не получала клика вовсе — обычное нажатие
+     * переставало работать. А без захвата вообще перетаскивание обрывалось
+     * на первом же переходе с пункта на пункт.
+     */
+    try {
+      barEl.value?.setPointerCapture(e.pointerId)
+    }
+    catch {}
+  }
+  moved = true
+  dragAt.value = positionFromEvent(e)
+}
+
+function endDrag(e: PointerEvent) {
+  if (e.pointerId !== pointerId)
+    return
+  try {
+    barEl.value?.releasePointerCapture(e.pointerId)
+  }
+  catch {}
+  const цель = moved ? dragIndex.value : -1
+  pressed.value = false
+  dragAt.value = null
+  pointerId = null
+  if (цель < 0)
+    return
+  const item = NAV_ITEMS[цель]
+  if (!item || isActivePath(item.path))
+    return
+  if (item.requiresAuth && !isLoggedIn.value) {
+    modalStore.openLoginModal()
+    return
+  }
+  pendingPath.value = item.path
+  isPageLoading.value = true
+  navigateTo(item.path)
+}
+
+function cancelDrag() {
+  pressed.value = false
+  dragAt.value = null
+  pointerId = null
+  moved = false
+}
+
 const displayItems = computed(() => NAV_ITEMS.map((item, index) => {
   const count = item.badge === 'cart' ? cartCount.value : item.badge === 'wish' ? wishCount.value : 0
   return {
     ...item,
     isActive: index === activeIndex.value,
+    // Под пальцем подрастает та иконка, над которой линза сейчас стоит.
+    isPressed: pressed.value && index === (dragIndex.value >= 0 ? dragIndex.value : activeIndex.value),
     badgeText: count > 99 ? '99+' : String(count),
     showBadge: !!item.badge && count > 0,
   }
-}))
-
-const lensStyle = computed(() => ({
-  transform: `translateY(-50%) translateX(${Math.max(activeIndex.value, 0) * 100}%)`,
 }))
 
 // NuxtLink's own navigation handler runs before a sibling `@click` listener,
@@ -93,6 +200,12 @@ const lensStyle = computed(() => ({
 // `custom` slot hands us the `navigate` trigger directly, so the gate always
 // runs first.
 function handleItemClick(event: MouseEvent, item: NavItem, navigate: (e?: MouseEvent) => void) {
+  // Палец проехал — переход уже случился на отпускании, клик тут лишний.
+  if (moved) {
+    event.preventDefault()
+    return
+  }
+
   if (item.requiresAuth && !isLoggedIn.value) {
     event.preventDefault()
     modalStore.openLoginModal()
@@ -147,11 +260,16 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 <template>
   <nav
+    ref="barEl"
     class="flex items-center lg:hidden z-50 mbn-bar"
     :class="isHidden ? 'mbn-bar--hidden' : ''"
     aria-label="Основная навигация"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="endDrag"
+    @pointercancel="cancelDrag"
   >
-    <span v-if="activeIndex >= 0" class="mbn-lens" :style="lensStyle">
+    <span v-if="activeIndex >= 0" class="mbn-lens" :class="{ 'mbn-lens--pressed': pressed }" :style="lensStyle">
       <span class="mbn-lens__pill" />
     </span>
 
@@ -165,8 +283,10 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
       <a
         :href="href"
         class="mbn-item"
+        draggable="false"
         :aria-label="item.label"
         :aria-current="item.isActive ? 'page' : undefined"
+        @dragstart.prevent
         @click="handleItemClick($event, item, navigate)"
       >
         <span class="mbn-icon-wrap">
@@ -174,7 +294,10 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             :name="item.icon"
             mode="svg"
             class="mbn-icon transition-[transform,color] duration-300 ease-out"
-            :class="item.isActive ? 'text-primary scale-[1.18]' : 'text-muted-foreground scale-100'"
+            :class="[
+              item.isActive ? 'text-primary' : 'text-muted-foreground',
+              item.isPressed ? 'scale-[1.34]' : item.isActive ? 'scale-[1.18]' : 'scale-100',
+            ]"
           />
           <span v-if="item.showBadge" class="mbn-badge">{{ item.badgeText }}</span>
         </span>
@@ -199,6 +322,12 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 @layer components {
   .mbn-bar {
+    /* Горизонтальные жесты забираем себе, вертикальную прокрутку страницы
+       оставляем браузеру: иначе с панели нельзя было бы листать страницу. */
+    touch-action: pan-y;
+    /* Без этого протягивание по панели выделяет подписи и рвёт жест. */
+    user-select: none;
+    -webkit-user-select: none;
     position: fixed;
     left: 16px;
     right: 16px;
@@ -237,7 +366,20 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     z-index: 0;
   }
 
+  /* Под пальцем линза подрастает — как нажатие в iOS. Масштаб на самой
+     линзе, а не на панели: панель не должна дрожать. */
+  .mbn-lens--pressed .mbn-lens__pill {
+    transform: scale(1.14);
+    box-shadow:
+      inset 0 2px 1px rgba(255, 255, 255, 1),
+      inset 0 -3px 5px rgba(15, 23, 42, 0.09),
+      0 10px 22px rgba(15, 23, 42, 0.26);
+  }
+
   .mbn-lens__pill {
+    transition:
+      transform 0.18s cubic-bezier(0.34, 1.3, 0.5, 1),
+      box-shadow 0.18s ease;
     width: 42px;
     height: 42px;
     border-radius: 999px;
