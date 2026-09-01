@@ -32,6 +32,43 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
 
 const route = useRoute()
 
+/*
+ * Заглушка на время перехода.
+ *
+ * Зачем. От нажатия до смены адреса проходит ~400 мс, и всё это время на
+ * экране прежняя страница — владелец описал это как «остаётся артефакт той
+ * страницы, с которой уходишь». Плавный переход тут не помогает: он может
+ * начаться только после того, как роутер разрешил переход, и лишь добавляется
+ * сверху (проверено дважды, 442 → 592 мс).
+ *
+ * Задержка перед показом обязательна. Быстрые переходы укладываются в
+ * полтораста миллисекунд, и без неё заглушка мелькала бы на них впустую —
+ * это раздражает сильнее, чем сама задержка.
+ */
+const DELAY_MS = 150
+const navigating = useNavigating()
+const showPlaceholder = ref(false)
+let timer: ReturnType<typeof setTimeout> | null = null
+
+watch(navigating, (идёт) => {
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+  }
+  if (!идёт) {
+    showPlaceholder.value = false
+    return
+  }
+  timer = setTimeout(() => {
+    showPlaceholder.value = true
+  }, DELAY_MS)
+})
+
+onBeforeUnmount(() => {
+  if (timer)
+    clearTimeout(timer)
+})
+
 const shell = computed(() => {
   const m = route.meta.shell
   if (m)
@@ -85,6 +122,16 @@ const headerSticky = computed(() => shell.value.header !== 'static')
       <slot />
     </main>
 
+    <!-- Заглушка накрывает содержимое, но НЕ шапку и не нижнюю навигацию:
+         по ним человек и понимает, что нажатие засчиталось. Она не заменяет
+         страницу в дереве — подменять слот нельзя, это пересоздало бы
+         удержанную страницу. -->
+    <Transition name="ph">
+      <div v-if="showPlaceholder" class="shell-placeholder" aria-hidden="true">
+        <span class="shell-placeholder__spin" />
+      </div>
+    </Transition>
+
     <!-- Подвал в собственном слое нужен только там, где под ним лежит
          фиксированный герой (главная): иначе он рисуется ПОД ним и герой
          просвечивает сквозь полупрозрачный фон. Резерв под нижнюю навигацию
@@ -111,6 +158,39 @@ const headerSticky = computed(() => shell.value.header !== 'static')
    Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
 @layer components {
+  .shell-placeholder {
+    position: fixed;
+    inset: 0;
+    /* Выше содержимого страницы (`.home-content` — 6), но ниже липких
+       заголовков (таббар каталога — 40) и нижней навигации. */
+    z-index: 30;
+    display: grid;
+    place-content: center;
+    background: var(--background);
+  }
+
+  .shell-placeholder__spin {
+    display: block;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    border-bottom: 2px solid var(--primary);
+    animation: shell-spin 0.9s linear infinite;
+  }
+
+  @keyframes shell-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Кому анимация мешает — тому её быть не должно. */
+  @media (prefers-reduced-motion: reduce) {
+    .shell-placeholder__spin {
+      animation: none;
+    }
+  }
+
   /* Фон личного кабинета: blue-50 сверху, уходящий в нейтральный к 320px.
      Живёт на корне оболочки, а не внутри страницы: он должен покрывать и
      область под шапкой. */
@@ -128,5 +208,15 @@ const headerSticky = computed(() => shell.value.header !== 'static')
     z-index: 1;
     background: var(--background);
   }
+}
+
+/* Заглушка появляется мгновенно, уходит с коротким затуханием: резкое
+   исчезновение читается как мигание. */
+.ph-leave-active {
+  transition: opacity 120ms ease;
+}
+
+.ph-leave-to {
+  opacity: 0;
 }
 </style>

@@ -48,6 +48,11 @@ import { rememberScrollPosition } from '@/utils/scrollPositions'
  */
 export default defineNuxtPlugin(() => {
   const router = useRouter()
+  /*
+   * Признак «идёт переход» для заглушки. Поднимается здесь, а не по хуку
+   * `page:start`: beforeEach срабатывает на любом переходе и раньше всех.
+   */
+  const navigating = useNavigating()
 
   // Переход назад/вперёд позицию не сбрасывает — её восстанавливает роутер.
   let isPopNavigation = false
@@ -87,13 +92,25 @@ export default defineNuxtPlugin(() => {
       return
 
     pendingReset = true
+    navigating.value = true
   })
 
   const nuxtApp = useNuxtApp()
   nuxtApp.hook('page:finish', () => {
+    navigating.value = false
     if (!pendingReset)
       return
     pendingReset = false
     window.scrollTo({ left: 0, top: 0, behavior: 'instant' })
+  })
+
+  // Переход мог оборваться (гейт авторизации, ошибка) — снимаем признак,
+  // иначе заглушка осталась бы висеть.
+  router.afterEach(() => {
+    if (!navigating.value)
+      return
+    setTimeout(() => {
+      navigating.value = false
+    }, 5000)
   })
 })
