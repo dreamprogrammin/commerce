@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type { ChildrenInsert, ChildrenRow, ChildrenUpdate } from '@/types'
+
 import { toast } from 'vue-sonner'
+import { profilePageShell } from '@/lib/shell'
 import { useChildrenStore } from '@/stores/publicStore/childrenStore'
 import { formatChildAge } from '@/utils/formatChildAge'
 
 definePageMeta({
-  layout: 'profile',
+  layout: 'shell',
+  shell: profilePageShell,
   profileBare: true, // страница рисует собственные карточки, обёртка layout не нужна
 })
 
@@ -93,115 +96,116 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-[18px]">
-    <!-- Шапка раздела -->
-    <div
-      class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
-    >
-      <div class="flex flex-wrap items-start justify-between gap-3.5">
-        <div>
-          <h1 class="mb-[5px] text-[clamp(24px,2.8vw,30px)] font-extrabold tracking-[-0.025em]">
-            Мои дети
-          </h1>
-          <p class="max-w-[520px] text-sm font-medium text-muted-foreground">
-            Управляйте информацией о детях для персонализированных рекомендаций
-          </p>
+  <ProfileShell>
+    <div class="flex flex-col gap-[18px]">
+      <!-- Шапка раздела -->
+      <div
+        class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3.5">
+          <div>
+            <h1 class="mb-[5px] text-[clamp(24px,2.8vw,30px)] font-extrabold tracking-[-0.025em]">
+              Мои дети
+            </h1>
+            <p class="max-w-[520px] text-sm font-medium text-muted-foreground">
+              Управляйте информацией о детях для персонализированных рекомендаций
+            </p>
+          </div>
+          <button type="button" class="ch-add-btn bg-gradient-to-br from-blue-400 to-blue-600" @click="openForNew">
+            <Icon name="lucide:plus" class="size-[19px]" />
+            Добавить
+          </button>
         </div>
-        <button type="button" class="ch-add-btn bg-gradient-to-br from-blue-400 to-blue-600" @click="openForNew">
-          <Icon name="lucide:plus" class="size-[19px]" />
-          Добавить
-        </button>
       </div>
-    </div>
 
-    <ClientOnly>
-      <!-- Скелетон: та же сетка, чтобы высота не прыгала -->
-      <div v-if="isLoading && children.length === 0" class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-        <div
-          v-for="i in 2"
-          :key="i"
-          class="flex animate-pulse items-center gap-4 rounded-[20px] border border-border bg-white p-[18px] shadow-sm"
-        >
-          <div class="size-16 flex-none rounded-[18px] bg-muted" />
-          <div class="min-w-0 flex-1">
-            <div class="mb-2.5 h-5 w-32 rounded bg-muted" />
-            <div class="flex gap-2">
-              <div class="h-6 w-24 rounded-full bg-muted" />
-              <div class="h-6 w-24 rounded-full bg-muted" />
+      <ClientOnly>
+        <!-- Скелетон: та же сетка, чтобы высота не прыгала -->
+        <div v-if="isLoading && children.length === 0" class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+          <div
+            v-for="i in 2"
+            :key="i"
+            class="flex animate-pulse items-center gap-4 rounded-[20px] border border-border bg-white p-[18px] shadow-sm"
+          >
+            <div class="size-16 flex-none rounded-[18px] bg-muted" />
+            <div class="min-w-0 flex-1">
+              <div class="mb-2.5 h-5 w-32 rounded bg-muted" />
+              <div class="flex gap-2">
+                <div class="h-6 w-24 rounded-full bg-muted" />
+                <div class="h-6 w-24 rounded-full bg-muted" />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!--
+        <!--
         Пустого состояния отдельной карточкой нет: пунктирная плитка «Добавить
         ребёнка» замыкает сетку и при нуле детей остаётся единственной — так же,
         как в макете.
       -->
-      <div v-else class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-        <button
-          v-for="child in children"
-          :key="child.id"
-          type="button"
-          class="ch-card shadow-sm hover:shadow-md"
-          @click="openForEdit(child)"
-        >
-          <span
-            class="ch-avatar"
-            :class="child.gender === 'male'
-              ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100'
-              : 'border-pink-200 bg-gradient-to-br from-pink-50 to-pink-100'"
+        <div v-else class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+          <button
+            v-for="child in children"
+            :key="child.id"
+            type="button"
+            class="ch-card shadow-sm hover:shadow-md"
+            @click="openForEdit(child)"
           >
-            <Icon
-              :name="child.gender === 'male' ? 'fluent-emoji-flat:boy' : 'fluent-emoji-flat:girl'"
-              class="size-10"
-            />
-          </span>
-
-          <span class="min-w-0 flex-1 text-left">
-            <span class="block truncate text-lg font-extrabold text-foreground">
-              {{ child.name }}
+            <span
+              class="ch-avatar"
+              :class="child.gender === 'male'
+                ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100'
+                : 'border-pink-200 bg-gradient-to-br from-pink-50 to-pink-100'"
+            >
+              <Icon
+                :name="child.gender === 'male' ? 'fluent-emoji-flat:boy' : 'fluent-emoji-flat:girl'"
+                class="size-10"
+              />
             </span>
-            <span class="mt-2.5 flex flex-wrap gap-2">
-              <span class="ch-chip">
-                <Icon name="lucide:cake" class="size-[13px] text-muted-foreground" />
-                {{ formatChildAge(child.birth_date) }}
+
+            <span class="min-w-0 flex-1 text-left">
+              <span class="block truncate text-lg font-extrabold text-foreground">
+                {{ child.name }}
               </span>
-              <span class="ch-chip">
-                <Icon name="lucide:calendar" class="size-[13px] text-muted-foreground" />
-                {{ new Date(child.birth_date).toLocaleDateString('ru-RU') }}
+              <span class="mt-2.5 flex flex-wrap gap-2">
+                <span class="ch-chip">
+                  <Icon name="lucide:cake" class="size-[13px] text-muted-foreground" />
+                  {{ formatChildAge(child.birth_date) }}
+                </span>
+                <span class="ch-chip">
+                  <Icon name="lucide:calendar" class="size-[13px] text-muted-foreground" />
+                  {{ new Date(child.birth_date).toLocaleDateString('ru-RU') }}
+                </span>
               </span>
             </span>
-          </span>
 
-          <!-- Декоративный, а не кнопка: кликабельна вся карточка -->
-          <span class="ch-chevron">
-            <Icon name="lucide:chevron-right" class="size-5" />
-          </span>
-        </button>
+            <!-- Декоративный, а не кнопка: кликабельна вся карточка -->
+            <span class="ch-chevron">
+              <Icon name="lucide:chevron-right" class="size-5" />
+            </span>
+          </button>
 
-        <button type="button" class="ch-add-tile" @click="openForNew">
-          <span class="ch-add-tile__icon">
-            <Icon name="lucide:plus" class="size-6" />
-          </span>
-          <span class="text-[14.5px] font-bold">Добавить ребёнка</span>
-        </button>
-      </div>
-
-      <template #fallback>
-        <div class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-          <div
-            v-for="i in 2"
-            :key="i"
-            class="h-[100px] animate-pulse rounded-[20px] border border-border bg-white shadow-sm"
-          />
+          <button type="button" class="ch-add-tile" @click="openForNew">
+            <span class="ch-add-tile__icon">
+              <Icon name="lucide:plus" class="size-6" />
+            </span>
+            <span class="text-[14.5px] font-bold">Добавить ребёнка</span>
+          </button>
         </div>
-      </template>
-    </ClientOnly>
 
-    <!-- Диалог добавления/редактирования -->
-    <Dialog v-model:open="isDialogOpen">
-      <!--
+        <template #fallback>
+          <div class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+            <div
+              v-for="i in 2"
+              :key="i"
+              class="h-[100px] animate-pulse rounded-[20px] border border-border bg-white shadow-sm"
+            />
+          </div>
+        </template>
+      </ClientOnly>
+
+      <!-- Диалог добавления/редактирования -->
+      <Dialog v-model:open="isDialogOpen">
+        <!--
         [&>button]:hidden убирает штатный крестик shadcn. Именно утилитой, а не
         scoped-правилом: класс из этого пропа `cn()` кладёт прямо на элемент
         контента, тогда как scoped-атрибут data-v-* уходит на корень обёртки
@@ -209,129 +213,130 @@ async function handleSubmit() {
         Наши кнопки лежат внутри DialogHeader и form, прямыми потомками не
         являются и под селектор не попадают.
       -->
-      <DialogContent
-        class="rounded-3xl sm:max-w-[460px] [&>button]:hidden"
-        @open-auto-focus.prevent
-      >
-        <DialogHeader>
-          <div class="flex items-center justify-between gap-3">
-            <DialogTitle class="text-[21px] font-extrabold tracking-[-0.02em]">
-              {{ editingChild ? 'Редактировать данные' : 'Добавить ребёнка' }}
-            </DialogTitle>
-            <!-- Свой крестик вместо штатного: в макете это кружок 38px с рамкой.
+        <DialogContent
+          class="rounded-3xl sm:max-w-[460px] [&>button]:hidden"
+          @open-auto-focus.prevent
+        >
+          <DialogHeader>
+            <div class="flex items-center justify-between gap-3">
+              <DialogTitle class="text-[21px] font-extrabold tracking-[-0.02em]">
+                {{ editingChild ? 'Редактировать данные' : 'Добавить ребёнка' }}
+              </DialogTitle>
+              <!-- Свой крестик вместо штатного: в макете это кружок 38px с рамкой.
                  Править общий components/ui/dialog/DialogContent.vue нельзя —
                  он обслуживает все диалоги приложения. -->
-            <button
-              type="button"
-              class="ch-close"
-              aria-label="Закрыть"
-              @click="isDialogOpen = false"
-            >
-              <Icon name="lucide:x" class="size-[19px]" />
-            </button>
-          </div>
-          <DialogDescription class="sr-only">
-            Эта информация поможет нам рекомендовать наиболее подходящие товары.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form class="space-y-[18px]" @submit.prevent="handleSubmit">
-          <div>
-            <Label for="name" class="mb-[7px] block text-[13.5px] font-bold">Имя</Label>
-            <Input
-              id="name"
-              v-model="formData.name"
-              placeholder="Например, Алма"
-              class="h-12 rounded-[13px] text-[15px]"
-              required
-            />
-          </div>
-
-          <div>
-            <span class="mb-[7px] block text-[13.5px] font-bold">Пол</span>
-            <div class="flex gap-2.5">
               <button
-                v-for="option in GENDERS"
-                :key="option.value"
                 type="button"
-                class="ch-gender"
-                :class="formData.gender === option.value ? 'ch-gender--on' : ''"
-                :aria-pressed="formData.gender === option.value"
-                @click="formData.gender = option.value"
+                class="ch-close"
+                aria-label="Закрыть"
+                @click="isDialogOpen = false"
               >
-                <Icon :name="option.icon" class="size-[19px]" />
-                {{ option.label }}
+                <Icon name="lucide:x" class="size-[19px]" />
               </button>
             </div>
-          </div>
+            <DialogDescription class="sr-only">
+              Эта информация поможет нам рекомендовать наиболее подходящие товары.
+            </DialogDescription>
+          </DialogHeader>
 
-          <div>
-            <Label for="birth_date" class="mb-[7px] block text-[13.5px] font-bold">Дата рождения</Label>
-            <Input
-              id="birth_date"
-              v-model="formData.birth_date"
-              type="date"
-              class="h-12 rounded-[13px] text-[15px]"
-              required
-            />
-          </div>
+          <form class="space-y-[18px]" @submit.prevent="handleSubmit">
+            <div>
+              <Label for="name" class="mb-[7px] block text-[13.5px] font-bold">Имя</Label>
+              <Input
+                id="name"
+                v-model="formData.name"
+                placeholder="Например, Алма"
+                class="h-12 rounded-[13px] text-[15px]"
+                required
+              />
+            </div>
 
-          <DialogFooter class="flex flex-col-reverse gap-2.5 pt-1.5 sm:flex-row sm:justify-between">
-            <button
-              v-if="editingChild"
-              type="button"
-              class="ch-btn-ghost text-destructive"
-              @click="triggerDeleteConfirmation"
-            >
-              <Icon name="lucide:trash-2" class="size-[18px]" />
-              Удалить
-            </button>
-            <div class="flex justify-end gap-2.5">
-              <button type="button" class="ch-btn-ghost text-foreground" @click="isDialogOpen = false">
-                Отмена
-              </button>
+            <div>
+              <span class="mb-[7px] block text-[13.5px] font-bold">Пол</span>
+              <div class="flex gap-2.5">
+                <button
+                  v-for="option in GENDERS"
+                  :key="option.value"
+                  type="button"
+                  class="ch-gender"
+                  :class="formData.gender === option.value ? 'ch-gender--on' : ''"
+                  :aria-pressed="formData.gender === option.value"
+                  @click="formData.gender = option.value"
+                >
+                  <Icon :name="option.icon" class="size-[19px]" />
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <Label for="birth_date" class="mb-[7px] block text-[13.5px] font-bold">Дата рождения</Label>
+              <Input
+                id="birth_date"
+                v-model="formData.birth_date"
+                type="date"
+                class="h-12 rounded-[13px] text-[15px]"
+                required
+              />
+            </div>
+
+            <DialogFooter class="flex flex-col-reverse gap-2.5 pt-1.5 sm:flex-row sm:justify-between">
               <button
-                type="submit"
-                class="ch-add-btn ch-add-btn--wide bg-gradient-to-br from-blue-400 to-blue-600"
-                :disabled="isLoading"
+                v-if="editingChild"
+                type="button"
+                class="ch-btn-ghost text-destructive"
+                @click="triggerDeleteConfirmation"
               >
-                <Icon name="lucide:check" class="size-[18px]" />
-                {{ isLoading ? 'Сохранение...' : 'Сохранить' }}
+                <Icon name="lucide:trash-2" class="size-[18px]" />
+                Удалить
               </button>
-            </div>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+              <div class="flex justify-end gap-2.5">
+                <button type="button" class="ch-btn-ghost text-foreground" @click="isDialogOpen = false">
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  class="ch-add-btn ch-add-btn--wide bg-gradient-to-br from-blue-400 to-blue-600"
+                  :disabled="isLoading"
+                >
+                  <Icon name="lucide:check" class="size-[18px]" />
+                  {{ isLoading ? 'Сохранение...' : 'Сохранить' }}
+                </button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-    <!-- Диалог подтверждения удаления -->
-    <AlertDialog v-model:open="isDeleteConfirmOpen">
-      <AlertDialogContent class="rounded-3xl" @open-auto-focus.prevent>
-        <AlertDialogHeader>
-          <div class="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-destructive/10">
-            <Icon name="lucide:alert-circle" class="size-8 text-destructive" />
-          </div>
-          <AlertDialogTitle class="text-center text-xl">
-            Вы уверены?
-          </AlertDialogTitle>
-          <AlertDialogDescription class="text-center text-base">
-            Это действие необратимо. Все данные о ребенке <strong>«{{ childToDelete?.name }}»</strong> будут удалены безвозвратно.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter class="flex-col-reverse gap-2 sm:flex-row">
-          <AlertDialogCancel class="w-full rounded-full sm:w-auto" @click="childToDelete = null">
-            Отмена
-          </AlertDialogCancel>
-          <AlertDialogAction
-            class="w-full rounded-full bg-destructive hover:bg-destructive/90 sm:w-auto"
-            @click="handleDeleteConfirm"
-          >
-            Да, удалить
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  </div>
+      <!-- Диалог подтверждения удаления -->
+      <AlertDialog v-model:open="isDeleteConfirmOpen">
+        <AlertDialogContent class="rounded-3xl" @open-auto-focus.prevent>
+          <AlertDialogHeader>
+            <div class="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-destructive/10">
+              <Icon name="lucide:alert-circle" class="size-8 text-destructive" />
+            </div>
+            <AlertDialogTitle class="text-center text-xl">
+              Вы уверены?
+            </AlertDialogTitle>
+            <AlertDialogDescription class="text-center text-base">
+              Это действие необратимо. Все данные о ребенке <strong>«{{ childToDelete?.name }}»</strong> будут удалены безвозвратно.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter class="flex-col-reverse gap-2 sm:flex-row">
+            <AlertDialogCancel class="w-full rounded-full sm:w-auto" @click="childToDelete = null">
+              Отмена
+            </AlertDialogCancel>
+            <AlertDialogAction
+              class="w-full rounded-full bg-destructive hover:bg-destructive/90 sm:w-auto"
+              @click="handleDeleteConfirm"
+            >
+              Да, удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  </ProfileShell>
 </template>
 
 <style scoped>

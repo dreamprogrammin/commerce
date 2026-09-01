@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { pageShell } from '@/lib/shell'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
+
 import type { BrandPageLayout, IBreadcrumbItem, ProductLine } from '@/types'
 import { ArrowLeft, Package } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'

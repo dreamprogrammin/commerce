@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import type { ProfileUpdate } from '@/types'
+
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, toRaw, watch } from 'vue'
 import { toast } from 'vue-sonner'
-
 import TelegramNotifyRow from '@/components/profile/TelegramNotifyRow.vue'
+
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { profilePageShell } from '@/lib/shell'
 import { useProfileStore } from '@/stores/core/profileStore'
 
 definePageMeta({
-  layout: 'profile',
+  layout: 'shell',
+  shell: profilePageShell,
   profileBare: true, // страница рисует собственные карточки, обёртка layout не нужна
 })
 
@@ -137,125 +140,127 @@ async function handleUpdate() {
 </script>
 
 <template>
-  <div class="flex max-w-[720px] flex-col gap-[18px]">
-    <!-- Карточка профиля -->
-    <div class="stg-card">
-      <h1 class="mb-[5px] text-[clamp(22px,2.6vw,28px)] font-extrabold tracking-[-0.025em]">
-        Настройка профиля
-      </h1>
-      <p class="mb-[22px] text-sm font-medium text-muted-foreground">
-        Здесь вы можете обновить информацию о себе
-      </p>
+  <ProfileShell>
+    <div class="flex max-w-[720px] flex-col gap-[18px]">
+      <!-- Карточка профиля -->
+      <div class="stg-card">
+        <h1 class="mb-[5px] text-[clamp(22px,2.6vw,28px)] font-extrabold tracking-[-0.025em]">
+          Настройка профиля
+        </h1>
+        <p class="mb-[22px] text-sm font-medium text-muted-foreground">
+          Здесь вы можете обновить информацию о себе
+        </p>
 
-      <ClientOnly>
-        <SettingsFormSkeleton v-if="isLoading && !profile" />
+        <ClientOnly>
+          <SettingsFormSkeleton v-if="isLoading && !profile" />
 
-        <template v-else-if="profile">
-          <form @submit.prevent="handleUpdate">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Label for="first_name" class="mb-[7px] block text-[13.5px] font-bold">Имя</Label>
-                <Input id="first_name" v-model="firstName" type="text" :class="INPUT_CLASS" placeholder="Иван" />
+          <template v-else-if="profile">
+            <form @submit.prevent="handleUpdate">
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <Label for="first_name" class="mb-[7px] block text-[13.5px] font-bold">Имя</Label>
+                  <Input id="first_name" v-model="firstName" type="text" :class="INPUT_CLASS" placeholder="Иван" />
+                </div>
+                <div>
+                  <Label for="last_name" class="mb-[7px] block text-[13.5px] font-bold">Фамилия</Label>
+                  <Input id="last_name" v-model="lastName" type="text" :class="INPUT_CLASS" placeholder="Петров" />
+                </div>
               </div>
-              <div>
-                <Label for="last_name" class="mb-[7px] block text-[13.5px] font-bold">Фамилия</Label>
-                <Input id="last_name" v-model="lastName" type="text" :class="INPUT_CLASS" placeholder="Петров" />
-              </div>
-            </div>
 
-            <div class="mt-4">
-              <Label for="phone" class="mb-[7px] block text-[13.5px] font-bold">Телефон</Label>
-              <Input
-                id="phone"
-                v-model="phone"
-                type="tel"
-                inputmode="tel"
-                :class="INPUT_CLASS"
-                placeholder="+7 (777) 123-45-67"
-              />
-            </div>
-
-            <!-- Почта приходит из OAuth и не редактируется — это витрина, не поле -->
-            <div class="mt-4">
-              <span class="mb-[7px] block text-[13.5px] font-bold">Email</span>
-              <div
-                class="flex h-12 items-center gap-2.5 rounded-[13px] border border-border bg-muted px-[15px] text-[15px] font-medium text-muted-foreground"
-              >
-                <Icon name="lucide:mail" class="size-[17px] flex-none" />
-                <span class="min-w-0 truncate">{{ email }}</span>
-                <span
-                  v-if="isEmailConfirmed"
-                  class="ml-auto inline-flex flex-none items-center gap-1 text-xs font-bold text-green-600"
-                >
-                  <Icon name="lucide:badge-check" class="size-3.5" />
-                  подтверждён
-                </span>
-              </div>
-            </div>
-
-            <div class="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                type="submit"
-                class="stg-btn-save"
-                :class="saveButton.tone"
-                :disabled="isSaving"
-              >
-                <Icon
-                  :name="saveButton.icon"
-                  class="size-[18px]"
-                  :class="isSaving ? 'animate-pulse' : ''"
+              <div class="mt-4">
+                <Label for="phone" class="mb-[7px] block text-[13.5px] font-bold">Телефон</Label>
+                <Input
+                  id="phone"
+                  v-model="phone"
+                  type="tel"
+                  inputmode="tel"
+                  :class="INPUT_CLASS"
+                  placeholder="+7 (777) 123-45-67"
                 />
-                {{ saveButton.label }}
-              </button>
-              <button
-                type="button"
-                class="stg-btn-outline h-12 px-[22px] text-[14.5px]"
-                :disabled="isSaving"
-                @click="resetForm"
-              >
-                Отменить
-              </button>
-            </div>
-          </form>
-        </template>
+              </div>
 
-        <!-- Профиль не загрузился -->
-        <div v-else class="py-10 text-center">
-          <p class="text-muted-foreground">
-            Не удалось загрузить данные профиля.
-          </p>
-          <button
-            type="button"
-            class="stg-btn-outline mt-4 h-11 px-5 text-sm"
-            @click="profileStore.loadProfile(true, true)"
-          >
-            Попробовать снова
-          </button>
-        </div>
+              <!-- Почта приходит из OAuth и не редактируется — это витрина, не поле -->
+              <div class="mt-4">
+                <span class="mb-[7px] block text-[13.5px] font-bold">Email</span>
+                <div
+                  class="flex h-12 items-center gap-2.5 rounded-[13px] border border-border bg-muted px-[15px] text-[15px] font-medium text-muted-foreground"
+                >
+                  <Icon name="lucide:mail" class="size-[17px] flex-none" />
+                  <span class="min-w-0 truncate">{{ email }}</span>
+                  <span
+                    v-if="isEmailConfirmed"
+                    class="ml-auto inline-flex flex-none items-center gap-1 text-xs font-bold text-green-600"
+                  >
+                    <Icon name="lucide:badge-check" class="size-3.5" />
+                    подтверждён
+                  </span>
+                </div>
+              </div>
 
-        <template #fallback>
-          <SettingsFormSkeleton />
-        </template>
-      </ClientOnly>
+              <div class="mt-6 flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  class="stg-btn-save"
+                  :class="saveButton.tone"
+                  :disabled="isSaving"
+                >
+                  <Icon
+                    :name="saveButton.icon"
+                    class="size-[18px]"
+                    :class="isSaving ? 'animate-pulse' : ''"
+                  />
+                  {{ saveButton.label }}
+                </button>
+                <button
+                  type="button"
+                  class="stg-btn-outline h-12 px-[22px] text-[14.5px]"
+                  :disabled="isSaving"
+                  @click="resetForm"
+                >
+                  Отменить
+                </button>
+              </div>
+            </form>
+          </template>
+
+          <!-- Профиль не загрузился -->
+          <div v-else class="py-10 text-center">
+            <p class="text-muted-foreground">
+              Не удалось загрузить данные профиля.
+            </p>
+            <button
+              type="button"
+              class="stg-btn-outline mt-4 h-11 px-5 text-sm"
+              @click="profileStore.loadProfile(true, true)"
+            >
+              Попробовать снова
+            </button>
+          </div>
+
+          <template #fallback>
+            <SettingsFormSkeleton />
+          </template>
+        </ClientOnly>
+      </div>
+
+      <!-- Уведомления -->
+      <div class="stg-card">
+        <h2 class="mb-[3px] text-[clamp(17px,1.9vw,20px)] font-extrabold tracking-[-0.02em]">
+          Уведомления
+        </h2>
+        <p class="mb-2 text-[13.5px] font-medium text-muted-foreground">
+          Выберите, как получать новости о заказах и акциях
+        </p>
+
+        <ClientOnly>
+          <TelegramNotifyRow />
+          <template #fallback>
+            <div class="h-[72px] animate-pulse border-t border-border" />
+          </template>
+        </ClientOnly>
+      </div>
     </div>
-
-    <!-- Уведомления -->
-    <div class="stg-card">
-      <h2 class="mb-[3px] text-[clamp(17px,1.9vw,20px)] font-extrabold tracking-[-0.02em]">
-        Уведомления
-      </h2>
-      <p class="mb-2 text-[13.5px] font-medium text-muted-foreground">
-        Выберите, как получать новости о заказах и акциях
-      </p>
-
-      <ClientOnly>
-        <TelegramNotifyRow />
-        <template #fallback>
-          <div class="h-[72px] animate-pulse border-t border-border" />
-        </template>
-      </ClientOnly>
-    </div>
-  </div>
+  </ProfileShell>
 </template>
 
 <style scoped>

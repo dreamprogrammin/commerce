@@ -4,6 +4,7 @@ import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { FREE_SHIPPING_THRESHOLD } from '@/constants'
+import { checkoutShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
@@ -15,9 +16,10 @@ import {
   DELIVERY_SLOT_DURATION,
   DELIVERY_SLOTS,
 } from '@/utils/deliverySlots'
+
 import { formatPrice } from '@/utils/formatPrice'
 
-definePageMeta({ layout: 'checkout' })
+definePageMeta({ layout: 'shell', shell: checkoutShell })
 
 // SEO: Закрываем страницу оформления заказа от индексации
 useHead({

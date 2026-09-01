@@ -32,6 +32,43 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
 
 const route = useRoute()
 
+/*
+ * Заглушка на время перехода.
+ *
+ * Зачем. От нажатия до смены адреса проходит ~400 мс, и всё это время на
+ * экране прежняя страница — владелец описал это как «остаётся артефакт той
+ * страницы, с которой уходишь». Плавный переход тут не помогает: он может
+ * начаться только после того, как роутер разрешил переход, и лишь добавляется
+ * сверху (проверено дважды, 442 → 592 мс).
+ *
+ * Задержка перед показом обязательна. Быстрые переходы укладываются в
+ * полтораста миллисекунд, и без неё заглушка мелькала бы на них впустую —
+ * это раздражает сильнее, чем сама задержка.
+ */
+const DELAY_MS = 150
+const navigating = useNavigating()
+const showPlaceholder = ref(false)
+let timer: ReturnType<typeof setTimeout> | null = null
+
+watch(navigating, (идёт) => {
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+  }
+  if (!идёт) {
+    showPlaceholder.value = false
+    return
+  }
+  timer = setTimeout(() => {
+    showPlaceholder.value = true
+  }, DELAY_MS)
+})
+
+onBeforeUnmount(() => {
+  if (timer)
+    clearTimeout(timer)
+})
+
 const shell = computed(() => {
   const m = route.meta.shell
   if (m)
@@ -45,10 +82,15 @@ const headerSticky = computed(() => shell.value.header !== 'static')
 </script>
 
 <template>
-  <div class="flex flex-col" style="min-height: 100dvh">
+  <div
+    class="flex flex-col" :class="[
+      shell.background === 'surface' ? 'bg-[var(--page-surface)]' : '',
+      shell.background === 'profile' ? 'shell-bg-profile' : '',
+    ]" style="min-height: 100dvh"
+  >
     <!-- Шапка только на десктопе. На узком экране её роль играет либо герой
          (главная), либо собственный таббар страницы. -->
-    <div v-if="shell.header !== 'none'" class="hidden lg:block">
+    <div v-if="shell.header !== 'none'" :class="shell.headerOnMobile ? '' : 'hidden lg:block'">
       <CommonSiteHeader :variant="headerVariant" :sticky="headerSticky" />
     </div>
 
@@ -57,15 +99,38 @@ const headerSticky = computed(() => shell.value.header !== 'static')
       <CommonCatalogMobileHeader />
     </div>
 
+    <!-- Общий мобильный таббар: страницы без собственного заголовка. -->
+    <div v-else-if="shell.mobileHeader === 'app'" class="lg:hidden">
+      <CommonAppTabBarMobile />
+    </div>
+
+    <!-- Обвязка флоу оформления: шаги и локейшн-панель. Отдельным
+         компонентом, чтобы оболочка не знала про заказы. -->
+    <OrderCheckoutChrome v-if="shell.chrome === 'checkout'" />
+
+    <!-- `<main>` рисуется всегда: условная обёртка меняет положение страницы
+         в дереве, и Vue пересоздаёт её при каждом переходе — удержание тогда
+         молча не работает. -->
     <main
-      class="flex-1"
       :class="[
-        shell.padTop ? 'pt-[56px] lg:pt-0' : '',
+        shell.grow ? 'flex-1' : '',
+        shell.padTop === 76 ? 'pt-[76px] lg:pt-0' : '',
+        shell.padTop === 56 ? 'pt-[56px] lg:pt-0' : '',
         shell.padBottom ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : '',
       ]"
     >
       <slot />
     </main>
+
+    <!-- Заглушка накрывает содержимое, но НЕ шапку и не нижнюю навигацию:
+         по ним человек и понимает, что нажатие засчиталось. Она не заменяет
+         страницу в дереве — подменять слот нельзя, это пересоздало бы
+         удержанную страницу. -->
+    <Transition name="ph">
+      <div v-if="showPlaceholder" class="shell-placeholder">
+        <CommonNavLoader />
+      </div>
+    </Transition>
 
     <!-- Подвал в собственном слое нужен только там, где под ним лежит
          фиксированный герой (главная): иначе он рисуется ПОД ним и герой
@@ -93,6 +158,25 @@ const headerSticky = computed(() => shell.value.header !== 'static')
    Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
 @layer components {
+  .shell-placeholder {
+    position: fixed;
+    inset: 0;
+    /* Выше содержимого страницы (`.home-content` — 6), но ниже липких
+       заголовков (таббар каталога — 40) и нижней навигации. */
+    z-index: 30;
+    display: grid;
+    place-content: center;
+    background: var(--background);
+  }
+
+  /* Фон личного кабинета: blue-50 сверху, уходящий в нейтральный к 320px.
+     Живёт на корне оболочки, а не внутри страницы: он должен покрывать и
+     область под шапкой. */
+  .shell-bg-profile {
+    overflow-x: clip;
+    background: linear-gradient(180deg, var(--color-blue-50, oklch(0.97 0.014 254.604)), #f5f6f9 320px);
+  }
+
   .home-footer-layer {
     position: relative;
     /* Строго между фиксированным героем (z-index: 0) и листом контента
@@ -102,5 +186,15 @@ const headerSticky = computed(() => shell.value.header !== 'static')
     z-index: 1;
     background: var(--background);
   }
+}
+
+/* Заглушка появляется мгновенно, уходит с коротким затуханием: резкое
+   исчезновение читается как мигание. */
+.ph-leave-active {
+  transition: opacity 120ms ease;
+}
+
+.ph-leave-to {
+  opacity: 0;
 }
 </style>
