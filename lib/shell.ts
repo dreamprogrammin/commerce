@@ -28,6 +28,12 @@ export interface ShellOptions {
    */
   chrome?: 'checkout' | 'none'
   /**
+   * Собственный фон страницы.
+   *
+   * У карточки товара он `--page-surface`, у остальных — фон документа.
+   */
+  surface?: boolean
+  /**
    * Растягивать ли `<main>` во всю высоту (`flex-1`).
    *
    * Сам `<main>` рисуется ВСЕГДА, даже там, где прежний макет обходился без
@@ -47,6 +53,7 @@ export interface ShellOptions {
 
 /** Прежний `CatalogListing.vue`: обычная нелипкая шапка, обычный подвал. */
 export const catalogShell: Required<ShellOptions> = {
+  surface: false,
   headerOnMobile: false,
   header: 'static',
   mobileHeader: 'none',
@@ -59,6 +66,7 @@ export const catalogShell: Required<ShellOptions> = {
 
 /** Прежний `Home.vue`: шапка поверх героя, подвал в слое, отступов нет. */
 export const homeShell: Required<ShellOptions> = {
+  surface: false,
   headerOnMobile: false,
   header: 'overlay',
   mobileHeader: 'none',
@@ -71,6 +79,7 @@ export const homeShell: Required<ShellOptions> = {
 
 /** Прежний `Catalog.vue`: обычная шапка, мобильный таббар, без подвала. */
 export const catalogRootShell: Required<ShellOptions> = {
+  surface: false,
   headerOnMobile: false,
   header: 'default',
   mobileHeader: 'catalog',
@@ -87,6 +96,7 @@ export const catalogRootShell: Required<ShellOptions> = {
  * `grow: false` — прежний макет не растягивал содержимое во всю высоту.
  */
 export const checkoutShell: Required<ShellOptions> = {
+  surface: false,
   headerOnMobile: true,
   header: 'default',
   mobileHeader: 'none',
@@ -95,4 +105,23 @@ export const checkoutShell: Required<ShellOptions> = {
   footer: 'none',
   padTop: false,
   padBottom: false,
+}
+
+/**
+ * Прежний `ProductDetail.vue`: липкая шапка, свой фон, обычный подвал.
+ *
+ * Мобильный тулбар карточки — часть содержимого страницы
+ * (`ProductMobileHeader`), а не оболочки: он `position: sticky` и сам
+ * резервирует высоту в потоке, поэтому `padTop` здесь не нужен.
+ */
+export const productShell: Required<ShellOptions> = {
+  surface: true,
+  headerOnMobile: false,
+  header: 'default',
+  mobileHeader: 'none',
+  chrome: 'none',
+  grow: true,
+  footer: 'plain',
+  padTop: false,
+  padBottom: true,
 }

@@ -20,6 +20,7 @@ import {
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
 } from '@/constants'
+import { productShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -28,9 +29,10 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+
 import { buildProductTitle } from '@/utils/seoTitle'
 
-definePageMeta({ layout: 'product-detail' })
+definePageMeta({ layout: 'shell', shell: productShell })
 
 const route = useRoute()
 const productsStore = useProductsStore()
