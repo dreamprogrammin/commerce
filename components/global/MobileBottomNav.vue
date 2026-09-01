@@ -305,7 +305,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             class="mbn-icon transition-[transform,color] duration-300 ease-out"
             :class="[
               item.isActive ? 'text-primary' : 'text-muted-foreground',
-              item.isPressed ? 'scale-[1.34]' : item.isActive ? 'scale-[1.18]' : 'scale-100',
+              item.isPressed ? 'scale-[1.42]' : item.isActive ? 'scale-[1.26]' : 'scale-100',
             ]"
           />
           <span v-if="item.showBadge" class="mbn-badge">{{ item.badgeText }}</span>
@@ -389,9 +389,14 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     transition:
       transform 0.18s cubic-bezier(0.34, 1.3, 0.5, 1),
       box-shadow 0.18s ease;
-    width: 42px;
-    height: 42px;
-    border-radius: 999px;
+    width: 44px;
+    height: 44px;
+    /*
+     * Скруглённый квадрат, а не круг. Радиус — треть стороны: меньше читается
+     * как «квадрат со скруглением», больше снова скатывается в круг. Та же
+     * пропорция, что у иконок приложений в iOS.
+     */
+    border-radius: 15px;
     background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.5));
     border: 1px solid rgba(255, 255, 255, 0.95);
     box-shadow:
