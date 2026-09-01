@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { pageShell } from '@/lib/shell'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
+
 const user = useSupabaseUser()
 const isLoading = ref(false)
 

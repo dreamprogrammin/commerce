@@ -19,7 +19,7 @@ export interface ShellOptions {
    */
   headerOnMobile?: boolean
   /** Собственная шапка на узком экране. */
-  mobileHeader?: 'catalog' | 'none'
+  mobileHeader?: 'catalog' | 'app' | 'none'
   /**
    * Обвязка поверх содержимого: шаги заказа и локейшн-панель.
    *
@@ -45,8 +45,11 @@ export interface ShellOptions {
   grow?: boolean
   /** Подвал. `layered` нужен там, где под ним фиксированный герой. */
   footer?: 'layered' | 'plain' | 'none'
-  /** Отступ сверху у `<main>` на узком экране (под фиксированный таббар). */
-  padTop?: boolean
+  /**
+   * Отступ сверху у `<main>` на узком экране, под фиксированный таббар.
+   * Значение в пикселях: у таббара каталога 56, у общего таббара 76.
+   */
+  padTop?: 0 | 56 | 76
   /** Резерв под нижнюю навигацию у `<main>` на узком экране. */
   padBottom?: boolean
 }
@@ -60,7 +63,7 @@ export const catalogShell: Required<ShellOptions> = {
   chrome: 'none',
   grow: true,
   footer: 'plain',
-  padTop: false,
+  padTop: 0,
   padBottom: true,
 }
 
@@ -73,7 +76,7 @@ export const homeShell: Required<ShellOptions> = {
   chrome: 'none',
   grow: true,
   footer: 'layered',
-  padTop: false,
+  padTop: 0,
   padBottom: false,
 }
 
@@ -86,7 +89,7 @@ export const catalogRootShell: Required<ShellOptions> = {
   chrome: 'none',
   grow: true,
   footer: 'none',
-  padTop: true,
+  padTop: 56,
   padBottom: true,
 }
 
@@ -103,7 +106,7 @@ export const checkoutShell: Required<ShellOptions> = {
   chrome: 'checkout',
   grow: false,
   footer: 'none',
-  padTop: false,
+  padTop: 0,
   padBottom: false,
 }
 
@@ -122,6 +125,26 @@ export const productShell: Required<ShellOptions> = {
   chrome: 'none',
   grow: true,
   footer: 'plain',
-  padTop: false,
+  padTop: 0,
+  padBottom: true,
+}
+
+/**
+ * Прежний `default.vue`: липкая шапка, общий мобильный таббар, обычный подвал.
+ *
+ * Сюда переехали страницы, у которых не было своего макета: бренды, «о нас»,
+ * правовые тексты, регистрация, уведомления. Пока они жили на `default`,
+ * переход на них уничтожал оболочку целиком — и на экране оставалась прежняя
+ * страница, уже подскочившая наверх (замер 1 сентября, `/brands`: 976 мс).
+ */
+export const pageShell: Required<ShellOptions> = {
+  surface: false,
+  headerOnMobile: false,
+  header: 'default',
+  mobileHeader: 'app',
+  chrome: 'none',
+  grow: true,
+  footer: 'plain',
+  padTop: 76,
   padBottom: true,
 }

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+
+import { pageShell } from '@/lib/shell'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useNotificationsStore } from '@/stores/publicStore/notificationsStore'
 
-definePageMeta({
-  layout: 'default',
-})
+definePageMeta({ layout: 'shell', shell: pageShell })
 
 const store = useNotificationsStore()
 const profileStore = useProfileStore()

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { pageShell } from '@/lib/shell'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
+
 import type { IParamsForgotPassword } from '~/types/type'
 import { useAuthStore } from '~/stores/auth'
 

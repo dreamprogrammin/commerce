@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { Brand } from '@/types'
+
 import { useQuery } from '@tanstack/vue-query'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
+import { pageShell } from '@/lib/shell'
 
-definePageMeta({
-  layout: 'default',
-})
+definePageMeta({ layout: 'shell', shell: pageShell })
 
 const supabase = useSupabaseClient()
 const { getVariantUrl } = useSupabaseStorage()

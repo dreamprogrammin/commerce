@@ -29,13 +29,18 @@ import { rememberScrollPosition } from '@/utils/scrollPositions'
  *   734 мс   всё ещё главная
  *  2242 мс   каталог наконец появился
  *
- * Сброс перенесён на наблюдатель за адресом роутера. Он срабатывает после
- * подтверждения перехода — и, в отличие от afterEach и scrollBehavior,
- * срабатывает НА ВСЕХ переходах, включая каталог → карточка товара. Проверено
- * отладкой всех трёх точек:
+ * Сброс делается по хуку `page:finish` — он приходит, когда новая страница
+ * ГОТОВА, и срабатывает на всех переходах, включая каталог → карточка товара
+ * (где молчат и afterEach, и scrollBehavior). Проверено отладкой всех точек:
  *
- *   главная → /catalog          beforeEach, afterEach, watch, scrollBehavior
- *   /catalog/all → товар        beforeEach, watch — и всё
+ *   главная → /catalog          beforeEach, afterEach, scrollBehavior, page:*
+ *   /catalog/all → товар        beforeEach, page:* — и всё
+ *
+ * Наблюдателя за адресом роутера здесь было мало. Он срабатывает, как только
+ * переход разрешён, а это может быть сильно раньше отрисовки: замер
+ * 1 сентября на переходе главная → /brands показал смену адреса на 56 мс и
+ * появление страницы только на 1612 мс. Полторы секунды человек смотрел на
+ * прежнюю страницу, уже сброшенную наверх.
  *
  * `behavior: 'instant'` обязателен: у `html` в глобальных стилях стоит
  * `scroll-behavior: smooth`, и без него сброс превращается в анимацию через всю
@@ -84,14 +89,11 @@ export default defineNuxtPlugin(() => {
     pendingReset = true
   })
 
-  watch(() => router.currentRoute.value.fullPath, () => {
+  const nuxtApp = useNuxtApp()
+  nuxtApp.hook('page:finish', () => {
     if (!pendingReset)
       return
     pendingReset = false
-    // nextTick — чтобы новая страница успела попасть в документ: сброс должен
-    // совпасть со сменой картинки, а не опередить её.
-    void nextTick(() => {
-      window.scrollTo({ left: 0, top: 0, behavior: 'instant' })
-    })
+    window.scrollTo({ left: 0, top: 0, behavior: 'instant' })
   })
 })
