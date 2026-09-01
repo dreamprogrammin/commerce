@@ -8,8 +8,35 @@
 export interface ShellOptions {
   /** Шапка на десктопе. `none` — не показывать вовсе. */
   header?: 'overlay' | 'default' | 'static' | 'none'
+  /**
+   * Показывать ли шапку и на узком экране.
+   *
+   * На витрине её роль там играет герой или собственный таббар страницы,
+   * поэтому по умолчанию шапка только десктопная. У флоу оформления своего
+   * мобильного заголовка нет, и прежний `Checkout.vue` рисовал `SiteHeader`
+   * без обёртки — он сам подстраивается под ширину. Без этого флага шапка на
+   * мобилке пропадала.
+   */
+  headerOnMobile?: boolean
   /** Собственная шапка на узком экране. */
   mobileHeader?: 'catalog' | 'none'
+  /**
+   * Обвязка поверх содержимого: шаги заказа и локейшн-панель.
+   *
+   * Живёт отдельным компонентом (`OrderCheckoutChrome`), а не в самой
+   * оболочке: оболочка не должна знать про шаги заказа.
+   */
+  chrome?: 'checkout' | 'none'
+  /**
+   * Растягивать ли `<main>` во всю высоту (`flex-1`).
+   *
+   * Сам `<main>` рисуется ВСЕГДА, даже там, где прежний макет обходился без
+   * него. Условная обёртка меняет положение страницы в дереве, и Vue
+   * пересоздаёт её при каждом переходе — удержание при этом молча
+   * перестаёт работать. Проверено меткой 1 сентября: через каталог главная
+   * переживала переход, через корзину — нет.
+   */
+  grow?: boolean
   /** Подвал. `layered` нужен там, где под ним фиксированный герой. */
   footer?: 'layered' | 'plain' | 'none'
   /** Отступ сверху у `<main>` на узком экране (под фиксированный таббар). */
@@ -20,8 +47,11 @@ export interface ShellOptions {
 
 /** Прежний `CatalogListing.vue`: обычная нелипкая шапка, обычный подвал. */
 export const catalogShell: Required<ShellOptions> = {
+  headerOnMobile: false,
   header: 'static',
   mobileHeader: 'none',
+  chrome: 'none',
+  grow: true,
   footer: 'plain',
   padTop: false,
   padBottom: true,
@@ -29,8 +59,11 @@ export const catalogShell: Required<ShellOptions> = {
 
 /** Прежний `Home.vue`: шапка поверх героя, подвал в слое, отступов нет. */
 export const homeShell: Required<ShellOptions> = {
+  headerOnMobile: false,
   header: 'overlay',
   mobileHeader: 'none',
+  chrome: 'none',
+  grow: true,
   footer: 'layered',
   padTop: false,
   padBottom: false,
@@ -38,9 +71,28 @@ export const homeShell: Required<ShellOptions> = {
 
 /** Прежний `Catalog.vue`: обычная шапка, мобильный таббар, без подвала. */
 export const catalogRootShell: Required<ShellOptions> = {
+  headerOnMobile: false,
   header: 'default',
   mobileHeader: 'catalog',
+  chrome: 'none',
+  grow: true,
   footer: 'none',
   padTop: true,
   padBottom: true,
+}
+
+/**
+ * Прежний `Checkout.vue`: обычная шапка, обвязка шагов заказа, без подвала.
+ *
+ * `grow: false` — прежний макет не растягивал содержимое во всю высоту.
+ */
+export const checkoutShell: Required<ShellOptions> = {
+  headerOnMobile: true,
+  header: 'default',
+  mobileHeader: 'none',
+  chrome: 'checkout',
+  grow: false,
+  footer: 'none',
+  padTop: false,
+  padBottom: false,
 }

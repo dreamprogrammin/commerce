@@ -7,13 +7,27 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useHaptic } from '@/composables/useHaptic'
 import { BUCKET_NAME_PRODUCT, FREE_SHIPPING_THRESHOLD } from '@/constants'
+import { checkoutShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+
 import { formatPrice } from '@/utils/formatPrice'
 
-definePageMeta({ layout: 'checkout' })
+definePageMeta({
+  layout: 'shell',
+  shell: checkoutShell,
+  /*
+   * Корзина тоже удерживается. Без этого переход на неё выбрасывал из кэша
+   * главную: Nuxt снимает обёртку удержания на маршруте, который её не
+   * просит, и вместе с обёрткой уходит весь кэш. Проверено меткой.
+   *
+   * Содержимое корзины живёт в сторе, поэтому удержанная страница не
+   * устаревает: изменение товаров прилетает реактивно.
+   */
+  keepalive: true,
+})
 
 // SEO: Закрываем страницу корзины от индексации
 useHead({

@@ -23,7 +23,8 @@ const mark = await p.evaluate(() => {
 })
 console.log(`метка: ${mark}`)
 
-await p.locator('nav[aria-label="Основная навигация"] a.mbn-item[href="/catalog"]').click({ timeout: 20000 })
+const TAB = process.argv.find(a => a.startsWith('--via='))?.slice(6) || '/catalog'
+await p.locator(`nav[aria-label="Основная навигация"] a.mbn-item[href="${TAB}"]`).click({ timeout: 20000 })
 await p.waitForTimeout(6000)
 await p.locator('nav[aria-label="Основная навигация"] a.mbn-item[href="/"]').click({ timeout: 20000 })
 await p.waitForTimeout(5000)

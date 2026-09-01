@@ -48,7 +48,7 @@ const headerSticky = computed(() => shell.value.header !== 'static')
   <div class="flex flex-col" style="min-height: 100dvh">
     <!-- Шапка только на десктопе. На узком экране её роль играет либо герой
          (главная), либо собственный таббар страницы. -->
-    <div v-if="shell.header !== 'none'" class="hidden lg:block">
+    <div v-if="shell.header !== 'none'" :class="shell.headerOnMobile ? '' : 'hidden lg:block'">
       <CommonSiteHeader :variant="headerVariant" :sticky="headerSticky" />
     </div>
 
@@ -57,9 +57,16 @@ const headerSticky = computed(() => shell.value.header !== 'static')
       <CommonCatalogMobileHeader />
     </div>
 
+    <!-- Обвязка флоу оформления: шаги и локейшн-панель. Отдельным
+         компонентом, чтобы оболочка не знала про заказы. -->
+    <OrderCheckoutChrome v-if="shell.chrome === 'checkout'" />
+
+    <!-- `<main>` рисуется всегда: условная обёртка меняет положение страницы
+         в дереве, и Vue пересоздаёт её при каждом переходе — удержание тогда
+         молча не работает. -->
     <main
-      class="flex-1"
       :class="[
+        shell.grow ? 'flex-1' : '',
         shell.padTop ? 'pt-[56px] lg:pt-0' : '',
         shell.padBottom ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : '',
       ]"
