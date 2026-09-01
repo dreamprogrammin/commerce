@@ -127,8 +127,8 @@ const headerSticky = computed(() => shell.value.header !== 'static')
          страницу в дереве — подменять слот нельзя, это пересоздало бы
          удержанную страницу. -->
     <Transition name="ph">
-      <div v-if="showPlaceholder" class="shell-placeholder" aria-hidden="true">
-        <span class="shell-placeholder__spin" />
+      <div v-if="showPlaceholder" class="shell-placeholder">
+        <CommonNavLoader />
       </div>
     </Transition>
 
@@ -167,28 +167,6 @@ const headerSticky = computed(() => shell.value.header !== 'static')
     display: grid;
     place-content: center;
     background: var(--background);
-  }
-
-  .shell-placeholder__spin {
-    display: block;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 9999px;
-    border-bottom: 2px solid var(--primary);
-    animation: shell-spin 0.9s linear infinite;
-  }
-
-  @keyframes shell-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  /* Кому анимация мешает — тому её быть не должно. */
-  @media (prefers-reduced-motion: reduce) {
-    .shell-placeholder__spin {
-      animation: none;
-    }
   }
 
   /* Фон личного кабинета: blue-50 сверху, уходящий в нейтральный к 320px.
