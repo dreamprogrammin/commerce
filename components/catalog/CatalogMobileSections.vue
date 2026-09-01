@@ -20,6 +20,7 @@ import type { AdditionalMenuItem, CategoryRow } from '@/types'
 import CategoryTile from '@/components/category/CategoryTile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { CATEGORY_TILE_TINTS } from '@/constants/homePlaceholders'
 import { isDiscountPromo } from '@/utils/promoTiles'
 
 const props = defineProps<{
@@ -30,19 +31,29 @@ const props = defineProps<{
 const { getVariantUrl } = useSupabaseStorage()
 
 /**
- * Пастельные подложки секций из прототипа. Ключ — slug корневой категории.
- * «Игры» в прототипе не было (там шло «Активный отдых»), поэтому коралловый
- * добавлен в тон остальным: палитра закрывает синий/розовый/янтарный/зелёный/
- * фиолетовый/бирюзовый, кораллового не хватало.
+ * Подложки секций. Ключ — slug корневой категории.
+ *
+ * Берутся из той же палитры, что на главной (`CATEGORY_TILE_TINTS`), и в том
+ * же порядке: мальчикам синий, девочкам розовый, малышам янтарный и так
+ * далее. Раньше здесь стояли собственные значения из прототипа
+ * `Каталог.dc.html` — почти белые (#dff0ff против #9fd3ea), из-за чего одна и
+ * та же категория на главной и в каталоге выглядела по-разному. Владелец
+ * попросил свести к главной.
+ *
+ * Шестой оттенок отдан «Играм» — именно так они окрашены на главной
+ * (проверено вычисленным `--ct-tint`, не на глаз). Праздник на главной не
+ * показывается, ему добавлен коралловый в тон остальным: синий, розовый,
+ * янтарный, зелёный, фиолетовый и бирюзовый палитра закрывает, кораллового
+ * не хватало.
  */
 const SECTION_TINTS: Record<string, string> = {
-  'boys': '#dff0ff',
-  'girls': '#ffe9f3',
-  'kiddy': '#fff3d9',
-  'constructors-root': '#e6f7e9',
-  'creativity': '#f1e9ff',
-  'games': '#ffe9e2',
-  'holyday': '#e0f5f7',
+  'boys': CATEGORY_TILE_TINTS[0],
+  'girls': CATEGORY_TILE_TINTS[1],
+  'kiddy': CATEGORY_TILE_TINTS[2],
+  'constructors-root': CATEGORY_TILE_TINTS[3],
+  'creativity': CATEGORY_TILE_TINTS[4],
+  'games': CATEGORY_TILE_TINTS[5],
+  'holyday': '#f2b6a4',
 }
 
 const TINT_CYCLE = Object.values(SECTION_TINTS)
