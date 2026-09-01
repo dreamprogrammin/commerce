@@ -45,7 +45,7 @@ const headerSticky = computed(() => shell.value.header !== 'static')
 </script>
 
 <template>
-  <div class="flex flex-col" style="min-height: 100dvh">
+  <div class="flex flex-col" :class="shell.surface ? 'bg-[var(--page-surface)]' : ''" style="min-height: 100dvh">
     <!-- Шапка только на десктопе. На узком экране её роль играет либо герой
          (главная), либо собственный таббар страницы. -->
     <div v-if="shell.header !== 'none'" :class="shell.headerOnMobile ? '' : 'hidden lg:block'">
