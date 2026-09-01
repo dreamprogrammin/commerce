@@ -45,7 +45,12 @@ const headerSticky = computed(() => shell.value.header !== 'static')
 </script>
 
 <template>
-  <div class="flex flex-col" :class="shell.surface ? 'bg-[var(--page-surface)]' : ''" style="min-height: 100dvh">
+  <div
+    class="flex flex-col" :class="[
+      shell.background === 'surface' ? 'bg-[var(--page-surface)]' : '',
+      shell.background === 'profile' ? 'shell-bg-profile' : '',
+    ]" style="min-height: 100dvh"
+  >
     <!-- Шапка только на десктопе. На узком экране её роль играет либо герой
          (главная), либо собственный таббар страницы. -->
     <div v-if="shell.header !== 'none'" :class="shell.headerOnMobile ? '' : 'hidden lg:block'">
@@ -106,6 +111,14 @@ const headerSticky = computed(() => shell.value.header !== 'static')
    Подробности и порядок слоёв: docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 
 @layer components {
+  /* Фон личного кабинета: blue-50 сверху, уходящий в нейтральный к 320px.
+     Живёт на корне оболочки, а не внутри страницы: он должен покрывать и
+     область под шапкой. */
+  .shell-bg-profile {
+    overflow-x: clip;
+    background: linear-gradient(180deg, var(--color-blue-50, oklch(0.97 0.014 254.604)), #f5f6f9 320px);
+  }
+
   .home-footer-layer {
     position: relative;
     /* Строго между фиксированным героем (z-index: 0) и листом контента

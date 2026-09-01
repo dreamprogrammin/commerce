@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
+
 import { storeToRefs } from 'pinia'
 import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 import { useUserOrders } from '@/composables/orders/useUserOrders'
+import { profilePageShell } from '@/lib/shell'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
@@ -219,7 +221,8 @@ onMounted(async () => {
 
 // --- Meta ---
 definePageMeta({
-  layout: 'profile',
+  layout: 'shell',
+  shell: profilePageShell,
   profileBare: true, // страница рисует собственные карточки, обёртка layout не нужна
 })
 
@@ -229,257 +232,259 @@ useHead({
 </script>
 
 <template>
-  <div class="flex flex-col gap-[18px]">
-    <!-- 👤 Шапка профиля -->
-    <div
-      class="flex items-center gap-4 rounded-[clamp(18px,2vw,24px)] border border-border bg-white p-[clamp(18px,2.4vw,26px)] shadow-sm"
-    >
-      <span
-        class="grid size-[clamp(54px,6vw,66px)] flex-none place-content-center rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-[clamp(22px,2.6vw,26px)] font-extrabold text-white"
+  <ProfileShell>
+    <div class="flex flex-col gap-[18px]">
+      <!-- 👤 Шапка профиля -->
+      <div
+        class="flex items-center gap-4 rounded-[clamp(18px,2vw,24px)] border border-border bg-white p-[clamp(18px,2.4vw,26px)] shadow-sm"
       >
-        <ClientOnly fallback="U">
-          {{ userInitial }}
-        </ClientOnly>
-      </span>
-      <div class="min-w-0">
-        <h1
-          class="truncate text-[clamp(22px,2.8vw,30px)] font-extrabold tracking-[-0.025em]"
-        >
-          <ClientOnly fallback="Загрузка...">
-            {{ fullName || 'Пользователь' }}
-          </ClientOnly>
-        </h1>
-        <p class="mt-[3px] text-[clamp(13px,1.5vw,15px)] font-medium text-muted-foreground">
-          <ClientOnly>{{ user?.email }}</ClientOnly>
-        </p>
-      </div>
-    </div>
-
-    <!-- Telegram баннер -->
-    <ClientOnly>
-      <TelegramBanner />
-    </ClientOnly>
-
-    <!-- 📊 Быстрые карточки -->
-    <div class="grid grid-cols-2 gap-3 lg:gap-4 xl:grid-cols-4">
-      <NuxtLink
-        v-for="stat in stats"
-        :key="stat.to"
-        :to="stat.to"
-        class="flex flex-col rounded-[18px] border border-border bg-white px-[17px] py-4 shadow-sm transition-[box-shadow,transform] duration-200 hover:-translate-y-[3px] hover:shadow-md"
-      >
-        <span class="flex items-center gap-2.5">
-          <span
-            class="grid size-[34px] flex-none place-content-center rounded-[11px]"
-            :class="stat.iconClass"
-          >
-            <Icon :name="stat.icon" class="size-[18px]" />
-          </span>
-          <span class="text-[13px] font-semibold text-muted-foreground">{{ stat.label }}</span>
-        </span>
         <span
-          class="mt-3 min-w-0 truncate text-[clamp(22px,2.4vw,27px)] leading-[1.1] font-extrabold tracking-[-0.02em]"
+          class="grid size-[clamp(54px,6vw,66px)] flex-none place-content-center rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-[clamp(22px,2.6vw,26px)] font-extrabold text-white"
         >
-          {{ stat.value }}
+          <ClientOnly fallback="U">
+            {{ userInitial }}
+          </ClientOnly>
         </span>
-        <span class="mt-[3px] text-[12.5px] font-medium" :class="stat.subClass">
-          {{ stat.sub }}
-        </span>
-      </NuxtLink>
-    </div>
-
-    <!-- 📦 Последние заказы -->
-    <section
-      class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
-    >
-      <div class="mb-1.5 flex items-center justify-between gap-3">
-        <h2 class="text-[clamp(18px,2vw,22px)] font-extrabold tracking-[-0.02em]">
-          Последние заказы
-        </h2>
-        <NuxtLink
-          v-if="recentOrders.length"
-          to="/profile/order"
-          class="inline-flex items-center gap-1.5 text-[13.5px] font-bold whitespace-nowrap text-primary"
-        >
-          Все заказы
-          <Icon name="lucide:arrow-right" class="size-[15px]" />
-        </NuxtLink>
-      </div>
-
-      <!-- Загрузка -->
-      <div v-if="isLoadingOrdersQuery" class="space-y-3 pt-3">
-        <Skeleton class="h-16 w-full" />
-        <Skeleton class="h-16 w-full" />
-      </div>
-
-      <!-- Пусто -->
-      <div v-else-if="!recentOrders.length" class="py-8 text-center">
-        <Icon name="lucide:shopping-bag" class="mx-auto mb-3 size-12 text-muted-foreground" />
-        <p class="mb-4 text-muted-foreground">
-          У вас пока нет заказов
-        </p>
-        <Button as-child>
-          <NuxtLink to="/catalog/all">
-            Перейти в каталог
-          </NuxtLink>
-        </Button>
-      </div>
-
-      <!-- Список -->
-      <div v-else>
-        <NuxtLink
-          v-for="order in recentOrders"
-          :key="order.id"
-          :to="`/profile/order/${order.id}`"
-          class="flex items-center gap-3.5 border-t border-border px-1.5 py-3.5 transition-colors hover:bg-muted/40"
-        >
-          <span
-            class="grid size-[46px] flex-none place-content-center rounded-xl bg-muted text-muted-foreground"
+        <div class="min-w-0">
+          <h1
+            class="truncate text-[clamp(22px,2.8vw,30px)] font-extrabold tracking-[-0.025em]"
           >
-            <Icon name="lucide:package" class="size-[22px]" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col leading-tight">
-            <span class="truncate text-[15px] font-bold">Заказ №{{ order.id.slice(-6) }}</span>
-            <span class="truncate text-[13px] font-medium text-muted-foreground">
-              {{ formatDate(order.created_at) }} · {{ orderItemsLabel(order) }}
-            </span>
-          </span>
-          <span class="flex flex-col items-end gap-1.5">
-            <span
-              class="rounded-full px-[11px] py-1 text-xs font-bold whitespace-nowrap"
-              :class="statusBadgeClass(order.status)"
-            >
-              {{ getStatusLabel(order.status) }}
-            </span>
-            <span class="text-[15px] font-extrabold whitespace-nowrap">
-              {{ formatPrice(order.final_amount) }}&nbsp;₸
-            </span>
-          </span>
-        </NuxtLink>
-      </div>
-    </section>
-
-    <!-- ❤️ Избранное -->
-    <section
-      class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
-    >
-      <div class="mb-4 flex items-center justify-between gap-3">
-        <h2 class="text-[clamp(18px,2vw,22px)] font-extrabold tracking-[-0.02em]">
-          Избранное
-        </h2>
-        <NuxtLink
-          v-if="recentWishlist.length"
-          to="/profile/wishlist"
-          class="inline-flex items-center gap-1.5 text-[13.5px] font-bold whitespace-nowrap text-primary"
-        >
-          Все товары
-          <Icon name="lucide:arrow-right" class="size-[15px]" />
-        </NuxtLink>
-      </div>
-
-      <!-- Загрузка -->
-      <div
-        v-if="isLoadingWishlistQuery"
-        class="grid grid-cols-2 gap-3 lg:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] lg:gap-4"
-      >
-        <Skeleton v-for="i in 4" :key="i" class="aspect-square rounded-xl" />
-      </div>
-
-      <!-- Пусто -->
-      <div v-else-if="!recentWishlist.length" class="py-8 text-center">
-        <Icon name="lucide:heart" class="mx-auto mb-3 size-12 text-muted-foreground" />
-        <p class="mb-4 text-muted-foreground">
-          Список избранного пуст
-        </p>
-        <Button variant="outline" as-child>
-          <NuxtLink to="/catalog/all">
-            Найти товары
-          </NuxtLink>
-        </Button>
-      </div>
-
-      <!-- Сетка товаров -->
-      <div
-        v-else
-        class="grid grid-cols-2 gap-3 lg:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] lg:gap-4"
-      >
-        <ProductCard
-          v-for="product in recentWishlist"
-          :key="product.id"
-          :product="product"
-        />
-      </div>
-    </section>
-
-    <!-- 🎁 Последние бонусные операции -->
-    <section
-      class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
-    >
-      <div class="mb-1.5 flex items-center justify-between gap-3">
-        <h2 class="text-[clamp(18px,2vw,22px)] font-extrabold tracking-[-0.02em]">
-          Бонусные операции
-        </h2>
-        <NuxtLink
-          v-if="bonusData && bonusData.length"
-          to="/profile/bonuses"
-          class="inline-flex items-center gap-1.5 text-[13.5px] font-bold whitespace-nowrap text-primary"
-        >
-          История
-          <Icon name="lucide:arrow-right" class="size-[15px]" />
-        </NuxtLink>
-      </div>
-
-      <!-- Загрузка -->
-      <div v-if="isLoadingBonusQuery" class="space-y-3 pt-3">
-        <Skeleton class="h-12 w-full" />
-        <Skeleton class="h-12 w-full" />
-      </div>
-
-      <!-- Пусто -->
-      <div v-else-if="!bonusData || !bonusData.length" class="py-8 text-center">
-        <Icon name="lucide:star" class="mx-auto mb-3 size-12 text-muted-foreground" />
-        <p class="text-muted-foreground">
-          Пока нет операций с бонусами
-        </p>
-      </div>
-
-      <!-- Список -->
-      <div v-else>
-        <div
-          v-for="tx in bonusData"
-          :key="tx.id"
-          class="flex items-center gap-3.5 border-t border-border px-1.5 py-3.5"
-        >
-          <span
-            class="grid size-[34px] flex-none place-content-center rounded-[11px]"
-            :class="bonusMeta(tx.transaction_type).tint"
-          >
-            <Icon :name="bonusMeta(tx.transaction_type).icon" class="size-5" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col leading-tight">
-            <span class="truncate text-[15px] font-bold">{{ bonusMeta(tx.transaction_type).label }}</span>
-            <span class="text-[13px] font-medium text-muted-foreground">{{ formatDate(tx.created_at) }}</span>
-          </span>
-          <span
-            class="text-[15px] font-extrabold whitespace-nowrap"
-            :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'"
-          >
-            {{ tx.amount > 0 ? '+' : '−' }}{{ formatPrice(Math.abs(tx.amount)) }}&nbsp;₸
-          </span>
+            <ClientOnly fallback="Загрузка...">
+              {{ fullName || 'Пользователь' }}
+            </ClientOnly>
+          </h1>
+          <p class="mt-[3px] text-[clamp(13px,1.5vw,15px)] font-medium text-muted-foreground">
+            <ClientOnly>{{ user?.email }}</ClientOnly>
+          </p>
         </div>
       </div>
-    </section>
 
-    <!-- 🚪 Выход — на десктопе живёт в сайдбаре -->
-    <div class="rounded-[20px] border border-border bg-white p-2 shadow-sm lg:hidden">
-      <button
-        type="button"
-        class="flex w-full items-center gap-3 rounded-[13px] px-3.5 py-3 text-[15px] font-bold text-red-600 transition-colors hover:bg-red-50"
-        @click="authStore.signOut()"
+      <!-- Telegram баннер -->
+      <ClientOnly>
+        <TelegramBanner />
+      </ClientOnly>
+
+      <!-- 📊 Быстрые карточки -->
+      <div class="grid grid-cols-2 gap-3 lg:gap-4 xl:grid-cols-4">
+        <NuxtLink
+          v-for="stat in stats"
+          :key="stat.to"
+          :to="stat.to"
+          class="flex flex-col rounded-[18px] border border-border bg-white px-[17px] py-4 shadow-sm transition-[box-shadow,transform] duration-200 hover:-translate-y-[3px] hover:shadow-md"
+        >
+          <span class="flex items-center gap-2.5">
+            <span
+              class="grid size-[34px] flex-none place-content-center rounded-[11px]"
+              :class="stat.iconClass"
+            >
+              <Icon :name="stat.icon" class="size-[18px]" />
+            </span>
+            <span class="text-[13px] font-semibold text-muted-foreground">{{ stat.label }}</span>
+          </span>
+          <span
+            class="mt-3 min-w-0 truncate text-[clamp(22px,2.4vw,27px)] leading-[1.1] font-extrabold tracking-[-0.02em]"
+          >
+            {{ stat.value }}
+          </span>
+          <span class="mt-[3px] text-[12.5px] font-medium" :class="stat.subClass">
+            {{ stat.sub }}
+          </span>
+        </NuxtLink>
+      </div>
+
+      <!-- 📦 Последние заказы -->
+      <section
+        class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
       >
-        <Icon name="lucide:log-out" class="size-[21px] flex-none" />
-        <span>Выйти из аккаунта</span>
-      </button>
+        <div class="mb-1.5 flex items-center justify-between gap-3">
+          <h2 class="text-[clamp(18px,2vw,22px)] font-extrabold tracking-[-0.02em]">
+            Последние заказы
+          </h2>
+          <NuxtLink
+            v-if="recentOrders.length"
+            to="/profile/order"
+            class="inline-flex items-center gap-1.5 text-[13.5px] font-bold whitespace-nowrap text-primary"
+          >
+            Все заказы
+            <Icon name="lucide:arrow-right" class="size-[15px]" />
+          </NuxtLink>
+        </div>
+
+        <!-- Загрузка -->
+        <div v-if="isLoadingOrdersQuery" class="space-y-3 pt-3">
+          <Skeleton class="h-16 w-full" />
+          <Skeleton class="h-16 w-full" />
+        </div>
+
+        <!-- Пусто -->
+        <div v-else-if="!recentOrders.length" class="py-8 text-center">
+          <Icon name="lucide:shopping-bag" class="mx-auto mb-3 size-12 text-muted-foreground" />
+          <p class="mb-4 text-muted-foreground">
+            У вас пока нет заказов
+          </p>
+          <Button as-child>
+            <NuxtLink to="/catalog/all">
+              Перейти в каталог
+            </NuxtLink>
+          </Button>
+        </div>
+
+        <!-- Список -->
+        <div v-else>
+          <NuxtLink
+            v-for="order in recentOrders"
+            :key="order.id"
+            :to="`/profile/order/${order.id}`"
+            class="flex items-center gap-3.5 border-t border-border px-1.5 py-3.5 transition-colors hover:bg-muted/40"
+          >
+            <span
+              class="grid size-[46px] flex-none place-content-center rounded-xl bg-muted text-muted-foreground"
+            >
+              <Icon name="lucide:package" class="size-[22px]" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col leading-tight">
+              <span class="truncate text-[15px] font-bold">Заказ №{{ order.id.slice(-6) }}</span>
+              <span class="truncate text-[13px] font-medium text-muted-foreground">
+                {{ formatDate(order.created_at) }} · {{ orderItemsLabel(order) }}
+              </span>
+            </span>
+            <span class="flex flex-col items-end gap-1.5">
+              <span
+                class="rounded-full px-[11px] py-1 text-xs font-bold whitespace-nowrap"
+                :class="statusBadgeClass(order.status)"
+              >
+                {{ getStatusLabel(order.status) }}
+              </span>
+              <span class="text-[15px] font-extrabold whitespace-nowrap">
+                {{ formatPrice(order.final_amount) }}&nbsp;₸
+              </span>
+            </span>
+          </NuxtLink>
+        </div>
+      </section>
+
+      <!-- ❤️ Избранное -->
+      <section
+        class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
+      >
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="text-[clamp(18px,2vw,22px)] font-extrabold tracking-[-0.02em]">
+            Избранное
+          </h2>
+          <NuxtLink
+            v-if="recentWishlist.length"
+            to="/profile/wishlist"
+            class="inline-flex items-center gap-1.5 text-[13.5px] font-bold whitespace-nowrap text-primary"
+          >
+            Все товары
+            <Icon name="lucide:arrow-right" class="size-[15px]" />
+          </NuxtLink>
+        </div>
+
+        <!-- Загрузка -->
+        <div
+          v-if="isLoadingWishlistQuery"
+          class="grid grid-cols-2 gap-3 lg:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] lg:gap-4"
+        >
+          <Skeleton v-for="i in 4" :key="i" class="aspect-square rounded-xl" />
+        </div>
+
+        <!-- Пусто -->
+        <div v-else-if="!recentWishlist.length" class="py-8 text-center">
+          <Icon name="lucide:heart" class="mx-auto mb-3 size-12 text-muted-foreground" />
+          <p class="mb-4 text-muted-foreground">
+            Список избранного пуст
+          </p>
+          <Button variant="outline" as-child>
+            <NuxtLink to="/catalog/all">
+              Найти товары
+            </NuxtLink>
+          </Button>
+        </div>
+
+        <!-- Сетка товаров -->
+        <div
+          v-else
+          class="grid grid-cols-2 gap-3 lg:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] lg:gap-4"
+        >
+          <ProductCard
+            v-for="product in recentWishlist"
+            :key="product.id"
+            :product="product"
+          />
+        </div>
+      </section>
+
+      <!-- 🎁 Последние бонусные операции -->
+      <section
+        class="rounded-[clamp(18px,2vw,22px)] border border-border bg-white p-[clamp(16px,2.2vw,24px)] shadow-sm"
+      >
+        <div class="mb-1.5 flex items-center justify-between gap-3">
+          <h2 class="text-[clamp(18px,2vw,22px)] font-extrabold tracking-[-0.02em]">
+            Бонусные операции
+          </h2>
+          <NuxtLink
+            v-if="bonusData && bonusData.length"
+            to="/profile/bonuses"
+            class="inline-flex items-center gap-1.5 text-[13.5px] font-bold whitespace-nowrap text-primary"
+          >
+            История
+            <Icon name="lucide:arrow-right" class="size-[15px]" />
+          </NuxtLink>
+        </div>
+
+        <!-- Загрузка -->
+        <div v-if="isLoadingBonusQuery" class="space-y-3 pt-3">
+          <Skeleton class="h-12 w-full" />
+          <Skeleton class="h-12 w-full" />
+        </div>
+
+        <!-- Пусто -->
+        <div v-else-if="!bonusData || !bonusData.length" class="py-8 text-center">
+          <Icon name="lucide:star" class="mx-auto mb-3 size-12 text-muted-foreground" />
+          <p class="text-muted-foreground">
+            Пока нет операций с бонусами
+          </p>
+        </div>
+
+        <!-- Список -->
+        <div v-else>
+          <div
+            v-for="tx in bonusData"
+            :key="tx.id"
+            class="flex items-center gap-3.5 border-t border-border px-1.5 py-3.5"
+          >
+            <span
+              class="grid size-[34px] flex-none place-content-center rounded-[11px]"
+              :class="bonusMeta(tx.transaction_type).tint"
+            >
+              <Icon :name="bonusMeta(tx.transaction_type).icon" class="size-5" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col leading-tight">
+              <span class="truncate text-[15px] font-bold">{{ bonusMeta(tx.transaction_type).label }}</span>
+              <span class="text-[13px] font-medium text-muted-foreground">{{ formatDate(tx.created_at) }}</span>
+            </span>
+            <span
+              class="text-[15px] font-extrabold whitespace-nowrap"
+              :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'"
+            >
+              {{ tx.amount > 0 ? '+' : '−' }}{{ formatPrice(Math.abs(tx.amount)) }}&nbsp;₸
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 🚪 Выход — на десктопе живёт в сайдбаре -->
+      <div class="rounded-[20px] border border-border bg-white p-2 shadow-sm lg:hidden">
+        <button
+          type="button"
+          class="flex w-full items-center gap-3 rounded-[13px] px-3.5 py-3 text-[15px] font-bold text-red-600 transition-colors hover:bg-red-50"
+          @click="authStore.signOut()"
+        >
+          <Icon name="lucide:log-out" class="size-[21px] flex-none" />
+          <span>Выйти из аккаунта</span>
+        </button>
+      </div>
     </div>
-  </div>
+  </ProfileShell>
 </template>

@@ -30,9 +30,13 @@ export interface ShellOptions {
   /**
    * Собственный фон страницы.
    *
-   * У карточки товара он `--page-surface`, у остальных — фон документа.
+   * `surface` — у карточки товара, `profile` — градиент личного кабинета.
+   * Фон живёт на корне оболочки, а не внутри страницы: в личном кабинете он
+   * должен покрывать и область под шапкой, а процентная высота внутри
+   * flex-потомка не срабатывает — замер поймал 739px градиента на 826px
+   * содержимого.
    */
-  surface?: boolean
+  background?: 'none' | 'surface' | 'profile'
   /**
    * Растягивать ли `<main>` во всю высоту (`flex-1`).
    *
@@ -56,7 +60,7 @@ export interface ShellOptions {
 
 /** Прежний `CatalogListing.vue`: обычная нелипкая шапка, обычный подвал. */
 export const catalogShell: Required<ShellOptions> = {
-  surface: false,
+  background: 'none',
   headerOnMobile: false,
   header: 'static',
   mobileHeader: 'none',
@@ -69,7 +73,7 @@ export const catalogShell: Required<ShellOptions> = {
 
 /** Прежний `Home.vue`: шапка поверх героя, подвал в слое, отступов нет. */
 export const homeShell: Required<ShellOptions> = {
-  surface: false,
+  background: 'none',
   headerOnMobile: false,
   header: 'overlay',
   mobileHeader: 'none',
@@ -82,7 +86,7 @@ export const homeShell: Required<ShellOptions> = {
 
 /** Прежний `Catalog.vue`: обычная шапка, мобильный таббар, без подвала. */
 export const catalogRootShell: Required<ShellOptions> = {
-  surface: false,
+  background: 'none',
   headerOnMobile: false,
   header: 'default',
   mobileHeader: 'catalog',
@@ -99,7 +103,7 @@ export const catalogRootShell: Required<ShellOptions> = {
  * `grow: false` — прежний макет не растягивал содержимое во всю высоту.
  */
 export const checkoutShell: Required<ShellOptions> = {
-  surface: false,
+  background: 'none',
   headerOnMobile: true,
   header: 'default',
   mobileHeader: 'none',
@@ -118,7 +122,7 @@ export const checkoutShell: Required<ShellOptions> = {
  * резервирует высоту в потоке, поэтому `padTop` здесь не нужен.
  */
 export const productShell: Required<ShellOptions> = {
-  surface: true,
+  background: 'surface',
   headerOnMobile: false,
   header: 'default',
   mobileHeader: 'none',
@@ -138,7 +142,7 @@ export const productShell: Required<ShellOptions> = {
  * страница, уже подскочившая наверх (замер 1 сентября, `/brands`: 976 мс).
  */
 export const pageShell: Required<ShellOptions> = {
-  surface: false,
+  background: 'none',
   headerOnMobile: false,
   header: 'default',
   mobileHeader: 'app',
@@ -147,4 +151,22 @@ export const pageShell: Required<ShellOptions> = {
   footer: 'plain',
   padTop: 76,
   padBottom: true,
+}
+
+/**
+ * Личный кабинет: липкая шапка, общий мобильный таббар, без подвала.
+ *
+ * Отступы и фон разворачивает сама страница через `ProfileShell` — боковое
+ * меню обнимает содержимое, и условной обёрткой в оболочке это не сделать.
+ */
+export const profilePageShell: Required<ShellOptions> = {
+  background: 'profile',
+  headerOnMobile: false,
+  header: 'default',
+  mobileHeader: 'app',
+  chrome: 'none',
+  grow: true,
+  footer: 'none',
+  padTop: 0,
+  padBottom: false,
 }
