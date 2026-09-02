@@ -4,6 +4,7 @@ import { pageShell } from '@/lib/shell'
 definePageMeta({ layout: 'shell', shell: pageShell })
 
 import type { BrandPageLayout, IBreadcrumbItem, ProductLine } from '@/types'
+
 import { ArrowLeft, Package } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
@@ -16,6 +17,15 @@ import {
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+
+/** Категория в строке `category_brand_seo` — ровно то, что нужно для ссылки. */
+interface BrandLandingCategory {
+  id: string
+  name: string
+  slug: string | null
+  href: string | null
+  parent_id: string | null
+}
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -103,6 +113,92 @@ const { data: brandProductLines } = await useAsyncData(
     return (data ?? []) as ProductLine[]
   },
   { watch: [brand], default: (): ProductLine[] => [] },
+)
+
+/**
+ * Категории, в которых у бренда есть СВОЙ индексируемый лендинг.
+ *
+ * Зачем. Со страницы бренда не вело НИ ОДНОЙ ссылки на бренд-лендинги
+ * `/catalog/<категория>/brand/<бренд>` — проверено на проде 2 сентября 2026 по
+ * /brand/lego, /brand/zuru и /brand/mokatoys. Перелинковка была
+ * односторонней: категория → лендинг (`CategoryBrands`), обратно ничего.
+ * Search Console показывает, чем это кончилось: лендинг
+ * `kukly-dlya-devochek/brand/mermaze` числится как «URL неизвестен Google» —
+ * робот до него просто не дошёл, карта сайта тут не помогла.
+ *
+ * Условие ровно то же, что у `robotsRule` на самой странице каталога и у
+ * карты сайта: своя строка в `category_brand_seo` И живой товар по порогу
+ * `MIN_PRODUCTS_FOR_BRAND_LANDING`. Ссылаться на адрес, закрытый `noindex`,
+ * незачем — он и в карте отсутствует.
+ *
+ * Товары считаются рекурсивно (`countProductsByCategoryBrand`), как их
+ * отбирает `get_filtered_products`: иначе у родительской категории, где все
+ * товары разложены по подкатегориям, выйдет ноль.
+ *
+ * Данные приходят через `useAsyncData`, а не через `ref` с `watchEffect`:
+ * блок обязан быть в СЕРВЕРНОЙ разметке. Вставка после гидратации не только
+ * невидима роботу — она ещё и толкает страницу вниз, чем уже отличились
+ * «Коллекции» (см. комментарий к `brandProductLines` выше).
+ */
+const { data: brandCategoryLinks } = await useAsyncData(
+  `brand-category-links-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return []
+
+    const brandId = brand.value.id
+
+    const [seoRows, brandProducts, allCategories] = await Promise.all([
+      supabase
+        .from('category_brand_seo')
+        .select('categories!inner(id, name, slug, href, parent_id)')
+        .eq('brand_id', brandId),
+      supabase
+        .from('products')
+        .select('category_id')
+        .eq('brand_id', brandId)
+        .eq('is_active', true),
+      supabase.from('categories').select('id, parent_id'),
+    ])
+
+    const rows = (seoRows.data ?? []) as { categories: BrandLandingCategory | null }[]
+    if (rows.length === 0)
+      return []
+
+    const counts = countProductsByCategoryBrand(
+      (brandProducts.data ?? []).map(p => ({
+        category_id: p.category_id,
+        brand_id: brandId,
+      })),
+      (allCategories.data ?? []) as { id: string, parent_id: string | null }[],
+    )
+
+    const seen = new Set<string>()
+    const links: { name: string, path: string }[] = []
+
+    for (const row of rows) {
+      const category = row.categories
+      // Лендинги живут только у категорий с родителем — как в карте сайта.
+      if (!category?.slug || !category.parent_id)
+        continue
+
+      const count = counts.get(brandLandingPairKey(category.id, brandId)) ?? 0
+      if (!isBrandLandingIndexable(count))
+        continue
+
+      const path = buildBrandLandingPath(
+        category.href || `/catalog/${category.slug}`,
+        brandSlug,
+      )
+      if (seen.has(path))
+        continue
+      seen.add(path)
+      links.push({ name: category.name, path })
+    }
+
+    return links.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  },
+  { watch: [brand], default: (): { name: string, path: string }[] => [] },
 )
 
 // Загружаем агрегированную статистику бренда
@@ -676,6 +772,30 @@ useIndexableRobotsRule(
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
       />
+
+      <!--
+        Ссылки на бренд-лендинги. Рисуются НА СЕРВЕРЕ и только на те адреса,
+        что открыты для индекса, — см. `brandCategoryLinks`.
+      -->
+      <nav
+        v-if="brandCategoryLinks.length > 0"
+        class="mt-6 md:mt-12 border-t pt-4 md:pt-8"
+        :aria-label="`${brand.name} в категориях`"
+      >
+        <h2 class="text-base md:text-lg font-semibold mb-3 md:mb-4">
+          {{ brand.name }} в категориях
+        </h2>
+        <div class="flex flex-wrap gap-2 md:gap-2.5">
+          <NuxtLink
+            v-for="link in brandCategoryLinks"
+            :key="link.path"
+            :to="link.path"
+            class="inline-flex items-center rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {{ link.name }}
+          </NuxtLink>
+        </div>
+      </nav>
     </div>
 
     <!-- Стандартный шаблон -->
@@ -686,6 +806,30 @@ useIndexableRobotsRule(
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
       />
+
+      <!--
+        Ссылки на бренд-лендинги. Рисуются НА СЕРВЕРЕ и только на те адреса,
+        что открыты для индекса, — см. `brandCategoryLinks`.
+      -->
+      <nav
+        v-if="brandCategoryLinks.length > 0"
+        class="mt-6 md:mt-12 border-t pt-4 md:pt-8"
+        :aria-label="`${brand.name} в категориях`"
+      >
+        <h2 class="text-base md:text-lg font-semibold mb-3 md:mb-4">
+          {{ brand.name }} в категориях
+        </h2>
+        <div class="flex flex-wrap gap-2 md:gap-2.5">
+          <NuxtLink
+            v-for="link in brandCategoryLinks"
+            :key="link.path"
+            :to="link.path"
+            class="inline-flex items-center rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {{ link.name }}
+          </NuxtLink>
+        </div>
+      </nav>
     </div>
   </div>
 </template>
