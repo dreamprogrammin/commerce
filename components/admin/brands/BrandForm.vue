@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { GeneratedBrandSeo } from '@/composables/admin/useBrandSeoGenerator'
 import type { BrandInsert, BrandPageLayout, BrandUpdate, Database, ProductLine } from '@/types'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import { useBrandSeoGenerator } from '@/composables/admin/useBrandSeoGenerator'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { formatFileSize, optimizeImageBeforeUpload } from '@/utils/imageOptimizer'
@@ -30,6 +32,8 @@ const formData = ref<Partial<BrandInsert | BrandUpdate>>({
   is_custom_page: (props.initialData as any)?.is_custom_page || false,
   page_layout: props.initialData ? (props.initialData as any).page_layout : null,
   // SEO поля
+  meta_title: props.initialData?.meta_title || null,
+  seo_h1: props.initialData?.seo_h1 || null,
   seo_description: props.initialData?.seo_description || null,
   seo_keywords: props.initialData?.seo_keywords || null,
 })
@@ -140,6 +144,49 @@ const descriptionValue = computed({
 
 // --- SEO ПОЛЯ ---
 
+/*
+ * Заголовок и H1 заводятся здесь, потому что заполнить их было НЕЧЕМ.
+ *
+ * В таблице `brands` под SEO отведено двадцать с лишним колонок, а форма
+ * показывала две: `seo_description` и `seo_keywords`. Результат на 2 сентября
+ * 2026 — `meta_title` и `seo_h1` пусты у всех 32 брендов, и каждая страница
+ * бренда отдавала один и тот же шаблонный заголовок «X - Купить товары бренда
+ * в Алматы | Ухтышка», а H1 был голым названием. По Search Console страницы
+ * брендов дают 20 кликов из 70 по сайту при 1550 показах — то есть заголовок
+ * тут решает больше, чем где-либо ещё.
+ *
+ * Остальные пустующие колонки (`og_*`, `canonical_url`, `meta_keywords`,
+ * `seo_text`, `meta_description`) сюда НЕ вынесены намеренно: страница их либо
+ * не читает вовсе, либо читает дублирующее поле, которое уже есть в форме
+ * (`meta_description` — тот же смысл, что у «SEO описания» ниже). Плодить в
+ * админке поля, ни на что не влияющие, — это как раз то, из-за чего никто и
+ * не понимал, какое заполнять.
+ */
+const metaTitleValue = computed({
+  get: () => formData.value.meta_title ?? '',
+  set: (value: string) => {
+    formData.value.meta_title = value === '' ? null : value
+  },
+})
+
+const seoH1Value = computed({
+  get: () => formData.value.seo_h1 ?? '',
+  set: (value: string) => {
+    formData.value.seo_h1 = value === '' ? null : value
+  },
+})
+
+/**
+ * Заголовок, который реально уйдёт в выдачу. Повторяет фолбэк из
+ * `pages/brand/[slug].vue` — предпросмотр обязан показывать то же самое,
+ * а не свою версию: раньше он рисовал «X - Купить товары бренда | Ухтышка»,
+ * тогда как страница отдаёт «…в Алматы | Ухтышка».
+ */
+const effectiveTitle = computed(
+  () => metaTitleValue.value
+    || `${formData.value.name || 'Бренд'} - Купить товары бренда в Алматы | Ухтышка`,
+)
+
 const seoDescriptionValue = computed({
   get: () => formData.value.seo_description ?? '',
   set: (value: string) => {
@@ -157,6 +204,74 @@ const seoKeywordsString = computed({
     formData.value.seo_keywords = keywords.length > 0 ? keywords : null
   },
 })
+
+/*
+ * Генерация SEO-полей моделью.
+ *
+ * Кнопка есть только у сохранённого бренда: тексты пишутся по фактам —
+ * сколько у бренда товаров, в каких категориях, по какой цене, — а у ещё не
+ * созданного бренда этих фактов нет.
+ *
+ * Сгенерированное НЕ сохраняется само: поля заполняются в форме, человек
+ * читает, правит и жмёт «Сохранить». Это не осторожность ради осторожности —
+ * модель пишет заголовок, который увидит покупатель в выдаче.
+ */
+const brandId = computed(
+  () => (props.initialData as any)?.id as string | undefined,
+)
+
+const { generate, isGenerating } = useBrandSeoGenerator()
+
+/*
+ * Сгенерированное показываем в предпросмотре, а не подставляем сразу.
+ *
+ * Так человек видит, что именно уедет в выдачу, ДО того как это затрёт
+ * заполненные поля, и заодно читает замечания о длине. Диалог здесь вместо
+ * `confirm()` не из вкуса: подтверждение вслепую («заменить поля?») не даёт
+ * увидеть текст, ради которого всё и затевалось.
+ */
+const preview = ref<GeneratedBrandSeo | null>(null)
+const isPreviewOpen = ref(false)
+
+async function handleGenerateSeo() {
+  const id = brandId.value
+  if (!id)
+    return
+
+  const result = await generate([id])
+
+  if ('error' in result) {
+    toast.error('Не удалось сгенерировать', { description: result.error })
+    return
+  }
+
+  const item = result.brands[0]
+  if (!item) {
+    toast.error('Модель не вернула текст для этого бренда')
+    return
+  }
+
+  preview.value = item
+  isPreviewOpen.value = true
+}
+
+function applyPreview() {
+  const item = preview.value
+  if (!item)
+    return
+
+  metaTitleValue.value = item.meta_title
+  seoH1Value.value = item.seo_h1
+  seoDescriptionValue.value = item.seo_description
+
+  // Текст «О бренде» приходит только у брендов, у которых его ещё нет:
+  // написанное руками функция намеренно не отдаёт, чтобы нечего было затереть.
+  if (item.description && !descriptionValue.value.trim())
+    descriptionValue.value = item.description
+
+  isPreviewOpen.value = false
+  toast.success('Подставлено в форму — проверьте и сохраните')
+}
 
 const displayLogoUrl = computed(() => {
   if (logoPreviewUrl.value) {
@@ -221,10 +336,62 @@ onBeforeUnmount(() => {
 
     <!-- 🔍 SEO секция -->
     <div class="space-y-4 pt-6 border-t">
-      <h3 class="font-semibold flex items-center gap-2">
-        <Icon name="lucide:search" class="w-4 h-4" />
-        SEO оптимизация
-      </h3>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-semibold flex items-center gap-2">
+          <Icon name="lucide:search" class="w-4 h-4" />
+          SEO оптимизация
+        </h3>
+
+        <Button
+          v-if="brandId"
+          type="button"
+          variant="outline"
+          size="sm"
+          :disabled="isGenerating"
+          @click="handleGenerateSeo"
+        >
+          <Icon
+            :name="isGenerating ? 'lucide:loader-circle' : 'lucide:sparkles'"
+            class="w-4 h-4 mr-1.5"
+            :class="{ 'animate-spin': isGenerating }"
+          />
+          {{ isGenerating ? 'Пишем…' : 'Сгенерировать' }}
+        </Button>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between">
+          <Label for="meta-title">Заголовок страницы (title)</Label>
+          <span
+            class="text-xs"
+            :class="effectiveTitle.length > 60 ? 'text-destructive' : effectiveTitle.length > 55 ? 'text-amber-500' : 'text-muted-foreground'"
+          >
+            {{ effectiveTitle.length }}/60
+          </span>
+        </div>
+        <Input
+          id="meta-title"
+          v-model="metaTitleValue"
+          placeholder="Конструкторы LEGO — купить в Алматы | Ухтышка"
+        />
+        <p class="text-xs text-muted-foreground mt-1">
+          Строка, которую видно в Google. Пусто — соберётся из названия бренда.
+          Google обрезает примерно на 60 знаках.
+        </p>
+      </div>
+
+      <div>
+        <Label for="seo-h1">Заголовок на странице (H1)</Label>
+        <Input
+          id="seo-h1"
+          v-model="seoH1Value"
+          placeholder="Конструкторы LEGO"
+        />
+        <p class="text-xs text-muted-foreground mt-1">
+          Крупный заголовок вверху страницы бренда. Пусто — покажем название
+          бренда, как сейчас.
+        </p>
+      </div>
 
       <div>
         <div class="flex items-center justify-between">
@@ -265,7 +432,7 @@ onBeforeUnmount(() => {
           Предпросмотр в Google:
         </p>
         <p class="text-blue-600 text-sm hover:underline cursor-pointer truncate">
-          {{ formData.name }} - Купить товары бренда | Ухтышка
+          {{ effectiveTitle }}
         </p>
         <p class="text-green-700 text-xs">
           uhti.kz › brand › {{ formData.slug || '...' }}
@@ -328,4 +495,70 @@ onBeforeUnmount(() => {
       Сохранить бренд
     </Button>
   </form>
+
+  <Dialog v-model:open="isPreviewOpen">
+    <DialogContent class="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Сгенерированные тексты</DialogTitle>
+        <DialogDescription>
+          Ничего ещё не сохранено. Посмотрите, поправьте при желании после
+          подстановки и нажмите «Сохранить» в форме.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div v-if="preview" class="space-y-4 text-sm">
+        <div v-if="preview.warnings.length" class="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 p-3">
+          <p class="font-medium text-amber-900 dark:text-amber-200 mb-1">
+            Замечания
+          </p>
+          <ul class="list-disc pl-5 text-amber-800 dark:text-amber-300 space-y-0.5">
+            <li v-for="w in preview.warnings" :key="w">
+              {{ w }}
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-xs text-muted-foreground mb-1">
+            Заголовок страницы (title) — {{ preview.meta_title.length }}/60
+          </p>
+          <p class="text-blue-600">
+            {{ preview.meta_title }}
+          </p>
+        </div>
+
+        <div>
+          <p class="text-xs text-muted-foreground mb-1">
+            Заголовок на странице (H1)
+          </p>
+          <p class="font-semibold">
+            {{ preview.seo_h1 }}
+          </p>
+        </div>
+
+        <div>
+          <p class="text-xs text-muted-foreground mb-1">
+            SEO описание — {{ preview.seo_description.length }}/160
+          </p>
+          <p>{{ preview.seo_description }}</p>
+        </div>
+
+        <div v-if="preview.description">
+          <p class="text-xs text-muted-foreground mb-1">
+            Текст «О бренде» (у этого бренда его не было)
+          </p>
+          <div class="rounded-lg border p-3 max-h-52 overflow-y-auto brand-description" v-html="preview.description" />
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" type="button" @click="isPreviewOpen = false">
+          Отмена
+        </Button>
+        <Button type="button" @click="applyPreview">
+          Подставить в форму
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

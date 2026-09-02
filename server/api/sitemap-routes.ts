@@ -1,7 +1,15 @@
 import type { Database } from '@/types'
 import { serverSupabaseClient } from '#supabase/server'
-import { BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS } from '@/constants'
-import { buildBrandLandingPath } from '~/utils/brandLanding'
+import {
+  BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS,
+  MIN_PRODUCTS_FOR_BRAND_LANDING,
+} from '@/constants'
+import {
+  brandLandingPairKey,
+  buildBrandLandingPath,
+  countProductsByCategoryBrand,
+  isBrandLandingIndexable,
+} from '~/utils/brandLanding'
 
 interface SitemapImage {
   loc: string
@@ -59,7 +67,9 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       // `is_new` нужен не карточкам, а листингу `/catalog/new` — см. ниже,
       // где он решает, попадёт ли страница в карту вообще. `brand_id` — там же
       // ниже, чтобы отсеять бренды без товара, закрытые `noindex`.
-      .select('slug, updated_at, is_new, brand_id, product_images(image_url, display_order)')
+      // `category_id` — для подсчёта товаров у пар категория+бренд, от него
+      // зависит, попадёт ли в карту бренд-лендинг (см. ниже).
+      .select('slug, updated_at, is_new, brand_id, category_id, product_images(image_url, display_order)')
       .eq('is_active', true)
       .not('slug', 'is', null)
       .order('created_at', { ascending: false })
@@ -153,7 +163,9 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // --- КАТЕГОРИИ ---
     const { data: categories, error: categoriesError } = await client
       .from('categories')
-      .select('slug, href, updated_at')
+      // `id` и `parent_id` — для того же подсчёта пар: товар засчитывается
+      // категории и всем её родителям, как это делает get_filtered_products.
+      .select('id, slug, href, parent_id, updated_at')
       .not('slug', 'is', null)
       .limit(1000)
 
@@ -302,7 +314,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // sitemap/индексации, найденное в SEO-аудите.
     const { data: brandLandings, error: brandLandingsError } = await client
       .from('category_brand_seo')
-      .select('updated_at, categories!inner(slug, href, parent_id), brands!inner(slug)')
+      .select('updated_at, categories!inner(id, slug, href, parent_id), brands!inner(id, slug)')
       .not('categories.slug', 'is', null)
       .not('brands.slug', 'is', null)
       .limit(10000)
@@ -311,9 +323,26 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       console.error('❌ Ошибка загрузки brand landing для sitemap:', brandLandingsError)
     }
 
+    /*
+     * Товаров у каждой пары категория+бренд — считаем рекурсивно, как это
+     * делает сама страница (см. countProductsByCategoryBrand).
+     *
+     * Считать можно, только если обе выборки удались. Если хоть одна упала,
+     * таблица останется пустой, и любая пара покажет ноль товаров — карта
+     * потеряла бы все бренд-лендинги из-за разовой ошибки базы. Поэтому в
+     * таком случае число товаров объявляется неизвестным (`null`), и
+     * `isBrandLandingIndexable` пропускает адрес: тот же fail-open, что
+     * применён к брендам выше.
+     */
+    const canCountBrandLandingProducts = !!products && !!categories
+    const brandLandingProductCounts = canCountBrandLandingProducts
+      ? countProductsByCategoryBrand(products as any[], categories as any[])
+      : new Map<string, number>()
+
     if (brandLandings && brandLandings.length > 0) {
       // Дедупликация — уникальные пары (categoryHref, brandSlug)
       const seen = new Set<string>()
+      let thin = 0
       brandLandings.forEach((item: any) => {
         const category = item.categories
         const brand = item.brands
@@ -322,6 +351,26 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
         // Brand landing только для категорий второго уровня (имеющих родителя)
         if (!category.parent_id)
           return
+
+        /*
+         * Пустой лендинг в карту не идёт.
+         *
+         * Наличие строки в `category_brand_seo` говорит лишь о том, что текст
+         * когда-то написали; товары с тех пор могли разойтись. На 2 сентября
+         * 2026 три страницы из четырнадцати содержали ноль товаров и всё
+         * равно лежали в карте под `index, follow`. Условие обязано совпадать
+         * с `robotsRule` на странице — обе стороны зовут одну функцию.
+         */
+        const productsCount = canCountBrandLandingProducts
+          ? brandLandingProductCounts.get(
+            brandLandingPairKey(category.id, brand.id),
+          ) ?? 0
+          : null
+        if (!isBrandLandingIndexable(productsCount)) {
+          thin += 1
+          return
+        }
+
         const categoryPath = category.href || `/catalog/${category.slug}`
         const key = `${categoryPath}|${brand.slug}`
         if (seen.has(key))
@@ -334,6 +383,11 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
           priority: 0.65,
         })
       })
+      if (thin > 0) {
+        console.warn(
+          `⚠️ Sitemap: ${thin} бренд-лендингов с числом товаров меньше ${MIN_PRODUCTS_FOR_BRAND_LANDING} закрыты noindex и в карту не попали`,
+        )
+      }
       console.log(`✅ Sitemap: Загружено ${seen.size} brand landing страниц`)
     }
 

@@ -4,6 +4,7 @@ import { pageShell } from '@/lib/shell'
 definePageMeta({ layout: 'shell', shell: pageShell })
 
 import type { BrandPageLayout, IBreadcrumbItem, ProductLine } from '@/types'
+
 import { ArrowLeft, Package } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
@@ -12,13 +13,19 @@ import {
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
-  SITE_LOGO_URL,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 
-import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+/** Категория в строке `category_brand_seo` — ровно то, что нужно для ссылки. */
+interface BrandLandingCategory {
+  id: string
+  name: string
+  slug: string | null
+  href: string | null
+  parent_id: string | null
+}
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -106,6 +113,92 @@ const { data: brandProductLines } = await useAsyncData(
     return (data ?? []) as ProductLine[]
   },
   { watch: [brand], default: (): ProductLine[] => [] },
+)
+
+/**
+ * Категории, в которых у бренда есть СВОЙ индексируемый лендинг.
+ *
+ * Зачем. Со страницы бренда не вело НИ ОДНОЙ ссылки на бренд-лендинги
+ * `/catalog/<категория>/brand/<бренд>` — проверено на проде 2 сентября 2026 по
+ * /brand/lego, /brand/zuru и /brand/mokatoys. Перелинковка была
+ * односторонней: категория → лендинг (`CategoryBrands`), обратно ничего.
+ * Search Console показывает, чем это кончилось: лендинг
+ * `kukly-dlya-devochek/brand/mermaze` числится как «URL неизвестен Google» —
+ * робот до него просто не дошёл, карта сайта тут не помогла.
+ *
+ * Условие ровно то же, что у `robotsRule` на самой странице каталога и у
+ * карты сайта: своя строка в `category_brand_seo` И живой товар по порогу
+ * `MIN_PRODUCTS_FOR_BRAND_LANDING`. Ссылаться на адрес, закрытый `noindex`,
+ * незачем — он и в карте отсутствует.
+ *
+ * Товары считаются рекурсивно (`countProductsByCategoryBrand`), как их
+ * отбирает `get_filtered_products`: иначе у родительской категории, где все
+ * товары разложены по подкатегориям, выйдет ноль.
+ *
+ * Данные приходят через `useAsyncData`, а не через `ref` с `watchEffect`:
+ * блок обязан быть в СЕРВЕРНОЙ разметке. Вставка после гидратации не только
+ * невидима роботу — она ещё и толкает страницу вниз, чем уже отличились
+ * «Коллекции» (см. комментарий к `brandProductLines` выше).
+ */
+const { data: brandCategoryLinks } = await useAsyncData(
+  `brand-category-links-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return []
+
+    const brandId = brand.value.id
+
+    const [seoRows, brandProducts, allCategories] = await Promise.all([
+      supabase
+        .from('category_brand_seo')
+        .select('categories!inner(id, name, slug, href, parent_id)')
+        .eq('brand_id', brandId),
+      supabase
+        .from('products')
+        .select('category_id')
+        .eq('brand_id', brandId)
+        .eq('is_active', true),
+      supabase.from('categories').select('id, parent_id'),
+    ])
+
+    const rows = (seoRows.data ?? []) as { categories: BrandLandingCategory | null }[]
+    if (rows.length === 0)
+      return []
+
+    const counts = countProductsByCategoryBrand(
+      (brandProducts.data ?? []).map(p => ({
+        category_id: p.category_id,
+        brand_id: brandId,
+      })),
+      (allCategories.data ?? []) as { id: string, parent_id: string | null }[],
+    )
+
+    const seen = new Set<string>()
+    const links: { name: string, path: string }[] = []
+
+    for (const row of rows) {
+      const category = row.categories
+      // Лендинги живут только у категорий с родителем — как в карте сайта.
+      if (!category?.slug || !category.parent_id)
+        continue
+
+      const count = counts.get(brandLandingPairKey(category.id, brandId)) ?? 0
+      if (!isBrandLandingIndexable(count))
+        continue
+
+      const path = buildBrandLandingPath(
+        category.href || `/catalog/${category.slug}`,
+        brandSlug,
+      )
+      if (seen.has(path))
+        continue
+      seen.add(path)
+      links.push({ name: category.name, path })
+    }
+
+    return links.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  },
+  { watch: [brand], default: (): { name: string, path: string }[] => [] },
 )
 
 // Загружаем агрегированную статистику бренда
@@ -273,27 +366,29 @@ const ogImageSrc = computed(
   () => brandLogoUrl.value || SITE_OG_IMAGE_URL,
 )
 
-const seoBlocks = computed(() => {
-  if (!brand.value?.seo_content)
-    return []
-  return parseHTMLToBlocks(brand.value.seo_content)
-})
-
-// Извлекаем текст из seo_content для Schema.org
-const seoContentText = computed(() => {
-  if (!seoBlocks.value.length)
-    return ''
-  return seoBlocks.value
-    .map((block) => {
-      if (block.type === 'ul') {
-        return block.items.map(item => item.text).join(' ')
-      }
-      return block.text
-    })
-    .filter(Boolean)
-    .join(' ')
-    .substring(0, 300)
-})
+/**
+ * Текст «О бренде» простой строкой — для JSON-LD.
+ *
+ * Читался он из `brand.seo_content`, а такой колонки нет ни в прод-базе, ни
+ * в `types/supabase.ts`: рассказ о бренде живёт в `description` (у 30 брендов
+ * из 32 это готовая вёрстка с заголовками и абзацами). Поле, которого нет,
+ * молча давало `undefined`, поэтому:
+ *
+ *  • `Brand.description` в разметке отдавал мета-описание вместо текста;
+ *  • отдельный блок `BrandSEOContentRenderer` не рисовался ни у одного
+ *    бренда — и хорошо, что не рисовался: тот же текст уже показывает
+ *    `BrandDescription` внутри шаблона, вышел бы дубль. Поэтому блок убран
+ *    целиком, а не «починен».
+ *
+ * Правильный источник виден на соседней странице линейки
+ * (`pages/brand/[brandSlug]/[lineSlug].vue`) — там читается `description`.
+ *
+ * `plainExcerpt`, а не `substring`: обрезка по границе слова, иначе в
+ * разметку уезжает оборванное слово.
+ */
+const brandDescriptionText = computed(() =>
+  plainExcerpt(brand.value?.description, 300),
+)
 
 defineOgImage({
   url: ogImageSrc.value,
@@ -344,7 +439,7 @@ useHead({
         '@type': 'Brand',
         '@id': `${brandUrl.value}#brand`,
         'name': brand.value.name, // FIX: чистое название без дублирования
-        'description': seoContentText.value || metaDescription.value,
+        'description': brandDescriptionText.value || metaDescription.value,
         'url': brandUrl.value,
         'logo': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
@@ -559,38 +654,21 @@ useHead({
       }),
     },
 
-    // Article Schema
-    brand.value && {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        'headline': `${brand.value.name} - Обзор бренда и каталог товаров`,
-        'description': metaDescription.value,
-        'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
-        'author': {
-          '@type': 'Organization',
-          'name': siteName,
-          'url': siteUrl,
-        },
-        'publisher': {
-          '@type': 'Organization',
-          'name': siteName,
-          'url': siteUrl,
-          'logo': {
-            '@type': 'ImageObject',
-            'url': SITE_LOGO_URL,
-          },
-        },
-        'datePublished': brand.value.created_at || new Date().toISOString(),
-        'dateModified': brand.value.updated_at || brand.value.created_at || new Date().toISOString(),
-        'mainEntityOfPage': {
-          '@type': 'WebPage',
-          '@id': brandUrl.value,
-        },
-        'articleBody': seoContentText.value || metaDescription.value,
-      }),
-    },
+    /*
+     * Узла `Article` здесь БЫЛО И БОЛЬШЕ НЕТ.
+     *
+     * Страница бренда — это листинг товаров, а не статья. Разметка объявляла
+     * `headline: «<Бренд> - Обзор бренда и каталог товаров»` и `articleBody`
+     * длиной в мета-описание (160 знаков), то есть заявляла Google статью,
+     * которой на странице нет. Заодно на одном адресе оказывались сразу три
+     * типа страницы: `WebPage` (от nuxt-schema-org), `CollectionPage` и
+     * `Article`.
+     *
+     * Это тот же класс ошибки, что уже разбирали на странице категории:
+     * узел с неподходящим типом не даёт улучшений в выдаче, а в отчёте
+     * Search Console числится ошибкой. Товары и их рейтинги живут в
+     * ItemList выше — они на месте и не тронуты.
+     */
   ].filter(Boolean)),
 })
 
@@ -695,14 +773,29 @@ useIndexableRobotsRule(
         :filter-state="filterState"
       />
 
-      <!-- SEO контент -->
-      <ClientOnly>
-        <BrandSEOContentRenderer
-          v-if="seoBlocks.length > 0"
-          :blocks="seoBlocks"
-          class="mt-8"
-        />
-      </ClientOnly>
+      <!--
+        Ссылки на бренд-лендинги. Рисуются НА СЕРВЕРЕ и только на те адреса,
+        что открыты для индекса, — см. `brandCategoryLinks`.
+      -->
+      <nav
+        v-if="brandCategoryLinks.length > 0"
+        class="mt-6 md:mt-12 border-t pt-4 md:pt-8"
+        :aria-label="`${brand.name} в категориях`"
+      >
+        <h2 class="text-base md:text-lg font-semibold mb-3 md:mb-4">
+          {{ brand.name }} в категориях
+        </h2>
+        <div class="flex flex-wrap gap-2 md:gap-2.5">
+          <NuxtLink
+            v-for="link in brandCategoryLinks"
+            :key="link.path"
+            :to="link.path"
+            class="inline-flex items-center rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {{ link.name }}
+          </NuxtLink>
+        </div>
+      </nav>
     </div>
 
     <!-- Стандартный шаблон -->
@@ -712,17 +805,31 @@ useIndexableRobotsRule(
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
-        :seo-blocks="seoBlocks"
       />
 
-      <!-- SEO контент -->
-      <ClientOnly>
-        <BrandSEOContentRenderer
-          v-if="seoBlocks.length > 0"
-          :blocks="seoBlocks"
-          class="mt-8"
-        />
-      </ClientOnly>
+      <!--
+        Ссылки на бренд-лендинги. Рисуются НА СЕРВЕРЕ и только на те адреса,
+        что открыты для индекса, — см. `brandCategoryLinks`.
+      -->
+      <nav
+        v-if="brandCategoryLinks.length > 0"
+        class="mt-6 md:mt-12 border-t pt-4 md:pt-8"
+        :aria-label="`${brand.name} в категориях`"
+      >
+        <h2 class="text-base md:text-lg font-semibold mb-3 md:mb-4">
+          {{ brand.name }} в категориях
+        </h2>
+        <div class="flex flex-wrap gap-2 md:gap-2.5">
+          <NuxtLink
+            v-for="link in brandCategoryLinks"
+            :key="link.path"
+            :to="link.path"
+            class="inline-flex items-center rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {{ link.name }}
+          </NuxtLink>
+        </div>
+      </nav>
     </div>
   </div>
 </template>

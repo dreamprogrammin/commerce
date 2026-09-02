@@ -34,9 +34,13 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import { buildBrandLandingPath, parseCatalogSlug } from '@/utils/brandLanding'
+import {
+  buildBrandLandingPath,
+  isBrandLandingIndexable,
+  parseCatalogSlug,
+} from '@/utils/brandLanding'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { clampDescription, composeCategoryLead } from '@/utils/seoDescription'
+import { composeCategoryMeta } from '@/utils/seoDescription'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
 // DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
@@ -79,8 +83,7 @@ const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
-const { generateBrandCategoryDescription, generateCategoryDescription }
-  = useSeoTemplates()
+const { generateBrandCategoryDescription } = useSeoTemplates()
 
 const priceValidUntil = new Date(
   new Date().setFullYear(new Date().getFullYear() + 1),
@@ -488,6 +491,16 @@ const canonicalUrl = computed(() => {
 
   const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
 
+  /*
+   * Условие НАМЕРЕННО мягче, чем у `robotsRule`: бренд-лендинг с уникальным
+   * текстом, но с парой товаров, закрывается `noindex` и при этом сохраняет
+   * canonical на самого себя.
+   *
+   * Связка «noindex + canonical на ДРУГОЙ адрес» — противоречивые указания:
+   * Google переносит запрет на цель canonical, а целью здесь была бы страница
+   * категории, которую закрывать нельзя ни в коем случае. Ссылаться на себя
+   * при `noindex` безопасно и однозначно.
+   */
   if (hasUniqueSeoContent) {
     return `${baseUrl}${buildBrandLandingPath(basePath, activeBrandSlug.value)}`
   }
@@ -610,6 +623,24 @@ const displayedProducts = computed<CatalogProduct[]>(() => {
   }
   return accumulatedProducts.value
 })
+
+/**
+ * Сколько товаров показывает бренд-лендинг — для решения об индексации.
+ *
+ * `null` означает «ещё не знаем»: запрос идёт или упал. Отличить это от
+ * честного нуля важно — иначе разовая ошибка базы закрыла бы `noindex`
+ * рабочую страницу, и держалось бы это до следующего обхода. Пока запрос
+ * не завершён, `isLoadingProducts` истинно; как только данные пришли —
+ * пусть и пустые — оно ложно, и ноль засчитывается как настоящий ноль.
+ *
+ * Значение SSR-безопасно: сетка засевается в кеш до отрисовки
+ * (`useCatalogSsrData`), поэтому на сервере счёт уже известен. Проверено на
+ * проде: пустой лендинг отдаёт в разметке блок «Скоро здесь появятся
+ * товары», а не скелетон, — то есть загрузка на сервере завершилась.
+ */
+const brandLandingProductsCount = computed<number | null>(() =>
+  isLoadingProducts.value ? null : displayedProducts.value.length,
+)
 
 // --- 4. Функции-обработчики ---
 
@@ -1189,6 +1220,66 @@ const minPrice = computed(() => {
   )
 })
 
+/**
+ * Сколько активных товаров в категории вместе со всеми подкатегориями.
+ *
+ * Нужно ровно для одного — честного числа в мета-описании. Прежний шаблон
+ * писал «В каталоге N моделей», подставляя длину ПЕРВОЙ СТРАНИЦЫ выдачи, а
+ * это максимум 12 (`PAGE_SIZE`). У категории с полусотней товаров в выдаче
+ * стояло «12 моделей»: число занижено втрое и вдобавок одинаково у половины
+ * категорий.
+ *
+ * Дерево берём из хранилища — оно уже загружено выше (`catalog-meta-…`) и
+ * приходит в серверную разметку, отдельного запроса за категориями не нужно.
+ * Обход вниз повторяет `get_category_and_children_ids` в базе, которым
+ * пользуется сама выборка товаров.
+ *
+ * `null` означает «сосчитать не удалось»; описание тогда просто обходится без
+ * количества, а не показывает ноль.
+ */
+const { data: categoryProductsCount } = await useAsyncData(
+  () => `catalog-count-${currentCategorySlug.value}`,
+  async (): Promise<number | null> => {
+    if (currentCategorySlug.value === 'all')
+      return null
+
+    /*
+     * `fetchCategoryData` — а не `categoriesStore.allCategories` напрямую:
+     * блок стоит ВЫШЕ основной загрузки категорий, и на голое поле хранилища
+     * тут рассчитывать нельзя. Повторным запросом это не оборачивается —
+     * у метода ранний выход, если категории уже загружены.
+     */
+    const all = await categoriesStore.fetchCategoryData()
+    const root = all.find(c => c.slug === currentCategorySlug.value)
+    if (!root)
+      return null
+
+    const ids: string[] = []
+    const queue = [root.id]
+    const seen = new Set<string>()
+    while (queue.length > 0) {
+      const id = queue.shift()!
+      if (seen.has(id))
+        continue
+      seen.add(id)
+      ids.push(id)
+      for (const child of all) {
+        if (child.parent_id === id)
+          queue.push(child.id)
+      }
+    }
+
+    const { count, error } = await supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .in('category_id', ids)
+      .eq('is_active', true)
+
+    return error ? null : count
+  },
+  { watch: [currentCategorySlug] },
+)
+
 const categoryStats = computed(() => {
   let totalReviews = 0
   let sumRatings = 0
@@ -1240,83 +1331,38 @@ const metaDescription = computed(() => {
     })
   }
 
-  if (currentCategory.value?.meta_description) {
-    // Вводная часть: текст категории плюс ходовые бренды. Раньше тут стояли
-    // две обрезки через substring, и обе рубили посреди слова — в выдаче это
-    // читалось как «…оружие и транспорт дл», «…широкий выбо», «…помощники в ».
-    // Логика с тестами лежит в utils/seoDescription.ts.
-    // Хвостовая точка снимается там же, отдельная проверка больше не нужна.
-    const cleanText = composeCategoryLead(
-      currentCategory.value.meta_description,
-      topBrands.value,
-    )
+  /*
+   * Дальше — описание категории. Порядок веток: сперва написанное руками,
+   * потом собранное из фактов.
+   *
+   * Что изменилось 2 сентября 2026 и почему. Прежний шаблон открывался
+   * эмодзи («💰 Цены от…»), вставлял ряд звёзд («⭐⭐⭐⭐⭐ 5,0 (1 отз)» —
+   * пять звёзд с ОДНОГО отзыва) и заканчивался призывом «Заказывайте
+   * оригиналы!». Search Console по этим страницам за 90 дней: на позициях
+   * до десятой — 238 показов и НОЛЬ кликов. Ноль при живых позициях 5–10 —
+   * это не про позиции, это про то, как выглядит строка в выдаче.
+   *
+   * Поэтому вперёд вынесены факты, ради которых кликают: что за товар,
+   * сколько его и от какой цены. Сборка и её правила — в
+   * `utils/seoDescription.ts`, там же тесты.
+   */
+  const ratingValue
+    = categoryStats.value.reviews > 0 && categoryStats.value.rating
+      ? Number.parseFloat(categoryStats.value.rating.replace(',', '.'))
+      : null
 
-    const parts = [cleanText]
-
-    if (minPrice.value) {
-      parts.push(
-        `💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`,
-      )
-    }
-
-    if (categoryStats.value.reviews > 0) {
-      const ratingValue
-        = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
-      const starCount = Math.round(ratingValue)
-      const starEmojis = '⭐'.repeat(starCount)
-      parts.push(
-        `${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`,
-      )
-    }
-
-    parts.push('Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!')
-
-    return clampDescription(parts.join('. '))
-  }
-
-  if (!hasActiveFilters.value && minPrice.value && topBrands.value.length > 0) {
-    const ratingValue
-      = categoryStats.value.reviews > 0
-        ? Number.parseFloat(categoryStats.value.rating.replace(',', '.'))
-        : undefined
-
-    return generateCategoryDescription({
-      categoryName: categoryName.value,
-      topBrands: topBrands.value,
-      minPrice: minPrice.value,
-      city: 'Алматы',
-      rating: ratingValue,
-      reviewsCount:
-        categoryStats.value.reviews > 0
-          ? categoryStats.value.reviews
-          : undefined,
-    })
-  }
-
-  const catName = categoryName.value
-  const productsCount = displayedProducts.value.length
-
-  let snippet = `${catName} в Ухтышке`
-
-  if (productsCount > 0) {
-    snippet += `. В каталоге ${productsCount} ${productsCount === 1 ? 'модель' : productsCount < 5 ? 'модели' : 'моделей'}`
-  }
-
-  if (minPrice.value) {
-    snippet += `. 💰 Цены от ${new Intl.NumberFormat('ru-RU').format(minPrice.value)} ₸`
-  }
-
-  if (categoryStats.value.reviews > 0) {
-    const ratingValue
-      = Number.parseFloat(categoryStats.value.rating.replace(',', '.')) || 5
-    const starCount = Math.round(ratingValue)
-    const starEmojis = '⭐'.repeat(starCount)
-    snippet += `. ${starEmojis} ${categoryStats.value.rating} (${categoryStats.value.reviews} отз)`
-  }
-
-  snippet += '. Быстрая доставка по Алматы за 1 день. Заказывайте оригиналы!'
-
-  return snippet.length > 165 ? `${snippet.substring(0, 162)}...` : snippet
+  return composeCategoryMeta({
+    categoryName: categoryName.value,
+    // Написанное руками вступление, если владелец его завёл, — оно идёт
+    // первым, а факты дописываются следом.
+    lead: currentCategory.value?.meta_description,
+    productsCount: categoryProductsCount.value,
+    minPrice: minPrice.value,
+    topBrands: topBrands.value,
+    city: 'Алматы',
+    rating: ratingValue,
+    reviewsCount: categoryStats.value.reviews,
+  })
 })
 
 const metaTitle = computed(() => {
@@ -1446,10 +1492,33 @@ const robotsIndexable = useRobotsContent('index, follow')
 const robotsNoindexFollow = useRobotsContent('noindex, follow')
 
 const robotsRule = computed(() => {
-  const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
+  /*
+   * Бренд-лендинг разбирается отдельно и ПЕРВЫМ, потому что обе ветки ниже
+   * для него врут.
+   *
+   * Уникального текста мало: страница обязана ещё и показывать товар. К
+   * сентябрю 2026 три адреса из четырнадцати в карте сайта содержали ноль
+   * товаров — текст писали давно, товары с тех пор разошлись, а `index,
+   * follow` держался на одном факте существования строки в
+   * `category_brand_seo`. У такой страницы и H1 теряет бренд: резолвить его
+   * не из чего, когда у бренда нет товаров в этой категории.
+   *
+   * Обратный случай — бренд в пути БЕЗ строки в `category_brand_seo` — до
+   * этой правки утекал в индекс тем же путём: фильтр по бренду ставится по
+   * найденным товарам, а когда их нет, `activeFiltersCount` равен нулю, и
+   * проверка ниже возвращала `index, follow`.
+   *
+   * Порог общий с картой сайта, обе стороны зовут одну функцию — иначе в
+   * карте появятся `noindex`-адреса. См. MIN_PRODUCTS_FOR_BRAND_LANDING.
+   */
+  if (activeBrandSlug.value) {
+    const indexable
+      = !!categoryBrandSeo.value
+        && isBrandLandingIndexable(brandLandingProductsCount.value)
 
-  if (hasUniqueSeoContent) {
-    return { index: true, follow: true }
+    return indexable
+      ? { index: true, follow: true }
+      : { noindex: true, follow: true }
   }
 
   if (

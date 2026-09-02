@@ -12,6 +12,8 @@
  * адрес стал бы неоднозначным. Проверка на это есть в `parseCatalogSlug`.
  */
 
+import { MIN_PRODUCTS_FOR_BRAND_LANDING } from '@/constants'
+
 /** Служебный сегмент пути. */
 export const BRAND_SEGMENT = 'brand'
 
@@ -73,4 +75,88 @@ export function buildBrandLandingPath(
       : trimmed
 
   return `${base}/${BRAND_SEGMENT}/${brandSlug}`
+}
+
+/** Категория в виде, достаточном для обхода дерева вверх. */
+export interface BrandLandingCategoryNode {
+  id: string
+  parent_id: string | null
+}
+
+/** Товар в виде, достаточном для подсчёта пар. */
+export interface BrandLandingProductRef {
+  category_id: string | null
+  brand_id: string | null
+}
+
+/** Ключ пары в таблице подсчёта. */
+export function brandLandingPairKey(
+  categoryId: string,
+  brandId: string,
+): string {
+  return `${categoryId}|${brandId}`
+}
+
+/**
+ * Сколько товаров у каждой пары категория+бренд, считая товары во ВСЕХ
+ * потомках категории.
+ *
+ * Рекурсия здесь не украшение, а условие совпадения с тем, что видит
+ * посетитель: страница каталога отбирает товары через `get_filtered_products`,
+ * а та разворачивает категорию в `get_category_and_children_ids`. Считать
+ * прямые совпадения `p.category_id = c.id` — значит получить ноль на
+ * родительской категории, у которой все товары разложены по подкатегориям.
+ * Ровно на этом спотыкается `get_category_brand_combinations`: пара
+ * «машинки + mokatoys» (9 товаров) ей не видна, потому что товары лежат
+ * в дочерних «радиоуправляемые машинки».
+ *
+ * Обход идёт от товара ВВЕРХ по родителям, а не от категории вниз: так дерево
+ * проходится один раз на товар, а не один раз на пару. `seen` защищает от
+ * зацикливания, если в данных окажется петля parent_id — молчаливый бесконечный
+ * цикл в обработчике карты сайта дороже лишнего множества.
+ */
+export function countProductsByCategoryBrand(
+  products: readonly BrandLandingProductRef[],
+  categories: readonly BrandLandingCategoryNode[],
+): Map<string, number> {
+  const parentOf = new Map<string, string | null>()
+  for (const category of categories)
+    parentOf.set(category.id, category.parent_id ?? null)
+
+  const counts = new Map<string, number>()
+
+  for (const product of products) {
+    const brandId = product.brand_id
+    if (!brandId || !product.category_id)
+      continue
+
+    const seen = new Set<string>()
+    let categoryId: string | null | undefined = product.category_id
+
+    while (categoryId && !seen.has(categoryId)) {
+      seen.add(categoryId)
+      const key = brandLandingPairKey(categoryId, brandId)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+      categoryId = parentOf.get(categoryId) ?? null
+    }
+  }
+
+  return counts
+}
+
+/**
+ * Годится ли бренд-лендинг для индекса по числу товаров.
+ *
+ * `null` означает «сосчитать не удалось» (данные ещё грузятся или запрос
+ * упал) и трактуется как «годится»: закрывать рабочую страницу из-за сбоя
+ * запроса нельзя — тот же принцип fail-open, что у бренд-страницы
+ * в pages/brand/[slug].vue.
+ */
+export function isBrandLandingIndexable(
+  productsCount: number | null | undefined,
+): boolean {
+  if (productsCount === null || productsCount === undefined)
+    return true
+
+  return productsCount >= MIN_PRODUCTS_FOR_BRAND_LANDING
 }

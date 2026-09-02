@@ -413,3 +413,12 @@ entrypoint = "./functions/send-user-telegram/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/send-broadcast/index.ts"
+
+# Генератор SEO-полей бренда. `verify_jwt = true` — в отличие от соседей:
+# функция стоит денег на каждый вызов, поэтому платформа сначала проверяет
+# токен, а сама функция дальше проверяет роль администратора. Публичного
+# анонимного ключа для вызова НЕ достаточно.
+[functions.generate-brand-seo]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/generate-brand-seo/index.ts"
