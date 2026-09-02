@@ -34,7 +34,11 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import { buildBrandLandingPath, parseCatalogSlug } from '@/utils/brandLanding'
+import {
+  buildBrandLandingPath,
+  isBrandLandingIndexable,
+  parseCatalogSlug,
+} from '@/utils/brandLanding'
 import { isWholeRange } from '@/utils/catalogFilterRange'
 import { clampDescription, composeCategoryLead } from '@/utils/seoDescription'
 
@@ -488,6 +492,16 @@ const canonicalUrl = computed(() => {
 
   const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
 
+  /*
+   * Условие НАМЕРЕННО мягче, чем у `robotsRule`: бренд-лендинг с уникальным
+   * текстом, но с парой товаров, закрывается `noindex` и при этом сохраняет
+   * canonical на самого себя.
+   *
+   * Связка «noindex + canonical на ДРУГОЙ адрес» — противоречивые указания:
+   * Google переносит запрет на цель canonical, а целью здесь была бы страница
+   * категории, которую закрывать нельзя ни в коем случае. Ссылаться на себя
+   * при `noindex` безопасно и однозначно.
+   */
   if (hasUniqueSeoContent) {
     return `${baseUrl}${buildBrandLandingPath(basePath, activeBrandSlug.value)}`
   }
@@ -610,6 +624,24 @@ const displayedProducts = computed<CatalogProduct[]>(() => {
   }
   return accumulatedProducts.value
 })
+
+/**
+ * Сколько товаров показывает бренд-лендинг — для решения об индексации.
+ *
+ * `null` означает «ещё не знаем»: запрос идёт или упал. Отличить это от
+ * честного нуля важно — иначе разовая ошибка базы закрыла бы `noindex`
+ * рабочую страницу, и держалось бы это до следующего обхода. Пока запрос
+ * не завершён, `isLoadingProducts` истинно; как только данные пришли —
+ * пусть и пустые — оно ложно, и ноль засчитывается как настоящий ноль.
+ *
+ * Значение SSR-безопасно: сетка засевается в кеш до отрисовки
+ * (`useCatalogSsrData`), поэтому на сервере счёт уже известен. Проверено на
+ * проде: пустой лендинг отдаёт в разметке блок «Скоро здесь появятся
+ * товары», а не скелетон, — то есть загрузка на сервере завершилась.
+ */
+const brandLandingProductsCount = computed<number | null>(() =>
+  isLoadingProducts.value ? null : displayedProducts.value.length,
+)
 
 // --- 4. Функции-обработчики ---
 
@@ -1446,10 +1478,33 @@ const robotsIndexable = useRobotsContent('index, follow')
 const robotsNoindexFollow = useRobotsContent('noindex, follow')
 
 const robotsRule = computed(() => {
-  const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
+  /*
+   * Бренд-лендинг разбирается отдельно и ПЕРВЫМ, потому что обе ветки ниже
+   * для него врут.
+   *
+   * Уникального текста мало: страница обязана ещё и показывать товар. К
+   * сентябрю 2026 три адреса из четырнадцати в карте сайта содержали ноль
+   * товаров — текст писали давно, товары с тех пор разошлись, а `index,
+   * follow` держался на одном факте существования строки в
+   * `category_brand_seo`. У такой страницы и H1 теряет бренд: резолвить его
+   * не из чего, когда у бренда нет товаров в этой категории.
+   *
+   * Обратный случай — бренд в пути БЕЗ строки в `category_brand_seo` — до
+   * этой правки утекал в индекс тем же путём: фильтр по бренду ставится по
+   * найденным товарам, а когда их нет, `activeFiltersCount` равен нулю, и
+   * проверка ниже возвращала `index, follow`.
+   *
+   * Порог общий с картой сайта, обе стороны зовут одну функцию — иначе в
+   * карте появятся `noindex`-адреса. См. MIN_PRODUCTS_FOR_BRAND_LANDING.
+   */
+  if (activeBrandSlug.value) {
+    const indexable
+      = !!categoryBrandSeo.value
+        && isBrandLandingIndexable(brandLandingProductsCount.value)
 
-  if (hasUniqueSeoContent) {
-    return { index: true, follow: true }
+    return indexable
+      ? { index: true, follow: true }
+      : { noindex: true, follow: true }
   }
 
   if (
