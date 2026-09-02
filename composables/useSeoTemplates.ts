@@ -53,45 +53,18 @@ export function useSeoTemplates() {
     return `${data.categoryName} ${data.brandName} — купить в Алматы с доставкой | Ухтышка`
   }
 
-  /**
-   * Генерирует Description для категории с топ-брендами
+  /*
+   * `generateCategoryDescription` ЖИЛ ЗДЕСЬ и удалён 2 сентября 2026.
+   *
+   * Он собирал мета-описание категории с эмодзи впереди («💰 От 6 190 ₸»)
+   * и рядом звёзд, набранных иногда с единственного отзыва. Search Console
+   * за 90 дней по страницам категорий на позициях до десятой: 238 показов,
+   * ноль кликов.
+   *
+   * Замена — `composeCategoryMeta` в `utils/seoDescription.ts`: факты
+   * вперёд (сколько моделей и от какой цены), без эмодзи, с настоящим
+   * числом товаров по всей ветке категорий. Там же тесты.
    */
-  function generateCategoryDescription(data: {
-    categoryName: string
-    topBrands: string[] // Топ-3 бренда
-    minPrice: number
-    city?: string
-    rating?: number
-    reviewsCount?: number
-  }): string {
-    const city = data.city || 'Алматы'
-
-    // Формируем список брендов через middot (максимум 3)
-    const brandsText = data.topBrands.length > 0
-      ? ` ${data.topBrands.slice(0, 3).join(' · ')}`
-      : ''
-
-    const parts = []
-
-    // Категория + бренды
-    parts.push(`${data.categoryName}${brandsText} в Ухтышке`)
-
-    // Цена
-    parts.push(`💰 От ${data.minPrice.toLocaleString('ru-KZ')} ₸`)
-
-    // Рейтинг (если есть)
-    if (data.rating && data.reviewsCount && data.reviewsCount > 0) {
-      const starCount = Math.round(data.rating)
-      const starEmojis = '⭐'.repeat(starCount)
-      parts.push(`${starEmojis} ${data.rating.toFixed(1).replace('.', ',')} (${data.reviewsCount} отз)`)
-    }
-
-    // Доставка
-    parts.push(`Доставка ${city} за 1 день`)
-
-    // Обрезка до 165 знаков — по границе слова, см. utils/seoDescription.ts
-    return clampDescription(parts.join('. '))
-  }
 
   /**
    * Генерирует Description для страницы категория + бренд (гибридный сниппет)
@@ -241,7 +214,6 @@ export function useSeoTemplates() {
   }
 
   return {
-    generateCategoryDescription,
     generateBrandCategorySeoText,
     generateBrandCategoryH1,
     generateBrandCategoryTitle,
