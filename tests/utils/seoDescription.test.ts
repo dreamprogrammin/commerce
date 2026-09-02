@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CATEGORY_LEAD_LIMIT,
   clampDescription,
-  composeCategoryLead,
+  composeCategoryMeta,
   META_DESCRIPTION_LIMIT,
+  pluralRu,
 } from '@/utils/seoDescription'
 
 /**
@@ -59,57 +59,27 @@ describe('прежнее поведение действительно лома�
     expect(legacyLead(text, BRANDS)).toContain(broken)
   })
 
+  /*
+   * Сборка с тех пор сменилась (`composeCategoryLead` → `composeCategoryMeta`),
+   * но гарантия та же: тексты из прод-базы не должны рубиться посреди слова.
+   */
   it('новая сборка тех же обрывков не даёт', () => {
-    expect(composeCategoryLead(REAL.boys, BRANDS)).not.toContain('транспорт дл ')
-    expect(composeCategoryLead(REAL.constructors, BRANDS)).not.toContain('широкий выбо ')
-  })
-})
-
-describe('composeCategoryLead', () => {
-  it('не обрывает слово ни на одном из трёх пострадавших описаний', () => {
-    for (const [name, text] of Object.entries(REAL)) {
-      const lead = composeCategoryLead(text, BRANDS)
-      expect(endsMidWord(lead, text), `${name}: «${lead}»`).toBe(false)
-    }
-  })
-
-  it('список брендов попадает целиком или не попадает вовсе', () => {
-    for (const text of Object.values(REAL)) {
-      const lead = composeCategoryLead(text, BRANDS)
-      if (lead.includes('('))
-        expect(lead).toContain(`(${BRANDS.join(', ')})`)
-    }
-  })
-
-  it('на описании «boys» отдаёт целые слова и полный список', () => {
-    const lead = composeCategoryLead(REAL.boys, BRANDS)
-    expect(lead).not.toContain('транспорт дл ')
-    expect(lead).toContain('(Hasbro, LEGO, Mattel)')
-  })
-
-  it('короткий текст возвращает как есть', () => {
-    expect(composeCategoryLead('Куклы и аксессуары', [])).toBe('Куклы и аксессуары')
-  })
-
-  it('не приклеивает бренды, если один из них уже упомянут', () => {
-    const text = 'Конструкторы LEGO и другие наборы для детей'
-    expect(composeCategoryLead(text, BRANDS)).toBe(text)
-  })
-
-  it('снимает html-теги', () => {
-    expect(composeCategoryLead('<p>Мягкие игрушки</p>', [])).toBe('Мягкие игрушки')
-  })
-
-  it('пустой вход не роняет', () => {
-    expect(composeCategoryLead(null, BRANDS)).toBe('')
-    expect(composeCategoryLead('   ', BRANDS)).toBe('')
-  })
-
-  it('опускает бренды, когда на текст не остаётся места', () => {
-    const huge = ['Очень Длинное Название Бренда', 'И Ещё Одно Такое Же', 'И Третье']
-    const lead = composeCategoryLead(REAL.boys, huge)
-    expect(lead).not.toContain('(')
-    expect(lead.length).toBeLessThanOrEqual(CATEGORY_LEAD_LIMIT + 8)
+    const boys = composeCategoryMeta({
+      categoryName: 'Игрушки для мальчиков',
+      lead: REAL.boys,
+      productsCount: 47,
+      minPrice: 3490,
+      topBrands: BRANDS,
+    })
+    const constructors = composeCategoryMeta({
+      categoryName: 'Конструкторы',
+      lead: REAL.constructors,
+      productsCount: 19,
+      minPrice: 6190,
+      topBrands: BRANDS,
+    })
+    expect(boys).not.toContain('транспорт дл ')
+    expect(constructors).not.toContain('широкий выбо ')
   })
 })
 
@@ -130,5 +100,181 @@ describe('clampDescription', () => {
 
   it('пустой вход не роняет', () => {
     expect(clampDescription(null)).toBe('')
+  })
+})
+
+describe('pluralRu', () => {
+  it('склоняет по последней цифре', () => {
+    expect(pluralRu(1, 'модель', 'модели', 'моделей')).toBe('модель')
+    expect(pluralRu(3, 'модель', 'модели', 'моделей')).toBe('модели')
+    expect(pluralRu(7, 'модель', 'модели', 'моделей')).toBe('моделей')
+  })
+
+  /* Отдельная ветка: 11–14 всегда «моделей», хотя цифра в конце обманчива. */
+  it('второй десяток не обманывает', () => {
+    expect(pluralRu(11, 'модель', 'модели', 'моделей')).toBe('моделей')
+    expect(pluralRu(12, 'модель', 'модели', 'моделей')).toBe('моделей')
+    expect(pluralRu(14, 'модель', 'модели', 'моделей')).toBe('моделей')
+  })
+
+  /*
+   * Прежняя формула на странице каталога была `n < 5 ? 'модели' : 'моделей'`
+   * и на 22 давала «22 моделей». Проверяем именно этот случай.
+   */
+  it('за двадцаткой счёт начинается заново', () => {
+    expect(pluralRu(21, 'модель', 'модели', 'моделей')).toBe('модель')
+    expect(pluralRu(22, 'модель', 'модели', 'моделей')).toBe('модели')
+    expect(pluralRu(25, 'модель', 'модели', 'моделей')).toBe('моделей')
+  })
+})
+
+/*
+ * `formatPrice` разделяет тысячи НЕРАЗРЫВНЫМ пробелом (U+00A0) — намеренно,
+ * чтобы «5 090 ₸» не разрывалось переносом. В ожиданиях писать невидимый
+ * символ нельзя: глазами он неотличим от обычного пробела, и тест падает с
+ * сообщением, в котором обе строки выглядят одинаково. Поэтому сравниваем
+ * через нормализацию.
+ */
+function plain(text: string): string {
+  return text.replace(/\u00A0/g, ' ')
+}
+
+describe('composeCategoryMeta', () => {
+  const base = {
+    categoryName: 'Куклы',
+    productsCount: 48,
+    minPrice: 3690,
+    topBrands: ['L.O.L. Surprise', 'Defa Lucy'],
+  }
+
+  it('вперёд идут товар, количество и цена', () => {
+    const meta = composeCategoryMeta(base)
+    expect(plain(meta).startsWith('Куклы в Алматы: 48 моделей от 3 690 ₸.')).toBe(true)
+    expect(meta).toContain('Доставка за 1 день, самовывоз')
+  })
+
+  /*
+   * Мобильная выдача обрезает около 120 знаков, а это 79 % показов сайта.
+   * Значит суть обязана уместиться в первую сотню, а не оказаться за хвостом.
+   */
+  it('суть помещается в первые 120 знаков', () => {
+    const head = composeCategoryMeta(base).slice(0, 120)
+    expect(head).toContain('48 моделей')
+    expect(plain(head)).toContain('3 690 ₸')
+  })
+
+  it('эмодзи не остаётся', () => {
+    const meta = composeCategoryMeta({
+      ...base,
+      rating: 5,
+      reviewsCount: 40,
+    })
+    expect(meta).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2B00}-\u{2BFF}\u{2600}-\u{27BF}]/u)
+  })
+
+  /*
+   * Пять звёзд с одного отзыва — то, что стояло в выдаче до 2 сентября 2026.
+   * Рейтинг показываем только когда за ним есть хоть какая-то выборка.
+   */
+  it('рейтинг по одному отзыву не показывается', () => {
+    const meta = composeCategoryMeta({ ...base, rating: 5, reviewsCount: 1 })
+    expect(meta).not.toContain('рейтинг')
+  })
+
+  it('рейтинг от порога — показывается и склоняется', () => {
+    const meta = composeCategoryMeta({
+      ...base,
+      topBrands: [],
+      rating: 4.75,
+      reviewsCount: 23,
+    })
+    expect(meta).toContain('рейтинг 4,8 из 5 по 23 отзывам')
+  })
+
+  it('бренды попадают целиком или не попадают вовсе', () => {
+    const meta = composeCategoryMeta({
+      ...base,
+      categoryName: 'Конструкторы для мальчиков и девочек любого возраста',
+      topBrands: ['Play Smart', 'MG Toys', 'Shantou Yisheng'],
+      rating: 4.9,
+      reviewsCount: 30,
+    })
+    expect(meta.includes('Бренды:')).toBe(false)
+    expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+  })
+
+  it('без количества и цены остаётся осмысленная строка', () => {
+    const meta = composeCategoryMeta({
+      categoryName: 'Куклы',
+      productsCount: null,
+      minPrice: null,
+      topBrands: [],
+    })
+    expect(meta).toBe('Куклы в Алматы. Доставка за 1 день, самовывоз.')
+  })
+
+  it('одна модель — единственное число', () => {
+    const meta = composeCategoryMeta({ ...base, productsCount: 1, topBrands: [] })
+    expect(plain(meta)).toContain('1 модель от')
+  })
+
+  /*
+   * Ветка с написанным руками вступлением: живая фраза человека остаётся
+   * впереди, факты дописываются следом, город не повторяется дважды.
+   */
+  it('ручной текст идёт первым, факты — следом', () => {
+    const meta = composeCategoryMeta({
+      categoryName: 'Игрушки для девочек',
+      lead: 'Куклы, наборы и мягкие игрушки — то, во что играют каждый день.',
+      productsCount: 38,
+      minPrice: 5090,
+      topBrands: [],
+    })
+    expect(meta.startsWith('Куклы, наборы и мягкие игрушки')).toBe(true)
+    expect(plain(meta)).toContain('38 моделей от 5 090 ₸')
+    expect(meta).toContain('Доставка по Алматы за 1 день, самовывоз')
+  })
+
+  it('город называется один раз', () => {
+    const withCityInLead = composeCategoryMeta({
+      categoryName: 'Куклы',
+      lead: 'Куклы и пупсы с доставкой по Алматы.',
+      productsCount: 19,
+      minPrice: 3690,
+      topBrands: [],
+    })
+    expect(withCityInLead.match(/Алматы/g)?.length).toBe(1)
+
+    const withoutLead = composeCategoryMeta({
+      categoryName: 'Куклы',
+      productsCount: 19,
+      minPrice: 3690,
+      topBrands: [],
+    })
+    expect(withoutLead.match(/Алматы/g)?.length).toBe(1)
+  })
+
+  it('разметка из ручного текста вычищается', () => {
+    const meta = composeCategoryMeta({
+      categoryName: 'Куклы',
+      lead: '<p>Куклы <strong>и пупсы</strong></p>',
+      productsCount: 19,
+      minPrice: 3690,
+      topBrands: [],
+    })
+    expect(meta).not.toContain('<')
+    expect(plain(meta).startsWith('Куклы и пупсы. 19 моделей')).toBe(true)
+  })
+
+  it('в лимит укладывается всегда', () => {
+    const meta = composeCategoryMeta({
+      categoryName: 'Развивающие игрушки и наборы для творчества малышам',
+      productsCount: 137,
+      minPrice: 1290,
+      topBrands: ['Huanger', 'Hola Toys', 'Shantou Yisheng'],
+      rating: 4.9,
+      reviewsCount: 88,
+    })
+    expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
   })
 })
