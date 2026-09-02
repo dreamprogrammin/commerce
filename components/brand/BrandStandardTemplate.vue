@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { BrandFilterState } from '@/composables/useBrandPageFilters'
 import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
-import type { SEOBlock } from '~/utils/parseSEOContent'
 import {
   ArrowLeft,
   ChevronDown,
@@ -18,7 +17,6 @@ const props = defineProps<{
   breadcrumbs: IBreadcrumbItem[]
   filterState: BrandFilterState
   brandStats?: { average_rating: number, total_reviews_count: number } | null
-  seoBlocks?: SEOBlock[]
 }>()
 
 const fs = props.filterState
