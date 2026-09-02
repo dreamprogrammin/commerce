@@ -30,6 +30,8 @@ const formData = ref<Partial<BrandInsert | BrandUpdate>>({
   is_custom_page: (props.initialData as any)?.is_custom_page || false,
   page_layout: props.initialData ? (props.initialData as any).page_layout : null,
   // SEO поля
+  meta_title: props.initialData?.meta_title || null,
+  seo_h1: props.initialData?.seo_h1 || null,
   seo_description: props.initialData?.seo_description || null,
   seo_keywords: props.initialData?.seo_keywords || null,
 })
@@ -140,6 +142,49 @@ const descriptionValue = computed({
 
 // --- SEO ПОЛЯ ---
 
+/*
+ * Заголовок и H1 заводятся здесь, потому что заполнить их было НЕЧЕМ.
+ *
+ * В таблице `brands` под SEO отведено двадцать с лишним колонок, а форма
+ * показывала две: `seo_description` и `seo_keywords`. Результат на 2 сентября
+ * 2026 — `meta_title` и `seo_h1` пусты у всех 32 брендов, и каждая страница
+ * бренда отдавала один и тот же шаблонный заголовок «X - Купить товары бренда
+ * в Алматы | Ухтышка», а H1 был голым названием. По Search Console страницы
+ * брендов дают 20 кликов из 70 по сайту при 1550 показах — то есть заголовок
+ * тут решает больше, чем где-либо ещё.
+ *
+ * Остальные пустующие колонки (`og_*`, `canonical_url`, `meta_keywords`,
+ * `seo_text`, `meta_description`) сюда НЕ вынесены намеренно: страница их либо
+ * не читает вовсе, либо читает дублирующее поле, которое уже есть в форме
+ * (`meta_description` — тот же смысл, что у «SEO описания» ниже). Плодить в
+ * админке поля, ни на что не влияющие, — это как раз то, из-за чего никто и
+ * не понимал, какое заполнять.
+ */
+const metaTitleValue = computed({
+  get: () => formData.value.meta_title ?? '',
+  set: (value: string) => {
+    formData.value.meta_title = value === '' ? null : value
+  },
+})
+
+const seoH1Value = computed({
+  get: () => formData.value.seo_h1 ?? '',
+  set: (value: string) => {
+    formData.value.seo_h1 = value === '' ? null : value
+  },
+})
+
+/**
+ * Заголовок, который реально уйдёт в выдачу. Повторяет фолбэк из
+ * `pages/brand/[slug].vue` — предпросмотр обязан показывать то же самое,
+ * а не свою версию: раньше он рисовал «X - Купить товары бренда | Ухтышка»,
+ * тогда как страница отдаёт «…в Алматы | Ухтышка».
+ */
+const effectiveTitle = computed(
+  () => metaTitleValue.value
+    || `${formData.value.name || 'Бренд'} - Купить товары бренда в Алматы | Ухтышка`,
+)
+
 const seoDescriptionValue = computed({
   get: () => formData.value.seo_description ?? '',
   set: (value: string) => {
@@ -228,6 +273,40 @@ onBeforeUnmount(() => {
 
       <div>
         <div class="flex items-center justify-between">
+          <Label for="meta-title">Заголовок страницы (title)</Label>
+          <span
+            class="text-xs"
+            :class="effectiveTitle.length > 60 ? 'text-destructive' : effectiveTitle.length > 55 ? 'text-amber-500' : 'text-muted-foreground'"
+          >
+            {{ effectiveTitle.length }}/60
+          </span>
+        </div>
+        <Input
+          id="meta-title"
+          v-model="metaTitleValue"
+          placeholder="Конструкторы LEGO — купить в Алматы | Ухтышка"
+        />
+        <p class="text-xs text-muted-foreground mt-1">
+          Строка, которую видно в Google. Пусто — соберётся из названия бренда.
+          Google обрезает примерно на 60 знаках.
+        </p>
+      </div>
+
+      <div>
+        <Label for="seo-h1">Заголовок на странице (H1)</Label>
+        <Input
+          id="seo-h1"
+          v-model="seoH1Value"
+          placeholder="Конструкторы LEGO"
+        />
+        <p class="text-xs text-muted-foreground mt-1">
+          Крупный заголовок вверху страницы бренда. Пусто — покажем название
+          бренда, как сейчас.
+        </p>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between">
           <Label for="seo-description">SEO описание</Label>
           <span
             class="text-xs"
@@ -265,7 +344,7 @@ onBeforeUnmount(() => {
           Предпросмотр в Google:
         </p>
         <p class="text-blue-600 text-sm hover:underline cursor-pointer truncate">
-          {{ formData.name }} - Купить товары бренда | Ухтышка
+          {{ effectiveTitle }}
         </p>
         <p class="text-green-700 text-xs">
           uhti.kz › brand › {{ formData.slug || '...' }}

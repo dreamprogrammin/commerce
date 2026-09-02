@@ -66,10 +66,18 @@ function toggleSeoExpanded() {
           </div>
 
           <div class="flex-1 text-center md:text-left space-y-3">
+            <!--
+              `seo_h1`, а не только название: страница бренда собирает 20 из 70
+              кликов по сайту (Search Console, 90 дней), и голое «LEGO» в H1 не
+              содержит ни слова о том, что это конструкторы. Поле заводится в
+              админке; пока оно пустое — показываем название, как и раньше,
+              поэтому у 32 существующих брендов ничего не меняется. Тот же
+              фолбэк уже стоял в BrandCustomTemplate.
+            -->
             <h1
               class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground"
             >
-              {{ brand.name }}
+              {{ brand.seo_h1 || brand.name }}
             </h1>
 
             <!-- Brand Trust Score -->
