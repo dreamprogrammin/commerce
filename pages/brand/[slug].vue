@@ -12,13 +12,10 @@ import {
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
-  SITE_LOGO_URL,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-
-import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -273,27 +270,29 @@ const ogImageSrc = computed(
   () => brandLogoUrl.value || SITE_OG_IMAGE_URL,
 )
 
-const seoBlocks = computed(() => {
-  if (!brand.value?.seo_content)
-    return []
-  return parseHTMLToBlocks(brand.value.seo_content)
-})
-
-// Извлекаем текст из seo_content для Schema.org
-const seoContentText = computed(() => {
-  if (!seoBlocks.value.length)
-    return ''
-  return seoBlocks.value
-    .map((block) => {
-      if (block.type === 'ul') {
-        return block.items.map(item => item.text).join(' ')
-      }
-      return block.text
-    })
-    .filter(Boolean)
-    .join(' ')
-    .substring(0, 300)
-})
+/**
+ * Текст «О бренде» простой строкой — для JSON-LD.
+ *
+ * Читался он из `brand.seo_content`, а такой колонки нет ни в прод-базе, ни
+ * в `types/supabase.ts`: рассказ о бренде живёт в `description` (у 30 брендов
+ * из 32 это готовая вёрстка с заголовками и абзацами). Поле, которого нет,
+ * молча давало `undefined`, поэтому:
+ *
+ *  • `Brand.description` в разметке отдавал мета-описание вместо текста;
+ *  • отдельный блок `BrandSEOContentRenderer` не рисовался ни у одного
+ *    бренда — и хорошо, что не рисовался: тот же текст уже показывает
+ *    `BrandDescription` внутри шаблона, вышел бы дубль. Поэтому блок убран
+ *    целиком, а не «починен».
+ *
+ * Правильный источник виден на соседней странице линейки
+ * (`pages/brand/[brandSlug]/[lineSlug].vue`) — там читается `description`.
+ *
+ * `plainExcerpt`, а не `substring`: обрезка по границе слова, иначе в
+ * разметку уезжает оборванное слово.
+ */
+const brandDescriptionText = computed(() =>
+  plainExcerpt(brand.value?.description, 300),
+)
 
 defineOgImage({
   url: ogImageSrc.value,
@@ -344,7 +343,7 @@ useHead({
         '@type': 'Brand',
         '@id': `${brandUrl.value}#brand`,
         'name': brand.value.name, // FIX: чистое название без дублирования
-        'description': seoContentText.value || metaDescription.value,
+        'description': brandDescriptionText.value || metaDescription.value,
         'url': brandUrl.value,
         'logo': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
@@ -559,38 +558,21 @@ useHead({
       }),
     },
 
-    // Article Schema
-    brand.value && {
-      type: 'application/ld+json',
-      innerHTML: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        'headline': `${brand.value.name} - Обзор бренда и каталог товаров`,
-        'description': metaDescription.value,
-        'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
-        'author': {
-          '@type': 'Organization',
-          'name': siteName,
-          'url': siteUrl,
-        },
-        'publisher': {
-          '@type': 'Organization',
-          'name': siteName,
-          'url': siteUrl,
-          'logo': {
-            '@type': 'ImageObject',
-            'url': SITE_LOGO_URL,
-          },
-        },
-        'datePublished': brand.value.created_at || new Date().toISOString(),
-        'dateModified': brand.value.updated_at || brand.value.created_at || new Date().toISOString(),
-        'mainEntityOfPage': {
-          '@type': 'WebPage',
-          '@id': brandUrl.value,
-        },
-        'articleBody': seoContentText.value || metaDescription.value,
-      }),
-    },
+    /*
+     * Узла `Article` здесь БЫЛО И БОЛЬШЕ НЕТ.
+     *
+     * Страница бренда — это листинг товаров, а не статья. Разметка объявляла
+     * `headline: «<Бренд> - Обзор бренда и каталог товаров»` и `articleBody`
+     * длиной в мета-описание (160 знаков), то есть заявляла Google статью,
+     * которой на странице нет. Заодно на одном адресе оказывались сразу три
+     * типа страницы: `WebPage` (от nuxt-schema-org), `CollectionPage` и
+     * `Article`.
+     *
+     * Это тот же класс ошибки, что уже разбирали на странице категории:
+     * узел с неподходящим типом не даёт улучшений в выдаче, а в отчёте
+     * Search Console числится ошибкой. Товары и их рейтинги живут в
+     * ItemList выше — они на месте и не тронуты.
+     */
   ].filter(Boolean)),
 })
 
@@ -694,15 +676,6 @@ useIndexableRobotsRule(
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
       />
-
-      <!-- SEO контент -->
-      <ClientOnly>
-        <BrandSEOContentRenderer
-          v-if="seoBlocks.length > 0"
-          :blocks="seoBlocks"
-          class="mt-8"
-        />
-      </ClientOnly>
     </div>
 
     <!-- Стандартный шаблон -->
@@ -712,17 +685,7 @@ useIndexableRobotsRule(
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
-        :seo-blocks="seoBlocks"
       />
-
-      <!-- SEO контент -->
-      <ClientOnly>
-        <BrandSEOContentRenderer
-          v-if="seoBlocks.length > 0"
-          :blocks="seoBlocks"
-          class="mt-8"
-        />
-      </ClientOnly>
     </div>
   </div>
 </template>
