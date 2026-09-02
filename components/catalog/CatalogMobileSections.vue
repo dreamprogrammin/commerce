@@ -8,9 +8,12 @@
  *    поля под цвет нет, поэтому оттенок берётся из карты по slug корня, а для
  *    незнакомого корня — циклом по той же палитре (иначе новая категория в
  *    админке приезжала бы без фона).
+ *  • Наложения (`blend`) тут НЕТ, как и на главной. Оно осталось от
+ *    прототипа и при бледных подложках было незаметно; когда оттенки свели к
+ *    палитре главной, умножение начало красить сами картинки в цвет фона —
+ *    владелец это и заметил.
  *  • LQIP тут намеренно нет: тайл ~112px, вариант `sm` (400px) прилетает
- *    мгновенно, а размытый плейсхолдер под `mix-blend-mode: multiply`
- *    проступает сквозь прозрачный PNG грязным пятном.
+ *    мгновенно.
  *
  * Сами плитки рисует `CategoryTile` — общий порт `CategoryTile.dc.html`.
  * Раскладка тут stack + подпись снизу; про `blend`, `sourceMedia` и
@@ -20,6 +23,7 @@ import type { AdditionalMenuItem, CategoryRow } from '@/types'
 import CategoryTile from '@/components/category/CategoryTile.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { CATEGORY_TILE_TINTS } from '@/constants/homePlaceholders'
 import { isDiscountPromo } from '@/utils/promoTiles'
 
 const props = defineProps<{
@@ -30,22 +34,49 @@ const props = defineProps<{
 const { getVariantUrl } = useSupabaseStorage()
 
 /**
- * Пастельные подложки секций из прототипа. Ключ — slug корневой категории.
- * «Игры» в прототипе не было (там шло «Активный отдых»), поэтому коралловый
- * добавлен в тон остальным: палитра закрывает синий/розовый/янтарный/зелёный/
- * фиолетовый/бирюзовый, кораллового не хватало.
+ * Подложки секций. Ключ — slug корневой категории.
+ *
+ * Берутся из той же палитры, что на главной (`CATEGORY_TILE_TINTS`), и в том
+ * же порядке: мальчикам синий, девочкам розовый, малышам янтарный и так
+ * далее. Раньше здесь стояли собственные значения из прототипа
+ * `Каталог.dc.html` — почти белые (#dff0ff против #9fd3ea), из-за чего одна и
+ * та же категория на главной и в каталоге выглядела по-разному. Владелец
+ * попросил свести к главной.
+ *
+ * Шестой оттенок отдан «Играм» — именно так они окрашены на главной
+ * (проверено вычисленным `--ct-tint`, не на глаз). Праздник на главной не
+ * показывается, ему добавлен коралловый в тон остальным: синий, розовый,
+ * янтарный, зелёный, фиолетовый и бирюзовый палитра закрывает, кораллового
+ * не хватало.
  */
 const SECTION_TINTS: Record<string, string> = {
-  'boys': '#dff0ff',
-  'girls': '#ffe9f3',
-  'kiddy': '#fff3d9',
-  'constructors-root': '#e6f7e9',
-  'creativity': '#f1e9ff',
-  'games': '#ffe9e2',
-  'holyday': '#e0f5f7',
+  'boys': CATEGORY_TILE_TINTS[0],
+  'girls': CATEGORY_TILE_TINTS[1],
+  'kiddy': CATEGORY_TILE_TINTS[2],
+  'constructors-root': CATEGORY_TILE_TINTS[3],
+  'creativity': CATEGORY_TILE_TINTS[4],
+  'games': CATEGORY_TILE_TINTS[5],
+  'holyday': '#f2b6a4',
 }
 
 const TINT_CYCLE = Object.values(SECTION_TINTS)
+
+/**
+ * Подложки промо-плиток «Новинки» и «Акции».
+ *
+ * Раньше брались из токенов `--brand-surface` и `--bonus-surface`, а это
+ * blue-50 и orange-50 — почти белые. Рядом с категориями, окрашенными
+ * палитрой главной, они выглядели выцветшими. Здесь та же весовая категория,
+ * что у `CATEGORY_TILE_TINTS`, и тот же смысл: синий у новинок, тёплый
+ * оранжевый у акций.
+ *
+ * Значения литералами, как и вся палитра плиток: тинты намеренно не
+ * переворачиваются в тёмной теме — про это написано в шапке CategoryTile.
+ */
+const PROMO_TINTS = {
+  brand: '#a9c9f5',
+  bonus: '#fbc99a',
+} as const
 
 const promoTiles = computed(() =>
   props.promos.map(item => ({
@@ -103,7 +134,7 @@ function buildSrcset(imageUrl: string | null): string | undefined {
         :key="promo.id"
         :to="promo.href"
         class="cat-surface cat-mob__promo"
-        :style="{ '--tile-tint': promo.accent === 'bonus' ? 'var(--bonus-surface)' : 'var(--brand-surface)' }"
+        :style="{ '--tile-tint': promo.accent === 'bonus' ? PROMO_TINTS.bonus : PROMO_TINTS.brand }"
       >
         <Icon
           :name="promo.icon"
@@ -139,7 +170,6 @@ function buildSrcset(imageUrl: string | null): string | undefined {
           :radius="16"
           :img-scale="78"
           :img-shadow="0"
-          blend
           :label-size="13.5"
           :label-weight="500"
           interaction="press"
