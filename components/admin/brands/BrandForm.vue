@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { GeneratedBrandSeo } from '@/composables/admin/useBrandSeoGenerator'
 import type { BrandInsert, BrandPageLayout, BrandUpdate, Database, ProductLine } from '@/types'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import { useBrandSeoGenerator } from '@/composables/admin/useBrandSeoGenerator'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { formatFileSize, optimizeImageBeforeUpload } from '@/utils/imageOptimizer'
@@ -203,6 +205,74 @@ const seoKeywordsString = computed({
   },
 })
 
+/*
+ * Генерация SEO-полей моделью.
+ *
+ * Кнопка есть только у сохранённого бренда: тексты пишутся по фактам —
+ * сколько у бренда товаров, в каких категориях, по какой цене, — а у ещё не
+ * созданного бренда этих фактов нет.
+ *
+ * Сгенерированное НЕ сохраняется само: поля заполняются в форме, человек
+ * читает, правит и жмёт «Сохранить». Это не осторожность ради осторожности —
+ * модель пишет заголовок, который увидит покупатель в выдаче.
+ */
+const brandId = computed(
+  () => (props.initialData as any)?.id as string | undefined,
+)
+
+const { generate, isGenerating } = useBrandSeoGenerator()
+
+/*
+ * Сгенерированное показываем в предпросмотре, а не подставляем сразу.
+ *
+ * Так человек видит, что именно уедет в выдачу, ДО того как это затрёт
+ * заполненные поля, и заодно читает замечания о длине. Диалог здесь вместо
+ * `confirm()` не из вкуса: подтверждение вслепую («заменить поля?») не даёт
+ * увидеть текст, ради которого всё и затевалось.
+ */
+const preview = ref<GeneratedBrandSeo | null>(null)
+const isPreviewOpen = ref(false)
+
+async function handleGenerateSeo() {
+  const id = brandId.value
+  if (!id)
+    return
+
+  const result = await generate([id])
+
+  if ('error' in result) {
+    toast.error('Не удалось сгенерировать', { description: result.error })
+    return
+  }
+
+  const item = result.brands[0]
+  if (!item) {
+    toast.error('Модель не вернула текст для этого бренда')
+    return
+  }
+
+  preview.value = item
+  isPreviewOpen.value = true
+}
+
+function applyPreview() {
+  const item = preview.value
+  if (!item)
+    return
+
+  metaTitleValue.value = item.meta_title
+  seoH1Value.value = item.seo_h1
+  seoDescriptionValue.value = item.seo_description
+
+  // Текст «О бренде» приходит только у брендов, у которых его ещё нет:
+  // написанное руками функция намеренно не отдаёт, чтобы нечего было затереть.
+  if (item.description && !descriptionValue.value.trim())
+    descriptionValue.value = item.description
+
+  isPreviewOpen.value = false
+  toast.success('Подставлено в форму — проверьте и сохраните')
+}
+
 const displayLogoUrl = computed(() => {
   if (logoPreviewUrl.value) {
     return logoPreviewUrl.value
@@ -266,10 +336,28 @@ onBeforeUnmount(() => {
 
     <!-- 🔍 SEO секция -->
     <div class="space-y-4 pt-6 border-t">
-      <h3 class="font-semibold flex items-center gap-2">
-        <Icon name="lucide:search" class="w-4 h-4" />
-        SEO оптимизация
-      </h3>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-semibold flex items-center gap-2">
+          <Icon name="lucide:search" class="w-4 h-4" />
+          SEO оптимизация
+        </h3>
+
+        <Button
+          v-if="brandId"
+          type="button"
+          variant="outline"
+          size="sm"
+          :disabled="isGenerating"
+          @click="handleGenerateSeo"
+        >
+          <Icon
+            :name="isGenerating ? 'lucide:loader-circle' : 'lucide:sparkles'"
+            class="w-4 h-4 mr-1.5"
+            :class="{ 'animate-spin': isGenerating }"
+          />
+          {{ isGenerating ? 'Пишем…' : 'Сгенерировать' }}
+        </Button>
+      </div>
 
       <div>
         <div class="flex items-center justify-between">
@@ -407,4 +495,70 @@ onBeforeUnmount(() => {
       Сохранить бренд
     </Button>
   </form>
+
+  <Dialog v-model:open="isPreviewOpen">
+    <DialogContent class="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Сгенерированные тексты</DialogTitle>
+        <DialogDescription>
+          Ничего ещё не сохранено. Посмотрите, поправьте при желании после
+          подстановки и нажмите «Сохранить» в форме.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div v-if="preview" class="space-y-4 text-sm">
+        <div v-if="preview.warnings.length" class="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 p-3">
+          <p class="font-medium text-amber-900 dark:text-amber-200 mb-1">
+            Замечания
+          </p>
+          <ul class="list-disc pl-5 text-amber-800 dark:text-amber-300 space-y-0.5">
+            <li v-for="w in preview.warnings" :key="w">
+              {{ w }}
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-xs text-muted-foreground mb-1">
+            Заголовок страницы (title) — {{ preview.meta_title.length }}/60
+          </p>
+          <p class="text-blue-600">
+            {{ preview.meta_title }}
+          </p>
+        </div>
+
+        <div>
+          <p class="text-xs text-muted-foreground mb-1">
+            Заголовок на странице (H1)
+          </p>
+          <p class="font-semibold">
+            {{ preview.seo_h1 }}
+          </p>
+        </div>
+
+        <div>
+          <p class="text-xs text-muted-foreground mb-1">
+            SEO описание — {{ preview.seo_description.length }}/160
+          </p>
+          <p>{{ preview.seo_description }}</p>
+        </div>
+
+        <div v-if="preview.description">
+          <p class="text-xs text-muted-foreground mb-1">
+            Текст «О бренде» (у этого бренда его не было)
+          </p>
+          <div class="rounded-lg border p-3 max-h-52 overflow-y-auto brand-description" v-html="preview.description" />
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" type="button" @click="isPreviewOpen = false">
+          Отмена
+        </Button>
+        <Button type="button" @click="applyPreview">
+          Подставить в форму
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
