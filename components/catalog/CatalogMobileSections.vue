@@ -61,6 +61,23 @@ const SECTION_TINTS: Record<string, string> = {
 
 const TINT_CYCLE = Object.values(SECTION_TINTS)
 
+/**
+ * Подложки промо-плиток «Новинки» и «Акции».
+ *
+ * Раньше брались из токенов `--brand-surface` и `--bonus-surface`, а это
+ * blue-50 и orange-50 — почти белые. Рядом с категориями, окрашенными
+ * палитрой главной, они выглядели выцветшими. Здесь та же весовая категория,
+ * что у `CATEGORY_TILE_TINTS`, и тот же смысл: синий у новинок, тёплый
+ * оранжевый у акций.
+ *
+ * Значения литералами, как и вся палитра плиток: тинты намеренно не
+ * переворачиваются в тёмной теме — про это написано в шапке CategoryTile.
+ */
+const PROMO_TINTS = {
+  brand: '#a9c9f5',
+  bonus: '#fbc99a',
+} as const
+
 const promoTiles = computed(() =>
   props.promos.map(item => ({
     ...item,
@@ -117,7 +134,7 @@ function buildSrcset(imageUrl: string | null): string | undefined {
         :key="promo.id"
         :to="promo.href"
         class="cat-surface cat-mob__promo"
-        :style="{ '--tile-tint': promo.accent === 'bonus' ? 'var(--bonus-surface)' : 'var(--brand-surface)' }"
+        :style="{ '--tile-tint': promo.accent === 'bonus' ? PROMO_TINTS.bonus : PROMO_TINTS.brand }"
       >
         <Icon
           :name="promo.icon"
