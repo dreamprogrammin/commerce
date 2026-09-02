@@ -28,8 +28,16 @@
  */
 
 import type { GeneratedBrandSeo } from './validate.ts'
-import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@supabase/supabase-js'
+/*
+ * Импорты — ПОЛНЫМИ АДРЕСАМИ, а не через карту в `deno.json`.
+ *
+ * Локальный `functions serve` карту подхватывает, а `functions deploy` —
+ * нет: сборка падает с «Relative import path "@supabase/supabase-js" not
+ * prefixed with / or ./ or ../», даже когда `import_map` прописан в
+ * config.toml. Соседние функции по этой же причине пишут адреса целиком.
+ */
+import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.123.0'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
 import { checkLengths, sanitizeBrandHtml } from './validate.ts'
 

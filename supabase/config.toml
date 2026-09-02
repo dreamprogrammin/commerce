@@ -421,5 +421,4 @@ entrypoint = "./functions/send-broadcast/index.ts"
 [functions.generate-brand-seo]
 enabled = true
 verify_jwt = true
-import_map = "./functions/generate-brand-seo/deno.json"
 entrypoint = "./functions/generate-brand-seo/index.ts"
