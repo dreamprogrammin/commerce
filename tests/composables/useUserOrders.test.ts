@@ -141,20 +141,35 @@ describe('useUserOrders', () => {
       const { useUserOrders } = await import('@/composables/orders/useUserOrders')
       const { getStatusLabel } = useUserOrders()
 
-      expect(getStatusLabel('pending')).toBe('Ожидает обработки')
-      expect(getStatusLabel('new')).toBe('Новый заказ')
+      // Подписи берутся из общей таблицы utils/orderStatus.ts — раньше здесь
+      // был второй, разошедшийся с ней список.
+      expect(getStatusLabel('pending')).toBe('В обработке')
+      expect(getStatusLabel('new')).toBe('В обработке')
       expect(getStatusLabel('processing')).toBe('В обработке')
       expect(getStatusLabel('confirmed')).toBe('Подтверждён')
-      expect(getStatusLabel('delivered')).toBe('Доставлен')
-      expect(getStatusLabel('shipped')).toBe('Отправлен')
+      expect(getStatusLabel('delivered')).toBe('Выполнен')
+      expect(getStatusLabel('shipped')).toBe('Доставляется')
       expect(getStatusLabel('cancelled')).toBe('Отменён')
     })
 
-    it('должен вернуть исходный статус для неизвестного', async () => {
+    /*
+     * `completed` — самый частый статус на проде (11 заказов из 43 на
+     * 2 сентября 2026), и в прежнем списке его просто не было: фолбэк отдавал
+     * сам ключ, и покупатель видел в кабинете английское «completed».
+     */
+    it('completed переведён, а не показан ключом', async () => {
       const { useUserOrders } = await import('@/composables/orders/useUserOrders')
       const { getStatusLabel } = useUserOrders()
 
-      expect(getStatusLabel('unknown')).toBe('unknown')
+      expect(getStatusLabel('completed')).toBe('Выполнен')
+      expect(getStatusLabel('completed')).not.toBe('completed')
+    })
+
+    it('неизвестный статус не показывает ключ покупателю', async () => {
+      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { getStatusLabel } = useUserOrders()
+
+      expect(getStatusLabel('unknown')).toBe('В обработке')
     })
   })
 
@@ -163,20 +178,23 @@ describe('useUserOrders', () => {
       const { useUserOrders } = await import('@/composables/orders/useUserOrders')
       const { getStatusColor } = useUserOrders()
 
-      expect(getStatusColor('pending')).toBe('bg-gray-100 text-gray-800')
+      // Цвет идёт по тону из общей таблицы: обработка, доставка, выполнен,
+      // отменён — четыре тона, а не семь несогласованных наборов классов.
+      expect(getStatusColor('pending')).toBe('bg-blue-100 text-blue-800')
       expect(getStatusColor('new')).toBe('bg-blue-100 text-blue-800')
-      expect(getStatusColor('processing')).toBe('bg-yellow-100 text-yellow-800')
-      expect(getStatusColor('confirmed')).toBe('bg-green-100 text-green-800')
-      expect(getStatusColor('delivered')).toBe('bg-purple-100 text-purple-800')
+      expect(getStatusColor('processing')).toBe('bg-blue-100 text-blue-800')
+      expect(getStatusColor('confirmed')).toBe('bg-blue-100 text-blue-800')
+      expect(getStatusColor('delivered')).toBe('bg-green-100 text-green-800')
+      expect(getStatusColor('completed')).toBe('bg-green-100 text-green-800')
       expect(getStatusColor('shipped')).toBe('bg-indigo-100 text-indigo-800')
       expect(getStatusColor('cancelled')).toBe('bg-red-100 text-red-800')
     })
 
-    it('должен вернуть цвет по умолчанию для неизвестного статуса', async () => {
+    it('неизвестный статус получает тон обработки', async () => {
       const { useUserOrders } = await import('@/composables/orders/useUserOrders')
       const { getStatusColor } = useUserOrders()
 
-      expect(getStatusColor('unknown')).toBe('bg-gray-100 text-gray-800')
+      expect(getStatusColor('unknown')).toBe('bg-blue-100 text-blue-800')
     })
   })
 

@@ -30,21 +30,38 @@ function normalize(status: string): OrderStatus {
 }
 
 /**
- * Пять состояний, которые проходит заказ, — они же пять сегментов полосы
- * прогресса в макете.
+ * Пять состояний в том порядке, в котором заказ их РЕАЛЬНО проходит.
+ *
+ * Порядок снят с кнопок оператора в Telegram (supabase/functions/
+ * sync-order-status-to-telegram/index.ts), а не выдуман:
+ *
+ *   new       «Взять в работу»    → processing  (assign-order-to-admin)
+ *   processing «Подтвердить»       → confirmed   (confirm-order)
+ *   confirmed  «Передать курьеру»  → shipped     (ship-order)
+ *   shipped    «Доставлен»         → delivered   (deliver-order)
+ *
+ * До 2 сентября 2026 здесь `confirmed` и `processing` стояли МЕСТАМИ
+ * НАОБОРОТ. Из-за этого полоса прогресса у покупателя ехала назад: оператор
+ * брал заказ в работу — доходило до «Комплектуется» (3 из 5), оператор
+ * подтверждал — откатывалось на «Подтверждён» (2 из 5). Именно это владелец
+ * и заметил как «статусы идут не по порядку».
  */
 const TRACK_STATUSES: OrderStatus[] = [
   'new',
-  'confirmed',
   'processing',
+  'confirmed',
   'shipped',
   'delivered',
 ]
 
+/**
+ * Подписи под сегментами. Короткие намеренно: их пять в ряд, и на 390px
+ * «Комплектуется» налезало на соседей — поймано скриншотом страницы заказа.
+ */
 export const ORDER_TRACK_LABELS = [
   'Принят',
+  'В работе',
   'Подтверждён',
-  'Комплектуется',
   'В пути',
   'Доставлен',
 ] as const
@@ -89,12 +106,15 @@ export const ORDER_STATUS_INFO: Record<OrderStatus, OrderStatusPresentation> = {
   },
   confirmed: {
     title: 'Заказ подтверждён',
-    description: 'Заказ подтверждён и готовится к отправке',
+    description: 'Собираем заказ и передаём курьеру',
     animation: `${ANIMATIONS_BASE}Success.lottie`,
   },
   processing: {
-    title: 'Заказ комплектуется',
-    description: 'Собираем ваш заказ и передаём курьеру',
+    // «Комплектуется» здесь было неверным: этот статус ставит
+    // assign-order-to-admin, когда оператор берёт заказ в работу, — то есть
+    // ДО подтверждения, а не после.
+    title: 'Заказ в обработке',
+    description: 'Менеджер взял заказ в работу',
     animation: `${ANIMATIONS_BASE}box.lottie`,
   },
   shipped: {
@@ -124,8 +144,12 @@ export function orderStatusInfo(status: string): OrderStatusPresentation {
 }
 
 /**
- * Вертикальная лента — четыре шага, а не пять: «подтверждён» и
- * «комплектуется» покупателю выглядят одинаково.
+ * Вертикальная лента — те же пять шагов, что и полоса прогресса.
+ *
+ * Раньше их было четыре, со своими подписями: «Заказ принят», «Подтверждён»,
+ * «Отправлен», «Доставлен» — и на странице «Заказ принят» лента с полосой
+ * висели рядом, показывая РАЗНЫЕ наборы шагов и разные названия одного и
+ * того же («В пути» против «Отправлен»). Наборов теперь один.
  */
 export const ORDER_STEPS = [
   {
@@ -134,28 +158,24 @@ export const ORDER_STEPS = [
     sub: 'Мы получили ваш заказ и начинаем его обработку',
   },
   {
+    icon: 'lucide:package-search',
+    title: 'В работе',
+    sub: 'Менеджер взял заказ в работу',
+  },
+  {
     icon: 'lucide:package-check',
     title: 'Подтверждён',
     sub: 'Готовим к отправке',
   },
-  { icon: 'lucide:truck', title: 'Отправлен', sub: 'В пути' },
+  { icon: 'lucide:truck', title: 'В пути', sub: 'Курьер уже везёт заказ' },
   { icon: 'lucide:home', title: 'Доставлен', sub: 'Спасибо за покупку!' },
 ] as const
 
-const STEP_BY_STATUS: Record<OrderStatus, number> = {
-  pending: 0,
-  new: 0,
-  confirmed: 1,
-  processing: 1,
-  shipped: 2,
-  delivered: 3,
-  completed: 3,
-  cancelled: -1,
-}
-
-export function orderStatusToStep(status: string): number {
-  return STEP_BY_STATUS[normalize(status)] ?? 0
-}
+/**
+ * Индекс шага в ленте. Совпадает с сегментом полосы: список один и тот же,
+ * и разъехаться им теперь нечем.
+ */
+export const orderStatusToStep = orderStatusToSegment
 
 /**
  * Плашка статуса в списке заказов: короткая подпись, иконка и тон.

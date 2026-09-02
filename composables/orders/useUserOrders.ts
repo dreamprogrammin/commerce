@@ -1,5 +1,7 @@
+import type { OrderBadgeTone } from '@/utils/orderStatus'
 import { toast } from 'vue-sonner'
 import { useProfileStore } from '@/stores/core/profileStore'
+import { orderStatusBadge } from '@/utils/orderStatus'
 
 export interface OrderItem {
   id: string
@@ -35,24 +37,23 @@ export interface UserOrder {
   order_items: OrderItem[]
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Ожидает обработки',
-  new: 'Новый заказ',
-  processing: 'В обработке',
-  confirmed: 'Подтверждён',
-  delivered: 'Доставлен',
-  shipped: 'Отправлен',
-  cancelled: 'Отменён',
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-800',
-  new: 'bg-blue-100 text-blue-800',
-  processing: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-green-100 text-green-800',
-  delivered: 'bg-purple-100 text-purple-800',
-  shipped: 'bg-indigo-100 text-indigo-800',
+/*
+ * Подписи и цвета статусов ЖИЛИ ЗДЕСЬ своим списком и удалены 2 сентября
+ * 2026: это была вторая копия того, что уже описано в utils/orderStatus.ts.
+ *
+ * Копия успела разъехаться с оригиналом, и цена этого видна покупателю. В ней
+ * не было ключа `completed` — самого частого статуса на проде (11 заказов из
+ * 43 на 2 сентября). Фолбэк отдавал сам ключ, и в кабинете вместо «Выполнен»
+ * стояло английское «completed». Поймано скриншотом страницы заказа.
+ *
+ * Тон плашки берётся из общей таблицы; классы под тон — ниже, рядом с местом,
+ * где они и применяются.
+ */
+const BADGE_CLASSES: Record<OrderBadgeTone, string> = {
   cancelled: 'bg-red-100 text-red-800',
+  done: 'bg-green-100 text-green-800',
+  shipping: 'bg-indigo-100 text-indigo-800',
+  processing: 'bg-blue-100 text-blue-800',
 }
 
 export function useUserOrders() {
@@ -175,7 +176,7 @@ export function useUserOrders() {
 
   // Toast уведомление при изменении статуса
   const showStatusChangeToast = (order: UserOrder) => {
-    const statusLabel = STATUS_LABELS[order.status] || order.status
+    const statusLabel = orderStatusBadge(order.status).label
     const orderNumber = order.id.slice(-6)
 
     toast(`Статус заказа №${orderNumber} изменён`, {
@@ -190,15 +191,11 @@ export function useUserOrders() {
     })
   }
 
-  // Получить цвет статуса
-  const getStatusColor = (status: string) => {
-    return STATUS_COLORS[status] || 'bg-gray-100 text-gray-800'
-  }
+  // Цвет и подпись плашки — из общей таблицы статусов
+  const getStatusColor = (status: string) =>
+    BADGE_CLASSES[orderStatusBadge(status).tone]
 
-  // Получить текст статуса
-  const getStatusLabel = (status: string) => {
-    return STATUS_LABELS[status] || status
-  }
+  const getStatusLabel = (status: string) => orderStatusBadge(status).label
 
   // Получить текущий активный заказ (последний не завершённый)
   const activeOrder = computed(() => {
