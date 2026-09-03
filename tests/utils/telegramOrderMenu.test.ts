@@ -5,7 +5,9 @@ import {
   buildCardKeyboard,
   buildListKeyboard,
   buildPanelKeyboard,
+  buildReplyKeyboard,
   parseMenuData,
+  replyButtonScope,
 } from '@/supabase/functions/_shared/orderMenu'
 
 const UUID = '1cfa2733-8c56-495d-be05-69807f5e4fc2'
@@ -109,5 +111,39 @@ describe('экраны', () => {
     expect(first('processing')).toBe('✅ Подтвердить')
     expect(first('confirmed')).toBe('🚚 Передать курьеру')
     expect(first('shipped')).toBe('✅ Доставлен')
+  })
+})
+
+/**
+ * Кнопки по умолчанию: постоянная клавиатура у поля ввода. Инлайн-панель надо
+ * было вызвать и закрепить, а эта видна всегда и всем в чате.
+ */
+describe('постоянная клавиатура', () => {
+  it('два входа теми же словами, что и на панели', () => {
+    const keys = buildReplyKeyboard().keyboard.flat().map(b => b.text)
+    expect(keys).toEqual(['📋 Активные заказы', '👤 Мои заказы'])
+  })
+
+  /* `is_persistent` — чтобы клавиатура не пряталась, когда менеджер печатает. */
+  it('не сворачивается и подогнана по высоте', () => {
+    const keyboard = buildReplyKeyboard()
+    expect(keyboard.is_persistent).toBe(true)
+    expect(keyboard.resize_keyboard).toBe(true)
+  })
+
+  it('нажатие узнаётся по тексту', () => {
+    expect(replyButtonScope('📋 Активные заказы')).toBe('a')
+    expect(replyButtonScope('👤 Мои заказы')).toBe('m')
+    expect(replyButtonScope('  📋 Активные заказы  ')).toBe('a')
+  })
+
+  /*
+   * Обычная переписка не должна выглядеть как нажатие: иначе бот удалял бы
+   * сообщения менеджеров и отвечал списками невпопад.
+   */
+  it('обычный текст кнопкой не считается', () => {
+    expect(replyButtonScope('привет, кто возьмёт заказ?')).toBeNull()
+    expect(replyButtonScope('активные')).toBeNull()
+    expect(replyButtonScope('')).toBeNull()
   })
 })
