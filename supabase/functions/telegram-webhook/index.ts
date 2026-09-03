@@ -980,5 +980,44 @@ async function fetchOrderById(
     console.error('Ошибка выборки заказа:', error.message)
     return null
   }
-  return data ? ({ ...data, table } as OrderSummary) : null
+  if (!data)
+    return null
+
+  return { ...data, table, items: await fetchOrderItems(supabase, table, orderId) } as OrderSummary
+}
+
+/**
+ * Состав заказа. Таблицы у обычных и гостевых заказов разные, и связь тоже:
+ * у гостевых внешний ключ называется `checkout_id`, а не `guest_checkout_id`
+ * — на этом имени легко споткнуться, отметка об этом есть и в docs/HANDOFF.md.
+ * Цена за штуку тоже под разными именами: `price_at_purchase` и
+ * `price_per_item`.
+ */
+async function fetchOrderItems(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+  orderId: string,
+): Promise<Array<{ name: string; quantity: number; price: number | null }>> {
+  const isGuest = table === 'guest_checkouts'
+  const itemsTable = isGuest ? 'guest_checkout_items' : 'order_items'
+  const foreignKey = isGuest ? 'checkout_id' : 'order_id'
+  const priceColumn = isGuest ? 'price_per_item' : 'price_at_purchase'
+
+  const { data, error } = await supabase
+    .from(itemsTable)
+    .select(`quantity, ${priceColumn}, product:products(name)`)
+    .eq(foreignKey, orderId)
+
+  if (error) {
+    console.error('Ошибка выборки состава заказа:', error.message)
+    return []
+  }
+
+  return (data ?? []).map((row: any) => ({
+    // Товар могли удалить из каталога — заказ от этого не перестал
+    // существовать, и позицию всё равно надо показать.
+    name: row.product?.name ?? 'Товар удалён из каталога',
+    quantity: row.quantity,
+    price: row[priceColumn],
+  }))
 }

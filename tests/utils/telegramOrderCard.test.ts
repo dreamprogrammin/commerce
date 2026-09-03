@@ -147,3 +147,47 @@ describe('список заказов', () => {
     expect(text).toContain('*Активные заказы* — 1')
   })
 })
+
+/**
+ * Состав заказа в карточке — то, ради чего её чаще всего и открывают: по нему
+ * менеджер собирает коробку. Без него пришлось бы искать в ленте исходное
+ * уведомление, а это ровно та прокрутка чата, от которой уходили.
+ */
+describe('состав заказа', () => {
+  const items = [
+    { name: 'Robo Alive Dino', quantity: 1, price: 7390 },
+    { name: 'Гараж-паркинг', quantity: 2, price: 11090 },
+  ]
+
+  it('позиции с количеством и суммой строки', () => {
+    const text = plain(orderCardMessage(order({ items }), NOW))
+    expect(text).toContain('*Состав:*')
+    expect(text).toContain('Robo Alive Dino × 1 — 7 390 ₸')
+    // Сумма строки, а не цена за штуку: две штуки по 11 090.
+    expect(text).toContain('Гараж-паркинг × 2 — 22 180 ₸')
+  })
+
+  it('без позиций раздела нет вовсе', () => {
+    expect(plain(orderCardMessage(order(), NOW))).not.toContain('Состав')
+    expect(plain(orderCardMessage(order({ items: [] }), NOW))).not.toContain('Состав')
+  })
+
+  /* Сообщение Telegram обрезается на 4096 знаках — лучше честный хвост. */
+  it('длинный заказ подрезается с пометкой', () => {
+    const many = Array.from({ length: 14 }, (_, i) => ({
+      name: `Товар ${i + 1}`, quantity: 1, price: 1000,
+    }))
+    const text = plain(orderCardMessage(order({ items: many }), NOW))
+    expect(text).toContain('Товар 10')
+    expect(text).not.toContain('Товар 11')
+    expect(text).toContain('и ещё 4')
+  })
+
+  it('удалённый из каталога товар не ломает карточку', () => {
+    const text = plain(orderCardMessage(
+      order({ items: [{ name: 'Товар удалён из каталога', quantity: 1, price: null }] }),
+      NOW,
+    ))
+    expect(text).toContain('Товар удалён из каталога × 1 — 0 ₸')
+  })
+})
