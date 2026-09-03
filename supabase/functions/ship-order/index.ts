@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { courierMessage, isPickup, shippedWording } from '../_shared/shopInfo.ts'
+import { isPickup, shippedWording } from '../_shared/shopInfo.ts'
+import { approvedCouriers, offerKeyboard, offerText } from '../_shared/courierOffers.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -167,41 +168,78 @@ Deno.serve(async (req) => {
     console.log('✅ Статус обновлён на shipped')
 
     /*
-     * Курьерский чат — только для курьерских заказов и только с тем, что
-     * нужно в дороге: адрес, время, телефон, сумма. Владелец выбрал такой
-     * состав намеренно: курьеру не нужны ни отмены, ни бонусы, ни чужие
-     * заказы.
+     * Доставка уходит курьерам в личку — всем принятым сразу, с кнопкой
+     * «Беру». Кто первым нажал, тот и везёт; у остальных предложение гаснет
+     * (это делает telegram-webhook).
      *
-     * Если TELEGRAM_COURIER_CHAT_ID не задан, шаг просто пропускается —
-     * магазин продолжает работать, как до появления курьерского чата.
+     * Раньше здесь было одно сообщение в общий курьерский чат. Он решал
+     * половину задачи: кухню магазина курьер не видел, зато видел чужие
+     * доставки — при двух курьерах каждый читал адреса и телефоны другого.
+     *
+     * Самовывоз сюда не попадает: везти нечего.
      */
-    const courierChatId = Deno.env.get('TELEGRAM_COURIER_CHAT_ID')
-    if (courierChatId && !isPickup(orderData.delivery_method)) {
+    if (!isPickup(orderData.delivery_method)) {
       const { data: full } = await supabase
         .from(tableName)
         .select('*')
         .eq('id', orderId)
         .maybeSingle()
 
-      if (full) {
-        const apiBase = Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
+      const couriers = full ? await approvedCouriers(supabase) : []
+      const apiBase = Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
+
+      if (full && couriers.length === 0) {
+        /*
+         * Некому передать — это надо сказать вслух, а не проглотить: заказ
+         * уже помечен переданным, и без предупреждения он молча зависнет.
+         */
+        const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+        if (adminChatId) {
+          await fetch(`${apiBase}/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: adminChatId,
+              text: `⚠️ Доставку №${orderId.slice(-6)} некому передать: принятых курьеров нет.\n\nКурьер заводится анкетой — /job в личке бота, дальше вы подтверждаете заявку.`,
+            }),
+          })
+        }
+        console.warn('🚗 Курьеров нет — предложение никому не ушло')
+      }
+
+      for (const courier of couriers) {
         const res = await fetch(`${apiBase}/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: courierChatId,
-            text: courierMessage(full as any),
+            chat_id: courier.telegram_user_id,
+            text: offerText(full as any),
             parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: [[
-                { text: '✅ Доставил', callback_data: `dlv:${tableName === 'guest_checkouts' ? 'g' : 'o'}:${orderId}` },
-              ]],
-            },
+            reply_markup: offerKeyboard(tableName!, orderId),
           }),
         })
         const sent = await res.json()
-        console.log(`🚗 Курьерский чат: ${sent.ok ? 'отправлено' : JSON.stringify(sent)}`)
+
+        if (!sent.ok) {
+          // Частый случай: курьер не открывал переписку с ботом — Telegram
+          // запрещает писать первым. Молчать нельзя, но и ронять доставку
+          // из-за одного курьера тоже.
+          console.warn(`🚗 ${courier.telegram_user_id}: ${JSON.stringify(sent)}`)
+          continue
+        }
+
+        await supabase
+          .from('courier_offers')
+          .upsert({
+            order_id: orderId,
+            order_table: tableName,
+            telegram_user_id: courier.telegram_user_id,
+            message_id: sent.result.message_id,
+          }, { onConflict: 'order_id,telegram_user_id' })
       }
+
+      if (couriers.length)
+        console.log(`🚗 Предложение ушло курьерам: ${couriers.length}`)
     }
 
     /*
