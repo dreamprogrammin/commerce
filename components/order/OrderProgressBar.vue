@@ -34,8 +34,15 @@ const cancelled = computed(() => isOrderCancelled(props.status))
           'opb-seg--cancelled': cancelled,
         }"
       />
+      <!--
+        `min-w-0` и `hyphens-auto` — потому что подписи налезали друг на
+        друга: пять колонок на 390px дают около 70px каждой, а слова длиннее
+        не переносились и уезжали на соседей. Поймано скриншотом страницы
+        заказа 2 сентября 2026.
+      -->
       <span
-        class="text-center text-[11px] leading-[1.2]"
+        class="min-w-0 text-center text-[10px] leading-[1.25] hyphens-auto break-words sm:text-[11px]"
+        lang="ru"
         :class="!cancelled && index <= activeIndex
           ? 'font-bold text-primary'
           : 'font-medium text-muted-foreground'"

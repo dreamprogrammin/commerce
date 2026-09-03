@@ -36,7 +36,7 @@ describe('представление статуса заказа', () => {
     it('подписи меняются, а не остаются «Заказ принят»', () => {
       expect(orderStatusInfo('new').title).toBe('Заказ принят')
       expect(orderStatusInfo('confirmed').title).toBe('Заказ подтверждён')
-      expect(orderStatusInfo('processing').title).toBe('Заказ комплектуется')
+      expect(orderStatusInfo('processing').title).toBe('Заказ в обработке')
       expect(orderStatusInfo('shipped').title).toBe('Заказ в пути')
       expect(orderStatusInfo('delivered').title).toBe('Заказ доставлен')
       expect(orderStatusInfo('cancelled').title).toBe('Заказ отменён')
@@ -83,12 +83,23 @@ describe('представление статуса заказа', () => {
       return wrapper.findAll('.opb-seg--done').length
     }
 
+    /*
+     * Порядок взят с кнопок оператора в Telegram: «Взять в работу» ставит
+     * processing, и только следующая кнопка «Подтвердить» — confirmed.
+     * До 2 сентября 2026 здесь стояло наоборот (confirmed 2, processing 3),
+     * и тест закреплял баг: у покупателя полоса ехала НАЗАД, когда оператор
+     * подтверждал взятый в работу заказ.
+     */
     it('заполняется по мере продвижения заказа', () => {
       expect(litSegments('new')).toBe(1)
-      expect(litSegments('confirmed')).toBe(2)
-      expect(litSegments('processing')).toBe(3)
+      expect(litSegments('processing')).toBe(2)
+      expect(litSegments('confirmed')).toBe(3)
       expect(litSegments('shipped')).toBe(4)
       expect(litSegments('delivered')).toBe(5)
+    })
+
+    it('подтверждение не отбрасывает заказ назад', () => {
+      expect(litSegments('confirmed')).toBeGreaterThan(litSegments('processing'))
     })
 
     it('у отменённого заказа гаснет целиком', () => {
@@ -116,19 +127,32 @@ describe('представление статуса заказа', () => {
 
     it('подсвечивает шаги по статусу', () => {
       expect(mountTracker('new').findAll('.ot-dot--done')).toHaveLength(1)
-      expect(mountTracker('confirmed').findAll('.ot-dot--done')).toHaveLength(2)
-      // «Комплектуется» отдельного шага в ленте не имеет — он идёт вместе
-      // с «Подтверждён», в отличие от полосы прогресса.
       expect(mountTracker('processing').findAll('.ot-dot--done')).toHaveLength(2)
-      expect(mountTracker('shipped').findAll('.ot-dot--done')).toHaveLength(3)
-      expect(mountTracker('delivered').findAll('.ot-dot--done')).toHaveLength(4)
+      expect(mountTracker('confirmed').findAll('.ot-dot--done')).toHaveLength(3)
+      expect(mountTracker('shipped').findAll('.ot-dot--done')).toHaveLength(4)
+      expect(mountTracker('delivered').findAll('.ot-dot--done')).toHaveLength(5)
+    })
+
+    /*
+     * Лента и полоса стоят на странице «Заказ принят» рядом. Раньше у ленты
+     * был свой набор из четырёх шагов и свои названия («Отправлен» против
+     * «В пути»), то есть покупатель видел два разных рассказа об одном заказе.
+     */
+    it('лента и полоса согласованы: столько же шагов, столько же подсвечено', () => {
+      expect(ORDER_STEPS).toHaveLength(ORDER_TRACK_LABELS.length)
+      for (const status of ['new', 'processing', 'confirmed', 'shipped', 'delivered']) {
+        expect(
+          mountTracker(status).findAll('.ot-dot--done').length,
+          status,
+        ).toBe(mount(OrderProgressBar, { props: { status } }).findAll('.opb-seg--done').length)
+      }
     })
 
     it('у отменённого не подсвечено ничего', () => {
       expect(mountTracker('cancelled').findAll('.ot-dot--done')).toHaveLength(0)
     })
 
-    it('рисует все четыре шага с описаниями', () => {
+    it('рисует все пять шагов с описаниями', () => {
       const text = mountTracker('new').text()
       for (const step of ORDER_STEPS) {
         expect(text).toContain(step.title)
