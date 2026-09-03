@@ -1,5 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { ACTION_FUNCTIONS, parseCallbackData } from '../_shared/orderActions.ts'
+import { ACTION_FUNCTIONS, buildOrderKeyboard, parseCallbackData } from '../_shared/orderActions.ts'
+import {
+  ACTIVE_STATUSES,
+  orderCardMessage,
+  orderListMessage,
+  shortNumber,
+  type OrderSummary,
+} from '../_shared/orderCard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +14,17 @@ const corsHeaders = {
 }
 
 console.log('Telegram webhook v6 initialized')
+
+/**
+ * Адрес Bot API. Переопределяется переменной окружения — только ради
+ * локальной проверки: заглушка вместо Telegram позволяет увидеть, что бот
+ * отправил бы в чат, не трогая настоящего бота (check-telegram-commands.mjs).
+ * В проде переменная не задана, и запросы идут на api.telegram.org.
+ */
+function telegramApiBase(): string {
+  return Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -54,7 +72,7 @@ Deno.serve(async (req) => {
     // === /setup — одноразовая команда для настройки бота (webhook, описание, команды) ===
     if (message.text?.trim() === '/setup') {
       console.log('🔧 Running bot setup...')
-      const baseUrl = `https://api.telegram.org/bot${botToken}`
+      const baseUrl = `${telegramApiBase()}/bot${botToken}`
       const webhookUrl = `${supabaseUrl}/functions/v1/telegram-webhook`
 
       const results: string[] = []
@@ -92,6 +110,34 @@ Deno.serve(async (req) => {
         const res = await r.json()
         results.push(`Commands: ${res.ok ? '✅' : '❌'}`)
       } catch (e) { results.push(`Commands: ❌ ${e}`) }
+
+      /*
+       * Команды менеджера — отдельным списком и только для рабочего чата.
+       * Через `scope: chat` они не попадают в меню покупателей: те пишут боту
+       * в личку, и «активные заказы» им там ни к чему.
+       */
+      try {
+        const managerChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+        if (managerChatId) {
+          const r = await fetch(`${baseUrl}/setMyCommands`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scope: { type: 'chat', chat_id: Number(managerChatId) },
+              commands: [
+                { command: 'orders', description: '📋 Активные заказы' },
+                { command: 'my', description: '👤 Мои заказы' },
+                { command: 'order', description: '🔍 Заказ по номеру: /order 5e4fc2' },
+              ],
+            }),
+          })
+          const res = await r.json()
+          results.push(`Команды менеджера: ${res.ok ? '✅' : '❌'} ${res.description || ''}`)
+        }
+        else {
+          results.push('Команды менеджера: ⚠️ не задан TELEGRAM_CHAT_ID')
+        }
+      } catch (e) { results.push(`Команды менеджера: ❌ ${e}`) }
 
       // Описание
       try {
@@ -136,6 +182,22 @@ Deno.serve(async (req) => {
     }
 
     const text = message.text.trim()
+
+    /*
+     * Команды менеджера. Работают ТОЛЬКО в рабочем чате: в личке бот
+     * обслуживает покупателей, и там же лежат их /start и /unlink. Разводить
+     * по чату, а не по списку людей, — то же решение, что и для кнопок:
+     * состав рабочего чата и есть список менеджеров.
+     */
+    const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+    if (adminChatId && String(chatId) === String(adminChatId)) {
+      const handled = await handleManagerCommand(text, chatId, botToken, supabase, message.from)
+      if (handled) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
 
     // /start {code} — привязка аккаунта
     if (text.startsWith('/start ')) {
@@ -258,7 +320,7 @@ async function sendPlainMessage(botToken: string, chatId: number, text: string) 
   try {
     console.log(`📤 sendPlainMessage to ${chatId}: ${text.slice(0, 50)}...`)
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      `${telegramApiBase()}/bot${botToken}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -282,7 +344,7 @@ async function deleteMessage(botToken: string, chatId: number, messageId: number
   try {
     console.log(`🗑 deleteMessage: chat_id=${chatId}, message_id=${messageId}`)
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/deleteMessage`,
+      `${telegramApiBase()}/bot${botToken}/deleteMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -353,7 +415,7 @@ async function answerCallback(
   text: string,
   showAlert = false,
 ): Promise<void> {
-  await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+  await fetch(`${telegramApiBase()}/bot${botToken}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -435,4 +497,172 @@ async function handleOrderAction(
     console.error('Ошибка вызова функции:', e)
     await answerCallback(botToken, callbackQuery.id, 'Не получилось — попробуйте ещё раз', true)
   }
+}
+
+
+/**
+ * Отправка с разметкой и (по желанию) кнопками. `sendPlainMessage` рядом
+ * шлёт без разметки — она для покупателя, где Markdown только мешает.
+ */
+async function sendRichMessage(
+  botToken: string,
+  chatId: number,
+  text: string,
+  replyMarkup?: unknown,
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'Markdown',
+  }
+  if (replyMarkup)
+    body.reply_markup = replyMarkup
+
+  const res = await fetch(`${telegramApiBase()}/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const result = await res.json()
+  if (!result.ok)
+    console.error('sendRichMessage failed:', JSON.stringify(result))
+}
+
+/** Заказы из обеих таблиц одним списком: гостевые лежат отдельно от обычных. */
+async function fetchOrders(
+  supabase: ReturnType<typeof createClient>,
+  filter: (query: any) => any,
+): Promise<OrderSummary[]> {
+  const columns
+    = 'id, status, final_amount, created_at, delivery_method, delivery_address, comment, assigned_admin_name, assigned_admin_username'
+
+  const [users, guests] = await Promise.all([
+    filter(supabase.from('orders').select(`${columns}, customer_name, customer_phone`)),
+    filter(supabase.from('guest_checkouts').select(`${columns}, guest_name, guest_phone`)),
+  ])
+
+  if (users.error)
+    console.error('Ошибка выборки orders:', users.error.message)
+  if (guests.error)
+    console.error('Ошибка выборки guest_checkouts:', guests.error.message)
+
+  return [
+    ...(users.data ?? []).map((o: any) => ({ ...o, table: 'orders' })),
+    ...(guests.data ?? []).map((o: any) => ({ ...o, table: 'guest_checkouts' })),
+  ].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  )
+}
+
+/**
+ * Команды менеджера в рабочем чате. Возвращает `true`, если команда узнана, —
+ * тогда покупательские ветки ниже не выполняются.
+ *
+ * Зачем они. Раньше найти заказ можно было только прокруткой чата: карточки
+ * приходят лентой и теряются среди переписки. Отсюда три команды — что горит
+ * прямо сейчас, что взял лично я, и «покажи вот этот заказ».
+ */
+async function handleManagerCommand(
+  text: string,
+  chatId: number,
+  botToken: string,
+  supabase: ReturnType<typeof createClient>,
+  from?: { first_name?: string; last_name?: string; username?: string },
+): Promise<boolean> {
+  const command = text.split(/\s+/)[0].split('@')[0].toLowerCase()
+
+  if (command === '/orders') {
+    const orders = await fetchOrders(supabase, (q: any) =>
+      q.in('status', ACTIVE_STATUSES).order('created_at', { ascending: false }).limit(15))
+    await sendRichMessage(
+      botToken,
+      chatId,
+      orderListMessage(orders, 'Активные заказы', 'Пусто — все заказы закрыты.'),
+    )
+    return true
+  }
+
+  if (command === '/my') {
+    /*
+     * Отбор по нику, а не по имени: имя пользователь меняет когда угодно, и
+     * заказы «потерялись» бы. Ник в заказ записывает обработчик нажатия
+     * кнопки — до перехода на callback его вообще не было, поэтому у старых
+     * заказов здесь пусто, и это ожидаемо.
+     */
+    if (!from?.username) {
+      await sendRichMessage(
+        botToken,
+        chatId,
+        'У вас не задан ник в Telegram — по нему я и различаю менеджеров. Заведите @username в настройках, и команда заработает.',
+      )
+      return true
+    }
+
+    const orders = await fetchOrders(supabase, (q: any) =>
+      q.eq('assigned_admin_username', from.username)
+        .in('status', ACTIVE_STATUSES)
+        .order('created_at', { ascending: false })
+        .limit(15))
+
+    await sendRichMessage(
+      botToken,
+      chatId,
+      orderListMessage(orders, 'Ваши активные заказы', 'За вами сейчас ничего не числится.'),
+    )
+    return true
+  }
+
+  if (command === '/order') {
+    const query = text.split(/\s+/)[1]?.trim().replace(/^#/, '')
+    if (!query) {
+      await sendRichMessage(botToken, chatId, 'Укажите номер заказа: `/order 5e4fc2`')
+      return true
+    }
+
+    /*
+     * Ищем по хвосту id — это и есть «номер заказа», который видят и
+     * покупатель, и менеджер.
+     *
+     * Фильтр применяется В КОДЕ, а не запросом. Колонка `id` типа uuid, и
+     * приведение прямо в фильтре PostgREST не проходит: проверено на локальной
+     * базе, `.ilike('id::text', …)` отвечает «operator does not exist:
+     * uuid ~~* unknown». Поэтому берём последние заказы и отбираем сами.
+     *
+     * Двухсот хватает с запасом: на проде 3 сентября 2026 всего 43 заказа за
+     * всё время, и ищут обычно свежие. Когда счёт пойдёт на тысячи, поиск
+     * стоит перенести в RPC с `right(id::text, 6) = p_query` — тогда и
+     * ограничение уйдёт.
+     */
+    const recent = await fetchOrders(supabase, (q: any) =>
+      q.order('created_at', { ascending: false }).limit(200))
+    const needle = query.toLowerCase()
+    const orders = recent
+      .filter(o => o.id.toLowerCase().endsWith(needle))
+      .slice(0, 5)
+
+    if (orders.length === 0) {
+      await sendRichMessage(botToken, chatId, `Заказ \`${query}\` не найден.`)
+      return true
+    }
+
+    if (orders.length > 1) {
+      await sendRichMessage(
+        botToken,
+        chatId,
+        orderListMessage(orders, `Нашлось несколько по «${query}»`, '', undefined),
+      )
+      return true
+    }
+
+    const order = orders[0]
+    await sendRichMessage(
+      botToken,
+      chatId,
+      orderCardMessage(order),
+      buildOrderKeyboard(order.status, order.table, order.id) ?? undefined,
+    )
+    return true
+  }
+
+  return false
 }
