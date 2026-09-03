@@ -41,7 +41,11 @@ const errors = []
 page.on('console', m => m.type() === 'error' && errors.push(m.text().slice(0, 200)))
 page.on('pageerror', e => errors.push(`pageerror: ${e.message.slice(0, 200)}`))
 
-for (const status of ['new', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled']) {
+const method = process.env.METHOD ?? 'courier'
+await service.from('orders').update({ delivery_method: method }).eq('id', ORDER)
+console.log(`способ доставки: ${method}\n`)
+
+for (const status of ['new', 'processing', 'confirmed', 'shipped', 'delivered', 'cancelled']) {
   await service.from('orders').update({ status }).eq('id', ORDER)
   await page.goto(`${BASE}/profile/order/${ORDER}`, { waitUntil: 'domcontentloaded', timeout: 120000 })
   await page.waitForSelector('.opb-seg', { timeout: 60000 }).catch(() => {})
@@ -54,7 +58,9 @@ for (const status of ['new', 'confirmed', 'processing', 'shipped', 'delivered', 
       done: el.classList.contains('opb-seg--done'),
       cancelled: el.classList.contains('opb-seg--cancelled'),
     })))
-  const labels = ['Принят', 'В работе', 'Подтверждён', 'В пути', 'Доставлен']
+  const labels = method === 'pickup'
+    ? ['Принят', 'В работе', 'Собран', 'Готов к выдаче', 'Выдан']
+    : ['Принят', 'В работе', 'Подтверждён', 'В пути', 'Доставлен']
   const bar = segs.map((s, i) => (s.cancelled ? `[${labels[i]}✗]` : s.done ? `[${labels[i]}●]` : `${labels[i]}·`)).join(' ')
   // Плашка статуса — соседка заголовка «Заказ №…», ищем по её классам.
   const badge = (await page.locator('span.rounded-full, span[class*="rounded"]').allTextContents())

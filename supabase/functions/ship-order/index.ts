@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage, escapeMarkdown } from '../_shared/telegramUtils.ts'
+import { courierMessage, isPickup, shippedWording } from '../_shared/shopInfo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,13 +74,15 @@ Deno.serve(async (req) => {
       guest_name?: string
       user_id?: string | null
       telegram_chat_id?: string | null
+      /** От него зависит, что писать покупателю: «в пути» или «готов к выдаче». */
+      delivery_method?: string | null
       profile?: { first_name: string | null; last_name: string | null } | null
     } | null = null
 
     if (tableName === 'orders') {
       const { data } = await supabase
         .from('orders')
-        .select('status, telegram_message_id, final_amount, user_id')
+        .select('status, telegram_message_id, final_amount, user_id, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data as any
@@ -99,7 +101,7 @@ Deno.serve(async (req) => {
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, telegram_message_id, final_amount, guest_name')
+        .select('status, telegram_message_id, final_amount, guest_name, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data
@@ -141,6 +143,14 @@ Deno.serve(async (req) => {
     }
 
     // Обновляем статус на shipped
+    /*
+     * Один и тот же статус `shipped` значит разное: курьеру заказ передают,
+     * а самовывозный просто собирают и ставят на выдачу. Раньше текст был
+     * только под курьера, и покупатель самовывоза получал «заказ уже едет к
+     * вам» — на проде это 42 заказа из 45.
+     */
+    const wording = shippedWording(orderData.delivery_method)
+
     const { error: updateError } = await supabase
       .from(tableName)
       .update({ status: 'shipped' })
@@ -156,39 +166,56 @@ Deno.serve(async (req) => {
 
     console.log('✅ Статус обновлён на shipped')
 
-    const customerNameRaw = tableName === 'orders'
-      ? `${(orderData as any).profile?.first_name || ''} ${(orderData as any).profile?.last_name || ''}`.trim() || 'Не указано'
-      : orderData.guest_name || 'Гость'
-    const customerName = escapeMarkdown(customerNameRaw)
+    /*
+     * Курьерский чат — только для курьерских заказов и только с тем, что
+     * нужно в дороге: адрес, время, телефон, сумма. Владелец выбрал такой
+     * состав намеренно: курьеру не нужны ни отмены, ни бонусы, ни чужие
+     * заказы.
+     *
+     * Если TELEGRAM_COURIER_CHAT_ID не задан, шаг просто пропускается —
+     * магазин продолжает работать, как до появления курьерского чата.
+     */
+    const courierChatId = Deno.env.get('TELEGRAM_COURIER_CHAT_ID')
+    if (courierChatId && !isPickup(orderData.delivery_method)) {
+      const { data: full } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('id', orderId)
+        .maybeSingle()
 
-    // Обновляем сообщение в Telegram (убираем кнопки, показываем новый статус + кнопку "Доставлен")
-    if (orderData.telegram_message_id) {
-      const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
-      const tableUrlParam = `&table=${tableName}`
-
-      const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${orderId}${tableUrlParam}${secretParam}`
-      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableUrlParam}${secretParam}`
-
-      const updatedText = `🚚 *ПЕРЕДАН КУРЬЕРУ*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n_Статус: shipped_\n\n📦 Заказ передан курьеру и в пути\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
-
-      const newButtons = {
-        inline_keyboard: [
-          [{ text: '✅ Доставлен', url: deliveredUrl }],
-          [{ text: '❌ Отменить', url: cancelUrl }],
-        ],
-      }
-
-      const updateResult = await updateTelegramMessage(
-        botToken, chatId, orderData.telegram_message_id, updatedText, 'Markdown', newButtons
-      )
-
-      if (updateResult.success) {
-        console.log('✅ Telegram сообщение обновлено')
-      } else {
-        console.error('⚠️ Не удалось обновить Telegram:', updateResult.error)
+      if (full) {
+        const apiBase = Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
+        const res = await fetch(`${apiBase}/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: courierChatId,
+            text: courierMessage(full as any),
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '✅ Доставил', callback_data: `dlv:${tableName === 'guest_checkouts' ? 'g' : 'o'}:${orderId}` },
+              ]],
+            },
+          }),
+        })
+        const sent = await res.json()
+        console.log(`🚗 Курьерский чат: ${sent.ok ? 'отправлено' : JSON.stringify(sent)}`)
       }
     }
 
+    /*
+     * Карточку в чате здесь БОЛЬШЕ НЕ ПЕРЕРИСОВЫВАЕМ.
+     *
+     * Этим занимается sync-order-status-to-telegram: на смену статуса стоят
+     * триггеры `on_order_status_changed` и `on_guest_order_status_changed`,
+     * и он перерисовывает сообщение общим сборщиком кнопок.
+     *
+     * Дубль здесь был не просто лишним. Он собирал кнопки СТАРОГО образца —
+     * ссылками с ADMIN_SECRET внутри, — и после каждого действия секрет
+     * снова оказывался в чате, откуда его убрал переход на callback. Плюс
+     * гонка: кто перерисует последним, того и кнопки.
+     */
     // Уведомляем клиента (если есть telegram_chat_id)
     if (tableName === 'orders' && orderData.telegram_chat_id) {
       console.log(`📱 Уведомление клиенту: ${orderData.telegram_chat_id}`)
@@ -198,16 +225,16 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${supabaseServiceKey}`,
         },
-        body: JSON.stringify({
+          body: JSON.stringify({
           chat_id: orderData.telegram_chat_id,
-          title: '🚚 Ваш заказ в пути!',
-          body: `Заказ №${orderId.slice(-6)} передан курьеру и уже едет к вам 🎉`,
+          title: wording.customerTitle,
+          body: wording.customerBody(orderId.slice(-6)),
         }),
       })
     }
 
     return new Response(
-      `✅ ЗАКАЗ ПЕРЕДАН КУРЬЕРУ\n\n📦 Заказ №${orderId.slice(-6)}\nСтатус: В пути\n\nОперация выполнена успешно.`,
+      `✅ ${wording.adminTitle}\n\n📦 Заказ №${orderId.slice(-6)}\n${wording.adminNote}`,
       { headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=UTF-8' } }
     )
   } catch (error) {

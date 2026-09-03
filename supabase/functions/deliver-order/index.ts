@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { updateTelegramMessage, removeMessageButtons, escapeMarkdown } from '../_shared/telegramUtils.ts'
+import { deliveredWording } from '../_shared/shopInfo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -106,6 +106,8 @@ Deno.serve(async (req) => {
       final_amount?: number
       guest_name?: string
       user_id?: string | null
+      /** Курьер довёз или покупатель забрал — от этого зависит слово в отчёте. */
+      delivery_method?: string | null
       profile?: { first_name: string | null; last_name: string | null } | null
     } | null = null
 
@@ -113,7 +115,7 @@ Deno.serve(async (req) => {
       // Получаем заказ БЕЗ вложенного запроса к profiles
       const { data } = await supabase
         .from('orders')
-        .select('status, telegram_message_id, final_amount, user_id')
+        .select('status, telegram_message_id, final_amount, user_id, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data as any
@@ -133,7 +135,7 @@ Deno.serve(async (req) => {
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, telegram_message_id, final_amount, guest_name')
+        .select('status, telegram_message_id, final_amount, guest_name, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data
@@ -225,42 +227,25 @@ Deno.serve(async (req) => {
 
     console.log('✅ Заказ успешно доставлен')
 
-    // Обновляем Telegram сообщение
-    if (orderData.telegram_message_id) {
-      console.log(`📱 Обновление Telegram сообщения ${orderData.telegram_message_id}...`)
-
-      const customerNameRaw = tableName === 'orders'
-        ? `${(orderData as any).profile?.first_name || ''} ${(orderData as any).profile?.last_name || ''}`.trim() || 'Не указано'
-        : orderData.guest_name || 'Гость'
-      const customerName = escapeMarkdown(customerNameRaw)
-
-      const updatedText = `✅ *ДОСТАВЛЕН*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n_Статус: delivered_\n\n📦 Заказ успешно доставлен\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
-
-      const updateResult = await updateTelegramMessage(
-        botToken,
-        chatId,
-        orderData.telegram_message_id,
-        updatedText
-      )
-
-      if (updateResult.success) {
-        console.log('✅ Telegram сообщение обновлено')
-
-        // Удаляем кнопки (заказ доставлен, действия не нужны)
-        await removeMessageButtons(botToken, chatId, orderData.telegram_message_id)
-      } else {
-        console.error('⚠️ Не удалось обновить Telegram:', updateResult.error)
-      }
-    }
+    /*
+     * Карточку в чате здесь БОЛЬШЕ НЕ ПЕРЕРИСОВЫВАЕМ — этим занимается
+     * sync-order-status-to-telegram по триггеру на смену статуса. Он же
+     * убирает кнопки: у доставленного заказа действий не осталось.
+     * Подробнее — в таком же пояснении в ship-order.
+     */
 
     console.log('🎉 Доставка заказа завершена')
 
+    /*
+     * Для самовывоза «доставлен» — неверное слово: покупатель забрал заказ
+     * сам. Подписи разведены там же, где и для шага отгрузки.
+     */
+    const wording = deliveredWording(orderData.delivery_method)
     const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
-    const responseText = `✅ ЗАКАЗ ДОСТАВЛЕН
+    const responseText = `✅ ${wording.adminTitle}
 
 📦 Заказ №${orderId.slice(-6)}
 Тип: ${orderType}
-Статус: Доставлен
 
 Операция выполнена успешно.`
 

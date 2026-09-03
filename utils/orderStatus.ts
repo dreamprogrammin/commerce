@@ -57,6 +57,9 @@ const TRACK_STATUSES: OrderStatus[] = [
 /**
  * Подписи под сегментами. Короткие намеренно: их пять в ряд, и на 390px
  * «Комплектуется» налезало на соседей — поймано скриншотом страницы заказа.
+ *
+ * Значение по умолчанию — курьерское. Для самовывоза два последних шага
+ * называются иначе, см. `orderTrackLabels`.
  */
 export const ORDER_TRACK_LABELS = [
   'Принят',
@@ -65,6 +68,28 @@ export const ORDER_TRACK_LABELS = [
   'В пути',
   'Доставлен',
 ] as const
+
+/** Заказ забирают сами или везёт курьер. */
+export type DeliveryMethod = 'courier' | 'pickup' | string | null | undefined
+
+export function isPickupOrder(method: DeliveryMethod): boolean {
+  return method === 'pickup'
+}
+
+/**
+ * Подписи шагов под способ доставки.
+ *
+ * Покупатель, выбравший самовывоз, видел в кабинете «В пути» и «Доставлен» —
+ * хотя заказ никуда не едет: он собран и ждёт в пункте выдачи. На проде
+ * самовывозом идут 42 заказа из 45, то есть неверную подпись видели почти
+ * все. Первые три шага одинаковы, различаются только последние два.
+ */
+export function orderTrackLabels(method: DeliveryMethod): readonly string[] {
+  if (!isPickupOrder(method))
+    return ORDER_TRACK_LABELS
+
+  return ['Принят', 'В работе', 'Собран', 'Готов к выдаче', 'Выдан']
+}
 
 /** Индекс в полосе прогресса. −1 для отменённого: полоса гаснет целиком. */
 export function orderStatusToSegment(status: string): number {
@@ -139,8 +164,30 @@ export const ORDER_STATUS_INFO: Record<OrderStatus, OrderStatusPresentation> = {
   },
 }
 
-export function orderStatusInfo(status: string): OrderStatusPresentation {
-  return ORDER_STATUS_INFO[normalize(status)] ?? ORDER_STATUS_INFO.new
+/**
+ * Заголовок и анимация под статус. Для самовывоза два последних состояния
+ * называются иначе: заказ не едет и не «доставлен», а ждёт и выдаётся.
+ */
+export function orderStatusInfo(
+  status: string,
+  method?: DeliveryMethod,
+): OrderStatusPresentation {
+  const base = ORDER_STATUS_INFO[normalize(status)] ?? ORDER_STATUS_INFO.new
+  if (!isPickupOrder(method))
+    return base
+
+  const normalized = normalize(status)
+  if (normalized === 'shipped') {
+    return {
+      ...base,
+      title: 'Заказ готов к выдаче',
+      description: 'Заберите заказ в пункте выдачи',
+    }
+  }
+  if (normalized === 'delivered') {
+    return { ...base, title: 'Заказ выдан', description: 'Спасибо за покупку!' }
+  }
+  return base
 }
 
 /**
@@ -151,7 +198,7 @@ export function orderStatusInfo(status: string): OrderStatusPresentation {
  * висели рядом, показывая РАЗНЫЕ наборы шагов и разные названия одного и
  * того же («В пути» против «Отправлен»). Наборов теперь один.
  */
-export const ORDER_STEPS = [
+const COURIER_STEPS = [
   {
     icon: 'lucide:check',
     title: 'Заказ принят',
@@ -170,6 +217,41 @@ export const ORDER_STEPS = [
   { icon: 'lucide:truck', title: 'В пути', sub: 'Курьер уже везёт заказ' },
   { icon: 'lucide:home', title: 'Доставлен', sub: 'Спасибо за покупку!' },
 ] as const
+
+/** Те же пять шагов, но для заказа, который забирают сами. */
+const PICKUP_STEPS = [
+  {
+    icon: 'lucide:check',
+    title: 'Заказ принят',
+    sub: 'Мы получили ваш заказ и начинаем его обработку',
+  },
+  {
+    icon: 'lucide:package-search',
+    title: 'В работе',
+    sub: 'Менеджер взял заказ в работу',
+  },
+  {
+    icon: 'lucide:package-check',
+    title: 'Собран',
+    sub: 'Готовим заказ к выдаче',
+  },
+  {
+    icon: 'lucide:store',
+    title: 'Готов к выдаче',
+    sub: 'Ждём вас в пункте выдачи',
+  },
+  { icon: 'lucide:home', title: 'Выдан', sub: 'Спасибо за покупку!' },
+] as const
+
+/**
+ * Совместимость: часть кода ждёт готовый список. По умолчанию курьерский —
+ * см. пояснение у `orderTrackLabels`.
+ */
+export const ORDER_STEPS = COURIER_STEPS
+
+export function orderSteps(method: DeliveryMethod) {
+  return isPickupOrder(method) ? PICKUP_STEPS : COURIER_STEPS
+}
 
 /**
  * Индекс шага в ленте. Совпадает с сегментом полосы: список один и тот же,

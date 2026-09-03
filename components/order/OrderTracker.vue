@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ORDER_STEPS, orderStatusToStep } from '@/utils/orderStatus'
+import type { DeliveryMethod } from '@/utils/orderStatus'
+import { orderStatusToStep, orderSteps } from '@/utils/orderStatus'
 
 /**
  * Статус заказа — порт блока «Статус заказа» из OrderSuccess.dc.html.
@@ -15,7 +16,11 @@ import { ORDER_STEPS, orderStatusToStep } from '@/utils/orderStatus'
 const props = defineProps<{
   orderId: string
   initialStatus: string
+  /** См. пояснение в OrderProgressBar: у самовывоза свои подписи шагов. */
+  deliveryMethod?: DeliveryMethod
 }>()
+
+const steps = computed(() => orderSteps(props.deliveryMethod))
 
 const supabase = useSupabaseClient()
 const orderStatus = ref(props.initialStatus)
@@ -56,7 +61,7 @@ onMounted(() => {
 
     <div class="flex flex-col gap-1">
       <div
-        v-for="(step, index) in ORDER_STEPS"
+        v-for="(step, index) in steps"
         :key="step.title"
         class="flex items-stretch gap-4"
       >
@@ -68,7 +73,7 @@ onMounted(() => {
             <Icon :name="step.icon" class="size-[18px]" />
           </span>
           <span
-            v-if="index < ORDER_STEPS.length - 1"
+            v-if="index < steps.length - 1"
             class="ot-line"
             :class="{ 'ot-line--done': index < activeStep }"
           />

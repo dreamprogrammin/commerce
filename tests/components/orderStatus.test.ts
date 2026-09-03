@@ -9,6 +9,8 @@ import {
   orderStatusInfo,
   orderStatusToSegment,
   orderStatusToStep,
+  orderSteps,
+  orderTrackLabels,
 } from '@/utils/orderStatus'
 
 /**
@@ -164,5 +166,73 @@ describe('представление статуса заказа', () => {
       const wrapper = mountTracker('new')
       expect(wrapper.findAll('.ot-line')).toHaveLength(ORDER_STEPS.length - 1)
     })
+  })
+})
+
+/**
+ * Самовывоз. Покупатель, забирающий заказ сам, видел в кабинете «В пути» и
+ * «Доставлен» — хотя заказ никуда не едет: он собран и ждёт в пункте выдачи.
+ * На проде самовывозом идут 42 заказа из 45, то есть неверные подписи видели
+ * почти все.
+ */
+describe('подписи для самовывоза', () => {
+  it('последние два шага называются иначе', () => {
+    const courier = orderTrackLabels('courier')
+    const pickup = orderTrackLabels('pickup')
+
+    // Первые три шага одинаковы: заказ приняли, взяли в работу, подтвердили.
+    expect(pickup.slice(0, 2)).toEqual(courier.slice(0, 2))
+    expect(pickup[3]).toBe('Готов к выдаче')
+    expect(pickup[4]).toBe('Выдан')
+    expect(pickup).not.toContain('В пути')
+    expect(pickup).not.toContain('Доставлен')
+  })
+
+  it('у курьера подписи прежние', () => {
+    expect(orderTrackLabels('courier')).toContain('В пути')
+    expect(orderTrackLabels('courier')).toContain('Доставлен')
+  })
+
+  /* Способ доставки может не прийти — тогда безопаснее курьерский вариант. */
+  it('без способа доставки — курьерские подписи', () => {
+    expect(orderTrackLabels(undefined)).toEqual(orderTrackLabels('courier'))
+    expect(orderTrackLabels(null)).toEqual(orderTrackLabels('courier'))
+  })
+
+  it('лента шагов тоже своя', () => {
+    const titles = orderSteps('pickup').map(s => s.title)
+    expect(titles).toContain('Готов к выдаче')
+    expect(titles).toContain('Выдан')
+    expect(orderSteps('pickup')).toHaveLength(orderSteps('courier').length)
+  })
+
+  it('заголовок над анимацией не обещает курьера', () => {
+    expect(orderStatusInfo('shipped', 'pickup').title).toBe('Заказ готов к выдаче')
+    expect(orderStatusInfo('delivered', 'pickup').title).toBe('Заказ выдан')
+    expect(orderStatusInfo('shipped', 'courier').title).toBe('Заказ в пути')
+  })
+
+  it('первые шаги описаны одинаково для обоих способов', () => {
+    expect(orderStatusInfo('new', 'pickup')).toEqual(orderStatusInfo('new', 'courier'))
+    expect(orderStatusInfo('confirmed', 'pickup')).toEqual(orderStatusInfo('confirmed', 'courier'))
+  })
+
+  it('полоса прогресса рисует подписи самовывоза', () => {
+    const wrapper = mount(OrderProgressBar, {
+      props: { status: 'shipped', deliveryMethod: 'pickup' },
+    })
+    expect(wrapper.text()).toContain('Готов к выдаче')
+    expect(wrapper.text()).not.toContain('В пути')
+    // Заполнение то же самое: статус один, меняются только слова.
+    expect(wrapper.findAll('.opb-seg--done')).toHaveLength(4)
+  })
+
+  it('лента статусов рисует шаги самовывоза', () => {
+    const wrapper = mount(OrderTracker, {
+      props: { orderId: 'o-1', initialStatus: 'delivered', deliveryMethod: 'pickup' },
+      global: { stubs: { Icon: true } },
+    })
+    expect(wrapper.text()).toContain('Выдан')
+    expect(wrapper.text()).not.toContain('Курьер уже везёт')
   })
 })

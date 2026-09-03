@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { buildOrderKeyboard } from '../_shared/orderActions.ts'
 import { escapeMarkdown } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
@@ -523,24 +524,14 @@ Deno.serve(async (req) => {
 
     messageText += `\n_Статус: ${typedOrderData.status}_`
 
-    // Кнопки управления заказом
-    const adminSecret = Deno.env.get('ADMIN_SECRET')
-    const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
-    const tableParam = `&table=${tableName}`
-
-    const assignUrl = `${supabaseUrl}/functions/v1/assign-order-to-admin?order_id=${orderId}${tableParam}${secretParam}`
-    const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${orderId}${tableParam}${secretParam}`
-
-    const inlineKeyboard = {
-      inline_keyboard: [
-        [
-          { text: '✅ Взять в работу', url: assignUrl }
-        ],
-        [
-          { text: '❌ Отменить', url: cancelUrl }
-        ],
-      ],
-    }
+    // Кнопки управления заказом — общий сборщик, см. _shared/orderActions.ts
+    // (там же объяснено, почему callback, а не ссылки).
+    const inlineKeyboard = buildOrderKeyboard(
+      typedOrderData.status,
+      tableName,
+      orderId,
+      typedOrderData.delivery_method,
+    ) ?? { inline_keyboard: [] }
 
     console.log('📤 Отправка в Telegram...')
 
