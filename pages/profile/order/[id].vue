@@ -348,8 +348,12 @@ useHead({
              компонент, поэтому собираем блок здесь; отступы тоже перешли
              к обёртке, раньше их приносил сам трекер. -->
           <CardContent class="flex flex-col items-center gap-6 py-8">
-            <OrderTrackerLottie :status="order.status" />
-            <OrderProgressBar :status="order.status" class="max-w-md" />
+            <OrderTrackerLottie :status="order.status" :delivery-method="order.delivery_method" />
+            <OrderProgressBar
+              :status="order.status"
+              :delivery-method="order.delivery_method"
+              class="max-w-md"
+            />
           </CardContent>
         </Card>
 

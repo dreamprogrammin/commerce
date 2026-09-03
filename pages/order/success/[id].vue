@@ -263,7 +263,11 @@ onMounted(async () => {
           <!-- Анимированный герой: своя .lottie и своя подпись на каждый
                статус. В макете здесь стоп-кадр — экспорт прототипа не умеет
                анимации, а не потому что её быть не должно. -->
-          <OrderTrackerLottie v-if="order" :status="order.status" />
+          <OrderTrackerLottie
+            v-if="order"
+            :status="order.status"
+            :delivery-method="order.delivery_method"
+          />
 
           <span class="mt-2 text-sm text-muted-foreground">Номер вашего заказа</span>
           <span class="os-number">{{ orderNo }}</span>
@@ -279,6 +283,7 @@ onMounted(async () => {
           <OrderProgressBar
             v-if="order"
             :status="order.status"
+            :delivery-method="order.delivery_method"
             class="mt-3 max-w-[472px]"
           />
         </div>
@@ -393,6 +398,7 @@ onMounted(async () => {
           v-if="isAuthenticated && order"
           :order-id="fullOrderId"
           :initial-status="order.status"
+          :delivery-method="order.delivery_method"
         />
 
         <!-- ============ ДЕТАЛИ И СТОИМОСТЬ ============ -->
