@@ -7,6 +7,15 @@ import {
   shortNumber,
   type OrderSummary,
 } from '../_shared/orderCard.ts'
+import {
+  buildCardKeyboard,
+  buildListKeyboard,
+  buildPanelKeyboard,
+  LIST_TITLES,
+  type MenuScope,
+  PANEL_TEXT,
+  parseMenuData,
+} from '../_shared/orderMenu.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,7 +60,15 @@ Deno.serve(async (req) => {
      * все заказы записывались на «Админ». Подробности в _shared/orderActions.ts.
      */
     if (update.callback_query) {
-      await handleOrderAction(update.callback_query, botToken, supabaseUrl)
+      // Сначала навигация по панели, потом действия под уведомлением о заказе.
+      const handledByMenu = await handleMenuTap(
+        update.callback_query,
+        botToken,
+        supabaseUrl,
+        supabase,
+      )
+      if (!handledByMenu)
+        await handleOrderAction(update.callback_query, botToken, supabaseUrl)
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -125,6 +142,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               scope: { type: 'chat', chat_id: Number(managerChatId) },
               commands: [
+                { command: 'panel', description: '🧭 Панель заказов' },
                 { command: 'orders', description: '📋 Активные заказы' },
                 { command: 'my', description: '👤 Мои заказы' },
                 { command: 'order', description: '🔍 Заказ по номеру: /order 5e4fc2' },
@@ -470,32 +488,53 @@ async function handleOrderAction(
     return
   }
 
-  const adminSecret = Deno.env.get('ADMIN_SECRET') ?? ''
-  const name = operatorName(callbackQuery.from)
+  const result = await runOrderAction(
+    parsed.action,
+    parsed.table,
+    parsed.orderId,
+    callbackQuery.from,
+    supabaseUrl,
+  )
+  // Ошибку показываем «алертом»: её надо прочитать, а не проморгать.
+  await answerCallback(botToken, callbackQuery.id, result.toast, !result.ok)
+}
 
-  const params = new URLSearchParams({
-    order_id: parsed.orderId,
-    table: parsed.table,
-    admin_name: name,
-  })
-  if (callbackQuery.from.username)
-    params.set('admin_username', callbackQuery.from.username)
+/**
+ * Зовёт эдж-функцию действия от имени нажавшего и возвращает готовый текст
+ * для всплывающей плашки.
+ *
+ * Один вызов на два пути: кнопки под уведомлением о заказе и кнопки на
+ * карточке в панели. Логика, проверки и уведомления покупателю живут в самих
+ * функциях (assign/confirm/ship/deliver/cancel) и здесь не дублируются.
+ */
+async function runOrderAction(
+  action: keyof typeof ACTION_FUNCTIONS,
+  table: string,
+  orderId: string,
+  from: { first_name?: string; last_name?: string; username?: string },
+  supabaseUrl: string,
+): Promise<{ ok: boolean; toast: string }> {
+  const adminSecret = Deno.env.get('ADMIN_SECRET') ?? ''
+  const name = operatorName(from)
+
+  const params = new URLSearchParams({ order_id: orderId, table, admin_name: name })
+  if (from.username)
+    params.set('admin_username', from.username)
   if (adminSecret)
     params.set('secret', adminSecret)
 
-  const fn = ACTION_FUNCTIONS[parsed.action]
-  console.log(`🔘 ${name} → ${fn} для заказа ${parsed.orderId}`)
+  const fn = ACTION_FUNCTIONS[action]
+  console.log(`🔘 ${name} → ${fn} для заказа ${orderId}`)
 
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/${fn}?${params}`)
     const body = await res.text()
     console.log(`   ответ ${res.status}: ${body.slice(0, 200)}`)
-    // Ошибку показываем «алертом»: её надо прочитать, а не проморгать.
-    await answerCallback(botToken, callbackQuery.id, toToast(body), !res.ok)
+    return { ok: res.ok, toast: toToast(body) }
   }
   catch (e) {
     console.error('Ошибка вызова функции:', e)
-    await answerCallback(botToken, callbackQuery.id, 'Не получилось — попробуйте ещё раз', true)
+    return { ok: false, toast: 'Не получилось — попробуйте ещё раз' }
   }
 }
 
@@ -570,6 +609,20 @@ async function handleManagerCommand(
   from?: { first_name?: string; last_name?: string; username?: string },
 ): Promise<boolean> {
   const command = text.split(/\s+/)[0].split('@')[0].toLowerCase()
+
+  if (command === '/panel' || command === '/start') {
+    /*
+     * Панель — то, ради чего всё и делалось: менеджеру не нужно помнить
+     * команды, он нажимает кнопки. Владелец вызывает её один раз и закрепляет
+     * сообщение в чате.
+     *
+     * `/start` тоже сюда: в рабочем чате это первое, что нажимает человек,
+     * добавивший бота, и логично показать ему панель, а не приветствие для
+     * покупателей.
+     */
+    await sendRichMessage(botToken, chatId, PANEL_TEXT, buildPanelKeyboard())
+    return true
+  }
 
   if (command === '/orders') {
     const orders = await fetchOrders(supabase, (q: any) =>
@@ -665,4 +718,194 @@ async function handleManagerCommand(
   }
 
   return false
+}
+
+
+/** Правка уже отправленного сообщения: так список превращается в карточку и обратно. */
+async function editMessage(
+  botToken: string,
+  chatId: number | string,
+  messageId: number,
+  text: string,
+  replyMarkup?: unknown,
+): Promise<void> {
+  const res = await fetch(`${telegramApiBase()}/bot${botToken}/editMessageText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: 'Markdown',
+      reply_markup: replyMarkup,
+    }),
+  })
+  const result = await res.json()
+  // «message is not modified» — не ошибка: менеджер нажал «Обновить», а
+  // ничего не изменилось. Остальное стоит увидеть в логах.
+  if (!result.ok && !String(result.description).includes('not modified'))
+    console.error('editMessageText failed:', JSON.stringify(result))
+}
+
+async function deleteMessageById(
+  botToken: string,
+  chatId: number | string,
+  messageId: number,
+): Promise<void> {
+  await fetch(`${telegramApiBase()}/bot${botToken}/deleteMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+  })
+}
+
+/** Заказы для списка: активные все или активные конкретного менеджера. */
+async function ordersForScope(
+  supabase: ReturnType<typeof createClient>,
+  scope: MenuScope,
+  username?: string,
+): Promise<OrderSummary[]> {
+  return await fetchOrders(supabase, (q: any) => {
+    let query = q.in('status', ACTIVE_STATUSES)
+    if (scope === 'm')
+      query = query.eq('assigned_admin_username', username ?? '\u0000')
+    return query.order('created_at', { ascending: false }).limit(20)
+  })
+}
+
+/**
+ * Нажатия на панели заказов. Возвращает `true`, если нажатие относилось к
+ * панели, — тогда обработчик действий под уведомлением не запускается.
+ *
+ * Экраны переключаются правкой ТОГО ЖЕ сообщения, в котором нажали: список
+ * становится карточкой, карточка — снова списком. Это личное сообщение
+ * менеджера (панель прислала его в ответ на нажатие), поэтому менеджеры друг
+ * другу не мешают.
+ */
+async function handleMenuTap(
+  callbackQuery: {
+    id: string
+    data?: string
+    from: { id: number; first_name?: string; last_name?: string; username?: string }
+    message?: { message_id: number; chat?: { id: number | string } }
+  },
+  botToken: string,
+  supabaseUrl: string,
+  supabase: ReturnType<typeof createClient>,
+): Promise<boolean> {
+  const parsed = callbackQuery.data ? parseMenuData(callbackQuery.data) : null
+  if (!parsed)
+    return false
+
+  const chatId = callbackQuery.message?.chat?.id
+  const messageId = callbackQuery.message?.message_id
+  if (chatId === undefined || messageId === undefined)
+    return true
+
+  // Та же проверка, что и для действий: панель работает только в рабочем чате.
+  const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  if (!adminChatId || String(chatId) !== String(adminChatId)) {
+    await answerCallback(botToken, callbackQuery.id, 'Панель работает только в рабочем чате', true)
+    return true
+  }
+
+  if (parsed.kind === 'close') {
+    await deleteMessageById(botToken, chatId, messageId)
+    await answerCallback(botToken, callbackQuery.id, '')
+    return true
+  }
+
+  const username = callbackQuery.from.username
+
+  if (parsed.kind === 'panel' || parsed.kind === 'menu') {
+    const scope = parsed.scope!
+
+    if (scope === 'm' && !username) {
+      await answerCallback(
+        botToken,
+        callbackQuery.id,
+        'У вас не задан ник в Telegram — по нему я различаю менеджеров',
+        true,
+      )
+      return true
+    }
+
+    const orders = await ordersForScope(supabase, scope, username)
+    const { title, empty } = LIST_TITLES[scope]
+    const text = orderListMessage(orders, title, empty)
+    const keyboard = buildListKeyboard(orders, scope)
+
+    /*
+     * С панели — новым сообщением, изнутри своего экрана — правкой его же.
+     * Панель одна на чат: перепиши её, и остальные увидят чужой список.
+     */
+    if (parsed.kind === 'panel')
+      await sendRichMessage(botToken, chatId as number, text, keyboard)
+    else
+      await editMessage(botToken, chatId, messageId, text, keyboard)
+
+    await answerCallback(botToken, callbackQuery.id, '')
+    return true
+  }
+
+  if (parsed.kind === 'card' || parsed.kind === 'card-action') {
+    const scope = parsed.scope!
+    const table = parsed.table!
+    const orderId = parsed.orderId!
+
+    // Действие выполняем ДО перерисовки, чтобы карточка показала новый статус.
+    if (parsed.kind === 'card-action') {
+      const result = await runOrderAction(
+        parsed.action!,
+        table,
+        orderId,
+        callbackQuery.from,
+        supabaseUrl,
+      )
+      await answerCallback(botToken, callbackQuery.id, result.toast, !result.ok)
+    }
+    else {
+      await answerCallback(botToken, callbackQuery.id, '')
+    }
+
+    const order = await fetchOrderById(supabase, table, orderId)
+    if (!order) {
+      await editMessage(botToken, chatId, messageId, 'Заказ не найден.', buildListKeyboard([], scope))
+      return true
+    }
+
+    await editMessage(
+      botToken,
+      chatId,
+      messageId,
+      orderCardMessage(order),
+      buildCardKeyboard(order.status, scope, table, orderId),
+    )
+    return true
+  }
+
+  return true
+}
+
+/** Один заказ по id — для карточки. */
+async function fetchOrderById(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+  orderId: string,
+): Promise<OrderSummary | null> {
+  const columns
+    = 'id, status, final_amount, created_at, delivery_method, delivery_address, comment, assigned_admin_name, assigned_admin_username'
+  const extra = table === 'guest_checkouts' ? 'guest_name, guest_phone' : 'customer_name, customer_phone'
+
+  const { data, error } = await supabase
+    .from(table)
+    .select(`${columns}, ${extra}`)
+    .eq('id', orderId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Ошибка выборки заказа:', error.message)
+    return null
+  }
+  return data ? ({ ...data, table } as OrderSummary) : null
 }
