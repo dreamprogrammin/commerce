@@ -146,3 +146,58 @@ export function canManageOrders(
     return false
   return record.role === 'manager' || record.role === 'owner'
 }
+
+
+/**
+ * Может ли человек управлять командой: принимать заявки и смотреть список.
+ *
+ * Только владелец. Менеджер ведёт заказы, но решать, кого пускать в систему,
+ * — это другое право. До появления первого владельца работает прежнее
+ * правило: решает любой из рабочего чата, иначе первую заявку принять было
+ * бы некому.
+ */
+export function canManageStaff(record: StaffRecord | null, ownersExist: boolean): boolean {
+  if (!ownersExist)
+    return true
+  return record?.status === 'approved' && record.role === 'owner'
+}
+
+/** Строка сотрудника в списке команды. */
+export function staffLine(record: StaffRecord): string {
+  const status = {
+    approved: '✅',
+    pending: '⏳',
+    rejected: '❌',
+    draft: '✏️',
+  }[record.status] ?? '•'
+
+  const role = record.role ? ROLE_LABELS[record.role] : 'роль не выбрана'
+  const nick = record.telegram_username ? ` @${record.telegram_username}` : ''
+  const phone = record.phone ? ` · ${record.phone}` : ''
+
+  return `${status} *${record.full_name ?? 'без имени'}* — ${role}${nick}${phone}`
+}
+
+export function staffListMessage(records: StaffRecord[]): string {
+  if (records.length === 0)
+    return '*Команда*\n\nПока никого. Люди подают заявки командой /job в личке бота.'
+
+  const byStatus = (s: StaffStatus) => records.filter(r => r.status === s)
+  const parts = ['*Команда*', '']
+
+  const pending = byStatus('pending')
+  if (pending.length > 0) {
+    parts.push('*Ждут решения:*', ...pending.map(staffLine), '')
+  }
+
+  const approved = byStatus('approved')
+  if (approved.length > 0) {
+    parts.push('*В команде:*', ...approved.map(staffLine), '')
+  }
+
+  const rejected = byStatus('rejected')
+  if (rejected.length > 0)
+    parts.push(`_Отклонённых: ${rejected.length}_`)
+
+  return parts.join('\n').trim()
+}

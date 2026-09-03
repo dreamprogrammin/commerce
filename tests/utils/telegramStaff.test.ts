@@ -4,11 +4,14 @@ import {
   buildApprovalKeyboard,
   buildRoleKeyboard,
   canManageOrders,
+  canManageStaff,
   isStrictMode,
   looksLikeName,
   looksLikePhone,
   nextStep,
   parseJobData,
+  staffLine,
+  staffListMessage,
 } from '@/supabase/functions/_shared/staff'
 
 const draft = (patch = {}) => ({
@@ -129,5 +132,64 @@ describe('заявка владельцу', () => {
   it('без ника строка про Telegram не появляется пустой', () => {
     const text = applicationMessage(draft({ telegram_username: null, full_name: 'Данияр' }))
     expect(text).not.toContain('Telegram:')
+  })
+})
+
+/**
+ * Владелец. В `staff` он попадает миграцией (его Telegram-id берётся из
+ * profiles, где role = 'admin'), а не через анкету: подавать заявку самому
+ * себе и самому же её принимать — странно, а до этого строгий режим вообще
+ * не включился бы.
+ */
+describe('права владельца', () => {
+  const owner = draft({ role: 'owner', status: 'approved' })
+  const manager = draft({ role: 'manager', status: 'approved' })
+
+  it('решает по заявкам только владелец', () => {
+    expect(canManageStaff(owner, true)).toBe(true)
+    // Менеджер ведёт заказы, но кого пускать в систему — не его решение.
+    expect(canManageStaff(manager, true)).toBe(false)
+    expect(canManageStaff(null, true)).toBe(false)
+  })
+
+  /* Пока владельца нет, первую заявку принять было бы некому. */
+  it('до появления владельца решает любой из рабочего чата', () => {
+    expect(canManageStaff(null, false)).toBe(true)
+  })
+
+  it('владелец управляет и заказами тоже', () => {
+    expect(canManageOrders(owner, true)).toBe(true)
+  })
+})
+
+describe('список команды', () => {
+  it('пустой список подсказывает, что делать', () => {
+    expect(staffListMessage([])).toContain('/job')
+  })
+
+  it('ждущие решения идут отдельно от принятых', () => {
+    const text = staffListMessage([
+      draft({ full_name: 'Айгуль', role: 'manager', status: 'approved' }),
+      draft({ full_name: 'Данияр', role: 'courier', status: 'pending', telegram_username: null }),
+    ])
+    expect(text.indexOf('Ждут решения')).toBeLessThan(text.indexOf('В команде'))
+    expect(text).toContain('Данияр')
+    expect(text).toContain('Курьер')
+  })
+
+  it('отклонённые не занимают место, но счёт виден', () => {
+    const text = staffListMessage([draft({ full_name: 'Кто-то', status: 'rejected' })])
+    expect(text).toContain('Отклонённых: 1')
+    expect(text).not.toContain('Кто-то')
+  })
+
+  it('строка сотрудника несёт роль, ник и телефон', () => {
+    const line = staffLine(draft({
+      full_name: 'Айгуль', role: 'manager', status: 'approved', phone: '+77015554433',
+    }))
+    expect(line).toContain('Айгуль')
+    expect(line).toContain('Менеджер')
+    expect(line).toContain('@aigul_m')
+    expect(line).toContain('+77015554433')
   })
 })

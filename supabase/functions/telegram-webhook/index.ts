@@ -9,6 +9,8 @@ import {
 } from '../_shared/orderCard.ts'
 import {
   applicationMessage,
+  canManageStaff,
+  staffListMessage,
   buildApprovalKeyboard,
   buildRoleKeyboard,
   canManageOrders,
@@ -763,7 +765,11 @@ async function handleManagerCommand(
       'Кнопки заказов теперь всегда под рукой — они под полем ввода.',
       buildReplyKeyboard(),
     )
-    await sendRichMessage(botToken, chatId, PANEL_TEXT, buildPanelKeyboard())
+    const canSeeStaff = canManageStaff(
+      await findStaff(supabase, from?.id ?? 0),
+      await ownersExist(supabase),
+    )
+    await sendRichMessage(botToken, chatId, PANEL_TEXT, buildPanelKeyboard(canSeeStaff))
     return true
   }
 
@@ -1106,6 +1112,16 @@ async function findStaff(
   return (data as StaffRecord | null) ?? null
 }
 
+/** Есть ли в базе подтверждённый владелец. */
+async function ownersExist(supabase: ReturnType<typeof createClient>): Promise<boolean> {
+  const { count } = await supabase
+    .from('staff')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'approved')
+    .eq('role', 'owner')
+  return (count ?? 0) > 0
+}
+
 /**
  * Строгий режим включается, когда появился хотя бы один подтверждённый
  * менеджер. До этого работаем по-старому — иначе первый же выкат заблокировал
@@ -1226,13 +1242,42 @@ async function handleJobTap(
   botToken: string,
   supabase: ReturnType<typeof createClient>,
 ): Promise<boolean> {
-  const parsed = callbackQuery.data ? parseJobData(callbackQuery.data) : null
-  if (!parsed)
-    return false
-
   const chatId = callbackQuery.message?.chat?.id
   const messageId = callbackQuery.message?.message_id
   const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+
+  /*
+   * Список команды. Открыт только владельцу: телефоны сотрудников по чату
+   * разносить незачем, да и решать, кого пускать, — его дело.
+   */
+  if (callbackQuery.data === 'stf:list') {
+    const allowed = canManageStaff(
+      await findStaff(supabase, callbackQuery.from.id),
+      await ownersExist(supabase),
+    )
+    if (!allowed) {
+      await answerCallback(botToken, callbackQuery.id, 'Список команды доступен владельцу', true)
+      return true
+    }
+
+    const { data } = await supabase
+      .from('staff')
+      .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+      .neq('status', 'draft')
+      .order('created_at', { ascending: false })
+
+    await answerCallback(botToken, callbackQuery.id, '')
+    await sendRichMessage(
+      botToken,
+      chatId as number,
+      staffListMessage((data ?? []) as StaffRecord[]),
+    )
+    return true
+  }
+
+  const parsed = callbackQuery.data ? parseJobData(callbackQuery.data) : null
+  if (!parsed)
+    return false
 
   // Соискатель выбрал роль — анкета заполнена, отправляем её владельцу.
   if (parsed.kind === 'role') {
@@ -1274,6 +1319,16 @@ async function handleJobTap(
   // одобрить сам соискатель, переслав себе сообщение с кнопками.
   if (!adminChatId || String(chatId ?? '') !== String(adminChatId)) {
     await answerCallback(botToken, callbackQuery.id, 'Решение принимается в рабочем чате', true)
+    return true
+  }
+
+  /*
+   * И по человеку: принимает владелец. Менеджер ведёт заказы, но решать,
+   * кого пускать в систему, — другое право. Пока владельца нет, решает любой
+   * из рабочего чата, иначе первую заявку принять было бы некому.
+   */
+  if (!canManageStaff(await findStaff(supabase, callbackQuery.from.id), await ownersExist(supabase))) {
+    await answerCallback(botToken, callbackQuery.id, 'Решение по заявкам принимает владелец', true)
     return true
   }
 
