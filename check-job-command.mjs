@@ -19,6 +19,18 @@ const NEWBIE = { id: 777003, first_name: 'Данияр', username: 'dan_k' }
 const service = createClient(SUPA, SERVICE)
 await service.from('staff').delete().neq('telegram_user_id', OWNER.id)
 
+/*
+ * Владельца заводим сами, а не рассчитываем на строку из миграции: соседние
+ * проверки чистят `staff` целиком, и порядок запуска не должен решать, зелёный
+ * тут результат или красный.
+ */
+await service.from('staff').upsert({
+  telegram_user_id: OWNER.id,
+  full_name: 'Малик Бабазов',
+  role: 'owner',
+  status: 'approved',
+}, { onConflict: 'telegram_user_id' })
+
 const calls = () => fs.existsSync(CALLS)
   ? fs.readFileSync(CALLS, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
   : []

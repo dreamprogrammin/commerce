@@ -1,5 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { ACTION_FUNCTIONS, buildOrderKeyboard, parseCallbackData } from '../_shared/orderActions.ts'
+import { ACTION_FUNCTIONS, buildOrderKeyboard, type OrderAction, parseCallbackData } from '../_shared/orderActions.ts'
+import {
+  assignedText,
+  courierLabel,
+  deliveredKeyboard,
+  managerNoticeText,
+  takenByText,
+} from '../_shared/courierOffers.ts'
 import {
   ACTIVE_STATUSES,
   orderCardMessage,
@@ -558,7 +565,7 @@ async function handleOrderAction(
     id: string
     data?: string
     from: { id: number; first_name?: string; last_name?: string; username?: string }
-    message?: { chat?: { id: number | string } }
+    message?: { chat?: { id: number | string }; message_id?: number }
   },
   botToken: string,
   supabaseUrl: string,
@@ -580,32 +587,46 @@ async function handleOrderAction(
    * им служит состав рабочего чата.
    */
   const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
-  const courierChatId = Deno.env.get('TELEGRAM_COURIER_CHAT_ID')
   const fromChatId = String(callbackQuery.message?.chat?.id ?? '')
   const fromAdminChat = !!adminChatId && fromChatId === String(adminChatId)
-  const fromCourierChat = !!courierChatId && fromChatId === String(courierChatId)
 
-  if (!fromAdminChat && !fromCourierChat) {
+  /*
+   * Вне рабочего чата кнопки заказов доступны ровно одному человеку —
+   * принятому курьеру у себя в личке, куда ему приходят предложения доставки.
+   * Проверка идёт по человеку (`callback_query.from`), а не по чату: чат тут
+   * личный, и подделать его нельзя, но и опознавать по нему нечего.
+   */
+  const courier = fromAdminChat ? null : await findStaff(supabase, callbackQuery.from.id)
+  const isCourier = !!courier && courier.role === 'courier' && courier.status === 'approved'
+
+  if (!fromAdminChat && !isCourier) {
     console.warn(`Действие из чужого чата: ${fromChatId}`)
     await answerCallback(botToken, callbackQuery.id, 'Управлять заказами можно только из рабочего чата', true)
     return
   }
 
   /*
-   * В курьерском чате доступно ровно одно действие — отметить доставку.
-   * Курьер не подтверждает и не отменяет заказы: он их возит. Проверка по
-   * чату, а не только по роли, потому что в курьерском чате может оказаться
-   * и менеджер — но и ему там нечего делать, кроме как отметить доставку.
+   * Курьер доставку берёт и отмечает доставленной. Подтверждать и отменять
+   * заказы — не его работа, и кнопок таких у него нет; проверка здесь на
+   * случай подделанного `callback_data`.
    */
-  if (fromCourierChat && parsed.action !== 'dlv') {
-    await answerCallback(botToken, callbackQuery.id, 'Здесь можно только отметить доставку', true)
+  if (isCourier && parsed.action !== 'tak' && parsed.action !== 'dlv') {
+    await answerCallback(botToken, callbackQuery.id, 'Здесь можно только взять доставку и отметить её', true)
+    return
+  }
+
+  if (parsed.action === 'tak') {
+    if (!isCourier) {
+      await answerCallback(botToken, callbackQuery.id, 'Доставки берут курьеры', true)
+      return
+    }
+    await claimDelivery(botToken, supabase, callbackQuery, parsed.table, parsed.orderId, courier!)
     return
   }
 
   /*
    * И вторая проверка — по человеку, а не по чату. Включается, только когда
    * в базе появился хотя бы один подтверждённый менеджер: см. `isStrictMode`.
-   * Курьерский чат под неё не попадает: там свой круг людей и одно действие.
    */
   if (fromAdminChat && !(await mayManageOrders(supabase, callbackQuery.from.id))) {
     await answerCallback(
@@ -615,6 +636,21 @@ async function handleOrderAction(
       true,
     )
     return
+  }
+
+  // Отметить доставленным может только тот курьер, который её вёз: иначе
+  // заказ закроет любой, кому пришло предложение.
+  if (isCourier && parsed.action === 'dlv') {
+    const { data: order } = await supabase
+      .from(parsed.table)
+      .select('courier_staff_id')
+      .eq('id', parsed.orderId)
+      .maybeSingle()
+
+    if ((order as { courier_staff_id?: string } | null)?.courier_staff_id !== courier!.id) {
+      await answerCallback(botToken, callbackQuery.id, 'Эту доставку везёт другой курьер', true)
+      return
+    }
   }
 
   const result = await runOrderAction(
@@ -637,7 +673,7 @@ async function handleOrderAction(
  * функциях (assign/confirm/ship/deliver/cancel) и здесь не дублируются.
  */
 async function runOrderAction(
-  action: keyof typeof ACTION_FUNCTIONS,
+  action: OrderAction,
   table: string,
   orderId: string,
   from: { first_name?: string; last_name?: string; username?: string },
@@ -652,7 +688,17 @@ async function runOrderAction(
   if (adminSecret)
     params.set('secret', adminSecret)
 
-  const fn = ACTION_FUNCTIONS[action]
+  /*
+   * `tak` («Беру» у курьера) сюда попасть не должен — его выполняет
+   * claimDelivery, эдж-функции под ним нет. Если попал, значит кнопку собрали
+   * не там: лучше сказать об этом, чем сходить по адресу `/functions/v1/undefined`.
+   */
+  const fn = ACTION_FUNCTIONS[action as Exclude<OrderAction, 'tak'>]
+  if (!fn) {
+    console.error(`Действие ${action} не привязано к функции`)
+    return { ok: false, toast: 'Эта кнопка здесь не работает' }
+  }
+
   console.log(`🔘 ${name} → ${fn} для заказа ${orderId}`)
 
   try {
@@ -723,7 +769,7 @@ async function fetchOrders(
   filter: (query: any) => any,
 ): Promise<OrderSummary[]> {
   const columns
-    = 'id, status, final_amount, created_at, delivery_method, delivery_address, comment, assigned_admin_name, assigned_admin_username'
+    = 'id, status, final_amount, created_at, delivery_method, delivery_address, comment, courier_name, assigned_admin_name, assigned_admin_username'
 
   const [users, guests] = await Promise.all([
     filter(supabase.from('orders').select(`${columns}, customer_name, customer_phone`)),
@@ -937,6 +983,98 @@ async function handleManagerCommand(
 }
 
 
+/**
+ * «Беру» у курьера: заказ закрепляется за первым нажавшим.
+ *
+ * ГОНКА ЗДЕСЬ НАСТОЯЩАЯ — предложение уходит всем курьерам разом, и двое
+ * вполне могут нажать одновременно. Поэтому закрепление идёт одним UPDATE с
+ * условием «ещё никем не занято»: кто попал, тот и везёт. Проверять сначала
+ * SELECT-ом, а потом писать — ровно тот способ, которым обе доставки
+ * достаются обоим.
+ */
+async function claimDelivery(
+  botToken: string,
+  supabase: ReturnType<typeof createClient>,
+  callbackQuery: {
+    id: string
+    from: { id: number }
+    message?: { chat?: { id: number | string }; message_id?: number }
+  },
+  table: string,
+  orderId: string,
+  courier: StaffRecord,
+): Promise<void> {
+  const name = courierLabel(courier)
+
+  const { data: claimed } = await supabase
+    .from(table)
+    .update({
+      courier_staff_id: courier.id,
+      courier_name: name,
+      courier_taken_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .is('courier_staff_id', null)
+    .select('*')
+    .maybeSingle()
+
+  const chatId = callbackQuery.message?.chat?.id
+  const messageId = callbackQuery.message?.message_id
+
+  if (!claimed) {
+    // Не успел. Показываем, кто везёт, и гасим кнопку — чтобы не жал ещё раз.
+    const { data: taken } = await supabase
+      .from(table)
+      .select('id, courier_name')
+      .eq('id', orderId)
+      .maybeSingle()
+
+    const holder = (taken as { courier_name?: string } | null)?.courier_name || 'другой курьер'
+    await answerCallback(botToken, callbackQuery.id, `Доставку уже взял ${holder}`, true)
+    if (chatId && messageId)
+      await editMessage(botToken, chatId, messageId, takenByText({ id: orderId } as never, holder), undefined)
+    return
+  }
+
+  const order = claimed as Record<string, unknown> & { id: string }
+
+  // Взявшему — полные данные с телефоном покупателя и кнопкой «Доставил».
+  if (chatId && messageId) {
+    await editMessage(
+      botToken,
+      chatId,
+      messageId,
+      assignedText(order as never),
+      deliveredKeyboard(table, orderId),
+    )
+  }
+
+  /*
+   * Остальным предложение гасим: адрес и время чужой доставки в переписке
+   * висеть не должны, а живая кнопка «Беру» под уже занятым заказом — прямой
+   * путь к «нажал, а оно не работает».
+   */
+  const { data: offers } = await supabase
+    .from('courier_offers')
+    .select('telegram_user_id, message_id')
+    .eq('order_id', orderId)
+
+  for (const offer of (offers ?? []) as Array<{ telegram_user_id: number; message_id: number }>) {
+    if (String(offer.telegram_user_id) === String(courier.telegram_user_id))
+      continue
+    await editMessage(botToken, offer.telegram_user_id, offer.message_id, takenByText(order as never, name), undefined)
+  }
+
+  // Менеджерам — строчка в рабочий чат: кто повёз. Без неё «передан курьеру»
+  // остаётся статусом без человека, а спрашивать приходится голосом.
+  const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  if (adminChatId)
+    await sendRichMessage(botToken, Number(adminChatId), managerNoticeText(order as never, name))
+
+  await answerCallback(botToken, callbackQuery.id, 'Доставка за вами. Контакты покупателя — в сообщении')
+}
+
+
 /** Правка уже отправленного сообщения: так список превращается в карточку и обратно. */
 async function editMessage(
   botToken: string,
@@ -1110,7 +1248,7 @@ async function fetchOrderById(
   orderId: string,
 ): Promise<OrderSummary | null> {
   const columns
-    = 'id, status, final_amount, created_at, delivery_method, delivery_address, comment, assigned_admin_name, assigned_admin_username'
+    = 'id, status, final_amount, created_at, delivery_method, delivery_address, comment, courier_name, assigned_admin_name, assigned_admin_username'
   const extra = table === 'guest_checkouts' ? 'guest_name, guest_phone' : 'customer_name, customer_phone'
 
   const { data, error } = await supabase

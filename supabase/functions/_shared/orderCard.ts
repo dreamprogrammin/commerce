@@ -32,6 +32,7 @@ export interface OrderSummary {
   guest_name?: string | null
   guest_phone?: string | null
   delivery_method?: string | null
+  courier_name?: string | null
   delivery_address?: { city?: string; line1?: string } | null
   comment?: string | null
   assigned_admin_name?: string | null
@@ -167,6 +168,14 @@ export function orderCardMessage(order: OrderSummary, now?: Date): string {
     if (address)
       lines.push(`*Адрес:* ${escapeMarkdown(address)}`)
   }
+
+  /*
+   * Кто повёз. Раньше «передан курьеру» был статусом без человека, и на
+   * вопрос «у кого заказ?» отвечали голосом в чате. Имя появляется, как
+   * только курьер нажал «Беру» у себя в личке.
+   */
+  if (order.courier_name)
+    lines.push(`*Везёт:* ${escapeMarkdown(order.courier_name)}`)
 
   if (order.comment)
     lines.push(`*Комментарий:* ${escapeMarkdown(order.comment)}`)
