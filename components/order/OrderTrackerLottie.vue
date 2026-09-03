@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DeliveryMethod } from '@/utils/orderStatus'
 import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
 import { orderStatusInfo } from '@/utils/orderStatus'
 
@@ -13,9 +14,11 @@ import { orderStatusInfo } from '@/utils/orderStatus'
  */
 const props = defineProps<{
   status: string
+  /** См. пояснение в OrderProgressBar: у самовывоза свои подписи. */
+  deliveryMethod?: DeliveryMethod
 }>()
 
-const info = computed(() => orderStatusInfo(props.status))
+const info = computed(() => orderStatusInfo(props.status, props.deliveryMethod))
 </script>
 
 <template>

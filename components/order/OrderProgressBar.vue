@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { DeliveryMethod } from '@/utils/orderStatus'
 import {
   isOrderCancelled,
-  ORDER_TRACK_LABELS,
   orderStatusToSegment,
+  orderTrackLabels,
 } from '@/utils/orderStatus'
 
 /**
@@ -14,7 +15,14 @@ import {
  */
 const props = defineProps<{
   status: string
+  /**
+   * Способ доставки: у самовывоза два последних шага называются иначе —
+   * заказ не едет, а ждёт в пункте выдачи. Не передан — считаем курьерским.
+   */
+  deliveryMethod?: DeliveryMethod
 }>()
+
+const labels = computed(() => orderTrackLabels(props.deliveryMethod))
 
 const activeIndex = computed(() => orderStatusToSegment(props.status))
 const cancelled = computed(() => isOrderCancelled(props.status))
@@ -23,7 +31,7 @@ const cancelled = computed(() => isOrderCancelled(props.status))
 <template>
   <div class="flex w-full items-start gap-2">
     <span
-      v-for="(label, index) in ORDER_TRACK_LABELS"
+      v-for="(label, index) in labels"
       :key="label"
       class="flex min-w-0 flex-1 flex-col items-stretch gap-2"
     >
