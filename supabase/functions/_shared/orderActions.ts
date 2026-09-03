@@ -31,10 +31,16 @@ import { type DeliveryMethod, deliveredWording, shippedWording } from './shopInf
 /** Таблица заказа, ужатая до одной буквы: `callback_data` даётся 64 байта. */
 export type OrderTableCode = 'o' | 'g'
 
-export type OrderAction = 'asg' | 'cfm' | 'shp' | 'dlv' | 'cnl'
+export type OrderAction = 'asg' | 'cfm' | 'shp' | 'dlv' | 'cnl' | 'tak'
 
-/** Какую эдж-функцию зовёт каждое действие. */
-export const ACTION_FUNCTIONS: Record<OrderAction, string> = {
+/**
+ * Какую эдж-функцию зовёт каждое действие.
+ *
+ * `tak` («Беру» у курьера) сюда не входит намеренно: закрепление заказа за
+ * курьером — одна запись в базе и правка разосланных сообщений, отдельной
+ * функции под это не нужно. Вебхук делает это сам.
+ */
+export const ACTION_FUNCTIONS: Record<Exclude<OrderAction, 'tak'>, string> = {
   asg: 'assign-order-to-admin',
   cfm: 'confirm-order',
   shp: 'ship-order',
@@ -70,7 +76,7 @@ export function parseCallbackData(
     return null
 
   const [action, tableCode, orderId] = parts
-  if (!(action in ACTION_FUNCTIONS))
+  if (!(action in ACTION_FUNCTIONS) && action !== 'tak')
     return null
   if (!orderId)
     return null
