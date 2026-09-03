@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { shippedWording } from '../_shared/shopInfo.ts'
+import { courierMessage, isPickup, shippedWording } from '../_shared/shopInfo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -165,6 +165,44 @@ Deno.serve(async (req) => {
     }
 
     console.log('✅ Статус обновлён на shipped')
+
+    /*
+     * Курьерский чат — только для курьерских заказов и только с тем, что
+     * нужно в дороге: адрес, время, телефон, сумма. Владелец выбрал такой
+     * состав намеренно: курьеру не нужны ни отмены, ни бонусы, ни чужие
+     * заказы.
+     *
+     * Если TELEGRAM_COURIER_CHAT_ID не задан, шаг просто пропускается —
+     * магазин продолжает работать, как до появления курьерского чата.
+     */
+    const courierChatId = Deno.env.get('TELEGRAM_COURIER_CHAT_ID')
+    if (courierChatId && !isPickup(orderData.delivery_method)) {
+      const { data: full } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('id', orderId)
+        .maybeSingle()
+
+      if (full) {
+        const apiBase = Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
+        const res = await fetch(`${apiBase}/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: courierChatId,
+            text: courierMessage(full as any),
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '✅ Доставил', callback_data: `dlv:${tableName === 'guest_checkouts' ? 'g' : 'o'}:${orderId}` },
+              ]],
+            },
+          }),
+        })
+        const sent = await res.json()
+        console.log(`🚗 Курьерский чат: ${sent.ok ? 'отправлено' : JSON.stringify(sent)}`)
+      }
+    }
 
     /*
      * Карточку в чате здесь БОЛЬШЕ НЕ ПЕРЕРИСОВЫВАЕМ.

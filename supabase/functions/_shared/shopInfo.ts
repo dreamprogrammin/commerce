@@ -83,3 +83,92 @@ export function deliveredWording(method: DeliveryMethod) {
       `Заказ №${orderNo} доставлен. Спасибо, что выбрали Ухтышку!`,
   }
 }
+
+
+/** Заказ в том виде, в каком его нужно знать курьеру. */
+export interface CourierOrder {
+  id: string
+  final_amount: number | string | null
+  payment_method?: string | null
+  delivery_address?: { city?: string; line1?: string } | null
+  delivery_date?: string | null
+  delivery_slot?: string | null
+  customer_name?: string | null
+  customer_phone?: string | null
+  guest_name?: string | null
+  guest_phone?: string | null
+  comment?: string | null
+}
+
+/**
+ * Сообщение курьеру: адрес, время, телефон, сумма — и ничего лишнего.
+ *
+ * Владелец выбрал именно такой состав. Курьеру не нужны ни отмены, ни бонусы,
+ * ни чужие заказы: он везёт коробку по адресу и берёт деньги, если оплата
+ * наличными. Состав заказа сюда тоже не идёт — вскрывать коробку по дороге
+ * незачем, а лишние данные о покупателе лучше не разносить.
+ */
+const MONTHS = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+]
+
+/**
+ * «2026-09-04» → «4 сентября». Курьер читает это на ходу, и сырая дата из
+ * базы тут лишняя работа для глаз. Нераспознанное значение отдаём как есть:
+ * лучше показать строку из базы, чем потерять день доставки.
+ */
+function formatDeliveryDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!match)
+    return value
+  const [, , month, day] = match
+  const name = MONTHS[Number(month) - 1]
+  return name ? `${Number(day)} ${name}` : value
+}
+
+/** Сумма с пробелами между тысячами: «16 480 ₸». */
+function money(value: number | string | null | undefined): string {
+  const n = Math.round(Number(value ?? 0))
+  if (!Number.isFinite(n))
+    return '0 ₸'
+  return `${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₸`
+}
+
+export function courierMessage(order: CourierOrder): string {
+  const address = [order.delivery_address?.city, order.delivery_address?.line1]
+    .filter(Boolean)
+    .join(', ')
+
+  const when = [
+    order.delivery_date ? formatDeliveryDate(order.delivery_date) : null,
+    order.delivery_slot,
+  ].filter(Boolean).join(', ')
+  const phone = order.customer_phone || order.guest_phone || null
+  const name = (order.customer_name || order.guest_name || '').trim()
+
+  // Сумму показываем только при оплате наличными: при оплате картой её уже
+  // забрали, и цифра в руках курьера только путает.
+  const cash = !order.payment_method || order.payment_method === 'cash'
+
+  const lines = [
+    `*Доставка №${order.id.slice(-6)}*`,
+    '',
+    address ? `📍 ${address}` : '📍 адрес не указан',
+  ]
+
+  if (when)
+    lines.push(`🕒 ${when}`)
+  if (name)
+    lines.push(`👤 ${name}`)
+  if (phone)
+    lines.push(`📞 ${phone}`)
+  if (cash)
+    lines.push(`💵 к оплате: ${money(order.final_amount)}`)
+  else
+    lines.push('💳 оплачено картой')
+  if (order.comment)
+    lines.push(`💬 ${order.comment}`)
+
+  return lines.join('\n')
+}
