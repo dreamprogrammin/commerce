@@ -12,6 +12,12 @@ interface StatusUpdatePayload {
     id: string
     status: string
     telegram_message_id?: string | null
+    /**
+     * Способ доставки приходит в теле вебхука вместе со всей строкой заказа —
+     * от него зависит подпись кнопки: «Передать курьеру» на самовывозном
+     * заказе неверна, а таких на проде 42 из 45.
+     */
+    delivery_method?: string | null
   }
   old_record: {
     status: string
@@ -234,7 +240,12 @@ Deno.serve(async (req) => {
      * Для delivered и cancelled сборщик возвращает null — действий не
      * осталось, и кнопка «Отменить» под доставленным заказом только путала бы.
      */
-    const buttons = buildOrderKeyboard(record.status, table, record.id)
+    const buttons = buildOrderKeyboard(
+      record.status,
+      table,
+      record.id,
+      record.delivery_method,
+    )
 
     console.log('🔘 Кнопки:', buttons ? JSON.stringify(buttons) : 'отсутствуют')
 
