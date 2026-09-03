@@ -105,15 +105,18 @@ export function parseMenuData(data: string): ParsedMenu | null {
 }
 
 /** Закреплённая панель — точка входа. Её видно всем, нажимает каждый за себя. */
-export function buildPanelKeyboard() {
-  return {
-    inline_keyboard: [
-      [
-        { text: '📋 Активные заказы', callback_data: `${PANEL_PREFIX}:a` },
-        { text: '👤 Мои заказы', callback_data: `${PANEL_PREFIX}:m` },
-      ],
-    ],
-  }
+export function buildPanelKeyboard(showStaff = false) {
+  const rows = [[
+    { text: '📋 Активные заказы', callback_data: `${PANEL_PREFIX}:a` },
+    { text: '👤 Мои заказы', callback_data: `${PANEL_PREFIX}:m` },
+  ]]
+
+  // Команда — только владельцу: остальным этот список ни к чему, а телефоны
+  // сотрудников разносить по чату незачем.
+  if (showStaff)
+    rows.push([{ text: '👥 Команда', callback_data: 'stf:list' }])
+
+  return { inline_keyboard: rows }
 }
 
 export const PANEL_TEXT = [
