@@ -530,6 +530,7 @@ Deno.serve(async (req) => {
       typedOrderData.status,
       tableName,
       orderId,
+      typedOrderData.delivery_method,
     ) ?? { inline_keyboard: [] }
 
     console.log('📤 Отправка в Telegram...')

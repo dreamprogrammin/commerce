@@ -39,7 +39,13 @@ async function isUrlAccessible(url: string): Promise<boolean> {
 }
 
 async function telegramApi(botToken: string, method: string, body: Record<string, unknown>) {
-  const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+  /*
+   * Адрес Bot API переопределяется переменной окружения — ради локальной
+   * проверки заглушкой: так видно, что именно уходит покупателю, не трогая
+   * настоящего бота. В проде переменная не задана.
+   */
+  const apiBase = Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
+  const response = await fetch(`${apiBase}/bot${botToken}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

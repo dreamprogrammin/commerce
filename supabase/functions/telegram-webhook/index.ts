@@ -952,7 +952,7 @@ async function handleMenuTap(
       chatId,
       messageId,
       orderCardMessage(order),
-      buildCardKeyboard(order.status, scope, table, orderId),
+      buildCardKeyboard(order.status, scope, table, orderId, order.delivery_method),
     )
     return true
   }

@@ -26,6 +26,8 @@
  * всплывающую плашку, и карточка перерисовывается на месте.
  */
 
+import { type DeliveryMethod, deliveredWording, shippedWording } from './shopInfo.ts'
+
 /** Таблица заказа, ужатая до одной буквы: `callback_data` даётся 64 байта. */
 export type OrderTableCode = 'o' | 'g'
 
@@ -89,6 +91,11 @@ export function buildOrderKeyboard(
   status: string,
   table: string,
   orderId: string,
+  /**
+   * Способ доставки: от него зависит подпись шага. «Передать курьеру» на
+   * самовывозном заказе — неверная кнопка, а таких заказов на проде 42 из 45.
+   */
+  deliveryMethod?: DeliveryMethod,
 ): { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> } | null {
   const cancel = {
     text: '❌ Отменить',
@@ -99,8 +106,8 @@ export function buildOrderKeyboard(
     new: { text: '✅ Взять в работу', action: 'asg' },
     pending: { text: '✅ Взять в работу', action: 'asg' },
     processing: { text: '✅ Подтвердить', action: 'cfm' },
-    confirmed: { text: '🚚 Передать курьеру', action: 'shp' },
-    shipped: { text: '✅ Доставлен', action: 'dlv' },
+    confirmed: { text: shippedWording(deliveryMethod).button, action: 'shp' },
+    shipped: { text: deliveredWording(deliveryMethod).button, action: 'dlv' },
   }
 
   const step = primary[status]

@@ -24,6 +24,7 @@
 import type { OrderSummary } from './orderCard.ts'
 import { formatAmount, shortNumber, statusLabel } from './orderCard.ts'
 import { type OrderAction, tableToCode } from './orderActions.ts'
+import { type DeliveryMethod, deliveredWording, shippedWording } from './shopInfo.ts'
 
 /** Какой список открыт: активные или свои. Нужен, чтобы «Назад» возвращал туда же. */
 export type MenuScope = 'a' | 'm'
@@ -153,6 +154,8 @@ export function buildCardKeyboard(
   scope: MenuScope,
   table: string,
   orderId: string,
+  /** См. пояснение у `buildOrderKeyboard`: подпись шага зависит от доставки. */
+  deliveryMethod?: DeliveryMethod,
 ) {
   const rows: Array<Array<{ text: string; callback_data: string }>> = []
 
@@ -160,8 +163,8 @@ export function buildCardKeyboard(
     new: { text: '✅ Взять в работу', action: 'asg' },
     pending: { text: '✅ Взять в работу', action: 'asg' },
     processing: { text: '✅ Подтвердить', action: 'cfm' },
-    confirmed: { text: '🚚 Передать курьеру', action: 'shp' },
-    shipped: { text: '✅ Доставлен', action: 'dlv' },
+    confirmed: { text: shippedWording(deliveryMethod).button, action: 'shp' },
+    shipped: { text: deliveredWording(deliveryMethod).button, action: 'dlv' },
   }
 
   const step = primary[status]
