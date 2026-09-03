@@ -552,18 +552,34 @@ async function handleOrderAction(
    * им служит состав рабочего чата.
    */
   const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  const courierChatId = Deno.env.get('TELEGRAM_COURIER_CHAT_ID')
   const fromChatId = String(callbackQuery.message?.chat?.id ?? '')
-  if (!adminChatId || fromChatId !== String(adminChatId)) {
+  const fromAdminChat = !!adminChatId && fromChatId === String(adminChatId)
+  const fromCourierChat = !!courierChatId && fromChatId === String(courierChatId)
+
+  if (!fromAdminChat && !fromCourierChat) {
     console.warn(`Действие из чужого чата: ${fromChatId}`)
     await answerCallback(botToken, callbackQuery.id, 'Управлять заказами можно только из рабочего чата', true)
     return
   }
 
   /*
+   * В курьерском чате доступно ровно одно действие — отметить доставку.
+   * Курьер не подтверждает и не отменяет заказы: он их возит. Проверка по
+   * чату, а не только по роли, потому что в курьерском чате может оказаться
+   * и менеджер — но и ему там нечего делать, кроме как отметить доставку.
+   */
+  if (fromCourierChat && parsed.action !== 'dlv') {
+    await answerCallback(botToken, callbackQuery.id, 'Здесь можно только отметить доставку', true)
+    return
+  }
+
+  /*
    * И вторая проверка — по человеку, а не по чату. Включается, только когда
    * в базе появился хотя бы один подтверждённый менеджер: см. `isStrictMode`.
+   * Курьерский чат под неё не попадает: там свой круг людей и одно действие.
    */
-  if (!(await mayManageOrders(supabase, callbackQuery.from.id))) {
+  if (fromAdminChat && !(await mayManageOrders(supabase, callbackQuery.from.id))) {
     await answerCallback(
       botToken,
       callbackQuery.id,
