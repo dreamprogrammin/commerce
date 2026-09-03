@@ -147,6 +147,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             commands: [
               { command: 'start', description: '🧸 Приветствие от Ухтышки' },
+              { command: 'job', description: '💼 Устроиться на работу' },
               { command: 'unlink', description: '🔓 Отвязать Telegram от аккаунта' },
             ],
           }),
@@ -170,6 +171,7 @@ Deno.serve(async (req) => {
               scope: { type: 'chat', chat_id: Number(managerChatId) },
               commands: [
                 { command: 'panel', description: '🧭 Панель заказов' },
+                { command: 'job', description: '💼 Анкета сотрудника' },
                 { command: 'orders', description: '📋 Активные заказы' },
                 { command: 'my', description: '👤 Мои заказы' },
                 { command: 'order', description: '🔍 Заказ по номеру: /order 5e4fc2' },
@@ -289,6 +291,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    // /start job — переход по кнопке «Заполнить анкету» из рабочего чата
+    if (text === '/start job') {
+      const answered = await handleJobAnswer('/job', chatId, botToken, supabase, {
+        id: message.from?.id ?? chatId,
+        username: message.from?.username,
+      })
+      if (answered) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
     // /start {code} — привязка аккаунта
     if (text.startsWith('/start ')) {
       const code = text.replace('/start ', '').trim()
@@ -350,6 +365,17 @@ Deno.serve(async (req) => {
         '👋 Привет!\n\n✅ Telegram успешно привязан!\n\n🎉 Теперь вы будете получать:\n📦 Статус ваших заказов\n💰 Начисление бонусов\n🔥 Акции и новинки\n\n🛍 Приятных покупок на uhti.kz!'
       )
 
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    /*
+     * Дальше — ветки для покупателя. В рабочем чате их быть не должно:
+     * приветствие «Ухтышка — магазин детских игрушек» в ответ на неизвестную
+     * команду выглядит как поломка и засоряет чат менеджеров.
+     */
+    if (adminChatId && String(chatId) === String(adminChatId)) {
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -646,6 +672,27 @@ async function runOrderAction(
  * Отправка с разметкой и (по желанию) кнопками. `sendPlainMessage` рядом
  * шлёт без разметки — она для покупателя, где Markdown только мешает.
  */
+/**
+ * Ник бота — нужен для ссылки «написать в личку». Запрашивается у Telegram,
+ * а не хранится константой: сменить бота проще, чем не забыть поправить
+ * строку в коде. Ответ кешируется на время жизни экземпляра функции.
+ */
+let cachedBotUsername: string | null = null
+
+async function botUsername(botToken: string): Promise<string | null> {
+  if (cachedBotUsername)
+    return cachedBotUsername
+  try {
+    const res = await fetch(`${telegramApiBase()}/bot${botToken}/getMe`)
+    const data = await res.json()
+    cachedBotUsername = data?.result?.username ?? null
+    return cachedBotUsername
+  }
+  catch {
+    return null
+  }
+}
+
 async function sendRichMessage(
   botToken: string,
   chatId: number,
@@ -743,6 +790,26 @@ async function handleManagerCommand(
   }
 
   const command = text.split(/\s+/)[0].split('@')[0].toLowerCase()
+
+  /*
+   * Анкету заполняют в личке: в общем чате на «как вас зовут?» ответили бы
+   * трое разом. Но написать `/job` человек естественно пробует именно здесь —
+   * он тут работает. Раньше на это приходило приветствие для покупателей, и
+   * выглядело как «команда не работает» (владелец так и написал). Теперь —
+   * подсказка с кнопкой, открывающей личку бота.
+   */
+  if (command === '/job' || command === '/rabota') {
+    const me = await botUsername(botToken)
+    await sendRichMessage(
+      botToken,
+      chatId,
+      'Анкету заполняем в личке — в общем чате диалог мешал бы переписке.',
+      me
+        ? { inline_keyboard: [[{ text: '✍️ Заполнить анкету', url: `https://t.me/${me}?start=job` }]] }
+        : undefined,
+    )
+    return true
+  }
 
   if (command === '/panel' || command === '/start') {
     /*
