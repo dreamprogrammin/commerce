@@ -189,3 +189,42 @@ export const LIST_TITLES: Record<MenuScope, { title: string; empty: string }> = 
   a: { title: 'Активные заказы', empty: 'Пусто — все заказы закрыты.' },
   m: { title: 'Ваши активные заказы', empty: 'За вами сейчас ничего не числится.' },
 }
+
+/**
+ * Постоянная клавиатура у поля ввода — «кнопки по умолчанию».
+ *
+ * Инлайн-панель надо было вызвать и закрепить, а закреплённое сообщение
+ * уезжает из поля зрения. Эта клавиатура висит у строки ввода всегда и у
+ * всех участников чата: менеджер открыл чат — кнопки уже есть, ничего
+ * вызывать не нужно.
+ *
+ * Нажатие приходит обычным текстовым сообщением — поэтому подписи кнопок
+ * сразу и служат «командами», см. REPLY_BUTTONS. Само сообщение бот удаляет,
+ * чтобы чат не зарастал нажатиями.
+ *
+ * `is_persistent` требует Bot API 6.4+ и означает, что клавиатура не
+ * сворачивается, когда менеджер начинает печатать.
+ */
+export const REPLY_BUTTONS = {
+  active: '📋 Активные заказы',
+  mine: '👤 Мои заказы',
+} as const
+
+export function buildReplyKeyboard() {
+  return {
+    keyboard: [[{ text: REPLY_BUTTONS.active }, { text: REPLY_BUTTONS.mine }]],
+    resize_keyboard: true,
+    is_persistent: true,
+    selective: false,
+  }
+}
+
+/** Текст нажатой кнопки → какой список открывать. */
+export function replyButtonScope(text: string): MenuScope | null {
+  const clean = text.trim()
+  if (clean === REPLY_BUTTONS.active)
+    return 'a'
+  if (clean === REPLY_BUTTONS.mine)
+    return 'm'
+  return null
+}

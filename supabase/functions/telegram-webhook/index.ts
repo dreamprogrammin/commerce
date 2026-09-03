@@ -11,10 +11,12 @@ import {
   buildCardKeyboard,
   buildListKeyboard,
   buildPanelKeyboard,
+  buildReplyKeyboard,
   LIST_TITLES,
   type MenuScope,
   PANEL_TEXT,
   parseMenuData,
+  replyButtonScope,
 } from '../_shared/orderMenu.ts'
 
 const corsHeaders = {
@@ -157,6 +159,28 @@ Deno.serve(async (req) => {
         }
       } catch (e) { results.push(`Команды менеджера: ❌ ${e}`) }
 
+      /*
+       * Постоянная клавиатура в рабочем чате — «кнопки по умолчанию».
+       * Ставится прямо здесь, чтобы после `/setup` менеджерам не пришлось
+       * ничего вызывать: открыл чат — кнопки уже под полем ввода.
+       */
+      try {
+        const managerChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+        if (managerChatId) {
+          const r = await fetch(`${baseUrl}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: managerChatId,
+              text: 'Кнопки заказов под полем ввода — нажимайте, ничего вводить не нужно.',
+              reply_markup: buildReplyKeyboard(),
+            }),
+          })
+          const res = await r.json()
+          results.push(`Кнопки в чате: ${res.ok ? '✅' : '❌'} ${res.description || ''}`)
+        }
+      } catch (e) { results.push(`Кнопки в чате: ❌ ${e}`) }
+
       // Описание
       try {
         const r = await fetch(`${baseUrl}/setMyDescription`, {
@@ -209,7 +233,14 @@ Deno.serve(async (req) => {
      */
     const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
     if (adminChatId && String(chatId) === String(adminChatId)) {
-      const handled = await handleManagerCommand(text, chatId, botToken, supabase, message.from)
+      const handled = await handleManagerCommand(
+        text,
+        chatId,
+        botToken,
+        supabase,
+        message.from,
+        messageId,
+      )
       if (handled) {
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -607,7 +638,38 @@ async function handleManagerCommand(
   botToken: string,
   supabase: ReturnType<typeof createClient>,
   from?: { first_name?: string; last_name?: string; username?: string },
+  messageId?: number,
 ): Promise<boolean> {
+  /*
+   * Нажатие постоянной клавиатуры приходит обычным текстом. Разбираем его до
+   * команд и сразу удаляем сообщение: иначе чат зарастёт строчками
+   * «📋 Активные заказы» от каждого менеджера.
+   */
+  const scope = replyButtonScope(text)
+  if (scope) {
+    if (messageId)
+      await deleteMessageById(botToken, chatId, messageId)
+
+    if (scope === 'm' && !from?.username) {
+      await sendRichMessage(
+        botToken,
+        chatId,
+        'У вас не задан ник в Telegram — по нему я различаю менеджеров. Заведите @username в настройках, и кнопка заработает.',
+      )
+      return true
+    }
+
+    const orders = await ordersForScope(supabase, scope, from?.username)
+    const { title, empty } = LIST_TITLES[scope]
+    await sendRichMessage(
+      botToken,
+      chatId,
+      orderListMessage(orders, title, empty),
+      buildListKeyboard(orders, scope),
+    )
+    return true
+  }
+
   const command = text.split(/\s+/)[0].split('@')[0].toLowerCase()
 
   if (command === '/panel' || command === '/start') {
@@ -620,6 +682,17 @@ async function handleManagerCommand(
      * добавивший бота, и логично показать ему панель, а не приветствие для
      * покупателей.
      */
+    /*
+     * Двумя сообщениями: сперва постоянная клавиатура у поля ввода — она и
+     * есть «кнопки по умолчанию», ради которых всё делалось, — затем панель
+     * с теми же входами для тех, кому привычнее инлайн.
+     */
+    await sendRichMessage(
+      botToken,
+      chatId,
+      'Кнопки заказов теперь всегда под рукой — они под полем ввода.',
+      buildReplyKeyboard(),
+    )
     await sendRichMessage(botToken, chatId, PANEL_TEXT, buildPanelKeyboard())
     return true
   }
