@@ -8,6 +8,20 @@ import {
   type OrderSummary,
 } from '../_shared/orderCard.ts'
 import {
+  applicationMessage,
+  buildApprovalKeyboard,
+  buildRoleKeyboard,
+  canManageOrders,
+  isStrictMode,
+  looksLikeName,
+  looksLikePhone,
+  nextStep,
+  parseJobData,
+  ROLE_LABELS,
+  type StaffRecord,
+  STEP_QUESTIONS,
+} from '../_shared/staff.ts'
+import {
   buildCardKeyboard,
   buildListKeyboard,
   buildPanelKeyboard,
@@ -62,6 +76,15 @@ Deno.serve(async (req) => {
      * все заказы записывались на «Админ». Подробности в _shared/orderActions.ts.
      */
     if (update.callback_query) {
+      // Заявки на работу — раньше остального: их кнопки живут и в личке,
+      // где панели заказов нет вовсе.
+      const handledByJob = await handleJobTap(update.callback_query, botToken, supabase)
+      if (handledByJob) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       // Сначала навигация по панели, потом действия под уведомлением о заказе.
       const handledByMenu = await handleMenuTap(
         update.callback_query,
@@ -70,7 +93,7 @@ Deno.serve(async (req) => {
         supabase,
       )
       if (!handledByMenu)
-        await handleOrderAction(update.callback_query, botToken, supabaseUrl)
+        await handleOrderAction(update.callback_query, botToken, supabaseUrl, supabase)
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -242,6 +265,22 @@ Deno.serve(async (req) => {
         messageId,
       )
       if (handled) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    /*
+     * Анкета сотрудника — только в личке. В рабочем чате такой диалог мешал
+     * бы переписке: на «как вас зовут?» ответили бы трое разом.
+     */
+    if (!adminChatId || String(chatId) !== String(adminChatId)) {
+      const answered = await handleJobAnswer(text, chatId, botToken, supabase, {
+        id: message.from?.id ?? chatId,
+        username: message.from?.username,
+      })
+      if (answered) {
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -495,6 +534,7 @@ async function handleOrderAction(
   },
   botToken: string,
   supabaseUrl: string,
+  supabase: ReturnType<typeof createClient>,
 ): Promise<void> {
   const parsed = callbackQuery.data ? parseCallbackData(callbackQuery.data) : null
   if (!parsed) {
@@ -516,6 +556,20 @@ async function handleOrderAction(
   if (!adminChatId || fromChatId !== String(adminChatId)) {
     console.warn(`Действие из чужого чата: ${fromChatId}`)
     await answerCallback(botToken, callbackQuery.id, 'Управлять заказами можно только из рабочего чата', true)
+    return
+  }
+
+  /*
+   * И вторая проверка — по человеку, а не по чату. Включается, только когда
+   * в базе появился хотя бы один подтверждённый менеджер: см. `isStrictMode`.
+   */
+  if (!(await mayManageOrders(supabase, callbackQuery.from.id))) {
+    await answerCallback(
+      botToken,
+      callbackQuery.id,
+      'Вы пока не в команде. Напишите боту в личку /job, чтобы подать заявку.',
+      true,
+    )
     return
   }
 
@@ -1020,4 +1074,225 @@ async function fetchOrderItems(
     quantity: row.quantity,
     price: row[priceColumn],
   }))
+}
+
+
+/** Заявка сотрудника по его Telegram-id. */
+async function findStaff(
+  supabase: ReturnType<typeof createClient>,
+  telegramUserId: number,
+): Promise<StaffRecord | null> {
+  const { data } = await supabase
+    .from('staff')
+    .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+    .eq('telegram_user_id', telegramUserId)
+    .maybeSingle()
+  return (data as StaffRecord | null) ?? null
+}
+
+/**
+ * Строгий режим включается, когда появился хотя бы один подтверждённый
+ * менеджер. До этого работаем по-старому — иначе первый же выкат заблокировал
+ * бы владельца, который ещё не подал заявку сам себе.
+ */
+async function strictModeOn(supabase: ReturnType<typeof createClient>): Promise<boolean> {
+  const { count } = await supabase
+    .from('staff')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'approved')
+    .in('role', ['manager', 'owner'])
+  return isStrictMode(count ?? 0)
+}
+
+/** Может ли этот человек управлять заказами. */
+async function mayManageOrders(
+  supabase: ReturnType<typeof createClient>,
+  telegramUserId: number,
+): Promise<boolean> {
+  const strict = await strictModeOn(supabase)
+  if (!strict)
+    return true
+  return canManageOrders(await findStaff(supabase, telegramUserId), true)
+}
+
+/**
+ * Анкета сотрудника: очередной ответ на вопрос бота.
+ *
+ * Возвращает `true`, если сообщение было ответом на анкету. Работает только в
+ * личке: в рабочем чате такой диалог мешал бы переписке, а на общий вопрос
+ * ответили бы трое разом.
+ */
+async function handleJobAnswer(
+  text: string,
+  chatId: number,
+  botToken: string,
+  supabase: ReturnType<typeof createClient>,
+  from: { id: number; username?: string },
+): Promise<boolean> {
+  const record = await findStaff(supabase, from.id)
+
+  // Начало анкеты.
+  if (text === '/job' || text === '/rabota') {
+    if (record?.status === 'approved') {
+      await sendRichMessage(
+        botToken,
+        chatId,
+        `Вы уже в команде: *${ROLE_LABELS[record.role ?? 'manager']}*.`,
+      )
+      return true
+    }
+    if (record?.status === 'pending') {
+      await sendRichMessage(botToken, chatId, 'Ваша заявка уже отправлена — ждём ответа.')
+      return true
+    }
+
+    await supabase.from('staff').upsert({
+      telegram_user_id: from.id,
+      telegram_username: from.username ?? null,
+      full_name: null,
+      phone: null,
+      role: null,
+      status: 'draft',
+    }, { onConflict: 'telegram_user_id' })
+
+    await sendRichMessage(botToken, chatId, `Заполним короткую анкету.\n\n${STEP_QUESTIONS.name}`)
+    return true
+  }
+
+  // Продолжение анкеты — только если она начата и не дошла до конца.
+  if (!record || record.status !== 'draft')
+    return false
+
+  const step = nextStep(record)
+
+  if (step === 'name') {
+    if (!looksLikeName(text)) {
+      await sendRichMessage(botToken, chatId, 'Похоже, это не имя. Напишите, как вас зовут.')
+      return true
+    }
+    await supabase.from('staff').update({ full_name: text.trim() }).eq('id', record.id)
+    await sendRichMessage(botToken, chatId, STEP_QUESTIONS.phone)
+    return true
+  }
+
+  if (step === 'phone') {
+    if (!looksLikePhone(text)) {
+      await sendRichMessage(botToken, chatId, 'Не похоже на номер телефона. Напишите его целиком, с кодом.')
+      return true
+    }
+    await supabase.from('staff').update({ phone: text.trim() }).eq('id', record.id)
+    await sendRichMessage(botToken, chatId, STEP_QUESTIONS.role, buildRoleKeyboard())
+    return true
+  }
+
+  // Роль выбирается кнопкой — текст здесь не ответ.
+  if (step === 'role') {
+    await sendRichMessage(botToken, chatId, STEP_QUESTIONS.role, buildRoleKeyboard())
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Кнопки анкеты: выбор роли соискателем и решение владельца по заявке.
+ *
+ * Решение принимается в рабочем чате — там же, где менеджеры видят заказы;
+ * заводить для этого отдельное место незачем.
+ */
+async function handleJobTap(
+  callbackQuery: {
+    id: string
+    data?: string
+    from: { id: number; first_name?: string; username?: string }
+    message?: { message_id: number; chat?: { id: number | string } }
+  },
+  botToken: string,
+  supabase: ReturnType<typeof createClient>,
+): Promise<boolean> {
+  const parsed = callbackQuery.data ? parseJobData(callbackQuery.data) : null
+  if (!parsed)
+    return false
+
+  const chatId = callbackQuery.message?.chat?.id
+  const messageId = callbackQuery.message?.message_id
+  const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+
+  // Соискатель выбрал роль — анкета заполнена, отправляем её владельцу.
+  if (parsed.kind === 'role') {
+    const record = await findStaff(supabase, callbackQuery.from.id)
+    if (!record || record.status !== 'draft') {
+      await answerCallback(botToken, callbackQuery.id, 'Анкета уже отправлена')
+      return true
+    }
+
+    const { data: updated } = await supabase
+      .from('staff')
+      .update({ role: parsed.role, status: 'pending' })
+      .eq('id', record.id)
+      .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+      .maybeSingle()
+
+    await answerCallback(botToken, callbackQuery.id, 'Заявка отправлена')
+    if (chatId !== undefined && messageId !== undefined) {
+      await editMessage(
+        botToken,
+        chatId,
+        messageId,
+        'Спасибо! Заявка отправлена, ждите ответа.',
+      )
+    }
+
+    if (adminChatId && updated) {
+      await sendRichMessage(
+        botToken,
+        Number(adminChatId),
+        applicationMessage(updated as StaffRecord),
+        buildApprovalKeyboard((updated as StaffRecord).id),
+      )
+    }
+    return true
+  }
+
+  // Решение владельца. Принимается только в рабочем чате: иначе заявку мог бы
+  // одобрить сам соискатель, переслав себе сообщение с кнопками.
+  if (!adminChatId || String(chatId ?? '') !== String(adminChatId)) {
+    await answerCallback(botToken, callbackQuery.id, 'Решение принимается в рабочем чате', true)
+    return true
+  }
+
+  const approved = parsed.kind === 'approve'
+  const { data: staff } = await supabase
+    .from('staff')
+    .update({
+      status: approved ? 'approved' : 'rejected',
+      approved_at: approved ? new Date().toISOString() : null,
+      approved_by: callbackQuery.from.id,
+    })
+    .eq('id', parsed.staffId!)
+    .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+    .maybeSingle()
+
+  await answerCallback(botToken, callbackQuery.id, approved ? 'Принят' : 'Отклонён')
+
+  if (staff && chatId !== undefined && messageId !== undefined) {
+    const record = staff as StaffRecord
+    await editMessage(
+      botToken,
+      chatId,
+      messageId,
+      `${applicationMessage(record)}\n\n*Решение:* ${approved ? '✅ принят' : '❌ отклонён'} (${callbackQuery.from.first_name ?? 'владелец'})`,
+    )
+
+    // Человеку сообщаем в личку: он ждёт ответа именно там.
+    await sendRichMessage(
+      botToken,
+      record.telegram_user_id,
+      approved
+        ? `Вас приняли: *${ROLE_LABELS[record.role ?? 'manager']}*. Добро пожаловать!`
+        : 'К сожалению, заявка отклонена.',
+    )
+  }
+
+  return true
 }
