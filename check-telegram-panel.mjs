@@ -52,7 +52,14 @@ let failed = false
 const check = (ok, label) => { if (!ok) failed = true; console.log(`${ok ? '✅' : '❌'} ${label}`) }
 
 // ── панель ────────────────────────────────────────────────────────────────
-const panel = (await say('/panel')).find(c => c.method === 'sendMessage')
+/*
+ * `/panel` присылает ДВА сообщения: сперва постоянную клавиатуру у поля
+ * ввода, затем саму панель с инлайн-кнопками. Берём именно панель — раньше
+ * тест брал первое сообщение и после появления клавиатуры стал смотреть не
+ * туда.
+ */
+const panel = (await say('/panel'))
+  .find(c => c.method === 'sendMessage' && c.body?.reply_markup?.inline_keyboard)
 check(!!panel, 'команда /panel присылает панель')
 const panelButtons = buttons(panel).map(b => b.text)
 check(panelButtons.includes('📋 Активные заказы') && panelButtons.includes('👤 Мои заказы'),
