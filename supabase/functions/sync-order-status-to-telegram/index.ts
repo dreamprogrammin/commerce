@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { buildOrderKeyboard } from '../_shared/orderActions.ts'
 import { updateTelegramMessage, escapeMarkdown } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
@@ -222,58 +223,18 @@ Deno.serve(async (req) => {
     console.log('📝 Текст обновления:')
     console.log(updatedText)
 
-    // Формируем кнопки в зависимости от статуса
-    let buttons = null
-    const adminSecret = Deno.env.get('ADMIN_SECRET')
-    const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
-    const tableParam = `&table=${table}`
-
-    if (record.status === 'processing') {
-      // В работе → показываем [Подтвердить] [Отменить]
-      const confirmUrl = `${supabaseUrl}/functions/v1/confirm-order?order_id=${record.id}${tableParam}${secretParam}`
-      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
-
-      buttons = {
-        inline_keyboard: [
-          [{ text: '✅ Подтвердить', url: confirmUrl }],
-          [{ text: '❌ Отменить', url: cancelUrl }]
-        ]
-      }
-    } else if (record.status === 'confirmed') {
-      // Подтверждён → показываем [Передать курьеру] [Отменить]
-      const shipUrl = `${supabaseUrl}/functions/v1/ship-order?order_id=${record.id}${tableParam}${secretParam}`
-      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
-
-      buttons = {
-        inline_keyboard: [
-          [{ text: '🚚 Передать курьеру', url: shipUrl }],
-          [{ text: '❌ Отменить', url: cancelUrl }]
-        ]
-      }
-    } else if (record.status === 'shipped') {
-      // В пути → показываем [Доставлен] [Отменить]
-      const deliveredUrl = `${supabaseUrl}/functions/v1/deliver-order?order_id=${record.id}${tableParam}${secretParam}`
-      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
-
-      buttons = {
-        inline_keyboard: [
-          [{ text: '✅ Доставлен', url: deliveredUrl }],
-          [{ text: '❌ Отменить', url: cancelUrl }]
-        ]
-      }
-    } else if (record.status === 'new' || record.status === 'pending') {
-      // Новый → показываем [Взять в работу] [Отменить]
-      const assignUrl = `${supabaseUrl}/functions/v1/assign-order-to-admin?order_id=${record.id}${tableParam}${secretParam}`
-      const cancelUrl = `${supabaseUrl}/functions/v1/cancel-order?order_id=${record.id}${tableParam}${secretParam}`
-
-      buttons = {
-        inline_keyboard: [
-          [{ text: '✅ Взять в работу', url: assignUrl }],
-          [{ text: '❌ Отменить', url: cancelUrl }]
-        ]
-      }
-    }
-    // Для delivered и cancelled кнопок нет (buttons = null)
+    /*
+     * Кнопки под статус — общий сборщик из _shared/orderActions.ts.
+     *
+     * Здесь лежала вторая копия этой раскладки: пять веток `if` с почти
+     * одинаковыми блоками, отдельно от такой же копии в
+     * notify-order-to-telegram. Расхождение между ними означало бы, что
+     * оператор видит на карточке не ту кнопку.
+     *
+     * Для delivered и cancelled сборщик возвращает null — действий не
+     * осталось, и кнопка «Отменить» под доставленным заказом только путала бы.
+     */
+    const buttons = buildOrderKeyboard(record.status, table, record.id)
 
     console.log('🔘 Кнопки:', buttons ? JSON.stringify(buttons) : 'отсутствуют')
 

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { ACTION_FUNCTIONS, parseCallbackData } from '../_shared/orderActions.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,20 @@ Deno.serve(async (req) => {
 
     const update = await req.json()
     console.log('📩 Incoming update:', JSON.stringify(update))
+
+    /*
+     * Нажатие кнопки под карточкой заказа.
+     *
+     * Раньше кнопки были ссылками на эдж-функции, и это уводило оператора в
+     * браузер, светило ADMIN_SECRET в чате и не давало узнать, КТО нажал —
+     * все заказы записывались на «Админ». Подробности в _shared/orderActions.ts.
+     */
+    if (update.callback_query) {
+      await handleOrderAction(update.callback_query, botToken, supabaseUrl)
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     const message = update.message
     if (!message) {
@@ -49,7 +64,14 @@ Deno.serve(async (req) => {
         const r = await fetch(`${baseUrl}/setWebhook`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: webhookUrl }),
+          // `allowed_updates` указан явно: без него список берётся тот, что
+          // остался от прошлой настройки, а нажатия кнопок под карточкой
+          // заказа приходят именно как callback_query. Молча потерять их —
+          // значит получить чат, где кнопки не работают вовсе.
+          body: JSON.stringify({
+            url: webhookUrl,
+            allowed_updates: ['message', 'callback_query'],
+          }),
         })
         const res = await r.json()
         results.push(`Webhook: ${res.ok ? '✅' : '❌'} ${res.description || ''}`)
@@ -302,4 +324,115 @@ async function sendWelcome(botToken: string, chatId: number) {
 
   await sendPlainMessage(botToken, chatId, welcomeText)
   console.log('🏠 sendWelcome completed')
+}
+
+
+/**
+ * Имя оператора для записи в заказ: «Айгуль Смагулова» или «Айгуль».
+ * Ник хранится отдельно — по нему в чате можно позвать человека.
+ */
+function operatorName(from: { first_name?: string; last_name?: string; username?: string }): string {
+  const name = [from.first_name, from.last_name].filter(Boolean).join(' ').trim()
+  return name || from.username || 'Оператор'
+}
+
+/**
+ * Всплывающая плашка над чатом. Telegram даёт на неё 200 знаков, а функции
+ * отвечают многострочным текстом вроде «✅ ЗАКАЗ ПОДТВЕРЖДЁН\n\nНомер: …» —
+ * поэтому берём первые непустые строки и обрезаем.
+ */
+function toToast(text: string): string {
+  const clean = text.replace(/\*/g, '').split('\n').map(l => l.trim()).filter(Boolean)
+  const joined = clean.slice(0, 2).join(' · ')
+  return joined.length > 195 ? `${joined.slice(0, 195)}…` : joined
+}
+
+async function answerCallback(
+  botToken: string,
+  callbackQueryId: string,
+  text: string,
+  showAlert = false,
+): Promise<void> {
+  await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text,
+      show_alert: showAlert,
+    }),
+  })
+}
+
+/**
+ * Выполняет действие с заказом от имени нажавшего.
+ *
+ * Работу делают те же эдж-функции, что и раньше (assign/confirm/ship/deliver/
+ * cancel) — логика, проверки и уведомления покупателю не дублируются. Меняется
+ * только вход: секрет берётся из окружения ЗДЕСЬ, на сервере, и в чат больше
+ * не попадает; имя и ник оператора приходят из самого нажатия.
+ *
+ * Карточку заказа перерисовывать не нужно: смена статуса поднимает триггер
+ * sync-order-status-to-telegram, и он обновляет сообщение на месте.
+ */
+async function handleOrderAction(
+  callbackQuery: {
+    id: string
+    data?: string
+    from: { id: number; first_name?: string; last_name?: string; username?: string }
+    message?: { chat?: { id: number | string } }
+  },
+  botToken: string,
+  supabaseUrl: string,
+): Promise<void> {
+  const parsed = callbackQuery.data ? parseCallbackData(callbackQuery.data) : null
+  if (!parsed) {
+    console.warn('Не разобрать callback_data:', callbackQuery.data)
+    await answerCallback(botToken, callbackQuery.id, 'Не удалось разобрать кнопку')
+    return
+  }
+
+  /*
+   * Управлять заказами можно только из рабочего чата.
+   *
+   * Без этой проверки бот, добавленный в любой другой чат, выполнял бы
+   * команды кого угодно: `callback_data` виден в разметке сообщения, а
+   * подделать его несложно. Список менеджеров при этом вести не нужно —
+   * им служит состав рабочего чата.
+   */
+  const adminChatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  const fromChatId = String(callbackQuery.message?.chat?.id ?? '')
+  if (!adminChatId || fromChatId !== String(adminChatId)) {
+    console.warn(`Действие из чужого чата: ${fromChatId}`)
+    await answerCallback(botToken, callbackQuery.id, 'Управлять заказами можно только из рабочего чата', true)
+    return
+  }
+
+  const adminSecret = Deno.env.get('ADMIN_SECRET') ?? ''
+  const name = operatorName(callbackQuery.from)
+
+  const params = new URLSearchParams({
+    order_id: parsed.orderId,
+    table: parsed.table,
+    admin_name: name,
+  })
+  if (callbackQuery.from.username)
+    params.set('admin_username', callbackQuery.from.username)
+  if (adminSecret)
+    params.set('secret', adminSecret)
+
+  const fn = ACTION_FUNCTIONS[parsed.action]
+  console.log(`🔘 ${name} → ${fn} для заказа ${parsed.orderId}`)
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/${fn}?${params}`)
+    const body = await res.text()
+    console.log(`   ответ ${res.status}: ${body.slice(0, 200)}`)
+    // Ошибку показываем «алертом»: её надо прочитать, а не проморгать.
+    await answerCallback(botToken, callbackQuery.id, toToast(body), !res.ok)
+  }
+  catch (e) {
+    console.error('Ошибка вызова функции:', e)
+    await answerCallback(botToken, callbackQuery.id, 'Не получилось — попробуйте ещё раз', true)
+  }
 }
