@@ -15,6 +15,13 @@
 import { escapeMarkdown } from './telegramUtils.ts'
 
 /** Заказ в том виде, в каком его достаточно знать для списка и карточки. */
+/** Позиция заказа — то, что менеджер собирает. */
+export interface OrderItem {
+  name: string
+  quantity: number
+  price: number | string | null
+}
+
 export interface OrderSummary {
   id: string
   status: string
@@ -31,6 +38,8 @@ export interface OrderSummary {
   assigned_admin_username?: string | null
   /** Из какой таблицы заказ: гостевые лежат отдельно. */
   table: string
+  /** Состав заказа. У списка его нет — он нужен только в карточке. */
+  items?: OrderItem[]
 }
 
 /** Короткий номер заказа — последние шесть знаков id, как в чате и на сайте. */
@@ -161,6 +170,24 @@ export function orderCardMessage(order: OrderSummary, now?: Date): string {
 
   if (order.comment)
     lines.push(`*Комментарий:* ${escapeMarkdown(order.comment)}`)
+
+  /*
+   * Состав заказа — то, ради чего карточку чаще всего и открывают: по нему
+   * собирают коробку. Без него менеджеру пришлось бы искать в ленте исходное
+   * уведомление, а это ровно та прокрутка чата, от которой уходили.
+   *
+   * Больше десяти позиций не печатаем: сообщение Telegram обрежет на 4096
+   * знаках, и лучше честный хвост «и ещё N», чем обрубок посреди строки.
+   */
+  if (order.items?.length) {
+    lines.push('', '*Состав:*')
+    for (const item of order.items.slice(0, 10)) {
+      const sum = formatAmount(Number(item.price ?? 0) * item.quantity)
+      lines.push(`• ${escapeMarkdown(item.name)} × ${item.quantity} — ${sum}`)
+    }
+    if (order.items.length > 10)
+      lines.push(`_…и ещё ${order.items.length - 10}_`)
+  }
 
   lines.push(
     '',

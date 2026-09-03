@@ -12,7 +12,9 @@ const SUPA = 'http://127.0.0.1:54321'
 const SERVICE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
 const CALLS = '/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/tg-calls.jsonl'
 const CHAT = -1001234567890
-const ORDER = '1cfa2733-8c56-495d-be05-69807f5e4fc2'
+// Заказ С ПОЗИЦИЯМИ: карточка обязана показывать состав, иначе менеджеру
+// нечего собирать, и он вернётся к прокрутке ленты.
+const ORDER = 'd7a7ed7f-94dc-4895-8838-90562bf973cb'
 
 const service = createClient(SUPA, SERVICE)
 await service.from('orders').update({
@@ -74,9 +76,10 @@ const cardCalls = await tap(target.callback_data, 200)
 const card = cardCalls.find(c => c.method === 'editMessageText')
 check(!!card, 'заказ открывается карточкой в том же сообщении')
 check(card?.body?.text?.includes('Заказ №'), 'карточка показывает заказ')
+check(card?.body?.text?.includes('*Состав:*'), 'в карточке есть состав заказа')
 const cardButtons = buttons(card).map(b => b.text)
 check(cardButtons.includes('← К списку'), `на карточке есть возврат: ${cardButtons.join(' | ')}`)
-console.log(`--- карточка ---\n${card?.body?.text?.split('\n').slice(0, 3).join('\n')}\n   кнопки: ${cardButtons.join(' | ')}\n`)
+console.log(`--- карточка ---\n${card?.body?.text}\n   кнопки: ${cardButtons.join(' | ')}\n`)
 
 // ── действие прямо с карточки ────────────────────────────────────────────
 const actionButton = buttons(card).find(b => b.callback_data?.startsWith('act:'))
