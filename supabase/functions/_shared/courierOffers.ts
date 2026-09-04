@@ -44,6 +44,42 @@ export async function approvedCouriers(supabase: {
   return (data ?? []).filter((c: Courier) => !!c.telegram_user_id)
 }
 
+/**
+ * Принятые владельцы — запасной адресат доставки.
+ *
+ * Пока курьеров в команде нет, возить некому, и заказ повисал бы с
+ * предупреждением «некому передать». На деле в такой момент возит сам
+ * владелец: он же и принимает заказы, и берёт их в работу. Поэтому
+ * предложение уходит ему.
+ */
+export async function approvedOwners(supabase: {
+  from: (table: string) => any
+}): Promise<Courier[]> {
+  const { data } = await supabase
+    .from('staff')
+    .select('id, telegram_user_id, full_name')
+    .eq('role', 'owner')
+    .eq('status', 'approved')
+
+  return (data ?? []).filter((c: Courier) => !!c.telegram_user_id)
+}
+
+/**
+ * Кому предлагать доставку: курьерам, а если их нет — владельцам.
+ *
+ * Владельцу предложение приходит ТОЛЬКО пока курьеров нет. Иначе он получал бы
+ * каждую доставку магазина себе в личку — и перестал бы их читать.
+ */
+export async function deliveryRecipients(supabase: {
+  from: (table: string) => any
+}): Promise<{ people: Courier[]; toOwner: boolean }> {
+  const couriers = await approvedCouriers(supabase)
+  if (couriers.length > 0)
+    return { people: couriers, toOwner: false }
+
+  return { people: await approvedOwners(supabase), toOwner: true }
+}
+
 /** Имя для чата: «Данияр Ким» или, если анкета без имени, «курьер». */
 export function courierLabel(courier: { full_name?: string | null }): string {
   return (courier.full_name || '').trim() || 'курьер'
@@ -53,10 +89,19 @@ export function courierLabel(courier: { full_name?: string | null }): string {
  * Предложение: куда и когда везти. Без телефона и имени покупателя — их
  * получит только тот, кто возьмёт заказ.
  */
-export function offerText(order: CourierOrder): string {
+export function offerText(order: CourierOrder, toOwner = false): string {
+  /*
+   * Владельцу говорим прямо, почему доставка пришла ему: «Нажмите „Беру“, если
+   * сможете отвезти» в магазине, где курьеров ещё нет, звучит как вопрос без
+   * выбора.
+   */
+  const tail = toOwner
+    ? '\n\nПринятых курьеров пока нет — доставка на вас.'
+    : '\n\nНажмите «Беру», если сможете отвезти.'
+
   return courierMessage({ ...order, customer_phone: null, guest_phone: null, customer_name: null, guest_name: null })
     .replace(`*Доставка №${order.id.slice(-6)}*`, `*Новая доставка №${order.id.slice(-6)}*`)
-    + '\n\nНажмите «Беру», если сможете отвезти.'
+    + tail
 }
 
 /** Тому, кто взял: то же самое плюс контакты покупателя. */

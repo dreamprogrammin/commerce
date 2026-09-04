@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { isPickup, shippedWording } from '../_shared/shopInfo.ts'
-import { approvedCouriers, offerKeyboard, offerText } from '../_shared/courierOffers.ts'
+import { deliveryRecipients, offerKeyboard, offerText } from '../_shared/courierOffers.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -185,7 +185,13 @@ Deno.serve(async (req) => {
         .eq('id', orderId)
         .maybeSingle()
 
-      const couriers = full ? await approvedCouriers(supabase) : []
+      /*
+       * Курьерам, а пока их нет — владельцу: в магазине на одного человека
+       * возит он сам, и предупреждение «некому передать» было бы неверным.
+       */
+      const { people: couriers, toOwner } = full
+        ? await deliveryRecipients(supabase)
+        : { people: [], toOwner: false }
       const apiBase = Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
 
       if (full && couriers.length === 0) {
@@ -200,11 +206,11 @@ Deno.serve(async (req) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: adminChatId,
-              text: `⚠️ Доставку №${orderId.slice(-6)} некому передать: принятых курьеров нет.\n\nКурьер заводится анкетой — /job в личке бота, дальше вы подтверждаете заявку.`,
+              text: `⚠️ Доставку №${orderId.slice(-6)} некому передать: ни курьеров, ни принятых владельцев.\n\nЧеловек заводится анкетой — /job в личке бота, дальше вы подтверждаете заявку.`,
             }),
           })
         }
-        console.warn('🚗 Курьеров нет — предложение никому не ушло')
+        console.warn('🚗 Ни курьеров, ни владельцев — предложение никому не ушло')
       }
 
       for (const courier of couriers) {
@@ -213,7 +219,7 @@ Deno.serve(async (req) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: courier.telegram_user_id,
-            text: offerText(full as any),
+            text: offerText(full as any, toOwner),
             parse_mode: 'Markdown',
             reply_markup: offerKeyboard(tableName!, orderId),
           }),

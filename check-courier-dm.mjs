@@ -7,7 +7,8 @@
  *
  * Проверяется: состав предложения (без телефона), закрепление за первым,
  * гашение предложения у остальных, запрет отметить чужую доставку, а также
- * что после доставки и после отмены кнопки в личке гаснут.
+ * что после доставки и после отмены кнопки в личке гаснут, а пока курьеров в
+ * команде нет — доставка уходит владельцу.
  *   node check-courier-dm.mjs
  */
 import { createClient } from '@supabase/supabase-js'
@@ -22,6 +23,7 @@ const ORDER = 'd7a7ed7f-94dc-4895-8838-90562bf973cb'
 
 const DANIYAR = { id: 777101, first_name: 'Данияр', username: 'dan_k' }
 const ASEL = { id: 777102, first_name: 'Асель', username: 'asel' }
+const OWNER = { id: 1321501590, first_name: 'Малик', username: 'owner' }
 
 const service = createClient(SUPA, SERVICE)
 const calls = () => fs.existsSync(CALLS)
@@ -30,6 +32,20 @@ const calls = () => fs.existsSync(CALLS)
 
 let failed = false
 const check = (ok, label) => { if (!ok) failed = true; console.log(`${ok ? '✅' : '❌'} ${label}`) }
+
+/*
+ * Владельца заводим сами: он запасной адресат доставки, когда курьеров нет, и
+ * порядок запуска соседних проверок не должен решать, есть он в базе или нет.
+ */
+async function seedOwner() {
+  await service.from('staff').upsert({
+    telegram_user_id: OWNER.id,
+    full_name: 'Малик Бабазов',
+    role: 'owner',
+    status: 'approved',
+  }, { onConflict: 'telegram_user_id' })
+}
+await seedOwner()
 
 async function couriers(list) {
   await service.from('staff').delete().in('telegram_user_id', [DANIYAR.id, ASEL.id])
@@ -106,6 +122,7 @@ check(!!offer, 'предложение приходит первому курь�
 check(!!sentTo(shipped, ASEL.id), 'и второму курьеру тоже')
 check(!shipped.some(c => c.method === 'sendMessage' && String(c.body?.chat_id) === String(ADMIN_CHAT)),
   'в рабочий чат при этом ничего лишнего не летит')
+check(!sentTo(shipped, OWNER.id), 'владельцу предложение не идёт, пока есть курьеры')
 
 const text = offer?.body?.text ?? ''
 check(text.includes('ул. Абая 10'), 'в предложении адрес')
@@ -199,12 +216,34 @@ check(toast(forbidden).includes('только взять доставку'), `о
 const stranger = await press({ id: 555000, first_name: 'Кто-то' }, `tak:o:${ORDER}`)
 check(toast(stranger).includes('рабочего чата'), `посторонний: «${toast(stranger)}»`)
 
-// ── курьеров нет — менеджеров предупреждают ───────────────────────────────
+// ── курьеров нет — доставка уходит владельцу ──────────────────────────────
 await couriers([])
+const toOwner = await ship('courier')
+const ownerOffer = sentTo(toOwner, OWNER.id)
+check(!!ownerOffer, 'без курьеров предложение приходит владельцу')
+check(ownerOffer?.body?.text?.includes('доставка на вас'), `владельцу: «${(ownerOffer?.body?.text ?? '—').split('\n').pop()}»`)
+check(ownerOffer?.body?.text?.includes('ул. Абая 10'), 'адрес в предложении владельцу на месте')
+check((ownerOffer?.body?.reply_markup?.inline_keyboard ?? []).flat().some(b => b.text === '🚗 Беру'),
+  'и кнопка «Беру» у него есть')
+check(!sentTo(toOwner, ADMIN_CHAT), 'предупреждения «некому передать» при этом нет')
+
+const ownerTook = await press(OWNER, `tak:o:${ORDER}`)
+check(toast(ownerTook).includes('за вами'), `владелец берёт доставку: «${toast(ownerTook)}»`)
+const { data: ownerOrder } = await service.from('orders').select('courier_name').eq('id', ORDER).single()
+check(ownerOrder.courier_name === 'Малик Бабазов', `в заказе записан развозящий: ${ownerOrder.courier_name}`)
+
+const ownerDone = await press(OWNER, `dlv:o:${ORDER}`)
+const { data: ownerDelivered } = await service.from('orders').select('status').eq('id', ORDER).single()
+check(ownerDelivered.status === 'delivered', `владелец закрывает свою доставку (статус: ${ownerDelivered.status})`)
+check(!editedFor(ownerDone, OWNER.id)?.body?.reply_markup, 'и кнопка у него гаснет так же')
+
+// ── нет вообще никого — менеджеров предупреждают ──────────────────────────
+await service.from('staff').delete().eq('telegram_user_id', OWNER.id)
 const nobody = await ship('courier')
 const warn = sentTo(nobody, ADMIN_CHAT)
-check(warn?.body?.text?.includes('некому передать'), `без курьеров: «${(warn?.body?.text ?? '—').split('\n')[0]}»`)
+check(warn?.body?.text?.includes('некому передать'), `без курьеров и владельцев: «${(warn?.body?.text ?? '—').split('\n')[0]}»`)
 
+await seedOwner()
 await couriers([])
 await service.from('orders').update({ status: 'delivered', courier_staff_id: null, courier_name: null }).eq('id', ORDER)
 if (failed) process.exitCode = 1
