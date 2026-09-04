@@ -2970,6 +2970,29 @@ export interface Database {
         Args: { p_limit?: number, p_query: string }
         Returns: Json
       }
+      search_brands: {
+        Args: { p_limit?: number, p_query: string }
+        Returns: {
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
+      search_products: {
+        Args: { p_limit?: number, p_query: string }
+        Returns: {
+          brand: Json
+          category_id: string
+          discount_percentage: number
+          id: string
+          images: Json
+          name: string
+          price: number
+          rank: number
+          slug: string
+          stock_quantity: number
+        }[]
+      }
       search_products_for_pos: {
         Args: { p_query: string }
         Returns: {

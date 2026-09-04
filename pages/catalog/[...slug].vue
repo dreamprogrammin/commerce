@@ -77,6 +77,20 @@ definePageMeta({ layout: 'shell' })
 // --- 1. Инициализация ---
 const route = useRoute()
 const router = useRouter()
+
+/*
+ * Старые ссылки вида `/catalog/all?q=лего`. Каталог текстового фильтра не
+ * имеет — параметр здесь молча игнорировался, и покупатель, нажавший в поиске
+ * «Показать все», видел весь каталог вместо найденного (проверено на проде
+ * 4 сентября 2026: `?q=lego` отдавал ровно тот же список, что и без него).
+ * Такие ссылки уводим на страницу результатов.
+ */
+if (route.query.q) {
+  await navigateTo(
+    { path: '/search', query: { q: String(route.query.q) } },
+    { replace: true },
+  )
+}
 const supabase = useSupabaseClient()
 const categoriesStore = useCategoriesStore()
 const categoryQuestionsStore = useCategoryQuestionsStore()
