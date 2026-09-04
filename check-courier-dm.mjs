@@ -156,10 +156,18 @@ check(toast(late).includes('уже взял'), `опоздавшему: «${toas
 const alien = await press(ASEL, `dlv:o:${ORDER}`)
 check(toast(alien).includes('другой курьер'), `чужая доставка: «${toast(alien)}»`)
 
-// ── свою — можно ──────────────────────────────────────────────────────────
-await press(DANIYAR, `dlv:o:${ORDER}`)
+// ── свою — можно, и кнопка гаснет тут же ──────────────────────────────────
+const closedByCourier = await press(DANIYAR, `dlv:o:${ORDER}`)
 const { data: delivered } = await service.from('orders').select('status').eq('id', ORDER).single()
 check(delivered.status === 'delivered', `свою доставку курьер закрывает (статус: ${delivered.status})`)
+
+/*
+ * Проверяем ответ на само нажатие, до всякого триггера: курьер смотрит в
+ * экран и должен увидеть результат сразу.
+ */
+const afterPress = editedFor(closedByCourier, DANIYAR.id)
+check(afterPress?.body?.text?.includes('завершена'), `сразу после нажатия: «${afterPress?.body?.text ?? '—'}»`)
+check(!!afterPress && !afterPress.body?.reply_markup, 'кнопка «Доставил» гаснет в ответ на нажатие, не дожидаясь триггера')
 
 // ── доставили — кнопка «Доставил» гаснет ──────────────────────────────────
 const done = await syncStatus('delivered')

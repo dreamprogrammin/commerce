@@ -663,6 +663,20 @@ async function handleOrderAction(
   )
   // Ошибку показываем «алертом»: её надо прочитать, а не проморгать.
   await answerCallback(botToken, callbackQuery.id, result.toast, !result.ok)
+
+  /*
+   * Курьеру правим его сообщение ПРЯМО ЗДЕСЬ, а не ждём, пока смена статуса
+   * дойдёт до sync-order-status-to-telegram через триггер и pg_net. Курьер
+   * стоит у подъезда и смотрит в экран: кнопка «Доставил» обязана погаснуть
+   * в ту же секунду, иначе непонятно, засчиталось нажатие или нет.
+   * (Владелец на это и указал 4 сентября 2026.)
+   */
+  if (isCourier && parsed.action === 'dlv' && result.ok) {
+    const chatId = callbackQuery.message?.chat?.id
+    const messageId = callbackQuery.message?.message_id
+    if (chatId && messageId)
+      await editMessage(botToken, chatId, messageId, courierClosedText(parsed.orderId, 'delivered'), undefined)
+  }
 }
 
 /**
