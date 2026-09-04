@@ -40,7 +40,9 @@ import {
   buildCardKeyboard,
   buildListKeyboard,
   buildPanelKeyboard,
+  buildOwnerDmKeyboard,
   buildReplyKeyboard,
+  REPLY_BUTTONS,
   LIST_TITLES,
   type MenuScope,
   PANEL_TEXT,
@@ -196,6 +198,8 @@ Deno.serve(async (req) => {
                 { command: 'orders', description: '📋 Активные заказы' },
                 { command: 'my', description: '👤 Мои заказы' },
                 { command: 'order', description: '🔍 Заказ по номеру: /order 5e4fc2' },
+                { command: 'report', description: '📊 Отчёт по работе команды' },
+                { command: 'team', description: '👥 Список команды' },
               ],
             }),
           })
@@ -206,6 +210,49 @@ Deno.serve(async (req) => {
           results.push('Команды менеджера: ⚠️ не задан TELEGRAM_CHAT_ID')
         }
       } catch (e) { results.push(`Команды менеджера: ❌ ${e}`) }
+
+      /*
+       * Личное меню команд владельцам.
+       *
+       * Меню бота у Telegram привязано к чату, а личка у каждого своя: без
+       * этого владелец видел в своей переписке покупательские `/start` и
+       * `/unlink`, а `/report` приходилось помнить наизусть. Владелец попросил
+       * показывать его кнопки нативно — это и есть нативное место.
+       */
+      try {
+        const { data: owners } = await supabase
+          .from('staff')
+          .select('telegram_user_id')
+          .eq('role', 'owner')
+          .eq('status', 'approved')
+
+        const ids = (owners ?? [])
+          .map((o: { telegram_user_id?: number }) => o.telegram_user_id)
+          .filter(Boolean) as number[]
+
+        let ok = 0
+        for (const id of ids) {
+          const r = await fetch(`${baseUrl}/setMyCommands`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scope: { type: 'chat', chat_id: id },
+              commands: [
+                { command: 'report', description: '📊 Отчёт по работе команды' },
+                { command: 'team', description: '👥 Список команды' },
+                { command: 'panel', description: '🧭 Панель заказов (в рабочем чате)' },
+                { command: 'job', description: '💼 Анкета сотрудника' },
+              ],
+            }),
+          })
+          if ((await r.json()).ok)
+            ok++
+        }
+
+        results.push(ids.length
+          ? `Меню владельца: ${ok === ids.length ? '✅' : '⚠️'} ${ok} из ${ids.length}`
+          : 'Меню владельца: ⚠️ принятых владельцев нет')
+      } catch (e) { results.push(`Меню владельца: ❌ ${e}`) }
 
       /*
        * Постоянная клавиатура в рабочем чате — «кнопки по умолчанию».
@@ -220,8 +267,10 @@ Deno.serve(async (req) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: managerChatId,
-              text: 'Кнопки заказов под полем ввода — нажимайте, ничего вводить не нужно.',
-              reply_markup: buildReplyKeyboard(),
+              text: 'Кнопки под полем ввода — нажимайте, ничего вводить не нужно.',
+              // Второй ряд — дела владельца. Клавиатура в группе одна на всех,
+              // поэтому кнопки видны каждому, но работают только у владельца.
+              reply_markup: buildReplyKeyboard(true),
             }),
           })
           const res = await r.json()
@@ -843,8 +892,27 @@ async function handleManagerCommand(
   /*
    * Нажатие постоянной клавиатуры приходит обычным текстом. Разбираем его до
    * команд и сразу удаляем сообщение: иначе чат зарастёт строчками
-   * «📋 Активные заказы» от каждого менеджера.
+   * «📋 Активные заказы» и «📊 Отчёт» от каждого нажавшего.
+   *
+   * Сначала кнопки владельца, следом — списки заказов.
    */
+  if (text === REPLY_BUTTONS.team || text === REPLY_BUTTONS.report) {
+    if (messageId)
+      await deleteMessageById(botToken, chatId, messageId)
+
+    if (!await isOwner(supabase, from?.id ?? 0)) {
+      await sendRichMessage(botToken, chatId, 'Команда и отчёт — дела владельца.')
+      return true
+    }
+
+    if (text === REPLY_BUTTONS.team)
+      await sendTeamList(botToken, supabase, chatId)
+    else
+      await sendRichMessage(botToken, chatId, REPORT_INTRO, reportKeyboard())
+
+    return true
+  }
+
   const scope = replyButtonScope(text)
   if (scope) {
     if (messageId)
@@ -907,15 +975,13 @@ async function handleManagerCommand(
      * есть «кнопки по умолчанию», ради которых всё делалось, — затем панель
      * с теми же входами для тех, кому привычнее инлайн.
      */
+    const canSeeStaff = await isOwner(supabase, from?.id ?? 0)
+
     await sendRichMessage(
       botToken,
       chatId,
       'Кнопки заказов теперь всегда под рукой — они под полем ввода.',
-      buildReplyKeyboard(),
-    )
-    const canSeeStaff = canManageStaff(
-      await findStaff(supabase, from?.id ?? 0),
-      await ownersExist(supabase),
+      buildReplyKeyboard(canSeeStaff),
     )
     await sendRichMessage(botToken, chatId, PANEL_TEXT, buildPanelKeyboard(canSeeStaff))
     return true
@@ -927,6 +993,15 @@ async function handleManagerCommand(
       return true
     }
     await sendRichMessage(botToken, chatId, REPORT_INTRO, reportKeyboard())
+    return true
+  }
+
+  if (command === '/team' || command === '/komanda') {
+    if (!await isOwner(supabase, from?.id ?? 0)) {
+      await sendRichMessage(botToken, chatId, 'Список команды доступен владельцу.')
+      return true
+    }
+    await sendTeamList(botToken, supabase, chatId)
     return true
   }
 
@@ -1429,13 +1504,40 @@ async function handleJobAnswer(
 ): Promise<boolean> {
   const record = await findStaff(supabase, from.id)
 
-  // Отчёт владельцу — в личке он и уместнее: выручка не попадает в общий чат.
-  if (text === '/report' || text === '/otchet') {
+  /*
+   * Дела владельца в личке: отчёт и команда. Доступны и командой, и нажатием
+   * кнопки постоянной клавиатуры — она приходит тем же текстом.
+   */
+  if (text === '/report' || text === '/otchet' || text === REPLY_BUTTONS.report) {
     if (!await mayReadReport(supabase, from.id)) {
       await sendRichMessage(botToken, chatId, 'Отчёт по работе команды доступен владельцу.')
       return true
     }
     await sendRichMessage(botToken, chatId, REPORT_INTRO, reportKeyboard())
+    return true
+  }
+
+  if (text === '/team' || text === '/komanda' || text === REPLY_BUTTONS.team) {
+    if (!await isOwner(supabase, from.id)) {
+      await sendRichMessage(botToken, chatId, 'Список команды доступен владельцу.')
+      return true
+    }
+    await sendTeamList(botToken, supabase, chatId)
+    return true
+  }
+
+  /*
+   * `/start` от принятого владельца — не приветствие для покупателя, а его
+   * кнопки. Раньше владелец в личке видел то же, что покупатель, и добраться
+   * до отчёта мог только по памяти о команде.
+   */
+  if (text === '/start' && await isOwner(supabase, from.id)) {
+    await sendRichMessage(
+      botToken,
+      chatId,
+      'Ваши кнопки — под полем ввода: отчёт по работе команды и список сотрудников.',
+      buildOwnerDmKeyboard(),
+    )
     return true
   }
 
@@ -1504,6 +1606,30 @@ async function handleJobAnswer(
 
 const REPORT_INTRO = 'Отчёт по работе команды. За какой период?'
 
+/** Список команды одним сообщением. Один текст на кнопку, команду и callback. */
+async function sendTeamList(
+  botToken: string,
+  supabase: ReturnType<typeof createClient>,
+  chatId: number,
+): Promise<void> {
+  const { data } = await supabase
+    .from('staff')
+    .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+    .neq('status', 'draft')
+    .order('created_at', { ascending: false })
+
+  await sendRichMessage(botToken, chatId, staffListMessage((data ?? []) as StaffRecord[]))
+}
+
+/** Владелец ли нажавший: одно правило на кнопки, команды и callback. */
+async function isOwner(
+  supabase: ReturnType<typeof createClient>,
+  telegramUserId: number,
+): Promise<boolean> {
+  return canManageStaff(await findStaff(supabase, telegramUserId), await ownersExist(supabase))
+}
+
+
 /**
  * Отчёт смотрит владелец. Менеджеру он не нужен: свои заказы он и так видит
  * в панели, а выручка и чужие показатели — не его дело.
@@ -1512,7 +1638,7 @@ async function mayReadReport(
   supabase: ReturnType<typeof createClient>,
   telegramUserId: number,
 ): Promise<boolean> {
-  return canManageStaff(await findStaff(supabase, telegramUserId), await ownersExist(supabase))
+  return await isOwner(supabase, telegramUserId)
 }
 
 /**
@@ -1581,18 +1707,8 @@ async function handleJobTap(
       return true
     }
 
-    const { data } = await supabase
-      .from('staff')
-      .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
-      .neq('status', 'draft')
-      .order('created_at', { ascending: false })
-
     await answerCallback(botToken, callbackQuery.id, '')
-    await sendRichMessage(
-      botToken,
-      chatId as number,
-      staffListMessage((data ?? []) as StaffRecord[]),
-    )
+    await sendTeamList(botToken, supabase, chatId as number)
     return true
   }
 

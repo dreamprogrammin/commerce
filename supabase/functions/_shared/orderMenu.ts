@@ -217,11 +217,46 @@ export const LIST_TITLES: Record<MenuScope, { title: string; empty: string }> = 
 export const REPLY_BUTTONS = {
   active: '📋 Активные заказы',
   mine: '👤 Мои заказы',
+  team: '👥 Команда',
+  report: '📊 Отчёт',
 } as const
 
-export function buildReplyKeyboard() {
+/**
+ * Клавиатура рабочего чата. Второй ряд — дела владельца: команда и отчёт.
+ *
+ * Раньше они жили ТОЛЬКО инлайн-кнопками внутри сообщения панели, то есть
+ * находились, лишь если знать, куда нажать. Владелец попросил вывести их
+ * нативно — под поле ввода, наравне с заказами.
+ *
+ * Клавиатура в группе одна на всех, персонализировать её Telegram не даёт.
+ * Поэтому кнопки видны всем, но по нажатию проверяется роль: менеджеру бот
+ * отвечает, что это дело владельца. Показать лишнюю кнопку дешевле, чем
+ * заставлять владельца помнить команду.
+ */
+export function buildReplyKeyboard(withOwnerRow = false) {
+  const rows: Array<Array<{ text: string }>> = [
+    [{ text: REPLY_BUTTONS.active }, { text: REPLY_BUTTONS.mine }],
+  ]
+
+  if (withOwnerRow)
+    rows.push([{ text: REPLY_BUTTONS.team }, { text: REPLY_BUTTONS.report }])
+
   return {
-    keyboard: [[{ text: REPLY_BUTTONS.active }, { text: REPLY_BUTTONS.mine }]],
+    keyboard: rows,
+    resize_keyboard: true,
+    is_persistent: true,
+    selective: false,
+  }
+}
+
+/**
+ * Клавиатура в личке владельца. Списков заказов здесь нет намеренно: кнопки
+ * под карточкой заказа работают только в рабочем чате, и список в личке
+ * оказался бы набором мёртвых кнопок.
+ */
+export function buildOwnerDmKeyboard() {
+  return {
+    keyboard: [[{ text: REPLY_BUTTONS.report }, { text: REPLY_BUTTONS.team }]],
     resize_keyboard: true,
     is_persistent: true,
     selective: false,
