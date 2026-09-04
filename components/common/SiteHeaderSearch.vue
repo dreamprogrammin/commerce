@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 /**
@@ -43,7 +42,7 @@ const {
   removeHistoryItem,
 } = useProductSearch()
 
-const { getImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 // Живой поиск при вводе (порог как в AppTabBar — от 3 символов).
 watch(searchQuery, (q) => {
@@ -160,15 +159,13 @@ function onRemoveHistory(text: string, event: Event) {
 }
 
 function productImageUrl(url: string | null | undefined): string | null {
-  if (!url)
-    return null
-  return getImageUrl(BUCKET_NAME_PRODUCT, url, {
-    width: IMAGE_SIZES.THUMBNAIL.width,
-    height: IMAGE_SIZES.THUMBNAIL.height,
-    quality: 80,
-    format: 'webp',
-    resize: 'cover',
-  })
+  /*
+   * Вариант `sm`, а не трансформация на лету: она у Supabase платная и здесь
+   * отключена, а `getImageUrl` в этом случае молча отдаёт URL без суффикса
+   * `_sm.webp` — картинка не грузится. Та же поломка была в шторке и на
+   * странице результатов.
+   */
+  return getVariantUrl(BUCKET_NAME_PRODUCT, url ?? null, 'sm')
 }
 
 function formatPrice(price: number, discount?: number) {
@@ -225,12 +222,26 @@ function formatPrice(price: number, discount?: number) {
       </form>
     </PopoverAnchor>
 
+    <!--
+      `focus-outside` гасим намеренно.
+
+      Выпадашка открывается по фокусу в поле, а фокус при этом ОСТАЁТСЯ в поле —
+      человек продолжает печатать. Слой Popover считает такой фокус «снаружи» и
+      немедленно закрывается сам: `aria-expanded` возвращался в `false` быстрее,
+      чем успевал отрисоваться список, и на десктопе выпадашки не было вовсе —
+      поиск работал только через отдельную страницу. Поймано 4 сентября 2026,
+      когда владелец на это и указал.
+
+      Закрытие мышью и клавиатурой остаётся: `pointer-down-outside` (клик мимо)
+      и Escape в `onKeydown`.
+    -->
     <PopoverContent
       align="start"
       :side-offset="10"
       class="w-[min(620px,92vw)] p-0 rounded-2xl overflow-hidden border border-border shadow-2xl"
       @open-auto-focus.prevent
       @close-auto-focus.prevent
+      @focus-outside.prevent
     >
       <!-- Загрузка -->
       <div v-if="isSearching" class="p-8 flex justify-center">
@@ -305,8 +316,8 @@ function formatPrice(price: number, discount?: number) {
                   object-fit="cover"
                   placeholder-type="lqip"
                   :blur-data-url="product.product_images[0].blur_placeholder"
-                  :bucket-name="BUCKET_NAME_PRODUCT"
-                  :file-path="product.product_images[0].image_url"
+                  :src-sm="productImageUrl(product.product_images[0].image_url)"
+                  sizes="64px"
                   class="w-full h-full object-cover group-hover:scale-105 transition-transform"
                   eager
                 />
