@@ -111,10 +111,13 @@ export function buildPanelKeyboard(showStaff = false) {
     { text: '👤 Мои заказы', callback_data: `${PANEL_PREFIX}:m` },
   ]]
 
-  // Команда — только владельцу: остальным этот список ни к чему, а телефоны
-  // сотрудников разносить по чату незачем.
+  // Команда и отчёт — только владельцу: остальным этот список ни к чему, а
+  // телефоны сотрудников и выручку разносить по чату незачем.
   if (showStaff)
-    rows.push([{ text: '👥 Команда', callback_data: 'stf:list' }])
+    rows.push([
+      { text: '👥 Команда', callback_data: 'stf:list' },
+      { text: '📊 Отчёт', callback_data: 'rep:w' },
+    ])
 
   return { inline_keyboard: rows }
 }
