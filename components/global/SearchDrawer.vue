@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { nextTick, watch } from 'vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 const props = defineProps<{
@@ -27,7 +26,7 @@ const {
   clearSearchHistory,
 } = useProductSearch()
 
-const { getImageUrl: getSupabaseImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 interface ComponentWithEl {
   $el: HTMLInputElement
@@ -88,16 +87,14 @@ function handleRemoveHistory(text: string, event: Event) {
  * Получить оптимизированный URL изображения
  */
 function getImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl)
-    return null
-
-  return getSupabaseImageUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-    width: IMAGE_SIZES.THUMBNAIL.width,
-    height: IMAGE_SIZES.THUMBNAIL.height,
-    quality: 80,
-    format: 'webp',
-    resize: 'cover',
-  })
+  /*
+   * Вариант `sm`, а не трансформация на лету: она у Supabase платная и на
+   * этом проекте отвечает `403 FeatureNotEnabled`, а `getImageUrl` в таком
+   * случае молча отдаёт URL без суффикса `_sm.webp` — и картинка не грузится
+   * вовсе. В шторке это держалось всё время, просто заметили на странице
+   * результатов.
+   */
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm')
 }
 </script>
 
@@ -220,8 +217,8 @@ function getImageUrl(imageUrl: string | null): string | null {
                   object-fit="cover"
                   placeholder-type="lqip"
                   :blur-data-url="product.product_images[0].blur_placeholder"
-                  :bucket-name="BUCKET_NAME_PRODUCT"
-                  :file-path="product.product_images[0].image_url"
+                  :src-sm="getImageUrl(product.product_images[0].image_url)"
+                  sizes="64px"
                   eager
                 />
                 <div v-else class="w-full h-full flex items-center justify-center bg-muted">
