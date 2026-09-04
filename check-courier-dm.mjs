@@ -6,7 +6,8 @@
  * курьерам лично, и кто первым нажал «Беру» — тот и везёт.
  *
  * Проверяется: состав предложения (без телефона), закрепление за первым,
- * гашение предложения у остальных, запрет отметить чужую доставку.
+ * гашение предложения у остальных, запрет отметить чужую доставку, а также
+ * что после доставки и после отмены кнопки в личке гаснут.
  *   node check-courier-dm.mjs
  */
 import { createClient } from '@supabase/supabase-js'
@@ -65,6 +66,27 @@ async function press(from, data, messageId = 999) {
     }),
   })
   await new Promise(r => setTimeout(r, 1800))
+  return calls().slice(before)
+}
+
+/**
+ * То же тело, что шлёт триггер `sync_order_status_to_telegram` (снято с прода
+ * через pg_get_functiondef). Сам триггер локально дёргать нельзя: в его теле
+ * зашит АДРЕС ПРОДА, и смена статуса в локальной базе уходит боевой функции.
+ */
+async function syncStatus(status) {
+  await service.from('orders').update({ status }).eq('id', ORDER)
+  const before = calls().length
+  await fetch(`${SUPA}/functions/v1/sync-order-status-to-telegram`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': 'pg_net/0.14.0' },
+    body: JSON.stringify({
+      record: { id: ORDER, status, telegram_message_id: null },
+      old_record: { status: 'shipped' },
+      table: 'orders',
+    }),
+  })
+  await new Promise(r => setTimeout(r, 1500))
   return calls().slice(before)
 }
 
@@ -138,6 +160,28 @@ check(toast(alien).includes('другой курьер'), `чужая доста
 await press(DANIYAR, `dlv:o:${ORDER}`)
 const { data: delivered } = await service.from('orders').select('status').eq('id', ORDER).single()
 check(delivered.status === 'delivered', `свою доставку курьер закрывает (статус: ${delivered.status})`)
+
+// ── доставили — кнопка «Доставил» гаснет ──────────────────────────────────
+const done = await syncStatus('delivered')
+const doneMsg = editedFor(done, DANIYAR.id)
+check(doneMsg?.body?.text?.includes('завершена'), `после доставки курьеру: «${doneMsg?.body?.text ?? '—'}»`)
+check(!!doneMsg && !doneMsg.body?.reply_markup, 'кнопки «Доставил» под сообщением не осталось')
+check(!editedFor(done, ASEL.id), 'сообщение второго курьера при этом не трогаем')
+
+// ── отменили до того, как взяли: гаснет у всех ────────────────────────────
+await ship('courier')
+const cancelled = await syncStatus('cancelled')
+const forDaniyar = editedFor(cancelled, DANIYAR.id)
+const forAsel = editedFor(cancelled, ASEL.id)
+check(forDaniyar?.body?.text?.includes('отменена'), `отмена курьеру: «${forDaniyar?.body?.text ?? '—'}»`)
+check(!!forDaniyar && !forDaniyar.body?.reply_markup && !!forAsel && !forAsel.body?.reply_markup,
+  'кнопки «Беру» больше нет ни у кого')
+check(!!forAsel, 'предложение погашено у обоих, а не у одного')
+
+const stale = await press(DANIYAR, `tak:o:${ORDER}`)
+check(toast(stale).includes('неактуальна'), `«Беру» на отменённом заказе: «${toast(stale)}»`)
+const { data: afterStale } = await service.from('orders').select('courier_staff_id').eq('id', ORDER).single()
+check(!afterStale.courier_staff_id, 'и курьер к отменённому заказу не привязался')
 
 // ── курьер не может подтверждать и отменять заказы ────────────────────────
 const forbidden = await press(DANIYAR, `cnl:o:${ORDER}`)
