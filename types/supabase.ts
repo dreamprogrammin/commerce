@@ -2981,14 +2981,19 @@ export interface Database {
       search_products: {
         Args: { p_limit?: number, p_query: string }
         Returns: {
+          avg_rating: number
+          bonus_points_award: number
           brand: Json
           category_id: string
           discount_percentage: number
+          final_price: number
           id: string
           images: Json
+          is_new: boolean
           name: string
           price: number
           rank: number
+          review_count: number
           slug: string
           stock_quantity: number
         }[]

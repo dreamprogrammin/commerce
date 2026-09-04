@@ -1,13 +1,36 @@
 /**
- * Картинки и вёрстка в результатах поиска — на мобильной ширине.
- * Стенд поднимается с ПРОД-данными (иначе бакеты пустые и картинок нет вовсе).
- *   BASE=http://localhost:3313 node search-visual.mjs
+ * Картинки в результатах поиска и в шторке — на мобильной ширине.
+ *
+ * Стенд локальный, картинки перехватываются и берутся с прода: в локальных
+ * бакетах их нет. Вёрстку сетки проверяет search-page-grid.mjs.
+ *   node search-visual.mjs
  */
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE || 'http://localhost:3313'
+const PROD_STORAGE = 'https://gvsdevsvzgcivpphcuai.supabase.co'
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true })
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true })
+
+// Картинки берём с прода: в локальных бакетах их нет, и проверять было бы нечего.
+await context.route('**/storage/v1/object/public/**', async (route) => {
+  const url = new URL(route.request().url())
+  try {
+    const res = await fetch(PROD_STORAGE + url.pathname + url.search)
+    if (!res.ok)
+      return route.abort()
+    await route.fulfill({
+      status: 200,
+      contentType: res.headers.get('content-type') || 'image/webp',
+      body: Buffer.from(await res.arrayBuffer()),
+    })
+  }
+  catch {
+    await route.abort()
+  }
+})
+
+const page = await context.newPage()
 
 let failed = false
 const check = (ok, label) => { if (!ok) failed = true; console.log(`${ok ? '✅' : '❌'} ${label}`) }
@@ -22,7 +45,9 @@ const shot = await page.evaluate(() => {
   const bar = document.querySelector('nav[class*="fixed"], [class*="tabbar"], footer')?.getBoundingClientRect()
   return {
     карточек: cards.length,
-    картинокЗагрузилось: imgs.filter(i => i.naturalWidth > 0).length,
+    /* Считаем настоящие картинки товаров, а не ссылки: у карточки их две. */
+    картинокВсего: imgs.filter(i => (i.currentSrc || i.src || '').includes('/storage/')).length,
+    картинокЗагрузилось: imgs.filter(i => (i.currentSrc || i.src || '').includes('/storage/') && i.naturalWidth > 0).length,
     ошибкаНеЗагрузилось: document.body.innerText.includes('Не загрузилось'),
     ширинаДокумента: document.documentElement.scrollWidth,
     ширинаОкна: document.documentElement.clientWidth,
@@ -34,10 +59,10 @@ const shot = await page.evaluate(() => {
 console.log(JSON.stringify(shot, null, 1))
 
 check(shot.карточек > 0, `карточки есть (${shot.карточек})`)
-check(shot.картинокЗагрузилось === shot.карточек, `картинки загрузились: ${shot.картинокЗагрузилось} из ${shot.карточек}`)
+check(shot.картинокВсего > 0 && shot.картинокЗагрузилось === shot.картинокВсего,
+  `картинки загрузились: ${shot.картинокЗагрузилось} из ${shot.картинокВсего}`)
 check(!shot.ошибкаНеЗагрузилось, 'на странице нет «Не загрузилось»')
 check(shot.ширинаДокумента <= shot.ширинаОкна, `нет горизонтальной прокрутки (${shot.ширинаДокумента} ≤ ${shot.ширинаОкна})`)
-check(shot.высотаПервойКарточки < 130, `строка не раздута по высоте (${shot.высотаПервойКарточки}px)`)
 
 // прокрутка до конца: последняя карточка не должна прятаться под таб-баром
 await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))

@@ -8,9 +8,30 @@
  */
 import { chromium } from 'playwright'
 
-const BASE = process.env.BASE || 'http://localhost:3313'
+const BASE = process.env.BASE || 'http://localhost:3311'
+const PROD_STORAGE = 'https://gvsdevsvzgcivpphcuai.supabase.co'
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+
+// Картинки — с прода: локальные бакеты пустые (см. search-visual.mjs).
+await context.route('**/storage/v1/object/public/**', async (route) => {
+  const url = new URL(route.request().url())
+  try {
+    const res = await fetch(PROD_STORAGE + url.pathname + url.search)
+    if (!res.ok)
+      return route.abort()
+    await route.fulfill({
+      status: 200,
+      contentType: res.headers.get('content-type') || 'image/webp',
+      body: Buffer.from(await res.arrayBuffer()),
+    })
+  }
+  catch {
+    await route.abort()
+  }
+})
+
+const page = await context.newPage()
 
 let failed = false
 const check = (ok, label) => { if (!ok) failed = true; console.log(`${ok ? '✅' : '❌'} ${label}`) }
