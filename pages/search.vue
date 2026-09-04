@@ -15,7 +15,6 @@
  * стал местом результатов.
  */
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 
 definePageMeta({
@@ -35,7 +34,7 @@ const {
   debouncedSearch,
 } = useProductSearch()
 
-const { getImageUrl: getSupabaseImageUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 
 const queryFromUrl = computed(() => String(route.query.q ?? '').trim())
 
@@ -81,17 +80,19 @@ function formatPrice(price: number, discount?: number) {
   return { original, final, hasDiscount }
 }
 
-function getImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl)
-    return null
-
-  return getSupabaseImageUrl(BUCKET_NAME_PRODUCT, imageUrl, {
-    width: IMAGE_SIZES.THUMBNAIL.width,
-    height: IMAGE_SIZES.THUMBNAIL.height,
-    quality: 80,
-    format: 'webp',
-    resize: 'cover',
-  })
+/*
+ * Вариант `sm`, а НЕ трансформация на лету.
+ *
+ * `getImageUrl(bucket, path, {width…})` на этом проекте картинку не отдаёт:
+ * трансформация у Supabase платная, хранилище отвечает `403 FeatureNotEnabled`,
+ * и функция молча возвращает публичный URL БЕЗ суффикса — а файлы лежат как
+ * `<имя>_sm.webp`. Браузер получает не картинку и режет ответ
+ * (`ERR_BLOCKED_BY_ORB`), в карточке остаётся «Не загрузилось». Ровно это и
+ * было видно на боевом сайте 4 сентября 2026. `getVariantUrl` подставляет
+ * суффикс — так делают карточка товара и корзина.
+ */
+function productImage(imageUrl: string | null): string | null {
+  return getVariantUrl(BUCKET_NAME_PRODUCT, imageUrl, 'sm')
 }
 </script>
 
@@ -120,7 +121,7 @@ function getImageUrl(imageUrl: string | null): string | null {
       </div>
     </header>
 
-    <main class="flex-1 p-3">
+    <main class="flex-1 w-full max-w-3xl mx-auto p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">
       <!-- Бренды: «лего» приводит и к самому бренду, не только к товарам -->
       <div v-if="brandSuggestions.length" class="mb-4 flex flex-wrap gap-2">
         <NuxtLink
@@ -147,19 +148,19 @@ function getImageUrl(imageUrl: string | null): string | null {
           v-for="product in searchResults"
           :key="product.id"
           :to="`/catalog/products/${product.slug}`"
-          class="w-full flex items-center gap-4 p-3 mb-2 bg-card rounded-xl border border-transparent hover:border-primary/30 hover:shadow-md transition-all duration-200"
+          class="w-full flex items-center gap-3 px-2 py-3 border-b border-border/60 last:border-0 active:bg-muted/60 transition-colors"
         >
-          <div class="size-16 rounded-lg overflow-hidden shrink-0">
+          <div class="size-[72px] rounded-lg overflow-hidden shrink-0 bg-muted">
             <ProgressiveImage
               v-if="product.product_images[0]?.image_url"
-              :src="getImageUrl(product.product_images[0].image_url)"
+              :src="productImage(product.product_images[0].image_url)"
+              :src-sm="productImage(product.product_images[0].image_url)"
+              sizes="72px"
               :alt="product.name"
               aspect-ratio="square"
-              object-fit="cover"
+              object-fit="contain"
               placeholder-type="lqip"
               :blur-data-url="product.product_images[0].blur_placeholder"
-              :bucket-name="BUCKET_NAME_PRODUCT"
-              :file-path="product.product_images[0].image_url"
               eager
             />
             <div v-else class="w-full h-full flex items-center justify-center bg-muted">
@@ -168,11 +169,11 @@ function getImageUrl(imageUrl: string | null): string | null {
           </div>
 
           <div class="flex-1 min-w-0">
-            <h2 class="text-sm font-medium text-foreground line-clamp-2 mb-1">
+            <h2 class="text-sm font-medium text-foreground line-clamp-2 mb-1 leading-snug">
               {{ product.name }}
             </h2>
 
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span
                 class="text-base font-bold"
                 :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-destructive' : 'text-foreground'"
