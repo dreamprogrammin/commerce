@@ -123,64 +123,43 @@ export function useProductSearch() {
     isSearching.value = true
 
     try {
-      // Параллельный поиск товаров и брендов
+      /*
+       * Поиск живёт в базе — функции `search_products` и `search_brands`.
+       *
+       * Здесь был запрос `name.ilike.%запрос%` прямо из браузера, и он не
+       * работал сразу в четырёх местах (проверено на боевых данных
+       * 4 сентября 2026): «лего» не находил ни одного из 22 товаров LEGO,
+       * «машинки» находили втрое меньше, чем «машинка», «конструктор лего»
+       * искалось одной строкой целиком, а запятая в запросе роняла его совсем —
+       * в PostgREST она разделяет условия `or=()`, и покупатель видел
+       * «Ошибка при поиске». Разбор запроса на слова, транслитерация и
+       * ранжирование — всё это в SQL, здесь остаётся только вызов.
+       */
       const [productsData, brandsData] = await Promise.all([
-        supabase
-          .from('products')
-          .select(`
-            id,
-            name,
-            slug,
-            price,
-            discount_percentage,
-            stock_quantity,
-            category_id,
-            product_images(image_url, blur_placeholder, display_order),
-            brands(id, name, slug)
-          `)
-          .eq('is_active', true)
-          .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-          .order('sales_count', { ascending: false })
-          .limit(20),
-
-        supabase
-          .from('brands')
-          .select('id, name, slug')
-          .ilike('name', `%${query}%`)
-          .limit(3),
+        supabase.rpc('search_products', { p_query: query, p_limit: 20 }),
+        supabase.rpc('search_brands', { p_query: query, p_limit: 3 }),
       ])
 
       if (productsData.error)
         throw productsData.error
 
-      // Обработка результатов с правильной типизацией изображений
-      const results = (productsData.data || []).map((product) => {
-        // Получаем изображения и сортируем их
-        const images = Array.isArray(product.product_images)
-          ? product.product_images
-              .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-              .map(img => ({
-                image_url: img.image_url || '',
-                blur_placeholder: img.blur_placeholder || null,
-              }))
-          : []
+      const results = (productsData.data || []).map((row) => {
+        const images = Array.isArray(row.images) ? row.images : []
+        const brand = row.brand as { id: string, name: string, slug: string } | null
 
         return {
-          id: product.id,
-          name: product.name,
-          slug: product.slug,
-          price: product.price,
-          discount_percentage: product.discount_percentage,
-          stock_quantity: product.stock_quantity,
-          category_id: product.category_id,
-          product_images: images,
-          brands: product.brands
-            ? {
-                id: (product.brands as any).id,
-                name: (product.brands as any).name,
-                slug: (product.brands as any).slug,
-              }
-            : null,
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          price: row.price,
+          discount_percentage: row.discount_percentage,
+          stock_quantity: row.stock_quantity,
+          category_id: row.category_id,
+          product_images: images.map((img: any) => ({
+            image_url: img?.image_url || '',
+            blur_placeholder: img?.blur_placeholder || null,
+          })),
+          brands: brand ? { id: brand.id, name: brand.name, slug: brand.slug } : null,
         }
       }) as ProductSearchResult[]
 
@@ -214,7 +193,13 @@ export function useProductSearch() {
       return
 
     saveToHistory(finalQuery)
-    router.push(`/catalog/all?q=${encodeURIComponent(finalQuery.trim())}`)
+    /*
+     * Результаты — на `/search?q=`, а не в каталог: каталог параметр `q`
+     * не читает вовсе (проверено на проде — `/catalog/all?q=lego` отдавал тот
+     * же список, что и без запроса), да и schema.org в app.vue давно обещает
+     * поисковикам именно этот адрес.
+     */
+    router.push(`/search?q=${encodeURIComponent(finalQuery.trim())}`)
   }
 
   function selectSuggestion(suggestion: string) {
