@@ -27,6 +27,15 @@
  * вернуть полный набор — и проверить ВСЕ шаблоны сообщений, потому что в v2
  * экранирования требует даже точка в обычном тексте.
  */
+/**
+ * База Telegram API. Вынесена в переменную окружения ради локальных проверок:
+ * без неё правка карточки уходит на настоящий api.telegram.org, и в тестовом
+ * прогоне её не видно — а иногда лучше бы и не уходила.
+ */
+function apiBase(): string {
+  return Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
+}
+
 export function escapeMarkdown(text: string | null | undefined): string {
   if (!text) return ''
 
@@ -73,7 +82,7 @@ export async function updateTelegramMessage(
     console.log('📤 Пробуем editMessageText:', JSON.stringify(body))
 
     let response = await fetch(
-      `https://api.telegram.org/bot${botToken}/editMessageText`,
+      `${apiBase()}/bot${botToken}/editMessageText`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,7 +100,7 @@ export async function updateTelegramMessage(
       body.caption = newText
       
       response = await fetch(
-        `https://api.telegram.org/bot${botToken}/editMessageCaption`,
+        `${apiBase()}/bot${botToken}/editMessageCaption`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -142,7 +151,7 @@ export async function updateMessageButtons(
     console.log(`🔘 Обновление кнопок в сообщении ${messageId}...`)
 
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`,
+      `${apiBase()}/bot${botToken}/editMessageReplyMarkup`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,7 +218,7 @@ export async function sendTelegramNotification(
     console.log('📤 Отправка уведомления в Telegram...')
 
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      `${apiBase()}/bot${botToken}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

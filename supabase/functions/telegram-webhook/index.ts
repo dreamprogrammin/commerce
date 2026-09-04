@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ACTION_FUNCTIONS, buildOrderKeyboard, type OrderAction, parseCallbackData } from '../_shared/orderActions.ts'
 import {
   assignedText,
+  courierClosedText,
   courierLabel,
   deliveredKeyboard,
   managerNoticeText,
@@ -1006,6 +1007,12 @@ async function claimDelivery(
 ): Promise<void> {
   const name = courierLabel(courier)
 
+  /*
+   * Условия на самом UPDATE, а не проверкой перед ним: предложение уходит всем
+   * курьерам сразу, и двое жмут «Беру» одновременно. Заодно `status` не даёт
+   * взять заказ, который уже отменили, — сообщение с кнопкой у курьера могло
+   * остаться открытым на телефоне.
+   */
   const { data: claimed } = await supabase
     .from(table)
     .update({
@@ -1014,6 +1021,7 @@ async function claimDelivery(
       courier_taken_at: new Date().toISOString(),
     })
     .eq('id', orderId)
+    .eq('status', 'shipped')
     .is('courier_staff_id', null)
     .select('*')
     .maybeSingle()
@@ -1022,17 +1030,27 @@ async function claimDelivery(
   const messageId = callbackQuery.message?.message_id
 
   if (!claimed) {
-    // Не успел. Показываем, кто везёт, и гасим кнопку — чтобы не жал ещё раз.
+    // Не взяли — либо не успел, либо заказа больше нет в доставке. В обоих
+    // случаях гасим кнопку, чтобы человек не жал её ещё раз.
     const { data: taken } = await supabase
       .from(table)
-      .select('id, courier_name')
+      .select('id, courier_name, status')
       .eq('id', orderId)
       .maybeSingle()
 
-    const holder = (taken as { courier_name?: string } | null)?.courier_name || 'другой курьер'
-    await answerCallback(botToken, callbackQuery.id, `Доставку уже взял ${holder}`, true)
-    if (chatId && messageId)
-      await editMessage(botToken, chatId, messageId, takenByText({ id: orderId } as never, holder), undefined)
+    const row = taken as { courier_name?: string | null; status?: string } | null
+    const holder = row?.courier_name
+
+    if (holder) {
+      await answerCallback(botToken, callbackQuery.id, `Доставку уже взял ${holder}`, true)
+      if (chatId && messageId)
+        await editMessage(botToken, chatId, messageId, takenByText({ id: orderId } as never, holder), undefined)
+    }
+    else {
+      await answerCallback(botToken, callbackQuery.id, 'Эта доставка уже неактуальна', true)
+      if (chatId && messageId)
+        await editMessage(botToken, chatId, messageId, courierClosedText(orderId, row?.status ?? 'cancelled'), undefined)
+    }
     return
   }
 
