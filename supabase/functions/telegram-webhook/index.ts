@@ -611,9 +611,16 @@ async function handleOrderAction(
    * личный, и подделать его нельзя, но и опознавать по нему нечего.
    */
   const courier = fromAdminChat ? null : await findStaff(supabase, callbackQuery.from.id)
-  const isCourier = !!courier && courier.role === 'courier' && courier.status === 'approved'
+  /*
+   * Владелец здесь наравне с курьером. В магазине, где курьеров ещё нет,
+   * доставки развозит он сам — ship-order и предложение шлёт ему. Отказывать
+   * ему в собственной кнопке было бы странно.
+   */
+  const canDeliver = !!courier
+    && courier.status === 'approved'
+    && (courier.role === 'courier' || courier.role === 'owner')
 
-  if (!fromAdminChat && !isCourier) {
+  if (!fromAdminChat && !canDeliver) {
     console.warn(`Действие из чужого чата: ${fromChatId}`)
     await answerCallback(botToken, callbackQuery.id, 'Управлять заказами можно только из рабочего чата', true)
     return
@@ -624,13 +631,13 @@ async function handleOrderAction(
    * заказы — не его работа, и кнопок таких у него нет; проверка здесь на
    * случай подделанного `callback_data`.
    */
-  if (isCourier && parsed.action !== 'tak' && parsed.action !== 'dlv') {
+  if (canDeliver && parsed.action !== 'tak' && parsed.action !== 'dlv') {
     await answerCallback(botToken, callbackQuery.id, 'Здесь можно только взять доставку и отметить её', true)
     return
   }
 
   if (parsed.action === 'tak') {
-    if (!isCourier) {
+    if (!canDeliver) {
       await answerCallback(botToken, callbackQuery.id, 'Доставки берут курьеры', true)
       return
     }
@@ -654,7 +661,7 @@ async function handleOrderAction(
 
   // Отметить доставленным может только тот курьер, который её вёз: иначе
   // заказ закроет любой, кому пришло предложение.
-  if (isCourier && parsed.action === 'dlv') {
+  if (canDeliver && parsed.action === 'dlv') {
     const { data: order } = await supabase
       .from(parsed.table)
       .select('courier_staff_id')
@@ -684,7 +691,7 @@ async function handleOrderAction(
    * в ту же секунду, иначе непонятно, засчиталось нажатие или нет.
    * (Владелец на это и указал 4 сентября 2026.)
    */
-  if (isCourier && parsed.action === 'dlv' && result.ok) {
+  if (canDeliver && parsed.action === 'dlv' && result.ok) {
     const chatId = callbackQuery.message?.chat?.id
     const messageId = callbackQuery.message?.message_id
     if (chatId && messageId)

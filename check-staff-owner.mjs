@@ -81,5 +81,25 @@ await tap(`job:ok:${applicant.id}`, OWNER)
 const { data: approved } = await service.from('staff').select('status').eq('id', applicant.id).single()
 check(approved.status === 'approved', `владелец принял заявку (${approved.status})`)
 
+// ── владелец ведёт заказы сам ─────────────────────────────────────────────
+/*
+ * Пока менеджеров нет, заказы разбирает владелец. Строгий режим при этом уже
+ * включён (в `staff` есть принятый человек), поэтому проверка не лишняя:
+ * именно она ловит случай «сам себе не даёт взять заказ».
+ */
+const ORDER = 'd7a7ed7f-94dc-4895-8838-90562bf973cb'
+await service.from('orders').update({
+  status: 'new', assigned_admin_name: null, assigned_admin_username: null, assigned_at: null,
+}).eq('id', ORDER)
+
+await tap(`asg:o:${ORDER}`, OWNER)
+const { data: taken } = await service.from('orders')
+  .select('status, assigned_admin_name').eq('id', ORDER).single()
+check(taken.assigned_admin_name === 'Малик', `владелец берёт заказ в работу: ${taken.assigned_admin_name ?? '—'}`)
+
+await tap(`cfm:o:${ORDER}`, OWNER)
+const { data: confirmed } = await service.from('orders').select('status').eq('id', ORDER).single()
+check(confirmed.status === 'confirmed', `и подтверждает его сам (статус: ${confirmed.status})`)
+
 await service.from('staff').delete().neq('telegram_user_id', OWNER.id)
 if (failed) process.exitCode = 1
