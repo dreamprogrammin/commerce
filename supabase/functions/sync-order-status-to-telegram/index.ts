@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildOrderKeyboard } from '../_shared/orderActions.ts'
 import { updateTelegramMessage, escapeMarkdown } from '../_shared/telegramUtils.ts'
+import { closeCourierOffers } from '../_shared/courierOffers.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,6 +70,27 @@ Deno.serve(async (req) => {
     console.log(`🔄 Статус изменен: ${old_record.status} → ${record.status}`)
     console.log(`💬 Telegram Message ID: ${record.telegram_message_id || 'отсутствует'}`)
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    /*
+     * Заказ доставлен или отменён — курьеру больше нечего нажимать, гасим
+     * кнопки у него в личке. Делаем это ДО проверки telegram_message_id:
+     * карточка в рабочем чате и сообщение курьера — разные сообщения, и
+     * отсутствие первой не повод оставлять вторую с живой кнопкой.
+     */
+    if (record.status === 'delivered' || record.status === 'cancelled') {
+      const closed = await closeCourierOffers(botToken, supabase, table, record.id, record.status)
+      console.log(`🚗 Погашено предложений курьерам: ${closed}`)
+    }
+
     // Если нет telegram_message_id, не можем обновить сообщение
     if (!record.telegram_message_id) {
       console.log('⚠️ Нет telegram_message_id, пропускаем обновление')
@@ -127,16 +149,6 @@ Deno.serve(async (req) => {
     }
 
     // Получаем дополнительную информацию о заказе из БД
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
     // Получаем информацию о заказе (включая cancelled_by)
     let orderInfo = ''
     let assignedAdmin = ''

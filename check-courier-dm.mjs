@@ -6,7 +6,9 @@
  * курьерам лично, и кто первым нажал «Беру» — тот и везёт.
  *
  * Проверяется: состав предложения (без телефона), закрепление за первым,
- * гашение предложения у остальных, запрет отметить чужую доставку.
+ * гашение предложения у остальных, запрет отметить чужую доставку, а также
+ * что после доставки и после отмены кнопки в личке гаснут, а пока курьеров в
+ * команде нет — доставка уходит владельцу.
  *   node check-courier-dm.mjs
  */
 import { createClient } from '@supabase/supabase-js'
@@ -21,6 +23,7 @@ const ORDER = 'd7a7ed7f-94dc-4895-8838-90562bf973cb'
 
 const DANIYAR = { id: 777101, first_name: 'Данияр', username: 'dan_k' }
 const ASEL = { id: 777102, first_name: 'Асель', username: 'asel' }
+const OWNER = { id: 1321501590, first_name: 'Малик', username: 'owner' }
 
 const service = createClient(SUPA, SERVICE)
 const calls = () => fs.existsSync(CALLS)
@@ -29,6 +32,20 @@ const calls = () => fs.existsSync(CALLS)
 
 let failed = false
 const check = (ok, label) => { if (!ok) failed = true; console.log(`${ok ? '✅' : '❌'} ${label}`) }
+
+/*
+ * Владельца заводим сами: он запасной адресат доставки, когда курьеров нет, и
+ * порядок запуска соседних проверок не должен решать, есть он в базе или нет.
+ */
+async function seedOwner() {
+  await service.from('staff').upsert({
+    telegram_user_id: OWNER.id,
+    full_name: 'Малик Бабазов',
+    role: 'owner',
+    status: 'approved',
+  }, { onConflict: 'telegram_user_id' })
+}
+await seedOwner()
 
 async function couriers(list) {
   await service.from('staff').delete().in('telegram_user_id', [DANIYAR.id, ASEL.id])
@@ -68,6 +85,27 @@ async function press(from, data, messageId = 999) {
   return calls().slice(before)
 }
 
+/**
+ * То же тело, что шлёт триггер `sync_order_status_to_telegram` (снято с прода
+ * через pg_get_functiondef). Сам триггер локально дёргать нельзя: в его теле
+ * зашит АДРЕС ПРОДА, и смена статуса в локальной базе уходит боевой функции.
+ */
+async function syncStatus(status) {
+  await service.from('orders').update({ status }).eq('id', ORDER)
+  const before = calls().length
+  await fetch(`${SUPA}/functions/v1/sync-order-status-to-telegram`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': 'pg_net/0.14.0' },
+    body: JSON.stringify({
+      record: { id: ORDER, status, telegram_message_id: null },
+      old_record: { status: 'shipped' },
+      table: 'orders',
+    }),
+  })
+  await new Promise(r => setTimeout(r, 1500))
+  return calls().slice(before)
+}
+
 const toast = cs => cs.filter(c => c.method === 'answerCallbackQuery').map(c => c.body.text).join(' | ')
 const sentTo = (cs, id) => cs.find(c => c.method === 'sendMessage' && String(c.body?.chat_id) === String(id))
 const editedFor = (cs, id) => cs.find(c => c.method === 'editMessageText' && String(c.body?.chat_id) === String(id))
@@ -84,6 +122,7 @@ check(!!offer, 'предложение приходит первому курь�
 check(!!sentTo(shipped, ASEL.id), 'и второму курьеру тоже')
 check(!shipped.some(c => c.method === 'sendMessage' && String(c.body?.chat_id) === String(ADMIN_CHAT)),
   'в рабочий чат при этом ничего лишнего не летит')
+check(!sentTo(shipped, OWNER.id), 'владельцу предложение не идёт, пока есть курьеры')
 
 const text = offer?.body?.text ?? ''
 check(text.includes('ул. Абая 10'), 'в предложении адрес')
@@ -134,10 +173,40 @@ check(toast(late).includes('уже взял'), `опоздавшему: «${toas
 const alien = await press(ASEL, `dlv:o:${ORDER}`)
 check(toast(alien).includes('другой курьер'), `чужая доставка: «${toast(alien)}»`)
 
-// ── свою — можно ──────────────────────────────────────────────────────────
-await press(DANIYAR, `dlv:o:${ORDER}`)
+// ── свою — можно, и кнопка гаснет тут же ──────────────────────────────────
+const closedByCourier = await press(DANIYAR, `dlv:o:${ORDER}`)
 const { data: delivered } = await service.from('orders').select('status').eq('id', ORDER).single()
 check(delivered.status === 'delivered', `свою доставку курьер закрывает (статус: ${delivered.status})`)
+
+/*
+ * Проверяем ответ на само нажатие, до всякого триггера: курьер смотрит в
+ * экран и должен увидеть результат сразу.
+ */
+const afterPress = editedFor(closedByCourier, DANIYAR.id)
+check(afterPress?.body?.text?.includes('завершена'), `сразу после нажатия: «${afterPress?.body?.text ?? '—'}»`)
+check(!!afterPress && !afterPress.body?.reply_markup, 'кнопка «Доставил» гаснет в ответ на нажатие, не дожидаясь триггера')
+
+// ── доставили — кнопка «Доставил» гаснет ──────────────────────────────────
+const done = await syncStatus('delivered')
+const doneMsg = editedFor(done, DANIYAR.id)
+check(doneMsg?.body?.text?.includes('завершена'), `после доставки курьеру: «${doneMsg?.body?.text ?? '—'}»`)
+check(!!doneMsg && !doneMsg.body?.reply_markup, 'кнопки «Доставил» под сообщением не осталось')
+check(!editedFor(done, ASEL.id), 'сообщение второго курьера при этом не трогаем')
+
+// ── отменили до того, как взяли: гаснет у всех ────────────────────────────
+await ship('courier')
+const cancelled = await syncStatus('cancelled')
+const forDaniyar = editedFor(cancelled, DANIYAR.id)
+const forAsel = editedFor(cancelled, ASEL.id)
+check(forDaniyar?.body?.text?.includes('отменена'), `отмена курьеру: «${forDaniyar?.body?.text ?? '—'}»`)
+check(!!forDaniyar && !forDaniyar.body?.reply_markup && !!forAsel && !forAsel.body?.reply_markup,
+  'кнопки «Беру» больше нет ни у кого')
+check(!!forAsel, 'предложение погашено у обоих, а не у одного')
+
+const stale = await press(DANIYAR, `tak:o:${ORDER}`)
+check(toast(stale).includes('неактуальна'), `«Беру» на отменённом заказе: «${toast(stale)}»`)
+const { data: afterStale } = await service.from('orders').select('courier_staff_id').eq('id', ORDER).single()
+check(!afterStale.courier_staff_id, 'и курьер к отменённому заказу не привязался')
 
 // ── курьер не может подтверждать и отменять заказы ────────────────────────
 const forbidden = await press(DANIYAR, `cnl:o:${ORDER}`)
@@ -147,12 +216,34 @@ check(toast(forbidden).includes('только взять доставку'), `о
 const stranger = await press({ id: 555000, first_name: 'Кто-то' }, `tak:o:${ORDER}`)
 check(toast(stranger).includes('рабочего чата'), `посторонний: «${toast(stranger)}»`)
 
-// ── курьеров нет — менеджеров предупреждают ───────────────────────────────
+// ── курьеров нет — доставка уходит владельцу ──────────────────────────────
 await couriers([])
+const toOwner = await ship('courier')
+const ownerOffer = sentTo(toOwner, OWNER.id)
+check(!!ownerOffer, 'без курьеров предложение приходит владельцу')
+check(ownerOffer?.body?.text?.includes('доставка на вас'), `владельцу: «${(ownerOffer?.body?.text ?? '—').split('\n').pop()}»`)
+check(ownerOffer?.body?.text?.includes('ул. Абая 10'), 'адрес в предложении владельцу на месте')
+check((ownerOffer?.body?.reply_markup?.inline_keyboard ?? []).flat().some(b => b.text === '🚗 Беру'),
+  'и кнопка «Беру» у него есть')
+check(!sentTo(toOwner, ADMIN_CHAT), 'предупреждения «некому передать» при этом нет')
+
+const ownerTook = await press(OWNER, `tak:o:${ORDER}`)
+check(toast(ownerTook).includes('за вами'), `владелец берёт доставку: «${toast(ownerTook)}»`)
+const { data: ownerOrder } = await service.from('orders').select('courier_name').eq('id', ORDER).single()
+check(ownerOrder.courier_name === 'Малик Бабазов', `в заказе записан развозящий: ${ownerOrder.courier_name}`)
+
+const ownerDone = await press(OWNER, `dlv:o:${ORDER}`)
+const { data: ownerDelivered } = await service.from('orders').select('status').eq('id', ORDER).single()
+check(ownerDelivered.status === 'delivered', `владелец закрывает свою доставку (статус: ${ownerDelivered.status})`)
+check(!editedFor(ownerDone, OWNER.id)?.body?.reply_markup, 'и кнопка у него гаснет так же')
+
+// ── нет вообще никого — менеджеров предупреждают ──────────────────────────
+await service.from('staff').delete().eq('telegram_user_id', OWNER.id)
 const nobody = await ship('courier')
 const warn = sentTo(nobody, ADMIN_CHAT)
-check(warn?.body?.text?.includes('некому передать'), `без курьеров: «${(warn?.body?.text ?? '—').split('\n')[0]}»`)
+check(warn?.body?.text?.includes('некому передать'), `без курьеров и владельцев: «${(warn?.body?.text ?? '—').split('\n')[0]}»`)
 
+await seedOwner()
 await couriers([])
 await service.from('orders').update({ status: 'delivered', courier_staff_id: null, courier_name: null }).eq('id', ORDER)
 if (failed) process.exitCode = 1

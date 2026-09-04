@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ACTION_FUNCTIONS, buildOrderKeyboard, type OrderAction, parseCallbackData } from '../_shared/orderActions.ts'
 import {
   assignedText,
+  courierClosedText,
   courierLabel,
   deliveredKeyboard,
   managerNoticeText,
@@ -14,6 +15,11 @@ import {
   shortNumber,
   type OrderSummary,
 } from '../_shared/orderCard.ts'
+import {
+  buildReport,
+  parseReportData,
+  reportKeyboard,
+} from '../_shared/teamReport.ts'
 import {
   applicationMessage,
   canManageStaff,
@@ -89,6 +95,14 @@ Deno.serve(async (req) => {
       // где панели заказов нет вовсе.
       const handledByJob = await handleJobTap(update.callback_query, botToken, supabase)
       if (handledByJob) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Отчёт — тоже раньше панели: его кнопки живут и в личке владельца.
+      const handledByReport = await handleReportTap(update.callback_query, botToken, supabase)
+      if (handledByReport) {
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -597,9 +611,16 @@ async function handleOrderAction(
    * личный, и подделать его нельзя, но и опознавать по нему нечего.
    */
   const courier = fromAdminChat ? null : await findStaff(supabase, callbackQuery.from.id)
-  const isCourier = !!courier && courier.role === 'courier' && courier.status === 'approved'
+  /*
+   * Владелец здесь наравне с курьером. В магазине, где курьеров ещё нет,
+   * доставки развозит он сам — ship-order и предложение шлёт ему. Отказывать
+   * ему в собственной кнопке было бы странно.
+   */
+  const canDeliver = !!courier
+    && courier.status === 'approved'
+    && (courier.role === 'courier' || courier.role === 'owner')
 
-  if (!fromAdminChat && !isCourier) {
+  if (!fromAdminChat && !canDeliver) {
     console.warn(`Действие из чужого чата: ${fromChatId}`)
     await answerCallback(botToken, callbackQuery.id, 'Управлять заказами можно только из рабочего чата', true)
     return
@@ -610,13 +631,13 @@ async function handleOrderAction(
    * заказы — не его работа, и кнопок таких у него нет; проверка здесь на
    * случай подделанного `callback_data`.
    */
-  if (isCourier && parsed.action !== 'tak' && parsed.action !== 'dlv') {
+  if (canDeliver && parsed.action !== 'tak' && parsed.action !== 'dlv') {
     await answerCallback(botToken, callbackQuery.id, 'Здесь можно только взять доставку и отметить её', true)
     return
   }
 
   if (parsed.action === 'tak') {
-    if (!isCourier) {
+    if (!canDeliver) {
       await answerCallback(botToken, callbackQuery.id, 'Доставки берут курьеры', true)
       return
     }
@@ -640,7 +661,7 @@ async function handleOrderAction(
 
   // Отметить доставленным может только тот курьер, который её вёз: иначе
   // заказ закроет любой, кому пришло предложение.
-  if (isCourier && parsed.action === 'dlv') {
+  if (canDeliver && parsed.action === 'dlv') {
     const { data: order } = await supabase
       .from(parsed.table)
       .select('courier_staff_id')
@@ -662,6 +683,20 @@ async function handleOrderAction(
   )
   // Ошибку показываем «алертом»: её надо прочитать, а не проморгать.
   await answerCallback(botToken, callbackQuery.id, result.toast, !result.ok)
+
+  /*
+   * Курьеру правим его сообщение ПРЯМО ЗДЕСЬ, а не ждём, пока смена статуса
+   * дойдёт до sync-order-status-to-telegram через триггер и pg_net. Курьер
+   * стоит у подъезда и смотрит в экран: кнопка «Доставил» обязана погаснуть
+   * в ту же секунду, иначе непонятно, засчиталось нажатие или нет.
+   * (Владелец на это и указал 4 сентября 2026.)
+   */
+  if (canDeliver && parsed.action === 'dlv' && result.ok) {
+    const chatId = callbackQuery.message?.chat?.id
+    const messageId = callbackQuery.message?.message_id
+    if (chatId && messageId)
+      await editMessage(botToken, chatId, messageId, courierClosedText(parsed.orderId, 'delivered'), undefined)
+  }
 }
 
 /**
@@ -802,7 +837,7 @@ async function handleManagerCommand(
   chatId: number,
   botToken: string,
   supabase: ReturnType<typeof createClient>,
-  from?: { first_name?: string; last_name?: string; username?: string },
+  from?: { id?: number; first_name?: string; last_name?: string; username?: string },
   messageId?: number,
 ): Promise<boolean> {
   /*
@@ -883,6 +918,15 @@ async function handleManagerCommand(
       await ownersExist(supabase),
     )
     await sendRichMessage(botToken, chatId, PANEL_TEXT, buildPanelKeyboard(canSeeStaff))
+    return true
+  }
+
+  if (command === '/report' || command === '/otchet') {
+    if (!await mayReadReport(supabase, from?.id ?? 0)) {
+      await sendRichMessage(botToken, chatId, 'Отчёт по работе команды доступен владельцу.')
+      return true
+    }
+    await sendRichMessage(botToken, chatId, REPORT_INTRO, reportKeyboard())
     return true
   }
 
@@ -1006,6 +1050,12 @@ async function claimDelivery(
 ): Promise<void> {
   const name = courierLabel(courier)
 
+  /*
+   * Условия на самом UPDATE, а не проверкой перед ним: предложение уходит всем
+   * курьерам сразу, и двое жмут «Беру» одновременно. Заодно `status` не даёт
+   * взять заказ, который уже отменили, — сообщение с кнопкой у курьера могло
+   * остаться открытым на телефоне.
+   */
   const { data: claimed } = await supabase
     .from(table)
     .update({
@@ -1014,6 +1064,7 @@ async function claimDelivery(
       courier_taken_at: new Date().toISOString(),
     })
     .eq('id', orderId)
+    .eq('status', 'shipped')
     .is('courier_staff_id', null)
     .select('*')
     .maybeSingle()
@@ -1022,17 +1073,27 @@ async function claimDelivery(
   const messageId = callbackQuery.message?.message_id
 
   if (!claimed) {
-    // Не успел. Показываем, кто везёт, и гасим кнопку — чтобы не жал ещё раз.
+    // Не взяли — либо не успел, либо заказа больше нет в доставке. В обоих
+    // случаях гасим кнопку, чтобы человек не жал её ещё раз.
     const { data: taken } = await supabase
       .from(table)
-      .select('id, courier_name')
+      .select('id, courier_name, status')
       .eq('id', orderId)
       .maybeSingle()
 
-    const holder = (taken as { courier_name?: string } | null)?.courier_name || 'другой курьер'
-    await answerCallback(botToken, callbackQuery.id, `Доставку уже взял ${holder}`, true)
-    if (chatId && messageId)
-      await editMessage(botToken, chatId, messageId, takenByText({ id: orderId } as never, holder), undefined)
+    const row = taken as { courier_name?: string | null; status?: string } | null
+    const holder = row?.courier_name
+
+    if (holder) {
+      await answerCallback(botToken, callbackQuery.id, `Доставку уже взял ${holder}`, true)
+      if (chatId && messageId)
+        await editMessage(botToken, chatId, messageId, takenByText({ id: orderId } as never, holder), undefined)
+    }
+    else {
+      await answerCallback(botToken, callbackQuery.id, 'Эта доставка уже неактуальна', true)
+      if (chatId && messageId)
+        await editMessage(botToken, chatId, messageId, courierClosedText(orderId, row?.status ?? 'cancelled'), undefined)
+    }
     return
   }
 
@@ -1368,6 +1429,16 @@ async function handleJobAnswer(
 ): Promise<boolean> {
   const record = await findStaff(supabase, from.id)
 
+  // Отчёт владельцу — в личке он и уместнее: выручка не попадает в общий чат.
+  if (text === '/report' || text === '/otchet') {
+    if (!await mayReadReport(supabase, from.id)) {
+      await sendRichMessage(botToken, chatId, 'Отчёт по работе команды доступен владельцу.')
+      return true
+    }
+    await sendRichMessage(botToken, chatId, REPORT_INTRO, reportKeyboard())
+    return true
+  }
+
   // Начало анкеты.
   if (text === '/job' || text === '/rabota') {
     if (record?.status === 'approved') {
@@ -1429,6 +1500,51 @@ async function handleJobAnswer(
   }
 
   return false
+}
+
+const REPORT_INTRO = 'Отчёт по работе команды. За какой период?'
+
+/**
+ * Отчёт смотрит владелец. Менеджеру он не нужен: свои заказы он и так видит
+ * в панели, а выручка и чужие показатели — не его дело.
+ */
+async function mayReadReport(
+  supabase: ReturnType<typeof createClient>,
+  telegramUserId: number,
+): Promise<boolean> {
+  return canManageStaff(await findStaff(supabase, telegramUserId), await ownersExist(supabase))
+}
+
+/**
+ * Кнопка периода под отчётом. Отвечаем НОВЫМ сообщением, а не правкой: так
+ * отчёты за разные периоды остаются в переписке рядом и их можно сравнить.
+ */
+async function handleReportTap(
+  callbackQuery: {
+    id: string
+    data?: string
+    from: { id: number }
+    message?: { chat?: { id: number | string } }
+  },
+  botToken: string,
+  supabase: ReturnType<typeof createClient>,
+): Promise<boolean> {
+  const period = callbackQuery.data ? parseReportData(callbackQuery.data) : null
+  if (!period)
+    return false
+
+  const chatId = callbackQuery.message?.chat?.id
+  if (chatId === undefined)
+    return true
+
+  if (!await mayReadReport(supabase, callbackQuery.from.id)) {
+    await answerCallback(botToken, callbackQuery.id, 'Отчёт доступен владельцу', true)
+    return true
+  }
+
+  await answerCallback(botToken, callbackQuery.id, 'Считаю…')
+  await sendRichMessage(botToken, chatId as number, await buildReport(supabase, period), reportKeyboard())
+  return true
 }
 
 /**
