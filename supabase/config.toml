@@ -409,6 +409,11 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/send-user-telegram/index.ts"
 
+[functions.sales-digest]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/sales-digest/index.ts"
+
 [functions.team-report]
 enabled = true
 verify_jwt = false
