@@ -13,7 +13,13 @@ interface ProductSearchResult {
   name: string
   slug: string
   price: number
+  /** Цена со скидкой — её ждёт карточка каталога (`BaseProduct`). */
+  final_price: number
   discount_percentage: number
+  bonus_points_award: number | null
+  avg_rating: number | null
+  review_count: number | null
+  is_new: boolean | null
   product_images: {
     image_url: string
     blur_placeholder?: string | null
@@ -152,7 +158,12 @@ export function useProductSearch() {
           name: row.name,
           slug: row.slug,
           price: row.price,
+          final_price: row.final_price,
           discount_percentage: row.discount_percentage,
+          bonus_points_award: row.bonus_points_award,
+          avg_rating: row.avg_rating,
+          review_count: row.review_count,
+          is_new: row.is_new,
           stock_quantity: row.stock_quantity,
           category_id: row.category_id,
           product_images: images.map((img: any) => ({
