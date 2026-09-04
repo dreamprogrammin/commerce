@@ -259,7 +259,7 @@ export interface DigestInput {
   weekAgo: PeriodStats
   month: PeriodStats
   prevMonthSoFar: PeriodStats
-  plan: number | null
+  plan: SalesPlan | null
   sessions: number | null
   monthSessions: number | null
 }
@@ -297,13 +297,15 @@ export function digestMessage(input: DigestInput): string {
   lines.push(`Прошлый месяц к этому дню: ${formatAmount(prevMonthSoFar.revenue)} (${delta(month.revenue, prevMonthSoFar.revenue)})`)
 
   if (plan) {
-    const pct = Math.round((month.revenue / plan) * 100)
-    const perDay = Math.round(plan / days)
-    const remains = Math.max(plan - month.revenue, 0)
+    const target = plan.amount
+    const pct = Math.round((month.revenue / target) * 100)
+    const perDay = Math.round(target / days)
+    const remains = Math.max(target - month.revenue, 0)
     const needPerDay = left > 0 ? Math.round(remains / left) : remains
 
     lines.push('')
-    lines.push(`*План месяца:* ${formatAmount(plan)} — выполнено *${pct}%*`)
+    lines.push(`*План месяца:* ${formatAmount(target)} — выполнено *${pct}%*`)
+    lines.push(`_${planExplanation(plan)}_`)
     lines.push(`Норма дня ${formatAmount(perDay)}`)
 
     if (remains === 0)
@@ -315,14 +317,14 @@ export function digestMessage(input: DigestInput): string {
 
     // Опережение считаем от нормы на прошедшие дни, а не от всего плана:
     // иначе первого числа «отставание» равнялось бы плану целиком.
-    const shouldBe = Math.round((plan / days) * (slot === 'morning' ? day - 1 : day))
+    const shouldBe = Math.round((target / days) * (slot === 'morning' ? day - 1 : day))
     const diff = month.revenue - shouldBe
     if (shouldBe > 0)
       lines.push(diff >= 0 ? `Идём с опережением на ${formatAmount(diff)}` : `Отставание ${formatAmount(-diff)}`)
   }
   else {
     lines.push('')
-    lines.push('_План месяца не задан — пришлите `/plan 3000000`, и появится процент выполнения._')
+    lines.push('_Плана нет: продаж в истории слишком мало, чтобы посчитать его самому. Поставьте вручную: `/plan 300000`._')
   }
 
   if (sessions !== null && sessions > 0) {
@@ -349,23 +351,139 @@ export function plural(n: number, one: string, few: string, many: string): strin
   return many
 }
 
-/** План текущего месяца, если задан. */
-export async function currentPlan(
+export interface PlanBasis {
+  /** Средняя выручка в день за окно наблюдения. */
+  perDay: number
+  /** Во сколько раз последние 30 дней отличаются от предыдущих 30. */
+  trend: number
+  /** Насколько план выше факта — чтобы он тянул вверх, а не повторял прошлое. */
+  ambition: number
+  /** Живых (не отменённых) заказов в окне. По нему судим, можно ли верить цифре. */
+  orders: number
+  /** Окно наблюдения в днях. */
+  window: number
+}
+
+export interface SalesPlan {
+  amount: number
+  source: 'auto' | 'manual'
+  basis: PlanBasis | null
+}
+
+/** Насколько план ставится выше факта. 15% — заметно, но достижимо. */
+const AMBITION = 1.15
+
+/** Коридор для тренда: на малых числах он скачет, и без ограничения план прыгал бы втрое. */
+const TREND_MIN = 0.8
+const TREND_MAX = 1.5
+
+/** Меньше этого числа живых заказов — истории мало, план ориентировочный. */
+export const ENOUGH_ORDERS = 10
+
+/** Окно наблюдения: 90 дней сглаживают всплески вроде одного крупного заказа. */
+const WINDOW_DAYS = 90
+
+/**
+ * Считает план месяца по истории продаж.
+ *
+ * ЗАЧЕМ ИМЕННО ТАК. Владелец попросил, чтобы план считался сам. Взять «среднее
+ * за прошлый месяц» нельзя: у магазина бывают месяцы, где все заказы отменены
+ * (август 2026 — 9 заказов, 9 отмен, ноль выручки), и план на сентябрь вышел бы
+ * нулевым. Поэтому окно 90 дней, тренд считается отдельно и зажат в коридор
+ * 0.8–1.5, а сверху добавляется 15% амбиции.
+ *
+ * Формула целиком: план = средняя выручка в день за 90 дней × тренд × 1.15 ×
+ * число дней в месяце, округлённое до 10 000 вверх.
+ *
+ * Если живых заказов в окне меньше десяти, цифре верить рано — план всё равно
+ * ставится, но сводка честно говорит, что он ориентировочный.
+ */
+export async function computePlan(
   supabase: { from: (t: string) => any },
   now: Date = new Date(),
-): Promise<number | null> {
+): Promise<{ amount: number, basis: PlanBasis }> {
+  const windowFrom = midnight(now, WINDOW_DAYS)
+  const rows = await fetchOrders(supabase, windowFrom, now)
+  const alive = rows.filter(r => r.status !== 'cancelled')
+  const revenue = alive.reduce((s, r) => s + Number(r.final_amount ?? 0), 0)
+
+  const recentFrom = midnight(now, 30)
+  const prevFrom = midnight(now, 60)
+  const sum = (from: Date, to: Date) => alive
+    .filter(r => {
+      const t = new Date(r.created_at).getTime()
+      return t >= from.getTime() && t < to.getTime()
+    })
+    .reduce((s, r) => s + Number(r.final_amount ?? 0), 0)
+
+  const recent = sum(recentFrom, now)
+  const previous = sum(prevFrom, recentFrom)
+
+  // Тренд считаем, только когда есть с чем сравнивать: иначе он либо ноль,
+  // либо бесконечность, и то и другое одинаково бессмысленно.
+  const rawTrend = previous > 0 ? recent / previous : 1
+  const trend = Math.min(Math.max(rawTrend, TREND_MIN), TREND_MAX)
+
+  const perDay = revenue / WINDOW_DAYS
+  const { days } = monthProgress(now)
+  const raw = perDay * trend * AMBITION * days
+
+  // Округляем вверх до 10 000: «46 231 ₸» выглядит как ошибка расчёта, а не
+  // как цель. Ноль оставляем нулём — выдумывать план на пустой истории нельзя.
+  const amount = raw > 0 ? Math.ceil(raw / 10000) * 10000 : 0
+
+  return {
+    amount,
+    basis: {
+      perDay: Math.round(perDay),
+      trend: Math.round(trend * 100) / 100,
+      ambition: AMBITION,
+      orders: alive.length,
+      window: WINDOW_DAYS,
+    },
+  }
+}
+
+/**
+ * План текущего месяца. Если его нет — считает и запоминает.
+ *
+ * Запоминает намеренно: посчитанный на лету план менялся бы каждый день вместе
+ * с окном, и «процент выполнения» скакал бы вверх-вниз при неизменных
+ * продажах. Цель, которая меняется сама, целью быть перестаёт.
+ */
+export async function ensurePlan(
+  supabase: { from: (t: string) => any },
+  now: Date = new Date(),
+): Promise<SalesPlan | null> {
   const month = monthStart(now).toISOString().slice(0, 10)
+
   const { data } = await supabase
     .from('sales_plans')
-    .select('amount')
+    .select('amount, source, basis')
     .eq('month', month)
     .maybeSingle()
 
-  const amount = (data as { amount?: number } | null)?.amount
-  return amount ? Number(amount) : null
+  const row = data as { amount?: number, source?: 'auto' | 'manual', basis?: PlanBasis } | null
+  if (row?.amount)
+    return { amount: Number(row.amount), source: row.source ?? 'manual', basis: row.basis ?? null }
+
+  const { amount, basis } = await computePlan(supabase, now)
+  if (amount <= 0)
+    return null
+
+  await supabase.from('sales_plans').upsert({
+    month,
+    amount,
+    source: 'auto',
+    basis,
+    updated_at: new Date().toISOString(),
+    updated_by: null,
+  }, { onConflict: 'month' })
+
+  return { amount, source: 'auto', basis }
 }
 
-/** Записать план на текущий месяц. */
+/** Записать план вручную — перебивает автоматический. */
 export async function setPlan(
   supabase: { from: (t: string) => any },
   amount: number,
@@ -375,9 +493,57 @@ export async function setPlan(
   await supabase.from('sales_plans').upsert({
     month: monthStart(now).toISOString().slice(0, 10),
     amount,
+    source: 'manual',
+    basis: null,
     updated_at: new Date().toISOString(),
     updated_by: telegramUserId,
   }, { onConflict: 'month' })
+}
+
+/** Пересчитать автоматический план заново, забыв прежний. */
+export async function resetPlanToAuto(
+  supabase: { from: (t: string) => any },
+  now: Date = new Date(),
+): Promise<SalesPlan | null> {
+  const month = monthStart(now).toISOString().slice(0, 10)
+  const { amount, basis } = await computePlan(supabase, now)
+
+  if (amount <= 0) {
+    await supabase.from('sales_plans').delete().eq('month', month)
+    return null
+  }
+
+  await supabase.from('sales_plans').upsert({
+    month,
+    amount,
+    source: 'auto',
+    basis,
+    updated_at: new Date().toISOString(),
+    updated_by: null,
+  }, { onConflict: 'month' })
+
+  return { amount, source: 'auto', basis }
+}
+
+/** Строка «откуда взялась цифра» — чтобы план не выглядел взятым с потолка. */
+export function planExplanation(plan: SalesPlan): string {
+  if (plan.source === 'manual')
+    return 'Поставлен вручную'
+
+  const b = plan.basis
+  if (!b)
+    return 'Посчитан ботом по истории продаж'
+
+  const parts = [`по ${formatAmount(b.perDay)} в день за ${b.window} дней`]
+  if (b.trend !== 1)
+    parts.push(`тренд ×${b.trend}`)
+  parts.push(`амбиция ×${b.ambition}`)
+
+  const tail = b.orders < ENOUGH_ORDERS
+    ? `. Живых заказов в истории всего ${b.orders} — цифра ориентировочная`
+    : ''
+
+  return `Посчитан ботом: ${parts.join(', ')}${tail}`
 }
 
 /** Собрать сводку целиком: чтение, счёт, текст. Один вызов на кнопку и на расписание. */
@@ -422,7 +588,7 @@ export async function buildDigest(
     weekAgo: summarize(weekAgoRows, weekUnits),
     month: summarize(monthRows, monthUnits),
     prevMonthSoFar: summarize(prevRows, prevUnits),
-    plan: await currentPlan(supabase, now),
+    plan: await ensurePlan(supabase, now),
     sessions: await ga4Sessions(dayStart, now),
     monthSessions: null,
   })

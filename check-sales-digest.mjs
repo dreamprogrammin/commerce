@@ -4,6 +4,8 @@
  * Владелец: «нужно, чтобы бот давал мотивации на продажи — CR, UPT,
  * товарооборот, план, сравнение продаж, процент выполнения; дважды в день,
  * в 9 утра и в 22».
+ * Плюс: план считается САМ по истории, ручной его перебивает, `/plan auto`
+ * возвращает расчёт.
  *   node check-sales-digest.mjs
  */
 import { createClient } from '@supabase/supabase-js'
@@ -72,16 +74,38 @@ async function say(text, from, chatId) {
 
 const said = cs => cs.filter(c => c.method === 'sendMessage').map(c => c.body.text).join('\n')
 
-// ── план ставится командой ────────────────────────────────────────────────
+// ── план считается сам ────────────────────────────────────────────────────
 await service.from('sales_plans').delete().neq('month', '1900-01-01')
-const noPlan = await say('/plan', OWNER, OWNER.id)
-check(said(noPlan).includes('не задан'), `без плана: «${said(noPlan).split('\n')[0]}»`)
+const autoPlan = await say('/plan', OWNER, OWNER.id)
+const autoText = said(autoPlan)
+console.log(`\n--- автоплан ---\n${autoText}\n`)
+check(/План на этот месяц: \*[\d\s]+ ₸\*/.test(autoText) || autoText.includes('слишком мало'),
+  `бот сам отвечает про план: «${autoText.split('\n')[0]}»`)
 
+const { data: autoRow } = await service.from('sales_plans').select('amount, source, basis').limit(1).maybeSingle()
+check(!autoRow || autoRow.source === 'auto', `план записан как автоматический: ${autoRow?.source ?? 'плана нет'}`)
+check(!autoRow || (autoRow.basis && typeof autoRow.basis.perDay === 'number'),
+  `в базе сохранено, из чего он посчитан: ${JSON.stringify(autoRow?.basis ?? null)}`)
+check(!autoRow || autoText.includes('Посчитан ботом'), 'и бот объясняет расчёт словами')
+check(!autoRow || Number(autoRow.amount) % 10000 === 0, `цифра округлена до десятков тысяч: ${autoRow?.amount}`)
+
+// ── ручной план перебивает автоматический ─────────────────────────────────
 const setPlan = await say('/plan 3 000 000', OWNER, OWNER.id)
 check(said(setPlan).includes('3 000 000'), `план принят: «${said(setPlan).split('\n')[0]}»`)
-const { data: planRow } = await service.from('sales_plans').select('amount, updated_by').limit(1).single()
+const { data: planRow } = await service.from('sales_plans').select('amount, updated_by, source').limit(1).single()
 check(Number(planRow?.amount) === 3000000 && String(planRow?.updated_by) === String(OWNER.id),
   `план записан в базу: ${planRow?.amount} от ${planRow?.updated_by}`)
+check(planRow?.source === 'manual', `ручной план помечен как ручной: ${planRow?.source}`)
+
+// ── /plan auto возвращает расчёт бота ─────────────────────────────────────
+const backToAuto = await say('/plan auto', OWNER, OWNER.id)
+const { data: afterAuto } = await service.from('sales_plans').select('amount, source').limit(1).maybeSingle()
+check(!afterAuto || afterAuto.source === 'auto', `«/plan auto» вернул расчёт бота: ${afterAuto?.source ?? 'плана нет'}`)
+check(said(backToAuto).includes('пересчитан') || said(backToAuto).includes('слишком мало'),
+  `ответ на «/plan auto»: «${said(backToAuto).split('\n')[0]}»`)
+
+// ставим ручной обратно — дальше проверяем сводку на понятной цифре
+await say('/plan 3 000 000', OWNER, OWNER.id)
 
 // ── сводка по команде ─────────────────────────────────────────────────────
 const digest = await say('/sales', OWNER, OWNER.id)

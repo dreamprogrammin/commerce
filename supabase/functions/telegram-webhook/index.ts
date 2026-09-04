@@ -21,7 +21,13 @@ import {
   parseReportData,
   reportKeyboard,
 } from '../_shared/teamReport.ts'
-import { buildDigest, currentPlan, setPlan } from '../_shared/salesDigest.ts'
+import {
+  buildDigest,
+  ensurePlan,
+  planExplanation,
+  resetPlanToAuto,
+  setPlan,
+} from '../_shared/salesDigest.ts'
 import {
   applicationMessage,
   canManageStaff,
@@ -1673,16 +1679,34 @@ async function handlePlanCommand(
   text: string,
   telegramUserId: number,
 ): Promise<void> {
-  const raw = text.replace(/^\/plan(@\S+)?/i, '').replace(/[\s_.,]/g, '').trim()
+  const argument = text.replace(/^\/plan(@\S+)?/i, '').trim().toLowerCase()
 
-  if (!raw) {
-    const plan = await currentPlan(supabase)
+  /*
+   * `/plan auto` — забыть ручную цифру и посчитать заново. Нужна, когда
+   * владелец однажды поставил план руками и больше не хочет его вести.
+   */
+  if (argument === 'auto' || argument === 'авто') {
+    const plan = await resetPlanToAuto(supabase)
     await sendRichMessage(
       botToken,
       chatId,
       plan
-        ? `План на этот месяц: *${formatAmount(plan)}*\n\nПоменять: \`/plan 3000000\``
-        : 'План на этот месяц не задан.\n\nПоставить: `/plan 3000000`',
+        ? `План на этот месяц пересчитан: *${formatAmount(plan.amount)}*\n\n_${planExplanation(plan)}_`
+        : 'Продаж в истории слишком мало, чтобы посчитать план. Поставьте вручную: `/plan 300000`',
+    )
+    return
+  }
+
+  const raw = argument.replace(/[\s_.,]/g, '')
+
+  if (!raw) {
+    const plan = await ensurePlan(supabase)
+    await sendRichMessage(
+      botToken,
+      chatId,
+      plan
+        ? `План на этот месяц: *${formatAmount(plan.amount)}*\n\n_${planExplanation(plan)}_\n\nПоменять: \`/plan 3000000\`, вернуть расчёт бота: \`/plan auto\``
+        : 'Продаж в истории слишком мало, чтобы посчитать план самому.\n\nПоставьте вручную: `/plan 300000`',
     )
     return
   }
@@ -1697,7 +1721,7 @@ async function handlePlanCommand(
   await sendRichMessage(
     botToken,
     chatId,
-    `План на этот месяц: *${formatAmount(amount)}*.\n\nПроцент выполнения появится в сводке продаж.`,
+    `План на этот месяц: *${formatAmount(amount)}* — поставлен вручную.\n\nВернуть расчёт бота: \`/plan auto\``,
   )
 }
 
