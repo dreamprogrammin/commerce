@@ -53,7 +53,11 @@ const box = await page.evaluate(() => {
    * считать всё подряд, проверка меряет заглушки.
    */
   const imgs = pop ? [...pop.querySelectorAll('img')].filter(i => (i.currentSrc || i.src || '').includes('/storage/')) : []
-  const field = document.querySelector('.sh-search__input')?.getBoundingClientRect()
+  /*
+   * Меряем по ФОРМЕ поиска, а не по <input>: видимая строка поиска — это вся
+   * форма с иконкой и полями, input внутри неё уже на ширину иконки.
+   */
+  const field = document.querySelector('form.sh-search')?.getBoundingClientRect()
   const r = pop?.getBoundingClientRect()
   return {
     открыта: !!pop,
@@ -63,6 +67,9 @@ const box = await page.evaluate(() => {
     картинокВсего: imgs.length,
     подПолем: r && field ? r.top >= field.bottom - 2 : false,
     ширина: r ? Math.round(r.width) : 0,
+    ширинаПоля: field ? Math.round(field.width) : 0,
+    /* Панель должна быть ровно по полю: уже — «приклеена к краю», шире — вылезает. */
+    поШиринеПоля: r && field ? Math.abs(r.width - field.width) <= 2 && Math.abs(r.left - field.left) <= 2 : false,
     вЭкране: r ? r.right <= window.innerWidth + 1 && r.bottom <= window.innerHeight + 200 : false,
     показатьВсе: (pop?.innerText || '').includes('Показать все'),
   }
@@ -75,6 +82,7 @@ check(box.брендов > 0, `и бренд-подсказка (${box.брен�
 check(box.картинокЗагрузилось === box.картинокВсего && box.картинокВсего > 0,
   `картинки в выпадашке загрузились: ${box.картинокЗагрузилось} из ${box.картинокВсего}`)
 check(box.подПолем && box.вЭкране, `висит под полем и не вылезает за экран (ширина ${box.ширина}px)`)
+check(box.поШиринеПоля, `растянута по ширине поля (панель ${box.ширина}px, поле ${box.ширинаПоля}px)`)
 check(box.показатьВсе, 'есть ссылка «Показать все» — страница остаётся как запасной путь')
 
 await page.screenshot({ path: 'desktop-dropdown.png', clip: { x: 0, y: 0, width: 1440, height: 760 } })

@@ -234,11 +234,16 @@ function formatPrice(price: number, discount?: number) {
 
       Закрытие мышью и клавиатурой остаётся: `pointer-down-outside` (клик мимо)
       и Escape в `onKeydown`.
+
+      Ширина — по ширине самого поля (`--reka-popper-anchor-width`), а не
+      фиксированные 620px: панель уже поля выглядела приклеенной к левому краю.
+      `min-width` держит её читаемой в узком компактном варианте (`dense`), где
+      поле совсем короткое.
     -->
     <PopoverContent
       align="start"
       :side-offset="10"
-      class="w-[min(620px,92vw)] p-0 rounded-2xl overflow-hidden border border-border shadow-2xl"
+      class="w-[var(--reka-popper-anchor-width)] max-w-[calc(100vw-2rem)] min-w-[320px] p-0 rounded-2xl overflow-hidden border border-border shadow-2xl"
       @open-auto-focus.prevent
       @close-auto-focus.prevent
       @focus-outside.prevent
