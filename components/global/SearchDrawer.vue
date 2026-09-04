@@ -232,7 +232,13 @@ function getImageUrl(imageUrl: string | null): string | null {
                   {{ product.name }}
                 </h4>
 
-                <div class="flex items-center gap-2">
+                <!--
+                  Цена, старая цена и скидка переносятся, а не выдавливают друг
+                  друга: на 390px строка «18 990,5 ₸ 19 990 ₸ -5%» шире колонки,
+                  и без переноса скидка уезжала под плашку наличия — владелец
+                  это и увидел 4 сентября 2026.
+                -->
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <span
                     class="text-base font-bold"
                     :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-destructive' : 'text-foreground'"
@@ -255,25 +261,29 @@ function getImageUrl(imageUrl: string | null): string | null {
                   </span>
                 </div>
 
-                <p v-if="product.brands" class="text-xs text-muted-foreground mt-0.5">
-                  {{ product.brands.name }}
-                </p>
-              </div>
+                <!--
+                  Наличие и бренд — внутри той же колонки, а не отдельным
+                  столбцом справа. Столбец забирал 92px из 358 и заставлял цену
+                  налезать на плашку; здесь всё просто переносится по строкам.
+                -->
+                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span
+                    v-if="product.stock_quantity > 0"
+                    class="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full"
+                  >
+                    <Icon name="lucide:check-circle" class="size-3 shrink-0" />
+                    <span class="font-medium">В наличии</span>
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
+                  >
+                    Нет в наличии
+                  </span>
 
-              <!-- Статус наличия -->
-              <div class="shrink-0">
-                <div
-                  v-if="product.stock_quantity > 0"
-                  class="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full"
-                >
-                  <Icon name="lucide:check-circle" class="size-3" />
-                  <span class="font-medium">В наличии</span>
-                </div>
-                <div
-                  v-else
-                  class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full"
-                >
-                  Нет в наличии
+                  <span v-if="product.brands" class="text-xs text-muted-foreground truncate">
+                    {{ product.brands.name }}
+                  </span>
                 </div>
               </div>
             </NuxtLink>
