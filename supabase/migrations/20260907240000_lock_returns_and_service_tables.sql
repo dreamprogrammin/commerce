@@ -14,6 +14,7 @@
 -- =====================================================================================
 
 DROP POLICY IF EXISTS "Authenticated can read order_returns" ON public.order_returns;
+DROP POLICY IF EXISTS "Users read own order returns" ON public.order_returns;
 
 CREATE POLICY "Users read own order returns"
   ON public.order_returns
@@ -29,6 +30,7 @@ CREATE POLICY "Users read own order returns"
   );
 
 DROP POLICY IF EXISTS "Authenticated can read order_return_items" ON public.order_return_items;
+DROP POLICY IF EXISTS "Users read own order return items" ON public.order_return_items;
 
 CREATE POLICY "Users read own order return items"
   ON public.order_return_items
