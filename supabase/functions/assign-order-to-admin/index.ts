@@ -104,6 +104,7 @@ Deno.serve(async (req) => {
 
     // Получаем текущие данные заказа
     let orderData: {
+      order_number?: number | null
       status: string
       assigned_admin_name?: string | null
       telegram_message_id?: string | null
@@ -117,7 +118,7 @@ Deno.serve(async (req) => {
       // Получаем заказ БЕЗ вложенного запроса к profiles
       const { data } = await supabase
         .from('orders')
-        .select('status, assigned_admin_name, telegram_message_id, final_amount, user_id')
+        .select('order_number, status, assigned_admin_name, telegram_message_id, final_amount, user_id')
         .eq('id', orderId)
         .single()
       orderData = data as any
@@ -137,7 +138,7 @@ Deno.serve(async (req) => {
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, assigned_admin_name, telegram_message_id, final_amount, guest_name')
+        .select('order_number, status, assigned_admin_name, telegram_message_id, final_amount, guest_name')
         .eq('id', orderId)
         .single()
       orderData = data
@@ -155,6 +156,12 @@ Deno.serve(async (req) => {
         }
       )
     }
+
+    /*
+     * Номер заказа — цифровой, из колонки `order_number`. Хвост UUID остаётся
+     * запасным вариантом: у заказов до нумерации его нет.
+     */
+    const orderNo = String(orderData?.order_number ?? orderId.slice(-6))
 
     // Проверяем, не взят ли уже заказ другим админом
     if (orderData.assigned_admin_name && orderData.assigned_admin_name !== adminName) {
@@ -209,7 +216,7 @@ Deno.serve(async (req) => {
       const escapedAdminName = escapeMarkdown(adminName)
       const escapedAdminUsername = adminUsername ? escapeMarkdown(adminUsername) : null
 
-      const updatedText = `⚙️ *В ОБРАБОТКЕ*\n\n🔔 Заказ №${orderId.slice(-6)}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n👨‍💼 *Ответственный:* ${escapedAdminName}${escapedAdminUsername ? ` (@${escapedAdminUsername})` : ''}\n\n_Статус: processing_\n\n📝 Заказ взят в работу. Уточните детали с клиентом.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+      const updatedText = `⚙️ *В ОБРАБОТКЕ*\n\n🔔 Заказ №${orderNo}\n💰 *Сумма:* ${orderData.final_amount} ₸\n👤 *Клиент:* ${customerName}\n\n👨‍💼 *Ответственный:* ${escapedAdminName}${escapedAdminUsername ? ` (@${escapedAdminUsername})` : ''}\n\n_Статус: processing_\n\n📝 Заказ взят в работу. Уточните детали с клиентом.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
       // Формируем параметры для URL кнопок
       const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
@@ -254,7 +261,7 @@ Deno.serve(async (req) => {
     const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
     const responseText = `✅ ЗАКАЗ ВЗЯТ В РАБОТУ
 
-📦 Заказ №${orderId.slice(-6)}
+📦 Заказ №${orderNo}
 Тип: ${orderType}
 👨‍💼 Ответственный: ${adminName}${adminUsername ? ` (@${adminUsername})` : ''}
 

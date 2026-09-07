@@ -153,11 +153,17 @@ Deno.serve(async (req) => {
     let orderInfo = ''
     let assignedAdmin = ''
     let cancelledBy = ''
+    /*
+     * Номер показываем цифрами. Триггер шлёт только id, поэтому берём номер из
+     * той же выборки, что и сумму с клиентом, — она ниже.
+     */
+    let orderNo = record.id.slice(-6)
 
     if (table === 'orders') {
       const { data: orderData } = await supabase
         .from('orders')
         .select(`
+          order_number,
           final_amount,
           bonuses_spent,
           bonuses_awarded,
@@ -170,6 +176,7 @@ Deno.serve(async (req) => {
         .single()
 
       if (orderData) {
+        orderNo = String((orderData as { order_number?: number | null }).order_number ?? orderNo)
         const customerNameRaw = orderData.profile
           ? `${orderData.profile.first_name} ${orderData.profile.last_name || ''}`.trim()
           : 'Не указано'
@@ -204,11 +211,12 @@ Deno.serve(async (req) => {
     } else {
       const { data: guestData } = await supabase
         .from('guest_checkouts')
-        .select('final_amount, guest_name, assigned_admin_name, assigned_admin_username, cancelled_by')
+        .select('order_number, final_amount, guest_name, assigned_admin_name, assigned_admin_username, cancelled_by')
         .eq('id', record.id)
         .single()
 
       if (guestData) {
+        orderNo = String((guestData as { order_number?: number | null }).order_number ?? orderNo)
         const guestName = escapeMarkdown(guestData.guest_name) || 'Гость'
         orderInfo = `\n💰 *Сумма:* ${guestData.final_amount} ₸`
         orderInfo += `\n👥 *Клиент:* ${guestName}`
@@ -236,7 +244,7 @@ Deno.serve(async (req) => {
     }
 
     // ✅ Формируем обновленное сообщение с информацией о том кто отменил
-    const updatedText = `${statusEmoji} *${statusText}*\n\n🔔 Заказ №${record.id.slice(-6)}${orderInfo}${assignedAdmin}${cancelledBy}\n\n_Статус: ${record.status}_\n\n${statusDescription}\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+    const updatedText = `${statusEmoji} *${statusText}*\n\n🔔 Заказ №${orderNo}${orderInfo}${assignedAdmin}${cancelledBy}\n\n_Статус: ${record.status}_\n\n${statusDescription}\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
     console.log('📝 Текст обновления:')
     console.log(updatedText)

@@ -106,22 +106,33 @@ Deno.serve(async (req) => {
     console.log(`📋 Таблица заказа: ${tableName}`)
 
     // Получаем данные заказа перед отменой (для информации о бонусах, telegram_message_id и cancelled_by)
-    let orderData: { user_id?: string; bonuses_spent?: number; bonuses_awarded?: number; status: string; telegram_message_id?: string | null; cancelled_by?: string | null } | null = null
+    let orderData: { order_number?: number | null; user_id?: string; bonuses_spent?: number; bonuses_awarded?: number; status: string; telegram_message_id?: string | null; cancelled_by?: string | null } | null = null
     if (tableName === 'orders') {
       const { data } = await supabase
         .from('orders')
-        .select('user_id, bonuses_spent, bonuses_awarded, status, telegram_message_id, cancelled_by')  // ✅ Добавлен cancelled_by
+        .select('order_number, user_id, bonuses_spent, bonuses_awarded, status, telegram_message_id, cancelled_by')  // ✅ Добавлен cancelled_by
         .eq('id', orderId)
         .single()
       orderData = data
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, telegram_message_id, cancelled_by')  // ✅ Добавлен cancelled_by
+        .select('order_number, status, telegram_message_id, cancelled_by')  // ✅ Добавлен cancelled_by
         .eq('id', orderId)
         .single()
-      orderData = data as { status: string; telegram_message_id?: string | null; cancelled_by?: string | null } | null
+      orderData = data as {
+        order_number?: number | null
+        status: string
+        telegram_message_id?: string | null
+        cancelled_by?: string | null
+      } | null
     }
+
+    /*
+     * Номер заказа — цифровой, из колонки `order_number`. Хвост UUID остаётся
+     * запасным вариантом: у заказов до нумерации его нет.
+     */
+    const orderNo = String(orderData?.order_number ?? orderId.slice(-6))
 
     // ✅ Вызываем функцию отмены заказа с указанием таблицы и cancelled_by='admin'
     const { data, error } = await supabase.rpc('cancel_order', {
@@ -165,7 +176,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             chat_id: profile.telegram_chat_id,
             title: '❌ Ваш заказ отменён',
-            body: `Заказ №${orderId.slice(-6)} был отменён.\n\n${orderData.bonuses_spent && orderData.bonuses_spent > 0 ? `Бонусы (${orderData.bonuses_spent}) возвращены на ваш счёт.` : ''}`,
+            body: `Заказ №${orderNo} был отменён.\n\n${orderData.bonuses_spent && orderData.bonuses_spent > 0 ? `Бонусы (${orderData.bonuses_spent}) возвращены на ваш счёт.` : ''}`,
           }),
         })
       }
@@ -188,7 +199,7 @@ Deno.serve(async (req) => {
         }
 
         // Обновляем текст и удаляем кнопки одним запросом
-        const updatedText = `❌ *ЗАКАЗ ОТМЕНЕН*\n\n🔔 Заказ №${orderId.slice(-6)} был отменен ${cancelledByText}\n\n_Статус: cancelled_\n\n⚠️ Все действия с этим заказом недоступны`
+        const updatedText = `❌ *ЗАКАЗ ОТМЕНЕН*\n\n🔔 Заказ №${orderNo} был отменен ${cancelledByText}\n\n_Статус: cancelled_\n\n⚠️ Все действия с этим заказом недоступны`
 
         const updateResult = await updateTelegramMessage(
           botToken,
@@ -216,7 +227,7 @@ Deno.serve(async (req) => {
     const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
     const responseText = `✅ ЗАКАЗ ОТМЕНЕН
 
-📦 Заказ №${orderId.slice(-6)}
+📦 Заказ №${orderNo}
 Тип: ${orderType}
 Статус: Отменен${bonusMessage}
 

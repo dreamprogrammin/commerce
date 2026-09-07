@@ -104,18 +104,18 @@ Deno.serve(async (req) => {
     console.log(`📋 Таблица заказа: ${tableName}`)
 
     // Получаем данные заказа (для информации и telegram_message_id)
-    let orderData: { status: string; telegram_message_id?: string | null } | null = null
+    let orderData: { order_number?: number | null; status: string; telegram_message_id?: string | null } | null = null
     if (tableName === 'orders') {
       const { data } = await supabase
         .from('orders')
-        .select('status, telegram_message_id')
+        .select('order_number, status, telegram_message_id')
         .eq('id', orderId)
         .single()
       orderData = data
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, telegram_message_id')
+        .select('order_number, status, telegram_message_id')
         .eq('id', orderId)
         .single()
       orderData = data
@@ -129,6 +129,12 @@ Deno.serve(async (req) => {
             ...corsHeaders,
             'Content-Type': 'text/plain; charset=UTF-8'
           },
+
+    /*
+     * Номер заказа — цифровой, из колонки `order_number`. Хвост UUID остаётся
+     * запасным вариантом: у заказов до нумерации его нет.
+     */
+    const orderNo = String(orderData?.order_number ?? orderId.slice(-6))
           status: 404
         }
       )
@@ -191,7 +197,7 @@ Deno.serve(async (req) => {
       if (botToken && chatId) {
         console.log(`📱 Обновление Telegram сообщения ${orderData.telegram_message_id}...`)
 
-        const updatedText = `✅ *ЗАКАЗ ПОДТВЕРЖДЕН*\n\n🔔 Заказ №${orderId.slice(-6)}\n\n_Статус: confirmed_\n\n✔️ Клиент согласен. Заказ готов к доставке.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
+        const updatedText = `✅ *ЗАКАЗ ПОДТВЕРЖДЕН*\n\n🔔 Заказ №${orderNo}\n\n_Статус: confirmed_\n\n✔️ Клиент согласен. Заказ готов к доставке.\n\n⏰ _Обновлено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}_`
 
         // Формируем новые кнопки: "Доставлен" и "Отменить"
         const secretParam = adminSecret ? `&secret=${adminSecret}` : ''
@@ -232,7 +238,7 @@ Deno.serve(async (req) => {
     const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
     const responseText = `✅ ЗАКАЗ ПОДТВЕРЖДЕН
 
-📦 Заказ №${orderId.slice(-6)}
+📦 Заказ №${orderNo}
 Тип: ${orderType}
 Статус: Подтвержден
 

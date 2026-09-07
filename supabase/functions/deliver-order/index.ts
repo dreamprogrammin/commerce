@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
 
     // Получаем текущие данные заказа
     let orderData: {
+      order_number?: number | null
       status: string
       telegram_message_id?: string | null
       final_amount?: number
@@ -115,7 +116,7 @@ Deno.serve(async (req) => {
       // Получаем заказ БЕЗ вложенного запроса к profiles
       const { data } = await supabase
         .from('orders')
-        .select('status, telegram_message_id, final_amount, user_id, delivery_method')
+        .select('order_number, status, telegram_message_id, final_amount, user_id, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data as any
@@ -135,7 +136,7 @@ Deno.serve(async (req) => {
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, telegram_message_id, final_amount, guest_name, delivery_method')
+        .select('order_number, status, telegram_message_id, final_amount, guest_name, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data
@@ -153,6 +154,12 @@ Deno.serve(async (req) => {
         }
       )
     }
+
+    /*
+     * Номер заказа — цифровой, из колонки `order_number`. Хвост UUID остаётся
+     * запасным вариантом: у заказов до нумерации его нет.
+     */
+    const orderNo = String(orderData?.order_number ?? orderId.slice(-6))
 
     // Проверяем статус
     if (orderData.status === 'delivered') {
@@ -244,7 +251,7 @@ Deno.serve(async (req) => {
     const orderType = tableName === 'guest_checkouts' ? 'Гостевой' : 'Пользовательский'
     const responseText = `✅ ${wording.adminTitle}
 
-📦 Заказ №${orderId.slice(-6)}
+📦 Заказ №${orderNo}
 Тип: ${orderType}
 
 Операция выполнена успешно.`

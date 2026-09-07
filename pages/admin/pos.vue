@@ -10,6 +10,7 @@ definePageMeta({
 })
 
 const { getVariantUrl } = useSupabaseStorage()
+const supabase = useSupabaseClient()
 
 const store = useAdminPosStore()
 const {
@@ -56,11 +57,25 @@ watch(phoneQuery, (phone) => {
 const saleResult = ref<OfflineSaleResult | null>(null)
 const showReceiptDialog = ref(false)
 
+/**
+ * Номер продажи для чека — цифрами.
+ *
+ * Здесь показывали первый блок UUID («9F5A9A»): продиктовать такое покупателю
+ * на кассе невозможно. Номер лежит в самом заказе, но RPC продажи его не
+ * возвращает, поэтому спрашиваем отдельно — по тому же id.
+ */
+const saleNumber = ref<string | null>(null)
+
 async function handleCompleteSale() {
   const result = await store.completeSale()
   if (result) {
     saleResult.value = result
+    saleNumber.value = null
     showReceiptDialog.value = true
+
+    const { data } = await supabase.rpc('order_number_by_id', { p_order_id: result.order_id })
+    if (data)
+      saleNumber.value = String(data)
   }
 }
 
@@ -486,7 +501,7 @@ function getImageUrl(product: PosProduct): string | null {
         </div>
 
         <p class="text-center text-xs text-muted-foreground">
-          №&nbsp;{{ saleResult.order_id.split('-')[0].toUpperCase() }}
+          №&nbsp;{{ saleNumber ?? saleResult.order_id.split('-')[0].toUpperCase() }}
         </p>
       </div>
 
