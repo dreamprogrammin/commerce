@@ -4,11 +4,26 @@ export interface BrandPageLayout {
   featuredLineIds: string[]
 }
 
+/**
+ * Строка карточки «Коротко о бренде»: `{ k: 'Страна', v: 'Китай' }`.
+ *
+ * Хранится в `brands.facts` массивом — порядок строк значим и задаётся
+ * автором. Форму стережёт ограничение в базе (миграция 20260906120000),
+ * но витрина всё равно отсеивает пустые: строки могли быть записаны мимо
+ * ограничения, прямым SQL.
+ */
+export interface BrandFact {
+  k: string
+  v: string
+}
+
 export interface Brand extends Tables<'brands'> {
   is_custom_page?: boolean
   page_layout?: BrandPageLayout | null
   seo_h1?: string | null
   seo_text?: string | null
+  /** Колонка `facts` — jsonb, в сгенерированных типах приходит как Json. */
+  facts?: BrandFact[] | null
 }
 
 // Линейка продуктов (подбренд/франшиза, например: Mattel → Barbie, Hot Wheels)
