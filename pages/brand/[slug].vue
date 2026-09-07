@@ -178,6 +178,32 @@ const { data: brandQuestions } = await useAsyncData(
   { watch: [brand] },
 )
 
+/*
+ * Соседние бренды для рельса перелинковки внизу страницы.
+ *
+ * На сервере, а не на клиенте: это внутренние ссылки, робот должен видеть
+ * их в разметке. Берём только те, у кого есть логотип — плитка без него
+ * пустая, — и с запасом, лишние отсечёт сам компонент.
+ */
+const { data: otherBrands } = await useAsyncData(
+  `brand-siblings-${brandSlug}`,
+  async () => {
+    const { data, error } = await supabase
+      .from('brands')
+      .select('name, slug, logo_url')
+      .not('logo_url', 'is', null)
+      .neq('slug', brandSlug)
+      .order('name')
+      .limit(16)
+
+    if (error) {
+      console.error('Не удалось загрузить соседние бренды:', error)
+      return []
+    }
+    return data ?? []
+  },
+)
+
 const { data: brandCategoryLinks } = await useAsyncData(
   `brand-category-links-${brandSlug}`,
   async () => {
@@ -845,6 +871,7 @@ useIndexableRobotsRule(
         :filter-state="filterState"
         :brand-stats="brandStats"
         :questions="brandQuestions"
+        :other-brands="otherBrands"
       />
 
       <!--
