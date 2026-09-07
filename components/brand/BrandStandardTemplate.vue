@@ -11,12 +11,20 @@ import {
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 
+interface BrandQuestion {
+  id: string
+  question_text: string
+  answer_text: string | null
+}
+
 const props = defineProps<{
   brand: Brand
   productLines?: ProductLine[]
   breadcrumbs: IBreadcrumbItem[]
   filterState: BrandFilterState
   brandStats?: { average_rating: number, total_reviews_count: number } | null
+  /** Отвеченные вопросы для секции FAQ. Грузятся на сервере, см. страницу. */
+  questions?: BrandQuestion[] | null
 }>()
 
 const fs = props.filterState
@@ -141,6 +149,10 @@ function toggleSeoExpanded() {
         </div>
       </div>
     </div>
+
+    <!-- Полоса доверия. Порт секции TRUST из макета: обещания магазина,
+         одинаковые для всех брендов. -->
+    <BrandTrustRow />
 
     <!-- Коллекции — карточки с логотипами -->
     <div v-if="productLines && productLines.length > 0">
@@ -272,8 +284,20 @@ function toggleSeoExpanded() {
       <BrandReviewsList :brand-id="brand.id" :brand-name="brand.name" />
     </div>
 
+    <!-- Частые вопросы. Данные лежали в brand_questions с самого начала,
+         но на странице не показывались нигде. -->
+    <div class="mt-6 md:mt-12">
+      <BrandFaqList :questions="questions" :brand-name="brand.name" />
+    </div>
+
     <!-- Описание бренда -->
-    <div v-if="brand.description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
+    <!-- Описание и «Коротко о бренде» — одна секция в две колонки, как в
+         макете. Карточка фактов сама прячется, если поле brands.facts пусто,
+         и тогда описание занимает всю ширину. -->
+    <div
+      v-if="brand.description"
+      class="mt-6 md:mt-12 border-t pt-4 md:pt-8 grid gap-4 md:gap-[18px] items-start lg:grid-cols-[minmax(0,1fr)_320px]"
+    >
       <div class="space-y-3 md:space-y-4">
         <button
           class="flex items-center gap-2 text-left w-full group"
@@ -325,6 +349,11 @@ function toggleSeoExpanded() {
           {{ isSeoExpanded ? "Свернуть" : "Читать далее" }}
         </button>
       </div>
+
+      <!-- Вторая колонка секции: короткая справка (brands.facts).
+           Сама прячется, если поле пустое, — тогда описание занимает
+           всю ширину, и пустого места не остаётся. -->
+      <BrandFactsCard :facts="brand.facts" />
     </div>
   </div>
 </template>
