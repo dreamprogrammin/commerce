@@ -20,7 +20,7 @@ await service.from('guest_checkouts').delete().eq('guest_email', MARK)
 const { data: order } = await service.from('guest_checkouts').insert({
   guest_email: MARK, guest_phone: '+77015554433', guest_name: 'Гульмира',
   total_amount: 12000, final_amount: 12000, delivery_method: 'courier', status: 'new',
-}).select('id, tracking_code').single()
+}).select('id, tracking_code, order_number').single()
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true })
@@ -38,6 +38,7 @@ const shot = await page.evaluate(() => {
     href: link?.getAttribute('href') || null,
     заголовок: section?.querySelector('span.font-bold')?.textContent?.trim() || null,
     обещаниеSms: document.body.innerText.includes('на указанный номер телефона'),
+    номерНаСтранице: document.body.innerText.match(/Номер вашего заказа\s*\n?\s*(\S+)/)?.[1] || null,
     прокруткаВбок: document.documentElement.scrollWidth > document.documentElement.clientWidth,
   }
 })
@@ -49,6 +50,9 @@ check(!(shot.href || '').includes(order.tracking_code), 'кода отслежи
 check(/Telegram/i.test(shot.заголовок || ''), `заголовок блока: «${shot.заголовок}»`)
 check(!shot.обещаниеSms, 'обещания прислать SMS на странице больше нет')
 check(!shot.прокруткаВбок, 'страница не разъезжается по ширине')
+check(shot.номерНаСтранице === String(order.order_number),
+  `номер на странице цифрами: «${shot.номерНаСтранице}» (в базе ${order.order_number})`)
+check(/^\d+$/.test(shot.номерНаСтранице || ''), 'и никаких букв в нём')
 check(errors.length === 0, `ошибок страницы: ${errors.length ? errors.join(' | ') : 'нет'}`)
 
 await page.screenshot({ path: 'tracking-button.png' })

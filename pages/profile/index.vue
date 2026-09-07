@@ -343,7 +343,7 @@ useHead({
               <Icon name="lucide:package" class="size-[22px]" />
             </span>
             <span class="flex min-w-0 flex-1 flex-col leading-tight">
-              <span class="truncate text-[15px] font-bold">Заказ №{{ order.id.slice(-6) }}</span>
+              <span class="truncate text-[15px] font-bold">Заказ №{{ order.order_number ?? order.id.slice(-6) }}</span>
               <span class="truncate text-[13px] font-medium text-muted-foreground">
                 {{ formatDate(order.created_at) }} · {{ orderItemsLabel(order) }}
               </span>

@@ -32,7 +32,24 @@ const personalizationStore = usePersonalizationStore()
 
 const fullOrderId = computed(() => route.params.id as string)
 // Короткий номер — те же последние 6 символов, что показывает бот и профиль.
-const orderNo = computed(() => fullOrderId.value.slice(-6).toUpperCase())
+/**
+ * Номер заказа — цифрами.
+ *
+ * Раньше показывали хвост UUID («50B61F»): такой номер не продиктуешь по
+ * телефону и легко спутать ноль с буквой O. Теперь у заказа есть свой номер,
+ * но гость собственный заказ прочитать не может (RLS отдаёт guest_checkouts
+ * админам), поэтому число отдаёт узкая функция базы по id из адреса страницы.
+ */
+const orderNumber = ref<number | null>(null)
+const orderNo = computed(() =>
+  orderNumber.value ? String(orderNumber.value) : fullOrderId.value.slice(-6).toUpperCase(),
+)
+
+async function fetchOrderNumber() {
+  const { data } = await supabase.rpc('order_number_by_id', { p_order_id: fullOrderId.value })
+  if (data)
+    orderNumber.value = Number(data)
+}
 
 const isAuthenticated = computed(() => !!user.value)
 const hasCartItems = computed(() => cartStore.items.length > 0)
@@ -223,6 +240,9 @@ function imageUrl(path: string | null) {
 
 onMounted(async () => {
   personalizationStore.invalidate()
+
+  // Номер нужен и гостю, и авторизованному — он на этой странице главный.
+  await fetchOrderNumber()
 
   if (isAuthenticated.value)
     await fetchOrder()

@@ -62,6 +62,7 @@ async function fetchOrder() {
       .select(
         `
         id,
+        order_number,
         created_at,
         status,
         final_amount,
@@ -309,7 +310,7 @@ definePageMeta({
 })
 
 useHead({
-  title: `Заказ №${orderId.slice(-6)}`,
+  title: `Заказ №${order.value?.order_number ?? orderId.slice(-6)}`,
 })
 </script>
 
@@ -361,7 +362,7 @@ useHead({
         <div class="flex items-start justify-between">
           <div>
             <h1 class="text-2xl md:text-3xl font-bold mb-2">
-              Заказ №{{ order.id.slice(-6) }}
+              Заказ №{{ order.order_number ?? order.id.slice(-6) }}
             </h1>
             <div class="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar class="w-4 h-4" />
@@ -599,7 +600,7 @@ useHead({
           <AlertDialogHeader>
             <AlertDialogTitle>Отменить заказ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Вы уверены, что хотите отменить заказ №{{ orderId.slice(-6) }}?
+              Вы уверены, что хотите отменить заказ №{{ order?.order_number ?? orderId.slice(-6) }}?
               <br><br>
               Потраченные бонусы будут возвращены на ваш счёт.
             </AlertDialogDescription>
