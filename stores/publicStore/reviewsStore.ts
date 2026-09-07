@@ -15,7 +15,12 @@ export interface ReviewImage {
 export interface ProductReview {
   id: string
   product_id: string
-  user_id: string
+  /**
+   * Свой ли это отзыв. Пришло на смену `user_id`: наружу внутренний id
+   * аккаунта больше не отдаётся (аудит 7 сентября 2026) — сервер сам
+   * сравнивает автора с текущим пользователем.
+   */
+  is_mine: boolean
   order_id: string | null
   rating: number
   text: string | null
