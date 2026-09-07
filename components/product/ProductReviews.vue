@@ -351,7 +351,7 @@ onUnmounted(() => {
           v-for="review in displayedReviews"
           :key="review.id"
           :review="review"
-          :can-delete="review.user_id === authStore.user?.id"
+          :can-delete="review.is_mine"
           @delete="handleDelete"
         />
       </div>

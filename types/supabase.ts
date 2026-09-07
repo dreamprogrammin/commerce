@@ -2888,6 +2888,7 @@ export interface Database {
         Returns: {
           created_at: string
           id: string
+          is_mine: boolean
           is_published: boolean
           order_id: string
           product_id: string
@@ -2896,7 +2897,6 @@ export interface Database {
           review_images: Json
           text: string
           updated_at: string
-          user_id: string
         }[]
       }
       get_profile_by_phone: {
