@@ -14,6 +14,7 @@ import {
   orderCardMessage,
   orderListMessage,
   shortNumber,
+  statusLabel,
   type OrderSummary,
 } from '../_shared/orderCard.ts'
 import {
@@ -384,6 +385,24 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
+    }
+
+    /*
+     * `/start t<код>` — подписка на заказ.
+     *
+     * Разбираем ДО привязки аккаунта: код заказа тоже приходит после `/start`,
+     * а искать его в `telegram_link_codes` бессмысленно — там коды профилей.
+     * Регистрация для этого не нужна, поэтому так работает и гость: у него
+     * заказ лежит в `guest_checkouts`, и чат запоминается прямо в заказе.
+     */
+    if (/^\/start t[0-9a-f]{6,}$/i.test(text)) {
+      const code = text.slice('/start t'.length).trim().toLowerCase()
+      await deleteMessage(botToken, chatId, messageId)
+      await subscribeToOrder(botToken, supabase, chatId, code)
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // /start {code} — привязка аккаунта
@@ -1652,6 +1671,57 @@ async function handleJobAnswer(
   }
 
   return false
+}
+
+/**
+ * Подписка покупателя на свой заказ.
+ *
+ * Ищем код в обеих таблицах заказов: гостевые лежат отдельно, а покупателю всё
+ * равно, как это устроено внутри. Ответ показывает текущий статус — человек
+ * нажал кнопку и должен сразу увидеть, что попал куда надо.
+ */
+async function subscribeToOrder(
+  botToken: string,
+  // Тип клиента здесь нарочно широкий: обе таблицы заказов перебираются в
+  // цикле по имени, а строгий клиент на такое отвечает `never` — как и в
+  // общих модулях, где мы уже так делаем.
+  // deno-lint-ignore no-explicit-any
+  supabase: { from: (table: any) => any },
+  chatId: number,
+  code: string,
+): Promise<void> {
+  for (const table of ['orders', 'guest_checkouts']) {
+    const { data } = await supabase
+      .from(table)
+      .select('id, status, delivery_method')
+      .eq('tracking_code', code)
+      .maybeSingle()
+
+    const order = data as { id: string, status: string, delivery_method: string | null } | null
+    if (!order)
+      continue
+
+    await supabase.from(table).update({ telegram_chat_id: chatId }).eq('id', order.id)
+
+    await sendPlainMessage(
+      botToken,
+      chatId,
+      `✅ Заказ №${shortNumber(order.id)} — слежу за ним.\n\n`
+      + `Сейчас: ${statusLabel(order.status)}.\n\n`
+      + 'Пришлю сообщение, когда он подтвердится, поедет и будет доставлен.',
+    )
+    return
+  }
+
+  /*
+   * Кода нет — говорим об этом прямо, а не показываем приветствие: человек
+   * пришёл по кнопке из своего заказа и ждёт ответа именно про заказ.
+   */
+  await sendPlainMessage(
+    botToken,
+    chatId,
+    'Не нашёл такой заказ. Откройте страницу заказа на uhti.kz и нажмите кнопку «Следить в Telegram» ещё раз.',
+  )
 }
 
 const REPORT_INTRO = 'Отчёт по работе команды. За какой период?'
