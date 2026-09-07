@@ -130,15 +130,16 @@ Deno.serve(async (req) => {
             'Content-Type': 'text/plain; charset=UTF-8'
           },
 
+          status: 404
+        }
+      )
+    }
+
     /*
      * Номер заказа — цифровой, из колонки `order_number`. Хвост UUID остаётся
      * запасным вариантом: у заказов до нумерации его нет.
      */
     const orderNo = String(orderData?.order_number ?? orderId.slice(-6))
-          status: 404
-        }
-      )
-    }
 
     // Проверяем статус заказа
     if (orderData.status === 'confirmed' || orderData.status === 'delivered') {
