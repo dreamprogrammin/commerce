@@ -219,6 +219,7 @@ export const REPLY_BUTTONS = {
   mine: '👤 Мои заказы',
   team: '👥 Команда',
   report: '📊 Отчёт',
+  sales: '📈 Продажи',
 } as const
 
 /**
@@ -239,7 +240,7 @@ export function buildReplyKeyboard(withOwnerRow = false) {
   ]
 
   if (withOwnerRow)
-    rows.push([{ text: REPLY_BUTTONS.team }, { text: REPLY_BUTTONS.report }])
+    rows.push([{ text: REPLY_BUTTONS.sales }, { text: REPLY_BUTTONS.team }, { text: REPLY_BUTTONS.report }])
 
   return {
     keyboard: rows,
@@ -256,7 +257,7 @@ export function buildReplyKeyboard(withOwnerRow = false) {
  */
 export function buildOwnerDmKeyboard() {
   return {
-    keyboard: [[{ text: REPLY_BUTTONS.report }, { text: REPLY_BUTTONS.team }]],
+    keyboard: [[{ text: REPLY_BUTTONS.sales }, { text: REPLY_BUTTONS.report }, { text: REPLY_BUTTONS.team }]],
     resize_keyboard: true,
     is_persistent: true,
     selective: false,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BrandFilterState } from '@/composables/useBrandPageFilters'
-import type { Brand, IBreadcrumbItem, ProductLine } from '@/types'
+import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import {
   ArrowLeft,
   ChevronDown,
@@ -10,6 +10,13 @@ import {
 } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import { useCartStore } from '@/stores/publicStore/cartStore'
+
+interface BrandQuestion {
+  id: string
+  question_text: string
+  answer_text: string | null
+}
 
 const props = defineProps<{
   brand: Brand
@@ -17,10 +24,30 @@ const props = defineProps<{
   breadcrumbs: IBreadcrumbItem[]
   filterState: BrandFilterState
   brandStats?: { average_rating: number, total_reviews_count: number } | null
+  /** Отвеченные вопросы для секции FAQ. Грузятся на сервере, см. страницу. */
+  questions?: BrandQuestion[] | null
+  /** Соседние бренды для рельса перелинковки внизу страницы. */
+  otherBrands?: { name: string, slug: string, logo_url: string | null }[] | null
 }>()
 
 const fs = props.filterState
 const { getVariantUrl } = useSupabaseStorage()
+
+/*
+ * Витрина в шапке — первый товар выдачи. Отдельного поля «хит бренда» нет,
+ * и заводить его ради картинки значило бы просить владельца вести ещё один
+ * список руками. Порядок задаёт сортировка страницы.
+ *
+ * Объявлено ПОСЛЕ `fs`: внутри computed ссылка разрешилась бы и до него,
+ * но читать такой код сверху вниз невозможно.
+ */
+const heroProduct = computed(() => fs.products.value[0] ?? null)
+
+const cartStore = useCartStore()
+
+function addHeroToCart(product: ProductWithGallery) {
+  cartStore.addItem(product, 1)
+}
 
 const isSeoExpanded = ref(false)
 const seoContentRef = ref<HTMLElement | null>(null)
@@ -39,34 +66,38 @@ function toggleSeoExpanded() {
     <!-- Breadcrumbs -->
     <Breadcrumbs :items="breadcrumbs" />
 
-    <!-- Hero section -->
-    <div
-      class="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background"
-    >
+    <!-- Шапка бренда: карточка слева, витрина товара справа.
+         Двухколоночная раскладка — порт секции HERO из макета. Витрина
+         сама прячется, если у бренда нет товаров, и карточка занимает
+         всю ширину. -->
+    <div class="grid gap-[14px] md:gap-[22px] items-stretch lg:grid-cols-[1.04fr_0.96fr]">
       <div
-        class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]"
-      />
+        class="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/50 bg-gradient-to-b from-muted/40 to-background"
+      >
+        <div
+          class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]"
+        />
 
-      <div class="relative p-5 md:p-10 lg:p-12">
-        <div class="flex flex-col md:flex-row items-center gap-5 md:gap-8">
-          <div v-if="brand.logo_url" class="shrink-0">
-            <div
-              class="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white shadow-md ring-1 ring-border overflow-hidden"
-            >
-              <ProgressiveImage
-                :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
-                :alt="`Логотип ${brand.name}`"
-                object-fit="contain"
-                placeholder-type="shimmer"
-                :use-transform="false"
-                eager
-                class="w-full h-full"
-              />
+        <div class="relative p-5 md:p-10 lg:p-12">
+          <div class="flex flex-col md:flex-row items-center gap-5 md:gap-8">
+            <div v-if="brand.logo_url" class="shrink-0">
+              <div
+                class="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white shadow-md ring-1 ring-border overflow-hidden"
+              >
+                <ProgressiveImage
+                  :src="getVariantUrl(BUCKET_NAME_BRANDS, brand.logo_url, 'sm')"
+                  :alt="`Логотип ${brand.name}`"
+                  object-fit="contain"
+                  placeholder-type="shimmer"
+                  :use-transform="false"
+                  eager
+                  class="w-full h-full"
+                />
+              </div>
             </div>
-          </div>
 
-          <div class="flex-1 text-center md:text-left space-y-3">
-            <!--
+            <div class="flex-1 text-center md:text-left space-y-3">
+              <!--
               `seo_h1`, а не только название: страница бренда собирает 20 из 70
               кликов по сайту (Search Console, 90 дней), и голое «LEGO» в H1 не
               содержит ни слова о том, что это конструкторы. Поле заводится в
@@ -74,73 +105,87 @@ function toggleSeoExpanded() {
               поэтому у 32 существующих брендов ничего не меняется. Тот же
               фолбэк уже стоял в BrandCustomTemplate.
             -->
-            <h1
-              class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground"
-            >
-              {{ brand.seo_h1 || brand.name }}
-            </h1>
-
-            <!-- Brand Trust Score -->
-            <div
-              v-if="brandStats && brandStats.total_reviews_count > 0"
-              class="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm p-3 md:p-4 rounded-2xl border border-border/50 shadow-sm mt-4 transition-all hover:shadow-md group"
-            >
-              <div
-                class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform"
+              <h1
+                class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground"
               >
-                <Icon
-                  name="gravity-ui:star-fill"
-                  class="w-8 h-8 text-yellow-400"
-                />
-              </div>
+                {{ brand.seo_h1 || brand.name }}
+              </h1>
 
-              <div class="flex flex-col justify-center">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-xl font-black text-foreground">
-                    {{ brandStats.average_rating.toFixed(1).replace(".", ",") }}
-                  </span>
-                  <span
-                    class="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider"
-                  >
-                    Рейтинг бренда
-                  </span>
+              <!-- Brand Trust Score -->
+              <div
+                v-if="brandStats && brandStats.total_reviews_count > 0"
+                class="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm p-3 md:p-4 rounded-2xl border border-border/50 shadow-sm mt-4 transition-all hover:shadow-md group"
+              >
+                <div
+                  class="p-2 bg-yellow-400/10 rounded-xl group-hover:scale-110 transition-transform"
+                >
+                  <Icon
+                    name="gravity-ui:star-fill"
+                    class="w-8 h-8 text-yellow-400"
+                  />
                 </div>
 
-                <p class="text-[11px] text-muted-foreground">
-                  На основе
-                  <strong class="text-foreground">{{
-                    brandStats.total_reviews_count
-                  }}</strong>
-                  отзывов покупателей
-                </p>
-              </div>
-            </div>
+                <div class="flex flex-col justify-center">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xl font-black text-foreground">
+                      {{ brandStats.average_rating.toFixed(1).replace(".", ",") }}
+                    </span>
+                    <span
+                      class="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider"
+                    >
+                      Рейтинг бренда
+                    </span>
+                  </div>
 
-            <div class="flex flex-wrap gap-2 justify-center md:justify-start">
-              <span
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium"
-              >
-                <Package class="w-3.5 h-3.5" />
-                {{ fs.products.value.length }}
-                {{
-                  fs.products.value.length === 1
-                    ? "товар"
-                    : fs.products.value.length < 5
-                      ? "товара"
-                      : "товаров"
-                }}
-              </span>
-              <span
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium"
-              >
-                <ShieldCheck class="w-3.5 h-3.5" />
-                Оригинал
-              </span>
+                  <p class="text-[11px] text-muted-foreground">
+                    На основе
+                    <strong class="text-foreground">{{
+                      brandStats.total_reviews_count
+                    }}</strong>
+                    отзывов покупателей
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-2 justify-center md:justify-start">
+                <span
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium"
+                >
+                  <Package class="w-3.5 h-3.5" />
+                  {{ fs.products.value.length }}
+                  {{
+                    fs.products.value.length === 1
+                      ? "товар"
+                      : fs.products.value.length < 5
+                        ? "товара"
+                        : "товаров"
+                  }}
+                </span>
+                <span
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium"
+                >
+                  <ShieldCheck class="w-3.5 h-3.5" />
+                  Оригинал
+                </span>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- Кнопки шапки. Без них колонка упиралась в пустоту: рядом
+             витрина 380px, а содержимого — логотип, имя и бейджи. -->
+        <BrandHeroActions
+          :product-count="fs.products.value.length"
+          catalog-id="brand-catalog"
+        />
       </div>
+
+      <BrandHeroHighlight :product="heroProduct" @add="addHeroToCart" />
     </div>
+
+    <!-- Полоса доверия. Порт секции TRUST из макета: обещания магазина,
+         одинаковые для всех брендов. -->
+    <BrandTrustRow />
 
     <!-- Коллекции — карточки с логотипами -->
     <div v-if="productLines && productLines.length > 0">
@@ -194,7 +239,7 @@ function toggleSeoExpanded() {
     </div>
 
     <!-- Catalog header + Filter trigger -->
-    <div class="flex flex-row justify-between items-center gap-2">
+    <div id="brand-catalog" class="flex flex-row justify-between items-center gap-2">
       <h2 class="text-xl md:text-3xl font-bold">
         Каталог товаров
       </h2>
@@ -230,10 +275,17 @@ function toggleSeoExpanded() {
       <main class="flex-1 min-w-0">
         <ProductGridSkeleton v-if="fs.isLoading.value" />
 
-        <ProductGrid
-          v-else-if="fs.products.value.length > 0"
-          :products="fs.products.value"
-        />
+        <template v-else-if="fs.products.value.length > 0">
+          <ProductGrid :products="fs.products.value" />
+
+          <!-- Заполняет неполный ряд, когда товаров мало. Порог и причина —
+               в самом компоненте. -->
+          <BrandNotifyCard
+            class="mt-4"
+            :brand-name="brand.name"
+            :product-count="fs.products.value.length"
+          />
+        </template>
 
         <Card v-else class="border-2 border-dashed">
           <CardContent
@@ -272,8 +324,20 @@ function toggleSeoExpanded() {
       <BrandReviewsList :brand-id="brand.id" :brand-name="brand.name" />
     </div>
 
+    <!-- Частые вопросы. Данные лежали в brand_questions с самого начала,
+         но на странице не показывались нигде. -->
+    <div class="mt-6 md:mt-12">
+      <BrandFaqList :questions="questions" :brand-name="brand.name" />
+    </div>
+
     <!-- Описание бренда -->
-    <div v-if="brand.description" class="mt-6 md:mt-12 border-t pt-4 md:pt-8">
+    <!-- Описание и «Коротко о бренде» — одна секция в две колонки, как в
+         макете. Карточка фактов сама прячется, если поле brands.facts пусто,
+         и тогда описание занимает всю ширину. -->
+    <div
+      v-if="brand.description"
+      class="mt-6 md:mt-12 border-t pt-4 md:pt-8 grid gap-4 md:gap-[18px] items-start lg:grid-cols-[minmax(0,1fr)_320px]"
+    >
       <div class="space-y-3 md:space-y-4">
         <button
           class="flex items-center gap-2 text-left w-full group"
@@ -325,6 +389,18 @@ function toggleSeoExpanded() {
           {{ isSeoExpanded ? "Свернуть" : "Читать далее" }}
         </button>
       </div>
+
+      <!-- Вторая колонка секции: короткая справка (brands.facts).
+           Сама прячется, если поле пустое, — тогда описание занимает
+           всю ширину, и пустого места не остаётся. -->
+      <BrandFactsCard :facts="brand.facts" />
+    </div>
+
+    <!-- Перелинковка на соседние бренды. По данным Search Console
+         бренд-страницы дают половину верхней выдачи — им есть ради чего
+         ссылаться друг на друга. -->
+    <div class="mt-6 md:mt-12">
+      <BrandOtherBrands :brands="otherBrands" :current-slug="brand.slug" />
     </div>
   </div>
 </template>

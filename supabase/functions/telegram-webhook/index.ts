@@ -10,6 +10,7 @@ import {
 } from '../_shared/courierOffers.ts'
 import {
   ACTIVE_STATUSES,
+  formatAmount,
   orderCardMessage,
   orderListMessage,
   shortNumber,
@@ -20,6 +21,13 @@ import {
   parseReportData,
   reportKeyboard,
 } from '../_shared/teamReport.ts'
+import {
+  buildDigest,
+  ensurePlan,
+  planExplanation,
+  resetPlanToAuto,
+  setPlan,
+} from '../_shared/salesDigest.ts'
 import {
   applicationMessage,
   canManageStaff,
@@ -200,6 +208,8 @@ Deno.serve(async (req) => {
                 { command: 'order', description: '🔍 Заказ по номеру: /order 5e4fc2' },
                 { command: 'report', description: '📊 Отчёт по работе команды' },
                 { command: 'team', description: '👥 Список команды' },
+                { command: 'sales', description: '📈 Сводка по продажам' },
+                { command: 'plan', description: '🎯 План месяца: /plan 3000000' },
               ],
             }),
           })
@@ -238,6 +248,8 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               scope: { type: 'chat', chat_id: id },
               commands: [
+                { command: 'sales', description: '📈 Сводка по продажам' },
+                { command: 'plan', description: '🎯 План месяца: /plan 3000000' },
                 { command: 'report', description: '📊 Отчёт по работе команды' },
                 { command: 'team', description: '👥 Список команды' },
                 { command: 'panel', description: '🧭 Панель заказов (в рабочем чате)' },
@@ -896,17 +908,19 @@ async function handleManagerCommand(
    *
    * Сначала кнопки владельца, следом — списки заказов.
    */
-  if (text === REPLY_BUTTONS.team || text === REPLY_BUTTONS.report) {
+  if (text === REPLY_BUTTONS.team || text === REPLY_BUTTONS.report || text === REPLY_BUTTONS.sales) {
     if (messageId)
       await deleteMessageById(botToken, chatId, messageId)
 
     if (!await isOwner(supabase, from?.id ?? 0)) {
-      await sendRichMessage(botToken, chatId, 'Команда и отчёт — дела владельца.')
+      await sendRichMessage(botToken, chatId, 'Команда, отчёт и продажи — дела владельца.')
       return true
     }
 
     if (text === REPLY_BUTTONS.team)
       await sendTeamList(botToken, supabase, chatId)
+    else if (text === REPLY_BUTTONS.sales)
+      await sendRichMessage(botToken, chatId, await buildDigest(supabase, digestSlot()))
     else
       await sendRichMessage(botToken, chatId, REPORT_INTRO, reportKeyboard())
 
@@ -1002,6 +1016,24 @@ async function handleManagerCommand(
       return true
     }
     await sendTeamList(botToken, supabase, chatId)
+    return true
+  }
+
+  if (command === '/sales' || command === '/prodazhi') {
+    if (!await isOwner(supabase, from?.id ?? 0)) {
+      await sendRichMessage(botToken, chatId, 'Сводка по продажам доступна владельцу.')
+      return true
+    }
+    await sendRichMessage(botToken, chatId, await buildDigest(supabase, digestSlot()))
+    return true
+  }
+
+  if (command === '/plan') {
+    if (!await isOwner(supabase, from?.id ?? 0)) {
+      await sendRichMessage(botToken, chatId, 'План продаж ставит владелец.')
+      return true
+    }
+    await handlePlanCommand(botToken, supabase, chatId, text, from?.id ?? 0)
     return true
   }
 
@@ -1526,6 +1558,24 @@ async function handleJobAnswer(
     return true
   }
 
+  if (text === '/sales' || text === '/prodazhi' || text === REPLY_BUTTONS.sales) {
+    if (!await isOwner(supabase, from.id)) {
+      await sendRichMessage(botToken, chatId, 'Сводка по продажам доступна владельцу.')
+      return true
+    }
+    await sendRichMessage(botToken, chatId, await buildDigest(supabase, digestSlot()))
+    return true
+  }
+
+  if (text === '/plan' || text.startsWith('/plan ')) {
+    if (!await isOwner(supabase, from.id)) {
+      await sendRichMessage(botToken, chatId, 'План продаж ставит владелец.')
+      return true
+    }
+    await handlePlanCommand(botToken, supabase, chatId, text, from.id)
+    return true
+  }
+
   /*
    * `/start` от принятого владельца — не приветствие для покупателя, а его
    * кнопки. Раньше владелец в личке видел то же, что покупатель, и добраться
@@ -1605,6 +1655,75 @@ async function handleJobAnswer(
 }
 
 const REPORT_INTRO = 'Отчёт по работе команды. За какой период?'
+
+/**
+ * Какую сводку показывать по требованию: до полудня по Алматы — утреннюю
+ * («план на день»), после — вечернюю («итог дня»). По расписанию слот приходит
+ * явно, здесь же его выбирает время нажатия.
+ */
+function digestSlot(now: Date = new Date()): 'morning' | 'evening' {
+  const hour = new Date(now.getTime() + 5 * 60 * 60000).getUTCHours()
+  return hour < 12 ? 'morning' : 'evening'
+}
+
+/**
+ * `/plan` — показать план месяца, `/plan 3000000` — поставить.
+ *
+ * Пробелы и разделители в числе терпим: владелец пишет «3 000 000» или
+ * «3000000», и требовать одного вида — лишний повод для «команда не работает».
+ */
+async function handlePlanCommand(
+  botToken: string,
+  supabase: ReturnType<typeof createClient>,
+  chatId: number,
+  text: string,
+  telegramUserId: number,
+): Promise<void> {
+  const argument = text.replace(/^\/plan(@\S+)?/i, '').trim().toLowerCase()
+
+  /*
+   * `/plan auto` — забыть ручную цифру и посчитать заново. Нужна, когда
+   * владелец однажды поставил план руками и больше не хочет его вести.
+   */
+  if (argument === 'auto' || argument === 'авто') {
+    const plan = await resetPlanToAuto(supabase)
+    await sendRichMessage(
+      botToken,
+      chatId,
+      plan
+        ? `План на этот месяц пересчитан: *${formatAmount(plan.amount)}*\n\n_${planExplanation(plan)}_`
+        : 'Продаж в истории слишком мало, чтобы посчитать план. Поставьте вручную: `/plan 300000`',
+    )
+    return
+  }
+
+  const raw = argument.replace(/[\s_.,]/g, '')
+
+  if (!raw) {
+    const plan = await ensurePlan(supabase)
+    await sendRichMessage(
+      botToken,
+      chatId,
+      plan
+        ? `План на этот месяц: *${formatAmount(plan.amount)}*\n\n_${planExplanation(plan)}_\n\nПоменять: \`/plan 3000000\`, вернуть расчёт бота: \`/plan auto\``
+        : 'Продаж в истории слишком мало, чтобы посчитать план самому.\n\nПоставьте вручную: `/plan 300000`',
+    )
+    return
+  }
+
+  const amount = Number(raw)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    await sendRichMessage(botToken, chatId, 'Не понял сумму. Напишите так: `/plan 3000000`')
+    return
+  }
+
+  await setPlan(supabase, amount, telegramUserId)
+  await sendRichMessage(
+    botToken,
+    chatId,
+    `План на этот месяц: *${formatAmount(amount)}* — поставлен вручную.\n\nВернуть расчёт бота: \`/plan auto\``,
+  )
+}
 
 /** Список команды одним сообщением. Один текст на кнопку, команду и callback. */
 async function sendTeamList(
