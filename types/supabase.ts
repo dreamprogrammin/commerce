@@ -2883,6 +2883,21 @@ export interface Database {
           slug: string
         }[]
       }
+      get_product_questions: {
+        Args: { p_product_id: string }
+        Returns: {
+          answer_text: string
+          answered_at: string
+          created_at: string
+          id: string
+          is_auto_generated: boolean
+          is_mine: boolean
+          is_published: boolean
+          product_id: string
+          profiles: Json
+          question_text: string
+        }[]
+      }
       get_product_reviews: {
         Args: { p_product_id: string }
         Returns: {

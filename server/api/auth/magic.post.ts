@@ -7,13 +7,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid token' })
   }
 
-  const config = useRuntimeConfig() // ← так читаем конфиг
+  const config = useRuntimeConfig()
 
-  console.log('[magic] config keys:', {
-    hasUrl: !!process.env.SUPABASE_URL,
-    hasServiceKey: !!config.supabaseServiceRoleKey,
-    serviceKeyLength: config.supabaseServiceRoleKey?.length ?? 0,
-  })
+  // Здесь стоял отладочный console.log с длиной сервисного ключа — он писал
+  // сведения о секрете в логи на каждый вход. Убрано аудитом 7 сентября 2026.
 
   const supabaseUrl = process.env.SUPABASE_URL || ''
   const supabaseServiceKey = config.supabaseServiceRoleKey // ← не process.env напрямую

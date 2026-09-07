@@ -230,7 +230,7 @@ watch(() => questions.value, (newQuestions) => {
 
           <!-- Кнопка удаления для владельца -->
           <button
-            v-if="!q.is_auto_generated && authStore.user?.id === q.user_id"
+            v-if="!q.is_auto_generated && q.is_mine"
             class="text-xs text-destructive hover:underline flex items-center gap-1 mt-2"
             @click="async () => {
               const ok = await questionsStore.deleteQuestion(q.id)
