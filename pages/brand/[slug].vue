@@ -140,6 +140,44 @@ const { data: brandProductLines } = await useAsyncData(
  * невидима роботу — она ещё и толкает страницу вниз, чем уже отличились
  * «Коллекции» (см. комментарий к `brandProductLines` выше).
  */
+/*
+ * Частые вопросы бренда для секции FAQ.
+ *
+ * Таблица `brand_questions` существовала и наполнялась (50 записей,
+ * `generate_brand_questions`), но на странице не показывалась нигде — блока
+ * FAQ в шаблоне не было вовсе.
+ *
+ * Через `useAsyncData`, а не клиентским запросом: вопросы и ответы — это
+ * текст, ради которого страницу и открывают из поиска, он обязан быть в
+ * серверной разметке. Ровно та беда, что была у товаров бренд-страниц до
+ * правки 22 августа.
+ *
+ * Берём только отвеченные и по порядку `priority_order`: в таблице лежат и
+ * заготовки без ответа, им в публичном FAQ делать нечего.
+ */
+const { data: brandQuestions } = await useAsyncData(
+  `brand-questions-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return []
+
+    const { data, error } = await supabase
+      .from('brand_questions')
+      .select('id, question_text, answer_text, priority_order')
+      .eq('brand_id', brand.value.id)
+      .not('answer_text', 'is', null)
+      .order('priority_order', { ascending: true })
+      .limit(8)
+
+    if (error) {
+      console.error('Не удалось загрузить вопросы бренда:', error)
+      return []
+    }
+    return data ?? []
+  },
+  { watch: [brand] },
+)
+
 const { data: brandCategoryLinks } = await useAsyncData(
   `brand-category-links-${brandSlug}`,
   async () => {
@@ -805,6 +843,8 @@ useIndexableRobotsRule(
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
+        :brand-stats="brandStats"
+        :questions="brandQuestions"
       />
 
       <!--
