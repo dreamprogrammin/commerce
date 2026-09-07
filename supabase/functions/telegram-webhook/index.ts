@@ -13,7 +13,8 @@ import {
   formatAmount,
   orderCardMessage,
   orderListMessage,
-  shortNumber,
+  orderNumber,
+  statusLabel,
   type OrderSummary,
 } from '../_shared/orderCard.ts'
 import {
@@ -205,7 +206,7 @@ Deno.serve(async (req) => {
                 { command: 'job', description: '💼 Анкета сотрудника' },
                 { command: 'orders', description: '📋 Активные заказы' },
                 { command: 'my', description: '👤 Мои заказы' },
-                { command: 'order', description: '🔍 Заказ по номеру: /order 5e4fc2' },
+                { command: 'order', description: '🔍 Заказ по номеру: /order 1042' },
                 { command: 'report', description: '📊 Отчёт по работе команды' },
                 { command: 'team', description: '👥 Список команды' },
                 { command: 'sales', description: '📈 Сводка по продажам' },
@@ -384,6 +385,24 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
+    }
+
+    /*
+     * `/start t<код>` — подписка на заказ.
+     *
+     * Разбираем ДО привязки аккаунта: код заказа тоже приходит после `/start`,
+     * а искать его в `telegram_link_codes` бессмысленно — там коды профилей.
+     * Регистрация для этого не нужна, поэтому так работает и гость: у него
+     * заказ лежит в `guest_checkouts`, и чат запоминается прямо в заказе.
+     */
+    if (/^\/start t[0-9a-f]{6,}$/i.test(text)) {
+      const code = text.slice('/start t'.length).trim().toLowerCase()
+      await deleteMessage(botToken, chatId, messageId)
+      await subscribeToOrder(botToken, supabase, chatId, code)
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // /start {code} — привязка аккаунта
@@ -722,17 +741,24 @@ async function handleOrderAction(
 
   // Отметить доставленным может только тот курьер, который её вёз: иначе
   // заказ закроет любой, кому пришло предложение.
+  // Номер берём здесь же: он понадобится в ответе курьеру, а второй запрос в
+  // базу за той же строкой не нужен.
+  let deliveredOrder: { id: string, order_number?: number | null } = { id: parsed.orderId }
+
   if (canDeliver && parsed.action === 'dlv') {
     const { data: order } = await supabase
       .from(parsed.table)
-      .select('courier_staff_id')
+      .select('id, order_number, courier_staff_id')
       .eq('id', parsed.orderId)
       .maybeSingle()
 
-    if ((order as { courier_staff_id?: string } | null)?.courier_staff_id !== courier!.id) {
+    const row = order as { id: string, order_number?: number | null, courier_staff_id?: string } | null
+    if (row?.courier_staff_id !== courier!.id) {
       await answerCallback(botToken, callbackQuery.id, 'Эту доставку везёт другой курьер', true)
       return
     }
+
+    deliveredOrder = row
   }
 
   const result = await runOrderAction(
@@ -756,7 +782,7 @@ async function handleOrderAction(
     const chatId = callbackQuery.message?.chat?.id
     const messageId = callbackQuery.message?.message_id
     if (chatId && messageId)
-      await editMessage(botToken, chatId, messageId, courierClosedText(parsed.orderId, 'delivered'), undefined)
+      await editMessage(botToken, chatId, messageId, courierClosedText(deliveredOrder, 'delivered'), undefined)
   }
 }
 
@@ -865,7 +891,7 @@ async function fetchOrders(
   filter: (query: any) => any,
 ): Promise<OrderSummary[]> {
   const columns
-    = 'id, status, final_amount, created_at, delivery_method, delivery_address, comment, courier_name, assigned_admin_name, assigned_admin_username'
+    = 'id, order_number, status, final_amount, created_at, delivery_method, delivery_address, comment, courier_name, assigned_admin_name, assigned_admin_username'
 
   const [users, guests] = await Promise.all([
     filter(supabase.from('orders').select(`${columns}, customer_name, customer_phone`)),
@@ -1081,13 +1107,14 @@ async function handleManagerCommand(
   if (command === '/order') {
     const query = text.split(/\s+/)[1]?.trim().replace(/^#/, '')
     if (!query) {
-      await sendRichMessage(botToken, chatId, 'Укажите номер заказа: `/order 5e4fc2`')
+      await sendRichMessage(botToken, chatId, 'Укажите номер заказа: `/order 1042`')
       return true
     }
 
     /*
-     * Ищем по хвосту id — это и есть «номер заказа», который видят и
-     * покупатель, и менеджер.
+     * Ищем по номеру заказа — тому самому, что видит покупатель. Номер теперь
+     * цифровой, но старые бумажки и переписка полны прежних «5e4fc2», поэтому
+     * хвост id продолжаем понимать.
      *
      * Фильтр применяется В КОДЕ, а не запросом. Колонка `id` типа uuid, и
      * приведение прямо в фильтре PostgREST не проходит: проверено на локальной
@@ -1096,14 +1123,13 @@ async function handleManagerCommand(
      *
      * Двухсот хватает с запасом: на проде 3 сентября 2026 всего 43 заказа за
      * всё время, и ищут обычно свежие. Когда счёт пойдёт на тысячи, поиск
-     * стоит перенести в RPC с `right(id::text, 6) = p_query` — тогда и
-     * ограничение уйдёт.
+     * стоит перенести в RPC — тогда и ограничение уйдёт.
      */
     const recent = await fetchOrders(supabase, (q: any) =>
       q.order('created_at', { ascending: false }).limit(200))
     const needle = query.toLowerCase()
     const orders = recent
-      .filter(o => o.id.toLowerCase().endsWith(needle))
+      .filter(o => String(o.order_number ?? '') === needle || o.id.toLowerCase().endsWith(needle))
       .slice(0, 5)
 
     if (orders.length === 0) {
@@ -1184,22 +1210,23 @@ async function claimDelivery(
     // случаях гасим кнопку, чтобы человек не жал её ещё раз.
     const { data: taken } = await supabase
       .from(table)
-      .select('id, courier_name, status')
+      .select('id, order_number, courier_name, status')
       .eq('id', orderId)
       .maybeSingle()
 
-    const row = taken as { courier_name?: string | null; status?: string } | null
+    const row = taken as
+      { id: string; order_number?: number | null; courier_name?: string | null; status?: string } | null
     const holder = row?.courier_name
 
     if (holder) {
       await answerCallback(botToken, callbackQuery.id, `Доставку уже взял ${holder}`, true)
       if (chatId && messageId)
-        await editMessage(botToken, chatId, messageId, takenByText({ id: orderId } as never, holder), undefined)
+        await editMessage(botToken, chatId, messageId, takenByText((row ?? { id: orderId }) as never, holder), undefined)
     }
     else {
       await answerCallback(botToken, callbackQuery.id, 'Эта доставка уже неактуальна', true)
       if (chatId && messageId)
-        await editMessage(botToken, chatId, messageId, courierClosedText(orderId, row?.status ?? 'cancelled'), undefined)
+        await editMessage(botToken, chatId, messageId, courierClosedText(row ?? { id: orderId }, row?.status ?? 'cancelled'), undefined)
     }
     return
   }
@@ -1652,6 +1679,58 @@ async function handleJobAnswer(
   }
 
   return false
+}
+
+/**
+ * Подписка покупателя на свой заказ.
+ *
+ * Ищем код в обеих таблицах заказов: гостевые лежат отдельно, а покупателю всё
+ * равно, как это устроено внутри. Ответ показывает текущий статус — человек
+ * нажал кнопку и должен сразу увидеть, что попал куда надо.
+ */
+async function subscribeToOrder(
+  botToken: string,
+  // Тип клиента здесь нарочно широкий: обе таблицы заказов перебираются в
+  // цикле по имени, а строгий клиент на такое отвечает `never` — как и в
+  // общих модулях, где мы уже так делаем.
+  // deno-lint-ignore no-explicit-any
+  supabase: { from: (table: any) => any },
+  chatId: number,
+  code: string,
+): Promise<void> {
+  for (const table of ['orders', 'guest_checkouts']) {
+    const { data } = await supabase
+      .from(table)
+      .select('id, order_number, status, delivery_method')
+      .eq('tracking_code', code)
+      .maybeSingle()
+
+    const order = data as
+      { id: string, order_number?: number | null, status: string, delivery_method: string | null } | null
+    if (!order)
+      continue
+
+    await supabase.from(table).update({ telegram_chat_id: chatId }).eq('id', order.id)
+
+    await sendPlainMessage(
+      botToken,
+      chatId,
+      `✅ Заказ №${orderNumber(order)} — слежу за ним.\n\n`
+      + `Сейчас: ${statusLabel(order.status)}.\n\n`
+      + 'Пришлю сообщение, когда он подтвердится, поедет и будет доставлен.',
+    )
+    return
+  }
+
+  /*
+   * Кода нет — говорим об этом прямо, а не показываем приветствие: человек
+   * пришёл по кнопке из своего заказа и ждёт ответа именно про заказ.
+   */
+  await sendPlainMessage(
+    botToken,
+    chatId,
+    'Не нашёл такой заказ. Откройте страницу заказа на uhti.kz и нажмите кнопку «Следить в Telegram» ещё раз.',
+  )
 }
 
 const REPORT_INTRO = 'Отчёт по работе команды. За какой период?'

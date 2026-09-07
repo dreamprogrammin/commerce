@@ -26,6 +26,8 @@ export interface OrderItem {
 
 export interface UserOrder {
   id: string
+  /** Цифровой номер заказа — то, что видит покупатель вместо хвоста UUID. */
+  order_number?: number | null
   created_at: string
   status: string
   final_amount: number
@@ -81,6 +83,7 @@ export function useUserOrders() {
         .from('orders')
         .select(`
           id,
+          order_number,
           created_at,
           status,
           final_amount,

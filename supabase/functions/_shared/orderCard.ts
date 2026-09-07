@@ -24,6 +24,7 @@ export interface OrderItem {
 
 export interface OrderSummary {
   id: string
+  order_number?: number | null
   status: string
   final_amount: number | string | null
   created_at: string
@@ -46,6 +47,18 @@ export interface OrderSummary {
 /** Короткий номер заказа — последние шесть знаков id, как в чате и на сайте. */
 export function shortNumber(id: string): string {
   return id.slice(-6)
+}
+
+/**
+ * Номер заказа для человека.
+ *
+ * Раньше это был хвост UUID — «50B61F», «f973cb». Владелец попросил цифры:
+ * такой номер не продиктуешь по телефону, а ноль и «O» в нём не различить.
+ * Теперь у заказа есть сквозной числовой номер; хвост id остаётся запасным
+ * вариантом на случай строки, до которой нумерация не дошла.
+ */
+export function orderNumber(order: { order_number?: number | string | null, id: string }): string {
+  return order.order_number ? String(order.order_number) : shortNumber(order.id)
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -118,7 +131,7 @@ export function assignedTo(order: OrderSummary): string {
  */
 export function orderListLine(order: OrderSummary, now?: Date): string {
   const parts = [
-    `\`${shortNumber(order.id)}\``,
+    `\`${orderNumber(order)}\``,
     statusLabel(order.status),
     formatAmount(order.final_amount),
     escapeMarkdown(customerName(order)),
@@ -147,7 +160,7 @@ export function orderListMessage(
 /** Компактная карточка одного заказа — ответ на «где заказ 5e4fc2». */
 export function orderCardMessage(order: OrderSummary, now?: Date): string {
   const lines = [
-    `*Заказ №${shortNumber(order.id)}* — ${statusLabel(order.status)}`,
+    `*Заказ №${orderNumber(order)}* — ${statusLabel(order.status)}`,
     '',
     `*Сумма:* ${formatAmount(order.final_amount)}`,
     `*Покупатель:* ${escapeMarkdown(customerName(order))}`,

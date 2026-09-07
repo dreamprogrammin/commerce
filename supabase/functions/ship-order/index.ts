@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
 
     // Получаем данные заказа
     let orderData: {
+      order_number?: number | null
       status: string
       telegram_message_id?: string | null
       final_amount?: number
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
     if (tableName === 'orders') {
       const { data } = await supabase
         .from('orders')
-        .select('status, telegram_message_id, final_amount, user_id, delivery_method')
+        .select('order_number, status, telegram_message_id, final_amount, user_id, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data as any
@@ -102,7 +103,7 @@ Deno.serve(async (req) => {
     } else {
       const { data } = await supabase
         .from('guest_checkouts')
-        .select('status, telegram_message_id, final_amount, guest_name, delivery_method')
+        .select('order_number, status, telegram_message_id, final_amount, guest_name, delivery_method')
         .eq('id', orderId)
         .single()
       orderData = data
@@ -114,6 +115,12 @@ Deno.serve(async (req) => {
         status: 404,
       })
     }
+
+    /*
+     * Номер заказа — цифровой, из колонки `order_number`. Хвост UUID остаётся
+     * запасным вариантом: у заказов до нумерации его нет.
+     */
+    const orderNo = String(orderData?.order_number ?? orderId.slice(-6))
 
     if (orderData.status === 'shipped') {
       return new Response('⚠️ ПРЕДУПРЕЖДЕНИЕ\n\nЗаказ уже передан курьеру', {
@@ -206,7 +213,7 @@ Deno.serve(async (req) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: adminChatId,
-              text: `⚠️ Доставку №${orderId.slice(-6)} некому передать: ни курьеров, ни принятых владельцев.\n\nЧеловек заводится анкетой — /job в личке бота, дальше вы подтверждаете заявку.`,
+              text: `⚠️ Доставку №${orderNo} некому передать: ни курьеров, ни принятых владельцев.\n\nЧеловек заводится анкетой — /job в личке бота, дальше вы подтверждаете заявку.`,
             }),
           })
         }
@@ -272,13 +279,13 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
           chat_id: orderData.telegram_chat_id,
           title: wording.customerTitle,
-          body: wording.customerBody(orderId.slice(-6)),
+          body: wording.customerBody(orderNo),
         }),
       })
     }
 
     return new Response(
-      `✅ ${wording.adminTitle}\n\n📦 Заказ №${orderId.slice(-6)}\n${wording.adminNote}`,
+      `✅ ${wording.adminTitle}\n\n📦 Заказ №${orderNo}\n${wording.adminNote}`,
       { headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=UTF-8' } }
     )
   } catch (error) {

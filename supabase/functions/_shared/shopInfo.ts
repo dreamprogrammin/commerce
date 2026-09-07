@@ -15,6 +15,8 @@
  * заменится выборкой.
  */
 
+import { orderNumber } from './orderCard.ts'
+
 export const PICKUP_POINT = {
   address: 'г. Алматы, мкр. Шапагат, ул. Амангельды',
   hours: 'ежедневно 10:00–20:00',
@@ -88,6 +90,7 @@ export function deliveredWording(method: DeliveryMethod) {
 /** Заказ в том виде, в каком его нужно знать курьеру. */
 export interface CourierOrder {
   id: string
+  order_number?: number | null
   final_amount: number | string | null
   payment_method?: string | null
   delivery_address?: { city?: string; line1?: string } | null
@@ -152,7 +155,7 @@ export function courierMessage(order: CourierOrder): string {
   const cash = !order.payment_method || order.payment_method === 'cash'
 
   const lines = [
-    `*Доставка №${order.id.slice(-6)}*`,
+    `*Доставка №${orderNumber(order)}*`,
     '',
     address ? `📍 ${address}` : '📍 адрес не указан',
   ]

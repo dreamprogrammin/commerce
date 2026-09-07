@@ -32,7 +32,24 @@ const personalizationStore = usePersonalizationStore()
 
 const fullOrderId = computed(() => route.params.id as string)
 // Короткий номер — те же последние 6 символов, что показывает бот и профиль.
-const orderNo = computed(() => fullOrderId.value.slice(-6).toUpperCase())
+/**
+ * Номер заказа — цифрами.
+ *
+ * Раньше показывали хвост UUID («50B61F»): такой номер не продиктуешь по
+ * телефону и легко спутать ноль с буквой O. Теперь у заказа есть свой номер,
+ * но гость собственный заказ прочитать не может (RLS отдаёт guest_checkouts
+ * админам), поэтому число отдаёт узкая функция базы по id из адреса страницы.
+ */
+const orderNumber = ref<number | null>(null)
+const orderNo = computed(() =>
+  orderNumber.value ? String(orderNumber.value) : fullOrderId.value.slice(-6).toUpperCase(),
+)
+
+async function fetchOrderNumber() {
+  const { data } = await supabase.rpc('order_number_by_id', { p_order_id: fullOrderId.value })
+  if (data)
+    orderNumber.value = Number(data)
+}
 
 const isAuthenticated = computed(() => !!user.value)
 const hasCartItems = computed(() => cartStore.items.length > 0)
@@ -69,6 +86,14 @@ interface OrderRow {
 }
 
 const order = ref<OrderRow | null>(null)
+
+/**
+ * Ссылка «следить в Telegram». Ведёт в эдж-функцию, та проверяет заказ и
+ * перебрасывает в бота с кодом отслеживания — см. пояснение у кнопки.
+ */
+const trackingUrl = computed(() =>
+  `${useRuntimeConfig().public.supabase.url}/functions/v1/track-order?order=${fullOrderId.value}`,
+)
 
 /**
  * Полные данные заказа грузим только для авторизованных.
@@ -216,6 +241,9 @@ function imageUrl(path: string | null) {
 onMounted(async () => {
   personalizationStore.invalidate()
 
+  // Номер нужен и гостю, и авторизованному — он на этой странице главный.
+  await fetchOrderNumber()
+
   if (isAuthenticated.value)
     await fetchOrder()
 
@@ -298,9 +326,14 @@ onMounted(async () => {
               <span class="leading-[1.45] text-primary">•</span>
               Наш менеджер скоро свяжется с вами для подтверждения деталей заказа
             </span>
+            <!--
+              Здесь было обещание прислать статус на телефон. SMS у магазина
+              нет вовсе: ни провайдера, ни интеграции — проверено 7 сентября
+              2026. Обещать то, чего не будет, хуже, чем не обещать ничего.
+            -->
             <span class="flex items-start gap-[9px] text-sm leading-[1.45] text-muted-foreground">
               <span class="leading-[1.45] text-primary">•</span>
-              Мы отправим уведомление о статусе заказа на указанный номер телефона
+              Статус заказа пришлём в Telegram — нажмите кнопку ниже
             </span>
           </span>
         </div>
@@ -339,6 +372,36 @@ onMounted(async () => {
           </div>
         </section>
 
+        <!-- ============ ГОСТЬ: СЛЕДИТЬ В TELEGRAM ============ -->
+        <!--
+          Гостю статус заказа не приходил никуда: триггер уведомлений
+          отсекает заказы без user_id первой строкой, а SMS у магазина нет.
+          Кнопка ведёт в бота, тот запоминает чат за этим заказом и присылает
+          «подтверждён», «в пути», «доставлен». Регистрация не нужна.
+
+          Адрес собирается через функцию `track-order`, а не напрямую на
+          t.me: ник бота знает только сам бот (getMe по токену), а гостевой
+          заказ покупатель прочитать не может — RLS отдаёт guest_checkouts
+          лишь админам, и код отслеживания со страницы не достать.
+        -->
+        <section
+          v-if="!isAuthenticated"
+          class="os-card-blue flex flex-wrap items-center gap-4 px-6 py-[22px]"
+        >
+          <span class="os-badge os-badge--blue">
+            <Icon name="logos:telegram" class="size-5" />
+          </span>
+          <span class="flex min-w-[180px] flex-1 flex-col gap-[3px]">
+            <span class="text-[17px] font-bold">Следить за заказом в Telegram</span>
+            <span class="text-sm leading-[1.4] text-muted-foreground">
+              Пришлём, когда заказ подтвердится, поедет и будет доставлен
+            </span>
+          </span>
+          <a :href="trackingUrl" target="_blank" rel="noopener" class="os-cta h-[46px] shrink-0 px-[22px]">
+            Включить
+          </a>
+        </section>
+
         <!-- ============ ГОСТЬ: ПРИГЛАШЕНИЕ ВОЙТИ ============ -->
         <section
           v-if="!isAuthenticated"
@@ -348,9 +411,15 @@ onMounted(async () => {
             <Icon name="lucide:user" class="size-5 text-primary" />
           </span>
           <span class="flex min-w-[180px] flex-1 flex-col gap-[3px]">
-            <span class="text-[17px] font-bold">Войдите, чтобы следить за заказом</span>
+            <!--
+              Заголовок был «Войдите, чтобы следить за заказом» — ровно то же
+              обещание, что и в блоке Telegram прямо над ним. Два одинаковых
+              предложения подряд заставляют выбирать там, где выбора нет:
+              следить проще в боте, а вход нужен ради истории и бонусов.
+            -->
+            <span class="text-[17px] font-bold">Войдите в личный кабинет</span>
             <span class="text-sm leading-[1.4] text-muted-foreground">
-              Статус, история заказов и бонусы — в личном кабинете
+              История заказов, бонусы и повтор покупки в один клик
             </span>
           </span>
           <!-- В макете это ссылка на главную: у прототипа нет модалки входа.

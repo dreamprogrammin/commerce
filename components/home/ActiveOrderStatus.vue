@@ -388,7 +388,7 @@ watch(() => displayOrder.value?.status, (newStatus, oldStatus) => {
 
                   <!-- Номер заказа -->
                   <h3 class="font-bold text-sm text-card-foreground">
-                    №{{ displayOrder.id.slice(-6) }}
+                    №{{ displayOrder.order_number ?? displayOrder.id.slice(-6) }}
                   </h3>
                 </div>
 

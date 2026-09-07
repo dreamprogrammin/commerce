@@ -17,6 +17,7 @@
  * взял: рассылать контакты покупателя всем, кто мимо, незачем.
  */
 
+import { orderNumber } from './orderCard.ts'
 import { type CourierOrder, courierMessage } from './shopInfo.ts'
 import { buildCallbackData, tableToCode } from './orderActions.ts'
 
@@ -100,7 +101,7 @@ export function offerText(order: CourierOrder, toOwner = false): string {
     : '\n\nНажмите «Беру», если сможете отвезти.'
 
   return courierMessage({ ...order, customer_phone: null, guest_phone: null, customer_name: null, guest_name: null })
-    .replace(`*Доставка №${order.id.slice(-6)}*`, `*Новая доставка №${order.id.slice(-6)}*`)
+    .replace(`*Доставка №${orderNumber(order)}*`, `*Новая доставка №${orderNumber(order)}*`)
     + tail
 }
 
@@ -114,7 +115,7 @@ export function assignedText(order: CourierOrder): string {
  * данные покупателя в чужой переписке остаются висеть.
  */
 export function takenByText(order: CourierOrder, courierName: string): string {
-  return `Доставку №${order.id.slice(-6)} взял ${courierName}.`
+  return `Доставку №${orderNumber(order)} взял ${courierName}.`
 }
 
 export function offerKeyboard(table: string, orderId: string) {
@@ -135,7 +136,7 @@ export function deliveredKeyboard(table: string, orderId: string) {
 
 /** Куда писать менеджерам, что доставку забрали. */
 export function managerNoticeText(order: CourierOrder, courierName: string): string {
-  return `🚗 Доставку №${order.id.slice(-6)} везёт ${courierName}`
+  return `🚗 Доставку №${orderNumber(order)} везёт ${courierName}`
 }
 
 /** Для журнала: `tak:o:<uuid>` читается в логах как есть. */
@@ -149,10 +150,13 @@ function apiBase(): string {
 }
 
 /** Чем предложение заканчивается для курьера. */
-export function courierClosedText(orderId: string, status: string): string {
+export function courierClosedText(
+  order: { id: string, order_number?: number | null },
+  status: string,
+): string {
   return status === 'delivered'
-    ? `✅ Доставка №${orderId.slice(-6)} завершена. Спасибо!`
-    : `❌ Доставка №${orderId.slice(-6)} отменена.`
+    ? `✅ Доставка №${orderNumber(order)} завершена. Спасибо!`
+    : `❌ Доставка №${orderNumber(order)} отменена.`
 }
 
 /**
@@ -189,11 +193,12 @@ export async function closeCourierOffers(
 
   const { data: order } = await supabase
     .from(table)
-    .select('courier_staff_id')
+    .select('id, order_number, courier_staff_id')
     .eq('id', orderId)
     .maybeSingle()
 
-  const staffId = (order as { courier_staff_id?: string | null } | null)?.courier_staff_id ?? null
+  const row = order as { id: string, order_number?: number | null, courier_staff_id?: string | null } | null
+  const staffId = row?.courier_staff_id ?? null
   let holder: number | null = null
   if (staffId) {
     const { data: staff } = await supabase
@@ -204,7 +209,7 @@ export async function closeCourierOffers(
     holder = (staff as { telegram_user_id?: number } | null)?.telegram_user_id ?? null
   }
 
-  const text = courierClosedText(orderId, status)
+  const text = courierClosedText(row ?? { id: orderId }, status)
   let closed = 0
 
   for (const offer of rows) {

@@ -83,7 +83,7 @@ function buildRow(order: UserOrder) {
 
   return {
     id: order.id,
-    number: order.id.slice(-6),
+    number: String(order.order_number ?? order.id.slice(-6)),
     date: formatOrderDate(order.created_at),
     itemsLabel: `${items.length} ${pluralizeRu(items.length, ['товар', 'товара', 'товаров'])}`,
     badge,

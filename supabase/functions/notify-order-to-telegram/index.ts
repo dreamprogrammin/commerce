@@ -54,6 +54,8 @@ interface OrderProfile {
 
 interface OrderData {
   id: string
+  /** Цифровой номер заказа — то, что видит покупатель. */
+  order_number?: number | null
   final_amount: number
   created_at: string
   delivery_method: string
@@ -163,7 +165,7 @@ Deno.serve(async (req) => {
       const result = await supabaseAdmin
         .from('guest_checkouts')
         .select(`
-          id, final_amount, created_at, delivery_method, payment_method,
+          id, order_number, final_amount, created_at, delivery_method, payment_method,
           delivery_address, guest_name, guest_phone, guest_email, status, source, comment,
           delivery_date, delivery_slot, promo_code, promo_discount,
           pickup_point:pickup_points(name, address),
@@ -196,6 +198,7 @@ Deno.serve(async (req) => {
         // Преобразуем структуру гостевого заказа к общему формату
         orderData = {
           id: guestData.id,
+          order_number: (guestData as { order_number?: number | null }).order_number ?? null,
           final_amount: guestData.final_amount,
           created_at: guestData.created_at,
           delivery_method: guestData.delivery_method,
@@ -228,7 +231,7 @@ Deno.serve(async (req) => {
       const result = await supabaseAdmin
         .from('orders')
         .select(`
-          id, final_amount, created_at, delivery_method, payment_method,
+          id, order_number, final_amount, created_at, delivery_method, payment_method,
           delivery_address, user_id, status, source, bonuses_awarded, bonuses_spent,
           customer_name, customer_phone, comment, delivery_date, delivery_slot,
           promo_code, promo_discount,
@@ -452,7 +455,13 @@ Deno.serve(async (req) => {
     })
 
     // Формируем основное текстовое сообщение
-    let messageText = `🔔 *Новый заказ №${orderId.slice(-6)}*\n\n`
+    /*
+     * Номер цифровой: владелец попросил убрать буквы — хвост UUID вроде
+     * «f973cb» невозможно продиктовать по телефону. Для заказов, оформленных
+     * до нумерации, остаётся прежний вид.
+     */
+    const orderNo = String(orderData?.order_number ?? orderId.slice(-6))
+    let messageText = `🔔 *Новый заказ №${orderNo}*\n\n`
     messageText += `*Дата:* ${orderDate}\n`
     messageText += `*Канал:* ${orderSource}\n`
     messageText += `*Тип:* ${customerType}\n`
