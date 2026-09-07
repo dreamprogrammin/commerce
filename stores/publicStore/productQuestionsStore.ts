@@ -6,7 +6,11 @@ import { useAuthStore } from '../auth'
 export interface ProductQuestion {
   id: string
   product_id: string
-  user_id: string
+  /**
+   * Свой ли вопрос. На смену `user_id`: внутренний id аккаунта наружу больше
+   * не отдаётся (аудит 7 сентября 2026), сервер сам сравнивает автора.
+   */
+  is_mine: boolean
   question_text: string
   answer_text: string | null
   answered_at: string | null
@@ -26,13 +30,16 @@ export const useProductQuestionsStore = defineStore('productQuestionsStore', () 
   const questions = ref<ProductQuestion[]>([])
   const isLoading = ref(false)
 
+  /*
+   * Через RPC, а не прямым запросом — как публичный список отзывов.
+   * Причины те же: имя автора анониму отдаёт SECURITY DEFINER-функция (join к
+   * profiles ему закрыт RLS), а внутренний user_id наружу не уходит вовсе —
+   * вместо него is_mine.
+   */
   async function fetchQuestions(productId: string): Promise<ProductQuestion[]> {
-    const { data, error } = await supabase
-      .from('product_questions')
-      .select('id, product_id, user_id, question_text, answer_text, answered_at, is_published, is_auto_generated, created_at, profiles!product_questions_profile_fk(first_name, last_name)')
-      .eq('product_id', productId)
-      .eq('is_published', true)
-      .order('created_at', { ascending: false })
+    const { data, error } = await supabase.rpc('get_product_questions', {
+      p_product_id: productId,
+    })
 
     if (error)
       throw error

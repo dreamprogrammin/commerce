@@ -3,6 +3,22 @@ definePageMeta({
   layout: 'blank',
 })
 
+/*
+ * Токен входа едет в адресе (?token=…) — иначе ссылку не сделать. Чтобы он не
+ * утёк, страница:
+ *   — не шлёт Referer никуда (referrer: no-referrer): открытая по ссылке с
+ *     токеном страница не должна передать его сторонним запросам;
+ *   — закрыта от индексации;
+ *   — стирает токен из адреса сразу после чтения (ниже, history.replaceState),
+ *     чтобы он не оставался в истории браузера и в заголовке вкладки.
+ */
+useHead({
+  meta: [
+    { name: 'referrer', content: 'no-referrer' },
+    { name: 'robots', content: 'noindex, nofollow' },
+  ],
+})
+
 const route = useRoute()
 const token = computed(() => route.query.token as string)
 
@@ -15,6 +31,11 @@ async function processToken() {
     errorMessage.value = 'Недействительная ссылка'
     return
   }
+
+  // Убираем токен из адресной строки, пока идёт обмен: он одноразовый, но
+  // незачем оставлять его в истории браузера и уж тем более пересылать.
+  if (typeof window !== 'undefined')
+    window.history.replaceState({}, '', '/auth/magic')
 
   try {
     const { action_link } = await $fetch<{ action_link: string }>('/api/auth/magic', {
