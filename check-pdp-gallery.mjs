@@ -225,6 +225,29 @@ ok('драг мышью двигает ленту', trace[trace.length - 1] > 20
 ok('драг мышью долистывает до следующего кадра', afterDrag.dot === 1 && Math.abs(afterDrag.scrollLeft - afterDrag.clientW) < 8, JSON.stringify(afterDrag))
 ok('снап вернулся после драга', afterDrag.snap.includes('mandatory'), afterDrag.snap)
 
+// 4a. короткая протяжка и рывок тоже должны листать.
+// До фикса кадр менялся только после протяжки больше ПОЛОВИНЫ кадра (405px из
+// 810), а скорость не учитывалась вовсе — со стороны «иногда не листается».
+async function dragBy(px, steps, pause) {
+  await p.evaluate(() => { const s = document.querySelector('.pg-slider'); s.scrollTo({ left: 0, behavior: 'auto' }); window.scrollTo(0, 0) })
+  await p.waitForTimeout(1100)
+  const bx = await p.locator('.pg-stage').boundingBox()
+  const y = bx.y + bx.height / 2
+  const from = bx.x + bx.width - 60
+  await p.mouse.move(from, y)
+  await p.mouse.down()
+  for (let i = 1; i <= steps; i++) {
+    await p.mouse.move(from - (px * i) / steps, y)
+    if (pause) await p.waitForTimeout(pause)
+  }
+  await p.mouse.up()
+  await p.waitForTimeout(1500)
+  return p.evaluate(() => [...document.querySelectorAll('.pg-dot')].findIndex(d => d.classList.contains('pg-dot--active')))
+}
+ok('короткая протяжка (100px) листает', await dragBy(100, 10, 12) === 1)
+ok('быстрый рывок (120px) листает', await dragBy(120, 3, 0) === 1)
+ok('случайное дрожание (25px) не листает', await dragBy(25, 6, 12) === 0)
+
 // 4b. свайп пальцем (лента листается нативно — mouse-обработчики её не трогают)
 if (MODE === 'mobile') {
   await p.evaluate(() => { document.querySelector('.pg-slider').scrollTo({ left: 0 }); window.scrollTo(0, 0) })

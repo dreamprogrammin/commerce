@@ -101,8 +101,25 @@ function selectImage(index: number) {
 const didDrag = ref(false)
 let dragStartX = 0
 let dragStartLeft = 0
+let dragStartTime = 0
 let isDragging = false
 let snapRestoreTimer: ReturnType<typeof setTimeout> | null = null
+
+/*
+ * Когда протяжку засчитывать за перелистывание.
+ *
+ * Раньше кадр менялся только по `Math.round(scrollLeft / width)` — то есть
+ * протянуть надо было больше ПОЛОВИНЫ кадра. Замер на сборке (десктоп, кадр
+ * 810px): 40, 80, 120, 200 и даже 300px возвращались назад, переход начинался
+ * с 420px. Плюс скорость не учитывалась вовсе, поэтому быстрый рывок тоже
+ * ничего не делал. Со стороны это выглядело как «иногда не листается».
+ *
+ * Теперь как у всех каруселей: засчитываем либо по расстоянию, либо по
+ * скорости рывка. Порог по расстоянию тот же, что у жестов в PhotoViewer.
+ */
+const DRAG_COMMIT_PX = 60
+const FLICK_SPEED = 0.35 // px/мс
+const FLICK_MIN_PX = 15
 
 /*
  * На время драга снап приходится выключать.
@@ -149,6 +166,7 @@ function onMouseDown(event: MouseEvent) {
   didDrag.value = false
   dragStartX = event.clientX
   dragStartLeft = el.scrollLeft
+  dragStartTime = Date.now()
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
 }
@@ -187,7 +205,27 @@ function onMouseUp() {
     return
   const width = el.clientWidth || 1
   const maxIndex = Math.max(props.images.length - 1, 0)
-  const index = Math.max(0, Math.min(Math.round(el.scrollLeft / width), maxIndex))
+  const startIndex = Math.round(dragStartLeft / width)
+  const delta = el.scrollLeft - dragStartLeft
+  const direction = Math.sign(delta)
+  const speed = Math.abs(delta) / Math.max(1, Date.now() - dragStartTime)
+
+  // целиком пройденные кадры плюс, возможно, ещё один — за остаток или рывок
+  const passed = Math.abs(delta) / width
+  const restPx = (passed % 1) * width
+  /*
+   * Рывок засчитываем только пока протяжка не покрыла ни одного целого кадра.
+   * Скорость меряется по всей протяжке, и без этого условия длинный быстрый
+   * жест перескакивал лишний кадр: протяжка на 2,05 кадра уезжала на три —
+   * остаток всего 40px, но скорость высокая. Для длинных жестов решает
+   * расстояние, а рывок нужен ровно для короткого броска.
+   */
+  const commitsOneMore
+    = restPx > DRAG_COMMIT_PX
+      || (Math.floor(passed) === 0 && speed > FLICK_SPEED && restPx > FLICK_MIN_PX)
+  const steps = Math.floor(passed) + (commitsOneMore ? 1 : 0)
+
+  const index = Math.max(0, Math.min(startIndex + direction * steps, maxIndex))
   activeIndex.value = index
   scrollToIndex(index)
   snapRestoreTimer = setTimeout(() => {
