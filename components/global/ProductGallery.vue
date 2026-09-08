@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ProductImageRow } from '@/types'
-import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSeoAltText } from '@/composables/useSeoAltText'
 import { IMAGE_SIZES } from '@/config/images'
@@ -199,7 +198,6 @@ function onMouseUp() {
 
 onBeforeUnmount(() => {
   stopDragListeners()
-  window.removeEventListener('keydown', onLightboxKeydown)
   if (snapRestoreTimer)
     clearTimeout(snapRestoreTimer)
 })
@@ -212,10 +210,10 @@ watch(() => props.images, () => {
 })
 
 // --- Лайтбокс -----------------------------------------------------------------
+// Само окно просмотра — PhotoViewer.vue (макет PhotoViewer.dc.html). Здесь
+// остаётся только то, что связывает его с лентой: открыть и вернуться на тот
+// кадр, на котором закрыли.
 const isLightboxOpen = ref(false)
-const lightboxApi = ref()
-const lightboxSlide = ref(0)
-const lightboxSlideCount = ref(0)
 
 function openLightbox() {
   if (didDrag.value)
@@ -242,81 +240,43 @@ function onSliderKeydown(event: KeyboardEvent) {
   }
 }
 
-// Возврат из лайтбокса на тот кадр, на котором его закрыли. Раньше лента
-// оставалась на исходном: пролистал в лайтбоксе до 3-го фото, закрыл —
-// под ним по-прежнему первое (проверено на проде 7 сентября).
-watch(isLightboxOpen, (open) => {
-  if (open)
-    window.addEventListener('keydown', onLightboxKeydown)
-  else
-    window.removeEventListener('keydown', onLightboxKeydown)
-
-  if (open || lightboxSlide.value === activeIndex.value)
-    return
-  activeIndex.value = lightboxSlide.value
-  // Прыжком, без плавности. Диалог в этот момент ещё разбирается, и снятие
-  // блокировки прокрутки меняет раскладку — начатую плавную прокрутку
-  // привязка кадров обрывала на полпути (вставала на 848 вместо 1696).
-  // Мгновенная попадает точно в точку привязки, и пересчёт её не двигает.
-  nextTick(() => scrollToIndex(lightboxSlide.value, false))
-})
-
-// Соседей текущего кадра в лайтбоксе грузим сразу, остальные — лениво.
-// Иначе открытие тянуло ВСЕ фото в полном размере: на мобильном профиле
-// это 14 файлов _lg разом (замер 7 сентября, ~600 КБ на один тап).
-function isNearLightbox(index: number) {
-  return Math.abs(index - lightboxSlide.value) <= 1
-}
-
-function getLightboxSrcset(imagePath: string) {
-  const { md, lg } = getImageVariants(imagePath)
-  const parts: string[] = []
-  if (md)
-    parts.push(`${md} 800w`)
-  if (lg)
-    parts.push(`${lg} 1440w`)
-  return parts.length ? parts.join(', ') : undefined
-}
-
-function onInitLightbox(api: any) {
-  lightboxApi.value = api
-  if (!api)
-    return
-  api.scrollTo(activeIndex.value, true)
-  lightboxSlideCount.value = api.scrollSnapList().length
-  lightboxSlide.value = api.selectedScrollSnap()
-  api.on('select', () => {
-    lightboxSlide.value = api.selectedScrollSnap()
-  })
-}
-
 /*
- * Слушаем окно, а не DialogContent.
+ * Возврат из просмотра на тот кадр, на котором его закрыли. Раньше лента
+ * оставалась на исходном: пролистал до 3-го фото, закрыл — под ним по-прежнему
+ * первое (проверено на проде 7 сентября).
  *
- * `@keydown` на <DialogContent> не навешивался вообще: компонент рендерит
- * фрагмент (портал + подложка + содержимое), и Vue об этом честно ругался в
- * консоли — «Extraneous non-emits event listeners (keydown) … could not be
- * automatically inherited». То есть стрелками лайтбокс не листался никогда:
- * фокус после открытия уходит на крестик, а собственный обработчик карусели
- * из shadcn срабатывает только когда фокус на ней самой. Проверено на сборке:
- * ArrowRight/ArrowLeft оставляли счётчик на «1 / 14».
+ * Прыжком, без плавности: окно в этот момент ещё разбирается, и снятие
+ * блокировки прокрутки меняет раскладку — начатую плавную прокрутку привязка
+ * кадров обрывала на полпути (вставала на 848 вместо 1696). Мгновенная
+ * попадает точно в точку привязки, и пересчёт её не двигает.
  */
-function onLightboxKeydown(e: KeyboardEvent) {
-  if (!lightboxApi.value)
+function onViewerIndex(next: number) {
+  if (next === activeIndex.value)
     return
-  // если фокус внутри карусели — стрелки обработает она сама, иначе выйдет
-  // двойной шаг
-  if ((e.target as HTMLElement)?.closest?.('[data-slot="carousel"]'))
-    return
-  if (e.key === 'ArrowLeft') {
-    e.preventDefault()
-    lightboxApi.value.scrollPrev()
-  }
-  if (e.key === 'ArrowRight') {
-    e.preventDefault()
-    lightboxApi.value.scrollNext()
-  }
+  activeIndex.value = next
+  nextTick(() => scrollToIndex(next, false))
 }
+
+// Кадры для просмотра: полный размер плюс средний вариант, чтобы на узком
+// экране не тянуть полуторатысячный файл.
+const lightboxSlides = computed(() =>
+  props.images.map((image, index) => {
+    const { md, lg } = getImageVariants(image.image_url)
+    const parts: string[] = []
+    if (md)
+      parts.push(`${md} 800w`)
+    if (lg)
+      parts.push(`${lg} 1440w`)
+    return {
+      src: getFullUrl(image.image_url) || '',
+      srcset: parts.length ? parts.join(', ') : null,
+      sizes: '92vw',
+      alt: getImageAlt(image, index),
+      // тот же файл, что и в рельсе миниатюр, — берётся из кеша браузера
+      thumb: getThumbUrl(image.image_url),
+    }
+  }),
+)
 
 // --- URL и alt ----------------------------------------------------------------
 function getThumbUrl(imagePath: string) {
@@ -451,114 +411,14 @@ function getImageAlt(image: ProductImageRow, index: number): string {
       </div>
     </div>
 
-    <!-- LIGHTBOX -->
-    <Dialog v-model:open="isLightboxOpen">
-      <!--
-        z-[120] обязателен. У DialogContent из shadcn стоит z-50, а шапка
-        сайта на десктопе — fixed z-100, мобильная плашка товара — sticky
-        z-60. Обе рисовались ПОВЕРХ лайтбокса и накрывали и счётчик кадров
-        слева сверху, и крестик справа: закрыть фото было нечем, кнопка
-        физически кликалась, но её не было видно (проверено на проде
-        7 сентября, оба размера экрана). Хит-тест при этом врал в другую
-        сторону — reka вешает pointer-events: none на body, поэтому
-        elementFromPoint отдавал крестик, хотя пиксели принадлежали шапке.
-      -->
-      <DialogContent
-        class="!max-w-[100vw] !w-screen !h-screen !max-h-screen !p-0 !rounded-none !border-none !bg-black/95 !gap-0 !z-[120]"
-      >
-        <DialogTitle class="sr-only">
-          Галерея изображений товара
-        </DialogTitle>
-
-        <!-- Закрыть -->
-        <button
-          class="absolute top-4 right-4 z-10 text-white/70 hover:text-white transition-colors"
-          @click="isLightboxOpen = false"
-        >
-          <X class="size-8" />
-          <span class="sr-only">Закрыть</span>
-        </button>
-
-        <!-- Счетчик слайдов -->
-        <div
-          v-if="hasMultipleImages"
-          class="absolute top-4 left-4 z-10 text-white/70 text-sm"
-        >
-          {{ lightboxSlide + 1 }} / {{ lightboxSlideCount }}
-        </div>
-
-        <!-- Карусель лайтбокса -->
-        <!-- Ширина в единицах окна, а не `w-full`. DialogContent — грид, и
-             ширину дорожки задавало содержимое: на экране 390 карусель
-             получалась 448, кадр вылезал за правый край. -->
-        <Carousel
-          class="w-screen h-[100dvh] flex items-center overflow-hidden"
-          :opts="{ loop: true, startIndex: activeIndex }"
-          @init-api="onInitLightbox"
-        >
-          <!--
-            Высота кадра задана вьюпортом, а не `h-full`.
-
-            Цепочка Carousel → CarouselContent → CarouselItem нигде не имела
-            определённой высоты: `h-full` упирался в блок, чью высоту задаёт
-            содержимое, и `max-h-full` у картинки не к чему было привязать.
-            Фото рисовалось в натуральную величину и вылезало за экран —
-            замер на проде 7 сентября: кадр 900×1200 при окне 1440×900, низ
-            обрезан; на мобильном 416×555 при ширине 390, обрезаны бока.
-            С `h-[100dvh]` у элемента высота определённая, и проценты
-            наконец считаются от неё.
-
-            Размер задан кадру целиком (`h-full w-full` + object-contain), а не
-            через `w-auto` с потолками: у вариантов в srcset дескрипторы шире
-            самих файлов (портрет 3:4 обрезается по длинной стороне, файл `_lg`
-            — 900px при заявленных 1440w), и браузер по этой поправке рисовал
-            «авто»-картинку 224px на экране 390. Фиксированная коробка от
-            дескрипторов не зависит.
-          -->
-          <!-- ml-0 гасит служебный отступ -ml-4 из shadcn: он делает ленту
-               на 16px шире окна, и кадр вылезал за правый край (на 390px
-               элемент картинки получался 416px). Здесь просвет между
-               кадрами не нужен — они показываются по одному. -->
-          <CarouselContent class="ml-0 h-full">
-            <CarouselItem
-              v-for="(image, index) in images"
-              :key="image.id"
-              class="h-[100dvh] flex items-center justify-center p-4 sm:p-8"
-            >
-              <img
-                :src="getFullUrl(image.image_url) || undefined"
-                :srcset="getLightboxSrcset(image.image_url)"
-                sizes="92vw"
-                :alt="getImageAlt(image, index)"
-                class="h-full w-full object-contain select-none"
-                draggable="false"
-                decoding="async"
-                :loading="isNearLightbox(index) ? 'eager' : 'lazy'"
-                :fetchpriority="index === lightboxSlide ? 'high' : 'auto'"
-              >
-            </CarouselItem>
-          </CarouselContent>
-
-          <!-- Стрелки навигации -->
-          <template v-if="hasMultipleImages">
-            <button
-              class="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 text-white/60 hover:text-white transition-colors bg-black/30 hover:bg-black/50 rounded-full p-2"
-              @click="lightboxApi?.scrollPrev()"
-            >
-              <ChevronLeft class="size-6 sm:size-8" />
-              <span class="sr-only">Предыдущее</span>
-            </button>
-            <button
-              class="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 text-white/60 hover:text-white transition-colors bg-black/30 hover:bg-black/50 rounded-full p-2"
-              @click="lightboxApi?.scrollNext()"
-            >
-              <ChevronRight class="size-6 sm:size-8" />
-              <span class="sr-only">Следующее</span>
-            </button>
-          </template>
-        </Carousel>
-      </DialogContent>
-    </Dialog>
+    <!-- Просмотр фото во весь экран — макет PhotoViewer.dc.html -->
+    <PhotoViewer
+      v-model:open="isLightboxOpen"
+      :images="lightboxSlides"
+      :start-index="activeIndex"
+      :title="productName"
+      @update:index="onViewerIndex"
+    />
   </div>
 </template>
 
