@@ -92,7 +92,23 @@ const revealImmediately = computed(() => props.eager)
  * Обёртка компонента и без подложки даёт нейтральный серый фон (`bg-muted`),
  * то есть пустое состояние выглядит ровно так же, только не мигает.
  */
-const hasSource = computed(() => Boolean(props.src || props.srcSm))
+const hasRealSource = computed(() => Boolean(props.src || props.srcSm))
+
+/*
+ * Один LQIP, без файла, — это тоже «есть что показать».
+ *
+ * Так живут дальние кадры галереи товара: пока они вне окна предзагрузки,
+ * `src` намеренно пуст (см. PRELOAD_RADIUS в ProductGallery.vue), а размытая
+ * подложка из БД у них есть. Без этой ветки такой кадр был бы ровным серым
+ * прямоугольником вместо привычного блюра.
+ *
+ * Крутилку при этом не показываем: она означает «идёт загрузка», а здесь
+ * ничего не грузится — ровно та же логика, что и в исходном фиксе вечной
+ * пульсации ниже.
+ */
+const hasSource = computed(
+  () => hasRealSource.value || Boolean(props.blurDataUrl || props.blurDataUrlMobile),
+)
 
 const showPlaceholder = computed(
   () => hasSource.value && !isLoaded.value && !isError.value,
@@ -317,7 +333,7 @@ const isDev = computed(() => import.meta.env.DEV)
 
       <!-- Маленький спиннер (только для LQIP и blur) -->
       <div
-        v-if="placeholderType === 'lqip' || placeholderType === 'blur'"
+        v-if="hasRealSource && (placeholderType === 'lqip' || placeholderType === 'blur')"
         class="absolute inset-0 flex items-center justify-center"
       >
         <div class="w-6 h-6 border-2 border-white/40 border-t-white/80 rounded-full animate-spin" />
@@ -325,7 +341,7 @@ const isDev = computed(() => import.meta.env.DEV)
 
       <!-- Обычный спиннер для shimmer/color -->
       <div
-        v-if="placeholderType === 'shimmer' || placeholderType === 'color'"
+        v-if="hasRealSource && (placeholderType === 'shimmer' || placeholderType === 'color')"
         class="absolute inset-0 flex items-center justify-center"
       >
         <div class="w-10 h-10 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />

@@ -146,6 +146,10 @@
   --bonus: oklch(64.6% 0.222 41.116); /* orange-600 */
   --bonus-surface: oklch(98% 0.016 73.684); /* orange-50 */
   --bonus-border: oklch(90.1% 0.076 70.697); /* orange-200 */
+  /* Вторая точка градиента бонусной плашки и начало градиента самой надписи —
+     из макета Товар.dc.html (там это сырые orange-100 и orange-400). */
+  --bonus-surface-2: oklch(95.4% 0.038 75.164); /* orange-100 */
+  --bonus-accent: oklch(75% 0.183 55.934); /* orange-400 */
 
   --rating: oklch(85.2% 0.199 91.936); /* yellow-400 */
   --rating-empty: oklch(87.2% 0.01 258.338); /* gray-300 */
@@ -211,6 +215,7 @@
   --brand-surface: oklch(37.9% 0.146 265.522); /* blue-900 */
   --bonus-surface: oklch(26.6% 0.079 36.259); /* orange-950 */
   --bonus-border: oklch(47.3% 0.137 46.201); /* orange-800 */
+  --bonus-surface-2: oklch(40.8% 0.123 38.172); /* orange-900 */
   --rating-empty: oklch(37.3% 0.034 259.733); /* gray-700 */
   --sold-out: oklch(70.7% 0.022 261.325); /* gray-400 */
   --page-surface: oklch(17.5% 0.006 264.5);
