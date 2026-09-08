@@ -146,9 +146,28 @@ await d.mouse.move(dbox.x + dbox.width * 0.8, dbox.y + dbox.height * 0.5)
 await d.waitForTimeout(500)
 const scanned = await dstate()
 ok('мышью: наведение водит по картинке', scanned.x !== clicked.x, `${clicked.x} → ${scanned.x}`)
+/*
+ * Зажатая мышь в увеличенном кадре НЕ должна возить картинку: возка — жест
+ * мобильный. Поведение здесь ровно то, что было до щипка (сверено запуском
+ * сборки на 64c2872): протяжка засчитывается браузером за клик и гасит
+ * увеличение. Проверяем именно это, чтобы возка мышью не приползла обратно.
+ */
+await d.mouse.move(dbox.x + dbox.width * 0.8, dbox.y + dbox.height * 0.5)
+await d.waitForTimeout(300)
+await d.mouse.down()
+for (let i = 1; i <= 8; i++) {
+  await d.mouse.move(dbox.x + dbox.width * 0.8 - i * ((dbox.width * 0.55) / 8), dbox.y + dbox.height * 0.6)
+  await d.waitForTimeout(20)
+}
+await d.mouse.up()
+await d.waitForTimeout(600)
+const dragged = await dstate()
+ok('мышью: протяжка в увеличенном кадре не возит картинку', dragged.zoom === 1 && dragged.x === 0,
+  `масштаб ${dragged.zoom}, сдвиг ${dragged.x}`)
+
 await d.mouse.click(dbox.x + dbox.width / 2, dbox.y + dbox.height / 2)
 await d.waitForTimeout(700)
-ok('мышью: повторный клик возвращает исходный размер', (await dstate()).zoom === 1)
+ok('мышью: клик снова увеличивает', (await dstate()).zoom > 1)
 
 console.log(fails === 0 ? '\nВСЁ ЗЕЛЁНОЕ' : `\nПРОВАЛОВ: ${fails}`)
 await b.close()
