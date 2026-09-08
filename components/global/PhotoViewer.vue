@@ -58,6 +58,7 @@ const emit = defineEmits<{
 }>()
 
 const HINT_MS = 3600
+const MAX_ZOOM = 4
 const SWIPE_COMMIT_PX = 62
 const DISMISS_PX = 110
 const AXIS_LOCK_PX = 6
@@ -75,8 +76,15 @@ const zoomFactor = computed(() => (props.zoomLevel > 1 ? props.zoomLevel : 2.2))
 
 const index = ref(0)
 const zoom = ref(1)
-const originX = ref(50)
-const originY = ref(50)
+/*
+ * Увеличение описывается сдвигом и масштабом (`translate` + `scale`), а не
+ * `transform-origin`, как было раньше. Через origin нельзя выразить щипок:
+ * при нём точка между пальцами обязана оставаться на месте, а origin задаётся
+ * до масштабирования и на ходу пересчитывается неоднозначно. Со сдвигом
+ * формула прямая — см. zoomAt().
+ */
+const panX = ref(0)
+const panY = ref(0)
 const dragX = ref(0)
 const dragY = ref(0)
 const isDragging = ref(false)
@@ -94,7 +102,7 @@ const showHint = computed(
 const hintText = computed(() =>
   isWide.value
     ? 'Клик — увеличить, тяните в сторону или вниз'
-    : 'Свайп в сторону · вниз — закрыть',
+    : 'Свайп · щипок — увеличить · вниз — закрыть',
 )
 
 /**
@@ -117,12 +125,59 @@ const stageStyle = computed(() => ({
 }))
 
 function imageStyle(i: number) {
+  const active = i === index.value
+  const scale = active ? zoom.value : 1
+  const x = active ? panX.value : 0
+  const y = active ? panY.value : 0
   return {
-    transform: `scale(${i === index.value ? zoom.value : 1})`,
-    transformOrigin: `${originX.value}% ${originY.value}%`,
+    transform: `translate3d(${x}px, ${y}px, 0) scale(${scale})`,
     transition: isDragging.value ? 'none' : 'transform .22s ease',
   }
 }
+
+/*
+ * Увеличенному кадру нужен файл покрупнее.
+ *
+ * `sizes` — обещание браузеру, какой ширины будет картинка; по нему он и
+ * выбирает вариант из srcset. В покое кадр занимает ~92vw, и на телефоне
+ * выбирался `_md` (600px по длинной стороне). При щипке до 3–4× такой файл
+ * растягивается вдвое и мылит — замер: 600px исходника на 1251 экранных.
+ *
+ * Переключать `sizes` прямо на жесте нельзя: браузер тут же бросает текущую
+ * картинку и начинает грузить новую, `naturalWidth` падает в ноль, и вместо
+ * фотографии посреди щипка пустое место (проверено). Поэтому сперва тихо
+ * догружаем крупный вариант в стороне, и только когда он в кеше — меняем
+ * обещание. Подмена тогда мгновенная.
+ */
+const hiRes = ref(new Set<number>())
+
+function sizesFor(i: number) {
+  if (hiRes.value.has(i))
+    return '300vw'
+  return slides.value[i]?.sizes || '92vw'
+}
+
+function ensureHiRes(i: number) {
+  const slide = slides.value[i]
+  if (!slide?.srcset || hiRes.value.has(i))
+    return
+  const pre = new Image()
+  pre.onload = () => {
+    const next = new Set(hiRes.value)
+    next.add(i)
+    hiRes.value = next
+  }
+  // те же srcset и обещание, что получит настоящий кадр, — значит браузер
+  // выберет и положит в кеш ровно тот файл, который потом и понадобится
+  pre.sizes = '300vw'
+  pre.srcset = slide.srcset
+  pre.src = slide.src
+}
+
+watch(isZoomed, (zoomed) => {
+  if (zoomed)
+    ensureHiRes(index.value)
+})
 
 // Соседние кадры грузим сразу, дальние — лениво: у товара их бывает полтора
 // десятка, и тянуть все разом при открытии незачем.
@@ -136,10 +191,83 @@ function altFor(image: PhotoViewerImage, i: number) {
 
 function resetView() {
   zoom.value = 1
-  originX.value = 50
-  originY.value = 50
+  panX.value = 0
+  panY.value = 0
   dragX.value = 0
   dragY.value = 0
+}
+
+// --- увеличение ---------------------------------------------------------------
+const stageRef = ref<HTMLElement | null>(null)
+
+function activeImage(): HTMLImageElement | null {
+  return stageRef.value?.querySelectorAll<HTMLImageElement>('.pv-img')[index.value] ?? null
+}
+
+/**
+ * На сколько кадр можно увести в сторону, чтобы фотография не отошла от края
+ * окна. Считаем по реально нарисованной картинке: у `object-fit: contain` она
+ * почти всегда меньше своего блока, и по габаритам блока запас вышел бы
+ * завышенным — картинку можно было бы утащить в пустое поле.
+ */
+function panLimits(atZoom = zoom.value) {
+  const img = activeImage()
+  if (!img)
+    return { x: 0, y: 0 }
+  const boxW = img.offsetWidth
+  const boxH = img.offsetHeight
+  const nw = img.naturalWidth
+  const nh = img.naturalHeight
+  const fit = nw && nh ? Math.min(boxW / nw, boxH / nh) : 1
+  const drawnW = nw ? nw * fit : boxW
+  const drawnH = nh ? nh * fit : boxH
+  return {
+    x: Math.max(0, (drawnW * atZoom - boxW) / 2),
+    y: Math.max(0, (drawnH * atZoom - boxH) / 2),
+  }
+}
+
+function clampPan() {
+  const lim = panLimits()
+  panX.value = Math.max(-lim.x, Math.min(panX.value, lim.x))
+  panY.value = Math.max(-lim.y, Math.min(panY.value, lim.y))
+}
+
+/**
+ * Увеличить до `next`, оставив точку (clientX, clientY) на месте.
+ *
+ * Масштаб идёт от центра блока, поэтому центр после преобразования — это
+ * центр блока плюс текущий сдвиг; отсюда и берём исходную точку отсчёта.
+ * Дальше обычная замена масштаба вокруг фокуса:
+ *     pan' = f − (f − pan) · z' / z
+ */
+function zoomAt(next: number, clientX: number, clientY: number) {
+  const img = activeImage()
+  const from = zoom.value
+  const to = Math.max(1, Math.min(next, MAX_ZOOM))
+  if (!img || from === to) {
+    zoom.value = to
+    if (to === 1) {
+      panX.value = 0
+      panY.value = 0
+    }
+    return
+  }
+  const rect = img.getBoundingClientRect()
+  const centreX = rect.left + rect.width / 2 - panX.value
+  const centreY = rect.top + rect.height / 2 - panY.value
+  const fx = clientX - centreX
+  const fy = clientY - centreY
+  const k = to / from
+  zoom.value = to
+  if (to === 1) {
+    panX.value = 0
+    panY.value = 0
+    return
+  }
+  panX.value = fx - (fx - panX.value) * k
+  panY.value = fy - (fy - panY.value) * k
+  clampPan()
 }
 
 function goTo(next: number) {
@@ -159,42 +287,124 @@ function close() {
 }
 
 // --- жесты -------------------------------------------------------------------
-let pointerActive = false
+/*
+ * Одним указателем работают прежние жесты: свайп в сторону листает, свайп вниз
+ * закрывает. Как только на кадре оказывается второй палец, включается щипок —
+ * и тогда свайп отменяется, иначе лента уезжала бы вбок под сведение пальцев.
+ * В увеличенном кадре один палец не листает, а возит картинку.
+ */
+const pointers = new Map<number, { x: number, y: number }>()
+type Gesture = 'swipe' | 'pan' | 'pinch' | null
+let gesture: Gesture = null
 let axis: 'x' | 'y' | null = null
 let moved = false
 let startX = 0
 let startY = 0
+let panStartX = 0
+let panStartY = 0
+let panFromX = 0
+let panFromY = 0
+let pinchStartDist = 0
+let pinchStartZoom = 1
+
+function pointerList() {
+  return [...pointers.values()]
+}
+
+function pinchDistance() {
+  const [a, b] = pointerList()
+  return Math.hypot(a.x - b.x, a.y - b.y)
+}
+
+function pinchCentre() {
+  const [a, b] = pointerList()
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+}
+
+function beginPan(x: number, y: number) {
+  gesture = 'pan'
+  panStartX = x
+  panStartY = y
+  panFromX = panX.value
+  panFromY = panY.value
+}
+
+function beginPinch() {
+  gesture = 'pinch'
+  moved = true
+  isDragging.value = true
+  // начатый свайп отменяем: под щипком лента не должна ехать
+  dragX.value = 0
+  dragY.value = 0
+  axis = null
+  pinchStartDist = pinchDistance() || 1
+  pinchStartZoom = zoom.value
+}
 
 function onPointerDown(event: PointerEvent) {
-  if (isZoomed.value)
-    return
-  pointerActive = true
-  axis = null
-  moved = false
-  startX = event.clientX
-  startY = event.clientY
-  isDragging.value = true
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
   try {
     if (event.pointerId != null)
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
   }
   catch {}
-}
 
-function onPointerMove(event: PointerEvent) {
-  // В увеличенном кадре мышь не тащит ленту, а водит точку увеличения.
-  if (isZoomed.value) {
-    if (event.pointerType === 'touch')
-      return
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    if (!rect.width || !rect.height)
-      return
-    originX.value = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100))
-    originY.value = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
+  if (pointers.size >= 2) {
+    beginPinch()
     return
   }
 
-  if (!pointerActive)
+  moved = false
+  isDragging.value = true
+  if (isZoomed.value) {
+    beginPan(event.clientX, event.clientY)
+    return
+  }
+  gesture = 'swipe'
+  axis = null
+  startX = event.clientX
+  startY = event.clientY
+}
+
+function onPointerMove(event: PointerEvent) {
+  if (pointers.has(event.pointerId))
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+  if (gesture === 'pinch' && pointers.size >= 2) {
+    const centre = pinchCentre()
+    zoomAt((pinchDistance() / pinchStartDist) * pinchStartZoom, centre.x, centre.y)
+    return
+  }
+
+  if (gesture === 'pan') {
+    panX.value = panFromX + (event.clientX - panStartX)
+    panY.value = panFromY + (event.clientY - panStartY)
+    clampPan()
+    if (Math.abs(event.clientX - panStartX) > AXIS_LOCK_PX
+      || Math.abs(event.clientY - panStartY) > AXIS_LOCK_PX) {
+      moved = true
+    }
+    return
+  }
+
+  // Мышь в увеличенном кадре не тащит, а водит: наведение показывает нужный
+  // угол фотографии. Кнопка при этом не нажата, своего указателя в списке нет.
+  if (!pointers.has(event.pointerId) && isZoomed.value && event.pointerType !== 'touch') {
+    const img = activeImage()
+    if (!img)
+      return
+    const rect = img.getBoundingClientRect()
+    if (!rect.width || !rect.height)
+      return
+    const u = (event.clientX - (rect.left + panX.value)) / rect.width
+    const v = (event.clientY - (rect.top + panY.value)) / rect.height
+    panX.value = (u - 0.5) * img.offsetWidth * (1 - zoom.value)
+    panY.value = (v - 0.5) * img.offsetHeight * (1 - zoom.value)
+    clampPan()
+    return
+  }
+
+  if (gesture !== 'swipe')
     return
 
   const dx = event.clientX - startX
@@ -216,10 +426,40 @@ function onPointerMove(event: PointerEvent) {
   }
 }
 
-function onPointerUp() {
-  if (!pointerActive)
+function onPointerUp(event: PointerEvent) {
+  pointers.delete(event.pointerId)
+
+  if (gesture === 'pinch') {
+    if (pointers.size === 1) {
+      // один палец остался — дальше он возит картинку, а не начинает свайп
+      const [rest] = pointerList()
+      beginPan(rest.x, rest.y)
+      return
+    }
+    if (pointers.size === 0) {
+      gesture = null
+      isDragging.value = false
+      // почти единица — считаем, что хотели вернуть исходный размер
+      if (zoom.value <= 1.05)
+        resetView()
+      else
+        clampPan()
+    }
     return
-  pointerActive = false
+  }
+
+  if (gesture === 'pan') {
+    if (pointers.size === 0) {
+      gesture = null
+      isDragging.value = false
+      clampPan()
+    }
+    return
+  }
+
+  if (gesture !== 'swipe')
+    return
+  gesture = null
 
   const draggedX = dragX.value
   const draggedY = dragY.value
@@ -237,7 +477,7 @@ function onPointerUp() {
 }
 
 function onStageClick(event: MouseEvent) {
-  // Клик после протяжки — не клик.
+  // Клик после протяжки или щипка — не клик.
   if (moved) {
     moved = false
     return
@@ -246,10 +486,7 @@ function onStageClick(event: MouseEvent) {
     resetView()
     return
   }
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  zoom.value = zoomFactor.value
-  originX.value = rect.width ? ((event.clientX - rect.left) / rect.width) * 100 : 50
-  originY.value = rect.height ? ((event.clientY - rect.top) / rect.height) * 100 : 50
+  zoomAt(zoomFactor.value, event.clientX, event.clientY)
 }
 
 function toggleZoom() {
@@ -258,8 +495,8 @@ function toggleZoom() {
     return
   }
   zoom.value = zoomFactor.value
-  originX.value = 50
-  originY.value = 50
+  panX.value = 0
+  panY.value = 0
 }
 
 // --- клавиатура и блокировка прокрутки ---------------------------------------
@@ -302,6 +539,10 @@ watch(isOpen, (open) => {
     const last = Math.max(0, slides.value.length - 1)
     index.value = Math.max(0, Math.min(props.startIndex, last))
     resetView()
+    // указатели могли остаться от прошлого открытия, если палец подняли уже
+    // за пределами окна
+    pointers.clear()
+    gesture = null
     isDragging.value = false
     hintSeen.value = false
     lockScroll(true)
@@ -355,6 +596,7 @@ onBeforeUnmount(() => {
       <!-- Кадры -->
       <div class="pv-stage-wrap">
         <div
+          ref="stageRef"
           class="pv-stage"
           :style="stageStyle"
           @pointerdown="onPointerDown"
@@ -371,7 +613,7 @@ onBeforeUnmount(() => {
                   :style="imageStyle(i)"
                   :src="image.src"
                   :srcset="image.srcset || undefined"
-                  :sizes="image.srcset ? (image.sizes || '92vw') : undefined"
+                  :sizes="image.srcset ? sizesFor(i) : undefined"
                   :alt="altFor(image, i)"
                   :loading="isNear(i) ? 'eager' : 'lazy'"
                   :fetchpriority="i === index ? 'high' : 'auto'"
