@@ -19,20 +19,71 @@ const { generateProductImageAlt } = useSeoAltText()
 
 // --- Основная лента: scroll-snap вместо Embla ---------------------------------
 // Единая механика с ProductCard.vue: нативный свайп на тач-устройствах,
-// pointer-драг на десктопе. Точки и вертикальный рельс миниатюр ведомы
+// драг мышью на десктопе. Точки и вертикальный рельс миниатюр ведомы
 // одним и тем же activeIndex.
 const sliderRef = ref<HTMLElement | null>(null)
+const railRef = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
 const hasMultipleImages = computed(() => props.images.length > 1)
+
+/*
+ * Окно предзагрузки. Реальный src получают только текущий кадр и соседи.
+ *
+ * До этого src стоял у всех кадров сразу, и нативный lazy их не сдерживал:
+ * замер на проде 7 сентября (iPhone-профиль 390×844, DPR 3, товар с 14 фото)
+ * — браузер тянул ШЕСТЬ кадров в варианте _lg, ~250 КБ, при том что виден
+ * один. Порог `loading="lazy"` считается от вьюпорта, а кадры лежат в
+ * горизонтальной ленте и попадают в него пачкой.
+ *
+ * Роботам это ничего не прячет: полный список URL всех фото уезжает в
+ * JSON-LD (`Product.image` собирается в pages/catalog/products/[slug].vue
+ * по всем product_images), а не вычитывается из разметки галереи.
+ */
+const PRELOAD_RADIUS = 1
+
+function isNearActive(index: number) {
+  return Math.abs(index - activeIndex.value) <= PRELOAD_RADIUS
+}
+
+/*
+ * Пока едет наша собственная прокрутка, обработчик scroll молчит.
+ *
+ * У плавной прокрутки промежуточные значения scrollLeft — это чужие кадры, и
+ * `Math.round` честно считал по ним индекс, затирая только что выставленный.
+ * Трассировка возврата из лайтбокса на кадр 3 (десктоп): dot=2 → sl=46 dot=0
+ * → sl=640 dot=1. Каждое такое изменение перерисовывает ленту, а mandatory
+ * -привязка на перерисовке доводит до ближайшего кадра — прокрутка вставала
+ * на 848 вместо 1696.
+ *
+ * При клике по миниатюре итог случайно сходился (последнее событие приходило
+ * уже на цели), но по дороге рельс миниатюр дёргался через все промежуточные.
+ */
+let programmaticScrollUntil = 0
 
 function scrollToIndex(index: number, smooth = true) {
   const el = sliderRef.value
   if (!el)
     return
+  programmaticScrollUntil = Date.now() + (smooth ? 800 : 120)
   el.scrollTo({ left: index * el.clientWidth, behavior: smooth ? 'smooth' : 'auto' })
 }
 
+// Активную миниатюру подтягиваем в видимую часть рельса: на мобильных он
+// прокручивается вбок, на десктопе вниз (14 фото — это 1148px при окне 560),
+// и без этого после свайпа подсвеченная миниатюра остаётся за краем.
+function revealActiveThumb() {
+  const rail = railRef.value
+  if (!rail)
+    return
+  const thumb = rail.children[activeIndex.value] as HTMLElement | undefined
+  thumb?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+}
+
+watch(activeIndex, () => nextTick(revealActiveThumb))
+
 function onSliderScroll(event: Event) {
+  if (Date.now() < programmaticScrollUntil)
+    return
   const el = event.currentTarget as HTMLElement
   if (!el?.clientWidth)
     return
@@ -52,9 +103,45 @@ const didDrag = ref(false)
 let dragStartX = 0
 let dragStartLeft = 0
 let isDragging = false
+let snapRestoreTimer: ReturnType<typeof setTimeout> | null = null
 
-function onPointerDown(event: PointerEvent) {
-  if (event.pointerType === 'touch')
+/*
+ * На время драга снап приходится выключать.
+ *
+ * `scroll-snap-type: x mandatory` действует и на программную прокрутку: браузер
+ * доводит до ближайшей точки привязки сразу после КАЖДОЙ записи в scrollLeft.
+ * А драг только так ленту и двигает (`el.scrollLeft = ...` в onMouseMove).
+ * Итог был буквальный: замер на проде 7 сентября, десктоп 1440×900 — протяжка
+ * на 606px (три четверти кадра), scrollLeft на всех двадцати шагах ноль,
+ * активная точка не сдвинулась. Мышью галерея не листалась вообще, оставались
+ * только миниатюры.
+ *
+ * Возвращаем снап не сразу: сначала должна доехать плавная прокрутка из
+ * onMouseUp, иначе она обрывается привязкой на полпути.
+ */
+function setSnap(enabled: boolean) {
+  const el = sliderRef.value
+  if (el)
+    el.style.scrollSnapType = enabled ? '' : 'none'
+}
+
+/*
+ * Драг слушаем мышиными событиями, а не pointer-. Это вторая половина той же
+ * поломки.
+ *
+ * На pointer-событиях сценарий был такой: setPointerCapture на ленте, первый
+ * pointermove честно двигал scrollLeft — и ровно на этом Chrome отменял
+ * указатель. В логе видно `pointercancel` сразу за первым сдвигом: браузер
+ * считает, что раз контейнер прокрутился, гестурой распоряжается он.
+ * Обработчик pointercancel (это тот же onPointerUp) доводил ленту до
+ * ближайшего кадра — то есть обратно на нулевой, — и на этом всё кончалось.
+ * Мышиные события такому отзыву не подлежат.
+ *
+ * Заодно исчезает и причина первой поломки: без setPointerCapture click
+ * больше не перенацеливается на ленту.
+ */
+function onMouseDown(event: MouseEvent) {
+  if (event.button !== 0)
     return
   const el = sliderRef.value
   if (!el)
@@ -63,35 +150,59 @@ function onPointerDown(event: PointerEvent) {
   didDrag.value = false
   dragStartX = event.clientX
   dragStartLeft = el.scrollLeft
-  el.setPointerCapture(event.pointerId)
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
 }
 
-function onPointerMove(event: PointerEvent) {
-  if (!isDragging)
-    return
+function onMouseMove(event: MouseEvent) {
   const el = sliderRef.value
-  if (!el)
+  if (!isDragging || !el)
     return
   const dx = event.clientX - dragStartX
-  if (Math.abs(dx) > 5)
+  // До порога это ещё не драг, а обычное нажатие: снап не трогаем, иначе
+  // тап на телефоне (браузер досылает совместимые mouse-события) на
+  // полсекунды оставлял бы ленту без привязки.
+  if (Math.abs(dx) <= 5)
+    return
+  if (!didDrag.value) {
     didDrag.value = true
+    if (snapRestoreTimer)
+      clearTimeout(snapRestoreTimer)
+    setSnap(false)
+  }
   el.scrollLeft = dragStartLeft - dx
 }
 
-function onPointerUp(event: PointerEvent) {
+function stopDragListeners() {
+  window.removeEventListener('mousemove', onMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
+}
+
+function onMouseUp() {
   if (!isDragging)
     return
   isDragging = false
+  stopDragListeners()
   const el = sliderRef.value
-  if (!el)
+  if (!el || !didDrag.value)
     return
-  el.releasePointerCapture?.(event.pointerId)
   const width = el.clientWidth || 1
   const maxIndex = Math.max(props.images.length - 1, 0)
   const index = Math.max(0, Math.min(Math.round(el.scrollLeft / width), maxIndex))
   activeIndex.value = index
   scrollToIndex(index)
+  snapRestoreTimer = setTimeout(() => {
+    if (!isDragging)
+      setSnap(true)
+  }, 450)
 }
+
+onBeforeUnmount(() => {
+  stopDragListeners()
+  window.removeEventListener('keydown', onLightboxKeydown)
+  if (snapRestoreTimer)
+    clearTimeout(snapRestoreTimer)
+})
 
 // Сброс на первый кадр при смене товара (цветовые варианты — отдельные URL,
 // но Nuxt переиспользует компонент страницы).
@@ -112,6 +223,61 @@ function openLightbox() {
   isLightboxOpen.value = true
 }
 
+// Клавиатура: до этого кадр был голым <div> с @click — открыть фото без мыши
+// было нельзя вообще. Стрелки заодно листают ленту.
+function onSliderKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    openLightbox()
+    return
+  }
+  const maxIndex = Math.max(props.images.length - 1, 0)
+  if (event.key === 'ArrowRight') {
+    event.preventDefault()
+    selectImage(Math.min(activeIndex.value + 1, maxIndex))
+  }
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault()
+    selectImage(Math.max(activeIndex.value - 1, 0))
+  }
+}
+
+// Возврат из лайтбокса на тот кадр, на котором его закрыли. Раньше лента
+// оставалась на исходном: пролистал в лайтбоксе до 3-го фото, закрыл —
+// под ним по-прежнему первое (проверено на проде 7 сентября).
+watch(isLightboxOpen, (open) => {
+  if (open)
+    window.addEventListener('keydown', onLightboxKeydown)
+  else
+    window.removeEventListener('keydown', onLightboxKeydown)
+
+  if (open || lightboxSlide.value === activeIndex.value)
+    return
+  activeIndex.value = lightboxSlide.value
+  // Прыжком, без плавности. Диалог в этот момент ещё разбирается, и снятие
+  // блокировки прокрутки меняет раскладку — начатую плавную прокрутку
+  // привязка кадров обрывала на полпути (вставала на 848 вместо 1696).
+  // Мгновенная попадает точно в точку привязки, и пересчёт её не двигает.
+  nextTick(() => scrollToIndex(lightboxSlide.value, false))
+})
+
+// Соседей текущего кадра в лайтбоксе грузим сразу, остальные — лениво.
+// Иначе открытие тянуло ВСЕ фото в полном размере: на мобильном профиле
+// это 14 файлов _lg разом (замер 7 сентября, ~600 КБ на один тап).
+function isNearLightbox(index: number) {
+  return Math.abs(index - lightboxSlide.value) <= 1
+}
+
+function getLightboxSrcset(imagePath: string) {
+  const { md, lg } = getImageVariants(imagePath)
+  const parts: string[] = []
+  if (md)
+    parts.push(`${md} 800w`)
+  if (lg)
+    parts.push(`${lg} 1440w`)
+  return parts.length ? parts.join(', ') : undefined
+}
+
 function onInitLightbox(api: any) {
   lightboxApi.value = api
   if (!api)
@@ -124,13 +290,32 @@ function onInitLightbox(api: any) {
   })
 }
 
+/*
+ * Слушаем окно, а не DialogContent.
+ *
+ * `@keydown` на <DialogContent> не навешивался вообще: компонент рендерит
+ * фрагмент (портал + подложка + содержимое), и Vue об этом честно ругался в
+ * консоли — «Extraneous non-emits event listeners (keydown) … could not be
+ * automatically inherited». То есть стрелками лайтбокс не листался никогда:
+ * фокус после открытия уходит на крестик, а собственный обработчик карусели
+ * из shadcn срабатывает только когда фокус на ней самой. Проверено на сборке:
+ * ArrowRight/ArrowLeft оставляли счётчик на «1 / 14».
+ */
 function onLightboxKeydown(e: KeyboardEvent) {
   if (!lightboxApi.value)
     return
-  if (e.key === 'ArrowLeft')
+  // если фокус внутри карусели — стрелки обработает она сама, иначе выйдет
+  // двойной шаг
+  if ((e.target as HTMLElement)?.closest?.('[data-slot="carousel"]'))
+    return
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
     lightboxApi.value.scrollPrev()
-  if (e.key === 'ArrowRight')
+  }
+  if (e.key === 'ArrowRight') {
+    e.preventDefault()
     lightboxApi.value.scrollNext()
+  }
 }
 
 // --- URL и alt ----------------------------------------------------------------
@@ -184,7 +369,7 @@ function getImageAlt(image: ProductImageRow, index: number): string {
   <div class="pg-card">
     <!-- Рельс миниатюр: на мобильных — горизонтальный под кадром (column-reverse),
          на десктопе — вертикальный слева -->
-    <div v-if="hasMultipleImages" class="pg-rail">
+    <div v-if="hasMultipleImages" ref="railRef" class="pg-rail">
       <button
         v-for="(image, index) in images"
         :key="image.id"
@@ -210,27 +395,41 @@ function getImageAlt(image: ProductImageRow, index: number): string {
     <div class="pg-stage">
       <span v-if="discountPercentage" class="pg-discount">−{{ discountPercentage }}%</span>
 
+      <!--
+        Клик слушает лента, а не кадр, и это не стилистика.
+
+        Прежний onPointerDown вешал setPointerCapture на саму ленту, а после
+        захвата браузер отдаёт click ближайшему общему предку захватившего
+        элемента и цели — то есть .pg-slider. Обработчик стоял на .pg-slide,
+        потомке, и до него событие не доходило никогда: на проде 7 сентября
+        клик мышью по фото не открывал лайтбокс ни на десктопе, ни в мобильной
+        эмуляции; тапом работало, потому что для touch захват не ставился.
+        Захвата больше нет — драг переехал на mouse-события, — но обработчик
+        оставлен на ленте: одного на всю ленту достаточно, и он не зависит от
+        того, во что именно попал курсор внутри неё.
+      -->
       <div
         ref="sliderRef"
         class="pg-slider"
+        tabindex="0"
+        :aria-label="`Фото товара, ${activeIndex + 1} из ${images.length}. Enter — открыть во весь экран`"
         @scroll.passive="onSliderScroll"
-        @pointerdown="onPointerDown"
-        @pointermove="onPointerMove"
-        @pointerup="onPointerUp"
-        @pointercancel="onPointerUp"
+        @mousedown="onMouseDown"
+        @dragstart.prevent
+        @click="openLightbox"
+        @keydown="onSliderKeydown"
       >
         <div
           v-for="(image, index) in images"
           :key="image.id"
           class="pg-slide"
-          @click="openLightbox"
         >
           <ProgressiveImage
-            :src="getMainUrl(image.image_url)"
-            :src-sm="getImageVariants(image.image_url).sm"
-            :src-md="getImageVariants(image.image_url).md"
-            :src-lg="getImageVariants(image.image_url).lg"
-            sizes="(max-width: 1024px) 100vw, 45vw"
+            :src="isNearActive(index) ? getMainUrl(image.image_url) : null"
+            :src-sm="isNearActive(index) ? getImageVariants(image.image_url).sm : null"
+            :src-md="isNearActive(index) ? getImageVariants(image.image_url).md : null"
+            :src-lg="isNearActive(index) ? getImageVariants(image.image_url).lg : null"
+            sizes="(max-width: 1024px) calc(100vw - 100px), (max-width: 1536px) 52vw, 740px"
             :blur-data-url="image.blur_placeholder"
             :alt="getImageAlt(image, index)"
             object-fit="contain"
@@ -254,9 +453,18 @@ function getImageAlt(image: ProductImageRow, index: number): string {
 
     <!-- LIGHTBOX -->
     <Dialog v-model:open="isLightboxOpen">
+      <!--
+        z-[120] обязателен. У DialogContent из shadcn стоит z-50, а шапка
+        сайта на десктопе — fixed z-100, мобильная плашка товара — sticky
+        z-60. Обе рисовались ПОВЕРХ лайтбокса и накрывали и счётчик кадров
+        слева сверху, и крестик справа: закрыть фото было нечем, кнопка
+        физически кликалась, но её не было видно (проверено на проде
+        7 сентября, оба размера экрана). Хит-тест при этом врал в другую
+        сторону — reka вешает pointer-events: none на body, поэтому
+        elementFromPoint отдавал крестик, хотя пиксели принадлежали шапке.
+      -->
       <DialogContent
-        class="!max-w-[100vw] !w-screen !h-screen !max-h-screen !p-0 !rounded-none !border-none !bg-black/95 !gap-0"
-        @keydown="onLightboxKeydown"
+        class="!max-w-[100vw] !w-screen !h-screen !max-h-screen !p-0 !rounded-none !border-none !bg-black/95 !gap-0 !z-[120]"
       >
         <DialogTitle class="sr-only">
           Галерея изображений товара
@@ -280,22 +488,53 @@ function getImageAlt(image: ProductImageRow, index: number): string {
         </div>
 
         <!-- Карусель лайтбокса -->
+        <!-- Ширина в единицах окна, а не `w-full`. DialogContent — грид, и
+             ширину дорожки задавало содержимое: на экране 390 карусель
+             получалась 448, кадр вылезал за правый край. -->
         <Carousel
-          class="w-full h-full flex items-center"
+          class="w-screen h-[100dvh] flex items-center overflow-hidden"
           :opts="{ loop: true, startIndex: activeIndex }"
           @init-api="onInitLightbox"
         >
-          <CarouselContent class="h-full">
+          <!--
+            Высота кадра задана вьюпортом, а не `h-full`.
+
+            Цепочка Carousel → CarouselContent → CarouselItem нигде не имела
+            определённой высоты: `h-full` упирался в блок, чью высоту задаёт
+            содержимое, и `max-h-full` у картинки не к чему было привязать.
+            Фото рисовалось в натуральную величину и вылезало за экран —
+            замер на проде 7 сентября: кадр 900×1200 при окне 1440×900, низ
+            обрезан; на мобильном 416×555 при ширине 390, обрезаны бока.
+            С `h-[100dvh]` у элемента высота определённая, и проценты
+            наконец считаются от неё.
+
+            Размер задан кадру целиком (`h-full w-full` + object-contain), а не
+            через `w-auto` с потолками: у вариантов в srcset дескрипторы шире
+            самих файлов (портрет 3:4 обрезается по длинной стороне, файл `_lg`
+            — 900px при заявленных 1440w), и браузер по этой поправке рисовал
+            «авто»-картинку 224px на экране 390. Фиксированная коробка от
+            дескрипторов не зависит.
+          -->
+          <!-- ml-0 гасит служебный отступ -ml-4 из shadcn: он делает ленту
+               на 16px шире окна, и кадр вылезал за правый край (на 390px
+               элемент картинки получался 416px). Здесь просвет между
+               кадрами не нужен — они показываются по одному. -->
+          <CarouselContent class="ml-0 h-full">
             <CarouselItem
               v-for="(image, index) in images"
               :key="image.id"
-              class="h-full flex items-center justify-center p-4 sm:p-8"
+              class="h-[100dvh] flex items-center justify-center p-4 sm:p-8"
             >
               <img
                 :src="getFullUrl(image.image_url) || undefined"
+                :srcset="getLightboxSrcset(image.image_url)"
+                sizes="92vw"
                 :alt="getImageAlt(image, index)"
-                class="max-w-full max-h-full object-contain select-none"
+                class="h-full w-full object-contain select-none"
                 draggable="false"
+                decoding="async"
+                :loading="isNearLightbox(index) ? 'eager' : 'lazy'"
+                :fetchpriority="index === lightboxSlide ? 'high' : 'auto'"
               >
             </CarouselItem>
           </CarouselContent>
@@ -403,6 +642,11 @@ function getImageAlt(image: ProductImageRow, index: number): string {
     top: 16px;
     left: 16px;
     z-index: 2;
+    /* Плашка лежит рядом с лентой, а не внутри кадра, поэтому клик по ней
+       никуда не всплывал — верхний левый угол фото был мёртвой зоной
+       примерно 62×32 (нашлось тем, что по нему не удавалось открыть
+       лайтбокс). Точкам ниже pointer-events уже отключён по той же причине. */
+    pointer-events: none;
     padding: 6px 13px;
     border-radius: 999px;
     background: var(--discount);
@@ -420,11 +664,14 @@ function getImageAlt(image: ProductImageRow, index: number): string {
     scroll-snap-type: x mandatory;
     overscroll-behavior-x: contain;
     cursor: grab;
+    /* Драг мышью больше не гасит mousedown через preventDefault (иначе лента
+       не получала бы фокус), поэтому выделение снимаем стилем. */
+    user-select: none;
     scrollbar-width: none;
     -ms-overflow-style: none;
     /* pan-x обязателен: без него браузер отдаёт тач только вертикали, и
-       свайп по кадру не листает галерею (ленту двигает нативный скролл —
-       onPointerDown намеренно выходит на pointerType === 'touch').
+       свайп по кадру не листает галерею — на тач-устройствах ленту двигает
+       нативный скролл, свои обработчики там не участвуют (они мышиные).
        pan-y остаётся, иначе кадр во весь экран запирает прокрутку страницы. */
     touch-action: pan-x pan-y pinch-zoom;
   }
@@ -435,6 +682,18 @@ function getImageAlt(image: ProductImageRow, index: number): string {
 
   .pg-slider:active {
     cursor: grabbing;
+  }
+
+  /* Лента стала фокусируемой (Enter открывает лайтбокс, стрелки листают) —
+     кольцо рисуем внутрь, снаружи его срезал бы overflow: hidden у .pg-stage. */
+  .pg-slider:focus {
+    outline: none;
+  }
+
+  .pg-slider:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -4px;
+    border-radius: 18px;
   }
 
   .pg-slide {
