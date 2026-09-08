@@ -23,7 +23,10 @@ function ok(name, pass, detail = '') {
 
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ ...view, ignoreHTTPSErrors: true, bypassCSP: true })
-await ctx.addInitScript(() => { try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())) } catch {} })
+await ctx.addInitScript(() => {
+  try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())) }
+  catch {}
+})
 
 // картинки берём с боевого хранилища, всё остальное — с локального сервера
 const mirror = new Map()
@@ -52,7 +55,8 @@ p.on('response', async (r) => {
   if (!/product-images/.test(r.url()))
     return
   let size = 0
-  try { size = Number((await r.headerValue('content-length')) || 0) } catch {}
+  try { size = Number((await r.headerValue('content-length')) || 0) }
+  catch {}
   img.push({ f: r.url().split('/').pop(), size, status: r.status() })
 })
 p.on('pageerror', e => console.log('  [pageerror]', String(e).slice(0, 180)))
@@ -106,18 +110,36 @@ ok('клик мышью по фото открывает лайтбокс', open
 if (opened) {
   const fit = await p.evaluate(() => {
     const d = document.querySelector('[role="dialog"]')
-    const im = [...d.querySelectorAll('img')].find(i => i.naturalWidth > 0)
+    const im = [...d.querySelectorAll('.pv-img')].find(i => i.naturalWidth > 0)
     const r = im.getBoundingClientRect()
     return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), left: Math.round(r.left), vw: innerWidth, vh: innerHeight }
   })
   ok('фото в лайтбоксе влезает по ширине', fit.left >= 0 && fit.left + fit.w <= fit.vw, `${fit.w}×${fit.h} at ${fit.left},${fit.top} / окно ${fit.vw}×${fit.vh}`)
   ok('фото в лайтбоксе влезает по высоте', fit.top >= 0 && fit.top + fit.h <= fit.vh, `низ на ${fit.top + fit.h}, окно ${fit.vh}`)
-  // «влезает» мало: до фикса дескрипторов srcset картинка на мобильном
-  // ужималась до 224px посреди чёрного экрана — формально влезала.
-  ok('фото в лайтбоксе занимает экран, а не жмётся в угол', Math.max(fit.w / fit.vw, fit.h / fit.vh) > 0.8, `${Math.round(100 * Math.max(fit.w / fit.vw, fit.h / fit.vh))}% экрана`)
+  // «влезает» мало: до фикса дескрипторов srcset картинка ужималась до 224px
+  // посреди чёрного экрана — формально влезала. Сверяемся не с окном (по
+  // макету белая карточка ограничена 820px и полосы по бокам — это норма),
+  // а с самой карточкой: кадр обязан занимать её целиком.
+  const fill = await p.evaluate(() => {
+    const card = document.querySelector('.pv-card')
+    const im = document.querySelector('.pv-img')
+    const cs = getComputedStyle(card)
+    const cw = card.getBoundingClientRect().width - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight)
+    const ch = card.getBoundingClientRect().height - Number.parseFloat(cs.paddingTop) - Number.parseFloat(cs.paddingBottom)
+    const r = im.getBoundingClientRect()
+    return { cw: Math.round(cw), ch: Math.round(ch), iw: Math.round(r.width), ih: Math.round(r.height) }
+  })
+  ok('кадр занимает карточку целиком', fill.iw >= fill.cw * 0.98 && fill.ih >= fill.ch * 0.98, `кадр ${fill.iw}×${fill.ih} в карточке ${fill.cw}×${fill.ch}`)
+
+  // Стрелки-кнопки по макету только на широком экране
+  const arrowsVisible = await p.evaluate(() => {
+    const a = document.querySelector('.pv-arrow--next')
+    return a ? getComputedStyle(a).display !== 'none' : false
+  })
+  ok(MODE === 'desktop' ? 'стрелки-кнопки есть на десктопе' : 'стрелок-кнопок нет на телефоне', MODE === 'desktop' ? arrowsVisible : !arrowsVisible)
 
   const lbLoaded = await p.evaluate(() => {
-    const im = [...document.querySelectorAll('[role="dialog"] img')]
+    const im = [...document.querySelectorAll('[role="dialog"] .pv-img')]
     return { total: im.length, loaded: im.filter(i => i.naturalWidth > 0).length }
   })
   ok('лайтбокс не тянет все кадры разом', lbLoaded.loaded <= 6, `загружено ${lbLoaded.loaded} из ${lbLoaded.total}`)
@@ -136,13 +158,13 @@ if (opened) {
     const real = tops.filter(t => !/devtools|vue-tracer|nuxt-island/i.test(t))
     return { zDlg, above: real, all: tops, atTop: el?.tagName }
   })
-  ok('шапка/плашка не перекрывают лайтбокс', px.above.length === 0, `z лайтбокса ${px.zDlg}; выше или вровень: ${px.above.join(', ') || 'нет'} (все: ${px.all.join(', ') || 'нет'})`)
+  ok('шапка/плашка не перекрывают просмотр', px.above.length === 0, `z лайтбокса ${px.zDlg}; выше или вровень: ${px.above.join(', ') || 'нет'} (все: ${px.all.join(', ') || 'нет'})`)
   await p.screenshot({ path: `${SC}/fix-${MODE}-lightbox.png` })
 
   // счётчик и крестик видимы
   const chrome = await p.evaluate(() => {
     const d = document.querySelector('[role="dialog"]')
-    const counter = d.querySelector('div.absolute.top-4.left-4')
+    const counter = d.querySelector('.pv-counter')
     const r = counter?.getBoundingClientRect()
     const hit = r ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null
     return { counterText: counter?.textContent?.trim(), hitIsCounter: hit === counter || counter?.contains(hit) }
@@ -150,22 +172,22 @@ if (opened) {
   ok('счётчик кадров виден поверх', chrome.hitIsCounter, chrome.counterText)
 
   // стрелки на клавиатуре внутри лайтбокса
-  const before = await p.evaluate(() => document.querySelector('[role="dialog"] div.absolute.top-4.left-4')?.textContent?.trim())
+  const before = await p.evaluate(() => document.querySelector('[role="dialog"] .pv-counter')?.textContent?.trim())
   await p.keyboard.press('ArrowRight')
   await p.waitForTimeout(900)
-  const afterArrow = await p.evaluate(() => document.querySelector('[role="dialog"] div.absolute.top-4.left-4')?.textContent?.trim())
+  const afterArrow = await p.evaluate(() => document.querySelector('[role="dialog"] .pv-counter')?.textContent?.trim())
   ok('стрелки листают лайтбокс', before === '1 / 14' && afterArrow === '2 / 14', `${before} → ${afterArrow}`)
   await p.keyboard.press('ArrowLeft')
   await p.waitForTimeout(900)
 
   // пролистать до 3-го и закрыть — лента должна пойти следом
-  await p.locator('[role="dialog"] button:has-text("Следующее")').click().catch(() => {})
-  await p.waitForTimeout(900)
-  await p.locator('[role="dialog"] button:has-text("Следующее")').click().catch(() => {})
-  await p.waitForTimeout(1200)
+  await p.keyboard.press('ArrowRight')
+  await p.waitForTimeout(700)
+  await p.keyboard.press('ArrowRight')
+  await p.waitForTimeout(1000)
   // сверяемся с тем кадром, который лайтбокс показывает на самом деле:
   // сколько раз нажалась стрелка — дело плавающее, а синхронизация нет
-  const shown = await p.evaluate(() => Number((document.querySelector('[role="dialog"] div.absolute.top-4.left-4')?.textContent || '').split('/')[0].trim()))
+  const shown = await p.evaluate(() => Number((document.querySelector('[role="dialog"] .pv-counter')?.textContent || '').split('/')[0].trim()))
   await p.keyboard.press('Escape')
   await p.waitForTimeout(1500)
   const sync = await p.evaluate(() => ({
@@ -248,7 +270,8 @@ if (badge) {
   ok('клик по плашке скидки открывает лайтбокс', await p.evaluate(() => !!document.querySelector('[role="dialog"]')))
   await p.keyboard.press('Escape')
   await p.waitForTimeout(900)
-} else {
+}
+else {
   console.log('  (у товара нет скидки — плашку не проверить)')
 }
 
