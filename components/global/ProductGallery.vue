@@ -346,7 +346,7 @@ function getImageAlt(image: ProductImageRow, index: number): string {
           :alt="getImageAlt(image, index)"
           object-fit="contain"
           :placeholder-type="image.blur_placeholder ? 'lqip' : 'shimmer'"
-          class="size-full"
+          class="size-full !bg-transparent"
         />
       </button>
     </div>
@@ -368,6 +368,12 @@ function getImageAlt(image: ProductImageRow, index: number): string {
         оставлен на ленте: одного на всю ленту достаточно, и он не зависит от
         того, во что именно попал курсор внутри неё.
       -->
+      <!-- `!bg-transparent` у кадров и миниатюр: по макету фото лежит на чистом
+           белом, а серая подложка `bg-muted` из ProgressiveImage при
+           object-fit: contain вылезала полями по бокам. Перебить её из
+           scoped-стиля нельзя — утилиты Tailwind всегда бьют @layer components
+           (см. docs/SCOPED_STYLES_TAILWIND_LAYERS.md), поэтому важность.
+           Размытая подложка LQIP лежит отдельным слоем и остаётся на месте. -->
       <div
         ref="sliderRef"
         class="pg-slider"
@@ -396,10 +402,17 @@ function getImageAlt(image: ProductImageRow, index: number): string {
             :placeholder-type="image.blur_placeholder ? 'lqip' : 'shimmer'"
             :eager="index === 0"
             :fetchpriority="index === 0 ? 'high' : 'auto'"
-            class="size-full"
+            class="size-full !bg-transparent"
           />
         </div>
       </div>
+
+      <!-- «Увеличить» — из макета Товар.dc.html. До неё открыть фото можно было
+           только кликом по самому кадру, и об этом никто не догадывался. -->
+      <button type="button" class="pg-zoom-cta" @click.stop="openLightbox">
+        <Icon name="lucide:zoom-in" class="size-[18px]" />
+        Увеличить
+      </button>
 
       <div v-if="hasMultipleImages" class="pg-dots">
         <span
@@ -523,7 +536,9 @@ function getImageAlt(image: ProductImageRow, index: number): string {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     overscroll-behavior-x: contain;
-    cursor: grab;
+    /* zoom-in, а не grab: по макету кадр в первую очередь открывается на весь
+       экран, а протяжка — вторичный жест. На время протяжки курсор меняем. */
+    cursor: zoom-in;
     /* Драг мышью больше не гасит mousedown через preventDefault (иначе лента
        не получала бы фокус), поэтому выделение снимаем стилем. */
     user-select: none;
@@ -564,6 +579,45 @@ function getImageAlt(image: ProductImageRow, index: number): string {
     scroll-snap-stop: always;
     padding: 18px;
     cursor: zoom-in;
+  }
+
+  /* Тень под товаром из макета (drop-shadow 0 22px 30px) сюда не переносится и
+     намеренно не сделана. drop-shadow идёт по альфе картинки: в макете это
+     PNG-вырезка танка, и тень обводит силуэт. В каталоге же фотографии
+     прямоугольные — сверено по двум товарам, у одного альфы нет вовсе, у
+     второго она есть, но фон всё равно залит. На таких снимках тень рисует
+     серый прямоугольник вокруг фото, и кадр выглядит наклеенной карточкой.
+     Вернуть можно, когда съёмка перейдёт на вырезки с прозрачным фоном. */
+
+  .pg-zoom-cta {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.96), rgba(224, 233, 247, 0.7));
+    -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(10px) saturate(1.6);
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 5px 14px rgba(15, 23, 42, 0.12);
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--primary);
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
+  }
+
+  .pg-zoom-cta:hover {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 8px 20px rgba(43, 127, 255, 0.26);
   }
 
   .pg-dots {
@@ -614,6 +668,13 @@ function getImageAlt(image: ProductImageRow, index: number): string {
 
     .pg-slide {
       padding: 34px;
+    }
+
+    /* Только на широком кадре: на телефоне пилюля с подписью наезжает на
+       ряд точек (у товара их бывает четырнадцать), а тап по фото там и так
+       привычный жест. */
+    .pg-zoom-cta {
+      display: inline-flex;
     }
   }
 }
