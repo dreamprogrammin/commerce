@@ -341,7 +341,36 @@ function beginPinch() {
   pinchStartZoom = zoom.value
 }
 
+/*
+ * Щипок и возка пальцем — только для касаний.
+ *
+ * Просили именно мобильный жест, и на десктопе увеличенный кадр обязан вести
+ * себя как раньше: наведение мыши водит по картинке, а зажатая кнопка не
+ * делает ничего. Без этой проверки мышь в увеличенном кадре начинала возить
+ * картинку, и на отпускании наведение тут же дёргало её обратно к курсору —
+ * два механизма спорили за один и тот же сдвиг.
+ *
+ * Заодно щипок не соберётся из мыши и пера: на гибридном ноутбуке второй
+ * указатель мог бы прилететь откуда угодно.
+ */
+function isTouch(event: PointerEvent) {
+  return event.pointerType === 'touch'
+}
+
 function onPointerDown(event: PointerEvent) {
+  if (!isTouch(event)) {
+    // мышь и перо: в увеличенном кадре ничего не начинаем, как было до щипка
+    if (isZoomed.value)
+      return
+    moved = false
+    isDragging.value = true
+    gesture = 'swipe'
+    axis = null
+    startX = event.clientX
+    startY = event.clientY
+    return
+  }
+
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
   try {
     if (event.pointerId != null)
@@ -367,7 +396,7 @@ function onPointerDown(event: PointerEvent) {
 }
 
 function onPointerMove(event: PointerEvent) {
-  if (pointers.has(event.pointerId))
+  if (isTouch(event) && pointers.has(event.pointerId))
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
   if (gesture === 'pinch' && pointers.size >= 2) {
@@ -427,7 +456,8 @@ function onPointerMove(event: PointerEvent) {
 }
 
 function onPointerUp(event: PointerEvent) {
-  pointers.delete(event.pointerId)
+  if (isTouch(event))
+    pointers.delete(event.pointerId)
 
   if (gesture === 'pinch') {
     if (pointers.size === 1) {
