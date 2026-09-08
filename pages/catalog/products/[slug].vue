@@ -1963,19 +1963,41 @@ watchEffect(() => {
     font-size: 11px;
   }
 
+  /* Бонусная плашка по макету Товар.dc.html: подложка на шаг светлее
+     (orange-50 → orange-100, было до orange-200), надпись залита градиентом
+     orange-400 → pink-600 через background-clip. На мобильных плашка чуть
+     мельче — тоже из макета. */
   .pdp-bonus {
     display: inline-flex;
     align-items: center;
     gap: 7px;
     border-radius: 11px;
-    background: linear-gradient(100deg, var(--bonus-surface), var(--bonus-border));
-    padding: 8px 13px;
-    font-size: 13.5px;
+    background: linear-gradient(100deg, var(--bonus-surface), var(--bonus-surface-2));
+    padding: 7px 12px;
+    font-size: 13px;
     font-weight: 700;
   }
 
+  @media (width >= 64rem) {
+    .pdp-bonus {
+      padding: 8px 13px;
+      font-size: 13.5px;
+    }
+  }
+
   .pdp-bonus-text {
+    /* color оставлен запасным: если background-clip: text не поддержан,
+       надпись останется читаемой, а не прозрачной */
     color: var(--bonus);
+    background: linear-gradient(100deg, var(--bonus-accent), var(--product-line));
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .pdp-bonus-text {
+      -webkit-text-fill-color: transparent;
+    }
   }
 
   .pdp-tile {
