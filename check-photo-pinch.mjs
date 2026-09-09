@@ -135,6 +135,40 @@ const flickCost = new Set(fullSizeRequests).size - beforeFlick
 ok('быстрое пролистывание не тянет полный размер каждому кадру', flickCost <= 2,
   `за 6 листаний рывком запрошено полноразмерных: ${flickCost}`)
 
+/*
+ * Закрытие обязано доигрываться, а не обрываться. Раньше `v-if` стоял на самом
+ * Teleport: окно снималось из DOM в тот же кадр, и уходу негде было
+ * проиграться — открытие плавное, закрытие обрыв. Ловим полукадры: должен
+ * найтись момент, когда окно ещё в DOM, но уже полупрозрачное.
+ */
+await p.keyboard.press('Escape')
+await p.waitForTimeout(1200)
+await p.evaluate(() => { window.scrollTo(0, 0); document.querySelector('.pg-slide').click() })
+await p.waitForFunction(() => !!document.querySelector('.pv-root'), null, { timeout: 60000 })
+await p.waitForTimeout(1500)
+const closeFilm = await p.evaluate(async () => {
+  const film = []
+  const t0 = performance.now()
+  let done
+  const ready = new Promise((r) => { done = r })
+  const tick = () => {
+    const el = document.querySelector('.pv-root')
+    film.push({ t: Math.round(performance.now() - t0), есть: !!el, o: el ? Number(getComputedStyle(el).opacity) : null })
+    if (performance.now() - t0 < 900) requestAnimationFrame(tick)
+    else done()
+  }
+  requestAnimationFrame(tick)
+  document.querySelector('.pv-root')?.querySelectorAll('button').forEach((b) => {
+    if (b.getAttribute('aria-label') === 'Закрыть') b.click()
+  })
+  await ready
+  return film
+})
+const midFade = closeFilm.filter(f => f.есть && f.o > 0.02 && f.o < 0.98).length
+const goneAt = closeFilm.find(f => !f.есть)?.t ?? null
+ok('закрытие плавное, а не обрывом', midFade >= 3, `полупрозрачных кадров: ${midFade}`)
+ok('окно всё же снимается из DOM', goneAt !== null && goneAt < 700, goneAt === null ? 'не снялось за 900мс' : `через ${goneAt}мс`)
+
 await p.screenshot({ path: `${SC}/pinch-after.png` })
 
 // --- мышиный путь: он переехал на ту же модель translate+scale ---------------
