@@ -354,14 +354,12 @@ async function addToCart(event?: MouseEvent) {
       addedCount++
     }
   }
-  if (addedCount > 0) {
-    toast.success(
-      addedCount === 1
-        ? 'Товар добавлен в корзину'
-        : `${addedCount} товара добавлено в корзину`,
-    )
-  }
-  else if (selectedAccessories.length > 0) {
+  /*
+   * Своего тоста на добавление здесь нет и быть не должно: о каждом товаре
+   * уже сказал `cartStore.addItem`. Раньше стояли оба, и на одно нажатие
+   * прилетало два уведомления сразу.
+   */
+  if (addedCount === 0 && selectedAccessories.length > 0) {
     toast.info('Выбранные товары уже в корзине')
   }
 }

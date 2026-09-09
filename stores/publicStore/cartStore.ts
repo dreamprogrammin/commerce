@@ -1,6 +1,7 @@
 import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import { toast } from 'vue-sonner'
-import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
+import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { BUCKET_NAME_PRODUCT, COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
 import {
   buildDeliveryDates,
   clampIndex,
@@ -22,6 +23,19 @@ export const useCartStore = defineStore(
   'cartStore',
   () => {
     const supabase = useSupabaseClient<Database>()
+    const { getVariantUrl } = useSupabaseStorage()
+    const { cartAdded, cartRemoved } = useToasts()
+
+    /**
+     * Картинка товара для тоста — самый мелкий вариант: он уже скачан
+     * карточкой, и тост показывает его из кеша, не занимая канал.
+     */
+    function thumbUrl(product: ProductWithImages): string | null {
+      const path = product.product_images?.[0]?.image_url
+      if (!path)
+        return null
+      return getVariantUrl(BUCKET_NAME_PRODUCT, path, 'sm')
+    }
     const router = useRouter()
     const profileStore = useProfileStore()
     const user = useSupabaseUser()
@@ -236,7 +250,7 @@ export const useCartStore = defineStore(
 
       if (existingItem) {
         existingItem.quantity += quantity
-        toast.success(`"${existingItem.product.name}" (+${quantity})`)
+        cartAdded(existingItem.product.name, thumbUrl(existingItem.product))
         // 🔥 Открываем корзину при добавлении товара
         isCartOpen.value = true
         // 🔥 Сбрасываем бонусы при изменении корзины
@@ -276,7 +290,7 @@ export const useCartStore = defineStore(
             product: fullProduct as ProductWithImages,
             quantity,
           })
-          toast.success(`"${fullProduct.name}" добавлен в корзину!`)
+          cartAdded(fullProduct.name, thumbUrl(fullProduct as ProductWithImages))
           // 🔥 Открываем корзину при добавлении нового товара
           isCartOpen.value = true
           // 🔥 Сбрасываем бонусы при изменении корзины
@@ -296,12 +310,37 @@ export const useCartStore = defineStore(
       }
     }
 
+    /**
+     * Вернуть удалённую позицию на место — из тоста «Вернуть».
+     *
+     * Кладётся снимок, а не повторное добавление: `addItem` сходил бы за
+     * товаром в базу и отправил бы add_to_cart, а возврат отменённого
+     * удаления покупкой не является — в отчётах вышла бы лишняя пара
+     * событий.
+     */
+    function restoreItem(item: ICartItem, index: number) {
+      if (items.value.some(i => i.product.id === item.product.id))
+        return
+      items.value.splice(Math.min(index, items.value.length), 0, item)
+      bonusesToSpend.value = 0
+    }
+
     function removeItem(productId: string) {
       // Ищем ДО фильтрации: после неё имени и цены для события уже не будет.
-      const removed = items.value.find(i => i.product.id === productId)
+      const index = items.value.findIndex(i => i.product.id === productId)
+      const removed = index >= 0 ? items.value[index] : undefined
 
       items.value = items.value.filter(i => i.product.id !== productId)
-      toast.info('Товар удален из корзины')
+      if (removed) {
+        cartRemoved(
+          removed.product.name,
+          () => restoreItem(removed, index),
+          thumbUrl(removed.product),
+        )
+      }
+      else {
+        toast.info('Товар удалён из корзины')
+      }
       // 🔥 Сбрасываем бонусы при изменении корзины
       bonusesToSpend.value = 0
 
@@ -722,6 +761,7 @@ export const useCartStore = defineStore(
       bonusesToAward,
       addItem,
       removeItem,
+      restoreItem,
       updateQuantity,
       clearCart,
       checkout,
