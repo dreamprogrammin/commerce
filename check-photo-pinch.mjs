@@ -34,6 +34,12 @@ await ctx.route('**/storage/v1/object/public/**', async (r) => {
 })
 await ctx.addInitScript(() => { try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())) } catch {} })
 const p = await ctx.newPage()
+const fullSizeRequests = []
+p.on('request', (r) => {
+  const u = r.url()
+  if (u.includes('/product-images/') && u.includes('_lg.webp'))
+    fullSizeRequests.push(u)
+})
 const cdp = await ctx.newCDPSession(p)
 
 await p.goto(`${BASE}/catalog/products/${SLUG}`, { waitUntil: 'domcontentloaded', timeout: 240000 })
@@ -105,6 +111,29 @@ for (let i = 1; i <= 10; i++) { await touch('touchMove', [[cx + 120 - i * 20, cy
 await touch('touchEnd', [])
 await p.waitForTimeout(900)
 ok('свайп листает как раньше', (await state()).counter === '2 / 14', (await state()).counter)
+
+// Быстрое пролистывание не должно заказывать полный размер каждому кадру:
+// «пробежаться в поисках нужного фото» стоило столько же, сколько вдумчивый
+// просмотр (8 листаний рывком = 8 полноразмерных файлов), а лишние закачки
+// отнимали канал у того кадра, на котором в итоге остановились — на 3G он
+// доходил до резкости 953мс вместо 522мс.
+await p.keyboard.press('Escape')
+await p.waitForTimeout(1200)
+await p.evaluate(() => { window.scrollTo(0, 0); document.querySelector('.pg-slide').click() })
+await p.waitForFunction(() => {
+  const i = document.querySelector('[role="dialog"] .pv-img')
+  return i && i.naturalWidth > 0
+}, null, { timeout: 60000 })
+await p.waitForTimeout(2500)
+const beforeFlick = new Set(fullSizeRequests).size
+for (let i = 0; i < 6; i++) {
+  await p.keyboard.press('ArrowRight')
+  await p.waitForTimeout(120)
+}
+await p.waitForTimeout(4000)
+const flickCost = new Set(fullSizeRequests).size - beforeFlick
+ok('быстрое пролистывание не тянет полный размер каждому кадру', flickCost <= 2,
+  `за 6 листаний рывком запрошено полноразмерных: ${flickCost}`)
 
 await p.screenshot({ path: `${SC}/pinch-after.png` })
 
