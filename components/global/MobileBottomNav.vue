@@ -298,7 +298,10 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
         @dragstart.prevent
         @click="handleItemClick($event, item, navigate)"
       >
-        <span class="mbn-icon-wrap">
+        <span
+          class="mbn-icon-wrap"
+          :data-cart-target="item.badge === 'cart' ? '' : undefined"
+        >
           <Icon
             :name="item.isActive || item.isPressed ? item.iconActive : item.icon"
             mode="svg"

@@ -427,10 +427,13 @@ function getImageAlt(image: ProductImageRow, index: number): string {
         @click="openLightbox"
         @keydown="onSliderKeydown"
       >
+        <!-- data-fly-origin — с этого кадра стартует полёт в корзину
+             (страница товара ищет его через DOM, чтобы не тащить ref наружу). -->
         <div
           v-for="(image, index) in images"
           :key="image.id"
           class="pg-slide"
+          :data-fly-origin="index === activeIndex ? '' : undefined"
         >
           <ProgressiveImage
             :src="isNearActive(index) ? getMainUrl(image.image_url) : null"
