@@ -44,6 +44,7 @@ const queryClient = useQueryClient()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 const { trackViewItem } = useEcommerceTracking()
+const { flyToCart } = useCartFly()
 const { generateBrandLogoAlt } = useSeoAltText()
 
 const priceValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -322,9 +323,23 @@ const quantityInCart = computed(() =>
   mainItemInCart.value ? mainItemInCart.value.quantity : 0,
 )
 
-async function addToCart() {
+/**
+ * Полёт «товар летит в корзину». Источник — активный кадр галереи: он размечен
+ * `data-fly-origin` внутри ProductGallery, и тащить ref наружу ради одной
+ * анимации незачем. Запасной источник — нажатая кнопка: на прокрученной
+ * странице галерея уже за экраном, а липкая панель под пальцем.
+ */
+function flyToCartFrom(event?: MouseEvent) {
+  const slide = document.querySelector<HTMLElement>('.pg-slide[data-fly-origin]')
+  flyToCart(slide, undefined, (event?.currentTarget as HTMLElement | null) ?? null)
+}
+
+async function addToCart(event?: MouseEvent) {
   if (!product.value)
     return
+  // Раньше добавления: кнопка тут же сменится степпером, и запасной источник
+  // перестанет существовать.
+  flyToCartFrom(event)
   let addedCount = 0
   if (!mainItemInCart.value) {
     await cartStore.addItem(product.value, 1)
@@ -351,12 +366,13 @@ async function addToCart() {
   }
 }
 
-function incQuantity() {
+function incQuantity(event?: MouseEvent) {
   if (!product.value)
     return
   const next = quantityInCart.value + 1
   if (product.value.stock_quantity && next > product.value.stock_quantity)
     return
+  flyToCartFrom(event)
   cartStore.updateQuantity(product.value.id, next)
 }
 
@@ -1374,12 +1390,12 @@ watchEffect(() => {
                         type="button"
                         class="pdp-stepper-btn"
                         aria-label="Увеличить количество"
-                        @click="incQuantity"
+                        @click="incQuantity($event)"
                       >
                         <Icon name="lucide:plus" class="size-[19px]" />
                       </button>
                     </div>
-                    <button v-else type="button" class="pdp-cta mb-2.5" @click="addToCart">
+                    <button v-else type="button" class="pdp-cta mb-2.5" @click="addToCart($event)">
                       <Icon name="solar:cart-3-bold" class="size-[22px]" />
                       Добавить в корзину
                     </button>
@@ -1687,12 +1703,12 @@ watchEffect(() => {
                 type="button"
                 class="pdp-stepper-btn pdp-stepper-btn--round"
                 aria-label="Увеличить количество"
-                @click="incQuantity"
+                @click="incQuantity($event)"
               >
                 <Icon name="lucide:plus" class="size-[18px]" />
               </button>
             </div>
-            <button v-else type="button" class="pdp-cta pdp-cta--pill flex-1" @click="addToCart">
+            <button v-else type="button" class="pdp-cta pdp-cta--pill flex-1" @click="addToCart($event)">
               <Icon name="solar:cart-3-bold" class="size-5" />
               В корзину
             </button>

@@ -198,7 +198,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           </PopoverContent>
         </Popover>
 
-        <NuxtLink to="/cart" aria-label="Корзина" class="csb-cart">
+        <NuxtLink to="/cart" aria-label="Корзина" class="csb-cart" data-cart-target>
           <Icon name="solar:cart-3-bold" class="csb-cart__icon" />
           <ClientOnly>
             <span v-if="cartCount > 0" class="csb-cart-badge">{{ cartCount > 9 ? '9+' : cartCount }}</span>

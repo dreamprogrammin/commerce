@@ -50,10 +50,13 @@ const authStore = useAuthStore()
 const modalStore = useModalStore()
 const { getImageUrl, getVariantUrl } = useSupabaseStorage()
 const { triggerHaptic } = useHaptic()
+const { flyToCart } = useCartFly()
 const { generateProductImageAlt } = useSeoAltText()
 
 // --- ГАЛЕРЕЯ: единая scroll-snap лента (нативный свайп на тач, наведение мышью на десктопе) ---
 const scrollerRef = ref<HTMLElement | null>(null)
+// Контейнер картинки — источник полёта «товар летит в корзину».
+const mediaRef = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
 
 const galleryImages = computed(() => props.product.product_images ?? [])
@@ -191,17 +194,29 @@ const itemInCart = computed(() => cartStore.items.find(item => item.product.id =
 const quantityInCart = computed(() => itemInCart.value?.quantity ?? 0)
 const maxAvailableQuantity = computed(() => Math.max(1, Math.floor((props.product.stock_quantity || 0) * 0.8)))
 
-function onAdd() {
+/**
+ * Полёт миниатюры в корзину. Источник — контейнер картинки; если карточку
+ * успели пролистать за экран, полетит от самой нажатой кнопки.
+ */
+function fly(event: MouseEvent) {
+  flyToCart(mediaRef.value, undefined, event.currentTarget as HTMLElement)
+}
+
+function onAdd(event: MouseEvent) {
+  // Полёт запускается ПЕРЕД добавлением: после него кнопка сменится степпером,
+  // и запасной источник (сама кнопка) уже не будет тем, куда нажали.
+  fly(event)
   // Событие add_to_cart отправляет сам `cartStore.addItem` — раньше оно
   // висело здесь, и потому считались только добавления из карточки в списке.
   cartStore.addItem(props.product as BaseProduct, 1)
   triggerHaptic('medium')
 }
 
-function onInc() {
+function onInc(event: MouseEvent) {
   const next = quantityInCart.value + 1
   if (next > maxAvailableQuantity.value)
     return
+  fly(event)
   cartStore.updateQuantity(props.product.id, next)
   triggerHaptic('light')
 }
@@ -232,7 +247,7 @@ async function onWish() {
     :class="quantityInCart > 0 ? 'pc-card--active' : ''"
   >
     <!-- 🖼️ ГАЛЕРЕЯ ИЗОБРАЖЕНИЙ -->
-    <div class="relative aspect-square overflow-hidden rounded-xl bg-white">
+    <div ref="mediaRef" class="relative aspect-square overflow-hidden rounded-xl bg-white">
       <NuxtLink
         :to="`/catalog/products/${product.slug}`"
         class="absolute inset-0 block"
