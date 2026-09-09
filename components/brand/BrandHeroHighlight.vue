@@ -22,6 +22,19 @@ const props = defineProps<{
 
 const emit = defineEmits<{ add: [product: ProductWithGallery] }>()
 
+const { flyToCart } = useCartFly()
+
+// Картинка хита — источник полёта в корзину.
+const imgRef = ref<HTMLImageElement | null>(null)
+
+function onAdd(event: MouseEvent) {
+  if (!props.product)
+    return
+  // До эмита: страница успеет перерисовать панель, и рект кнопки устареет.
+  flyToCart(imgRef.value, undefined, event.currentTarget as HTMLElement)
+  emit('add', props.product)
+}
+
 const { getVariantUrl } = useSupabaseStorage()
 
 const imageUrl = computed(() => {
@@ -56,6 +69,7 @@ const priceLabel = computed(() => {
     <NuxtLink :to="`/catalog/products/${product.slug}`" class="bhh__media">
       <img
         v-if="imageUrl"
+        ref="imgRef"
         :src="imageUrl"
         :alt="product.name"
         class="bhh__img"
@@ -72,7 +86,7 @@ const priceLabel = computed(() => {
         <span class="bhh__caption">Хит бренда · {{ product.name }}</span>
         <span v-if="priceLabel" class="bhh__price">{{ priceLabel }}</span>
       </span>
-      <button type="button" class="bhh__add" @click="emit('add', product)">
+      <button type="button" class="bhh__add" @click="onAdd">
         В корзину
       </button>
     </div>

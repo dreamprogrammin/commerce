@@ -9,8 +9,8 @@ import { useMediaQuery } from '@vueuse/core'
  * пороги жестов — взяты из макета как есть.
  *
  * Отличия от прототипа, все в одну сторону — «так надо для боевого магазина»:
- *  • кадр рисуется <img> с alt и srcset, а не фоном у <span>: фон не даёт ни
- *    альтернативного текста, ни выбора варианта по плотности экрана;
+ *  • кадр рисуется <img> с alt, а не фоном у <span>: фон не даёт ни
+ *    альтернативного текста, ни ленивой загрузки;
  *  • дальние кадры грузятся лениво (у прототипа все сразу);
  *  • раскладка «мобильный/десктоп» сделана медиазапросами, а не замером
  *    window.innerWidth на resize — она верна ещё до гидратации;
@@ -19,9 +19,14 @@ import { useMediaQuery } from '@vueuse/core'
  */
 
 export interface PhotoViewerImage {
+  /** Облегчённый файл: с него кадр показывается сразу. */
   src: string
-  srcset?: string | null
-  sizes?: string | null
+  /**
+   * Полноразмерный файл. Грузится ТОЛЬКО для того кадра, который сейчас
+   * смотрят, — и подменяется, когда доедет. Так деталь видна там, где её
+   * разглядывают, а за остальные тринадцать фото платить не приходится.
+   */
+  full?: string | null
   alt?: string | null
   /**
        Мелкий вариант для панели снизу. Без него в плитку 54×54 уедет полный
@@ -61,6 +66,8 @@ const HINT_MS = 3600
 const MAX_ZOOM = 4
 const SWIPE_COMMIT_PX = 62
 const DISMISS_PX = 110
+const CLOSE_MS = 220
+const DISMISS_TRAVEL_PX = 280
 const AXIS_LOCK_PX = 6
 const EDGE_RESISTANCE = 0.32
 
@@ -89,6 +96,15 @@ const dragX = ref(0)
 const dragY = ref(0)
 const isDragging = ref(false)
 const hintSeen = ref(false)
+/*
+ * Закрытие смахиванием доигрывается, а не обрывается.
+ *
+ * Раньше при переходе порога вызывался close() прямо на полужесте: кадр
+ * оставался там, куда его довели пальцем, и всё окно пропадало разом. Теперь
+ * кадр доезжает вниз и гаснет вместе с подложкой, и только потом окно
+ * снимается. Длительность совпадает с CLOSE_MS ниже.
+ */
+const isDismissing = ref(false)
 
 const isZoomed = computed(() => zoom.value > 1)
 // Подсказка различается текстом, а не только шириной, поэтому одними
@@ -136,30 +152,33 @@ function imageStyle(i: number) {
 }
 
 /*
- * Увеличенному кадру нужен файл покрупнее.
+ * Полный размер — только тому кадру, который смотрят.
  *
- * `sizes` — обещание браузеру, какой ширины будет картинка; по нему он и
- * выбирает вариант из srcset. В покое кадр занимает ~92vw, и на телефоне
- * выбирался `_md` (600px по длинной стороне). При щипке до 3–4× такой файл
- * растягивается вдвое и мылит — замер: 600px исходника на 1251 экранных.
+ * Кадр показывается с облегчённого файла, а полноразмерный догружается в
+ * стороне и подменяется по `onload`. Подменять напрямую нельзя: смена `src` у
+ * уже нарисованной картинки роняет `naturalWidth` в ноль, и на месте фото до
+ * конца загрузки пустота — проверено, когда так же пробовал менять `sizes`.
+ * Через предзагрузку файл к моменту подмены уже в кеше, и она мгновенная.
  *
- * Переключать `sizes` прямо на жесте нельзя: браузер тут же бросает текущую
- * картинку и начинает грузить новую, `naturalWidth` падает в ноль, и вместо
- * фотографии посреди щипка пустое место (проверено). Поэтому сперва тихо
- * догружаем крупный вариант в стороне, и только когда он в кеше — меняем
- * обещание. Подмена тогда мгновенная.
+ * Множество, а не один индекс: пролистал вперёд-назад — возвращаться к
+ * облегчённому варианту незачем, файл уже скачан.
  */
 const hiRes = ref(new Set<number>())
 
-function sizesFor(i: number) {
-  if (hiRes.value.has(i))
-    return '300vw'
-  return slides.value[i]?.sizes || '92vw'
+function srcFor(i: number) {
+  const slide = slides.value[i]
+  if (!slide)
+    return undefined
+  // дальним кадрам не даём ничего: у товара их бывает полтора десятка, и
+  // тянуть все разом при открытии незачем
+  if (!isNear(i))
+    return undefined
+  return hiRes.value.has(i) ? (slide.full || slide.src) : slide.src
 }
 
 function ensureHiRes(i: number) {
   const slide = slides.value[i]
-  if (!slide?.srcset || hiRes.value.has(i))
+  if (!slide?.full || slide.full === slide.src || hiRes.value.has(i))
     return
   const pre = new Image()
   pre.onload = () => {
@@ -167,23 +186,43 @@ function ensureHiRes(i: number) {
     next.add(i)
     hiRes.value = next
   }
-  // те же srcset и обещание, что получит настоящий кадр, — значит браузер
-  // выберет и положит в кеш ровно тот файл, который потом и понадобится
-  pre.sizes = '300vw'
-  pre.srcset = slide.srcset
-  pre.src = slide.src
+  pre.src = slide.full
 }
 
-watch(isZoomed, (zoomed) => {
-  if (zoomed)
-    ensureHiRes(index.value)
-})
-
-// Соседние кадры грузим сразу, дальние — лениво: у товара их бывает полтора
-// десятка, и тянуть все разом при открытии незачем.
+// Соседние кадры грузим сразу, дальние — лениво.
 function isNear(i: number) {
   return Math.abs(i - index.value) <= 1
 }
+
+/*
+ * Полный размер заказываем не на каждом пролистывании, а когда на кадре
+ * задержались.
+ *
+ * Без паузы «пробежаться по фото в поисках нужного» стоило столько же, сколько
+ * вдумчивый просмотр: замер — восемь листаний с паузой 120мс дают восемь
+ * полноразмерных файлов, ровно как восемь листаний с паузой 1.5с. Причём
+ * лишние закачки отнимают канал у того кадра, на котором в итоге остановились:
+ * на 3G после рывка через шесть кадров нужный снимок доходил до полного
+ * размера 953мс, тогда как при спокойном листании он был готов заранее.
+ *
+ * При открытии ждать нечего — просмотр открыли ради конкретного фото.
+ */
+const HIRES_SETTLE_MS = 300
+let hiResTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleHiRes(i: number) {
+  if (hiResTimer)
+    clearTimeout(hiResTimer)
+  hiResTimer = setTimeout(() => ensureHiRes(i), HIRES_SETTLE_MS)
+}
+
+watch(index, i => scheduleHiRes(i))
+
+// Сменился товар — индексы теперь про другие фотографии, отметки о скачанном
+// сбрасываем, иначе чужой кадр показался бы «уже полноразмерным».
+watch(slides, () => {
+  hiRes.value = new Set()
+})
 
 function altFor(image: PhotoViewerImage, i: number) {
   return image.alt || `${props.title || 'Фото'} — изображение ${i + 1}`
@@ -284,6 +323,21 @@ function step(delta: number) {
 function close() {
   emit('update:index', index.value)
   emit('update:open', false)
+}
+
+let dismissTimer: ReturnType<typeof setTimeout> | null = null
+
+function dismissByDrag() {
+  if (isDismissing.value)
+    return
+  isDismissing.value = true
+  // переходы обратно включаем, иначе кадр «телепортируется» вниз
+  isDragging.value = false
+  dragY.value = Math.max(dragY.value, DISMISS_TRAVEL_PX)
+  dismissTimer = setTimeout(() => {
+    isDismissing.value = false
+    close()
+  }, CLOSE_MS)
 }
 
 // --- жесты -------------------------------------------------------------------
@@ -495,7 +549,7 @@ function onPointerUp(event: PointerEvent) {
   const draggedY = dragY.value
 
   if (draggedY > DISMISS_PX) {
-    close()
+    dismissByDrag()
     return
   }
 
@@ -568,6 +622,7 @@ watch(isOpen, (open) => {
   if (open) {
     const last = Math.max(0, slides.value.length - 1)
     index.value = Math.max(0, Math.min(props.startIndex, last))
+    ensureHiRes(index.value)
     resetView()
     // указатели могли остаться от прошлого открытия, если палец подняли уже
     // за пределами окна
@@ -590,6 +645,11 @@ watch(isOpen, (open) => {
     window.removeEventListener('keydown', onKeydown)
     if (hintTimer)
       clearTimeout(hintTimer)
+    if (hiResTimer)
+      clearTimeout(hiResTimer)
+    if (dismissTimer)
+      clearTimeout(dismissTimer)
+    isDismissing.value = false
     restoreFocusTo?.focus?.()
     restoreFocusTo = null
   }
@@ -601,114 +661,125 @@ onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKeydown)
   if (hintTimer)
     clearTimeout(hintTimer)
+  if (hiResTimer)
+    clearTimeout(hiResTimer)
+  if (dismissTimer)
+    clearTimeout(dismissTimer)
 })
 </script>
 
 <template>
-  <Teleport v-if="isOpen" to="body">
-    <div
-      ref="overlayRef"
-      class="pv-root"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="title ? `Просмотр фото: ${title}` : 'Просмотр фото'"
-      tabindex="-1"
-    >
-      <!-- Шапка: счётчик · название · закрыть -->
-      <div class="pv-bar">
-        <span class="pv-counter">{{ counter }}</span>
-        <span class="pv-heading">{{ title }}</span>
-        <button type="button" class="pv-round" aria-label="Закрыть" @click="close">
-          <Icon name="lucide:x" class="size-[22px]" />
-        </button>
-      </div>
+  <Teleport to="body">
+    <!--
+      `v-if` переехал внутрь Transition. Пока он стоял на самом Teleport, окно
+      снималось из DOM в тот же кадр, и анимации ухода просто негде было
+      проиграться: открытие было плавным, закрытие — обрывом.
+    -->
+    <Transition name="pv">
+      <div
+        v-if="isOpen"
+        ref="overlayRef"
+        class="pv-root"
+        :class="{ 'pv-root--out': isDismissing }"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="title ? `Просмотр фото: ${title}` : 'Просмотр фото'"
+        tabindex="-1"
+      >
+        <!-- Шапка: счётчик · название · закрыть -->
+        <div class="pv-bar">
+          <span class="pv-counter">{{ counter }}</span>
+          <span class="pv-heading">{{ title }}</span>
+          <button type="button" class="pv-round" aria-label="Закрыть" @click="close">
+            <Icon name="lucide:x" class="size-[22px]" />
+          </button>
+        </div>
 
-      <!-- Кадры -->
-      <div class="pv-stage-wrap">
-        <div
-          ref="stageRef"
-          class="pv-stage"
-          :style="stageStyle"
-          @pointerdown="onPointerDown"
-          @pointermove="onPointerMove"
-          @pointerup="onPointerUp"
-          @pointercancel="onPointerUp"
-          @click="onStageClick"
-        >
-          <div class="pv-track" :style="trackStyle">
-            <div v-for="(image, i) in slides" :key="`${image.src}-${i}`" class="pv-slot">
-              <span class="pv-card">
-                <img
-                  class="pv-img"
-                  :style="imageStyle(i)"
-                  :src="image.src"
-                  :srcset="image.srcset || undefined"
-                  :sizes="image.srcset ? sizesFor(i) : undefined"
-                  :alt="altFor(image, i)"
-                  :loading="isNear(i) ? 'eager' : 'lazy'"
-                  :fetchpriority="i === index ? 'high' : 'auto'"
-                  decoding="async"
-                  draggable="false"
-                >
-              </span>
+        <!-- Кадры -->
+        <div class="pv-stage-wrap">
+          <div
+            ref="stageRef"
+            class="pv-stage"
+            :style="stageStyle"
+            @pointerdown="onPointerDown"
+            @pointermove="onPointerMove"
+            @pointerup="onPointerUp"
+            @pointercancel="onPointerUp"
+            @click="onStageClick"
+          >
+            <div class="pv-track" :style="trackStyle">
+              <div v-for="(image, i) in slides" :key="`${image.src}-${i}`" class="pv-slot">
+                <span class="pv-card">
+                  <img
+                    class="pv-img"
+                    :style="imageStyle(i)"
+                    :src="srcFor(i)"
+                    :alt="altFor(image, i)"
+                    :loading="isNear(i) ? 'eager' : 'lazy'"
+                    :fetchpriority="i === index ? 'high' : 'auto'"
+                    decoding="async"
+                    draggable="false"
+                  >
+                </span>
+              </div>
             </div>
           </div>
+
+          <!-- Стрелки: по макету только на широком экране, там же где есть курсор -->
+          <template v-if="hasMany">
+            <button
+              type="button"
+              class="pv-round pv-arrow pv-arrow--prev"
+              aria-label="Предыдущее фото"
+              @click.stop="step(-1)"
+            >
+              <Icon name="lucide:chevron-left" class="size-6" />
+            </button>
+            <button
+              type="button"
+              class="pv-round pv-arrow pv-arrow--next"
+              aria-label="Следующее фото"
+              @click.stop="step(1)"
+            >
+              <Icon name="lucide:chevron-right" class="size-6" />
+            </button>
+          </template>
         </div>
 
-        <!-- Стрелки: по макету только на широком экране, там же где есть курсор -->
-        <template v-if="hasMany">
-          <button
-            type="button"
-            class="pv-round pv-arrow pv-arrow--prev"
-            aria-label="Предыдущее фото"
-            @click.stop="step(-1)"
-          >
-            <Icon name="lucide:chevron-left" class="size-6" />
-          </button>
-          <button
-            type="button"
-            class="pv-round pv-arrow pv-arrow--next"
-            aria-label="Следующее фото"
-            @click.stop="step(1)"
-          >
-            <Icon name="lucide:chevron-right" class="size-6" />
-          </button>
-        </template>
-      </div>
+        <!-- Подсказка и стеклянная панель с миниатюрами -->
+        <div class="pv-foot">
+          <span v-if="showHint" class="pv-hint">{{ hintText }}</span>
 
-      <!-- Подсказка и стеклянная панель с миниатюрами -->
-      <div class="pv-foot">
-        <span v-if="showHint" class="pv-hint">{{ hintText }}</span>
+          <div class="pv-dock">
+            <div v-if="hasMany" class="pv-thumbs">
+              <button
+                v-for="(image, i) in slides"
+                :key="`t-${image.src}-${i}`"
+                type="button"
+                class="pv-thumb"
+                :class="{ 'pv-thumb--active': i === index }"
+                :aria-label="`Фото ${i + 1}`"
+                :aria-current="i === index"
+                @click.stop="goTo(i)"
+              >
+                <img class="pv-thumb-img" :src="image.thumb || image.src" alt="" loading="lazy" decoding="async">
+              </button>
+            </div>
+            <span v-if="hasMany" class="pv-divider" />
 
-        <div class="pv-dock">
-          <div v-if="hasMany" class="pv-thumbs">
             <button
-              v-for="(image, i) in slides"
-              :key="`t-${image.src}-${i}`"
               type="button"
-              class="pv-thumb"
-              :class="{ 'pv-thumb--active': i === index }"
-              :aria-label="`Фото ${i + 1}`"
-              :aria-current="i === index"
-              @click.stop="goTo(i)"
+              class="pv-zoom"
+              :aria-label="isZoomed ? 'Уменьшить' : 'Увеличить'"
+              :aria-pressed="isZoomed"
+              @click.stop="toggleZoom"
             >
-              <img class="pv-thumb-img" :src="image.thumb || image.src" alt="" loading="lazy" decoding="async">
+              <Icon :name="isZoomed ? 'lucide:zoom-out' : 'lucide:zoom-in'" class="size-[21px]" />
             </button>
           </div>
-          <span v-if="hasMany" class="pv-divider" />
-
-          <button
-            type="button"
-            class="pv-zoom"
-            :aria-label="isZoomed ? 'Уменьшить' : 'Увеличить'"
-            :aria-pressed="isZoomed"
-            @click.stop="toggleZoom"
-          >
-            <Icon :name="isZoomed ? 'lucide:zoom-out' : 'lucide:zoom-in'" class="size-[21px]" />
-          </button>
         </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -727,8 +798,41 @@ onBeforeUnmount(() => {
     background: radial-gradient(120% 100% at 50% 0%, rgb(30 41 59 / 0.95), rgb(2 6 23 / 0.97));
     backdrop-filter: blur(16px) saturate(1.15);
     -webkit-backdrop-filter: blur(16px) saturate(1.15);
-    animation: pv-fade 0.16s ease;
     outline: none;
+  }
+
+  /* ── Появление и уход ──────────────────────────────────────────────────────
+     Открытие как было — короткое проявление. Уход длиннее: на телефоне окно
+     занимает весь экран, и мгновенное исчезновение читается как сбой, а не
+     как закрытие. */
+  .pv-enter-active {
+    animation: pv-fade 0.16s ease;
+  }
+
+  .pv-leave-active {
+    transition:
+      opacity 0.22s ease,
+      transform 0.22s ease;
+    /* уходящее окно уже не должно ловить нажатия: под ним снова страница */
+    pointer-events: none;
+  }
+
+  .pv-leave-to {
+    opacity: 0;
+    /* чуть уводим вглубь — окно «отступает», а не гаснет плоско */
+    transform: scale(0.96);
+  }
+
+  /* Смахивание вниз: кадр уже уехал за нижний край, подложке остаётся погаснуть.
+     Масштаб здесь не трогаем, иначе движение пальца и уход спорят. */
+  .pv-root--out {
+    opacity: 0;
+    transition: opacity 0.22s ease;
+  }
+
+  .pv-root--out.pv-leave-active,
+  .pv-root--out.pv-leave-to {
+    transform: none;
   }
 
   /* ── Шапка ─────────────────────────────────────────────────────────────── */
@@ -1014,6 +1118,13 @@ onBeforeUnmount(() => {
     .pv-root,
     .pv-card {
       animation: none;
+    }
+
+    .pv-enter-active,
+    .pv-leave-active,
+    .pv-root--out {
+      animation: none;
+      transition: none;
     }
   }
 }

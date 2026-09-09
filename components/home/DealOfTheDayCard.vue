@@ -18,6 +18,10 @@ const productsStore = useProductsStore()
 const cartStore = useCartStore()
 const { getVariantUrl } = useSupabaseStorage()
 const { items } = storeToRefs(cartStore)
+const { flyToCart } = useCartFly()
+
+// Картинка товара — источник полёта в корзину.
+const imgRef = ref<HTMLElement | null>(null)
 
 /*
  * Товар берётся на сервере, а не в onMounted.
@@ -71,9 +75,15 @@ const qty = computed(() => {
   return items.value.find(i => i.product.id === id)?.quantity ?? 0
 })
 
-function addOne() {
-  if (product.value)
-    cartStore.addItem(product.value, 1)
+/**
+ * Источник полёта — картинка товара дня. До добавления: кнопка сразу сменится
+ * счётчиком, и запасной источник исчезнет.
+ */
+function addOne(event: MouseEvent) {
+  if (!product.value)
+    return
+  flyToCart(imgRef.value, undefined, event.currentTarget as HTMLElement)
+  cartStore.addItem(product.value, 1)
 }
 
 // --- обратный отсчёт до конца суток ---
@@ -144,7 +154,7 @@ useResumableEffect(
     </div>
 
     <NuxtLink :to="`/catalog/products/${product.slug}`" class="deal__body">
-      <span class="deal__img">
+      <span ref="imgRef" class="deal__img">
         <img v-if="imageUrl" :src="imageUrl" :alt="product.name" loading="lazy">
       </span>
       <div class="deal__info">

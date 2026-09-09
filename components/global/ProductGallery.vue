@@ -295,25 +295,29 @@ function onViewerIndex(next: number) {
   nextTick(() => scrollToIndex(next, false))
 }
 
-// Кадры для просмотра: полный размер плюс средний вариант, чтобы на узком
-// экране не тянуть полуторатысячный файл.
+/*
+ * Кадры для просмотра: три варианта под три роли.
+ *
+ * `src` — средний файл, с него кадр показывается сразу. `full` —
+ * полноразмерный, просмотр догрузит его только для того кадра, который
+ * смотрят, и подменит на лету. `thumb` — мелкий, для панели снизу.
+ *
+ * Раньше выбор отдавали браузеру через srcset и обещание `sizes: 92vw`, и на
+ * телефоне при DPR 2 расчёт давал 718px — подходящим оказывался средний файл
+ * в 600px, фото выходило мягче, чем есть. На десктопе тот же расчёт давал
+ * 2650px и брался полный, поэтому на широком экране этого было не видно.
+ * Выбор по ширине здесь вообще не годится: окно во весь экран да ещё щипок до
+ * 4× — «подходящий» вариант всегда мелковат. Поэтому решаем сами, и платим
+ * за полный размер ровно один раз, за рассматриваемое фото.
+ */
 const lightboxSlides = computed(() =>
-  props.images.map((image, index) => {
-    const { md, lg } = getImageVariants(image.image_url)
-    const parts: string[] = []
-    if (md)
-      parts.push(`${md} 800w`)
-    if (lg)
-      parts.push(`${lg} 1440w`)
-    return {
-      src: getFullUrl(image.image_url) || '',
-      srcset: parts.length ? parts.join(', ') : null,
-      sizes: '92vw',
-      alt: getImageAlt(image, index),
-      // тот же файл, что и в рельсе миниатюр, — берётся из кеша браузера
-      thumb: getThumbUrl(image.image_url),
-    }
-  }),
+  props.images.map((image, index) => ({
+    src: getImageVariants(image.image_url).md || getFullUrl(image.image_url) || '',
+    full: getFullUrl(image.image_url),
+    alt: getImageAlt(image, index),
+    // тот же файл, что и в рельсе миниатюр, — берётся из кеша браузера
+    thumb: getThumbUrl(image.image_url),
+  })),
 )
 
 // --- URL и alt ----------------------------------------------------------------
@@ -423,10 +427,13 @@ function getImageAlt(image: ProductImageRow, index: number): string {
         @click="openLightbox"
         @keydown="onSliderKeydown"
       >
+        <!-- data-fly-origin — с этого кадра стартует полёт в корзину
+             (страница товара ищет его через DOM, чтобы не тащить ref наружу). -->
         <div
           v-for="(image, index) in images"
           :key="image.id"
           class="pg-slide"
+          :data-fly-origin="index === activeIndex ? '' : undefined"
         >
           <ProgressiveImage
             :src="isNearActive(index) ? getMainUrl(image.image_url) : null"

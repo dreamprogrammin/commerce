@@ -34,6 +34,12 @@ await ctx.route('**/storage/v1/object/public/**', async (r) => {
 })
 await ctx.addInitScript(() => { try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())) } catch {} })
 const p = await ctx.newPage()
+const fullSizeRequests = []
+p.on('request', (r) => {
+  const u = r.url()
+  if (u.includes('/product-images/') && u.includes('_lg.webp'))
+    fullSizeRequests.push(u)
+})
 const cdp = await ctx.newCDPSession(p)
 
 await p.goto(`${BASE}/catalog/products/${SLUG}`, { waitUntil: 'domcontentloaded', timeout: 240000 })
@@ -105,6 +111,63 @@ for (let i = 1; i <= 10; i++) { await touch('touchMove', [[cx + 120 - i * 20, cy
 await touch('touchEnd', [])
 await p.waitForTimeout(900)
 ok('свайп листает как раньше', (await state()).counter === '2 / 14', (await state()).counter)
+
+// Быстрое пролистывание не должно заказывать полный размер каждому кадру:
+// «пробежаться в поисках нужного фото» стоило столько же, сколько вдумчивый
+// просмотр (8 листаний рывком = 8 полноразмерных файлов), а лишние закачки
+// отнимали канал у того кадра, на котором в итоге остановились — на 3G он
+// доходил до резкости 953мс вместо 522мс.
+await p.keyboard.press('Escape')
+await p.waitForTimeout(1200)
+await p.evaluate(() => { window.scrollTo(0, 0); document.querySelector('.pg-slide').click() })
+await p.waitForFunction(() => {
+  const i = document.querySelector('[role="dialog"] .pv-img')
+  return i && i.naturalWidth > 0
+}, null, { timeout: 60000 })
+await p.waitForTimeout(2500)
+const beforeFlick = new Set(fullSizeRequests).size
+for (let i = 0; i < 6; i++) {
+  await p.keyboard.press('ArrowRight')
+  await p.waitForTimeout(120)
+}
+await p.waitForTimeout(4000)
+const flickCost = new Set(fullSizeRequests).size - beforeFlick
+ok('быстрое пролистывание не тянет полный размер каждому кадру', flickCost <= 2,
+  `за 6 листаний рывком запрошено полноразмерных: ${flickCost}`)
+
+/*
+ * Закрытие обязано доигрываться, а не обрываться. Раньше `v-if` стоял на самом
+ * Teleport: окно снималось из DOM в тот же кадр, и уходу негде было
+ * проиграться — открытие плавное, закрытие обрыв. Ловим полукадры: должен
+ * найтись момент, когда окно ещё в DOM, но уже полупрозрачное.
+ */
+await p.keyboard.press('Escape')
+await p.waitForTimeout(1200)
+await p.evaluate(() => { window.scrollTo(0, 0); document.querySelector('.pg-slide').click() })
+await p.waitForFunction(() => !!document.querySelector('.pv-root'), null, { timeout: 60000 })
+await p.waitForTimeout(1500)
+const closeFilm = await p.evaluate(async () => {
+  const film = []
+  const t0 = performance.now()
+  let done
+  const ready = new Promise((r) => { done = r })
+  const tick = () => {
+    const el = document.querySelector('.pv-root')
+    film.push({ t: Math.round(performance.now() - t0), есть: !!el, o: el ? Number(getComputedStyle(el).opacity) : null })
+    if (performance.now() - t0 < 900) requestAnimationFrame(tick)
+    else done()
+  }
+  requestAnimationFrame(tick)
+  document.querySelector('.pv-root')?.querySelectorAll('button').forEach((b) => {
+    if (b.getAttribute('aria-label') === 'Закрыть') b.click()
+  })
+  await ready
+  return film
+})
+const midFade = closeFilm.filter(f => f.есть && f.o > 0.02 && f.o < 0.98).length
+const goneAt = closeFilm.find(f => !f.есть)?.t ?? null
+ok('закрытие плавное, а не обрывом', midFade >= 3, `полупрозрачных кадров: ${midFade}`)
+ok('окно всё же снимается из DOM', goneAt !== null && goneAt < 700, goneAt === null ? 'не снялось за 900мс' : `через ${goneAt}мс`)
 
 await p.screenshot({ path: `${SC}/pinch-after.png` })
 

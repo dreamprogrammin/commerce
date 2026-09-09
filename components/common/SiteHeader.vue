@@ -209,7 +209,7 @@ const wrapStyle = computed<CSSProperties>(() => {
             </NuxtLink>
 
             <!-- Корзина -->
-            <NuxtLink to="/cart" class="sh-icon-btn" aria-label="Корзина">
+            <NuxtLink to="/cart" class="sh-icon-btn" aria-label="Корзина" data-cart-target>
               <Icon name="solar:cart-3-bold" class="size-[22px]" mode="svg" />
               <ClientOnly>
                 <span v-if="cartCount > 0" class="sh-badge">{{ cartCount > 9 ? '9+' : cartCount }}</span>
@@ -272,7 +272,7 @@ const wrapStyle = computed<CSSProperties>(() => {
           <span v-if="wishlistCount > 0" class="sh-mobile__dot" />
         </ClientOnly>
       </NuxtLink>
-      <NuxtLink to="/cart" class="sh-mobile__btn" aria-label="Корзина">
+      <NuxtLink to="/cart" class="sh-mobile__btn" aria-label="Корзина" data-cart-target>
         <Icon name="solar:cart-3-bold" class="size-[19px]" mode="svg" />
         <ClientOnly>
           <span v-if="cartCount > 0" class="sh-mobile__dot" />

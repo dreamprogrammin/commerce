@@ -138,6 +138,23 @@ if (opened) {
   })
   ok(MODE === 'desktop' ? 'стрелки-кнопки есть на десктопе' : 'стрелок-кнопок нет на телефоне', MODE === 'desktop' ? arrowsVisible : !arrowsVisible)
 
+  // Просмотр обязан показывать полноразмерный вариант. До правки на телефоне
+  // браузер выбирал `_md` (600px): sizes обещал 92vw, на 390px при DPR 2 это
+  // 718px, и подходящим оказывался средний файл. На десктопе расчёт давал
+  // 2650px и уже выбирался `lg`, поэтому мягкая картинка была видна только на
+  // телефоне — и незаметна при проверке на широком экране.
+  const lbVariant = await p.evaluate(() => {
+    const im = document.querySelector('[role="dialog"] .pv-img')
+    return { src: (im?.currentSrc || '').split('/').pop() || '', w: im?.naturalWidth || 0 }
+  })
+  // Проверяем и файл, и natural. Одного имени мало: этот прогон идёт при DPR 3,
+  // где старый srcset и так выбирал `_lg`, — ломалось при DPR 2. Зато natural
+  // выдаёт механизм с головой: пока кадр идёт через srcset, браузер ужимает
+  // intrinsic по обещанию `sizes` (900px файла показывались как 224), а без
+  // srcset natural равен настоящей ширине файла.
+  ok('в просмотре полноразмерный вариант', /_lg\.webp$/.test(lbVariant.src) && lbVariant.w >= 800,
+    `${lbVariant.src.slice(-18)} (natural ${lbVariant.w}px)`)
+
   const lbLoaded = await p.evaluate(() => {
     const im = [...document.querySelectorAll('[role="dialog"] .pv-img')]
     return { total: im.length, loaded: im.filter(i => i.naturalWidth > 0).length }
