@@ -183,9 +183,29 @@ function isNear(i: number) {
   return Math.abs(i - index.value) <= 1
 }
 
-// Просматриваемый кадр всегда доводим до полного размера — и при открытии,
-// и на каждом пролистывании.
-watch(index, i => ensureHiRes(i))
+/*
+ * Полный размер заказываем не на каждом пролистывании, а когда на кадре
+ * задержались.
+ *
+ * Без паузы «пробежаться по фото в поисках нужного» стоило столько же, сколько
+ * вдумчивый просмотр: замер — восемь листаний с паузой 120мс дают восемь
+ * полноразмерных файлов, ровно как восемь листаний с паузой 1.5с. Причём
+ * лишние закачки отнимают канал у того кадра, на котором в итоге остановились:
+ * на 3G после рывка через шесть кадров нужный снимок доходил до полного
+ * размера 953мс, тогда как при спокойном листании он был готов заранее.
+ *
+ * При открытии ждать нечего — просмотр открыли ради конкретного фото.
+ */
+const HIRES_SETTLE_MS = 300
+let hiResTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleHiRes(i: number) {
+  if (hiResTimer)
+    clearTimeout(hiResTimer)
+  hiResTimer = setTimeout(() => ensureHiRes(i), HIRES_SETTLE_MS)
+}
+
+watch(index, i => scheduleHiRes(i))
 
 // Сменился товар — индексы теперь про другие фотографии, отметки о скачанном
 // сбрасываем, иначе чужой кадр показался бы «уже полноразмерным».
@@ -599,6 +619,8 @@ watch(isOpen, (open) => {
     window.removeEventListener('keydown', onKeydown)
     if (hintTimer)
       clearTimeout(hintTimer)
+    if (hiResTimer)
+      clearTimeout(hiResTimer)
     restoreFocusTo?.focus?.()
     restoreFocusTo = null
   }
@@ -610,6 +632,8 @@ onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKeydown)
   if (hintTimer)
     clearTimeout(hintTimer)
+  if (hiResTimer)
+    clearTimeout(hiResTimer)
 })
 </script>
 
