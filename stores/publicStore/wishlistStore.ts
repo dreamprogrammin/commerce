@@ -7,6 +7,7 @@ import { useProductsStore } from './productsStore'
 export const useWishlistStore = defineStore('wishlistStore', () => {
   const supabase = useSupabaseClient<Database>()
   const authStore = useAuthStore() // Используем уже существующий AuthStore
+  const { wishAdded, wishRemoved } = useToasts()
   const productsStore = useProductsStore() // Используем ProductsStore
 
   const wishlistProductIds = ref<string[]>([]) // Только ID товаров в избранном
@@ -104,14 +105,14 @@ export const useWishlistStore = defineStore('wishlistStore', () => {
         const { error } = await supabase.from('wishlist').delete().match({ user_id: authStore.user.id, product_id: productId })
         if (error)
           throw error
-        toast.success(`Товар "${productName}" удален из избранного.`)
+        wishRemoved(productName)
       }
       else {
         const { error } = await supabase.from('wishlist').insert({ user_id: authStore.user.id, product_id: productId })
         // Игнорируем 23505 — товар уже в базе (рассинхрон вкладок)
         if (error && error.code !== '23505')
           throw error
-        toast.success(`Товар "${productName}" добавлен в избранное.`)
+        wishAdded(productName)
       }
     }
     catch (error: any) {

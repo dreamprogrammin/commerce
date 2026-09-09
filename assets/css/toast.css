@@ -1,0 +1,307 @@
+/*
+ * Уведомления (тосты) по макету «Тосты.dc.html».
+ *
+ * Библиотека остаётся прежней (vue-sonner) — переписывается только внешний
+ * вид: белая карточка на радиусе 14, цветной чип иконки вместо цветной
+ * плашки, подпись отдельной строкой с обрезкой в две строки, действие
+ * («Перейти в корзину», «Вернуть») прямо в тосте и полоса времени жизни.
+ *
+ * Правила намеренно начинаются с `html`. Стили самой библиотеки приходят
+ * отдельным файлом, и порядок их подключения относительно этого файла Vite
+ * не гарантирует; лишний `html` поднимает специфичность на единицу и снимает
+ * зависимость от порядка. По той же причине здесь нет `@layer`: утилиты
+ * Tailwind всегда бьют слои (см. docs/SCOPED_STYLES_TAILWIND_LAYERS.md).
+ */
+
+/*
+ * Ширину библиотека проставляет ИНЛАЙНОМ (356px), поэтому здесь `!important`:
+ * без него макетные 380 не доезжают. Ширину на мобильных не трогаем вовсе —
+ * там ширина считается от отступов, и своё `width` у карточки её ломало:
+ * тост уезжал за правый край экрана ровно на величину отступа.
+ */
+html [data-sonner-toaster] {
+  --width: 380px !important;
+  --gap: 10px;
+}
+
+/*
+ * Внутренние правила библиотеки записаны через `[data-sonner-toast][data-styled='true']`,
+ * поэтому здесь ровно тот же приём: без него библиотека выигрывает по
+ * специфичности, и кнопка действия остаётся чёрной плашкой, а иконке
+ * навязывается размер 20px.
+ */
+html [data-sonner-toast][data-styled='true'] {
+  /* Акцент задаёт всё остальное: чип, действие, полосу времени. */
+  --uh-accent: var(--muted-foreground);
+  /* Время жизни для полосы. Проставляется плагином по duration тоста. */
+  --uh-toast-life: 4s;
+}
+
+html [data-sonner-toast][data-styled='true'][data-type='success'] {
+  --uh-accent: var(--success);
+}
+
+html [data-sonner-toast][data-styled='true'][data-type='info'] {
+  --uh-accent: var(--primary);
+}
+
+html [data-sonner-toast][data-styled='true'][data-type='warning'],
+html [data-sonner-toast][data-styled='true'].uh-toast--bonus {
+  --uh-accent: var(--bonus);
+}
+
+html [data-sonner-toast][data-styled='true'][data-type='error'],
+html [data-sonner-toast][data-styled='true'].uh-toast--wish {
+  --uh-accent: var(--discount);
+}
+
+html [data-sonner-toast][data-styled='true'] {
+  /*
+   * Сетка, а не флекс: кнопка действия у библиотеки лежит СОСЕДОМ текста, а
+   * по макету она под текстом. Второй ряд ставит её на место без правки
+   * разметки библиотеки.
+   */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'icon content close'
+    '.    action  .';
+  align-items: start;
+  column-gap: 12px;
+  padding: 13px 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow:
+    0 18px 40px rgb(15 23 42 / 18%),
+    0 2px 6px rgb(15 23 42 / 6%);
+  color: var(--foreground);
+  font-family: inherit;
+  overflow: hidden;
+  /* Появление по макету: 220 мс вместо библиотечных 400. Сам сдвиг считает
+     библиотека — она же двигает стопку, и вмешиваться в её трансформации
+     нельзя. */
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms;
+}
+
+/* Чип иконки. */
+html [data-sonner-toast][data-styled='true'] [data-icon] {
+  grid-area: icon;
+  display: grid;
+  place-content: center;
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  border-radius: 12px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--uh-accent) 7%, var(--card)),
+    color-mix(in srgb, var(--uh-accent) 16%, var(--card))
+  );
+  color: var(--uh-accent);
+}
+
+html [data-sonner-toast][data-styled='true']:not(.uh-toast--rich) [data-icon] > svg,
+html [data-sonner-toast][data-styled='true']:not(.uh-toast--rich) [data-icon] > span {
+  width: 19px;
+  height: 19px;
+}
+
+/*
+ * Богатый тост (корзина, избранное, бонусы) рисует фигуру сам: чип с иконкой
+ * и рядом фотографию товара. Контейнер иконки в этом случае — просто ряд,
+ * а чип живёт внутри него отдельным узлом.
+ */
+html [data-sonner-toast][data-styled='true'].uh-toast--rich [data-icon] {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+}
+
+html [data-sonner-toast][data-styled='true'] .uh-toast-figure {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+html [data-sonner-toast][data-styled='true'] .uh-toast-chip {
+  display: grid;
+  place-content: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--uh-accent) 7%, var(--card)),
+    color-mix(in srgb, var(--uh-accent) 16%, var(--card))
+  );
+  color: var(--uh-accent);
+  font-size: 19px;
+}
+
+/*
+ * Фотография товара. Подложка белая: снимки в каталоге сняты на белом, а
+ * рамка внутренней тенью не занимает места и не сдвигает сетку.
+ */
+html [data-sonner-toast][data-styled='true'] .uh-toast-thumb {
+  display: grid;
+  place-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+html [data-sonner-toast][data-styled='true'] .uh-toast-thumb img {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+}
+
+html [data-sonner-toast][data-styled='true'] [data-content] {
+  grid-area: content;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+html [data-sonner-toast][data-styled='true'] [data-title] {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--foreground);
+}
+
+/* Название товара — второй строкой и не длиннее двух строк. */
+html [data-sonner-toast][data-styled='true'] [data-description] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+/* Действие — ссылкой в цвет акцента, а не кнопкой-плашкой. */
+html [data-sonner-toast][data-styled='true'] [data-button] {
+  grid-area: action;
+  justify-self: start;
+  height: auto;
+  margin: 3px 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--uh-accent);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+html [data-sonner-toast][data-styled='true'] [data-button]:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+html [data-sonner-toast][data-styled='true'] [data-close-button] {
+  grid-area: close;
+  position: static;
+  display: grid;
+  place-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 9px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  transform: none;
+  cursor: pointer;
+}
+
+html [data-sonner-toast][data-styled='true'] [data-close-button]:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 18%, var(--card));
+  border: none;
+}
+
+html [data-sonner-toast][data-styled='true'] [data-close-button] svg {
+  width: 15px;
+  height: 15px;
+}
+
+/*
+ * Полоса времени жизни. Рисуется на `[data-content]`, а не на самом тосте:
+ * у тоста оба псевдоэлемента заняты библиотекой — `::before` работает при
+ * смахивании, `::after` подставляет зазор в раскрытой стопке. Полоса всё
+ * равно тянется во всю ширину: тост позиционирован, и абсолютные координаты
+ * считаются от него.
+ */
+html [data-sonner-toast][data-styled='true'] [data-content]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--uh-accent);
+  opacity: 0.9;
+  transform-origin: left center;
+  animation: uh-toast-bar var(--uh-toast-life) linear forwards;
+}
+
+/* Тост, который висит до закрытия руками, полосы не получает: нечего отмерять. */
+html [data-sonner-toast][data-styled='true'].uh-toast--nobar [data-content]::after {
+  content: none;
+}
+
+/* Наведение останавливает отсчёт у библиотеки — полоса обязана встать с ним. */
+html [data-sonner-toaster]:hover [data-sonner-toast] [data-content]::after {
+  animation-play-state: paused;
+}
+
+@keyframes uh-toast-bar {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html [data-sonner-toast][data-styled='true'] [data-content]::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
+/*
+ * Страницы с собственной липкой кнопкой внизу: корзина («Перейти к
+ * оформлению») и карточка товара («В корзину»). Макет отмерял отступ от
+ * таб-бара, но на этих двух экранах между тостом и таб-баром стоит ещё одна
+ * панель, и тост её закрывал целиком — проверено на 390px: тост занимал
+ * 616–748, кнопка оформления 700–760.
+ *
+ * `:has` по body: тостер лежит в другой ветке разметки, доступа к соседям у
+ * него нет. Браузеры без `:has` просто получат макетные 96px.
+ */
+@media (max-width: 600px) {
+  html body:has(.cart-mobile-cta) [data-sonner-toaster],
+  html body:has(.pdp-buybar) [data-sonner-toaster] {
+    /* Отступ библиотека проставляет инлайном — отсюда `!important`. */
+    --mobile-offset-bottom: 168px !important;
+  }
+}

@@ -13,6 +13,8 @@ import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
 import 'vue-sonner/style.css'
+// Наш вид тостов — строго после стилей библиотеки.
+import '@/assets/css/toast.css'
 
 /*
  * Toaster импортируется статически, и это проверено, а не по недосмотру.
@@ -281,16 +283,29 @@ useSchemaOrg([
       -->
       <NuxtPage :keepalive="{ max: 3 }" />
 
-      <!-- ✅ ИСПРАВЛЕНИЕ: Toaster только на клиенте -->
+      <!--
+        Уведомления по макету «Тосты.dc.html»: снизу справа на десктопе,
+        снизу над таб-баром на мобильных, до трёх штук в стопке.
+
+        `expand` обязателен: без него библиотека держит стопку сложенной,
+        видно только верхний тост, а по макету рядом лежат все три.
+        `rich-colors` убран намеренно — цветную плашку заменил чип иконки,
+        и её фон перекрашивал бы карточку.
+
+        Вид задан в assets/css/toast.css.
+      -->
       <ClientOnly>
         <Toaster
-          position="top-center"
-          :offset="16"
-          :mobile-offset="{ top: 70, left: 16, right: 16 }"
+          position="bottom-right"
+          :offset="{ right: 22, bottom: 26 }"
+          :mobile-offset="{ bottom: 96, left: 10, right: 10 }"
+          :visible-toasts="3"
+          :gap="10"
+          expand
+          close-button
           :toast-options="{
-            duration: 3000,
+            duration: 4000,
           }"
-          rich-colors
         />
       </ClientOnly>
     </NuxtLayout>
