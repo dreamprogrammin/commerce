@@ -295,25 +295,24 @@ function onViewerIndex(next: number) {
   nextTick(() => scrollToIndex(next, false))
 }
 
-// Кадры для просмотра: полный размер плюс средний вариант, чтобы на узком
-// экране не тянуть полуторатысячный файл.
+/*
+ * Кадры для просмотра — всегда полноразмерный вариант `lg`.
+ *
+ * Раньше сюда уезжал ещё и средний вариант в srcset, и на телефоне браузер
+ * выбирал именно его: `sizes` обещал ~92vw, на 390px при DPR 2 это 718px, и
+ * подходящим оказывался `_md` в 600px. На десктопе тот же расчёт давал 2650px
+ * и выбирался `lg`, поэтому мягкая картинка была видна только на телефоне.
+ *
+ * Для окна во весь экран, которое вдобавок увеличивается щипком до 4×,
+ * «подходящий по ширине» вариант всегда мелковат, так что выбор тут не нужен.
+ */
 const lightboxSlides = computed(() =>
-  props.images.map((image, index) => {
-    const { md, lg } = getImageVariants(image.image_url)
-    const parts: string[] = []
-    if (md)
-      parts.push(`${md} 800w`)
-    if (lg)
-      parts.push(`${lg} 1440w`)
-    return {
-      src: getFullUrl(image.image_url) || '',
-      srcset: parts.length ? parts.join(', ') : null,
-      sizes: '92vw',
-      alt: getImageAlt(image, index),
-      // тот же файл, что и в рельсе миниатюр, — берётся из кеша браузера
-      thumb: getThumbUrl(image.image_url),
-    }
-  }),
+  props.images.map((image, index) => ({
+    src: getFullUrl(image.image_url) || '',
+    alt: getImageAlt(image, index),
+    // тот же файл, что и в рельсе миниатюр, — берётся из кеша браузера
+    thumb: getThumbUrl(image.image_url),
+  })),
 )
 
 // --- URL и alt ----------------------------------------------------------------
