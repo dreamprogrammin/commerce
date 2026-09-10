@@ -2,14 +2,16 @@
 /**
  * «Подобрать набор» — макет `Бренд LEGO.dc.html`, секция выбора.
  *
- * Три оси: возраст, цена, коллекция. Внутри оси — корзины со счётчиками; сетка
- * показывает первые четыре товара и раскрывается кнопкой.
+ * Оси: возраст, интересы, цена, коллекция. Внутри оси — корзины со
+ * счётчиками; сетка показывает первые четыре товара и раскрывается кнопкой.
+ * Порядок внутри корзины задаёт список сортировки справа.
  *
  * Отбор идёт по уже загруженным товарам бренда (их не больше двухсот), а не
  * запросом на каждый чип: страница и так тянет весь список ради серверной
  * разметки, и повторный поход в базу добавил бы задержку на ровном месте.
  */
 import type { ProductLine, ProductWithGallery } from '@/types'
+import { pluralRu } from '@/utils/seoDescription'
 
 const props = defineProps<{
   brandName: string
@@ -17,13 +19,21 @@ const props = defineProps<{
   lines: ProductLine[]
   /** id товара → id коллекции. Выдача RPC своей линейки не отдаёт. */
   lineByProduct: Record<string, string>
-  /** Коллекция, выбранная в панели шапки. */
+  /** Коллекция, выбранная в ленте коллекций. */
   activeLineId?: string | null
+  /**
+   * id категории → её имя. Ось «по интересам» — это категории каталога, в
+   * которых лежат товары бренда: тематических меток у товара в базе нет.
+   */
+  categoryNames?: Record<string, string> | null
 }>()
 
-const emit = defineEmits<{ 'update:activeLineId': [lineId: string | null] }>()
+const emit = defineEmits<{
+  'update:activeLineId': [lineId: string | null]
+  'openCollections': []
+}>()
 
-type Axis = 'age' | 'price' | 'line'
+type Axis = 'age' | 'category' | 'price' | 'line'
 
 /** Сколько товаров показываем до нажатия «Показать ещё». */
 const VISIBLE_LIMIT = 4
@@ -46,15 +56,47 @@ const PRICE_BUCKETS = [
   { id: 'high', label: 'от 30 000 ₸', min: 30000, max: Number.POSITIVE_INFINITY },
 ]
 
+/** Порядок внутри корзины — считается по уже загруженному списку. */
+const SORTS = [
+  { id: 'popular', label: 'По популярности' },
+  { id: 'cheap', label: 'Сначала дешевле' },
+  { id: 'expensive', label: 'Сначала дороже' },
+  { id: 'discount', label: 'Больше скидка' },
+] as const
+
+type SortId = (typeof SORTS)[number]['id']
+
 const axis = ref<Axis>('age')
+const sortId = ref<SortId>('popular')
 const bucketId = ref<string | null>(null)
 /** Раскрыть текущую корзину целиком — кнопка «Показать ещё». */
 const showAll = ref(false)
 /** Снять отбор совсем — кнопка «Все N товаров». */
 const allProducts = ref(false)
 
+/**
+ * Категории товаров бренда. Ось «по интересам» появляется только от двух
+ * категорий: у LEGO все 14 наборов лежат в одной («Конструкторы»), и единый
+ * чип с полным списком под ним выглядел бы поломкой, а не выбором.
+ */
+const categoryBuckets = computed(() => {
+  const names = props.categoryNames ?? {}
+  const ids: string[] = []
+  for (const product of props.products) {
+    const id = (product as any).category_id as string | null
+    if (id && names[id] && !ids.includes(id))
+      ids.push(id)
+  }
+  return ids
+    .map(id => ({ id, label: names[id]! }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ru'))
+})
+
 const axes = computed(() => [
   { key: 'age' as Axis, label: 'По возрасту', icon: 'lucide:cake' },
+  ...(categoryBuckets.value.length > 1
+    ? [{ key: 'category' as Axis, label: 'По интересам', icon: 'lucide:heart' }]
+    : []),
   { key: 'price' as Axis, label: 'По цене', icon: 'lucide:wallet' },
   ...(props.lines.length
     ? [{ key: 'line' as Axis, label: 'По коллекции', icon: 'lucide:blocks' }]
@@ -76,6 +118,9 @@ function matches(product: ProductWithGallery, currentAxis: Axis, id: string): bo
     return min >= bucket.from && min <= bucket.to
   }
 
+  if (currentAxis === 'category')
+    return (product as any).category_id === id
+
   if (currentAxis === 'price') {
     const bucket = PRICE_BUCKETS.find(b => b.id === id)
     if (!bucket)
@@ -94,6 +139,8 @@ function countIn(currentAxis: Axis, id: string) {
 const buckets = computed(() => {
   if (axis.value === 'age')
     return AGE_BUCKETS.map(b => ({ id: b.id, label: b.label }))
+  if (axis.value === 'category')
+    return categoryBuckets.value
   if (axis.value === 'price')
     return PRICE_BUCKETS.map(b => ({ id: b.id, label: b.label }))
   return props.lines.map(l => ({ id: l.id, label: l.name }))
@@ -110,11 +157,36 @@ const activeBucket = computed(() => {
   return filled?.id ?? buckets.value[0]?.id ?? null
 })
 
+/**
+ * Порядок внутри корзины. Считается по уже загруженному списку, а не запросом:
+ * все товары бренда (их не больше двухсот) и так лежат на странице.
+ */
+function sortProducts(list: ProductWithGallery[]) {
+  const out = [...list]
+  if (sortId.value === 'cheap')
+    return out.sort((a, b) => (a.final_price ?? a.price) - (b.final_price ?? b.price))
+  if (sortId.value === 'expensive')
+    return out.sort((a, b) => (b.final_price ?? b.price) - (a.final_price ?? a.price))
+  if (sortId.value === 'discount')
+    return out.sort((a, b) => (b.discount_percentage ?? 0) - (a.discount_percentage ?? 0))
+  return out.sort((a, b) => (b.sales_count ?? 0) - (a.sales_count ?? 0))
+}
+
 const matched = computed(() =>
-  activeBucket.value
-    ? props.products.filter(p => matches(p, axis.value, activeBucket.value!))
-    : props.products,
+  sortProducts(
+    activeBucket.value
+      ? props.products.filter(p => matches(p, axis.value, activeBucket.value!))
+      : props.products,
+  ),
 )
+
+/** Список без отбора — кнопка «Все N товаров». */
+const allSorted = computed(() => sortProducts(props.products))
+
+const matchedLabel = computed(() => {
+  const n = matched.value.length
+  return `${n} ${pluralRu(n, 'товар', 'товара', 'товаров')}`
+})
 
 const shown = computed(() =>
   showAll.value ? matched.value : matched.value.slice(0, VISIBLE_LIMIT),
@@ -127,22 +199,29 @@ const emptyTitle = computed(() => {
   const bucket = buckets.value.find(b => b.id === activeBucket.value)
   return axis.value === 'line' && bucket
     ? `Серия ${bucket.label} скоро приедет`
-    : 'Наборы скоро приедут'
+    : 'Товары скоро приедут'
 })
 
 const totalLabel = computed(() => {
   const n = props.products.length
-  const word = n % 10 === 1 && n % 100 !== 11
-    ? 'товар'
-    : [2, 3, 4].includes(n % 10) && (n % 100 < 10 || n % 100 >= 20)
-        ? 'товара'
-        : 'товаров'
-  return `Все ${n} ${word}`
+  return `Все ${n} ${pluralRu(n, 'товар', 'товара', 'товаров')}`
+})
+
+const collectionsLabel = computed(() => {
+  const n = props.lines.length
+  return `Все ${n} ${pluralRu(n, 'коллекция', 'коллекции', 'коллекций')}`
 })
 
 const notifyHref = computed(
   () => `mailto:info@uhti.kz?subject=${encodeURIComponent(`Новинки ${props.brandName}`)}`,
 )
+
+function pickSort(next: string) {
+  if (!SORTS.some(s => s.id === next))
+    return
+  sortId.value = next as SortId
+  showAll.value = false
+}
 
 function pickAxis(next: Axis) {
   axis.value = next
@@ -204,10 +283,23 @@ watch(
           Выберите возраст, бюджет или коллекцию — покажем подходящие товары.
         </span>
       </div>
-      <button type="button" class="blp__all" @click="showEverything">
-        {{ totalLabel }}
-        <Icon name="lucide:arrow-right" class="size-4" />
-      </button>
+      <span class="blp__head-tools">
+        <!-- Ниже 1200px ленты коллекций не видно целиком — отсюда шторка. -->
+        <button
+          v-if="lines.length"
+          type="button"
+          class="blp__cols"
+          @click="emit('openCollections')"
+        >
+          <Icon name="lucide:layout-grid" class="size-[15px]" />
+          {{ collectionsLabel }}
+        </button>
+
+        <button type="button" class="blp__all" @click="showEverything">
+          {{ totalLabel }}
+          <Icon name="lucide:arrow-right" class="size-4" />
+        </button>
+      </span>
     </div>
 
     <div class="blp__tabs">
@@ -222,6 +314,24 @@ watch(
         <Icon :name="item.icon" class="size-4" />
         {{ item.label }}
       </button>
+    </div>
+
+    <div class="blp__sortline">
+      <span class="blp__matched">{{ matchedLabel }}</span>
+      <label class="blp__sort">
+        <Icon name="lucide:arrow-up-down" class="size-4 text-primary" />
+        <select
+          class="blp__sort-select"
+          :value="sortId"
+          aria-label="Порядок товаров"
+          @change="pickSort(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="option in SORTS" :key="option.id" :value="option.id">
+            {{ option.label }}
+          </option>
+        </select>
+        <Icon name="lucide:chevron-down" class="size-[15px] text-muted-foreground" />
+      </label>
     </div>
 
     <div class="blp__buckets">
@@ -243,7 +353,7 @@ watch(
 
     <div class="blp__grid">
       <ProductCard
-        v-for="(product, index) in (noBucketFilter ? products : shown)"
+        v-for="(product, index) in (noBucketFilter ? allSorted : shown)"
         :key="product.id"
         :product="(product as any)"
         :position="index"
@@ -313,6 +423,69 @@ watch(
   .blp__sub {
     color: var(--muted-foreground);
     font-size: 14px;
+  }
+
+  .blp__head-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .blp__cols {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid rgb(43 127 255 / 0.28);
+    border-radius: 999px;
+    background: rgb(43 127 255 / 0.09);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .blp__sortline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .blp__matched {
+    color: var(--muted-foreground);
+    font-weight: 600;
+    font-size: 13.5px;
+  }
+
+  .blp__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 14px;
+    border: 1px solid rgb(255 255 255 / 0.9);
+    border-radius: 999px;
+    background: linear-gradient(150deg, #fff, rgb(224 233 247 / 0.6));
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 4px 12px rgb(15 23 42 / 0.06);
+  }
+
+  .blp__sort-select {
+    padding-right: 2px;
+    border: none;
+    background: transparent;
+    color: var(--foreground);
+    font-weight: 600;
+    font-size: 13.5px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
   }
 
   .blp__all {
@@ -547,6 +720,10 @@ watch(
   }
 
   @media (min-width: 1200px) {
+    .blp__cols {
+      display: none;
+    }
+
     .blp__grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
