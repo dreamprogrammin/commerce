@@ -6,10 +6,11 @@
  * страницы (`brands.is_custom_page`); остальные идут обычным шаблоном со
  * своим сайдбаром фильтров.
  *
- * Порядок секций макета: шапка бренда с витриной и коллекциями, подборка
- * «Подобрать набор», тёмная карточка хита, описание с фактами. Отзывы
- * оставлены от прежнего лендинга — макет их не отменяет, а страница без них
- * теряет живой отклик покупателей.
+ * Порядок секций макета: тёмная шапка с витриной флагмана, лента коллекций,
+ * «Акции и новинки», подборка «Подобрать набор», тёмная карточка хита,
+ * описание с фактами, ссылки на категории. Отзывы оставлены от прежнего
+ * лендинга — макет их не отменяет, а страница без них теряет живой отклик
+ * покупателей.
  */
 import type { BrandFilterState } from '@/composables/useBrandPageFilters'
 import type { Brand, BrandFact, IBreadcrumbItem, ProductLine } from '@/types'
@@ -24,9 +25,13 @@ const props = defineProps<{
   /**
    * Витринные коллекции из `page_layout.featuredLineIds` — их админ помечает
    * руками. В макете отдельной полки для них нет, поэтому они просто идут
-   * первыми в панели коллекций.
+   * первыми в ленте коллекций.
    */
   featuredLineIds?: string[] | null
+  /** id категории → её имя: ось «по интересам» в подборке. */
+  categoryNames?: Record<string, string> | null
+  /** Категории с индексируемым бренд-лендингом — секция внизу страницы. */
+  categoryLinks?: { name: string, path: string }[] | null
 }>()
 
 const fs = props.filterState
@@ -87,15 +92,38 @@ const lineCounts = computed(() => {
   return counts
 })
 
-/** Выбранная коллекция общая у панели в шапке и у подборки под ней. */
+/** Выбранная коллекция общая у ленты коллекций, плашек акций и подборки. */
 const activeLineId = ref<string | null>(null)
 
 const pickerRef = ref<HTMLElement | null>(null)
+/** Шторку «Все коллекции» открывают из двух мест — состояние держим здесь. */
+const collectionsDrawer = ref(false)
 
 function pickLine(lineId: string) {
   activeLineId.value = lineId
   pickerRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
+
+/*
+ * Кнопка «Наверх» из макета. Страница длинная, а до шапки с прокрутки в
+ * середине подборки иначе не добраться. Порог 420px — из макета.
+ */
+const showTopButton = ref(false)
+
+function onScroll() {
+  showTopButton.value = window.scrollY > 420
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+onMounted(() => {
+  onScroll()
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+
+onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 
 /**
  * «Коротко о бренде». Строки из админки идут первыми, к ним снизу
@@ -138,14 +166,27 @@ const facts = computed<BrandFact[]>(() => {
 
 <template>
   <div class="bct" :style="tintVars">
-    <Breadcrumbs :items="breadcrumbs" />
+    <Breadcrumbs :items="breadcrumbs" class="bct__crumbs" />
 
     <BrandLandingHero
       :brand="brand"
       :products="products"
       :lines="orderedLines"
+    />
+
+    <BrandLandingCollections
+      v-model:drawer-open="collectionsDrawer"
+      :brand="brand"
+      :lines="orderedLines"
       :line-counts="lineCounts"
       :active-line-id="activeLineId"
+      @pick-line="pickLine"
+    />
+
+    <BrandLandingPromo
+      :products="products"
+      :lines="orderedLines"
+      :line-by-product="lineByProduct"
       @pick-line="pickLine"
     />
 
@@ -158,6 +199,8 @@ const facts = computed<BrandFact[]>(() => {
         :products="products"
         :lines="orderedLines"
         :line-by-product="lineByProduct"
+        :category-names="categoryNames"
+        @open-collections="collectionsDrawer = true"
       />
     </div>
 
@@ -174,10 +217,48 @@ const facts = computed<BrandFact[]>(() => {
       <BrandFactsCard :facts="facts" />
     </section>
 
+    <!--
+      Ссылки на бренд-лендинги в категориях — секция «LEGO в категориях» из
+      макета. Рисуются НА СЕРВЕРЕ и только на адреса, открытые для индекса
+      (отбор — в `brandCategoryLinks` на странице).
+    -->
+    <nav
+      v-if="categoryLinks?.length"
+      class="bct__cats"
+      :aria-label="`${brand.name} в категориях`"
+    >
+      <h2 class="bct__cats-title">
+        {{ brand.name }} в категориях
+      </h2>
+      <div class="bct__cats-list">
+        <NuxtLink
+          v-for="link in categoryLinks"
+          :key="link.path"
+          :to="link.path"
+          class="bct__cat"
+        >
+          <Icon name="lucide:blocks" class="size-[17px] text-primary" />
+          {{ link.name }}
+        </NuxtLink>
+      </div>
+    </nav>
+
     <!-- Отзывы о бренде. Макет их не рисует, но и не отменяет. -->
     <div class="bct__reviews">
       <BrandReviewsList :brand-id="brand.id" :brand-name="brand.name" />
     </div>
+
+    <Transition name="bct-top">
+      <button
+        v-if="showTopButton"
+        type="button"
+        class="bct__top"
+        @click="scrollToTop"
+      >
+        <Icon name="lucide:arrow-up" class="size-[18px] text-primary" />
+        Наверх
+      </button>
+    </Transition>
   </div>
 </template>
 
@@ -187,7 +268,88 @@ const facts = computed<BrandFact[]>(() => {
   .bct {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+  }
+
+  /*
+   * Расстояния между секциями держат сами секции (28px на телефоне, 44px
+   * на десктопе — значения макета). Общий `gap` здесь складывался бы с их
+   * отступами и растягивал страницу.
+   */
+  .bct__crumbs {
+    margin-bottom: 14px;
+  }
+
+  .bct__cats {
+    margin-top: 28px;
+  }
+
+  .bct__cats-title {
+    margin: 0 0 12px;
+    color: var(--foreground);
+    font-weight: 800;
+    font-size: 23px;
+    letter-spacing: -0.025em;
+  }
+
+  .bct__cats-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .bct__cat {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    height: 46px;
+    padding: 0 20px;
+    border: 1px solid rgb(255 255 255 / 0.9);
+    border-radius: 999px;
+    background: linear-gradient(150deg, #fff, rgb(224 233 247 / 0.6));
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 5px 14px rgb(15 23 42 / 0.06);
+    color: var(--foreground);
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .bct__cat:hover {
+    background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.7));
+  }
+
+  /* «Наверх»: над таб-баром на телефоне, в углу на десктопе. */
+  .bct__top {
+    position: fixed;
+    right: 14px;
+    bottom: 104px;
+    z-index: 150;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 46px;
+    padding: 0 18px;
+    border: 1px solid rgb(255 255 255 / 0.9);
+    border-radius: 999px;
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.96), rgb(224 233 247 / 0.85));
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 10px 24px rgb(15 23 42 / 0.16);
+    backdrop-filter: blur(12px) saturate(1.5);
+    color: var(--foreground);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .bct-top-enter-active,
+  .bct-top-leave-active {
+    transition: opacity 0.2s ease;
+  }
+
+  .bct-top-enter-from,
+  .bct-top-leave-to {
+    opacity: 0;
   }
 
   .bct__about {
@@ -281,13 +443,23 @@ const facts = computed<BrandFact[]>(() => {
   }
 
   @media (min-width: 760px) {
-    .bct {
-      gap: 18px;
+    .bct__crumbs {
+      margin-bottom: 18px;
     }
 
     .bct__about,
+    .bct__cats,
     .bct__reviews {
       margin-top: 44px;
+    }
+
+    .bct__cats-title {
+      font-size: 30px;
+    }
+
+    .bct__top {
+      right: 26px;
+      bottom: 26px;
     }
 
     .bct__about {

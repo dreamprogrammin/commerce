@@ -152,6 +152,51 @@ const { data: lineByProduct } = await useAsyncData(
 )
 
 /**
+ * Имена категорий, в которых лежат товары бренда, — ось «по интересам»
+ * в подборке лендинга. Тематических меток у товара в базе нет, а категория
+ * каталога и есть тот самый интерес: «Конструкторы», «Роботы», «Куклы».
+ *
+ * Только для брендов с собственным лендингом: обычному шаблону эти имена
+ * не нужны, а лишний запрос платят все 32 бренда.
+ */
+const { data: productCategoryNames } = await useAsyncData(
+  `brand-product-categories-${brandSlug}`,
+  async () => {
+    if (!brand.value || !(brand.value as any).is_custom_page)
+      return {}
+
+    const { data: rows, error } = await supabase
+      .from('products')
+      .select('category_id')
+      .eq('brand_id', brand.value.id)
+      .eq('is_active', true)
+      .not('category_id', 'is', null)
+
+    if (error) {
+      console.error('Не удалось загрузить категории товаров бренда:', error)
+      return {}
+    }
+
+    const ids = [...new Set((rows ?? []).map(r => r.category_id).filter(Boolean))] as string[]
+    if (ids.length === 0)
+      return {}
+
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('id, name')
+      .in('id', ids)
+
+    const map: Record<string, string> = {}
+    for (const category of categories ?? []) {
+      if (category.name)
+        map[category.id] = category.name
+    }
+    return map
+  },
+  { watch: [brand], default: (): Record<string, string> => ({}) },
+)
+
+/**
  * Категории, в которых у бренда есть СВОЙ индексируемый лендинг.
  *
  * Зачем. Со страницы бренда не вело НИ ОДНОЙ ссылки на бренд-лендинги
@@ -865,31 +910,9 @@ useIndexableRobotsRule(
         :filter-state="filterState"
         :line-by-product="lineByProduct"
         :featured-line-ids="pageLayout?.featuredLineIds ?? null"
+        :category-names="productCategoryNames"
+        :category-links="brandCategoryLinks"
       />
-
-      <!--
-        Ссылки на бренд-лендинги. Рисуются НА СЕРВЕРЕ и только на те адреса,
-        что открыты для индекса, — см. `brandCategoryLinks`.
-      -->
-      <nav
-        v-if="brandCategoryLinks.length > 0"
-        class="mt-6 md:mt-12 border-t pt-4 md:pt-8"
-        :aria-label="`${brand.name} в категориях`"
-      >
-        <h2 class="text-base md:text-lg font-semibold mb-3 md:mb-4">
-          {{ brand.name }} в категориях
-        </h2>
-        <div class="flex flex-wrap gap-2 md:gap-2.5">
-          <NuxtLink
-            v-for="link in brandCategoryLinks"
-            :key="link.path"
-            :to="link.path"
-            class="inline-flex items-center rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground"
-          >
-            {{ link.name }}
-          </NuxtLink>
-        </div>
-      </nav>
     </div>
 
     <!-- Стандартный шаблон -->

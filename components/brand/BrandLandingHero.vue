@@ -2,28 +2,25 @@
 /**
  * Шапка лендинга бренда — макет `Бренд LEGO.dc.html`, секция HERO.
  *
- * Одна карточка с тёплой подложкой: логотип, название, короткое описание,
- * полоса доверия, витрина флагманского товара и панель коллекций. Показывается
- * только на странице бренда с собственным лендингом (флаг ставит админ).
+ * Тёмная полоса во всю ширину: логотип, имя, лид, четыре цифры о бренде и
+ * полоса доверия; справа белая карточка флагманского товара с ценой и
+ * кнопкой. Свечение подложки задаёт цвет бренда (`--brand-glow`).
+ *
+ * Коллекции живут отдельной секцией ниже — в шапке их нет.
  */
 import type { Brand, ProductLine, ProductWithGallery } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
+import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
+import { pluralRu } from '@/utils/seoDescription'
 
 const props = defineProps<{
   brand: Brand
   /** Товары бренда — первый идёт витриной. */
   products: ProductWithGallery[]
   lines: ProductLine[]
-  /** Сколько активных товаров в каждой коллекции. */
-  lineCounts: Record<string, number>
-  /** Коллекция, выбранная в подборке ниже: панель подсвечивает её же. */
-  activeLineId?: string | null
 }>()
-
-const emit = defineEmits<{ pickLine: [lineId: string] }>()
 
 const { getVariantUrl } = useSupabaseStorage()
 const cartStore = useCartStore()
@@ -49,17 +46,15 @@ const logoUrl = computed(() =>
     : null,
 )
 
-function productImage(product: ProductWithGallery | null, variant: 'sm' | 'md' = 'md') {
-  const path = product?.product_images?.[0]?.image_url
-  return path ? getVariantUrl(BUCKET_NAME_PRODUCT, path, variant) : null
-}
-
-const heroImage = computed(() => productImage(hero.value))
+const heroImage = computed(() => {
+  const path = hero.value?.product_images?.[0]?.image_url
+  return path ? getVariantUrl(BUCKET_NAME_PRODUCT, path, 'md') : null
+})
 
 /**
- * Надстрочник по макету: «Бренд · Дания, с 1932 года». Страна и год живут в
- * `brands.facts` и заполняются вручную, поэтому строка собирается из того,
- * что есть: пока поле пустое — остаётся одно слово «Бренд».
+ * Надстрочник по макету: «Дания · с 1932 года». Страна и год живут в
+ * `brands.facts` и заполняются руками; поле пустое у всех 32 брендов, поэтому
+ * строка собирается из того, что есть, и целиком прячется, когда нет ничего.
  */
 const eyebrow = computed(() => {
   const facts = props.brand.facts ?? []
@@ -69,7 +64,7 @@ const eyebrow = computed(() => {
   const country = value('стран')
   const founded = value('основан')
 
-  return ['Бренд', country, founded && `с ${founded.replace(/\s*год\w*$/i, '')} года`]
+  return [country, founded && `с ${founded.replace(/\s*год\w*$/i, '')} года`]
     .filter(Boolean)
     .join(' · ')
 })
@@ -80,72 +75,63 @@ const inStockCount = computed(
   () => props.products.filter(p => (p.stock_quantity ?? 0) > 0).length,
 )
 
-const trust = computed(() => [
-  { icon: 'lucide:shield-check', label: 'Оригинал и сертификаты', kind: 'ok' },
-  {
-    icon: 'lucide:package',
-    label: `${inStockCount.value} ${plural(inStockCount.value, 'товар', 'товара', 'товаров')} в наличии`,
-    kind: 'info',
-  },
-  { icon: 'lucide:truck', label: 'Доставим за 1–2 дня', kind: 'warm' },
-  { icon: 'lucide:gift', label: 'Бонусы 1 = 1 ₸', kind: 'pink' },
-])
-
-function plural(n: number, one: string, few: string, many: string) {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11)
-    return one
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20))
-    return few
-  return many
-}
-
-const seriesLabel = computed(
-  () => `${props.lines.length} ${plural(props.lines.length, 'серия', 'серии', 'серий')}`,
-)
-
-const collections = computed(() =>
-  props.lines.map((line) => {
-    const count = props.lineCounts[line.id] ?? 0
-    return {
-      id: line.id,
-      name: line.name,
-      href: `/brand/${props.brand.slug}/${line.slug}`,
-      thumb: line.logo_url
-        ? getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm')
-        : null,
-      countLabel: count
-        ? `${count} ${plural(count, 'набор', 'набора', 'наборов')}`
-        : 'Скоро в наличии',
-      isEmpty: count === 0,
-    }
-  }),
-)
-
-const heroMeta = computed(() => {
-  if (!hero.value)
+/** Возрастной охват бренда — по крайним границам его товаров. */
+const ageSpan = computed(() => {
+  const mins = props.products
+    .map(p => (p as any).min_age_years as number | null)
+    .filter((n): n is number => n != null)
+  if (mins.length === 0)
     return ''
-  const line = props.lines.find(l => l.id === (hero.value as any)?.product_line_id)
-  const age = ageLabel(hero.value)
-  return [line?.name, age].filter(Boolean).join(' · ')
+
+  const maxs = props.products
+    .map(p => (p as any).max_age_years as number | null)
+    .filter((n): n is number => n != null)
+  const from = Math.min(...mins)
+  const to = maxs.length ? Math.max(...maxs) : null
+  return to ? `От ${from} до ${to} лет` : `От ${from} лет`
 })
 
-function ageLabel(product: ProductWithGallery): string {
-  const min = (product as any).min_age_years as number | null
-  const max = (product as any).max_age_years as number | null
-  if (min == null)
-    return ''
-  return max ? `${min}–${max} лет` : `от ${min} лет`
-}
+/*
+ * Четыре цифры макета. Первые две считаются по выдаче, вторые — условия
+ * магазина, они одинаковы для всех брендов и уже стоят в полосе доверия.
+ */
+const stats = computed(() => {
+  const rows = [
+    {
+      num: String(inStockCount.value),
+      label: `${pluralRu(inStockCount.value, 'товар', 'товара', 'товаров')} в наличии`,
+    },
+  ]
+
+  if (props.lines.length > 0) {
+    rows.push({
+      num: String(props.lines.length),
+      label: pluralRu(props.lines.length, 'коллекция', 'коллекции', 'коллекций'),
+    })
+  }
+
+  rows.push(
+    { num: '1–2 дня', label: 'доставка по КЗ' },
+    { num: '1 = 1 ₸', label: 'бонусы за покупку' },
+  )
+
+  return rows
+})
+
+const tags = computed(() =>
+  [
+    { icon: 'lucide:shield-check', label: 'Оригинал и сертификаты', color: '#4ade80' },
+    ageSpan.value && { icon: 'lucide:cake', label: ageSpan.value, color: '#ffd84d' },
+    { icon: 'lucide:package-check', label: 'Отправка из Алматы', color: '#8ec2ff' },
+  ].filter(Boolean) as { icon: string, label: string, color: string }[],
+)
 
 const heroPrice = computed(() => {
   const product = hero.value
   if (!product)
     return null
-  const final = product.final_price ?? product.price
   return {
-    final,
+    final: product.final_price ?? product.price,
     old: product.discount_percentage ? product.price : null,
     discount: product.discount_percentage
       ? `−${Math.round(product.discount_percentage)}%`
@@ -165,61 +151,63 @@ function addHeroToCart(event: MouseEvent) {
 
 <template>
   <section class="blh">
-    <!-- Бренд: логотип, имя, короткое описание -->
-    <div class="blh__brand">
-      <span v-if="logoUrl" class="blh__logo">
-        <ProgressiveImage
-          :src="logoUrl"
-          :alt="`Логотип ${brand.name}`"
-          object-fit="contain"
-          placeholder-type="shimmer"
-          :use-transform="false"
-          eager
-          class="size-full"
-        />
-      </span>
+    <span class="blh__aura" aria-hidden="true" />
 
-      <div class="blh__title">
-        <span class="blh__eyebrow">{{ eyebrow }}</span>
-        <h1 class="blh__h1">
-          {{ brand.seo_h1 || brand.name }}
-        </h1>
+    <div class="blh__grid">
+      <div class="blh__left">
+        <div class="blh__brand">
+          <span v-if="logoUrl" class="blh__logo">
+            <ProgressiveImage
+              :src="logoUrl"
+              :alt="`Логотип ${brand.name}`"
+              object-fit="contain"
+              placeholder-type="shimmer"
+              :use-transform="false"
+              eager
+              class="size-full"
+            />
+          </span>
+
+          <div class="blh__title">
+            <span v-if="eyebrow" class="blh__eyebrow">{{ eyebrow }}</span>
+            <h1 class="blh__h1">
+              {{ brand.seo_h1 || brand.name }}
+            </h1>
+          </div>
+        </div>
+
         <p v-if="lead" class="blh__lead">
           {{ lead }}
         </p>
+
+        <div class="blh__stats">
+          <span v-for="stat in stats" :key="stat.label" class="blh__stat">
+            <span class="blh__stat-num">{{ stat.num }}</span>
+            <span class="blh__stat-label">{{ stat.label }}</span>
+          </span>
+        </div>
+
+        <div class="blh__tags">
+          <span v-for="tag in tags" :key="tag.label" class="blh__tag">
+            <Icon :name="tag.icon" class="size-[14px]" :style="{ color: tag.color }" />
+            {{ tag.label }}
+          </span>
+        </div>
       </div>
 
-      <NuxtLink to="/brands" class="blh__all">
-        <Icon name="lucide:layout-grid" class="size-[17px] text-primary" />
-        Все бренды
-      </NuxtLink>
-    </div>
-
-    <!-- Полоса доверия -->
-    <div class="blh__trust">
-      <span
-        v-for="item in trust"
-        :key="item.label"
-        class="blh__chip"
-        :class="`blh__chip--${item.kind}`"
-      >
-        <Icon :name="item.icon" class="size-[15px]" />
-        {{ item.label }}
-      </span>
-    </div>
-
-    <div class="blh__split">
       <!-- Витрина флагмана -->
-      <div v-if="hero && heroPrice" class="blh__feat">
+      <div v-if="hero && heroPrice" class="blh__flag">
+        <span class="blh__flag-eyebrow">Флагман бренда</span>
+
         <NuxtLink
           ref="heroImageRef"
           :to="`/catalog/products/${hero.slug}`"
-          class="blh__feat-img"
+          class="blh__flag-img"
         >
           <!-- `!bg-transparent`: серая подложка ProgressiveImage при
-               object-fit: contain вылезает полями по бокам и рисует белый
-               прямоугольник поверх тёплой карточки. Тот же приём — в галерее
-               товара. -->
+               object-fit: contain вылезает полями по бокам и рисует
+               прямоугольник поверх подложки карточки. Тот же приём — в
+               галерее товара. -->
           <ProgressiveImage
             v-if="heroImage"
             :src="heroImage"
@@ -234,73 +222,33 @@ function addHeroToCart(event: MouseEvent) {
           </span>
         </NuxtLink>
 
-        <div class="blh__feat-body">
-          <span class="blh__feat-eyebrow">
-            <Icon name="lucide:sparkles" class="size-[15px] blh__accent-icon" />
-            Флагман бренда
-          </span>
-          <NuxtLink :to="`/catalog/products/${hero.slug}`" class="blh__feat-name">
-            {{ hero.name }}
-          </NuxtLink>
-          <span v-if="heroMeta" class="blh__feat-meta">{{ heroMeta }}</span>
+        <NuxtLink :to="`/catalog/products/${hero.slug}`" class="blh__flag-name">
+          {{ hero.name }}
+        </NuxtLink>
 
-          <span class="blh__prices">
-            <span class="blh__price">{{ formatPrice(heroPrice.final) }}&nbsp;₸</span>
-            <span v-if="heroPrice.old" class="blh__price-old">
-              {{ formatPrice(heroPrice.old) }}&nbsp;₸
-            </span>
+        <span class="blh__prices">
+          <span class="blh__price">{{ formatPrice(heroPrice.final) }}&nbsp;₸</span>
+          <span v-if="heroPrice.old" class="blh__price-old">
+            {{ formatPrice(heroPrice.old) }}&nbsp;₸
           </span>
-
           <span v-if="heroPrice.bonus > 0" class="blh__bonus">
-            <Icon name="lucide:gift" class="size-[15px] blh__bonus-icon" />
+            <Icon name="lucide:gift" class="size-[14px] blh__bonus-icon" />
             +{{ formatPrice(heroPrice.bonus) }} бонусов
           </span>
+        </span>
 
-          <div class="blh__actions">
-            <button type="button" class="blh__cta" @click="addHeroToCart">
-              <Icon name="solar:cart-3-bold" class="size-[19px]" />
-              В корзину
-            </button>
-            <NuxtLink :to="`/catalog/products/${hero.slug}`" class="blh__ghost">
-              Подробнее
-              <Icon name="lucide:arrow-right" class="size-[17px] text-primary" />
-            </NuxtLink>
-          </div>
-        </div>
-      </div>
-
-      <!-- Панель коллекций -->
-      <div v-if="collections.length" class="blh__panel">
-        <div class="blh__panel-head">
-          <span class="blh__panel-title">Коллекции</span>
-          <span class="blh__panel-count">
-            {{ seriesLabel }}
-            <Icon name="lucide:blocks" class="size-[15px] blh__accent-icon" />
-          </span>
-        </div>
-
-        <div class="blh__panel-list">
-          <button
-            v-for="collection in collections"
-            :key="collection.id"
-            type="button"
-            class="blh__col"
-            :class="{ 'blh__col--on': collection.id === activeLineId }"
-            @click="emit('pickLine', collection.id)"
-          >
-            <span
-              class="blh__col-thumb"
-              :style="collection.thumb ? { backgroundImage: `url(${collection.thumb})` } : undefined"
-            />
-            <span class="blh__col-text">
-              <span class="blh__col-name">{{ collection.name }}</span>
-              <span
-                class="blh__col-count"
-                :class="{ 'blh__col-count--empty': collection.isEmpty }"
-              >{{ collection.countLabel }}</span>
-            </span>
-            <Icon name="lucide:chevron-right" class="blh__col-chevron size-[17px]" />
+        <div class="blh__actions">
+          <button type="button" class="blh__cta" @click="addHeroToCart">
+            <Icon name="solar:cart-3-bold" class="size-[19px]" />
+            В корзину
           </button>
+          <NuxtLink
+            :to="`/catalog/products/${hero.slug}`"
+            class="blh__more"
+            aria-label="Подробнее о товаре"
+          >
+            <Icon name="lucide:arrow-right" class="size-[19px] text-primary" />
+          </NuxtLink>
         </div>
       </div>
     </div>
@@ -314,21 +262,44 @@ function addHeroToCart(event: MouseEvent) {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 20px;
-    border: 1px solid rgb(255 255 255 / 0.9);
+    padding: 22px 18px;
     border-radius: 24px;
-    /* Подложка бренда: тёплая радиальная растяжка из макета. */
-    background: var(--brand-wash);
-    box-shadow:
-      inset 0 1px 0 #fff,
-      0 18px 44px rgb(15 23 42 / 0.09);
+    background: linear-gradient(146deg, #0d1830 0%, #152a4d 52%, #0a142b 100%);
+    box-shadow: 0 22px 50px rgb(9 17 35 / 0.3);
+    overflow: hidden;
+  }
+
+  /* Свечение в цвет бренда — единственное цветное пятно на тёмной полосе. */
+  .blh__aura {
+    position: absolute;
+    top: -38%;
+    left: 50%;
+    width: 150%;
+    height: 78%;
+    transform: translateX(-50%);
+    background: radial-gradient(closest-side at 50% 50%, var(--brand-glow) 0%, rgb(0 0 0 / 0) 100%);
+    pointer-events: none;
+  }
+
+  .blh__grid {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .blh__left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
   }
 
   .blh__brand {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 14px;
+    min-width: 0;
   }
 
   .blh__logo {
@@ -348,196 +319,171 @@ function addHeroToCart(event: MouseEvent) {
 
   .blh__title {
     display: flex;
-    flex: 1;
     flex-direction: column;
-    gap: 7px;
+    gap: 4px;
     min-width: 0;
   }
 
   .blh__eyebrow {
-    color: var(--brand-accent);
+    color: #ffd84d;
     font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.14em;
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
   }
 
   .blh__h1 {
     margin: 0;
-    color: var(--foreground);
+    color: #fff;
     font-weight: 800;
     font-size: 38px;
-    line-height: 0.98;
+    line-height: 0.95;
     letter-spacing: -0.035em;
   }
 
   .blh__lead {
-    margin: 2px 0 0;
-    max-width: 44ch;
-    color: var(--muted-foreground);
+    margin: 0;
+    max-width: 42ch;
+    color: rgb(255 255 255 / 0.78);
     font-size: 14px;
-    line-height: 1.55;
+    line-height: 1.6;
     text-wrap: pretty;
   }
 
-  /* Кнопка «Все бренды» помещается только на широком экране. */
-  .blh__all {
-    display: none;
+  .blh__stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
   }
 
-  .blh__trust {
+  .blh__stat {
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px;
+    border: 1px solid rgb(255 255 255 / 0.14);
+    border-radius: 16px;
+    background: rgb(255 255 255 / 0.07);
   }
 
-  .blh__trust::-webkit-scrollbar {
-    display: none;
+  .blh__stat-num {
+    color: #fff;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.02em;
   }
 
-  .blh__chip {
+  .blh__stat-label {
+    color: rgb(255 255 255 / 0.66);
+    font-weight: 500;
+    font-size: 12px;
+  }
+
+  .blh__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+  }
+
+  .blh__tag {
     display: inline-flex;
-    flex: none;
     align-items: center;
     gap: 7px;
-    height: 34px;
-    padding: 0 14px;
+    height: 32px;
+    padding: 0 13px;
+    border: 1px solid rgb(255 255 255 / 0.16);
     border-radius: 999px;
-    font-weight: 700;
+    background: rgb(255 255 255 / 0.09);
+    color: #e9f0fb;
+    font-weight: 600;
     font-size: 12.5px;
   }
 
-  .blh__chip--ok {
-    background: rgb(0 188 125 / 0.12);
-    color: #007a55;
-  }
-
-  .blh__chip--info {
-    background: rgb(43 127 255 / 0.12);
-    color: var(--primary);
-  }
-
-  .blh__chip--warm {
-    background: var(--bonus-surface);
-    color: var(--bonus);
-  }
-
-  .blh__chip--pink {
-    background: rgb(230 0 118 / 0.1);
-    color: #c2185b;
-  }
-
-  .blh__split {
+  .blh__flag {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 20px;
+    background: var(--card);
+    box-shadow: 0 18px 40px rgb(6 12 26 / 0.34);
   }
 
-  .blh__feat {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+  .blh__flag-eyebrow {
+    color: var(--muted-foreground);
+    font-weight: 700;
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
   }
 
-  .blh__feat-img {
+  .blh__flag-img {
     position: relative;
     display: block;
-    overflow: hidden;
+    border-radius: 16px;
+    background: linear-gradient(158deg, #f7f9fc, #eaf0f8);
     aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+
+  .blh__flag-img :deep(img) {
     padding: 18px;
-    border: 1px solid rgb(255 255 255 / 0.85);
-    border-radius: 20px;
-    background: var(--brand-soft);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.9),
-      0 10px 26px rgb(15 23 42 / 0.08);
   }
 
   .blh__discount {
     position: absolute;
-    top: 14px;
-    left: 14px;
-    padding: 6px 13px;
+    top: 12px;
+    left: 12px;
+    padding: 5px 12px;
     border-radius: 999px;
     background: var(--discount);
     color: #fff;
     font-weight: 800;
-    font-size: 14px;
-    box-shadow: 0 6px 16px rgb(231 0 11 / 0.28);
+    font-size: 13px;
   }
 
-  .blh__feat-body {
-    display: flex;
-    flex-direction: column;
-    gap: 11px;
-    min-width: 0;
-  }
-
-  .blh__feat-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--muted-foreground);
-    font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .blh__accent-icon {
-    color: var(--brand-accent);
-  }
-
-  .blh__feat-name {
+  .blh__flag-name {
+    display: -webkit-box;
     color: var(--foreground);
-    font-weight: 700;
-    font-size: 17px;
-    line-height: 1.28;
-    text-wrap: pretty;
-  }
-
-  .blh__feat-meta {
-    color: var(--muted-foreground);
-    font-weight: 500;
-    font-size: 13.5px;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
   }
 
   .blh__prices {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 12px;
-    margin-top: 2px;
+    gap: 10px;
   }
 
   .blh__price {
     color: var(--discount);
     font-weight: 800;
-    font-size: 30px;
-    white-space: nowrap;
+    font-size: 28px;
   }
 
   .blh__price-old {
     color: var(--price-old);
     font-weight: 500;
-    font-size: 15px;
-    white-space: nowrap;
+    font-size: 14px;
     text-decoration: line-through;
   }
 
   .blh__bonus {
     display: inline-flex;
-    align-self: flex-start;
     align-items: center;
-    gap: 8px;
-    padding: 8px 13px;
-    border-radius: 12px;
-    background: linear-gradient(100deg, var(--bonus-surface), var(--bonus-surface-2));
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 10px;
+    background: var(--bonus-surface);
     color: var(--bonus);
     font-weight: 700;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .blh__bonus-icon {
@@ -546,190 +492,70 @@ function addHeroToCart(event: MouseEvent) {
 
   .blh__actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 4px;
+    gap: 9px;
+    margin-top: 2px;
   }
 
   .blh__cta {
     display: inline-flex;
+    flex: 1;
     align-items: center;
+    justify-content: center;
     gap: 9px;
-    height: 52px;
-    padding: 0 24px;
-    border: 1px solid rgb(255 255 255 / 0.45);
+    min-width: 0;
+    height: 50px;
+    padding: 0 18px;
     border-radius: 999px;
-    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.9));
+    background: linear-gradient(150deg, rgb(77 148 255 / 0.98), rgb(23 101 235 / 0.94));
+    box-shadow: 0 10px 22px rgb(43 127 255 / 0.28);
     color: #fff;
     font-weight: 700;
     font-size: 15px;
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.5),
-      0 10px 24px rgb(43 127 255 / 0.3);
     cursor: pointer;
   }
 
   .blh__cta:hover {
-    background: linear-gradient(150deg, rgb(90 158 255 / 1), rgb(21 93 252 / 0.95));
+    background: linear-gradient(150deg, rgb(90 158 255 / 1), rgb(21 93 252 / 0.98));
   }
 
-  .blh__ghost {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    height: 52px;
-    padding: 0 22px;
-    border: 1px solid rgb(255 255 255 / 0.9);
+  .blh__more {
+    display: grid;
+    flex: none;
+    place-content: center;
+    width: 50px;
+    height: 50px;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: linear-gradient(150deg, #fff, rgb(224 233 247 / 0.6));
-    color: var(--foreground);
-    font-weight: 600;
-    font-size: 15px;
-    box-shadow:
-      inset 0 1px 0 #fff,
-      0 6px 16px rgb(15 23 42 / 0.08);
+    background: var(--card);
   }
 
-  .blh__ghost:hover {
-    background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.7));
-  }
-
-  .blh__panel {
-    display: flex;
-    flex-direction: column;
-    padding: 12px;
-    border: 1px solid rgb(255 255 255 / 0.9);
-    border-radius: 20px;
-    background: rgb(255 255 255 / 0.72);
-    box-shadow:
-      inset 0 1px 0 #fff,
-      0 10px 26px rgb(15 23 42 / 0.07);
-    backdrop-filter: blur(12px) saturate(1.4);
-    -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  }
-
-  .blh__panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 2px 6px 10px;
-  }
-
-  .blh__panel-title {
-    color: var(--foreground);
-    font-weight: 800;
-    font-size: 16px;
-    letter-spacing: -0.015em;
-  }
-
-  .blh__panel-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted-foreground);
-    font-weight: 600;
-    font-size: 12.5px;
-  }
-
-  /* До широкого экрана коллекции едут лентой. */
-  .blh__panel-list {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    padding: 2px 2px 6px;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-  }
-
-  .blh__panel-list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .blh__col {
-    display: flex;
-    flex: none;
-    flex-direction: column;
-    gap: 9px;
-    width: 158px;
-    padding: 9px;
-    border: 1px solid transparent;
-    border-radius: 18px;
-    background: transparent;
-    text-align: left;
-    scroll-snap-align: start;
-    cursor: pointer;
-    transition: background 0.14s ease;
-  }
-
-  .blh__col:hover {
-    background: rgb(15 23 42 / 0.035);
-  }
-
-  .blh__col--on {
-    border-color: rgb(43 127 255 / 0.3);
-    background: rgb(43 127 255 / 0.08);
-  }
-
-  .blh__col-thumb {
-    width: 100%;
-    height: 92px;
-    border-radius: 12px;
-    background: #f5f5f5 center / cover no-repeat;
-    box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.09);
-  }
-
-  .blh__col-text {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .blh__col-name {
-    overflow: hidden;
-    color: var(--foreground);
-    font-weight: 600;
-    font-size: 13.5px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .blh__col-count {
-    color: var(--muted-foreground);
-    font-weight: 500;
-    font-size: 12px;
-  }
-
-  /* Пустая коллекция — не серым: это приглашение, а не отсутствие данных. */
-  .blh__col-count--empty {
-    color: var(--primary);
-  }
-
-  .blh__col-chevron {
-    display: none;
-    flex: none;
-    color: var(--muted-foreground);
+  .blh__more:hover {
+    background: var(--muted);
   }
 
   @media (min-width: 760px) {
     .blh {
-      gap: 20px;
-      padding: 26px;
+      padding: 28px;
       border-radius: 30px;
     }
 
-    .blh__brand {
-      align-items: center;
-      gap: 18px;
+    .blh__aura {
+      top: -46%;
+      left: -6%;
+      width: 66%;
+      height: 180%;
+      transform: none;
     }
 
-    .blh__logo {
-      width: 92px;
-      height: 92px;
-      padding: 12px;
-      border-radius: 22px;
+    .blh__grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 24px;
+      align-items: center;
+    }
+
+    .blh__left {
+      gap: 20px;
     }
 
     .blh__h1 {
@@ -740,104 +566,54 @@ function addHeroToCart(event: MouseEvent) {
       font-size: 15.5px;
     }
 
-    .blh__trust {
-      flex-wrap: wrap;
-      overflow-x: visible;
+    .blh__logo {
+      width: 92px;
+      height: 92px;
+      padding: 12px;
+      border-radius: 22px;
     }
 
-    .blh__split {
-      gap: 20px;
+    .blh__stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
     }
 
-    .blh__feat {
-      display: grid;
-      grid-template-columns: minmax(280px, 0.92fr) minmax(0, 1.08fr);
-      gap: 20px;
-      align-items: center;
+    .blh__stat-num {
+      font-size: 23px;
     }
 
-    .blh__feat-img {
-      aspect-ratio: 1 / 1;
-      padding: 22px;
+    .blh__flag {
+      gap: 10px;
+      padding: 18px;
       border-radius: 24px;
     }
 
-    .blh__feat-name {
-      font-size: 20px;
+    .blh__flag-img {
+      border-radius: 18px;
+      aspect-ratio: 1 / 1;
+    }
+
+    .blh__flag-img :deep(img) {
+      padding: 22px;
+    }
+
+    .blh__flag-name {
+      font-size: 16px;
     }
 
     .blh__price {
-      font-size: 36px;
-    }
-
-    .blh__panel {
-      padding: 14px;
-      border-radius: 24px;
+      font-size: 32px;
     }
   }
 
   @media (min-width: 1200px) {
     .blh {
-      padding: 30px 32px;
+      padding: 34px 36px;
     }
 
-    .blh__all {
-      display: inline-flex;
-      flex: none;
-      align-items: center;
-      gap: 8px;
-      height: 44px;
-      padding: 0 18px;
-      border: 1px solid rgb(255 255 255 / 0.9);
-      border-radius: 999px;
-      background: linear-gradient(150deg, #fff, rgb(224 233 247 / 0.6));
-      color: var(--foreground);
-      font-weight: 600;
-      font-size: 14px;
-      box-shadow:
-        inset 0 1px 0 #fff,
-        0 6px 16px rgb(15 23 42 / 0.08);
-    }
-
-    .blh__all:hover {
-      background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.7));
-    }
-
-    .blh__split {
-      display: grid;
-      grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
-      gap: 22px;
-      align-items: start;
-    }
-
-    .blh__feat {
-      gap: 24px;
-    }
-
-    /* На широком экране коллекции становятся списком. */
-    .blh__panel-list {
-      flex-direction: column;
-      gap: 2px;
-      overflow-x: visible;
-    }
-
-    .blh__col {
-      flex-direction: row;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      padding: 8px 10px;
-      border-radius: 16px;
-    }
-
-    .blh__col-thumb {
-      flex: none;
-      width: 64px;
-      height: 46px;
-    }
-
-    .blh__col-chevron {
-      display: block;
+    .blh__grid {
+      grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
+      gap: 34px;
     }
   }
 }
