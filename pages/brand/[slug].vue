@@ -116,6 +116,42 @@ const { data: brandProductLines } = await useAsyncData(
 )
 
 /**
+ * Коллекция каждого товара бренда.
+ *
+ * Лендинг раскладывает товары по сериям, а выдача `get_filtered_products`
+ * своей линейки не отдаёт — в списке колонок её просто нет. Отдельный лёгкий
+ * запрос дешевле правки RPC: две колонки на весь бренд, и он идёт на сервере,
+ * чтобы разбивка попала в серверную разметку вместе с товарами.
+ */
+const { data: lineByProduct } = await useAsyncData(
+  `brand-product-lines-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return {}
+
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, product_line_id')
+      .eq('brand_id', brand.value.id)
+      .eq('is_active', true)
+      .not('product_line_id', 'is', null)
+
+    if (error) {
+      console.error('Error loading product lines map:', error)
+      return {}
+    }
+
+    const map: Record<string, string> = {}
+    for (const row of data ?? []) {
+      if (row.product_line_id)
+        map[row.id] = row.product_line_id
+    }
+    return map
+  },
+  { watch: [brand], default: (): Record<string, string> => ({}) },
+)
+
+/**
  * Категории, в которых у бренда есть СВОЙ индексируемый лендинг.
  *
  * Зачем. Со страницы бренда не вело НИ ОДНОЙ ссылки на бренд-лендинги
@@ -368,13 +404,6 @@ const isCustomPage = computed(() => !!(brand.value as any)?.is_custom_page)
 const pageLayout = computed(
   () => (brand.value as any)?.page_layout as BrandPageLayout | null,
 )
-
-const featuredProductLines = computed(() => {
-  if (!pageLayout.value?.featuredLineIds?.length)
-    return []
-  const ids = new Set(pageLayout.value.featuredLineIds)
-  return brandProductLines.value.filter(l => ids.has(l.id))
-})
 
 const brandLogoUrl = computed(() => {
   if (!brand.value?.logo_url)
@@ -832,9 +861,10 @@ useIndexableRobotsRule(
       <BrandCustomTemplate
         :brand="brand"
         :product-lines="brandProductLines"
-        :featured-product-lines="featuredProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
+        :line-by-product="lineByProduct"
+        :featured-line-ids="pageLayout?.featuredLineIds ?? null"
       />
 
       <!--
