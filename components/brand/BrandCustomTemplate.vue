@@ -32,6 +32,8 @@ const props = defineProps<{
   categoryNames?: Record<string, string> | null
   /** Категории с индексируемым бренд-лендингом — секция внизу страницы. */
   categoryLinks?: { name: string, path: string }[] | null
+  /** Раздел каталога для надстрочника в H1: «Конструкторы», «Куклы». */
+  topCategory?: string | null
 }>()
 
 const fs = props.filterState
@@ -172,6 +174,7 @@ const facts = computed<BrandFact[]>(() => {
       :brand="brand"
       :products="products"
       :lines="orderedLines"
+      :top-category="topCategory"
     />
 
     <BrandLandingCollections

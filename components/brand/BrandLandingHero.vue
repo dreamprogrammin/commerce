@@ -20,6 +20,8 @@ const props = defineProps<{
   /** Товары бренда — первый идёт витриной. */
   products: ProductWithGallery[]
   lines: ProductLine[]
+  /** Раздел каталога, где лежат товары бренда: «Конструкторы», «Куклы». */
+  topCategory?: string | null
 }>()
 
 const { getVariantUrl } = useSupabaseStorage()
@@ -52,11 +54,22 @@ const heroImage = computed(() => {
 })
 
 /**
- * Надстрочник по макету: «Дания · с 1932 года». Страна и год живут в
- * `brands.facts` и заполняются руками; поле пустое у всех 32 брендов, поэтому
- * строка собирается из того, что есть, и целиком прячется, когда нет ничего.
+ * Надстрочник в шапке — строка НАД именем бренда, по макету.
+ *
+ * Он же первая половина заголовка страницы: `<h1>` читается как
+ * «Конструкторы LEGO», а выглядит ровно как в макете — мелкая строка
+ * раздела и крупное имя. Голое «LEGO» в H1 не содержало ни слова о том, что
+ * продаётся, и страница висела на 28-й позиции по «лего алматы купить».
+ *
+ * Страна и год основания живут в `brands.facts`, пустых у всех 32 брендов.
+ * Они идут в надстрочник, только когда раздел неизвестен: смешивать их с
+ * названием раздела внутри H1 нельзя, заголовок превратится в кашу. Сами
+ * факты и так показываются в карточке «Коротко о бренде».
  */
 const eyebrow = computed(() => {
+  if (props.topCategory)
+    return props.topCategory
+
   const facts = props.brand.facts ?? []
   const value = (key: string) =>
     facts.find(f => f?.k?.toLowerCase().startsWith(key))?.v?.trim()
@@ -168,12 +181,10 @@ function addHeroToCart(event: MouseEvent) {
             />
           </span>
 
-          <div class="blh__title">
+          <h1 class="blh__title">
             <span v-if="eyebrow" class="blh__eyebrow">{{ eyebrow }}</span>
-            <h1 class="blh__h1">
-              {{ brand.seo_h1 || brand.name }}
-            </h1>
-          </div>
+            <span class="blh__h1">{{ brand.seo_h1 || brand.name }}</span>
+          </h1>
         </div>
 
         <p v-if="lead" class="blh__lead">
@@ -321,6 +332,7 @@ function addHeroToCart(event: MouseEvent) {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    margin: 0;
     min-width: 0;
   }
 
@@ -333,7 +345,7 @@ function addHeroToCart(event: MouseEvent) {
   }
 
   .blh__h1 {
-    margin: 0;
+    display: block;
     color: #fff;
     font-weight: 800;
     font-size: 38px;

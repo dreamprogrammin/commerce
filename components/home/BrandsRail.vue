@@ -7,9 +7,18 @@ import { sectionSpacingVariants } from '@/lib/variants'
 /**
  * «Популярные бренды» (Homepage.dc.html: секция brands).
  *
- * Горизонтальная лента логотипов в рамках. Источник — таблица brands
- * (метрики популярности у брендов нет; алфавит + limit — существующий
- * продовый компромисс, тот же, что в BrandsCollapsible).
+ * Горизонтальная лента логотипов в рамках. Порядок — по числу живых товаров
+ * бренда, а не по алфавиту.
+ *
+ * Почему поменяли. До 11 сентября 2026 лента брала первые двенадцать брендов
+ * ПО АЛФАВИТУ, и на главную попадали air-blaster, bowa, cufan, eva-puzzle —
+ * у половины из них два товара или один. А LEGO, самый большой бренд
+ * каталога (14 товаров из 178), на главную не попадал вовсе: единственная
+ * ссылка на него шла со страницы /brands, и Google обходил его раз в два с
+ * лишним месяца (инспекция 11 сентября: последний обход 30 июня).
+ *
+ * Настоящей метрики популярности у брендов нет: `sales_count` у всех товаров
+ * ноль. Число товаров — единственный честный признак «есть что показать».
  */
 /*
  * Двенадцать логотипов, а не двадцать.
@@ -32,16 +41,34 @@ const { getVariantUrl } = useSupabaseStorage()
 const { data: brands } = await useAsyncData(
   'home-brands-rail',
   async () => {
+    /*
+     * `products(count)` считает связанные товары на стороне базы — одним
+     * запросом вместо выгрузки всех товаров ради группировки. Фильтр по
+     * `is_active` стоит явно, хотя анониму RLS и так отдаёт только живые:
+     * полагаться на побочный эффект политики в коде выдачи нельзя.
+     */
     const { data, error } = await supabase
       .from('brands')
-      .select('id, name, slug, logo_url, blur_placeholder')
-      .order('name')
-      .limit(BRANDS_LIMIT)
+      .select('id, name, slug, logo_url, blur_placeholder, products(count)')
+      .eq('products.is_active', true)
+      .limit(200)
     if (error) {
       console.error('❌ Не удалось загрузить бренды:', error)
       return []
     }
-    return data ?? []
+
+    const withCounts = (data ?? []).map(brand => ({
+      ...brand,
+      productCount: (brand as any).products?.[0]?.count ?? 0,
+    }))
+
+    // Бренд без товаров ведёт на страницу, закрытую noindex, — в ленте ему нечего делать.
+    return withCounts
+      .filter(brand => brand.productCount > 0)
+      .sort((a, b) =>
+        b.productCount - a.productCount || a.name.localeCompare(b.name, 'ru'),
+      )
+      .slice(0, BRANDS_LIMIT)
   },
   /*
    * Грузим на СЕРВЕРЕ и без `lazy`.

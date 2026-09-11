@@ -28,6 +28,13 @@ const props = defineProps<{
   questions?: BrandQuestion[] | null
   /** Соседние бренды для рельса перелинковки внизу страницы. */
   otherBrands?: { name: string, slug: string, logo_url: string | null }[] | null
+  /**
+   * Раздел каталога, где лежит большинство товаров бренда: «Конструкторы»,
+   * «Куклы». Идёт строкой над названием ВНУТРИ `<h1>`, чтобы заголовок
+   * говорил, что именно продаётся. Пока в админке заполнен `seo_h1`,
+   * показывается он, а надстрочник не рисуется — иначе выйдет повтор.
+   */
+  topCategory?: string | null
 }>()
 
 const fs = props.filterState
@@ -108,6 +115,10 @@ function toggleSeoExpanded() {
               <h1
                 class="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground"
               >
+                <span
+                  v-if="!brand.seo_h1 && topCategory"
+                  class="block text-sm md:text-base font-semibold uppercase tracking-[0.14em] text-primary"
+                >{{ topCategory }}</span>
                 {{ brand.seo_h1 || brand.name }}
               </h1>
 
