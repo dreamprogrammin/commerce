@@ -155,25 +155,39 @@ watch(drawer, (open) => {
         </label>
 
         <div class="blc__sheet-grid">
-          <NuxtLink
-            v-for="collection in found"
-            :key="collection.id"
-            :to="collection.href"
-            class="blc__sheet-tile"
-            @click="drawer = false"
-          >
-            <span
-              class="blc__cover"
-              :style="collection.cover ? { backgroundImage: `url(${collection.cover})` } : undefined"
-            />
-            <span class="blc__text">
-              <span class="blc__name">{{ collection.name }}</span>
+          <!--
+            Серия без товаров ссылкой не становится: её страница закрыта
+            `noindex` (см. pages/brand/[brandSlug]/[lineSlug].vue), и вести
+            туда и робота, и покупателя незачем — там пусто.
+          -->
+          <template v-for="collection in found" :key="collection.id">
+            <NuxtLink
+              v-if="!collection.isEmpty"
+              :to="collection.href"
+              class="blc__sheet-tile"
+              @click="drawer = false"
+            >
               <span
-                class="blc__count"
-                :class="{ 'blc__count--empty': collection.isEmpty }"
-              >{{ collection.countLabel }}</span>
-            </span>
-          </NuxtLink>
+                class="blc__cover"
+                :style="collection.cover ? { backgroundImage: `url(${collection.cover})` } : undefined"
+              />
+              <span class="blc__text">
+                <span class="blc__name">{{ collection.name }}</span>
+                <span class="blc__count">{{ collection.countLabel }}</span>
+              </span>
+            </NuxtLink>
+
+            <div v-else class="blc__sheet-tile blc__sheet-tile--empty">
+              <span
+                class="blc__cover"
+                :style="collection.cover ? { backgroundImage: `url(${collection.cover})` } : undefined"
+              />
+              <span class="blc__text">
+                <span class="blc__name">{{ collection.name }}</span>
+                <span class="blc__count blc__count--empty">{{ collection.countLabel }}</span>
+              </span>
+            </div>
+          </template>
 
           <span v-if="found.length === 0" class="blc__no-match">
             Ничего не нашли — попробуйте другое название
@@ -375,6 +389,16 @@ watch(drawer, (open) => {
 
   .blc__sheet-tile:active {
     transform: scale(0.97);
+  }
+
+  /* Пустая серия — просто карточка-обещание, нажимать не на что. */
+  .blc__sheet-tile--empty {
+    opacity: 0.72;
+    cursor: default;
+  }
+
+  .blc__sheet-tile--empty:active {
+    transform: none;
   }
 
   .blc__no-match {

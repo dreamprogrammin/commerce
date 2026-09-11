@@ -17,6 +17,7 @@ import {
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { brandHeadingWord } from '@/utils/brandHeading'
 
 /** Категория в строке `category_brand_seo` — ровно то, что нужно для ссылки. */
 interface BrandLandingCategory {
@@ -285,11 +286,12 @@ const { data: otherBrands } = await useAsyncData(
   },
 )
 
-const { data: brandCategoryLinks } = await useAsyncData(
+const { data: brandCategoryData } = await useAsyncData(
   `brand-category-links-${brandSlug}`,
   async () => {
+    const empty = { links: [] as { name: string, path: string }[], topCategory: null as string | null }
     if (!brand.value)
-      return []
+      return empty
 
     const brandId = brand.value.id
 
@@ -303,19 +305,51 @@ const { data: brandCategoryLinks } = await useAsyncData(
         .select('category_id')
         .eq('brand_id', brandId)
         .eq('is_active', true),
-      supabase.from('categories').select('id, parent_id'),
+      supabase.from('categories').select('id, parent_id, name, slug'),
     ])
+
+    const categories = (allCategories.data ?? []) as {
+      id: string
+      parent_id: string | null
+      name: string
+      slug: string | null
+    }[]
+
+    /*
+     * Корневая категория, в которой у бренда больше всего товаров. Из её
+     * слага берётся слово для заголовка — «Конструкторы LEGO»; почему не имя
+     * категории как есть, объяснено в `utils/brandHeading.ts`.
+     *
+     * Берём именно корень дерева, а не категорию товара: «Конструкторы»
+     * читается как раздел, «Конструкторы Мальчикам» в заголовке бренда
+     * звучит криво.
+     *
+     * Поля `seo_h1` и `meta_title` из админки по-прежнему главнее: это
+     * фолбэк для 32 брендов, у которых они пустые.
+     */
+    const byId = new Map(categories.map(c => [c.id, c]))
+    const rootCounts = new Map<string, number>()
+    for (const product of brandProducts.data ?? []) {
+      let current = product.category_id ? byId.get(product.category_id) : undefined
+      // Ограничение глубины — страховка от петли `parent_id` в данных.
+      for (let depth = 0; current?.parent_id && depth < 10; depth++)
+        current = byId.get(current.parent_id)
+      if (current)
+        rootCounts.set(current.id, (rootCounts.get(current.id) ?? 0) + 1)
+    }
+    const topRootId = [...rootCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+    const topCategory = brandHeadingWord(topRootId ? byId.get(topRootId)?.slug : null)
 
     const rows = (seoRows.data ?? []) as { categories: BrandLandingCategory | null }[]
     if (rows.length === 0)
-      return []
+      return { links: [], topCategory }
 
     const counts = countProductsByCategoryBrand(
       (brandProducts.data ?? []).map(p => ({
         category_id: p.category_id,
         brand_id: brandId,
       })),
-      (allCategories.data ?? []) as { id: string, parent_id: string | null }[],
+      categories,
     )
 
     const seen = new Set<string>()
@@ -341,10 +375,28 @@ const { data: brandCategoryLinks } = await useAsyncData(
       links.push({ name: category.name, path })
     }
 
-    return links.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    return {
+      links: links.sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+      topCategory,
+    }
   },
-  { watch: [brand], default: (): { name: string, path: string }[] => [] },
+  {
+    watch: [brand],
+    default: () => ({
+      links: [] as { name: string, path: string }[],
+      topCategory: null as string | null,
+    }),
+  },
 )
+
+/** Ссылки на бренд-лендинги в категориях. */
+const brandCategoryLinks = computed(() => brandCategoryData.value?.links ?? [])
+
+/**
+ * Слово для заголовка: «Конструкторы» у LEGO, «Игрушки» у бренда из раздела
+ * аудитории. Пустое, пока у бренда нет товаров ни в одной категории.
+ */
+const topCategory = computed(() => brandCategoryData.value?.topCategory ?? null)
 
 // Загружаем агрегированную статистику бренда
 const brandStats = ref<{
@@ -469,6 +521,15 @@ const metaTitle = computed(() => {
     return brand.value.meta_title
   if (brand.value.seo_title)
     return brand.value.seo_title
+  /*
+   * «Конструкторы LEGO — купить в Алматы с доставкой», а не «LEGO - Купить
+   * товары бренда в Алматы». Формулировка повторяет заголовок бренд-лендинга
+   * в категории: по тем же запросам он держится на 20-й позиции против 28-й
+   * у страницы бренда (Search Console, лето 2026). Слово раздела берётся из
+   * товаров бренда — см. `topCategory`.
+   */
+  if (topCategory.value)
+    return `${topCategory.value} ${brand.value.name} — купить в Алматы с доставкой | ${siteName}`
   return `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}`
 })
 
@@ -912,6 +973,7 @@ useIndexableRobotsRule(
         :featured-line-ids="pageLayout?.featuredLineIds ?? null"
         :category-names="productCategoryNames"
         :category-links="brandCategoryLinks"
+        :top-category="topCategory"
       />
     </div>
 
@@ -925,6 +987,7 @@ useIndexableRobotsRule(
         :brand-stats="brandStats"
         :questions="brandQuestions"
         :other-brands="otherBrands"
+        :top-category="topCategory"
       />
 
       <!--

@@ -148,15 +148,33 @@ async function open(opts) {
   // ---------- 3. Шторка «Все коллекции» ----------
   await page.click('.blc__all')
   await page.waitForTimeout(800)
-  const sheet = await page.evaluate(() => ({
-    open: !!document.querySelector('.blc__sheet-grid'),
-    tiles: document.querySelectorAll('.blc__sheet-tile').length,
-    links: [...document.querySelectorAll('.blc__sheet-tile')].every(a => a.tagName === 'A' && a.getAttribute('href')?.startsWith('/brand/lego/')),
-  }))
+  const sheet = await page.evaluate(() => {
+    const tiles = [...document.querySelectorAll('.blc__sheet-tile')]
+    const empty = tiles.filter(t => t.classList.contains('blc__sheet-tile--empty'))
+    const filled = tiles.filter(t => !t.classList.contains('blc__sheet-tile--empty'))
+    return {
+      open: !!document.querySelector('.blc__sheet-grid'),
+      tiles: tiles.length,
+      emptyCount: empty.length,
+      filledAreLinks: filled.length > 0 && filled.every(
+        a => a.tagName === 'A' && a.getAttribute('href')?.startsWith('/brand/lego/'),
+      ),
+      emptyAreNotLinks: empty.every(t => t.tagName !== 'A'),
+    }
+  })
   console.log('\n3) шторка «Все коллекции»')
   check(sheet.open, 'шторка открылась')
   check(sheet.tiles === 7, `в шторке все семь коллекций (${sheet.tiles})`)
-  check(sheet.links, 'плитки шторки — ссылки на страницы серий')
+  check(sheet.filledAreLinks, 'серии с товарами — ссылки на свои страницы')
+  /*
+   * Пустая серия ссылкой быть не должна: её страница закрыта `noindex`
+   * (см. pages/brand/[brandSlug]/[lineSlug].vue), и с 11 сентября 2026 такие
+   * адреса не подаются даже в карту сайта.
+   */
+  check(
+    sheet.emptyCount > 0 && sheet.emptyAreNotLinks,
+    `пустые серии не ссылки (${sheet.emptyCount} шт.)`,
+  )
 
   await page.fill('.blc__search-input', 'city')
   await page.waitForTimeout(500)
