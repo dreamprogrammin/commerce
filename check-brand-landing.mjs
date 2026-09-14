@@ -352,10 +352,33 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   console.log('\n9) текст о бренде')
   check(/Конструкторы LEGO в Алматы/.test(about.h2 ?? ''), `H2 текста: «${about.h2}»`)
   check(about.h3.length >= 5, `подзаголовки под запросы (${about.h3.length}): ${about.h3.slice(0, 3).join(' / ')}`)
-  check(about.words > 400, `объём текста: ${about.words} слов`)
+  check(about.words > 700, `объём текста: ${about.words} слов`)
   check(about.seriesLinks.length >= 4, `ссылки на страницы серий внутри текста (${about.seriesLinks.length})`)
   check(about.bullet, 'вместо маркера — галочка')
   check(about.facts >= 3, `в справке ${about.facts} строк`)
+
+  /*
+   * Блок «Частые вопросы» должен быть ВИДИМЫМ и совпадать с разметкой
+   * FAQPage. Раньше разметка отдавала три вопроса, которых на странице не
+   * было вовсе, — Google такие блоки игнорирует.
+   */
+  const faq = await page.evaluate(() => {
+    const visible = [...document.querySelectorAll('.blf__q')].map(q => q.textContent.trim())
+    const node = [...document.querySelectorAll('script[type="application/ld+json"]')]
+      .map(n => JSON.parse(n.textContent))
+      .find(d => d['@type'] === 'FAQPage')
+    return {
+      visible,
+      marked: node ? node.mainEntity.map(q => q.name) : [],
+      answered: node ? node.mainEntity.every(q => (q.acceptedAnswer?.text ?? '').length > 40) : false,
+    }
+  })
+  check(faq.visible.length >= 5, `вопросов на странице: ${faq.visible.length}`)
+  check(
+    JSON.stringify(faq.marked) === JSON.stringify(faq.visible),
+    'разметка FAQPage повторяет видимые вопросы, а не свои',
+  )
+  check(faq.answered, 'у каждого вопроса в разметке есть развёрнутый ответ')
   check((about.cats ?? []).length > 0, `плитки категорий: ${about.cats?.join(', ')}`)
 
   // Заявка уходит в WhatsApp с номером набора.

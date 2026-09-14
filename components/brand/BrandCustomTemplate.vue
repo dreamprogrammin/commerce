@@ -17,7 +17,7 @@
  */
 import type { BrandFilterState } from '@/composables/useBrandPageFilters'
 import type { Brand, BrandFact, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
-import { brandStaticText } from '@/constants/brandStaticText'
+import { brandStaticFaq, brandStaticText } from '@/constants/brandStaticText'
 
 const props = defineProps<{
   brand: Brand
@@ -149,6 +149,9 @@ const aboutHtml = computed(
   () => brandStaticText(props.brand.slug) ?? props.brand.description ?? '',
 )
 
+/** Вопросы показываются на странице и из них же собирается разметка FAQPage. */
+const faq = computed(() => brandStaticFaq(props.brand.slug))
+
 /**
  * «Коротко о бренде». Строки из админки идут первыми, к ним снизу
  * добавляется то, что страница знает сама, — без повторов по ключу.
@@ -251,7 +254,10 @@ const facts = computed<BrandFact[]>(() => {
     <div ref="aboutRef" class="bct__anchor bct__about-band">
       <div class="bct__inner">
         <section class="bct__about">
-          <article v-if="aboutHtml" class="bct__text" v-html="aboutHtml" />
+          <div class="bct__col">
+            <article v-if="aboutHtml" class="bct__text" v-html="aboutHtml" />
+            <BrandLandingFaq :items="faq" />
+          </div>
 
           <aside class="bct__facts">
             <BrandFactsCard :facts="facts" />
@@ -336,6 +342,13 @@ const facts = computed<BrandFact[]>(() => {
     grid-template-columns: 1fr;
     gap: 12px;
     align-items: start;
+  }
+
+  .bct__col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
   }
 
   .bct__text {
@@ -488,7 +501,8 @@ const facts = computed<BrandFact[]>(() => {
       padding: 64px 0;
     }
 
-    .bct__about {
+    .bct__about,
+    .bct__col {
       gap: 18px;
     }
 
