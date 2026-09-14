@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import type { ParamsSignUp } from '~/types/type'
+
 import { pageShell } from '@/lib/shell'
+import { useModalStore } from '@/stores/modal/useModalStore'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
-
-import type { ParamsSignUp } from '~/types/type'
-import { useAuthStore } from '~/stores/auth'
 
 const formData = ref<ParamsSignUp>({
   email: '',
@@ -12,6 +13,7 @@ const formData = ref<ParamsSignUp>({
   confirmPassword: '',
 })
 const authStore = useAuthStore()
+const modalStore = useModalStore()
 
 async function handleRegister() {}
 </script>
@@ -55,8 +57,12 @@ async function handleRegister() {}
         {{ authStore.errors.register }}
       </p>
     </div>
-    <nuxt-link to="/login">
+    <!--
+      Страницы `/login` на сайте нет: вход открывается окном из `app.vue`.
+      Ссылка вела в 404.
+    -->
+    <button type="button" class="text-primary hover:underline" @click="modalStore.openLoginModal()">
       У вас есть аккаунт?
-    </nuxt-link>
+    </button>
   </div>
 </template>
