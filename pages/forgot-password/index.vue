@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import type { IParamsForgotPassword } from '~/types/type'
+
 import { pageShell } from '@/lib/shell'
+import { useModalStore } from '@/stores/modal/useModalStore'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
-
-import type { IParamsForgotPassword } from '~/types/type'
-import { useAuthStore } from '~/stores/auth'
 
 const isLoading = ref(false)
 const email = ref('')
 const authStore = useAuthStore()
+const modalStore = useModalStore()
 const message = ref('')
 
 async function handleResetPassword() {
@@ -49,9 +51,13 @@ async function handleResetPassword() {
         {{ isLoading ? "Отправка..." : "Отправить" }}
       </button>
     </form>
-    <nuxt-link to="/login">
-      Вернутся в авторизации
-    </nuxt-link>
+    <!--
+      Страницы `/login` на сайте нет: вход открывается окном, оно смонтировано
+      глобально в `app.vue`. Ссылка вела в 404.
+    -->
+    <button type="button" class="text-primary hover:underline" @click="modalStore.openLoginModal()">
+      Вернуться ко входу
+    </button>
     <p v-if="authStore.errors.forgotPassword">
       {{ message }}
     </p>
