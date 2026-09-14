@@ -25,7 +25,7 @@
  * Значения по умолчанию повторяют прежний `CatalogListing.vue` — самый
  * обычный случай.
  */
-import { catalogShell } from '@/lib/shell'
+import { catalogShell, useShellOverride } from '@/lib/shell'
 
 // Подвал грузим лениво — он внизу страницы, не нужен при первом рендере.
 const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/Footer.vue'))
@@ -69,12 +69,18 @@ onBeforeUnmount(() => {
     clearTimeout(timer)
 })
 
+/*
+ * Правка от самой страницы (см. `setShellOverride`). Нужна там, где один файл
+ * обслуживает разные по устройству страницы: лендинг бренда гасит липкую
+ * шапку, остальные бренды её сохраняют.
+ */
+const override = useShellOverride()
+
 const shell = computed(() => {
   const m = route.meta.shell
-  if (m)
-    return { ...catalogShell, ...m }
+  const base = m ? { ...catalogShell, ...m } : catalogShell
   // Страница ничего не объявила — ведём себя как прежний CatalogListing.
-  return catalogShell
+  return override.value ? { ...base, ...override.value } : base
 })
 
 const headerVariant = computed<'overlay' | 'solid'>(() => (shell.value.header === 'overlay' ? 'overlay' : 'solid'))

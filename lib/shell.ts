@@ -1,3 +1,5 @@
+import type { MaybeRefOrGetter } from 'vue'
+
 /**
  * Настройки оболочки страницы для макета `Shell.vue`.
  *
@@ -169,4 +171,36 @@ export const profilePageShell: Required<ShellOptions> = {
   footer: 'none',
   padTop: 0,
   padBottom: false,
+}
+
+/**
+ * Разовая правка оболочки от самой страницы.
+ *
+ * `definePageMeta` статичен, а `pages/brand/[slug].vue` обслуживает и обычные
+ * бренды, и лендинг: у лендинга своя липкая панель разделов, и вторая липкая
+ * шапка над ней — это две полосы друг на друге. Менять `meta.shell` на всю
+ * страницу нельзя, иначе шапка перестанет липнуть у остальных 31 бренда.
+ *
+ * Поэтому страница выставляет правку на время своей жизни, а оболочка
+ * подмешивает её поверх `meta.shell`. Значение общее на приложение — в один
+ * момент времени смонтирована одна страница, — и снимается в `onScopeDispose`,
+ * то есть и при уходе со страницы, и при её удержании в кэше.
+ */
+const shellOverride = shallowRef<MaybeRefOrGetter<Partial<ShellOptions> | null>>(null)
+
+/** Читает оболочка. */
+export function useShellOverride() {
+  return computed(() => toValue(shellOverride.value))
+}
+
+/**
+ * Ставит страница. Принимает не снимок, а источник: страница `[slug].vue`
+ * переживает смену параметра без пересоздания, и снимок остался бы от
+ * прежнего бренда. Снимается сам, когда умрёт scope страницы.
+ */
+export function setShellOverride(source: MaybeRefOrGetter<Partial<ShellOptions> | null>) {
+  shellOverride.value = source
+  onScopeDispose(() => {
+    shellOverride.value = null
+  })
 }

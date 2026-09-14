@@ -74,6 +74,12 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
       buttons: [...document.querySelectorAll('.blh__cta, .blh__ghost')].map(b => b.textContent.trim()),
       tagPrice: document.querySelector('.blh__tag-price')?.textContent?.trim(),
       hasAdd: !!document.querySelector('.blh__add'),
+      /*
+       * Признак липкого режима шапки — распорка, которую она рисует вместо
+       * себя в потоке. На лендинге шапка не липкая: над плавающей капсулой
+       * разделов она была бы второй полосой.
+       */
+      headerSpacer: !!document.querySelector('.sh-spacer'),
     }
   })
 
@@ -88,6 +94,7 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   check(hero.stats === 4, `четыре цифры (${hero.statNums.join(', ')})`)
   check(hero.buttons.length === 2, `две кнопки: ${hero.buttons.join(' / ')}`)
   check(!!hero.tagPrice && hero.hasAdd, `витрина с ценой «${hero.tagPrice}» и кнопкой корзины`)
+  check(!hero.headerSpacer, 'шапка сайта на лендинге не липкая')
 
   /*
    * Срок доставки и кэшбэк берутся из условий магазина и из данных, а не из
@@ -441,6 +448,7 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
       bento: css('.blc__bento', 'gridTemplateColumns').split(' ').length,
       grid: css('.blp__grid', 'gridTemplateColumns').split(' ').length,
       subnav: css('.blsn', 'position'),
+      subnavHidden: css('.blsn', 'visibility'),
     }
   })
 
@@ -450,7 +458,8 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   check(mob.statsHidden, 'цифры шапки спрятаны')
   check(mob.bento === 2, `мозаика в две колонки (${mob.bento})`)
   check(mob.grid === 2, `сетка товаров в две колонки (${mob.grid})`)
-  check(mob.subnav === 'sticky', `меню разделов липкое (${mob.subnav})`)
+  check(mob.subnav === 'fixed', `меню разделов плавающее, как в каталоге (${mob.subnav})`)
+  check(mob.subnavHidden === 'hidden', 'у верха страницы капсула спрятана')
 
   await ctx.close()
 }
@@ -464,12 +473,14 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
     landing: !!document.querySelector('.blh'),
     bands: !!document.querySelector('.blc, .bla, .blq'),
     sidebar: !!document.querySelector('aside'),
+    headerSpacer: !!document.querySelector('.sh-spacer'),
   }))
 
   console.log('\n13) бренд без флага собственной страницы')
   check(!plain.landing, 'лендинга нет')
   check(!plain.bands, 'полос лендинга нет')
   check(plain.sidebar, 'обычный шаблон с фильтрами на месте')
+  check(plain.headerSpacer, 'у обычного бренда шапка осталась липкой')
   await ctx.close()
 }
 

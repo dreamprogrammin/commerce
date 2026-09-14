@@ -13,7 +13,7 @@ import {
   SITE_OG_IMAGE_URL,
 } from '@/constants'
 import { brandStaticFaq } from '@/constants/brandStaticText'
-import { pageShell } from '@/lib/shell'
+import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
@@ -492,6 +492,14 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
 })
 
 const isCustomPage = computed(() => !!(brand.value as any)?.is_custom_page)
+
+/*
+ * У лендинга своя липкая панель разделов, и липкая шапка сайта над ней
+ * ставила бы две полосы друг на друге. Гасим её только здесь — остальные 31
+ * бренд идут обычным шаблоном, и у них шапка остаётся липкой. Так же, к
+ * слову, устроен каталог: там шапка нелипкая, а сверху плавает капсула.
+ */
+setShellOverride(() => (isCustomPage.value ? { header: 'static' } : null))
 
 /** Вопросы из статики: те же, что показаны на лендинге блоком «Частые вопросы». */
 const staticFaq = computed(() => brandStaticFaq(brand.value?.slug))
