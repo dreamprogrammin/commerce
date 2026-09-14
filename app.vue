@@ -204,11 +204,26 @@ useHead({
 
 useSchemaOrg([
   {
-    '@type': 'Organization',
+    /*
+     * `OnlineStore` рядом с `Organization`.
+     *
+     * Зачем. ИИ-поисковику на вопрос «где купить лего в Алматы» нужна не
+     * абстрактная организация, а магазин: с телефоном, почтой, валютой и
+     * способами оплаты. Всё перечисленное ниже взято с самого сайта —
+     * подвал и разделы 4–5 пользовательского соглашения, ничего не
+     * придумано. Часов работы в схеме нет намеренно: их нигде не
+     * опубликовано.
+     */
+    '@type': ['Organization', 'OnlineStore'],
     '@id': `${siteUrl}/#organization`,
     'name': siteName,
     'legalName': 'ИП Ухтышка',
     'url': siteUrl,
+    'telephone': '+7-702-537-94-73',
+    'email': 'info@uhti.kz',
+    'areaServed': { '@type': 'Country', 'name': 'Казахстан' },
+    'currenciesAccepted': 'KZT',
+    'paymentAccepted': 'Наличные при получении, банковская карта при получении, онлайн-оплата',
     'logo': {
       '@type': 'ImageObject',
       '@id': `${siteUrl}/#logo`,
@@ -238,7 +253,15 @@ useSchemaOrg([
       'availableLanguage': ['Russian', 'Kazakh'],
       'areaServed': 'KZ',
     },
-    'sameAs': ['https://www.instagram.com/uhtykz'],
+    /*
+     * Профили, по которым ИИ и поисковик связывают магазин в одну сущность.
+     * Оба адреса — те же, что в подвале сайта и на странице возврата.
+     */
+    'sameAs': [
+      'https://www.instagram.com/uhtykz',
+      'https://t.me/uhtikz',
+      'https://wa.me/77025379473',
+    ],
   },
   {
     '@type': 'WebSite',
