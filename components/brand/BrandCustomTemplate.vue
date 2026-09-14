@@ -1,74 +1,46 @@
 <script setup lang="ts">
 /**
- * Лендинг бренда — макет `Бренд LEGO.dc.html`.
+ * Лендинг бренда — макет `Бренд LEGO v2.dc.html`.
  *
- * Показывается только тем брендам, которым админ поставил флаг собственной
+ * Показывается только бренду, которому админ поставил флаг собственной
  * страницы (`brands.is_custom_page`); остальные идут обычным шаблоном со
  * своим сайдбаром фильтров.
  *
- * Порядок секций макета: тёмная шапка с витриной флагмана, лента коллекций,
- * «Акции и новинки», подборка «Подобрать набор», тёмная карточка хита,
- * описание с фактами, ссылки на категории. Отзывы оставлены от прежнего
- * лендинга — макет их не отменяет, а страница без них теряет живой отклик
- * покупателей.
+ * Порядок полос макета: синяя шапка с витриной флагмана, липкое меню
+ * разделов, полоса условий, мозаика серий, подборка с ползунками, карточки
+ * по возрасту, тёмная полоса хита, лента «Рекомендуем», полоса бонусов,
+ * текст о бренде со справкой, заявка на набор. Отзывы оставлены от прежней
+ * версии — макет их не рисует, но и не отменяет.
+ *
+ * Полосы идут ВО ВСЮ ШИРИНУ экрана, поэтому страница не обёрнута общим
+ * контейнером: ширину держит каждая полоса сама (см. `pages/brand/[slug].vue`).
  */
 import type { BrandFilterState } from '@/composables/useBrandPageFilters'
-import type { Brand, BrandFact, IBreadcrumbItem, ProductLine } from '@/types'
+import type { Brand, BrandFact, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
+import { brandStaticText } from '@/constants/brandStaticText'
 
 const props = defineProps<{
   brand: Brand
   productLines: ProductLine[]
   breadcrumbs: IBreadcrumbItem[]
   filterState: BrandFilterState
-  /** id товара → id коллекции: выдача RPC своей линейки не отдаёт. */
+  /** id товара → id серии: выдача RPC своей линейки не отдаёт. */
   lineByProduct?: Record<string, string> | null
   /**
-   * Витринные коллекции из `page_layout.featuredLineIds` — их админ помечает
-   * руками. В макете отдельной полки для них нет, поэтому они просто идут
-   * первыми в ленте коллекций.
+   * Витринные серии из `page_layout.featuredLineIds` — их админ помечает
+   * руками. Отдельной полки для них в макете нет, поэтому они просто идут
+   * первыми в мозаике.
    */
   featuredLineIds?: string[] | null
-  /** id категории → её имя: ось «по интересам» в подборке. */
-  categoryNames?: Record<string, string> | null
-  /** Категории с индексируемым бренд-лендингом — секция внизу страницы. */
+  /** Категории с индексируемым бренд-лендингом — плитки в справке. */
   categoryLinks?: { name: string, path: string }[] | null
-  /** Раздел каталога для надстрочника в H1: «Конструкторы», «Куклы». */
+  /** Раздел каталога, где лежат товары бренда: «Конструкторы», «Куклы». */
   topCategory?: string | null
+  /** Товары того же раздела других брендов — лента «Рекомендуем». */
+  recommended?: ProductWithGallery[] | null
 }>()
 
 const fs = props.filterState
-
-/**
- * Подложка бренда. В макете три темы; LEGO идёт жёлтой, остальные — синей
- * фирменной: собственного цвета у брендов в базе нет, а раскрашивать чужой
- * бренд в жёлтый LEGO нельзя.
- */
-const TINTS: Record<string, { wash: string, accent: string, soft: string, glow: string, onDark: string }> = {
-  lego: {
-    wash: 'radial-gradient(120% 130% at 6% 0%,#fff5d1 0%,#ffffff 56%,#f7f9fc 100%)',
-    accent: '#bf000a',
-    soft: 'linear-gradient(158deg,#fffaea,#fff2c9)',
-    glow: 'rgb(253 199 0 / 0.2)',
-    onDark: '#fdc700',
-  },
-  default: {
-    wash: 'radial-gradient(120% 130% at 6% 0%,#e8f1ff 0%,#ffffff 54%,#f7f9fc 100%)',
-    accent: 'var(--primary)',
-    soft: 'linear-gradient(158deg,#f3f8ff,#e4eefe)',
-    glow: 'rgb(43 127 255 / 0.22)',
-    onDark: '#8ec2ff',
-  },
-}
-
-const tint = computed(() => TINTS[props.brand.slug] ?? TINTS.default!)
-
-const tintVars = computed(() => ({
-  '--brand-wash': tint.value.wash,
-  '--brand-accent': tint.value.accent,
-  '--brand-soft': tint.value.soft,
-  '--brand-glow': tint.value.glow,
-  '--brand-on-dark': tint.value.onDark,
-}))
 
 const products = computed(() => fs.products.value)
 
@@ -81,9 +53,10 @@ const orderedLines = computed(() => {
     ...props.productLines.filter(l => !featured.has(l.id)),
   ]
 })
+
 const lineByProduct = computed(() => props.lineByProduct ?? {})
 
-/** Сколько товаров в каждой коллекции — для панели в шапке. */
+/** Сколько товаров в каждой серии — для счётчиков мозаики. */
 const lineCounts = computed(() => {
   const counts: Record<string, number> = {}
   for (const product of products.value) {
@@ -94,21 +67,61 @@ const lineCounts = computed(() => {
   return counts
 })
 
-/** Выбранная коллекция общая у ленты коллекций, плашек акций и подборки. */
-const activeLineId = ref<string | null>(null)
+/** Доля бонусов от цены — для полосы условий. Считается по товарам бренда. */
+const bonusShare = computed(() => {
+  const shares = products.value
+    .map((p) => {
+      const price = p.final_price ?? p.price
+      const bonus = p.bonus_points_award ?? 0
+      return price > 0 ? (bonus / price) * 100 : 0
+    })
+    .filter(value => value > 0)
+  return shares.length ? Math.round(Math.max(...shares)) : 0
+})
 
-const pickerRef = ref<HTMLElement | null>(null)
-/** Шторку «Все коллекции» открывают из двух мест — состояние держим здесь. */
+/** Серия, выбранная в мозаике; её же держит подборка. */
+const activeLineId = ref<string | null>(null)
 const collectionsDrawer = ref(false)
+
+// ── Якоря разделов ──
+const seriesRef = ref<HTMLElement | null>(null)
+const pickRef = ref<HTMLElement | null>(null)
+const hitRef = ref<HTMLElement | null>(null)
+const aboutRef = ref<HTMLElement | null>(null)
+const pickerRef = ref<{ applyAge: (lo: number, hi: number) => void } | null>(null)
+
+const anchors = computed(() =>
+  [
+    orderedLines.value.length ? { key: 'series', label: 'Серии' } : null,
+    products.value.length ? { key: 'pick', label: 'Подобрать' } : null,
+    products.value.length > 1 ? { key: 'hit', label: 'Хит продаж' } : null,
+    { key: 'about', label: 'О бренде' },
+  ].filter(Boolean) as { key: string, label: string }[],
+)
+
+function jumpTo(key: string) {
+  const targets: Record<string, HTMLElement | null> = {
+    series: seriesRef.value,
+    pick: pickRef.value,
+    hit: hitRef.value,
+    about: aboutRef.value,
+  }
+  targets[key]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 function pickLine(lineId: string) {
   activeLineId.value = lineId
-  pickerRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  jumpTo('pick')
+}
+
+function pickAge(lo: number, hi: number) {
+  pickerRef.value?.applyAge(lo, hi)
+  jumpTo('pick')
 }
 
 /*
- * Кнопка «Наверх» из макета. Страница длинная, а до шапки с прокрутки в
- * середине подборки иначе не добраться. Порог 420px — из макета.
+ * Кнопка «Наверх». Страница длинная, а до шапки с середины подборки иначе не
+ * добраться. Порог 420px — из макета.
  */
 const showTopButton = ref(false)
 
@@ -126,6 +139,15 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
+
+/**
+ * Текст о бренде. Статика из репозитория главнее того, что заведено в
+ * админке: владелец попросил держать текст лендинга в коде и разрешил
+ * перекрыть админский (см. `constants/brandStaticText.ts`).
+ */
+const aboutHtml = computed(
+  () => brandStaticText(props.brand.slug) ?? props.brand.description ?? '',
+)
 
 /**
  * «Коротко о бренде». Строки из админки идут первыми, к ним снизу
@@ -146,7 +168,7 @@ const facts = computed<BrandFact[]>(() => {
     push('Товаров в наличии', String(inStock))
 
   if (props.productLines.length > 0)
-    push('Коллекций', String(props.productLines.length))
+    push('Серий', String(props.productLines.length))
 
   const ages = products.value
     .map(p => (p as any).min_age_years as number | null)
@@ -160,104 +182,113 @@ const facts = computed<BrandFact[]>(() => {
     push('Возраст', to ? `от ${from} до ${to} лет` : `от ${from} лет`)
   }
 
-  push('Бонусы', '1 = 1 ₸')
+  if (bonusShare.value > 0)
+    push('Бонусы', `1 = 1 ₸, до ${bonusShare.value}% с покупки`)
 
   return [...own, ...derived]
 })
 </script>
 
 <template>
-  <div class="bct" :style="tintVars">
-    <Breadcrumbs :items="breadcrumbs" class="bct__crumbs" />
-
+  <div class="bct">
     <BrandLandingHero
       :brand="brand"
       :products="products"
       :lines="orderedLines"
-      :top-category="topCategory"
+      :breadcrumbs="breadcrumbs"
+      @jump="jumpTo"
     />
 
-    <BrandLandingCollections
-      v-model:drawer-open="collectionsDrawer"
-      :brand="brand"
-      :lines="orderedLines"
-      :line-counts="lineCounts"
-      :active-line-id="activeLineId"
-      @pick-line="pickLine"
-    />
+    <BrandLandingSubnav :items="anchors" @jump="jumpTo" />
 
-    <BrandLandingPromo
-      :products="products"
-      :lines="orderedLines"
-      :line-by-product="lineByProduct"
-      @pick-line="pickLine"
-    />
+    <BrandLandingBenefits :bonus-share="bonusShare" />
 
-    <div ref="pickerRef">
-      <ProductGridSkeleton v-if="fs.isLoading.value" />
+    <div ref="seriesRef" class="bct__anchor">
+      <BrandLandingCollections
+        v-model:drawer-open="collectionsDrawer"
+        :brand="brand"
+        :lines="orderedLines"
+        :line-counts="lineCounts"
+        :active-line-id="activeLineId"
+        @pick-line="pickLine"
+      />
+    </div>
+
+    <div ref="pickRef" class="bct__anchor">
+      <div v-if="fs.isLoading.value" class="bct__skeleton">
+        <ProductGridSkeleton />
+      </div>
       <BrandLandingPicker
         v-else-if="products.length > 0"
+        ref="pickerRef"
         v-model:active-line-id="activeLineId"
         :brand-name="brand.name"
         :products="products"
         :lines="orderedLines"
         :line-by-product="lineByProduct"
-        :category-names="categoryNames"
-        @open-collections="collectionsDrawer = true"
       />
     </div>
 
-    <BrandLandingSpotlight
-      :products="products"
-      :lines="orderedLines"
-      :line-by-product="lineByProduct"
-      :exclude-id="products[0]?.id ?? null"
-    />
+    <BrandLandingAgeCards :products="products" @pick="pickAge" />
 
-    <!-- Описание бренда и короткая справка — секция ABOUT макета. -->
-    <section v-if="brand.description || facts.length" class="bct__about">
-      <article v-if="brand.description" class="bct__text" v-html="brand.description" />
-      <BrandFactsCard :facts="facts" />
-    </section>
-
-    <!--
-      Ссылки на бренд-лендинги в категориях — секция «LEGO в категориях» из
-      макета. Рисуются НА СЕРВЕРЕ и только на адреса, открытые для индекса
-      (отбор — в `brandCategoryLinks` на странице).
-    -->
-    <nav
-      v-if="categoryLinks?.length"
-      class="bct__cats"
-      :aria-label="`${brand.name} в категориях`"
-    >
-      <h2 class="bct__cats-title">
-        {{ brand.name }} в категориях
-      </h2>
-      <div class="bct__cats-list">
-        <NuxtLink
-          v-for="link in categoryLinks"
-          :key="link.path"
-          :to="link.path"
-          class="bct__cat"
-        >
-          <Icon name="lucide:blocks" class="size-[17px] text-primary" />
-          {{ link.name }}
-        </NuxtLink>
-      </div>
-    </nav>
-
-    <!-- Отзывы о бренде. Макет их не рисует, но и не отменяет. -->
-    <div class="bct__reviews">
-      <BrandReviewsList :brand-id="brand.id" :brand-name="brand.name" />
+    <div ref="hitRef" class="bct__anchor">
+      <BrandLandingSpotlight
+        :products="products"
+        :lines="orderedLines"
+        :line-by-product="lineByProduct"
+        :exclude-id="products[0]?.id ?? null"
+      />
     </div>
 
+    <BrandLandingRecommend
+      :products="recommended ?? []"
+      :category-name="topCategory"
+    />
+
+    <BrandLandingBonus :brand-name="brand.name" :products="products" />
+
+    <!-- Текст о бренде и короткая справка — секция ABOUT макета. -->
+    <div ref="aboutRef" class="bct__anchor bct__about-band">
+      <div class="bct__inner">
+        <section class="bct__about">
+          <article v-if="aboutHtml" class="bct__text" v-html="aboutHtml" />
+
+          <aside class="bct__facts">
+            <BrandFactsCard :facts="facts" />
+
+            <!--
+              Ссылки на бренд-лендинги в категориях. Рисуются НА СЕРВЕРЕ и
+              только на адреса, открытые для индекса (отбор — на странице).
+            -->
+            <nav
+              v-if="categoryLinks?.length"
+              class="bct__cats"
+              :aria-label="`${brand.name} в категориях`"
+            >
+              <NuxtLink
+                v-for="link in categoryLinks"
+                :key="link.path"
+                :to="link.path"
+                class="bct__cat"
+              >
+                <Icon name="lucide:blocks" class="size-4 text-primary" />
+                {{ link.name }}
+              </NuxtLink>
+            </nav>
+          </aside>
+        </section>
+
+        <!-- Отзывы о бренде. Макет их не рисует, но и не отменяет. -->
+        <div class="bct__reviews">
+          <BrandReviewsList :brand-id="brand.id" :brand-name="brand.name" />
+        </div>
+      </div>
+    </div>
+
+    <BrandLandingRequest :brand-name="brand.name" />
+
     <Transition name="bct-top">
-      <button
-        v-if="showTopButton"
-        type="button"
-        class="bct__top"
-        @click="scrollToTop"
-      >
+      <button v-if="showTopButton" type="button" class="bct__top" @click="scrollToTop">
         <Icon name="lucide:arrow-up" class="size-[18px] text-primary" />
         Наверх
       </button>
@@ -274,51 +305,80 @@ const facts = computed<BrandFact[]>(() => {
   }
 
   /*
-   * Расстояния между секциями держат сами секции (28px на телефоне, 44px
-   * на десктопе — значения макета). Общий `gap` здесь складывался бы с их
-   * отступами и растягивал страницу.
+   * Отступ под липкое меню разделов: без него прокрутка по якорю прячет
+   * заголовок секции под панель.
    */
-  .bct__crumbs {
-    margin-bottom: 14px;
+  .bct__anchor {
+    scroll-margin-top: 130px;
+  }
+
+  .bct__inner {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--page-gutter);
+  }
+
+  .bct__skeleton {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 34px var(--page-gutter);
+  }
+
+  .bct__about-band {
+    padding: 34px 0;
+    background: var(--background);
+  }
+
+  .bct__about {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .bct__text {
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--card);
+    box-shadow: 0 4px 14px rgb(15 23 42 / 0.05);
+  }
+
+  .bct__facts {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .bct__cats {
-    margin-top: 28px;
-  }
-
-  .bct__cats-title {
-    margin: 0 0 12px;
-    color: var(--foreground);
-    font-weight: 800;
-    font-size: 23px;
-    letter-spacing: -0.025em;
-  }
-
-  .bct__cats-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 9px;
   }
 
   .bct__cat {
     display: inline-flex;
     align-items: center;
-    gap: 9px;
-    height: 46px;
-    padding: 0 20px;
-    border: 1px solid rgb(255 255 255 / 0.9);
+    gap: 8px;
+    height: 42px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: linear-gradient(150deg, #fff, rgb(224 233 247 / 0.6));
-    box-shadow:
-      inset 0 1px 0 #fff,
-      0 5px 14px rgb(15 23 42 / 0.06);
+    background: var(--card);
     color: var(--foreground);
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13.5px;
   }
 
   .bct__cat:hover {
-    background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.7));
+    background: var(--muted);
+    color: var(--foreground);
+  }
+
+  .bct__reviews {
+    margin-top: 28px;
   }
 
   /* «Наверх»: над таб-баром на телефоне, в углу на десктопе. */
@@ -332,12 +392,10 @@ const facts = computed<BrandFact[]>(() => {
     gap: 8px;
     height: 46px;
     padding: 0 18px;
-    border: 1px solid rgb(255 255 255 / 0.9);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: linear-gradient(150deg, rgb(255 255 255 / 0.96), rgb(224 233 247 / 0.85));
-    box-shadow:
-      inset 0 1px 0 #fff,
-      0 10px 24px rgb(15 23 42 / 0.16);
+    background: rgb(255 255 255 / 0.96);
+    box-shadow: 0 10px 24px rgb(15 23 42 / 0.16);
     backdrop-filter: blur(12px) saturate(1.5);
     color: var(--foreground);
     font-weight: 700;
@@ -355,47 +413,21 @@ const facts = computed<BrandFact[]>(() => {
     opacity: 0;
   }
 
-  .bct__about {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-    align-items: start;
-    margin-top: 28px;
-  }
-
-  .bct__text {
-    padding: 20px;
-    border: 1px solid var(--border);
-    border-radius: 26px;
-    background: var(--card);
-    box-shadow: 0 8px 24px rgb(15 23 42 / 0.06);
-  }
-
-  .bct__reviews {
-    margin-top: 28px;
-  }
-
   /*
-   * Типографика описания задаётся здесь, а не в редакторе: в базе лежит
-   * чистый HTML без inline-стилей, и разметка у всех брендов одинаковая.
-   * `:deep`, потому что содержимое приходит через v-html.
+   * Типографика текста о бренде задаётся здесь: в статике лежит чистый HTML
+   * без inline-стилей. `:deep`, потому что содержимое приходит через v-html.
    */
   .bct__text :deep(h2) {
     margin: 0 0 12px;
     color: var(--foreground);
     font-weight: 800;
     font-size: 21px;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
     text-wrap: pretty;
   }
 
-  .bct__text :deep(h2:not(:first-child)),
-  .bct__text :deep(h3:not(:first-child)) {
-    margin-top: 22px;
-  }
-
   .bct__text :deep(h3) {
-    margin: 0 0 10px;
+    margin: 22px 0 10px;
     color: var(--foreground);
     font-weight: 700;
     font-size: 17px;
@@ -403,7 +435,7 @@ const facts = computed<BrandFact[]>(() => {
   }
 
   .bct__text :deep(p) {
-    margin: 0 0 22px;
+    margin: 0 0 20px;
     color: var(--foreground);
     font-size: 15px;
     line-height: 1.72;
@@ -414,11 +446,17 @@ const facts = computed<BrandFact[]>(() => {
     margin-bottom: 0;
   }
 
+  .bct__text :deep(a) {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .bct__text :deep(ul) {
     display: flex;
     flex-direction: column;
     gap: 9px;
-    margin: 0;
+    margin: 0 0 20px;
     padding: 0;
     list-style: none;
   }
@@ -446,23 +484,8 @@ const facts = computed<BrandFact[]>(() => {
   }
 
   @media (min-width: 760px) {
-    .bct__crumbs {
-      margin-bottom: 18px;
-    }
-
-    .bct__about,
-    .bct__cats,
-    .bct__reviews {
-      margin-top: 44px;
-    }
-
-    .bct__cats-title {
-      font-size: 30px;
-    }
-
-    .bct__top {
-      right: 26px;
-      bottom: 26px;
+    .bct__about-band {
+      padding: 64px 0;
     }
 
     .bct__about {
@@ -480,11 +503,20 @@ const facts = computed<BrandFact[]>(() => {
     .bct__text :deep(h3) {
       font-size: 19px;
     }
+
+    .bct__reviews {
+      margin-top: 44px;
+    }
+
+    .bct__top {
+      right: 26px;
+      bottom: 26px;
+    }
   }
 
   @media (min-width: 1200px) {
     .bct__about {
-      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-columns: minmax(0, 1fr) 330px;
     }
   }
 }

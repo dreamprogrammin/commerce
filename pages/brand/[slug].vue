@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { pageShell } from '@/lib/shell'
-
-definePageMeta({ layout: 'shell', shell: pageShell })
-
 import type { BrandPageLayout, IBreadcrumbItem, ProductLine } from '@/types'
 
 import { ArrowLeft, Package } from 'lucide-vue-next'
+
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 import {
@@ -15,9 +12,12 @@ import {
   BUCKET_NAME_PRODUCT_LINES,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
+import { pageShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
 
 /** Категория в строке `category_brand_seo` — ровно то, что нужно для ссылки. */
 interface BrandLandingCategory {
@@ -153,51 +153,6 @@ const { data: lineByProduct } = await useAsyncData(
 )
 
 /**
- * Имена категорий, в которых лежат товары бренда, — ось «по интересам»
- * в подборке лендинга. Тематических меток у товара в базе нет, а категория
- * каталога и есть тот самый интерес: «Конструкторы», «Роботы», «Куклы».
- *
- * Только для брендов с собственным лендингом: обычному шаблону эти имена
- * не нужны, а лишний запрос платят все 32 бренда.
- */
-const { data: productCategoryNames } = await useAsyncData(
-  `brand-product-categories-${brandSlug}`,
-  async () => {
-    if (!brand.value || !(brand.value as any).is_custom_page)
-      return {}
-
-    const { data: rows, error } = await supabase
-      .from('products')
-      .select('category_id')
-      .eq('brand_id', brand.value.id)
-      .eq('is_active', true)
-      .not('category_id', 'is', null)
-
-    if (error) {
-      console.error('Не удалось загрузить категории товаров бренда:', error)
-      return {}
-    }
-
-    const ids = [...new Set((rows ?? []).map(r => r.category_id).filter(Boolean))] as string[]
-    if (ids.length === 0)
-      return {}
-
-    const { data: categories } = await supabase
-      .from('categories')
-      .select('id, name')
-      .in('id', ids)
-
-    const map: Record<string, string> = {}
-    for (const category of categories ?? []) {
-      if (category.name)
-        map[category.id] = category.name
-    }
-    return map
-  },
-  { watch: [brand], default: (): Record<string, string> => ({}) },
-)
-
-/**
  * Категории, в которых у бренда есть СВОЙ индексируемый лендинг.
  *
  * Зачем. Со страницы бренда не вело НИ ОДНОЙ ссылки на бренд-лендинги
@@ -289,7 +244,11 @@ const { data: otherBrands } = await useAsyncData(
 const { data: brandCategoryData } = await useAsyncData(
   `brand-category-links-${brandSlug}`,
   async () => {
-    const empty = { links: [] as { name: string, path: string }[], topCategory: null as string | null }
+    const empty = {
+      links: [] as { name: string, path: string }[],
+      topCategory: null as string | null,
+      topRootSlug: null as string | null,
+    }
     if (!brand.value)
       return empty
 
@@ -338,11 +297,12 @@ const { data: brandCategoryData } = await useAsyncData(
         rootCounts.set(current.id, (rootCounts.get(current.id) ?? 0) + 1)
     }
     const topRootId = [...rootCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
-    const topCategory = brandHeadingWord(topRootId ? byId.get(topRootId)?.slug : null)
+    const topRootSlug = topRootId ? byId.get(topRootId)?.slug ?? null : null
+    const topCategory = brandHeadingWord(topRootSlug)
 
     const rows = (seoRows.data ?? []) as { categories: BrandLandingCategory | null }[]
     if (rows.length === 0)
-      return { links: [], topCategory }
+      return { links: [], topCategory, topRootSlug }
 
     const counts = countProductsByCategoryBrand(
       (brandProducts.data ?? []).map(p => ({
@@ -378,6 +338,7 @@ const { data: brandCategoryData } = await useAsyncData(
     return {
       links: links.sort((a, b) => a.name.localeCompare(b.name, 'ru')),
       topCategory,
+      topRootSlug,
     }
   },
   {
@@ -385,8 +346,40 @@ const { data: brandCategoryData } = await useAsyncData(
     default: () => ({
       links: [] as { name: string, path: string }[],
       topCategory: null as string | null,
+      topRootSlug: null as string | null,
     }),
   },
+)
+
+/**
+ * Лента «Рекомендуем» на лендинге: товары ТОГО ЖЕ раздела каталога, но
+ * других брендов.
+ *
+ * Данных о совместных покупках у нас нет — `accessory_ids` у товаров бренда
+ * пустой, а заказы на клиент не приходят. Поэтому лента честно показывает
+ * соседей по разделу; заодно это внутренние ссылки на другие бренды.
+ *
+ * На сервере и только для лендинга: обычному шаблону лента не нужна, а
+ * лишний запрос иначе платят все 32 бренда.
+ */
+const { data: recommendedProducts } = await useAsyncData(
+  `brand-recommended-${brandSlug}`,
+  async () => {
+    const rootSlug = brandCategoryData.value?.topRootSlug
+    if (!brand.value || !(brand.value as any).is_custom_page || !rootSlug)
+      return []
+
+    const result = await productsStore.fetchProducts(
+      { categorySlug: rootSlug, sortBy: 'newest' } as any,
+      1,
+      24,
+    )
+
+    return (result.products ?? [])
+      .filter(product => product.brand_id !== brand.value!.id)
+      .slice(0, 12)
+  },
+  { watch: [brand, brandCategoryData], default: () => [] },
 )
 
 /** Ссылки на бренд-лендинги в категориях. */
@@ -962,8 +955,11 @@ useIndexableRobotsRule(
       </div>
     </div>
 
-    <!-- Кастомный шаблон -->
-    <div v-else-if="isCustomPage" :class="`${containerClass} py-4 md:py-8`">
+    <!--
+      Кастомный шаблон. БЕЗ общего контейнера и вертикальных отступов: полосы
+      лендинга идут во всю ширину экрана, ширину держит каждая полоса сама.
+    -->
+    <div v-else-if="isCustomPage">
       <BrandCustomTemplate
         :brand="brand"
         :product-lines="brandProductLines"
@@ -971,9 +967,9 @@ useIndexableRobotsRule(
         :filter-state="filterState"
         :line-by-product="lineByProduct"
         :featured-line-ids="pageLayout?.featuredLineIds ?? null"
-        :category-names="productCategoryNames"
         :category-links="brandCategoryLinks"
         :top-category="topCategory"
+        :recommended="recommendedProducts"
       />
     </div>
 

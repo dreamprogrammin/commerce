@@ -1,10 +1,13 @@
 <script setup lang="ts">
 /**
- * «Коллекции» — макет `Бренд LEGO.dc.html`, секция после шапки.
+ * «Серии LEGO» — макет `Бренд LEGO v2.dc.html`, секция после шапки.
  *
- * Лента плиток с обложкой серии и счётчиком наборов; нажатие переключает
- * подборку ниже на эту серию. Кнопка «Все N» открывает шторку со всеми
- * коллекциями и поиском — там плитки уже ссылки на страницы серий.
+ * Мозаика обложек: первая плитка крупная, остальные мельче; в углу каждой —
+ * счётчик наборов. Нажатие переводит подборку ниже на эту серию. Кнопка «Все
+ * серии» открывает шторку, и там плитки уже ССЫЛКИ на страницы серий:
+ * перелинковки на них со страницы бренда раньше не было.
+ *
+ * Серия без товаров ссылкой не становится — её страница закрыта `noindex`.
  */
 import type { Brand, ProductLine } from '@/types'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
@@ -15,7 +18,7 @@ import { pluralRu } from '@/utils/seoDescription'
 const props = defineProps<{
   brand: Brand
   lines: ProductLine[]
-  /** Сколько товаров бренда лежит в каждой коллекции. */
+  /** Сколько товаров бренда лежит в каждой серии. */
   lineCounts: Record<string, number>
   /** Серия, выбранная в подборке ниже: плитка подсвечивается той же. */
   activeLineId?: string | null
@@ -28,7 +31,6 @@ const emit = defineEmits<{
 }>()
 
 const { getVariantUrl } = useSupabaseStorage()
-const { railRef, atStart, atEnd, syncEdges, nudge, onMouseDown } = useRailScroll()
 
 const query = ref('')
 
@@ -40,7 +42,7 @@ const collections = computed(() =>
       name: line.name,
       href: `/brand/${props.brand.slug}/${line.slug}`,
       cover: line.logo_url
-        ? getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'sm')
+        ? getVariantUrl(BUCKET_NAME_PRODUCT_LINES, line.logo_url, 'md')
         : null,
       countLabel: count
         ? `${count} ${pluralRu(count, 'набор', 'набора', 'наборов')}`
@@ -50,7 +52,10 @@ const collections = computed(() =>
   }),
 )
 
-const allLabel = computed(() => `Все ${props.lines.length}`)
+const subtitle = computed(() => {
+  const n = props.lines.length
+  return `${n} ${pluralRu(n, 'серия', 'серии', 'серий')} бренда — выберите свою`
+})
 
 const found = computed(() => {
   const needle = query.value.trim().toLowerCase()
@@ -64,9 +69,6 @@ const drawer = computed({
   set: (open: boolean) => emit('update:drawerOpen', open),
 })
 
-// Плитки приезжают вместе с обложками — края считаем после отрисовки.
-onMounted(() => nextTick(syncEdges))
-watch(() => props.lines.length, () => nextTick(syncEdges))
 watch(drawer, (open) => {
   if (open)
     query.value = ''
@@ -75,73 +77,47 @@ watch(drawer, (open) => {
 
 <template>
   <section v-if="collections.length" class="blc">
-    <div class="blc__head">
-      <h2 class="blc__title">
-        Коллекции
-      </h2>
-
-      <span class="blc__tools">
-        <span class="blc__arrows">
-          <button
-            type="button"
-            class="blc__arrow"
-            :disabled="atStart"
-            aria-label="Предыдущие коллекции"
-            @click="nudge(-1)"
-          >
-            <Icon name="lucide:chevron-left" class="size-[18px]" />
-          </button>
-          <button
-            type="button"
-            class="blc__arrow"
-            :disabled="atEnd"
-            aria-label="Следующие коллекции"
-            @click="nudge(1)"
-          >
-            <Icon name="lucide:chevron-right" class="size-[18px]" />
-          </button>
-        </span>
+    <div class="blc__inner">
+      <div class="blc__head">
+        <div class="blc__head-text">
+          <h2 class="blc__title">
+            Серии {{ brand.name }}
+          </h2>
+          <span class="blc__sub">{{ subtitle }}</span>
+        </div>
 
         <button type="button" class="blc__all" @click="drawer = true">
-          <Icon name="lucide:layout-grid" class="size-[15px]" />
-          {{ allLabel }}
+          <Icon name="lucide:layout-grid" class="size-4 text-primary" />
+          Все серии
         </button>
-      </span>
-    </div>
+      </div>
 
-    <div
-      ref="railRef"
-      class="blc__rail"
-      @scroll="syncEdges"
-      @mousedown="onMouseDown"
-    >
-      <button
-        v-for="collection in collections"
-        :key="collection.id"
-        type="button"
-        class="blc__tile"
-        :class="{ 'blc__tile--on': collection.id === activeLineId }"
-        @click="emit('pickLine', collection.id)"
-      >
-        <span
-          class="blc__cover"
-          :style="collection.cover ? { backgroundImage: `url(${collection.cover})` } : undefined"
-        />
-        <span class="blc__text">
-          <span class="blc__name">{{ collection.name }}</span>
+      <div class="blc__bento">
+        <button
+          v-for="collection in collections"
+          :key="collection.id"
+          type="button"
+          class="blc__tile"
+          :class="{ 'blc__tile--on': collection.id === activeLineId }"
+          @click="emit('pickLine', collection.id)"
+        >
           <span
-            class="blc__count"
-            :class="{ 'blc__count--empty': collection.isEmpty }"
-          >{{ collection.countLabel }}</span>
-        </span>
-      </button>
+            class="blc__cover"
+            :style="collection.cover ? { backgroundImage: `url(${collection.cover})` } : undefined"
+          />
+          <span class="blc__cap" :class="{ 'blc__cap--empty': collection.isEmpty }">
+            {{ collection.countLabel }}
+          </span>
+          <span class="blc__name">{{ collection.name }}</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Шторка «Все коллекции»: тот же список, но ссылками на страницы серий. -->
+    <!-- Шторка «Все серии»: тот же список, но ссылками на страницы серий. -->
     <Drawer v-model:open="drawer">
       <DrawerContent class="mx-auto max-w-[520px] px-4 pb-6">
         <DrawerTitle class="px-1 pt-1 text-[21px] font-extrabold tracking-[-0.02em]">
-          Все коллекции
+          Все серии {{ brand.name }}
         </DrawerTitle>
 
         <label class="blc__search">
@@ -149,17 +125,12 @@ watch(drawer, (open) => {
           <input
             v-model="query"
             type="search"
-            placeholder="Поиск коллекции…"
+            placeholder="Поиск серии…"
             class="blc__search-input"
           >
         </label>
 
         <div class="blc__sheet-grid">
-          <!--
-            Серия без товаров ссылкой не становится: её страница закрыта
-            `noindex` (см. pages/brand/[brandSlug]/[lineSlug].vue), и вести
-            туда и робота, и покупателя незачем — там пусто.
-          -->
           <template v-for="collection in found" :key="collection.id">
             <NuxtLink
               v-if="!collection.isEmpty"
@@ -171,9 +142,9 @@ watch(drawer, (open) => {
                 class="blc__cover"
                 :style="collection.cover ? { backgroundImage: `url(${collection.cover})` } : undefined"
               />
-              <span class="blc__text">
-                <span class="blc__name">{{ collection.name }}</span>
-                <span class="blc__count">{{ collection.countLabel }}</span>
+              <span class="blc__sheet-text">
+                <span class="blc__sheet-name">{{ collection.name }}</span>
+                <span class="blc__sheet-count">{{ collection.countLabel }}</span>
               </span>
             </NuxtLink>
 
@@ -182,9 +153,9 @@ watch(drawer, (open) => {
                 class="blc__cover"
                 :style="collection.cover ? { backgroundImage: `url(${collection.cover})` } : undefined"
               />
-              <span class="blc__text">
-                <span class="blc__name">{{ collection.name }}</span>
-                <span class="blc__count blc__count--empty">{{ collection.countLabel }}</span>
+              <span class="blc__sheet-text">
+                <span class="blc__sheet-name">{{ collection.name }}</span>
+                <span class="blc__sheet-count blc__sheet-count--empty">{{ collection.countLabel }}</span>
               </span>
             </div>
           </template>
@@ -202,148 +173,132 @@ watch(drawer, (open) => {
 /* @layer components — см. docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 @layer components {
   .blc {
-    margin-top: 28px;
+    padding: 34px 0;
+    background: var(--background);
+  }
+
+  .blc__inner {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--page-gutter);
   }
 
   .blc__head {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: flex-end;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .blc__head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
   }
 
   .blc__title {
     margin: 0;
     color: var(--foreground);
     font-weight: 800;
-    font-size: 23px;
-    letter-spacing: -0.025em;
+    font-size: 24px;
+    letter-spacing: -0.03em;
   }
 
-  .blc__tools {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* Стрелки — только там, где есть мышь: пальцем лента листается сама. */
-  .blc__arrows {
-    display: none;
-    gap: 6px;
-  }
-
-  .blc__arrow {
-    display: grid;
-    place-content: center;
-    width: 38px;
-    height: 38px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--card);
-    box-shadow: 0 4px 12px rgb(15 23 42 / 0.07);
-    color: var(--foreground);
-    cursor: pointer;
-  }
-
-  .blc__arrow:disabled {
-    opacity: 0.35;
-    cursor: default;
+  .blc__sub {
+    color: var(--muted-foreground);
+    font-size: 14.5px;
   }
 
   .blc__all {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    height: 38px;
-    padding: 0 15px;
-    border: 1px solid rgb(43 127 255 / 0.28);
+    gap: 8px;
+    height: 44px;
+    padding: 0 18px;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: rgb(43 127 255 / 0.09);
-    color: var(--primary);
-    font-weight: 700;
-    font-size: 13px;
+    background: var(--card);
+    color: var(--foreground);
+    font-weight: 600;
+    font-size: 14px;
     cursor: pointer;
   }
 
-  .blc__rail {
-    display: flex;
-    gap: 12px;
-    /* Лента едет от края до края экрана — как в макете. */
-    margin-inline: calc(-1 * var(--page-gutter));
-    padding: 2px var(--page-gutter) 10px;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    scroll-padding-inline: var(--page-gutter);
-    scrollbar-width: none;
-    cursor: grab;
-    touch-action: pan-x pan-y;
+  .blc__all:hover {
+    background: var(--muted);
   }
 
-  .blc__rail::-webkit-scrollbar {
-    display: none;
+  /* Мозаика: на телефоне квадраты по два в ряд. */
+  .blc__bento {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .blc__tile {
-    display: flex;
-    flex: none;
-    flex-direction: column;
-    width: 172px;
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    background: var(--card);
-    box-shadow: 0 6px 16px rgb(15 23 42 / 0.08);
-    text-align: left;
-    scroll-snap-align: start;
+    position: relative;
+    display: block;
+    padding: 0;
+    border: 1px solid rgb(15 23 42 / 0.08);
+    border-radius: 14px;
+    background: var(--muted);
+    box-shadow: 0 4px 14px rgb(15 23 42 / 0.08);
+    aspect-ratio: 1 / 1;
     cursor: pointer;
     overflow: hidden;
-    transition:
-      box-shadow 0.14s ease,
-      border-color 0.14s ease;
   }
 
   .blc__tile--on {
     border: 2px solid var(--primary);
-    box-shadow: 0 10px 24px rgb(43 127 255 / 0.2);
+    box-shadow: 0 12px 26px rgb(43 127 255 / 0.2);
   }
 
   .blc__cover {
-    display: block;
-    width: 100%;
+    position: absolute;
+    inset: 0;
     background-color: var(--muted);
     background-position: center;
     background-size: cover;
     background-repeat: no-repeat;
-    box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.09);
-    aspect-ratio: 16 / 11;
   }
 
-  .blc__text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 9px 11px 11px;
-    text-align: left;
+  .blc__cap {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.94);
+    box-shadow: 0 2px 8px rgb(15 23 42 / 0.18);
+    color: #0b2444;
+    font-weight: 700;
+    font-size: 12px;
   }
 
+  .blc__cap--empty {
+    color: var(--primary);
+  }
+
+  /*
+   * Название серии поверх обложки. В макете его нет — обложки там с
+   * надписями. У нас логотип серии не всегда читается на плитке, а имя нужно
+   * и человеку, и роботу: текстом, а не картинкой.
+   */
   .blc__name {
-    color: var(--foreground);
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 22px 12px 10px;
+    background: linear-gradient(180deg, rgb(11 36 68 / 0) 0%, rgb(11 36 68 / 0.78) 100%);
+    color: #fff;
     font-weight: 700;
     font-size: 13px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-
-  .blc__count {
-    color: var(--muted-foreground);
-    font-weight: 500;
-    font-size: 11.5px;
-  }
-
-  /* Пустая серия — не серым, а обещанием: её ещё привезут. */
-  .blc__count--empty {
-    color: var(--primary);
+    text-align: left;
+    text-shadow: 0 1px 6px rgb(11 36 68 / 0.6);
   }
 
   .blc__search {
@@ -379,6 +334,7 @@ watch(drawer, (open) => {
   }
 
   .blc__sheet-tile {
+    position: relative;
     display: block;
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -387,11 +343,18 @@ watch(drawer, (open) => {
     overflow: hidden;
   }
 
+  .blc__sheet-tile .blc__cover {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 11;
+  }
+
   .blc__sheet-tile:active {
     transform: scale(0.97);
   }
 
-  /* Пустая серия — просто карточка-обещание, нажимать не на что. */
+  /* Пустая серия — карточка-обещание, нажимать не на что. */
   .blc__sheet-tile--empty {
     opacity: 0.72;
     cursor: default;
@@ -399,6 +362,32 @@ watch(drawer, (open) => {
 
   .blc__sheet-tile--empty:active {
     transform: none;
+  }
+
+  .blc__sheet-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 9px 11px 11px;
+  }
+
+  .blc__sheet-name {
+    color: var(--foreground);
+    font-weight: 700;
+    font-size: 13px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+
+  .blc__sheet-count {
+    color: var(--muted-foreground);
+    font-weight: 500;
+    font-size: 11.5px;
+  }
+
+  .blc__sheet-count--empty {
+    color: var(--primary);
   }
 
   .blc__no-match {
@@ -412,25 +401,46 @@ watch(drawer, (open) => {
 
   @media (min-width: 760px) {
     .blc {
-      margin-top: 44px;
+      padding: 64px 0;
     }
 
     .blc__title {
-      font-size: 30px;
+      font-size: 34px;
     }
 
-    .blc__arrows {
-      display: inline-flex;
+    .blc__head {
+      margin-bottom: 22px;
     }
 
-    .blc__rail {
-      margin-inline: 0;
-      padding: 2px 2px 6px;
-      scroll-padding-inline: 0;
+    .blc__bento {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-auto-rows: 150px;
+      gap: 14px;
     }
 
     .blc__tile {
-      width: 214px;
+      border-radius: 18px;
+      aspect-ratio: auto;
+    }
+
+    /* Первая плитка — крупная, четвёртая вытянута вниз: ритм из макета. */
+    .blc__tile:first-child {
+      grid-row: span 2;
+      grid-column: span 2;
+    }
+
+    .blc__tile:nth-child(4) {
+      grid-row: span 2;
+    }
+
+    .blc__name {
+      font-size: 15px;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .blc__bento {
+      grid-auto-rows: 176px;
     }
   }
 }
