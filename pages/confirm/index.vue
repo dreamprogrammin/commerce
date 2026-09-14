@@ -11,7 +11,8 @@ watch(
   () => {
     if (user.value) {
       isLoading.value = false
-      return navigateTo('/dashboard')
+      // `/dashboard` на сайте нет — личный кабинет живёт на `/profile`.
+      return navigateTo('/profile')
     }
   },
   {
@@ -28,8 +29,8 @@ watch(
     </div>
     <div v-if="user">
       <h2>Email подтвержден</h2>
-      <nuxt-link to="/dashboard">
-        Перейти на рабочую страницу
+      <nuxt-link to="/profile">
+        Перейти в личный кабинет
       </nuxt-link>
     </div>
 

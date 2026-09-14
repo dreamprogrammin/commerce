@@ -10,8 +10,11 @@ const confirmPassword = ref('')
 const user = useSupabaseClient()
 
 async function handleResetPassword() {
+  // Без `return` пароль менялся ДАЖЕ при несовпадении: сообщение показывалось,
+  // а следом уходил запрос с первым из двух значений.
   if (password.value !== confirmPassword.value) {
     message.value = 'Пароли не совпадают'
+    return
   }
   isLoading.value = true
   try {
@@ -21,7 +24,9 @@ async function handleResetPassword() {
       message.value = error.message
       return
     }
-    await navigateTo('/login')
+    // Страницы `/login` на сайте нет; после смены пароля место человека —
+    // в личном кабинете.
+    await navigateTo('/profile')
   }
   catch (error) {
     message.value = 'Ошибка в системе'

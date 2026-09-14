@@ -139,7 +139,7 @@ onMounted(() => {
               variant="outline"
               class="w-full rounded-lg h-9 text-xs font-medium"
             >
-              <NuxtLink to="/bonus-program-rules">
+              <NuxtLink to="/terms#bonusy">
                 <Icon name="lucide:info" class="size-3.5 mr-1.5" />
                 Правила
               </NuxtLink>
@@ -159,7 +159,7 @@ onMounted(() => {
               variant="outline"
               class="w-full rounded-lg h-9 text-xs font-medium"
             >
-              <NuxtLink to="/bonus-program-rules">
+              <NuxtLink to="/terms#bonusy">
                 <Icon name="lucide:info" class="size-3.5 mr-1.5" />
                 Правила
               </NuxtLink>
@@ -182,7 +182,7 @@ onMounted(() => {
                 variant="outline"
                 class="w-full rounded-lg h-9 text-xs font-medium"
               >
-                <NuxtLink to="/bonus-program-rules">
+                <NuxtLink to="/terms#bonusy">
                   <Icon name="lucide:info" class="size-3.5 mr-1.5" />
                   Правила
                 </NuxtLink>

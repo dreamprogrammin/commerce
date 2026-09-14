@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { pageShell } from '@/lib/shell'
-
-definePageMeta({ layout: 'shell', shell: pageShell })
-
 import type { BrandPageLayout, IBreadcrumbItem, ProductLine } from '@/types'
 
 import { ArrowLeft, Package } from 'lucide-vue-next'
+
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBrandPageFilters } from '@/composables/useBrandPageFilters'
 import {
@@ -15,8 +12,13 @@ import {
   BUCKET_NAME_PRODUCT_LINES,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
+import { brandStaticFaq } from '@/constants/brandStaticText'
+import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { brandHeadingWord } from '@/utils/brandHeading'
+
+definePageMeta({ layout: 'shell', shell: pageShell })
 
 /** Категория в строке `category_brand_seo` — ровно то, что нужно для ссылки. */
 interface BrandLandingCategory {
@@ -116,6 +118,42 @@ const { data: brandProductLines } = await useAsyncData(
 )
 
 /**
+ * Коллекция каждого товара бренда.
+ *
+ * Лендинг раскладывает товары по сериям, а выдача `get_filtered_products`
+ * своей линейки не отдаёт — в списке колонок её просто нет. Отдельный лёгкий
+ * запрос дешевле правки RPC: две колонки на весь бренд, и он идёт на сервере,
+ * чтобы разбивка попала в серверную разметку вместе с товарами.
+ */
+const { data: lineByProduct } = await useAsyncData(
+  `brand-product-lines-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return {}
+
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, product_line_id')
+      .eq('brand_id', brand.value.id)
+      .eq('is_active', true)
+      .not('product_line_id', 'is', null)
+
+    if (error) {
+      console.error('Error loading product lines map:', error)
+      return {}
+    }
+
+    const map: Record<string, string> = {}
+    for (const row of data ?? []) {
+      if (row.product_line_id)
+        map[row.id] = row.product_line_id
+    }
+    return map
+  },
+  { watch: [brand], default: (): Record<string, string> => ({}) },
+)
+
+/**
  * Категории, в которых у бренда есть СВОЙ индексируемый лендинг.
  *
  * Зачем. Со страницы бренда не вело НИ ОДНОЙ ссылки на бренд-лендинги
@@ -204,11 +242,16 @@ const { data: otherBrands } = await useAsyncData(
   },
 )
 
-const { data: brandCategoryLinks } = await useAsyncData(
+const { data: brandCategoryData } = await useAsyncData(
   `brand-category-links-${brandSlug}`,
   async () => {
+    const empty = {
+      links: [] as { name: string, path: string }[],
+      topCategory: null as string | null,
+      topRootSlug: null as string | null,
+    }
     if (!brand.value)
-      return []
+      return empty
 
     const brandId = brand.value.id
 
@@ -222,19 +265,52 @@ const { data: brandCategoryLinks } = await useAsyncData(
         .select('category_id')
         .eq('brand_id', brandId)
         .eq('is_active', true),
-      supabase.from('categories').select('id, parent_id'),
+      supabase.from('categories').select('id, parent_id, name, slug'),
     ])
+
+    const categories = (allCategories.data ?? []) as {
+      id: string
+      parent_id: string | null
+      name: string
+      slug: string | null
+    }[]
+
+    /*
+     * Корневая категория, в которой у бренда больше всего товаров. Из её
+     * слага берётся слово для заголовка — «Конструкторы LEGO»; почему не имя
+     * категории как есть, объяснено в `utils/brandHeading.ts`.
+     *
+     * Берём именно корень дерева, а не категорию товара: «Конструкторы»
+     * читается как раздел, «Конструкторы Мальчикам» в заголовке бренда
+     * звучит криво.
+     *
+     * Поля `seo_h1` и `meta_title` из админки по-прежнему главнее: это
+     * фолбэк для 32 брендов, у которых они пустые.
+     */
+    const byId = new Map(categories.map(c => [c.id, c]))
+    const rootCounts = new Map<string, number>()
+    for (const product of brandProducts.data ?? []) {
+      let current = product.category_id ? byId.get(product.category_id) : undefined
+      // Ограничение глубины — страховка от петли `parent_id` в данных.
+      for (let depth = 0; current?.parent_id && depth < 10; depth++)
+        current = byId.get(current.parent_id)
+      if (current)
+        rootCounts.set(current.id, (rootCounts.get(current.id) ?? 0) + 1)
+    }
+    const topRootId = [...rootCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+    const topRootSlug = topRootId ? byId.get(topRootId)?.slug ?? null : null
+    const topCategory = brandHeadingWord(topRootSlug)
 
     const rows = (seoRows.data ?? []) as { categories: BrandLandingCategory | null }[]
     if (rows.length === 0)
-      return []
+      return { links: [], topCategory, topRootSlug }
 
     const counts = countProductsByCategoryBrand(
       (brandProducts.data ?? []).map(p => ({
         category_id: p.category_id,
         brand_id: brandId,
       })),
-      (allCategories.data ?? []) as { id: string, parent_id: string | null }[],
+      categories,
     )
 
     const seen = new Set<string>()
@@ -260,10 +336,61 @@ const { data: brandCategoryLinks } = await useAsyncData(
       links.push({ name: category.name, path })
     }
 
-    return links.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    return {
+      links: links.sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+      topCategory,
+      topRootSlug,
+    }
   },
-  { watch: [brand], default: (): { name: string, path: string }[] => [] },
+  {
+    watch: [brand],
+    default: () => ({
+      links: [] as { name: string, path: string }[],
+      topCategory: null as string | null,
+      topRootSlug: null as string | null,
+    }),
+  },
 )
+
+/**
+ * Лента «Рекомендуем» на лендинге: товары ТОГО ЖЕ раздела каталога, но
+ * других брендов.
+ *
+ * Данных о совместных покупках у нас нет — `accessory_ids` у товаров бренда
+ * пустой, а заказы на клиент не приходят. Поэтому лента честно показывает
+ * соседей по разделу; заодно это внутренние ссылки на другие бренды.
+ *
+ * На сервере и только для лендинга: обычному шаблону лента не нужна, а
+ * лишний запрос иначе платят все 32 бренда.
+ */
+const { data: recommendedProducts } = await useAsyncData(
+  `brand-recommended-${brandSlug}`,
+  async () => {
+    const rootSlug = brandCategoryData.value?.topRootSlug
+    if (!brand.value || !(brand.value as any).is_custom_page || !rootSlug)
+      return []
+
+    const result = await productsStore.fetchProducts(
+      { categorySlug: rootSlug, sortBy: 'newest' } as any,
+      1,
+      24,
+    )
+
+    return (result.products ?? [])
+      .filter(product => product.brand_id !== brand.value!.id)
+      .slice(0, 12)
+  },
+  { watch: [brand, brandCategoryData], default: () => [] },
+)
+
+/** Ссылки на бренд-лендинги в категориях. */
+const brandCategoryLinks = computed(() => brandCategoryData.value?.links ?? [])
+
+/**
+ * Слово для заголовка: «Конструкторы» у LEGO, «Игрушки» у бренда из раздела
+ * аудитории. Пустое, пока у бренда нет товаров ни в одной категории.
+ */
+const topCategory = computed(() => brandCategoryData.value?.topCategory ?? null)
 
 // Загружаем агрегированную статистику бренда
 const brandStats = ref<{
@@ -365,16 +492,20 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
 })
 
 const isCustomPage = computed(() => !!(brand.value as any)?.is_custom_page)
+
+/*
+ * У лендинга своя липкая панель разделов, и липкая шапка сайта над ней
+ * ставила бы две полосы друг на друге. Гасим её только здесь — остальные 31
+ * бренд идут обычным шаблоном, и у них шапка остаётся липкой. Так же, к
+ * слову, устроен каталог: там шапка нелипкая, а сверху плавает капсула.
+ */
+setShellOverride(() => (isCustomPage.value ? { header: 'static' } : null))
+
+/** Вопросы из статики: те же, что показаны на лендинге блоком «Частые вопросы». */
+const staticFaq = computed(() => brandStaticFaq(brand.value?.slug))
 const pageLayout = computed(
   () => (brand.value as any)?.page_layout as BrandPageLayout | null,
 )
-
-const featuredProductLines = computed(() => {
-  if (!pageLayout.value?.featuredLineIds?.length)
-    return []
-  const ids = new Set(pageLayout.value.featuredLineIds)
-  return brandProductLines.value.filter(l => ids.has(l.id))
-})
 
 const brandLogoUrl = computed(() => {
   if (!brand.value?.logo_url)
@@ -395,6 +526,15 @@ const metaTitle = computed(() => {
     return brand.value.meta_title
   if (brand.value.seo_title)
     return brand.value.seo_title
+  /*
+   * «Конструкторы LEGO — купить в Алматы с доставкой», а не «LEGO - Купить
+   * товары бренда в Алматы». Формулировка повторяет заголовок бренд-лендинга
+   * в категории: по тем же запросам он держится на 20-й позиции против 28-й
+   * у страницы бренда (Search Console, лето 2026). Слово раздела берётся из
+   * товаров бренда — см. `topCategory`.
+   */
+  if (topCategory.value)
+    return `${topCategory.value} ${brand.value.name} — купить в Алматы с доставкой | ${siteName}`
   return `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}`
 })
 
@@ -683,38 +823,44 @@ useHead({
       }),
     },
 
-    // FAQPage Schema
+    /*
+     * FAQPage.
+     *
+     * Вопросы берутся из статики бренда (`constants/brandStaticText.ts`) —
+     * ровно те, что ПОКАЗАНЫ на странице блоком «Частые вопросы». Раньше
+     * здесь лежали три общих вопроса, которых в разметке страницы не было
+     * вовсе: Google такие блоки игнорирует, а то и считает нарушением.
+     *
+     * Для брендов без статики остаётся прежняя тройка — она хотя бы отвечает
+     * на то, что у таких страниц спрашивают, и менять её этой правкой я не
+     * стал.
+     */
     brand.value && {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
-        'mainEntity': [
-          {
-            '@type': 'Question',
-            'name': `Где купить товары бренда ${brand.value.name} в Казахстане?`,
-            'acceptedAnswer': {
-              '@type': 'Answer',
-              'text': `Оригинальные товары бренда ${brand.value.name} можно купить в интернет-магазине ${siteName} с доставкой по всему Казахстану. Мы предлагаем широкий ассортимент продукции с гарантией качества.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            'name': `Как быстро доставляют товары ${brand.value.name}?`,
-            'acceptedAnswer': {
-              '@type': 'Answer',
-              'text': 'Доставка по Алматы осуществляется в течение 1-3 дней. По другим городам Казахстана срок доставки составляет 3-7 дней в зависимости от региона.',
-            },
-          },
-          {
-            '@type': 'Question',
-            'name': `Какая гарантия на товары ${brand.value.name}?`,
-            'acceptedAnswer': {
-              '@type': 'Answer',
-              'text': `Все товары бренда ${brand.value.name} в нашем магазине оригинальные и имеют официальную гарантию производителя. Возврат и обмен возможен в течение 14 дней.`,
-            },
-          },
-        ],
+        'mainEntity': (staticFaq.value.length
+          ? staticFaq.value.map(item => ({ name: item.q, text: item.a }))
+          : [
+              {
+                name: `Где купить товары бренда ${brand.value.name} в Казахстане?`,
+                text: `Оригинальные товары бренда ${brand.value.name} можно купить в интернет-магазине ${siteName} с доставкой по всему Казахстану. Мы предлагаем широкий ассортимент продукции с гарантией качества.`,
+              },
+              {
+                name: `Как быстро доставляют товары ${brand.value.name}?`,
+                text: 'Доставка по Алматы осуществляется в течение 1-3 дней. По другим городам Казахстана срок доставки составляет 3-7 дней в зависимости от региона.',
+              },
+              {
+                name: `Какая гарантия на товары ${brand.value.name}?`,
+                text: `Все товары бренда ${brand.value.name} в нашем магазине оригинальные и имеют официальную гарантию производителя. Возврат и обмен возможен в течение 14 дней.`,
+              },
+            ]
+        ).map(item => ({
+          '@type': 'Question',
+          'name': item.name,
+          'acceptedAnswer': { '@type': 'Answer', 'text': item.text },
+        })),
       }),
     },
 
@@ -827,39 +973,22 @@ useIndexableRobotsRule(
       </div>
     </div>
 
-    <!-- Кастомный шаблон -->
-    <div v-else-if="isCustomPage" :class="`${containerClass} py-4 md:py-8`">
+    <!--
+      Кастомный шаблон. БЕЗ общего контейнера и вертикальных отступов: полосы
+      лендинга идут во всю ширину экрана, ширину держит каждая полоса сама.
+    -->
+    <div v-else-if="isCustomPage">
       <BrandCustomTemplate
         :brand="brand"
         :product-lines="brandProductLines"
-        :featured-product-lines="featuredProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
+        :line-by-product="lineByProduct"
+        :featured-line-ids="pageLayout?.featuredLineIds ?? null"
+        :category-links="brandCategoryLinks"
+        :top-category="topCategory"
+        :recommended="recommendedProducts"
       />
-
-      <!--
-        Ссылки на бренд-лендинги. Рисуются НА СЕРВЕРЕ и только на те адреса,
-        что открыты для индекса, — см. `brandCategoryLinks`.
-      -->
-      <nav
-        v-if="brandCategoryLinks.length > 0"
-        class="mt-6 md:mt-12 border-t pt-4 md:pt-8"
-        :aria-label="`${brand.name} в категориях`"
-      >
-        <h2 class="text-base md:text-lg font-semibold mb-3 md:mb-4">
-          {{ brand.name }} в категориях
-        </h2>
-        <div class="flex flex-wrap gap-2 md:gap-2.5">
-          <NuxtLink
-            v-for="link in brandCategoryLinks"
-            :key="link.path"
-            :to="link.path"
-            class="inline-flex items-center rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground"
-          >
-            {{ link.name }}
-          </NuxtLink>
-        </div>
-      </nav>
     </div>
 
     <!-- Стандартный шаблон -->
@@ -872,6 +1001,7 @@ useIndexableRobotsRule(
         :brand-stats="brandStats"
         :questions="brandQuestions"
         :other-brands="otherBrands"
+        :top-category="topCategory"
       />
 
       <!--

@@ -2112,6 +2112,25 @@ else {
     />
     <div v-else class="mb-3 lg:mb-4" />
 
+    <!--
+      С бренд-лендинга ведём на страницу самого бренда.
+      Обратная ссылка была только одна и шла с /brands: Search Console
+      11 сентября 2026 показывал у `/brand/lego` последний обход 30 июня и
+      28-ю позицию, тогда как лендинг в категории обходился в августе и
+      держался на 20-й. Две страницы делят один интент, и связать их надо
+      хотя бы в одну сторону — с частой на редкую.
+
+      Рисуется на сервере: ссылка нужна роботу, а не только человеку.
+    -->
+    <NuxtLink
+      v-if="activeBrandSlug && activeBrandName"
+      :to="`/brand/${activeBrandSlug}`"
+      class="inline-flex items-center gap-1.5 mb-3 lg:mb-4 text-sm font-semibold text-primary hover:underline"
+    >
+      Все товары {{ activeBrandName }}
+      <Icon name="lucide:arrow-right" class="size-4" />
+    </NuxtLink>
+
     <!-- Бренды как 3-й уровень навигации (перед товарами) -->
     <CategoryBrands
       v-if="availableBrands.length > 1 && !activeBrandSlug"

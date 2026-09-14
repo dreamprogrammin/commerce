@@ -69,7 +69,9 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       // ниже, чтобы отсеять бренды без товара, закрытые `noindex`.
       // `category_id` — для подсчёта товаров у пар категория+бренд, от него
       // зависит, попадёт ли в карту бренд-лендинг (см. ниже).
-      .select('slug, updated_at, is_new, brand_id, category_id, product_images(image_url, display_order)')
+      // `product_line_id` — тем же манером отсеивает пустые линейки: страница
+      // закрывает их `noindex`, а карта до 11 сентября 2026 подавала их роботу.
+      .select('slug, updated_at, is_new, brand_id, category_id, product_line_id, product_images(image_url, display_order)')
       .eq('is_active', true)
       .not('slug', 'is', null)
       .order('created_at', { ascending: false })
@@ -281,7 +283,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // --- ТОВАРНЫЕ ЛИНЕЙКИ ---
     const { data: productLines, error: productLinesError } = await client
       .from('product_lines')
-      .select('slug, updated_at, brand_id, brands!inner(slug)')
+      .select('id, slug, updated_at, brand_id, brands!inner(slug)')
       .not('slug', 'is', null)
       .limit(1000)
 
@@ -292,7 +294,36 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     console.log(`✅ Sitemap: Загружено ${productLines?.length || 0} товарных линеек`)
 
     if (productLines && productLines.length > 0) {
-      productLines.forEach((line: any) => {
+      /*
+       * Пустая линейка в карту не идёт.
+       *
+       * Страница линейки закрывает себя `noindex`, когда товаров нет
+       * (pages/brand/[brandSlug]/[lineSlug].vue), а карта подавала роботу все
+       * линейки подряд. Что из этого вышло, видно в инспекции 11 сентября
+       * 2026: `/brand/lego/lego-technic` — Soft 404, `/brand/lego/ninjago` —
+       * «исключено тегом noindex», `/brand/lego/lego-friends` — «обойдено, не
+       * проиндексировано». Три адреса из восьми у одного бренда, и все три
+       * лежали в карте. Ровно та же рассогласованность, что чинили у брендов
+       * 20 августа.
+       */
+      const lineIdsWithProducts = new Set(
+        (products ?? [])
+          .map((p: any) => p.product_line_id)
+          .filter((id: string | null): id is string => !!id),
+      )
+
+      const indexableLines = productLines.filter(
+        (line: any) => lineIdsWithProducts.has(line.id),
+      )
+
+      const skippedLines = productLines.length - indexableLines.length
+      if (skippedLines > 0) {
+        console.warn(
+          `⚠️ Sitemap: ${skippedLines} линеек без товаров закрыты noindex и в карту не попали`,
+        )
+      }
+
+      indexableLines.forEach((line: any) => {
         const brandSlug = line.brands?.slug
         if (brandSlug) {
           sitemapRoutes.push({
