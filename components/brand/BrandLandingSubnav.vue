@@ -13,6 +13,12 @@
  * только сдвигом, без `opacity`. Любое промежуточное значение прозрачности
  * делает элемент новым backdrop-root, и `backdrop-filter` капсулы перестаёт
  * размывать страницу.
+ *
+ * ТЁМНАЯ, в отличие от каталожной. Там капсула светлая и висит над пёстрой
+ * сеткой товаров, а тут под ней почти всё белое: мозаика серий, карточки
+ * подборки, текст о бренде. Светлое стекло на белом не читалось вовсе.
+ * Тёмно-синий берём из шапки лендинга — полоса, тёмная карточка хита и
+ * нижний блок заявки сделаны тем же цветом.
  */
 const props = defineProps<{
   items: { key: string, label: string }[]
@@ -98,7 +104,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
   .blsn__capsule {
     display: flex;
-    gap: 9px;
+    gap: 8px;
     align-items: center;
     /*
      * Капсула по содержимому, а не во всю ширину. В каталоге её заполняет
@@ -108,14 +114,13 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     width: max-content;
     max-width: 100%;
     padding: 7px 8px;
-    border: 1px solid rgb(255 255 255 / 0.7);
+    border: 1px solid rgb(255 255 255 / 0.14);
     border-radius: 24px;
-    background: linear-gradient(150deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.26));
+    background: linear-gradient(150deg, rgb(11 36 68 / 0.92), rgb(0 57 106 / 0.88));
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.85),
-      inset 0 -1px 1px rgb(15 23 42 / 0.05),
-      0 12px 32px rgb(15 23 42 / 0.16);
-    backdrop-filter: blur(24px) saturate(1.9);
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 14px 34px rgb(6 20 44 / 0.32);
+    backdrop-filter: blur(24px) saturate(1.6);
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -131,25 +136,25 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     gap: 8px;
     height: 38px;
     padding: 0 15px;
-    border: 1px solid rgb(255 255 255 / 0.9);
+    border: 1px solid rgb(255 255 255 / 0.16);
     border-radius: 999px;
-    background: linear-gradient(150deg, rgb(255 255 255 / 0.9), rgb(224 233 247 / 0.55));
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.95),
-      inset 0 -1px 2px rgb(15 23 42 / 0.06),
-      0 6px 18px rgb(15 23 42 / 0.1);
-    backdrop-filter: blur(14px) saturate(1.7);
-    color: var(--foreground);
+    background: rgb(255 255 255 / 0.1);
+    color: #eaf2ff;
     font-weight: 600;
     font-size: 13.5px;
     white-space: nowrap;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
   }
 
+  /* Наведение — жёлтым: тот же акцент, что у кнопки «Подобрать набор». */
   .blsn__pill:hover {
-    border-color: rgb(43 127 255 / 0.35);
-    color: var(--primary);
+    border-color: rgb(253 199 0 / 0.55);
+    background: rgb(253 199 0 / 0.16);
+    color: #ffd84d;
   }
 }
 </style>
