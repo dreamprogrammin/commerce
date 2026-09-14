@@ -461,6 +461,19 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   check(mob.subnav === 'fixed', `меню разделов плавающее, как в каталоге (${mob.subnav})`)
   check(mob.subnavHidden === 'hidden', 'у верха страницы капсула спрятана')
 
+  /*
+   * Капсула тёмная: под ней почти вся страница белая, и светлое стекло на
+   * белом не читалось. Признак — светлый текст кнопок.
+   */
+  const capsuleInk = await page.evaluate(() => {
+    const pill = document.querySelector('.blsn__pill')
+    if (!pill)
+      return 0
+    const [r, g, b] = getComputedStyle(pill).color.match(/\d+/g).map(Number)
+    return Math.round((0.2126 * r + 0.7152 * g + 0.0722 * b) / 2.55) / 100
+  })
+  check(capsuleInk > 0.6, `кнопки капсулы светлые на тёмном (яркость ${capsuleInk})`)
+
   await ctx.close()
 }
 
