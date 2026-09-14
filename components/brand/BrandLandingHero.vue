@@ -1,14 +1,18 @@
 <script setup lang="ts">
 /**
- * Шапка лендинга бренда — макет `Бренд LEGO.dc.html`, секция HERO.
+ * Шапка лендинга бренда — макет `Бренд LEGO v2.dc.html`, секция HERO.
  *
- * Тёмная полоса во всю ширину: логотип, имя, лид, четыре цифры о бренде и
- * полоса доверия; справа белая карточка флагманского товара с ценой и
- * кнопкой. Свечение подложки задаёт цвет бренда (`--brand-glow`).
+ * Синяя полоса во всю ширину экрана с «кирпичной» сеткой шипов: слева
+ * хлебные крошки, плашка бренда, заголовок, лид, две кнопки и четыре цифры;
+ * справа витрина флагманского товара на белом круге. На телефоне витрина
+ * едет наверх отдельной карточкой, а крошки и цифры прячутся.
  *
- * Коллекции живут отдельной секцией ниже — в шапке их нет.
+ * Цифры считаются по выдаче, а не пишутся руками. Срок доставки — из
+ * опубликованных условий `/terms` (Алматы 1–3 рабочих дня), а не из макета,
+ * где стояло «1–2 дня»: обещание на странице не должно расходиться с
+ * условиями магазина.
  */
-import type { Brand, ProductLine, ProductWithGallery } from '@/types'
+import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -20,9 +24,10 @@ const props = defineProps<{
   /** Товары бренда — первый идёт витриной. */
   products: ProductWithGallery[]
   lines: ProductLine[]
-  /** Раздел каталога, где лежат товары бренда: «Конструкторы», «Куклы». */
-  topCategory?: string | null
+  breadcrumbs: IBreadcrumbItem[]
 }>()
+
+const emit = defineEmits<{ jump: [key: 'series' | 'pick'] }>()
 
 const { getVariantUrl } = useSupabaseStorage()
 const cartStore = useCartStore()
@@ -33,14 +38,31 @@ const { flyToCart } = useCartFly()
  * заводить его ради картинки значило бы просить владельца вести ещё один
  * список руками; порядок задаёт сортировка страницы.
  */
-const hero = computed(() => props.products[0] ?? null)
-// Ссылка — компонент, поэтому у неё берётся `$el`: полёт в корзину считает
-// координаты по настоящему узлу картинки.
-const heroImageRef = ref<{ $el?: HTMLElement } | HTMLElement | null>(null)
-const heroImageEl = computed<HTMLElement | null>(() => {
-  const node = heroImageRef.value as any
+const flagship = computed(() => props.products[0] ?? null)
+
+/*
+ * Витрина нарисована дважды — карточкой для телефона и кругом для десктопа,
+ * лишнюю прячет CSS. Полёт в корзину должен стартовать от ВИДИМОЙ: у скрытой
+ * `display: none` рект нулевой, и призрак улетал бы из левого верхнего угла.
+ * Ссылка — компонент, поэтому берётся её `$el`.
+ */
+const shotBandRef = ref<{ $el?: HTMLElement } | HTMLElement | null>(null)
+const shotStageRef = ref<{ $el?: HTMLElement } | HTMLElement | null>(null)
+
+function nodeOf(source: unknown): HTMLElement | null {
+  const node = source as any
   return (node?.$el ?? node ?? null) as HTMLElement | null
-})
+}
+
+function visibleShot(): HTMLElement | null {
+  const stage = nodeOf(shotStageRef.value)
+  if (stage?.offsetParent)
+    return stage
+  const band = nodeOf(shotBandRef.value)
+  if (band?.offsetParent)
+    return band
+  return stage ?? band
+}
 
 const logoUrl = computed(() =>
   props.brand.logo_url
@@ -48,128 +70,133 @@ const logoUrl = computed(() =>
     : null,
 )
 
-const heroImage = computed(() => {
-  const path = hero.value?.product_images?.[0]?.image_url
+const shotImage = computed(() => {
+  const path = flagship.value?.product_images?.[0]?.image_url
   return path ? getVariantUrl(BUCKET_NAME_PRODUCT, path, 'md') : null
 })
-
-/**
- * Надстрочник в шапке — строка НАД именем бренда, по макету.
- *
- * Он же первая половина заголовка страницы: `<h1>` читается как
- * «Конструкторы LEGO», а выглядит ровно как в макете — мелкая строка
- * раздела и крупное имя. Голое «LEGO» в H1 не содержало ни слова о том, что
- * продаётся, и страница висела на 28-й позиции по «лего алматы купить».
- *
- * Страна и год основания живут в `brands.facts`, пустых у всех 32 брендов.
- * Они идут в надстрочник, только когда раздел неизвестен: смешивать их с
- * названием раздела внутри H1 нельзя, заголовок превратится в кашу. Сами
- * факты и так показываются в карточке «Коротко о бренде».
- */
-const eyebrow = computed(() => {
-  if (props.topCategory)
-    return props.topCategory
-
-  const facts = props.brand.facts ?? []
-  const value = (key: string) =>
-    facts.find(f => f?.k?.toLowerCase().startsWith(key))?.v?.trim()
-
-  const country = value('стран')
-  const founded = value('основан')
-
-  return [country, founded && `с ${founded.replace(/\s*год\w*$/i, '')} года`]
-    .filter(Boolean)
-    .join(' · ')
-})
-
-const lead = computed(() => props.brand.seo_description || '')
 
 const inStockCount = computed(
   () => props.products.filter(p => (p.stock_quantity ?? 0) > 0).length,
 )
 
-/** Возрастной охват бренда — по крайним границам его товаров. */
-const ageSpan = computed(() => {
-  const mins = props.products
-    .map(p => (p as any).min_age_years as number | null)
-    .filter((n): n is number => n != null)
-  if (mins.length === 0)
-    return ''
+/** «Официальный бренд · Дания, 1932» — страна и год из `brands.facts`. */
+const pillNote = computed(() => {
+  const facts = props.brand.facts ?? []
+  const value = (key: string) =>
+    facts.find(f => f?.k?.toLowerCase().startsWith(key))?.v?.trim()
 
-  const maxs = props.products
-    .map(p => (p as any).max_age_years as number | null)
-    .filter((n): n is number => n != null)
-  const from = Math.min(...mins)
-  const to = maxs.length ? Math.max(...maxs) : null
-  return to ? `От ${from} до ${to} лет` : `От ${from} лет`
+  const country = value('стран')
+  const founded = value('основан')?.replace(/\s*год\w*$/i, '')
+  const origin = [country, founded].filter(Boolean).join(', ')
+
+  return origin ? `Официальный бренд · ${origin}` : 'Официальный бренд'
 })
 
-/*
- * Четыре цифры макета. Первые две считаются по выдаче, вторые — условия
- * магазина, они одинаковы для всех брендов и уже стоят в полосе доверия.
+const lead = computed(() => props.brand.seo_description || '')
+
+/**
+ * Кэшбэк бренда — наибольшая доля бонусов от цены среди его товаров. В
+ * макете стояло «до 10%», по данным выходит 5%: обещание в разметке должно
+ * совпадать с тем, что начислится в корзине.
  */
+const bonusShare = computed(() => {
+  const shares = props.products
+    .map((p) => {
+      const price = p.final_price ?? p.price
+      const bonus = p.bonus_points_award ?? 0
+      return price > 0 ? (bonus / price) * 100 : 0
+    })
+    .filter(share => share > 0)
+  return shares.length ? Math.round(Math.max(...shares)) : 0
+})
+
 const stats = computed(() => {
-  const rows = [
+  const rows: { num: string, label: string }[] = [
     {
       num: String(inStockCount.value),
-      label: `${pluralRu(inStockCount.value, 'товар', 'товара', 'товаров')} в наличии`,
+      label: pluralRu(inStockCount.value, 'набор', 'набора', 'наборов'),
     },
   ]
-
   if (props.lines.length > 0) {
     rows.push({
       num: String(props.lines.length),
-      label: pluralRu(props.lines.length, 'коллекция', 'коллекции', 'коллекций'),
+      label: pluralRu(props.lines.length, 'серия', 'серии', 'серий'),
     })
   }
-
-  rows.push(
-    { num: '1–2 дня', label: 'доставка по КЗ' },
-    { num: '1 = 1 ₸', label: 'бонусы за покупку' },
-  )
-
+  rows.push({ num: '1–3 дня', label: 'доставка по Алматы' })
+  if (bonusShare.value > 0)
+    rows.push({ num: `${bonusShare.value}%`, label: 'бонусами с покупки' })
   return rows
 })
 
-const tags = computed(() =>
-  [
-    { icon: 'lucide:shield-check', label: 'Оригинал и сертификаты', color: '#4ade80' },
-    ageSpan.value && { icon: 'lucide:cake', label: ageSpan.value, color: '#ffd84d' },
-    { icon: 'lucide:package-check', label: 'Отправка из Алматы', color: '#8ec2ff' },
-  ].filter(Boolean) as { icon: string, label: string, color: string }[],
-)
-
-const heroPrice = computed(() => {
-  const product = hero.value
+const price = computed(() => {
+  const product = flagship.value
   if (!product)
     return null
   return {
     final: product.final_price ?? product.price,
-    old: product.discount_percentage ? product.price : null,
     discount: product.discount_percentage
       ? `−${Math.round(product.discount_percentage)}%`
       : '',
-    bonus: product.bonus_points_award ?? 0,
   }
 })
 
-function addHeroToCart(event: MouseEvent) {
-  if (!hero.value)
+function addFlagship(event: MouseEvent) {
+  if (!flagship.value)
     return
   // До добавления: кнопка остаётся на месте, но рект источника берём заранее.
-  flyToCart(heroImageEl.value, undefined, event.currentTarget as HTMLElement)
-  cartStore.addItem(hero.value as any, 1)
+  flyToCart(visibleShot(), undefined, event.currentTarget as HTMLElement)
+  cartStore.addItem(flagship.value as any, 1)
 }
 </script>
 
 <template>
   <section class="blh">
+    <span class="blh__studs" aria-hidden="true" />
     <span class="blh__aura" aria-hidden="true" />
 
-    <div class="blh__grid">
-      <div class="blh__left">
-        <div class="blh__brand">
-          <span v-if="logoUrl" class="blh__logo">
+    <div class="blh__inner">
+      <!-- Телефон: витрина отдельной карточкой над текстом. -->
+      <div v-if="flagship && price" class="blh__shot-band">
+        <NuxtLink
+          ref="shotBandRef"
+          :to="`/catalog/products/${flagship.slug}`"
+          class="blh__shot-band-link"
+        >
+          <ProgressiveImage
+            v-if="shotImage"
+            :src="shotImage"
+            :alt="flagship.name"
+            object-fit="contain"
+            placeholder-type="shimmer"
+            eager
+            class="size-full !bg-transparent"
+          />
+        </NuxtLink>
+        <span v-if="price.discount" class="blh__shot-badge">{{ price.discount }}</span>
+        <span class="blh__shot-cap">
+          <span class="blh__shot-cap-key">Флагман</span>
+          <span class="blh__shot-cap-price">{{ formatPrice(price.final) }}&nbsp;₸</span>
+        </span>
+      </div>
+
+      <div class="blh__copy">
+        <nav class="blh__crumbs" aria-label="Хлебные крошки">
+          <template v-for="(crumb, index) in breadcrumbs" :key="crumb.href || crumb.name">
+            <NuxtLink v-if="crumb.href && index < breadcrumbs.length - 1" :to="crumb.href">
+              {{ crumb.name }}
+            </NuxtLink>
+            <span v-else class="blh__crumbs-current">{{ crumb.name }}</span>
+            <Icon
+              v-if="index < breadcrumbs.length - 1"
+              name="lucide:chevron-right"
+              class="size-[13px]"
+            />
+          </template>
+        </nav>
+
+        <span class="blh__pill">
+          <span v-if="logoUrl" class="blh__pill-logo">
             <ProgressiveImage
               :src="logoUrl"
               :alt="`Логотип ${brand.name}`"
@@ -180,16 +207,32 @@ function addHeroToCart(event: MouseEvent) {
               class="size-full"
             />
           </span>
+          {{ pillNote }}
+        </span>
 
-          <h1 class="blh__title">
-            <span v-if="eyebrow" class="blh__eyebrow">{{ eyebrow }}</span>
-            <span class="blh__h1">{{ brand.seo_h1 || brand.name }}</span>
-          </h1>
-        </div>
+        <h1 class="blh__h1">
+          Собирайте вместе с <span class="blh__mark">{{ brand.name }}</span>
+        </h1>
 
         <p v-if="lead" class="blh__lead">
           {{ lead }}
         </p>
+
+        <div class="blh__buttons">
+          <button type="button" class="blh__cta" @click="emit('jump', 'pick')">
+            Подобрать набор
+            <Icon name="lucide:chevron-right" class="size-[17px]" />
+          </button>
+          <button
+            v-if="lines.length"
+            type="button"
+            class="blh__ghost"
+            @click="emit('jump', 'series')"
+          >
+            Все серии {{ brand.name }}
+            <Icon name="lucide:chevron-right" class="size-[17px]" />
+          </button>
+        </div>
 
         <div class="blh__stats">
           <span v-for="stat in stats" :key="stat.label" class="blh__stat">
@@ -197,69 +240,43 @@ function addHeroToCart(event: MouseEvent) {
             <span class="blh__stat-label">{{ stat.label }}</span>
           </span>
         </div>
-
-        <div class="blh__tags">
-          <span v-for="tag in tags" :key="tag.label" class="blh__tag">
-            <Icon :name="tag.icon" class="size-[14px]" :style="{ color: tag.color }" />
-            {{ tag.label }}
-          </span>
-        </div>
       </div>
 
-      <!-- Витрина флагмана -->
-      <div v-if="hero && heroPrice" class="blh__flag">
-        <span class="blh__flag-eyebrow">Флагман бренда</span>
-
-        <NuxtLink
-          ref="heroImageRef"
-          :to="`/catalog/products/${hero.slug}`"
-          class="blh__flag-img"
-        >
-          <!-- `!bg-transparent`: серая подложка ProgressiveImage при
-               object-fit: contain вылезает полями по бокам и рисует
-               прямоугольник поверх подложки карточки. Тот же приём — в
-               галерее товара. -->
-          <ProgressiveImage
-            v-if="heroImage"
-            :src="heroImage"
-            :alt="hero.name"
-            object-fit="contain"
-            placeholder-type="shimmer"
-            eager
-            class="size-full !bg-transparent"
-          />
-          <span v-if="heroPrice.discount" class="blh__discount">
-            {{ heroPrice.discount }}
-          </span>
-        </NuxtLink>
-
-        <NuxtLink :to="`/catalog/products/${hero.slug}`" class="blh__flag-name">
-          {{ hero.name }}
-        </NuxtLink>
-
-        <span class="blh__prices">
-          <span class="blh__price">{{ formatPrice(heroPrice.final) }}&nbsp;₸</span>
-          <span v-if="heroPrice.old" class="blh__price-old">
-            {{ formatPrice(heroPrice.old) }}&nbsp;₸
-          </span>
-          <span v-if="heroPrice.bonus > 0" class="blh__bonus">
-            <Icon name="lucide:gift" class="size-[14px] blh__bonus-icon" />
-            +{{ formatPrice(heroPrice.bonus) }} бонусов
-          </span>
-        </span>
-
-        <div class="blh__actions">
-          <button type="button" class="blh__cta" @click="addHeroToCart">
-            <Icon name="solar:cart-3-bold" class="size-[19px]" />
-            В корзину
-          </button>
+      <!-- Десктоп: витрина на белом круге. -->
+      <div v-if="flagship && price" class="blh__stage-wrap">
+        <div class="blh__stage">
+          <span class="blh__disc" aria-hidden="true" />
           <NuxtLink
-            :to="`/catalog/products/${hero.slug}`"
-            class="blh__more"
-            aria-label="Подробнее о товаре"
+            ref="shotStageRef"
+            :to="`/catalog/products/${flagship.slug}`"
+            class="blh__stage-link"
           >
-            <Icon name="lucide:arrow-right" class="size-[19px] text-primary" />
+            <ProgressiveImage
+              v-if="shotImage"
+              :src="shotImage"
+              :alt="flagship.name"
+              object-fit="contain"
+              placeholder-type="shimmer"
+              eager
+              class="size-full !bg-transparent"
+            />
           </NuxtLink>
+          <span v-if="price.discount" class="blh__badge">{{ price.discount }}</span>
+
+          <div class="blh__tag">
+            <span class="blh__tag-text">
+              <span class="blh__tag-key">Флагман</span>
+              <span class="blh__tag-price">{{ formatPrice(price.final) }}&nbsp;₸</span>
+            </span>
+            <button
+              type="button"
+              class="blh__add"
+              aria-label="Добавить флагманский набор в корзину"
+              @click="addFlagship"
+            >
+              <Icon name="solar:cart-3-bold" class="size-[19px]" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -271,179 +288,214 @@ function addHeroToCart(event: MouseEvent) {
 @layer components {
   .blh {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    padding: 22px 18px;
-    border-radius: 24px;
-    background: linear-gradient(146deg, #0d1830 0%, #152a4d 52%, #0a142b 100%);
-    box-shadow: 0 22px 50px rgb(9 17 35 / 0.3);
+    padding: 16px 0 28px;
+    background: linear-gradient(122deg, #00396a 0%, #0059c2 62%, #003a78 100%);
     overflow: hidden;
   }
 
-  /* Свечение в цвет бренда — единственное цветное пятно на тёмной полосе. */
-  .blh__aura {
+  /* Сетка шипов «кирпичика» — фирменный приём макета. */
+  .blh__studs {
     position: absolute;
-    top: -38%;
-    left: 50%;
-    width: 150%;
-    height: 78%;
-    transform: translateX(-50%);
-    background: radial-gradient(closest-side at 50% 50%, var(--brand-glow) 0%, rgb(0 0 0 / 0) 100%);
+    inset: 0;
+    background-image: radial-gradient(circle at 13px 13px, rgb(255 255 255 / 0.13) 5.5px, rgb(0 0 0 / 0) 6.5px);
+    background-size: 42px 42px;
+    opacity: 0.55;
     pointer-events: none;
   }
 
-  .blh__grid {
+  .blh__aura {
+    position: absolute;
+    top: -24%;
+    left: 50%;
+    width: 170%;
+    height: 62%;
+    background: radial-gradient(closest-side at 50% 50%, rgb(253 199 0 / 0.3) 0%, rgb(0 0 0 / 0) 100%);
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .blh__inner {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 18px;
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--page-gutter);
   }
 
-  .blh__left {
+  .blh__copy {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 13px;
     min-width: 0;
   }
 
-  .blh__brand {
-    display: flex;
+  .blh__crumbs {
+    display: none;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
-    min-width: 0;
+    gap: 7px;
+    color: rgb(255 255 255 / 0.55);
+    font-weight: 500;
+    font-size: 12.5px;
   }
 
-  .blh__logo {
+  .blh__crumbs a {
+    color: rgb(255 255 255 / 0.55);
+  }
+
+  .blh__crumbs a:hover {
+    color: #fff;
+  }
+
+  .blh__crumbs-current {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .blh__pill {
+    display: none;
+    align-self: flex-start;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 14px 5px 5px;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.1);
+    color: rgb(255 255 255 / 0.82);
+    font-weight: 600;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  .blh__pill-logo {
     display: grid;
     flex: none;
     place-content: center;
-    width: 72px;
-    height: 72px;
-    padding: 9px;
-    border: 1px solid rgb(255 255 255 / 0.95);
-    border-radius: 18px;
+    width: 36px;
+    height: 36px;
+    padding: 5px;
+    border-radius: 999px;
     background: #fff;
-    box-shadow:
-      inset 0 1px 0 #fff,
-      0 10px 24px rgb(15 23 42 / 0.12);
-  }
-
-  .blh__title {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 0;
-    min-width: 0;
-  }
-
-  .blh__eyebrow {
-    color: #ffd84d;
-    font-weight: 700;
-    font-size: 11.5px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
   }
 
   .blh__h1 {
-    display: block;
+    margin: 0;
     color: #fff;
     font-weight: 800;
-    font-size: 38px;
-    line-height: 0.95;
-    letter-spacing: -0.035em;
+    font-size: 30px;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+
+  /* Имя бренда — жёлтой плашкой, как деталь конструктора. */
+  .blh__mark {
+    display: inline-block;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: #fdc700;
+    box-shadow: 0 6px 18px rgb(253 199 0 / 0.3);
+    color: #0b2444;
   }
 
   .blh__lead {
     margin: 0;
-    max-width: 42ch;
-    color: rgb(255 255 255 / 0.78);
-    font-size: 14px;
-    line-height: 1.6;
+    max-width: 34ch;
+    color: #e8f1ff;
+    font-size: 13.5px;
+    line-height: 1.55;
     text-wrap: pretty;
   }
 
+  .blh__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+  }
+
+  .blh__cta,
+  .blh__ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    height: 52px;
+    padding: 0 20px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .blh__cta {
+    border: none;
+    background: #ffd84d;
+    color: #0b2444;
+  }
+
+  .blh__ghost {
+    border: 1.5px solid #fff;
+    background: transparent;
+    color: #fff;
+  }
+
   .blh__stats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px;
+    display: none;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
   }
 
   .blh__stat {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    padding: 12px 14px;
-    border: 1px solid rgb(255 255 255 / 0.14);
-    border-radius: 16px;
-    background: rgb(255 255 255 / 0.07);
+    gap: 1px;
+    min-width: 0;
+    padding: 10px 13px;
+    border: 1px solid rgb(255 255 255 / 0.13);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.08);
   }
 
   .blh__stat-num {
     color: #fff;
     font-weight: 800;
-    font-size: 20px;
-    letter-spacing: -0.02em;
+    font-size: 21px;
+    letter-spacing: -0.025em;
   }
 
   .blh__stat-label {
-    color: rgb(255 255 255 / 0.66);
+    color: rgb(255 255 255 / 0.88);
     font-weight: 500;
-    font-size: 12px;
-  }
-
-  .blh__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 9px;
-  }
-
-  .blh__tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    height: 32px;
-    padding: 0 13px;
-    border: 1px solid rgb(255 255 255 / 0.16);
-    border-radius: 999px;
-    background: rgb(255 255 255 / 0.09);
-    color: #e9f0fb;
-    font-weight: 600;
-    font-size: 12.5px;
-  }
-
-  .blh__flag {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 14px;
-    border-radius: 20px;
-    background: var(--card);
-    box-shadow: 0 18px 40px rgb(6 12 26 / 0.34);
-  }
-
-  .blh__flag-eyebrow {
-    color: var(--muted-foreground);
-    font-weight: 700;
     font-size: 11.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
   }
 
-  .blh__flag-img {
+  /* ── Витрина: телефон ── */
+  .blh__shot-band {
     position: relative;
-    display: block;
-    border-radius: 16px;
-    background: linear-gradient(158deg, #f7f9fc, #eaf0f8);
+    display: grid;
+    place-items: center;
+    width: 100%;
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 16px 34px rgb(2 18 44 / 0.28);
     aspect-ratio: 4 / 3;
     overflow: hidden;
   }
 
-  .blh__flag-img :deep(img) {
-    padding: 18px;
+  .blh__shot-band-link {
+    display: block;
+    width: 74%;
+    height: 74%;
   }
 
-  .blh__discount {
+  .blh__shot-badge {
     position: absolute;
     top: 12px;
     left: 12px;
@@ -452,180 +504,217 @@ function addHeroToCart(event: MouseEvent) {
     background: var(--discount);
     color: #fff;
     font-weight: 800;
-    font-size: 13px;
+    font-size: 13.5px;
   }
 
-  .blh__flag-name {
-    display: -webkit-box;
-    color: var(--foreground);
-    font-weight: 600;
-    font-size: 15px;
-    line-height: 1.35;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-  }
-
-  .blh__prices {
-    display: flex;
-    flex-wrap: wrap;
+  .blh__shot-cap {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: inline-flex;
     align-items: baseline;
-    gap: 10px;
+    gap: 9px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.95);
+    box-shadow: 0 6px 16px rgb(2 18 44 / 0.16);
   }
 
-  .blh__price {
+  .blh__shot-cap-key {
+    color: var(--muted-foreground);
+    font-weight: 700;
+    font-size: 12.5px;
+  }
+
+  .blh__shot-cap-price {
     color: var(--discount);
     font-weight: 800;
-    font-size: 28px;
-  }
-
-  .blh__price-old {
-    color: var(--price-old);
-    font-weight: 500;
-    font-size: 14px;
-    text-decoration: line-through;
-  }
-
-  .blh__bonus {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 10px;
-    border-radius: 10px;
-    background: var(--bonus-surface);
-    color: var(--bonus);
-    font-weight: 700;
-    font-size: 12px;
-  }
-
-  .blh__bonus-icon {
-    color: var(--bonus-accent);
-  }
-
-  .blh__actions {
-    display: flex;
-    gap: 9px;
-    margin-top: 2px;
-  }
-
-  .blh__cta {
-    display: inline-flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    min-width: 0;
-    height: 50px;
-    padding: 0 18px;
-    border-radius: 999px;
-    background: linear-gradient(150deg, rgb(77 148 255 / 0.98), rgb(23 101 235 / 0.94));
-    box-shadow: 0 10px 22px rgb(43 127 255 / 0.28);
-    color: #fff;
-    font-weight: 700;
     font-size: 15px;
-    cursor: pointer;
   }
 
-  .blh__cta:hover {
-    background: linear-gradient(150deg, rgb(90 158 255 / 1), rgb(21 93 252 / 0.98));
+  /* ── Витрина: десктоп ── */
+  .blh__stage-wrap {
+    display: none;
+    justify-content: flex-end;
   }
 
-  .blh__more {
+  .blh__stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    max-width: 420px;
+    aspect-ratio: 1 / 1;
+  }
+
+  /*
+   * В макете товар — вырезанный рендер на белом круге. У нас фотографии
+   * сняты НА БЕЛОМ ФОНЕ, и круг под ними не читается: получается белый
+   * прямоугольник поверх подсветки. Поэтому витрина — белая карточка с
+   * радиусом, как в мобильной версии того же макета, а круг остался мягкой
+   * подсветкой под ней.
+   */
+  .blh__disc {
+    position: absolute;
+    inset: 2%;
+    border-radius: 999px;
+    background: radial-gradient(
+      circle at 50% 45%,
+      rgb(255 255 255 / 0.35) 0%,
+      rgb(255 255 255 / 0) 70%
+    );
+    pointer-events: none;
+  }
+
+  .blh__stage-link {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 86%;
+    height: 86%;
+    padding: 6%;
+    border-radius: 26px;
+    background: #fff;
+    box-shadow: 0 22px 44px rgb(2 18 44 / 0.3);
+  }
+
+  .blh__badge {
+    position: absolute;
+    top: 6%;
+    left: 4%;
+    padding: 6px 13px;
+    border-radius: 999px;
+    background: var(--discount);
+    color: #fff;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .blh__tag {
+    position: absolute;
+    bottom: 2%;
+    left: 50%;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 9px 9px 16px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 12px 26px rgb(2 18 44 / 0.26);
+    transform: translateX(-50%);
+  }
+
+  .blh__tag-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .blh__tag-key {
+    color: var(--muted-foreground);
+    font-weight: 700;
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .blh__tag-price {
+    color: var(--discount);
+    font-weight: 800;
+    font-size: 18px;
+    white-space: nowrap;
+  }
+
+  .blh__add {
     display: grid;
     flex: none;
     place-content: center;
-    width: 50px;
-    height: 50px;
-    border: 1px solid var(--border);
+    width: 44px;
+    height: 44px;
+    border: none;
     border-radius: 999px;
-    background: var(--card);
-  }
-
-  .blh__more:hover {
-    background: var(--muted);
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
   }
 
   @media (min-width: 760px) {
     .blh {
-      padding: 28px;
-      border-radius: 30px;
+      padding: 24px 0 40px;
     }
 
     .blh__aura {
       top: -46%;
-      left: -6%;
-      width: 66%;
-      height: 180%;
+      right: -6%;
+      left: auto;
+      width: 52%;
+      height: 200%;
       transform: none;
     }
 
-    .blh__grid {
+    .blh__inner {
       display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
-      gap: 24px;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 0.75fr);
+      gap: 36px;
       align-items: center;
     }
 
-    .blh__left {
-      gap: 20px;
+    .blh__copy {
+      gap: 16px;
+    }
+
+    .blh__shot-band {
+      display: none;
+    }
+
+    .blh__crumbs {
+      display: flex;
+    }
+
+    .blh__pill {
+      display: inline-flex;
     }
 
     .blh__h1 {
-      font-size: 52px;
+      font-size: 50px;
     }
 
     .blh__lead {
+      max-width: 40ch;
       font-size: 15.5px;
     }
 
-    .blh__logo {
-      width: 92px;
-      height: 92px;
-      padding: 12px;
-      border-radius: 22px;
+    .blh__cta,
+    .blh__ghost {
+      justify-content: center;
+      width: auto;
+      white-space: nowrap;
+    }
+
+    .blh__cta {
+      padding: 0 22px;
+      box-shadow: 0 12px 26px rgb(253 199 0 / 0.28);
+    }
+
+    .blh__ghost {
+      border: 1px solid rgb(255 255 255 / 0.34);
+      background: rgb(255 255 255 / 0.08);
+      font-weight: 600;
     }
 
     .blh__stats {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
+      display: grid;
     }
 
-    .blh__stat-num {
-      font-size: 23px;
-    }
-
-    .blh__flag {
-      gap: 10px;
-      padding: 18px;
-      border-radius: 24px;
-    }
-
-    .blh__flag-img {
-      border-radius: 18px;
-      aspect-ratio: 1 / 1;
-    }
-
-    .blh__flag-img :deep(img) {
-      padding: 22px;
-    }
-
-    .blh__flag-name {
-      font-size: 16px;
-    }
-
-    .blh__price {
-      font-size: 32px;
+    .blh__stage-wrap {
+      display: flex;
     }
   }
 
   @media (min-width: 1200px) {
-    .blh {
-      padding: 34px 36px;
-    }
-
-    .blh__grid {
-      grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
-      gap: 34px;
+    .blh__inner {
+      grid-template-columns: minmax(0, 1.05fr) minmax(330px, 0.95fr);
     }
   }
 }

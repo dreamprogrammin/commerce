@@ -141,67 +141,70 @@ async function toggleWish() {
 
 <template>
   <section v-if="hit && price" class="bls">
+    <span class="bls__studs" aria-hidden="true" />
     <span class="bls__glow" aria-hidden="true" />
 
-    <NuxtLink ref="imageRef" :to="`/catalog/products/${hit.slug}`" class="bls__img">
-      <ProgressiveImage
-        v-if="image"
-        :src="image"
-        :alt="hit.name"
-        object-fit="contain"
-        placeholder-type="shimmer"
-        class="size-full"
-      />
-      <span v-if="price.discount" class="bls__discount">{{ price.discount }}</span>
-    </NuxtLink>
-
-    <div class="bls__body">
-      <span class="bls__eyebrow">
-        <Icon name="lucide:flame" class="size-4" />
-        Хит продаж
-      </span>
-
-      <NuxtLink :to="`/catalog/products/${hit.slug}`" class="bls__name">
-        {{ hit.name }}
+    <div class="bls__inner">
+      <NuxtLink ref="imageRef" :to="`/catalog/products/${hit.slug}`" class="bls__img">
+        <ProgressiveImage
+          v-if="image"
+          :src="image"
+          :alt="hit.name"
+          object-fit="contain"
+          placeholder-type="shimmer"
+          class="size-full"
+        />
+        <span v-if="price.discount" class="bls__discount">{{ price.discount }}</span>
       </NuxtLink>
 
-      <span v-if="rating" class="bls__rating">
-        <Icon name="gravity-ui:star-fill" class="bls__star size-4" />
-        {{ rating.value }}
-        <span class="bls__rating-note">{{ rating.label }}</span>
-      </span>
-
-      <div v-if="specs.length" class="bls__specs">
-        <span v-for="spec in specs" :key="spec.label" class="bls__spec">
-          <Icon :name="spec.icon" class="size-[15px]" />
-          {{ spec.label }}
+      <div class="bls__body">
+        <span class="bls__eyebrow">
+          <Icon name="lucide:flame" class="size-4" />
+          Хит продаж
         </span>
-      </div>
 
-      <span class="bls__prices">
-        <span class="bls__price">{{ formatPrice(price.final) }}&nbsp;₸</span>
-        <span v-if="price.old" class="bls__price-old">
-          {{ formatPrice(price.old) }}&nbsp;₸
-        </span>
-        <span v-if="price.bonus > 0" class="bls__bonus">
-          <Icon name="lucide:gift" class="size-[15px]" />
-          +{{ formatPrice(price.bonus) }} бонусов
-        </span>
-      </span>
+        <NuxtLink :to="`/catalog/products/${hit.slug}`" class="bls__name">
+          {{ hit.name }}
+        </NuxtLink>
 
-      <div class="bls__actions">
-        <button type="button" class="bls__cta" @click="addToCart">
-          <Icon name="solar:cart-3-bold" class="size-[19px]" />
-          В корзину
-        </button>
-        <button type="button" class="bls__wish" @click="toggleWish">
-          <Icon
-            :name="isWished ? 'line-md:heart-filled' : 'line-md:heart'"
-            class="size-[19px]"
-            mode="svg"
-          />
-          {{ isWished ? 'В избранном' : 'В избранное' }}
-        </button>
+        <span v-if="rating" class="bls__rating">
+          <Icon name="gravity-ui:star-fill" class="bls__star size-4" />
+          {{ rating.value }}
+          <span class="bls__rating-note">{{ rating.label }}</span>
+        </span>
+
+        <div v-if="specs.length" class="bls__specs">
+          <span v-for="spec in specs" :key="spec.label" class="bls__spec">
+            <Icon :name="spec.icon" class="size-[15px]" />
+            {{ spec.label }}
+          </span>
+        </div>
+
+        <span class="bls__prices">
+          <span class="bls__price">{{ formatPrice(price.final) }}&nbsp;₸</span>
+          <span v-if="price.old" class="bls__price-old">
+            {{ formatPrice(price.old) }}&nbsp;₸
+          </span>
+          <span v-if="price.bonus > 0" class="bls__bonus">
+            <Icon name="lucide:gift" class="size-[15px]" />
+            +{{ formatPrice(price.bonus) }} бонусов
+          </span>
+        </span>
+
+        <div class="bls__actions">
+          <button type="button" class="bls__cta" @click="addToCart">
+            <Icon name="solar:cart-3-bold" class="size-[19px]" />
+            В корзину
+          </button>
+          <button type="button" class="bls__wish" @click="toggleWish">
+            <Icon
+              :name="isWished ? 'line-md:heart-filled' : 'line-md:heart'"
+              class="size-[19px]"
+              mode="svg"
+            />
+            {{ isWished ? 'В избранном' : 'В избранное' }}
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -210,18 +213,35 @@ async function toggleWish() {
 <style scoped>
 /* @layer components — см. docs/SCOPED_STYLES_TAILWIND_LAYERS.md */
 @layer components {
+  /*
+   * Полоса во всю ширину экрана — макет `Бренд LEGO v2.dc.html`. Раньше это
+   * была карточка с радиусом внутри контейнера.
+   */
   .bls {
+    position: relative;
+    padding: 34px 0;
+    background: linear-gradient(150deg, #0b1526 0%, #17253f 55%, #091322 100%);
+    overflow: hidden;
+  }
+
+  .bls__inner {
     position: relative;
     display: grid;
     grid-template-columns: 1fr;
     gap: 18px;
     align-items: center;
-    margin-top: 28px;
-    padding: 18px;
-    overflow: hidden;
-    border-radius: 24px;
-    background: linear-gradient(150deg, #0e1a33 0%, #17253f 55%, #0b1630 100%);
-    box-shadow: 0 22px 50px rgb(9 17 35 / 0.34);
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--page-gutter);
+  }
+
+  .bls__studs {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 13px 13px, rgb(255 255 255 / 0.07) 5.5px, rgb(0 0 0 / 0) 6.5px);
+    background-size: 42px 42px;
+    pointer-events: none;
   }
 
   /* Тёплое пятно из макета: держит взгляд на фотографии. */
@@ -410,15 +430,16 @@ async function toggleWish() {
 
   @media (min-width: 760px) {
     .bls {
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-      gap: 30px;
-      margin-top: 44px;
-      padding: 30px;
-      border-radius: 30px;
+      padding: 64px 0;
+    }
+
+    .bls__inner {
+      grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+      gap: 34px;
     }
 
     .bls__img {
-      border-radius: 24px;
+      border-radius: 22px;
     }
 
     .bls__name {
