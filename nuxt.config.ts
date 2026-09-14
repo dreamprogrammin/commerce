@@ -326,6 +326,53 @@ export default defineNuxtConfig({
               '/_nuxt',
             ],
           },
+          /*
+           * Краулеры ИИ-поисковиков — отдельной группой.
+           *
+           * Формально они и так подпадали под `*` и получали 200 (проверено
+           * запросами к проду 14 сентября 2026 от имени GPTBot, OAI-SearchBot,
+           * ChatGPT-User, PerplexityBot, ClaudeBot, Google-Extended, Bingbot,
+           * Applebot). Группа нужна не чтобы «разрешить», а чтобы намерение
+           * было записано: правило по своему имени бот читает первым, и
+           * случайный `Disallow: /` в общей группе больше не отключит нас от
+           * ИИ-выдачи молча.
+           *
+           * Набор путей тот же, что у `*`: приватные разделы закрыты и для
+           * них. На превью (`isPreview`) вся эта ветка не действует — там
+           * одна запрещающая группа.
+           */
+          {
+            userAgent: [
+              'GPTBot',
+              'OAI-SearchBot',
+              'ChatGPT-User',
+              'PerplexityBot',
+              'Perplexity-User',
+              'ClaudeBot',
+              'Claude-User',
+              'Claude-SearchBot',
+              'Google-Extended',
+              'Applebot-Extended',
+              'meta-externalagent',
+              'Amazonbot',
+              'CCBot',
+            ],
+            allow: ['/', '/catalog/**', '/brand/**'],
+            disallow: [
+              '/admin',
+              '/confirm',
+              '/order',
+              '/profile',
+              '/cart',
+              '/checkout',
+              '/search',
+              '/notifications',
+              '/auth',
+              '/api/**',
+              '/__nuxt',
+              '/_nuxt',
+            ],
+          },
           // Yandex-специфичная конфигурация для очистки параметров фильтров
           {
             userAgent: ['Yandex'],
