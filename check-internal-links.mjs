@@ -18,6 +18,13 @@ const SKIP = [/^\/profile/, /^\/admin/, /^\/checkout/, /^\/auth/, /^\/api\//]
 
 const PAGES = ['/', '/brand/lego', '/catalog', '/about', '/terms', '/returns']
 
+/*
+ * Страницы, которые обязаны отвечать 200. `/forgot-password` и `/register`
+ * до 14 сентября 2026 отдавали 500 — и на проде тоже: их шаблоны читали
+ * `authStore.errors.…`, а такого поля в сторе нет.
+ */
+const MUST_RENDER = ['/forgot-password', '/register', '/reset-password', '/confirm']
+
 const fails = []
 function check(ok, text) {
   console.log(`${ok ? '  ok  ' : ' ПРОВАЛ '} ${text}`)
@@ -87,7 +94,16 @@ for (const page of PAGES) {
   const found = new Map()
   for (const file of files) {
     const source = readFileSync(file, 'utf8')
-    for (const match of source.matchAll(/\b(?:to|href)="(\/[a-z0-9\-/#]*)"/gi)) {
+    /*
+     * Кроме разметки смотрим и переходы из кода: `navigateTo('/login')` в
+     * `reset-password` уводил человека на несуществующий адрес сразу после
+     * смены пароля, и в разметке этого не видно.
+     */
+    const patterns = [
+      /\b(?:to|href)="(\/[a-z0-9\-/#]*)"/gi,
+      /navigateTo\(\s*'(\/[a-z0-9\-/#]*)'/gi,
+    ]
+    for (const match of [...patterns.flatMap(re => [...source.matchAll(re)])]) {
       const path = match[1]
       if (path === '/' || SKIP.some(rule => rule.test(path)))
         continue
@@ -134,6 +150,11 @@ for (const page of PAGES) {
     check(target.includes(`id="${anchor}"`), `на /terms есть якорь #${anchor}`)
     check(/Бонусная программа/i.test(target), 'в этом же документе описаны условия бонусов')
   }
+}
+
+for (const path of MUST_RENDER) {
+  const response = await fetch(`${BASE}${path}`, { redirect: 'follow' })
+  check(response.status === 200, `${path} отвечает ${response.status}`)
 }
 
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: внутренние ссылки живые' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)
