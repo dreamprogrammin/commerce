@@ -12,7 +12,6 @@
  */
 import type { ProductLine, ProductWithGallery } from '@/types'
 import { BRAND_THEMES, matchesAge, matchesPrice, themesOf } from '@/utils/brandLandingFilters'
-import { formatPrice } from '@/utils/formatPrice'
 import { pluralRu } from '@/utils/seoDescription'
 
 const props = defineProps<{
@@ -159,45 +158,23 @@ const emptyTitle = computed(() => {
   return line ? `Серия ${line.name} скоро приедет` : 'Под такой отбор пока ничего нет'
 })
 
-// ── Подписи ползунков ──
-const ageLabel = computed(() => `${ageLo.value}–${ageHi.value >= ageBounds.value.hi ? `${ageBounds.value.hi}+` : ageHi.value} лет`)
-const priceLabel = computed(() => `${formatPrice(priceLo.value)} – ${formatPrice(priceHi.value)} ₸`)
-
-function fraction(value: number, lo: number, hi: number) {
-  return hi === lo ? 0 : (value - lo) / (hi - lo)
-}
-
-const ageFill = computed(() => ({
-  left: `calc(${fraction(ageLo.value, ageBounds.value.lo, ageBounds.value.hi) * 100}% )`,
-  width: `${(fraction(ageHi.value, ageBounds.value.lo, ageBounds.value.hi) - fraction(ageLo.value, ageBounds.value.lo, ageBounds.value.hi)) * 100}%`,
-}))
-
-const priceFill = computed(() => ({
-  left: `calc(${fraction(priceLo.value, priceBounds.value.lo, priceBounds.value.hi) * 100}% )`,
-  width: `${(fraction(priceHi.value, priceBounds.value.lo, priceBounds.value.hi) - fraction(priceLo.value, priceBounds.value.lo, priceBounds.value.hi)) * 100}%`,
-}))
-
 // ── Действия ──
-function onAgeLo(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
+function setAgeLo(value: number) {
   ageLo.value = Math.min(value, ageHi.value)
   showAll.value = false
 }
 
-function onAgeHi(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
+function setAgeHi(value: number) {
   ageHi.value = Math.max(value, ageLo.value)
   showAll.value = false
 }
 
-function onPriceLo(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
+function setPriceLo(value: number) {
   priceLo.value = Math.min(value, priceHi.value)
   showAll.value = false
 }
 
-function onPriceHi(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
+function setPriceHi(value: number) {
   priceHi.value = Math.max(value, priceLo.value)
   showAll.value = false
 }
@@ -272,63 +249,34 @@ watch(
 
       <div class="blp__card">
         <div class="blp__sliders">
-          <div class="blp__band">
-            <span class="blp__band-label">Возраст</span>
-            <span class="blp__range">
-              <span class="blp__track" />
-              <span class="blp__fill" :style="ageFill" />
-              <span class="blp__cap">{{ ageLabel }}</span>
-              <input
-                class="blp__input"
-                type="range"
-                :min="ageBounds.lo"
-                :max="ageBounds.hi"
-                step="1"
-                :value="ageLo"
-                aria-label="Возраст от"
-                @input="onAgeLo"
-              >
-              <input
-                class="blp__input"
-                type="range"
-                :min="ageBounds.lo"
-                :max="ageBounds.hi"
-                step="1"
-                :value="ageHi"
-                aria-label="Возраст до"
-                @input="onAgeHi"
-              >
-            </span>
-          </div>
+          <CommonRangeFilter
+            label="Возраст"
+            tone="blue"
+            compact
+            :min="ageBounds.lo"
+            :max="ageBounds.hi"
+            :lo="ageLo"
+            :hi="ageHi"
+            :unit-forms="['год', 'года', 'лет']"
+            @update:lo="setAgeLo"
+            @update:hi="setAgeHi"
+          />
 
-          <div class="blp__band">
-            <span class="blp__band-label">Цена</span>
-            <span class="blp__range">
-              <span class="blp__track" />
-              <span class="blp__fill" :style="priceFill" />
-              <span class="blp__cap">{{ priceLabel }}</span>
-              <input
-                class="blp__input"
-                type="range"
-                :min="priceBounds.lo"
-                :max="priceBounds.hi"
-                :step="priceBounds.step"
-                :value="priceLo"
-                aria-label="Цена от"
-                @input="onPriceLo"
-              >
-              <input
-                class="blp__input"
-                type="range"
-                :min="priceBounds.lo"
-                :max="priceBounds.hi"
-                :step="priceBounds.step"
-                :value="priceHi"
-                aria-label="Цена до"
-                @input="onPriceHi"
-              >
-            </span>
-          </div>
+          <CommonRangeFilter
+            label="Цена"
+            tone="yellow"
+            compact
+            thousands
+            :min="priceBounds.lo"
+            :max="priceBounds.hi"
+            :step="priceBounds.step"
+            :lo="priceLo"
+            :hi="priceHi"
+            unit="₸"
+            max-suffix=""
+            @update:lo="setPriceLo"
+            @update:hi="setPriceHi"
+          />
         </div>
 
         <div v-if="themeChips.length > 1" class="blp__block">
@@ -495,105 +443,6 @@ watch(
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
-  }
-
-  .blp__band {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    /* Место справа под подпись значения. */
-    padding-right: 6px;
-    min-width: 0;
-    padding: 8px 14px;
-    border-radius: 14px;
-    background: var(--muted);
-  }
-
-  .blp__band-label {
-    flex: none;
-    color: var(--muted-foreground);
-    font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  /* Двойной ползунок: две дорожки поверх одной шкалы. */
-  .blp__range {
-    position: relative;
-    flex: 1;
-    min-width: 0;
-    height: 52px;
-  }
-
-  .blp__track,
-  .blp__fill {
-    position: absolute;
-    top: 33px;
-    height: 6px;
-    border-radius: 999px;
-  }
-
-  .blp__track {
-    right: 0;
-    left: 0;
-    background: rgb(11 74 143 / 0.16);
-  }
-
-  .blp__fill {
-    background: var(--primary);
-  }
-
-  /* Подпись — НАД дорожкой: на одной линии её перекрывал правый бегунок. */
-  .blp__cap {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    color: var(--foreground);
-    font-weight: 700;
-    font-size: 12.5px;
-    white-space: nowrap;
-    pointer-events: none;
-  }
-
-  /*
-   * Оба `input` лежат друг на друге и прозрачны: видимой остаётся дорожка
-   * выше. События берут только бегунки, иначе верхний вход перехватывал бы
-   * нажатия по всей ширине и нижний бегунок стал бы недоступен.
-   */
-  .blp__input {
-    position: absolute;
-    top: 25px;
-    left: 0;
-    width: 100%;
-    height: 22px;
-    margin: 0;
-    background: transparent;
-    pointer-events: none;
-    appearance: none;
-  }
-
-  .blp__input::-webkit-slider-thumb {
-    width: 22px;
-    height: 22px;
-    border: 2px solid #fff;
-    border-radius: 999px;
-    background: var(--primary);
-    box-shadow: 0 2px 8px rgb(6 20 44 / 0.28);
-    cursor: pointer;
-    pointer-events: auto;
-    appearance: none;
-  }
-
-  .blp__input::-moz-range-thumb {
-    width: 22px;
-    height: 22px;
-    border: 2px solid #fff;
-    border-radius: 999px;
-    background: var(--primary);
-    box-shadow: 0 2px 8px rgb(6 20 44 / 0.28);
-    cursor: pointer;
-    pointer-events: auto;
   }
 
   .blp__block {

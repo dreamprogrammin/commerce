@@ -171,10 +171,14 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   await page.waitForTimeout(3500)
 
   const start = await page.evaluate(() => ({
-    sliders: document.querySelectorAll('.blp__range').length,
-    inputs: document.querySelectorAll('.blp__input').length,
-    ageBounds: [...document.querySelectorAll('.blp__input')].slice(0, 2).map(i => `${i.min}-${i.max}`),
-    caps: [...document.querySelectorAll('.blp__cap')].map(c => c.textContent.trim()),
+    sliders: document.querySelectorAll('.rf__area').length,
+    inputs: document.querySelectorAll('.rf__input').length,
+    ageBounds: [...document.querySelectorAll('.rf__input')].slice(0, 2).map(i => `${i.min}-${i.max}`),
+    caps: [...document.querySelectorAll('.rf__cap')]
+      .filter(c => c.offsetParent !== null)
+      .map(c => c.textContent.trim()),
+    tones: [...document.querySelectorAll('.rf')].map(r => r.className.match(/rf--(\w+)/)?.[1]),
+    studs: document.querySelectorAll('.rf__studs').length,
     themes: [...document.querySelectorAll('.blp__block')][0]?.textContent?.replace(/\s+/g, ' ').trim(),
     seriesChips: document.querySelectorAll('.blp__block:nth-of-type(2) .blp__chip').length,
     cards: document.querySelectorAll('.blp__grid .pc-card').length,
@@ -185,7 +189,15 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   console.log('\n4) подборка')
   check(start.sliders === 2 && start.inputs === 4, `два двойных ползунка (${start.sliders}/${start.inputs})`)
   check(start.ageBounds[0] === '4-12', `границы возраста из данных (${start.ageBounds[0]})`)
-  check(start.caps.length === 2 && start.caps[1].includes('₸'), `подписи ползунков: ${start.caps.join(' | ')}`)
+  check(start.caps.length >= 2 && start.caps.some(c => c.includes('₸')), `подписи на пузырьках: ${start.caps.join(' | ')}`)
+  check(
+    start.tones.join(',') === 'blue,yellow' && start.studs === 2,
+    `полосы по макету RangeFilter: тона ${start.tones.join(', ')}, шипы ${start.studs}`,
+  )
+  check(
+    start.caps.some(c => /^\d+\s(год|года|лет)/.test(c)),
+    `возраст склоняется: ${start.caps.find(c => /(год|года|лет)/.test(c))}`,
+  )
   check(/Интерес/.test(start.themes ?? ''), `чипы интересов: ${start.themes?.slice(0, 60)}`)
   check(start.cards === 8, `в сетке восемь товаров (${start.cards})`)
   check(!start.reset, 'кнопки сброса нет, пока ничего не выбрано')
@@ -193,7 +205,7 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   // Ползунок возраста сужает выдачу.
   const total = Number(start.found?.match(/\d+/)?.[0] ?? 0)
   await page.evaluate(() => {
-    const input = document.querySelectorAll('.blp__input')[0]
+    const input = document.querySelectorAll('.rf__input')[0]
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
     setter.call(input, '10')
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -201,7 +213,7 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   await page.waitForTimeout(700)
   const narrowed = await page.evaluate(() => ({
     found: Number(document.querySelector('.blp__found')?.textContent?.match(/\d+/)?.[0] ?? 0),
-    cap: document.querySelector('.blp__cap')?.textContent?.trim(),
+    cap: [...document.querySelectorAll('.rf__cap')].filter(c => c.offsetParent !== null)[0]?.textContent?.trim(),
     reset: !!document.querySelector('.blp__reset'),
   }))
   check(narrowed.found > 0 && narrowed.found < total, `ползунок возраста сужает выдачу (${total} → ${narrowed.found})`)
@@ -269,7 +281,7 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   await page.evaluate(() => document.querySelectorAll('.bla__card')[2]?.click())
   await page.waitForTimeout(1200)
   const applied = await page.evaluate(() => ({
-    cap: document.querySelector('.blp__cap')?.textContent?.trim(),
+    cap: [...document.querySelectorAll('.rf__cap')].filter(c => c.offsetParent !== null)[0]?.textContent?.trim(),
     reset: !!document.querySelector('.blp__reset'),
   }))
   check(/^10/.test(applied.cap ?? ''), `карточка «10+ лет» выставила отрезок («${applied.cap}»)`)
