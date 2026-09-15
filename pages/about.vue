@@ -3,6 +3,100 @@ import { pageShell } from '@/lib/shell'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
 
+const supabase = useSupabaseClient()
+
+/*
+ * Что здесь считается и почему это не написано текстом.
+ *
+ * До 15 сентября 2026 страница обещала «более 1000 наименований» при 178
+ * активных товарах и перечисляла бренды, которых в каталоге нет вовсе
+ * (Hasbro, Rainbow High, Qman). Сверено с `products` и `brands` на бою. Для
+ * Google это ровно то, что описано в принципах качества как вводящие в
+ * заблуждение сведения, а для покупателя — обещание, которое не сбывается
+ * на первой же странице каталога.
+ *
+ * Поэтому число товаров, список брендов и разделы берутся из базы. Текст,
+ * который нельзя опровергнуть выдачей каталога, не устареет ни при завозе,
+ * ни при распродаже, и его не придётся править руками.
+ *
+ * Запросы дешёвые: три выборки маленьких колонок (178 строк товаров,
+ * 32 бренда, 64 категории), страница закеширована на час (`routeRules`).
+ */
+const { data: catalogFacts } = await useAsyncData('about-catalog-facts', async () => {
+  const [products, brands, categories] = await Promise.all([
+    supabase.from('products').select('brand_id, category_id').eq('is_active', true),
+    supabase.from('brands').select('id, name'),
+    supabase.from('categories').select('id, name, slug, parent_id'),
+  ])
+
+  const rows = products.data ?? []
+  if (!rows.length)
+    return null
+
+  const countBy = (key: 'brand_id' | 'category_id') => {
+    const counts = new Map<string, number>()
+    for (const row of rows) {
+      const id = row[key]
+      if (id)
+        counts.set(id, (counts.get(id) ?? 0) + 1)
+    }
+    return counts
+  }
+
+  const byBrand = countBy('brand_id')
+  const byCategory = countBy('category_id')
+
+  const brandNames = (brands.data ?? [])
+    .filter(brand => byBrand.has(brand.id))
+    .sort((a, b) => (byBrand.get(b.id) ?? 0) - (byBrand.get(a.id) ?? 0))
+    .map(brand => brand.name)
+
+  /*
+   * Адрес категории — цепочка слагов от корня, как в карте сайта
+   * (`/catalog/kiddy/katalki`). Каталог отвечает 200 и на короткий путь из
+   * одного слага, но canonical считается от `route.path`, и такая ссылка
+   * плодила бы второй адрес той же страницы.
+   */
+  const categoryById = new Map((categories.data ?? []).map(category => [category.id, category]))
+  const pathOf = (id: string) => {
+    const chain: string[] = []
+    let current = categoryById.get(id)
+    while (current) {
+      chain.unshift(current.slug)
+      current = current.parent_id ? categoryById.get(current.parent_id) : undefined
+    }
+    return chain.length ? `/catalog/${chain.join('/')}` : null
+  }
+
+  const sections = [...byCategory.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([id, count]) => ({
+      name: categoryById.get(id)?.name?.trim() ?? '',
+      count,
+      path: pathOf(id),
+    }))
+    .filter(section => section.name && section.path)
+
+  return { products: rows.length, brandNames, sections }
+})
+
+/** «178 игрушек» — с правильным окончанием, число приходит из базы. */
+const productsPhrase = computed(() => {
+  const total = catalogFacts.value?.products ?? 0
+  const tail = total % 10
+  const teen = total % 100
+  const word = tail === 1 && teen !== 11
+    ? 'игрушка'
+    : tail >= 2 && tail <= 4 && (teen < 12 || teen > 14)
+      ? 'игрушки'
+      : 'игрушек'
+  return `${total} ${word}`
+})
+
+/** Первые шесть брендов по числу живых товаров — остальные уводим в «и другие». */
+const topBrands = computed(() => (catalogFacts.value?.brandNames ?? []).slice(0, 6))
+
 // BreadcrumbList JSON-LD
 useBreadcrumbSchema([{ name: 'О нас' }])
 
@@ -77,10 +171,16 @@ useSeoMeta({
           Почему выбирают нас
         </h2>
         <ul class="list-disc space-y-2 pl-6">
-          <li>
-            <strong>Широкий ассортимент:</strong> Более 1000 наименований
-            игрушек от ведущих мировых брендов — LEGO, MGA Entertainment,
-            Mattel, Hasbro и многих других.
+          <li v-if="catalogFacts">
+            <strong>Каталог, который можно проверить:</strong> сейчас в нём
+            {{ productsPhrase }} от {{ catalogFacts.brandNames.length }} брендов —
+            {{ topBrands.join(', ') }}<span v-if="catalogFacts.brandNames.length > topBrands.length"> и другие</span>.
+            Число берётся из каталога, а не из рекламного текста.
+          </li>
+          <li v-else>
+            <strong>Игрушки известных брендов:</strong> конструкторы, куклы,
+            радиоуправляемые машинки и развивающие игрушки — всё, что есть в
+            каталоге, лежит на нашем складе в Алматы.
           </li>
           <li>
             <strong>Качество и безопасность:</strong> Все товары сертифицированы
@@ -111,10 +211,23 @@ useSeoMeta({
         <h2 class="text-xl font-semibold">
           Наш ассортимент
         </h2>
-        <p>В нашем каталоге вы найдёте:</p>
-        <ul class="list-disc space-y-1 pl-6">
-          <li>Конструкторы (LEGO, CADA, Qman и другие)</li>
-          <li>Куклы и аксессуары (LOL Surprise, Barbie, Rainbow High)</li>
+        <p v-if="catalogFacts">
+          Самые полные разделы каталога на сегодня — с числом товаров в каждом:
+        </p>
+        <p v-else>
+          В нашем каталоге вы найдёте:
+        </p>
+        <ul v-if="catalogFacts" class="list-disc space-y-1 pl-6">
+          <li v-for="section in catalogFacts.sections" :key="section.path!">
+            <NuxtLink :to="section.path!" class="text-primary hover:underline">
+              {{ section.name }}
+            </NuxtLink>
+            — {{ section.count }}
+          </li>
+        </ul>
+        <ul v-else class="list-disc space-y-1 pl-6">
+          <li>Конструкторы</li>
+          <li>Куклы и аксессуары</li>
           <li>
             Машинки и транспорт (радиоуправляемые, металлические, игровые
             наборы)
@@ -122,7 +235,6 @@ useSeoMeta({
           <li>
             Развивающие игрушки для малышей (бизиборды, сортеры, пирамидки)
           </li>
-          <li>Настольные игры и пазлы</li>
           <li>Мягкие игрушки</li>
           <li>Игрушки для активного отдыха</li>
           <li>Творчество и рукоделие</li>
@@ -207,7 +319,14 @@ useSeoMeta({
           <li>
             <strong>Адрес:</strong> г. Алматы, мкр. Шапагат, ул. Амангельды
           </li>
-          <li><strong>Режим работы:</strong> Ежедневно с 10:00 до 20:00</li>
+          <!--
+            Часы держим ровно те же, что в разметке `Store` на главной
+            (`pages/index.vue`, `openingHours: 'Mo-Su 09:00-21:00'`). До
+            15 сентября 2026 страница писала «с 10:00 до 20:00», и сайт
+            противоречил сам себе; какие часы верные — сказал владелец.
+            Меняете здесь — меняйте и там.
+          -->
+          <li><strong>Режим работы:</strong> Ежедневно с 9:00 до 21:00</li>
         </ul>
       </section>
 
