@@ -32,7 +32,6 @@ import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/
 import { categoryStaticFor } from '@/constants/categoryStaticText'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
-import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import {
   buildBrandLandingPath,
@@ -93,7 +92,6 @@ if (route.query.q) {
 }
 const supabase = useSupabaseClient()
 const categoriesStore = useCategoriesStore()
-const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
@@ -1707,48 +1705,16 @@ if (import.meta.client && _filterPayload.value) {
   isLoadingFilters.value = false
 }
 
-// FAQ загружаем обычным способом
-const { data: categoryQuestions } = await useAsyncData(
-  `catalog-faq-${currentCategorySlug.value}-${activeBrandSlug.value || 'all'}`,
-  async () => {
-    const category = categoriesStore.allCategories.find(
-      c => c.slug === currentCategorySlug.value,
-    )
-    if (!category?.id || currentCategorySlug.value === 'all')
-      return []
-
-    try {
-      if (activeBrandSlug.value && categoryBrandSeo.value) {
-        const { data } = await supabase
-          .from('category_brand_questions')
-          .select('*')
-          .eq('category_id', category.id)
-          .eq('brand_id', categoryBrandSeo.value.brand_id)
-          .order('created_at', { ascending: true })
-
-        if (data && data.length > 0) {
-          return data.map(q => ({
-            id: q.id,
-            question: q.question_text,
-            answer: q.answer_text,
-          }))
-        }
-      }
-
-      return await categoryQuestionsStore.fetchQuestions(category.id)
-    }
-    catch (error) {
-      console.error('Error fetching FAQ:', error)
-      return []
-    }
-  },
-  {
-    watch: [currentCategorySlug, activeBrandSlug],
-    server: true,
-  },
-)
-
-const faqQuestions = computed(() => categoryQuestions.value || [])
+/*
+ * Здесь лежал `useAsyncData('catalog-faq-…')`, тянувший вопросы категории (или
+ * связки категория+бренд) в `faqQuestions`. Снят 15 сентября 2026: результат
+ * не использовался НИГДЕ — ни в разметке страницы, ни в JSON-LD. Вопросы на
+ * странице рисует `CategoryQuestions`, он грузит их сам по `category_id`.
+ *
+ * Чем это было плохо: лишний запрос к базе на каждый серверный рендер любой
+ * категории и лишний вес payload — тексты вопросов уезжали в `__NUXT_DATA__`
+ * и тут же выбрасывались.
+ */
 
 const currentCategoryId = computed(() => {
   const cat = categoriesStore.allCategories.find(
