@@ -254,10 +254,23 @@ const facts = computed<BrandFact[]>(() => {
     <div ref="aboutRef" class="bct__anchor bct__about-band">
       <div class="bct__inner">
         <section class="bct__about">
-          <div class="bct__col">
-            <article v-if="aboutHtml" class="bct__text" v-html="aboutHtml" />
+          <!--
+            Текст и вопросы лежат в ОДНОМ `<article>`, и это не косметика.
+            Раньше статьёй был только текст, а блок вопросов стоял сиблингом
+            после неё — извлекатели основного содержимого берут статью и
+            отбрасывают соседей. Проверено 15 сентября 2026 на бою тем же
+            инструментом, которым это нашли: trafilatura вернула 791 слово и
+            НИ ОДНОГО вопроса. Для ИИ-поиска это потеря самого цитируемого
+            формата: пары «вопрос — ответ» он берёт охотнее сплошного текста.
+
+            Классы не тронуты: `.bct__col` держит колонку флексом с отступом,
+            `.bct__text` — карточку с текстом, оба правила по классу, а не по
+            тегу.
+          -->
+          <article class="bct__col">
+            <div v-if="aboutHtml" class="bct__text" v-html="aboutHtml" />
             <BrandLandingFaq :items="faq" />
-          </div>
+          </article>
 
           <aside class="bct__facts">
             <BrandFactsCard :facts="facts" />
