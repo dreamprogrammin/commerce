@@ -150,7 +150,7 @@ describe('composeCategoryMeta', () => {
   it('вперёд идут товар, количество и цена', () => {
     const meta = composeCategoryMeta(base)
     expect(plain(meta).startsWith('Куклы в Алматы: 48 моделей от 3 690 ₸.')).toBe(true)
-    expect(meta).toContain('Доставка за 1 день, самовывоз')
+    expect(meta).toContain('Доставка 1–3 дня, самовывоз')
   })
 
   /*
@@ -210,7 +210,7 @@ describe('composeCategoryMeta', () => {
       minPrice: null,
       topBrands: [],
     })
-    expect(meta).toBe('Куклы в Алматы. Доставка за 1 день, самовывоз.')
+    expect(meta).toBe('Куклы в Алматы. Доставка 1–3 дня, самовывоз.')
   })
 
   it('одна модель — единственное число', () => {
@@ -232,7 +232,7 @@ describe('composeCategoryMeta', () => {
     })
     expect(meta.startsWith('Куклы, наборы и мягкие игрушки')).toBe(true)
     expect(plain(meta)).toContain('38 моделей от 5 090 ₸')
-    expect(meta).toContain('Доставка по Алматы за 1 день, самовывоз')
+    expect(meta).toContain('Доставка по Алматы 1–3 дня, самовывоз')
   })
 
   it('город называется один раз', () => {
@@ -276,5 +276,15 @@ describe('composeCategoryMeta', () => {
       reviewsCount: 88,
     })
     expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+  })
+  it('не обещает доставку за день: по условиям это 1–3 рабочих дня', () => {
+    const meta = composeCategoryMeta({
+      categoryName: 'Куклы',
+      city: 'Алматы',
+      productsCount: 19,
+      minPrice: 3690,
+    })
+    expect(meta).not.toContain('за 1 день')
+    expect(meta).toContain('1–3 дня')
   })
 })
