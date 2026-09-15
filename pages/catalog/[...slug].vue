@@ -28,11 +28,10 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { useSeoTemplates } from '@/composables/useSeoTemplates'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/constants'
+import { categoryStaticFor } from '@/constants/categoryStaticText'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
-import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import {
   buildBrandLandingPath,
@@ -40,7 +39,7 @@ import {
   parseCatalogSlug,
 } from '@/utils/brandLanding'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { composeCategoryMeta } from '@/utils/seoDescription'
+import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
 // DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
@@ -93,9 +92,8 @@ if (route.query.q) {
 }
 const supabase = useSupabaseClient()
 const categoriesStore = useCategoriesStore()
-const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
-const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 const { generateBrandCategoryDescription } = useSeoTemplates()
 
@@ -425,6 +423,16 @@ const categoryName = computed(() => {
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 
+/*
+ * Запасной текст, заголовок и вопросы для корневых разделов — из репозитория.
+ * База ГЛАВНЕЕ: как только `seo_text` или `seo_h1` заполнят в админке,
+ * показываться будет она. Зачем это вообще нужно — в шапке
+ * `constants/categoryStaticText.ts`.
+ */
+const categoryStatic = computed(() =>
+  activeBrand.value ? undefined : categoryStaticFor(currentCategorySlug.value),
+)
+
 const title = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
@@ -443,7 +451,7 @@ const title = computed(() => {
     return `${prefix} в Алматы`
   }
 
-  return currentCategory.value?.seo_h1 || categoryName.value
+  return currentCategory.value?.seo_h1 || categoryStatic.value?.h1 || categoryName.value
 })
 
 const priceRange = ref({ min: 0, max: 50000 })
@@ -1327,8 +1335,16 @@ const topBrands = computed(() => {
 
 const metaDescription = computed(() => {
   if (activeBrand.value && categoryBrandSeo.value) {
-    if (categoryBrandSeo.value.seo_description) {
-      return categoryBrandSeo.value.seo_description
+    /*
+     * Сохранённое описание показываем, только если оно не собрано СТАРЫМ
+     * шаблоном: тот открывался эмодзи, вставлял звёзды с одного отзыва и
+     * обещал доставку «за 1 день» — по условиям магазина это 1–3 рабочих дня.
+     * Таких строк в базе пять из четырнадцати, остальные написаны руками.
+     * Их не трогаем, а машинные собираем заново по нынешним правилам.
+     */
+    const stored = categoryBrandSeo.value.seo_description
+    if (stored && !hasLegacyTemplateMarks(stored)) {
+      return stored
     }
 
     return generateBrandCategoryDescription({
@@ -1689,48 +1705,16 @@ if (import.meta.client && _filterPayload.value) {
   isLoadingFilters.value = false
 }
 
-// FAQ загружаем обычным способом
-const { data: categoryQuestions } = await useAsyncData(
-  `catalog-faq-${currentCategorySlug.value}-${activeBrandSlug.value || 'all'}`,
-  async () => {
-    const category = categoriesStore.allCategories.find(
-      c => c.slug === currentCategorySlug.value,
-    )
-    if (!category?.id || currentCategorySlug.value === 'all')
-      return []
-
-    try {
-      if (activeBrandSlug.value && categoryBrandSeo.value) {
-        const { data } = await supabase
-          .from('category_brand_questions')
-          .select('*')
-          .eq('category_id', category.id)
-          .eq('brand_id', categoryBrandSeo.value.brand_id)
-          .order('created_at', { ascending: true })
-
-        if (data && data.length > 0) {
-          return data.map(q => ({
-            id: q.id,
-            question: q.question_text,
-            answer: q.answer_text,
-          }))
-        }
-      }
-
-      return await categoryQuestionsStore.fetchQuestions(category.id)
-    }
-    catch (error) {
-      console.error('Error fetching FAQ:', error)
-      return []
-    }
-  },
-  {
-    watch: [currentCategorySlug, activeBrandSlug],
-    server: true,
-  },
-)
-
-const faqQuestions = computed(() => categoryQuestions.value || [])
+/*
+ * Здесь лежал `useAsyncData('catalog-faq-…')`, тянувший вопросы категории (или
+ * связки категория+бренд) в `faqQuestions`. Снят 15 сентября 2026: результат
+ * не использовался НИГДЕ — ни в разметке страницы, ни в JSON-LD. Вопросы на
+ * странице рисует `CategoryQuestions`, он грузит их сам по `category_id`.
+ *
+ * Чем это было плохо: лишний запрос к базе на каждый серверный рендер любой
+ * категории и лишний вес payload — тексты вопросов уезжали в `__NUXT_DATA__`
+ * и тут же выбрасывались.
+ */
 
 const currentCategoryId = computed(() => {
   const cat = categoriesStore.allCategories.find(
@@ -1981,11 +1965,17 @@ const schemaData = computed(() => {
               }),
             },
             ...(product.barcode && { gtin: product.barcode }),
+            /*
+             * `IMAGE_SIZES.CARD` третьим аргументом здесь НЕ работал: пока
+             * `IMAGE_OPTIMIZATION_ENABLED = false`, `getImageUrl` игнорирует
+             * опции и отдаёт голый путь, а он на хранилище отдаёт 400.
+             * Нужен вариант с суффиксом — как на карточке товара.
+             */
             ...(product.product_images?.[0]?.image_url && {
-              image: getImageUrl(
+              image: getVariantUrl(
                 BUCKET_NAME_PRODUCT,
                 product.product_images[0].image_url,
-                IMAGE_SIZES.CARD,
+                'lg',
               ),
             }),
             'offers': {
@@ -2048,6 +2038,27 @@ const schemaData = computed(() => {
             }),
           },
         })),
+    })
+  }
+
+  /*
+   * FAQPage — ТОЛЬКО из статических вопросов раздела, то есть из тех, что
+   * показаны на странице блоком `StaticSeoBlock`.
+   *
+   * Вопросы, которые генерирует SQL-функция и показывает `CategoryQuestions`,
+   * в разметку не идут намеренно: они собираются подстановкой названия
+   * категории в шаблон, а названия у нас в дательном падеже. На
+   * `/catalog/girls` это выглядит как «Что такое Девочкам?» и «Сколько стоят
+   * Девочкам в Алматы?». Такое нельзя отдавать поиску расширенным сниппетом.
+   */
+  if (categoryStatic.value?.faq.length) {
+    schemas.push({
+      '@type': 'FAQPage',
+      'mainEntity': categoryStatic.value.faq.map(item => ({
+        '@type': 'Question',
+        'name': item.q,
+        'acceptedAnswer': { '@type': 'Answer', 'text': item.a },
+      })),
     })
   }
 
@@ -2638,15 +2649,32 @@ else {
       class="mt-8"
     />
 
+    <!-- Свой текст и вопросы корневого раздела — из репозитория.
+
+         Показываются, только когда в базе текста нет (`seoBlocks` пуст) и
+         фильтры не активны. Почему не через `SEOContentRenderer`, которым
+         рисуется текст из базы: тот разбирает HTML регулярками и ВЫРЕЗАЕТ
+         ССЫЛКИ, а половина смысла этого текста — увести в подразделы. -->
+    <CommonStaticSeoBlock
+      v-if="categoryStatic && seoBlocks.length === 0 && !hasActiveFilters"
+      :html="categoryStatic.html"
+      :faq="categoryStatic.faq"
+    />
+
     <!-- FAQ блок для категории — рисуется НА СЕРВЕРЕ.
 
          `ClientOnly` снят: пока он стоял, вопросы и ответы не попадали в
          серверную разметку, хотя FAQ — ровно тот контент, который Google
          показывает расширенными сниппетами. Данные компонент берёт через
          useAsyncData, а санитайзер в нём переведён с DOM на регулярки —
-         иначе серверный рендер был бы невозможен. -->
+         иначе серверный рендер был бы невозможен.
+
+         У разделов со СВОИМИ вопросами (блок выше) этот скрыт: шаблонные
+         вопросы SQL-генератора подставляют название раздела в дательном
+         падеже и получаются нечитаемыми — разбор в шапке
+         `constants/categoryStaticText.ts`. -->
     <CategoryQuestions
-      v-if="currentCategory"
+      v-if="currentCategory && !categoryStatic"
       :category-id="currentCategory.id"
       :category-name="currentCategory.name"
     />

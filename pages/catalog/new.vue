@@ -15,7 +15,10 @@ const siteName = 'Ухтышка'
 const pageUrl = `${siteUrl}/catalog/new`
 
 const metaTitle = 'Новинки - Новые детские игрушки | Ухтышка'
-const metaDescription = 'Новинки детских игрушек в интернет-магазине Ухтышка ⭐ Самые новые и актуальные игрушки для детей всех возрастов ✓ Доставка по Казахстану ✓ Бонусная программа'
+// Без эмодзи и звёзд — то же правило, что у описаний категорий
+// (`composeCategoryMeta`): Google вырезает их из русской выдачи, а знаки
+// под них тратятся. Сроки — из опубликованных условий `/terms`.
+const metaDescription = 'Новинки детских игрушек в Ухтышке: то, что приехало на склад последним. Доставка по Алматы 1–3 дня, по Казахстану 3–7, самовывоз.'
 
 // Загрузка новинок
 const { data: products, pending } = await useAsyncData(
@@ -61,6 +64,23 @@ useBreadcrumbSchema([
   { name: 'Новинки' },
 ])
 
+/*
+ * Пустой листинг закрываем от индекса.
+ *
+ * На 15 сентября 2026 `/catalog/new` отдавал 200 и `index, follow` при НУЛЕ
+ * товаров с `is_new`, и при этом его нет ни в карте сайта, ни в навигации —
+ * страница-сирота, которую Google уже пометил «Crawled — currently not
+ * indexed». Правило то же, что у бренд-лендингов (`isBrandLandingIndexable`):
+ * нет товара — нет страницы в индексе. Появится товар — вернётся сама, как и
+ * адрес в карте сайта.
+ *
+ * `robots` — computed, а не строка: с `lazy: true` данные приходят уже после
+ * setup, и снимок на этом месте всегда считал бы список пустым.
+ */
+const robotsIndexable = useRobotsContent('index, follow')
+const robotsEmpty = useRobotsContent('noindex, follow')
+const robots = computed(() => (products.value?.length ? robotsIndexable : robotsEmpty))
+
 // SEO мета-теги
 useHead({
   title: metaTitle,
@@ -84,7 +104,7 @@ useHead({
     { name: 'twitter:description', content: metaDescription },
 
     // Robots
-    { name: 'robots', content: useRobotsContent('index, follow') },
+    { name: 'robots', content: robots },
   ],
 })
 </script>

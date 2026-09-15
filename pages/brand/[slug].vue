@@ -32,7 +32,7 @@ interface BrandLandingCategory {
 const route = useRoute()
 const supabase = useSupabaseClient()
 const productsStore = useProductsStore()
-const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
@@ -723,10 +723,22 @@ useHead({
               ...(product.description && {
                 description: cleanDescription(product.description, 200),
               }),
+              /*
+               * Вариант с суффиксом, а не голый путь. В `product_images.image_url`
+               * лежит путь БЕЗ расширения (`.../uhti-product-…-46e271a8`), файлы
+               * на хранилище называются `…_sm.webp`, `…_md.webp`, `…_lg.webp`.
+               * Публичный URL по голому пути отдаёт 400 — проверено на бою
+               * 15 сентября 2026 на всех бренд-страницах.
+               *
+               * `getImageUrl` здесь не подходит и с третьим аргументом:
+               * трансформация выключена (`IMAGE_OPTIMIZATION_ENABLED = false`),
+               * и опции размера молча игнорируются.
+               */
               ...(product.product_images?.[0]?.image_url && {
-                image: getImageUrl(
+                image: getVariantUrl(
                   BUCKET_NAME_PRODUCT,
                   product.product_images[0].image_url,
+                  'lg',
                 ),
               }),
               // FIX: короткий SKU из поля БД, не slug

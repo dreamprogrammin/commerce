@@ -3,6 +3,7 @@ import type { CategoryRow } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
+import { catalogFaq, catalogStaticHtml } from '@/constants/catalogStaticText'
 import { catalogRootShell } from '@/lib/shell'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
@@ -17,7 +18,12 @@ const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
 const catalogUrl = `${siteUrl}/catalog`
 
-const metaTitle = 'Каталог детских игрушек - Купить игрушки для детей в Алматы | Ухтышка'
+/*
+ * Длина заголовка. Было 69 знаков — «Каталог детских игрушек - Купить игрушки
+ * для детей в Алматы | Ухтышка», и в выдаче хвост срезался вместе с именем
+ * магазина. Google показывает около 60. Осталось 42: раздел, город, магазин.
+ */
+const metaTitle = 'Каталог детских игрушек в Алматы | Ухтышка'
 /*
  * Описание корневого каталога. Было 178 знаков со звёздочками и галочками
  * («⭐ … ✓ Доставка … ✓ Бонусная программа»): Google показывает около 160,
@@ -127,6 +133,25 @@ useHead(() => {
       }),
     },
   ]
+
+  /*
+   * FAQPage собирается из `catalogFaq` — ровно тех вопросов, которые ПОКАЗАНЫ
+   * на странице компонентом `CatalogHubText`. Разметка, которой нет в видимом
+   * тексте, Google игнорируется, а то и считается нарушением (тот же урок, что
+   * на лендинге бренда 14 сентября).
+   */
+  schemas.push({
+    type: 'application/ld+json',
+    innerHTML: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      'mainEntity': catalogFaq.map(item => ({
+        '@type': 'Question',
+        'name': item.q,
+        'acceptedAnswer': { '@type': 'Answer', 'text': item.a },
+      })),
+    }),
+  })
 
   if (secondLevelCategories.value.length > 0) {
     schemas.push({
@@ -453,6 +478,13 @@ function getCategoryColor(index: number): string {
         </div>
       </div>
     </div>
+
+    <!--
+      Текст и вопросы. Рисуются ОДИН раз, вне обеих веток раскладки: мобильная
+      и десктопная лежат в разметке всегда (прячет их CSS, а не `v-if`), и
+      внутри любой из них текст уехал бы роботу дважды.
+    -->
+    <CommonStaticSeoBlock :html="catalogStaticHtml" :faq="catalogFaq" />
   </div>
 </template>
 

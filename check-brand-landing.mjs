@@ -497,6 +497,38 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   await ctx.close()
 }
 
+// ---------- 14. Приоритет картинок ----------
+/*
+ * Смысл проверки. `fetchpriority="high"` имеет смысл ровно у одной картинки —
+ * той, по которой считается LCP. На бою 15 сентября 2026 их на лендинге было
+ * ОДИННАДЦАТЬ: три в шапке и восемь в сетках подборки и рекомендаций, куда
+ * приходил проп `position`, придуманный для сетки каталога. Восемь картинок
+ * ниже сгиба отбирали канал у той единственной, что видна сразу.
+ *
+ * Считаем не теги, а РАЗНЫЕ ссылки: витрина флагмана нарисована дважды
+ * (полоса для телефона и сцена для десктопа, одна из них скрыта), ссылка там
+ * одна и запрос тоже один.
+ */
+{
+  const html = await (await fetch(`${BASE}/brand/lego`)).text()
+  const priority = new Set()
+  for (const [tag] of html.matchAll(/<img[^>]*>/g)) {
+    if (!/fetchpriority="high"/.test(tag))
+      continue
+    priority.add(tag.match(/src="([^"]*)"/)?.[1] ?? '')
+  }
+
+  console.log('\n14) приоритет картинок')
+  check(
+    priority.size <= 1,
+    `приоритетных ссылок на картинки: ${priority.size} (было 11 до правки)`,
+  )
+  check(
+    [...priority].every(src => src.includes('/product-images/')),
+    'приоритетная картинка — витрина товара, а не значок',
+  )
+}
+
 await browser.close()
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: лендинг бренда по макету v2' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)
 process.exit(fails.length === 0 ? 0 : 1)

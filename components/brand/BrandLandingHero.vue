@@ -197,6 +197,12 @@ function addFlagship(event: MouseEvent) {
 
         <span class="blh__pill">
           <span v-if="logoUrl" class="blh__pill-logo">
+            <!--
+              `eager` оставляем — значок над сгибом и должен появиться сразу,
+              а вот `fetchpriority` понижаем: по умолчанию `eager` означает
+              `high`, и логотип 24 px соревновался за канал с картинкой
+              флагмана, по которой считается LCP.
+            -->
             <ProgressiveImage
               :src="logoUrl"
               :alt="`Логотип ${brand.name}`"
@@ -204,6 +210,7 @@ function addFlagship(event: MouseEvent) {
               placeholder-type="shimmer"
               :use-transform="false"
               eager
+              fetchpriority="low"
               class="size-full"
             />
           </span>

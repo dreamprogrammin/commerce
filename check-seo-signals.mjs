@@ -147,5 +147,68 @@ function h1Of(html) {
   )
 }
 
+// ---------- 6. Описание бренд-лендинга ----------
+/*
+ * У пяти связок «категория + бренд» из четырнадцати описание собрано старым
+ * шаблоном: «💰 Цены от…», ряд звёзд с одного отзыва и «Быстрая доставка по
+ * Алматы за 1 день. Заказывайте оригиналы!». Срок неверный — по `/terms` это
+ * 1–3 рабочих дня; эмодзи Google из русской выдачи вырезает, но знаки под них
+ * тратятся. Страница теперь собирает описание заново, если сохранённое несёт
+ * признаки того шаблона.
+ */
+{
+  console.log('\n6) описание бренд-лендинга')
+  const landing = await get('/catalog/constructors-root/konstruktory-malchikam/brand/lego')
+  const description = landing.body.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? ''
+  check(description.length > 0, `описание есть (${description.length} знаков)`)
+  check(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u.test(description), 'без эмодзи')
+  check(!/за 1 день/i.test(description), 'без обещания доставки за день')
+  check(!/заказывайте/i.test(description), 'без призыва «Заказывайте»')
+  console.log(`        ${description}`)
+}
+
+// ---------- 7. Пустые листинги и их описания ----------
+/*
+ * `/catalog/new` отдавал 200 и `index, follow` при нуле товаров с `is_new`,
+ * не будучи ни в карте сайта, ни в навигации, — страница-сирота. Правило
+ * теперь то же, что у бренд-лендингов: нет товара — нет индекса.
+ *
+ * Здесь же проверяются описания обеих витрин: в них стояли звёзды и галочки
+ * («⭐ … ✓ Доставка …») и «Скидки до 50%», которых никто не считал.
+ */
+{
+  console.log('\n7) витрины «Новинки» и «Акции»')
+  /*
+   * На превью `@nuxtjs/robots` закрывает ВЕСЬ сайт, поэтому «открыта ли
+   * страница с товаром» там проверять бессмысленно — сверяем только то, что
+   * пустая витрина закрыта. Признак превью берём с главной: если и она
+   * noindex, значит стенд закрыт целиком.
+   */
+  const home = await get('/')
+  const previewMode = /noindex/.test(home.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? '')
+  if (previewMode)
+    console.log('        (превью: весь сайт под noindex, проверяем только закрытие пустой витрины)')
+
+  for (const [path, name] of [['/catalog/new', 'новинки'], ['/catalog/promotions', 'акции']]) {
+    const page = await get(path)
+    const robots = page.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? ''
+    const description = page.body.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? ''
+    const cards = (page.body.match(/class="pc-/g) ?? []).length
+
+    check(page.status === 200, `${name}: страница отвечает 200 (${page.status})`)
+    if (cards === 0 || !previewMode) {
+      check(
+        cards > 0 ? !/noindex/.test(robots) : /noindex/.test(robots),
+        `${name}: ${cards > 0 ? 'с товаром открыта' : 'пустая закрыта'} (${robots.split(',')[0]}, карточек ${cards})`,
+      )
+    }
+    check(
+      !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2705}\u{2713}\u{2714}]/u.test(description),
+      `${name}: описание без эмодзи и галочек`,
+    )
+    check(!/за 1 день|до 50%/i.test(description), `${name}: без обещаний, которых никто не считал`)
+  }
+}
+
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: сигналы поиска на месте' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)
 process.exit(fails.length === 0 ? 0 : 1)
