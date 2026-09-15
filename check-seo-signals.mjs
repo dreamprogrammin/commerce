@@ -178,6 +178,17 @@ function h1Of(html) {
  */
 {
   console.log('\n7) витрины «Новинки» и «Акции»')
+  /*
+   * На превью `@nuxtjs/robots` закрывает ВЕСЬ сайт, поэтому «открыта ли
+   * страница с товаром» там проверять бессмысленно — сверяем только то, что
+   * пустая витрина закрыта. Признак превью берём с главной: если и она
+   * noindex, значит стенд закрыт целиком.
+   */
+  const home = await get('/')
+  const previewMode = /noindex/.test(home.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? '')
+  if (previewMode)
+    console.log('        (превью: весь сайт под noindex, проверяем только закрытие пустой витрины)')
+
   for (const [path, name] of [['/catalog/new', 'новинки'], ['/catalog/promotions', 'акции']]) {
     const page = await get(path)
     const robots = page.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? ''
@@ -185,10 +196,12 @@ function h1Of(html) {
     const cards = (page.body.match(/class="pc-/g) ?? []).length
 
     check(page.status === 200, `${name}: страница отвечает 200 (${page.status})`)
-    check(
-      cards > 0 ? !/noindex/.test(robots) : /noindex/.test(robots),
-      `${name}: ${cards > 0 ? 'с товаром открыта' : 'пустая закрыта'} (${robots.split(',')[0]}, карточек ${cards})`,
-    )
+    if (cards === 0 || !previewMode) {
+      check(
+        cards > 0 ? !/noindex/.test(robots) : /noindex/.test(robots),
+        `${name}: ${cards > 0 ? 'с товаром открыта' : 'пустая закрыта'} (${robots.split(',')[0]}, карточек ${cards})`,
+      )
+    }
     check(
       !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2705}\u{2713}\u{2714}]/u.test(description),
       `${name}: описание без эмодзи и галочек`,
