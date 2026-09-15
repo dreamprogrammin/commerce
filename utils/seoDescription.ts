@@ -81,6 +81,33 @@ export function pluralRu(
   return many
 }
 
+/**
+ * Признаки описания, собранного СТАРЫМ шаблоном.
+ *
+ * Такие строки лежат в `category_brand_seo.seo_description` с прежних
+ * генераций: они открываются эмодзи «💰 Цены от…», вставляют ряд звёзд и
+ * обещают «доставку за 1 день», чего магазин не делает — по `/terms` это 1–3
+ * рабочих дня. На 15 сентября 2026 таких строк пять из четырнадцати,
+ * остальные девять написаны руками и этих признаков не имеют.
+ *
+ * Страница по этому признаку предпочитает собрать описание заново, а не
+ * показывать сохранённое: переписывать чужой текст в базе мы не можем, а
+ * отдавать в выдачу неверный срок — тем более.
+ */
+export function hasLegacyTemplateMarks(text: string | null | undefined): boolean {
+  if (!text)
+    return false
+  // ⭐ (U+2B50) лежит вне диапазона «прочих символов», поэтому блок 2B тоже.
+  return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u.test(text)
+    || /за 1 день/i.test(text)
+    || /заказывайте/i.test(text)
+}
+
+/** Цена в формате сниппета: «6 190». */
+export function formatPriceRu(price: number): string {
+  return formatPrice(price)
+}
+
 export interface CategoryMetaFacts {
   categoryName: string
   /**
