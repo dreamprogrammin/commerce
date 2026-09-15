@@ -4,6 +4,33 @@ import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'vue-sonner'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, IMAGE_VARIANTS_WIDE } from '@/config/images'
 
+/**
+ * Старый файл: расширение прямо в пути. У таких вариантов рядом нет, и
+ * публичный URL по пути — единственное, что работает.
+ *
+ * У всех новых путь лежит БЕЗ расширения, а на хранилище — только варианты
+ * `…_sm.webp` / `…_card.webp` / `…_md.webp` / `…_lg.webp`. Проверено на
+ * боевой базе 15 сентября 2026: из 690 путей (товары, логотипы, категории,
+ * слайды) с расширением — НИ ОДНОГО.
+ */
+const PATH_WITH_EXTENSION = /\.\w{3,4}$/
+
+/**
+ * Ширина, которую просит вызывающий, → ближайший вариант не меньше её.
+ *
+ * `card` (480) сюда намеренно не попадает: он заведён под карточку товара, и
+ * у логотипов с категориями такого файла нет. `sm`, `md`, `lg` есть везде.
+ */
+function variantForWidth(width?: number): ImageVariant {
+  if (!width)
+    return 'md'
+  if (width <= IMAGE_VARIANTS.sm.maxWidthOrHeight)
+    return 'sm'
+  if (width <= IMAGE_VARIANTS.md.maxWidthOrHeight)
+    return 'md'
+  return 'lg'
+}
+
 export interface ImageTransformOptions {
   width?: number
   height?: number
@@ -282,15 +309,19 @@ export function useSupabaseStorage() {
    * - БЕСПЛАТНЫЙ: Публичный URL (оригинал)
    * - ПЛАТНЫЙ: Supabase Transformation
    *
-   * ⚠️ ДЛЯ ТОВАРНЫХ КАРТИНОК НУЖЕН `getVariantUrl`, А НЕ ЭТА ФУНКЦИЯ.
-   * Пока `IMAGE_OPTIMIZATION_ENABLED = false`, третий аргумент молча
-   * игнорируется и возвращается публичный URL по пути как есть. А в
-   * `product_images.image_url` путь лежит БЕЗ расширения — на хранилище по
-   * нему ничего нет, ответ 400. Так на бою и оказались битыми все адреса
-   * картинок в разметке `ItemList` на страницах брендов, линеек и категорий
-   * (найдено 15 сентября 2026). `getVariantUrl` знает про суффиксы
-   * (`_sm`/`_card`/`_md`/`_lg`) и умеет откатиться на публичный URL для
-   * старых файлов, у которых расширение в пути есть.
+   * ⚠️ ЗНАЙТЕ ПРО ТРЕТИЙ АРГУМЕНТ. Пока `IMAGE_OPTIMIZATION_ENABLED = false`,
+   * трансформации нет, и размер из опций работает не как обрезка на лету, а
+   * как ВЫБОР ВАРИАНТА: ближайший из `_sm` (400), `_md` (800), `_lg` (1440).
+   *
+   * Раньше в этой ветке возвращался публичный URL по пути как есть, и он был
+   * заведомо битым: пути в базе лежат без расширения, на хранилище есть
+   * только варианты, хранилище отвечало 400. Так на бою оказались битыми
+   * адреса картинок в разметке `ItemList` (страницы брендов, линеек,
+   * категорий), миниатюры в заказе покупателя, полоса активного заказа на
+   * главной и подбор товара для акции — найдено 15 сентября 2026.
+   *
+   * Когда размер известен заранее, зовите `getVariantUrl` напрямую: это
+   * читается яснее, чем «ширина 400, значит вариант sm».
    *
    * @example
    * // Бесплатный режим
@@ -324,9 +355,13 @@ export function useSupabaseStorage() {
       // ✅ ПЛАТНЫЙ: Supabase Transformation
       url = getOptimizedUrl(bucketName, filePath, options)
     }
-    else {
-      // ✅ БЕСПЛАТНЫЙ: Публичный URL
+    else if (PATH_WITH_EXTENSION.test(filePath)) {
+      // ✅ БЕСПЛАТНЫЙ, старый файл: публичный URL по пути как есть
       url = getPublicUrl(bucketName, filePath)
+    }
+    else {
+      // ✅ БЕСПЛАТНЫЙ, новый файл: на хранилище лежат только варианты
+      url = getVariantUrl(bucketName, filePath, variantForWidth(options?.width))
     }
 
     // Кешируем URL (БЕЗ timestamp для стабильности)
