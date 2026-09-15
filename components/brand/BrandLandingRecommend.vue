@@ -67,8 +67,10 @@ watch(() => props.products.length, () => nextTick(syncEdges))
         @scroll="syncEdges"
         @mousedown="onMouseDown"
       >
-        <div v-for="(product, index) in products" :key="product.id" class="blr__item">
-          <ProductCard :product="(product as any)" :position="index" />
+        <!-- Лента стоит в самом низу страницы: `position` здесь дал бы четыре
+             приоритетные картинки за пределами первого экрана. -->
+        <div v-for="product in products" :key="product.id" class="blr__item">
+          <ProductCard :product="(product as any)" />
         </div>
       </div>
     </div>
