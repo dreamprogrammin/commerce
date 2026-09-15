@@ -3,7 +3,7 @@ import type { CategoryRow } from '@/types'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
-import { catalogFaq } from '@/constants/catalogStaticText'
+import { catalogFaq, catalogStaticHtml } from '@/constants/catalogStaticText'
 import { catalogRootShell } from '@/lib/shell'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
@@ -484,7 +484,7 @@ function getCategoryColor(index: number): string {
       и десктопная лежат в разметке всегда (прячет их CSS, а не `v-if`), и
       внутри любой из них текст уехал бы роботу дважды.
     -->
-    <CatalogHubText />
+    <CommonStaticSeoBlock :html="catalogStaticHtml" :faq="catalogFaq" />
   </div>
 </template>
 

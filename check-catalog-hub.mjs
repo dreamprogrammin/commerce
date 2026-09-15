@@ -1,5 +1,5 @@
 /*
- * Корневой каталог: текст, вопросы и разметка под ними.
+ * Корневой каталог и корневые разделы: текст, вопросы и разметка под ними.
  *
  * Почему это проверяется. Search Console 15 сентября 2026: `/catalog` последний
  * раз обходился 28 апреля и числится как «Crawled — currently not indexed».
@@ -41,7 +41,7 @@ const strip = s => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&
 // ---------- 2. Текст ----------
 {
   console.log('\n2) текст под сеткой разделов')
-  const block = html.match(/<section class="cht"[\s\S]*?<\/section>/)?.[0] ?? ''
+  const block = html.match(/<section class="ssb"[\s\S]*?<\/section>/)?.[0] ?? ''
   check(block.length > 0, 'блок текста есть в серверной разметке')
 
   const words = strip(block).split(' ').filter(Boolean).length
@@ -74,7 +74,7 @@ const strip = s => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&
 // ---------- 3. Вопросы и разметка ----------
 {
   console.log('\n3) вопросы и FAQPage')
-  const visible = [...html.matchAll(/<h3[^>]*class="cht__q"[^>]*>([\s\S]*?)<\/h3>/g)].map(m => strip(m[1]))
+  const visible = [...html.matchAll(/<h3[^>]*class="ssb__q"[^>]*>([\s\S]*?)<\/h3>/g)].map(m => strip(m[1]))
   check(visible.length >= 5, `вопросов показано: ${visible.length}`)
 
   const blocks = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1])
@@ -99,5 +99,76 @@ const strip = s => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&
   )
 }
 
-console.log(fails.length ? `\nКРАСНЫЙ: ${fails.length} провал(ов)` : '\nЗЕЛЁНЫЙ: каталог отвечает на вопросы, а не повторяет меню')
+// ---------- 4. Корневые разделы со своим текстом ----------
+/*
+ * У всех девяти корневых разделов `seo_text` в базе пуст, а спрос на них есть:
+ * `/catalog/girls` — 410 показов и позиция 27, `/catalog/boys` — 77 и 19,7
+ * (Search Console, 90 дней на 15 сентября 2026). Четырём самым весомым текст
+ * и вопросы написаны в репозитории.
+ *
+ * Здесь же проверяется, что шаблонные вопросы SQL-генератора на этих
+ * страницах НЕ показываются: они подставляют название в дательном падеже
+ * («Что такое Девочкам?»).
+ */
+const HUBS = [
+  ['/catalog/girls', 'Игрушки для девочек'],
+  ['/catalog/boys', 'Игрушки для мальчиков'],
+  ['/catalog/kiddy', 'Игрушки для малышей'],
+  ['/catalog/constructors-root', 'Конструкторы для детей'],
+]
+
+for (const [path, expectedH1] of HUBS) {
+  console.log(`\n4) корневой раздел ${path}`)
+  const page = await (await fetch(`${BASE}${path}`)).text()
+
+  const h1 = [...page.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map(m => strip(m[1]))
+  check(h1.length === 1 && h1[0] === expectedH1, `H1 «${h1.join(' | ')}» (ждём «${expectedH1}»)`)
+
+  const block = page.match(/<section class="ssb"[\s\S]*?<\/section>/)?.[0] ?? ''
+  const words = strip(block).split(' ').filter(Boolean).length
+  check(words >= 250, `слов в блоке: ${words}`)
+
+  const links = [...new Set([...block.matchAll(/href="(\/(?:catalog|brand|brands)[^"#]*)"/g)].map(m => m[1]))]
+  check(links.length >= 3, `ссылок из текста: ${links.length}`)
+  const codes = await Promise.all(links.map(async (href) => {
+    const r = await fetch(`${BASE}${href}`, { redirect: 'manual' })
+    return [href, r.status]
+  }))
+  const broken = codes.filter(([, status]) => status !== 200)
+  check(broken.length === 0, `ссылки живые${broken.length ? `: ${broken.map(b => b.join(' → ')).join(', ')}` : ''}`)
+
+  const visible = [...page.matchAll(/<h3[^>]*class="ssb__q"[^>]*>([\s\S]*?)<\/h3>/g)].map(m => strip(m[1]))
+  check(visible.length >= 4, `своих вопросов показано: ${visible.length}`)
+
+  const faqNode = [...page.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const parsed = JSON.parse(m[1])
+        return parsed['@graph'] ?? [parsed]
+      }
+      catch {
+        return []
+      }
+    })
+    .find(node => node?.['@type'] === 'FAQPage')
+  const asked = (faqNode?.mainEntity ?? []).map(q => q.name)
+  check(
+    asked.length === visible.length && asked.every(q => visible.includes(q)),
+    `разметка FAQPage повторяет видимые вопросы (${asked.length} против ${visible.length})`,
+  )
+
+  /*
+   * Шаблонные вопросы генератора («Что такое Девочкам?») не должны
+   * ПОКАЗЫВАТЬСЯ. Смотрим только видимую разметку: в `__NUXT_DATA__` они пока
+   * остаются — страница тянет их мёртвым `useAsyncData`, результат которого
+   * никуда не идёт (отдельная правка).
+   */
+  const visibleMarkup = strip(page.replace(/<script[\s\S]*?<\/script>/g, ' '))
+  check(
+    !/Что такое [А-ЯЁ][а-яё]+\?/.test(visibleMarkup),
+    'шаблонных вопросов генератора на странице нет',
+  )
+}
+
+console.log(fails.length ? `\nКРАСНЫЙ: ${fails.length} провал(ов)` : '\nЗЕЛЁНЫЙ: каталог и разделы отвечают на вопросы, а не повторяют меню')
 process.exit(fails.length ? 1 : 0)
