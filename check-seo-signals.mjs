@@ -147,5 +147,25 @@ function h1Of(html) {
   )
 }
 
+// ---------- 6. Описание бренд-лендинга ----------
+/*
+ * У пяти связок «категория + бренд» из четырнадцати описание собрано старым
+ * шаблоном: «💰 Цены от…», ряд звёзд с одного отзыва и «Быстрая доставка по
+ * Алматы за 1 день. Заказывайте оригиналы!». Срок неверный — по `/terms` это
+ * 1–3 рабочих дня; эмодзи Google из русской выдачи вырезает, но знаки под них
+ * тратятся. Страница теперь собирает описание заново, если сохранённое несёт
+ * признаки того шаблона.
+ */
+{
+  console.log('\n6) описание бренд-лендинга')
+  const landing = await get('/catalog/constructors-root/konstruktory-malchikam/brand/lego')
+  const description = landing.body.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? ''
+  check(description.length > 0, `описание есть (${description.length} знаков)`)
+  check(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u.test(description), 'без эмодзи')
+  check(!/за 1 день/i.test(description), 'без обещания доставки за день')
+  check(!/заказывайте/i.test(description), 'без призыва «Заказывайте»')
+  console.log(`        ${description}`)
+}
+
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: сигналы поиска на месте' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)
 process.exit(fails.length === 0 ? 0 : 1)

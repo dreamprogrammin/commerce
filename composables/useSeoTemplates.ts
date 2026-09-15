@@ -1,6 +1,6 @@
 import type { Database } from '@/types'
 import { FREE_SHIPPING_LABEL } from '@/constants/homePlaceholders'
-import { clampDescription } from '@/utils/seoDescription'
+import { clampDescription, formatPriceRu, MIN_REVIEWS_FOR_SNIPPET, pluralRu } from '@/utils/seoDescription'
 
 interface SeoTemplateData {
   brandName: string
@@ -67,29 +67,36 @@ export function useSeoTemplates() {
    */
 
   /**
-   * Генерирует Description для страницы категория + бренд (гибридный сниппет)
+   * Description для страницы «категория + бренд».
+   *
+   * Переписан 15 сентября 2026 по тем же правилам, что `composeCategoryMeta`
+   * для категорий (см. разбор там же). Прежний шаблон открывался эмодзи
+   * «💰 Цены от…», добавлял ряд звёзд, набранных иногда с единственного
+   * отзыва, и заканчивался призывом «Заказывайте оригиналы!». Мобильная
+   * выдача режет описание около 120 знаков, и до фактов дело не доходило.
+   *
+   * Плюс он обещал доставку «за 1 день», чего магазин не делает: по
+   * опубликованным условиям это 1–3 рабочих дня по Алматы.
    */
   function generateBrandCategoryDescription(data: SeoTemplateData): string {
-    const city = data.city || 'Алматы'
-    const parts = []
+    const parts = [`${data.categoryName} ${data.brandName} в ${data.city || 'Алматы'}`]
 
-    // Эмоциональная фраза + бренд
-    parts.push(`${data.categoryName} ${data.brandName} в Ухтышке`)
-
-    // Цена
-    parts.push(`💰 Цены от ${data.minPrice.toLocaleString('ru-KZ')} ₸`)
-
-    // Рейтинг и отзывы с динамическими звездами (если есть)
-    if (data.rating && data.reviewsCount && data.reviewsCount > 0) {
-      const starCount = Math.round(data.rating)
-      const starEmojis = '⭐'.repeat(starCount)
-      parts.push(`${starEmojis} ${data.rating.toFixed(1).replace('.', ',')} (${data.reviewsCount} отз)`)
+    if (data.productsCount > 0) {
+      parts[0] += `: ${data.productsCount} ${pluralRu(data.productsCount, 'модель', 'модели', 'моделей')}`
+    }
+    if (data.minPrice > 0) {
+      parts[0] += ` от ${formatPriceRu(data.minPrice)} ₸`
     }
 
-    // Доставка и призыв
-    parts.push(`Быстрая доставка по ${city} за 1 день. Заказывайте оригиналы!`)
+    parts.push('Доставка 1–3 дня, самовывоз')
 
-    return clampDescription(parts.join('. '))
+    if (data.rating && (data.reviewsCount ?? 0) >= MIN_REVIEWS_FOR_SNIPPET) {
+      parts.push(
+        `рейтинг ${data.rating.toFixed(1).replace('.', ',')} из 5 по ${data.reviewsCount} ${pluralRu(data.reviewsCount!, 'отзыву', 'отзывам', 'отзывам')}`,
+      )
+    }
+
+    return clampDescription(`${parts.join('. ')}.`)
   }
 
   /**

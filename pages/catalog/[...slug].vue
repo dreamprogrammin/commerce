@@ -40,7 +40,7 @@ import {
   parseCatalogSlug,
 } from '@/utils/brandLanding'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { composeCategoryMeta } from '@/utils/seoDescription'
+import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
 // DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
@@ -1337,8 +1337,16 @@ const topBrands = computed(() => {
 
 const metaDescription = computed(() => {
   if (activeBrand.value && categoryBrandSeo.value) {
-    if (categoryBrandSeo.value.seo_description) {
-      return categoryBrandSeo.value.seo_description
+    /*
+     * Сохранённое описание показываем, только если оно не собрано СТАРЫМ
+     * шаблоном: тот открывался эмодзи, вставлял звёзды с одного отзыва и
+     * обещал доставку «за 1 день» — по условиям магазина это 1–3 рабочих дня.
+     * Таких строк в базе пять из четырнадцати, остальные написаны руками.
+     * Их не трогаем, а машинные собираем заново по нынешним правилам.
+     */
+    const stored = categoryBrandSeo.value.seo_description
+    if (stored && !hasLegacyTemplateMarks(stored)) {
+      return stored
     }
 
     return generateBrandCategoryDescription({

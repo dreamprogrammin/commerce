@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  clampDescription,
-  composeCategoryMeta,
-  META_DESCRIPTION_LIMIT,
-  pluralRu,
-} from '@/utils/seoDescription'
+import { clampDescription, composeCategoryMeta, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu } from '@/utils/seoDescription'
 
 /**
  * Тексты взяты из прод-базы: ровно на них аудит 12 августа и поймал обрезку
@@ -286,5 +281,29 @@ describe('composeCategoryMeta', () => {
     })
     expect(meta).not.toContain('за 1 день')
     expect(meta).toContain('1–3 дня')
+  })
+})
+
+/*
+ * Признак описания, собранного старым шаблоном. Такие строки лежат в
+ * `category_brand_seo` с прежних генераций (пять из четырнадцати на
+ * 15 сентября 2026) и обещают доставку за день, которой у магазина нет.
+ */
+describe('hasLegacyTemplateMarks', () => {
+  it('ловит эмодзи, обещание дня и призыв', () => {
+    expect(hasLegacyTemplateMarks('Конструкторы LEGO. 💰 Цены от 6 190 ₸')).toBe(true)
+    expect(hasLegacyTemplateMarks('Быстрая доставка по Алматы за 1 день')).toBe(true)
+    expect(hasLegacyTemplateMarks('Заказывайте оригиналы!')).toBe(true)
+    expect(hasLegacyTemplateMarks('⭐⭐⭐⭐⭐ 5,0 (1 отз)')).toBe(true)
+  })
+
+  it('не трогает написанное руками', () => {
+    expect(
+      hasLegacyTemplateMarks(
+        'Конструкторы Sluban для мальчиков в Ухтышке. Военная техника, города, поезда и роботы.',
+      ),
+    ).toBe(false)
+    expect(hasLegacyTemplateMarks(null)).toBe(false)
+    expect(hasLegacyTemplateMarks('')).toBe(false)
   })
 })
