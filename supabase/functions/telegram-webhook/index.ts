@@ -31,11 +31,17 @@ import {
 } from '../_shared/salesDigest.ts'
 import {
   applicationMessage,
+  canFire,
   canManageStaff,
   staffListMessage,
   buildApprovalKeyboard,
+  buildFireConfirmKeyboard,
   buildRoleKeyboard,
+  buildTeamKeyboard,
   canManageOrders,
+  fireConfirmText,
+  firedNoticeText,
+  firedResultText,
   isStrictMode,
   looksLikeName,
   looksLikePhone,
@@ -944,7 +950,7 @@ async function handleManagerCommand(
     }
 
     if (text === REPLY_BUTTONS.team)
-      await sendTeamList(botToken, supabase, chatId)
+      await sendTeamList(botToken, supabase, chatId, from?.id ?? 0)
     else if (text === REPLY_BUTTONS.sales)
       await sendRichMessage(botToken, chatId, await buildDigest(supabase, digestSlot()))
     else
@@ -1041,7 +1047,7 @@ async function handleManagerCommand(
       await sendRichMessage(botToken, chatId, 'Список команды доступен владельцу.')
       return true
     }
-    await sendTeamList(botToken, supabase, chatId)
+    await sendTeamList(botToken, supabase, chatId, from?.id ?? 0)
     return true
   }
 
@@ -1499,6 +1505,10 @@ async function fetchOrderItems(
 }
 
 
+/** Поля анкеты — одним списком: их читают в пяти местах. */
+const STAFF_COLUMNS
+  = 'id, telegram_user_id, telegram_username, full_name, phone, role, status, fired_at'
+
 /** Заявка сотрудника по его Telegram-id. */
 async function findStaff(
   supabase: ReturnType<typeof createClient>,
@@ -1506,20 +1516,66 @@ async function findStaff(
 ): Promise<StaffRecord | null> {
   const { data } = await supabase
     .from('staff')
-    .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+    .select(STAFF_COLUMNS)
     .eq('telegram_user_id', telegramUserId)
     .maybeSingle()
   return (data as StaffRecord | null) ?? null
 }
 
-/** Есть ли в базе подтверждённый владелец. */
-async function ownersExist(supabase: ReturnType<typeof createClient>): Promise<boolean> {
+/** Сотрудник по его записи в `staff` — так приходят кнопки увольнения. */
+async function findStaffById(
+  supabase: ReturnType<typeof createClient>,
+  staffId: string,
+): Promise<StaffRecord | null> {
+  const { data } = await supabase
+    .from('staff')
+    .select(STAFF_COLUMNS)
+    .eq('id', staffId)
+    .maybeSingle()
+  return (data as StaffRecord | null) ?? null
+}
+
+/** Сколько в базе подтверждённых владельцев. */
+async function approvedOwnerCount(supabase: ReturnType<typeof createClient>): Promise<number> {
   const { count } = await supabase
     .from('staff')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'approved')
     .eq('role', 'owner')
-  return (count ?? 0) > 0
+  return count ?? 0
+}
+
+/** Есть ли в базе подтверждённый владелец. */
+async function ownersExist(supabase: ReturnType<typeof createClient>): Promise<boolean> {
+  return await approvedOwnerCount(supabase) > 0
+}
+
+/**
+ * Незакрытые заказы человека — те, что после увольнения повиснут.
+ *
+ * Считаем по обеим ролям сразу: курьер привязан к заказу ссылкой
+ * `courier_staff_id`, менеджер — ником в `assigned_admin_username` (так
+ * заказы разбирали ещё до появления `staff`). Гостевые заказы лежат в своей
+ * таблице, и забыть её — значит недосчитать половину.
+ */
+async function activeOrdersOf(
+  supabase: ReturnType<typeof createClient>,
+  record: StaffRecord,
+): Promise<number> {
+  const conditions = [`courier_staff_id.eq.${record.id}`]
+  if (record.telegram_username)
+    conditions.push(`assigned_admin_username.eq.${record.telegram_username}`)
+
+  const counts = await Promise.all(['orders', 'guest_checkouts'].map(async (table) => {
+    const { count } = await supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .in('status', ACTIVE_STATUSES)
+      .or(conditions.join(','))
+    return count ?? 0
+  }))
+
+  return counts.reduce((sum, value) => sum + value, 0)
 }
 
 /**
@@ -1581,7 +1637,7 @@ async function handleJobAnswer(
       await sendRichMessage(botToken, chatId, 'Список команды доступен владельцу.')
       return true
     }
-    await sendTeamList(botToken, supabase, chatId)
+    await sendTeamList(botToken, supabase, chatId, from.id)
     return true
   }
 
@@ -1804,19 +1860,34 @@ async function handlePlanCommand(
   )
 }
 
-/** Список команды одним сообщением. Один текст на кнопку, команду и callback. */
+/**
+ * Список команды одним сообщением. Один текст на кнопку, команду и callback.
+ *
+ * Под списком — кнопки «Уволить», по одной на того, кого нажавший вправе
+ * убрать. Список и есть то место, где увольняют: заявка с кнопками «Принять» и
+ * «Отклонить» давно ушла вверх по переписке, а человек в команде — вот он.
+ */
 async function sendTeamList(
   botToken: string,
   supabase: ReturnType<typeof createClient>,
   chatId: number,
+  actorTelegramId: number,
 ): Promise<void> {
   const { data } = await supabase
     .from('staff')
-    .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+    .select(STAFF_COLUMNS)
     .neq('status', 'draft')
     .order('created_at', { ascending: false })
 
-  await sendRichMessage(botToken, chatId, staffListMessage((data ?? []) as StaffRecord[]))
+  const records = (data ?? []) as StaffRecord[]
+  const actor = records.find(r => String(r.telegram_user_id) === String(actorTelegramId)) ?? null
+
+  await sendRichMessage(
+    botToken,
+    chatId,
+    staffListMessage(records),
+    buildTeamKeyboard(records, actor?.id ?? null),
+  )
 }
 
 /** Владелец ли нажавший: одно правило на кнопки, команды и callback. */
@@ -1906,7 +1977,7 @@ async function handleJobTap(
     }
 
     await answerCallback(botToken, callbackQuery.id, '')
-    await sendTeamList(botToken, supabase, chatId as number)
+    await sendTeamList(botToken, supabase, chatId as number, callbackQuery.from.id)
     return true
   }
 
@@ -1926,7 +1997,7 @@ async function handleJobTap(
       .from('staff')
       .update({ role: parsed.role, status: 'pending' })
       .eq('id', record.id)
-      .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+      .select(STAFF_COLUMNS)
       .maybeSingle()
 
     await answerCallback(botToken, callbackQuery.id, 'Заявка отправлена')
@@ -1947,6 +2018,76 @@ async function handleJobTap(
         buildApprovalKeyboard((updated as StaffRecord).id),
       )
     }
+    return true
+  }
+
+  /*
+   * Увольнение. Идёт до проверки рабочего чата нарочно: список команды
+   * владелец открывает и в личке, а право здесь проверяется строже, чем у
+   * заявок, — `canFire` требует принятого владельца и в мягком режиме тоже.
+   */
+  if (parsed.kind === 'fireCancel') {
+    await answerCallback(botToken, callbackQuery.id, 'Отменил')
+    if (chatId !== undefined && messageId !== undefined)
+      await editMessage(botToken, chatId, messageId, 'Увольнение отменено.')
+    return true
+  }
+
+  if (parsed.kind === 'fire' || parsed.kind === 'fireConfirm') {
+    const [actor, target, owners] = await Promise.all([
+      findStaff(supabase, callbackQuery.from.id),
+      findStaffById(supabase, parsed.staffId!),
+      approvedOwnerCount(supabase),
+    ])
+
+    /*
+     * Право проверяется и на подтверждении тоже: между двумя нажатиями
+     * человека мог уволить кто-то другой, а самого нажавшего — разжаловать.
+     */
+    const verdict = canFire(actor, target, owners)
+    if (!verdict.ok) {
+      await answerCallback(botToken, callbackQuery.id, verdict.reason, true)
+      return true
+    }
+
+    const record = target as StaffRecord
+    const active = await activeOrdersOf(supabase, record)
+
+    if (parsed.kind === 'fire') {
+      await answerCallback(botToken, callbackQuery.id, '')
+      if (chatId !== undefined) {
+        await sendRichMessage(
+          botToken,
+          chatId as number,
+          fireConfirmText(record, active),
+          buildFireConfirmKeyboard(record.id),
+        )
+      }
+      return true
+    }
+
+    await supabase
+      .from('staff')
+      .update({
+        status: 'fired',
+        fired_at: new Date().toISOString(),
+        fired_by: callbackQuery.from.id,
+      })
+      .eq('id', record.id)
+
+    await answerCallback(botToken, callbackQuery.id, 'Уволен')
+
+    if (chatId !== undefined && messageId !== undefined) {
+      await editMessage(
+        botToken,
+        chatId,
+        messageId,
+        firedResultText(record, callbackQuery.from.first_name ?? 'владелец', active),
+      )
+    }
+
+    // Человеку — в личку: доступ пропал, и он должен знать почему.
+    await sendRichMessage(botToken, record.telegram_user_id, firedNoticeText())
     return true
   }
 
@@ -1976,7 +2117,7 @@ async function handleJobTap(
       approved_by: callbackQuery.from.id,
     })
     .eq('id', parsed.staffId!)
-    .select('id, telegram_user_id, telegram_username, full_name, phone, role, status')
+    .select(STAFF_COLUMNS)
     .maybeSingle()
 
   await answerCallback(botToken, callbackQuery.id, approved ? 'Принят' : 'Отклонён')
