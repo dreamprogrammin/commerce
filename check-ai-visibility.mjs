@@ -60,6 +60,14 @@ for (const ua of AGENTS) {
 // ---------- 3. llms.txt со сводом условий ----------
 {
   console.log('\n3) llms.txt')
+  /*
+   * HEAD проверяется отдельно и первым. На бою 15 сентября 2026 `GET`
+   * отдавал 200, а `HEAD` — 404: имя маршрута с суффиксом `.get`
+   * регистрирует в Nitro только GET. Краулер, который сперва пробует HEAD,
+   * решал, что файла нет, и содержимое ниже уже не имело значения.
+   */
+  const head = await fetch(`${BASE}/llms.txt`, { method: 'HEAD' })
+  check(head.status === 200, `HEAD /llms.txt отвечает 200 (${head.status})`)
   const file = await (await fetch(`${BASE}/llms.txt`)).text()
   check(file.includes('## Условия'), 'есть свод условий')
   check(/Доставка:/.test(file) && /рабочих дня/.test(file), 'назван срок доставки')
