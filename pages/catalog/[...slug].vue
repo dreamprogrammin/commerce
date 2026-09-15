@@ -28,7 +28,6 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { useSeoTemplates } from '@/composables/useSeoTemplates'
-import { IMAGE_SIZES } from '@/config/images'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -95,7 +94,7 @@ const supabase = useSupabaseClient()
 const categoriesStore = useCategoriesStore()
 const categoryQuestionsStore = useCategoryQuestionsStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
-const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 const { generateBrandCategoryDescription } = useSeoTemplates()
 
@@ -1981,11 +1980,17 @@ const schemaData = computed(() => {
               }),
             },
             ...(product.barcode && { gtin: product.barcode }),
+            /*
+             * `IMAGE_SIZES.CARD` третьим аргументом здесь НЕ работал: пока
+             * `IMAGE_OPTIMIZATION_ENABLED = false`, `getImageUrl` игнорирует
+             * опции и отдаёт голый путь, а он на хранилище отдаёт 400.
+             * Нужен вариант с суффиксом — как на карточке товара.
+             */
             ...(product.product_images?.[0]?.image_url && {
-              image: getImageUrl(
+              image: getVariantUrl(
                 BUCKET_NAME_PRODUCT,
                 product.product_images[0].image_url,
-                IMAGE_SIZES.CARD,
+                'lg',
               ),
             }),
             'offers': {

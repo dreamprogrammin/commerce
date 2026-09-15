@@ -25,7 +25,7 @@ import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
-const { getImageUrl, getVariantUrl } = useSupabaseStorage()
+const { getVariantUrl } = useSupabaseStorage()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
 const brandSlug = route.params.brandSlug as string
@@ -408,10 +408,13 @@ useHead({
                       productLine.value!.name,
                       200,
                     ),
+                    // Вариант с суффиксом: голый путь из `image_url` отдаёт 400,
+                    // см. пояснение в `pages/brand/[slug].vue`.
                     ...(product.product_images?.[0]?.image_url && {
-                      image: getImageUrl(
+                      image: getVariantUrl(
                         BUCKET_NAME_PRODUCT,
                         product.product_images[0].image_url,
+                        'lg',
                       ),
                     }),
                     // FIX: короткий SKU из БД, не slug
