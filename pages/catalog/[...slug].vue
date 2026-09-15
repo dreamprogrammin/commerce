@@ -29,6 +29,7 @@ import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuer
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { useSeoTemplates } from '@/composables/useSeoTemplates'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/constants'
+import { categoryStaticFor } from '@/constants/categoryStaticText'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useCategoryQuestionsStore } from '@/stores/publicStore/categoryQuestionsStore'
@@ -424,6 +425,16 @@ const categoryName = computed(() => {
   return currentCategorySlug.value?.replace(/-/g, ' ') || 'Каталог'
 })
 
+/*
+ * Запасной текст, заголовок и вопросы для корневых разделов — из репозитория.
+ * База ГЛАВНЕЕ: как только `seo_text` или `seo_h1` заполнят в админке,
+ * показываться будет она. Зачем это вообще нужно — в шапке
+ * `constants/categoryStaticText.ts`.
+ */
+const categoryStatic = computed(() =>
+  activeBrand.value ? undefined : categoryStaticFor(currentCategorySlug.value),
+)
+
 const title = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
@@ -442,7 +453,7 @@ const title = computed(() => {
     return `${prefix} в Алматы`
   }
 
-  return currentCategory.value?.seo_h1 || categoryName.value
+  return currentCategory.value?.seo_h1 || categoryStatic.value?.h1 || categoryName.value
 })
 
 const priceRange = ref({ min: 0, max: 50000 })
@@ -2056,6 +2067,27 @@ const schemaData = computed(() => {
     })
   }
 
+  /*
+   * FAQPage — ТОЛЬКО из статических вопросов раздела, то есть из тех, что
+   * показаны на странице блоком `StaticSeoBlock`.
+   *
+   * Вопросы, которые генерирует SQL-функция и показывает `CategoryQuestions`,
+   * в разметку не идут намеренно: они собираются подстановкой названия
+   * категории в шаблон, а названия у нас в дательном падеже. На
+   * `/catalog/girls` это выглядит как «Что такое Девочкам?» и «Сколько стоят
+   * Девочкам в Алматы?». Такое нельзя отдавать поиску расширенным сниппетом.
+   */
+  if (categoryStatic.value?.faq.length) {
+    schemas.push({
+      '@type': 'FAQPage',
+      'mainEntity': categoryStatic.value.faq.map(item => ({
+        '@type': 'Question',
+        'name': item.q,
+        'acceptedAnswer': { '@type': 'Answer', 'text': item.a },
+      })),
+    })
+  }
+
   return schemas
 })
 
@@ -2643,15 +2675,32 @@ else {
       class="mt-8"
     />
 
+    <!-- Свой текст и вопросы корневого раздела — из репозитория.
+
+         Показываются, только когда в базе текста нет (`seoBlocks` пуст) и
+         фильтры не активны. Почему не через `SEOContentRenderer`, которым
+         рисуется текст из базы: тот разбирает HTML регулярками и ВЫРЕЗАЕТ
+         ССЫЛКИ, а половина смысла этого текста — увести в подразделы. -->
+    <CommonStaticSeoBlock
+      v-if="categoryStatic && seoBlocks.length === 0 && !hasActiveFilters"
+      :html="categoryStatic.html"
+      :faq="categoryStatic.faq"
+    />
+
     <!-- FAQ блок для категории — рисуется НА СЕРВЕРЕ.
 
          `ClientOnly` снят: пока он стоял, вопросы и ответы не попадали в
          серверную разметку, хотя FAQ — ровно тот контент, который Google
          показывает расширенными сниппетами. Данные компонент берёт через
          useAsyncData, а санитайзер в нём переведён с DOM на регулярки —
-         иначе серверный рендер был бы невозможен. -->
+         иначе серверный рендер был бы невозможен.
+
+         У разделов со СВОИМИ вопросами (блок выше) этот скрыт: шаблонные
+         вопросы SQL-генератора подставляют название раздела в дательном
+         падеже и получаются нечитаемыми — разбор в шапке
+         `constants/categoryStaticText.ts`. -->
     <CategoryQuestions
-      v-if="currentCategory"
+      v-if="currentCategory && !categoryStatic"
       :category-id="currentCategory.id"
       :category-name="currentCategory.name"
     />
