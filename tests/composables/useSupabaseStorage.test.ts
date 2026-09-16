@@ -18,10 +18,18 @@ import { IMAGE_SIZES } from '@/config/images'
  */
 const STORAGE = 'https://example.supabase.co/storage/v1/object/public'
 
+/** Что именно ушло в хранилище при последней загрузке. */
+const lastUpload: { path?: string, options?: Record<string, unknown> } = {}
+
 vi.stubGlobal('useSupabaseClient', () => ({
   storage: {
     from: (bucket: string) => ({
       getPublicUrl: (path: string) => ({ data: { publicUrl: `${STORAGE}/${bucket}/${path}` } }),
+      upload: (path: string, _file: unknown, options: Record<string, unknown>) => {
+        lastUpload.path = path
+        lastUpload.options = options
+        return Promise.resolve({ data: { path }, error: null })
+      },
     }),
   },
 }))
@@ -81,5 +89,27 @@ describe('getVariantUrl остаётся прежним', () => {
     expect(getVariantUrl('product-images', PATH, 'lg')).toBe(
       `${STORAGE}/product-images/${PATH}_lg.webp`,
     )
+  })
+})
+
+/*
+ * Время жизни кеша у картинок. На бою 16 сентября 2026 все файлы отдавались с
+ * `cache-control: max-age=3600` — час, хотя путь к файлу уникален на каждую
+ * загрузку и перезаписи на месте не бывает. Lighthouse считал это потерей
+ * 504 КБ на повторном заходе.
+ */
+describe('uploadFile: время жизни кеша', () => {
+  const file = new File(['x'], 'photo.webp', { type: 'image/webp' })
+
+  it('по умолчанию год, а не час', async () => {
+    const { uploadFile } = useSupabaseStorage()
+    await uploadFile(file, { bucketName: 'product-images' })
+    expect(lastUpload.options?.cacheControl).toBe('31536000')
+  })
+
+  it('значение из опций перебивает умолчание', async () => {
+    const { uploadFile } = useSupabaseStorage()
+    await uploadFile(file, { bucketName: 'product-images', cacheControl: '600' })
+    expect(lastUpload.options?.cacheControl).toBe('600')
   })
 })

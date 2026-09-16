@@ -16,6 +16,26 @@ import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, IMAGE_VARIANTS_WIDE } from 
 const PATH_WITH_EXTENSION = /\.\w{3,4}$/
 
 /**
+ * Сколько браузеру и CDN держать картинку — год.
+ *
+ * Было `3600`, то есть час: проверено на бою 16 сентября 2026, все файлы
+ * отдаются с `cache-control: max-age=3600` (смотреть GET-запросом — на HEAD
+ * хранилище отвечает `no-cache` и врёт). Lighthouse считает это потерей
+ * 504 КБ на повторном заходе.
+ *
+ * Год безопасен, потому что путь к файлу уникален на каждую загрузку:
+ * `generateSeoFileName` вшивает в имя короткий uuid, и замена картинки
+ * создаёт НОВЫЙ путь, а прежний файл удаляется. Перезаписи на месте, из-за
+ * которой посетитель год видел бы старую картинку, в проекте не бывает —
+ * даже там, где имя задаётся через `customFileName`, оно построено на том же
+ * уникальном основании.
+ *
+ * ⚠️ Меняет поведение ТОЛЬКО ДЛЯ НОВЫХ ЗАГРУЗОК. У 1046 картинок, которые уже
+ * лежат в хранилище, останется час, пока их не перезальют.
+ */
+const DEFAULT_CACHE_SECONDS = '31536000'
+
+/**
  * Ширина, которую просит вызывающий, → ближайший вариант не меньше её.
  *
  * `card` (480) сюда намеренно не попадает: он заведён под карточку товара, и
@@ -174,7 +194,7 @@ export function useSupabaseStorage() {
       const { data, error } = await supabase.storage
         .from(options.bucketName)
         .upload(filePath, file, {
-          cacheControl: options.cashControl || '3600',
+          cacheControl: options.cacheControl || DEFAULT_CACHE_SECONDS,
           upsert: options.upsert === undefined ? true : options.upsert,
           contentType: options.contentType,
         })
