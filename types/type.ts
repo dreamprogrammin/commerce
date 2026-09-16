@@ -123,7 +123,13 @@ export interface IUploadFileOptions {
   bucketName: string
   filePathPrefix?: string
   upsert?: boolean
-  cashControl?: string
+  /**
+   * Время жизни кеша в секундах. По умолчанию год — имена файлов содержат
+   * uuid, и замена картинки создаёт новый путь, а не переписывает прежний.
+   * Поле называлось `cashControl`: опечатка, из-за которой любая попытка
+   * передать значение молча игнорировалась.
+   */
+  cacheControl?: string
   contentType?: string
   /** SEO-имя для файла (будет в формате: uhti-{seoName}-{uuid}.ext) */
   seoName?: string
