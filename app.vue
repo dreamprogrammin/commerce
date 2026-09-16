@@ -249,7 +249,9 @@ useSchemaOrg([
       'addressCountry': 'KZ',
       'addressLocality': 'Алматы',
       'streetAddress': 'мкр. Шапагат, ул. Амангельды',
-      'postalCode': '050058',
+      // Индекс назван владельцем 16 сентября 2026. Стоял 050058, OSM для этой
+      // улицы давал 050024 — оба оказались мимо.
+      'postalCode': '050061',
     },
     'contactPoint': {
       '@type': 'ContactPoint',
