@@ -116,7 +116,12 @@ export function useSeoTemplates() {
       },
       {
         question: `Как быстро доставят ${data.categoryName.toLowerCase()} ${data.brandName} в ${city}?`,
-        answer: `Доставка ${data.categoryName.toLowerCase()} ${data.brandName} по ${city} занимает 1 день при заказе до 18:00. Бесплатная доставка при заказе от ${FREE_SHIPPING_LABEL}. Также доступен самовывоз из пункта выдачи.`,
+        // Срок — из опубликованных условий `/terms`: по Алматы 1–3 рабочих дня.
+        // Стояло «1 день при заказе до 18:00»: и срок неверный, и условие про
+        // 18:00 нигде не опубликовано. Та же формулировка сидела в функции
+        // `generate_category_brand_faq` и разошлась по 13 ответам в базе —
+        // починено миграцией 20260916130000.
+        answer: `Доставка ${data.categoryName.toLowerCase()} ${data.brandName} по ${city} занимает 1–3 рабочих дня. Бесплатная доставка при заказе от ${FREE_SHIPPING_LABEL}. Также доступен самовывоз из пункта выдачи.`,
       },
       {
         question: `Оригинальные ли ${data.categoryName.toLowerCase()} ${data.brandName} в Ухтышке?`,
