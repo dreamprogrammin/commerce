@@ -223,7 +223,7 @@ useSchemaOrg([
     'email': 'info@uhti.kz',
     'areaServed': { '@type': 'Country', 'name': 'Казахстан' },
     'currenciesAccepted': 'KZT',
-    'paymentAccepted': 'Наличные при получении, банковская карта при получении, онлайн-оплата',
+    'paymentAccepted': 'Наличные при получении, перевод или QR через Kaspi',
     'logo': {
       '@type': 'ImageObject',
       '@id': `${siteUrl}/#logo`,
