@@ -55,7 +55,7 @@ const orderForm = ref({
   name: '',
   phone: '',
   email: '',
-  paymentMethod: 'kaspi' as 'kaspi' | 'cash' | 'card',
+  paymentMethod: 'kaspi' as 'kaspi' | 'cash',
   comment: '',
 })
 
@@ -470,6 +470,10 @@ async function placeOrder() {
   promoCodeStore.clearCode()
 }
 
+// Оплата картой убрана по просьбе владельца 16 сентября 2026 («пока»), то есть
+// временно. Остались Kaspi (перевод или QR) и наличные; Kaspi стоит первым и
+// выбран по умолчанию. Подписи 'card' в кабинете и на странице успеха НЕ
+// трогаем — по ним читаются уже оформленные заказы.
 const PAYMENT_METHODS = [
   {
     key: 'kaspi' as const,
@@ -484,13 +488,6 @@ const PAYMENT_METHODS = [
     desc: 'Курьеру или в пункте самовывоза',
     icon: 'lucide:banknote',
     tint: 'bg-green-50 text-green-600',
-  },
-  {
-    key: 'card' as const,
-    name: 'Картой при получении',
-    desc: 'Оплата картой курьеру',
-    icon: 'lucide:credit-card',
-    tint: 'bg-blue-50 text-blue-600',
   },
 ]
 
