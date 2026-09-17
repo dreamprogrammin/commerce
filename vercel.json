@@ -29,6 +29,31 @@
       "permanent": true
     },
     {
+      "source": "/catalog/products/akkordeon-detskiy-xx2028-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let",
+      "destination": "/catalog/products/akkordeon-detskiy-hih02-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let",
+      "permanent": true
+    },
+    {
+      "source": "/catalog/products/lego-marvel-76287-zheleznyy-chelovek-s-motociklom-i-halk-pervyy-konstruktor-dlya-detey-ot-4-let",
+      "destination": "/catalog/products/konstruktor-lego-marvel-76287-zheleznyy-chelovek-na-motocikle-protiv-halka-s-razrushaemym-domom",
+      "permanent": true
+    },
+    {
+      "source": "/catalog/products/batteries-aa-4pcs",
+      "destination": "/catalog/products/batareyki-soni-palchikovye-solevye-tip-aa-15v-4-sht-v-upakovke-dlya-rc-igrushek",
+      "permanent": true
+    },
+    {
+      "source": "/catalog/products/batteries-aaa-2pcs",
+      "destination": "/catalog/accessories/batteries",
+      "permanent": true
+    },
+    {
+      "source": "/catalog/products/radioupravlyaemaya-mashina-vnedorozhnik-2172-masshtab-1-16-so-zvukom-i-svetom-off-road-s-usb-zaryadkoy",
+      "destination": "/catalog/boys/mashinki/radioupravlyaemye-mashinki",
+      "permanent": true
+    },
+    {
       "source": "/catalog/:path((?!.*/brand/).*)",
       "has": [
         {
