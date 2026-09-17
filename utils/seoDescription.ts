@@ -108,6 +108,97 @@ export function formatPriceRu(price: number): string {
   return formatPrice(price)
 }
 
+/*
+ * Сроки — из опубликованных условий `/terms`: по Алматы 1–3 рабочих дня.
+ * До 15 сентября 2026 в сниппетах стояло «за 1 день»; за день магазин не
+ * возит, и то же «1–2 дня» из макета лендинга уже правилось на 1–3 по этой
+ * причине.
+ *
+ * Самовывоз остаётся: он не обещание на бумаге, а основной способ получения
+ * (`utils/orderStatus.ts` — 42 заказа из 45). Отдельная беда в том, что адрес
+ * выдачи нигде не опубликован: `pickup_points` пуста, и на оформлении блок с
+ * пунктом не рисуется — но это чинится заведением пункта в админке, а не
+ * вычёркиванием слова из сниппета.
+ *
+ * Строка одна на весь сайт намеренно: пока она была написана в каждом месте
+ * заново, «за 1 день» пережило три чистки подряд и осталось в запасном
+ * описании карточки (найдено 17 сентября 2026).
+ */
+export const DELIVERY_SHORT = 'Доставка 1–3 дня, самовывоз'
+
+/** Та же строка, но с городом — когда выше по тексту его ещё не называли. */
+export function deliveryLine(city: string, cityAlreadyMentioned: boolean): string {
+  return cityAlreadyMentioned
+    ? DELIVERY_SHORT
+    : `Доставка по ${city} 1–3 дня, самовывоз`
+}
+
+export interface ProductMetaFacts {
+  /** Название товара как в каталоге — уже содержит артикул и обычно возраст. */
+  name: string
+  /** «для девочек» / «для мальчиков», если в названии этого нет. */
+  gender?: string | null
+  /** «от 3 лет», «от 3 до 6 лет» — тоже только если в названии нет. */
+  age?: string | null
+  inStock?: boolean
+  rating?: number | null
+  reviewsCount?: number | null
+  price?: number | null
+  city?: string
+}
+
+/**
+ * Запасное мета-описание карточки — для товаров, которым текст в базе не
+ * завели. Таких на 17 сентября 2026 двое из 178, но новый товар заводится
+ * пустым, и в сниппет уходит именно это.
+ *
+ * Что здесь важно.
+ *
+ * **Возраст не повторяется.** Названия в каталоге почти всегда кончаются на
+ * «… от 3 лет», а прежний сборщик приклеивал возраст вторым разом: на проде
+ * висело «…медицинские инструменты, от 3 лет от 3 лет». Поэтому пол и возраст
+ * дописываются только тогда, когда их нет в самом названии.
+ *
+ * **Обрезается название, а не хвост.** Раньше готовая строка резалась с конца,
+ * то есть первой терялась цена — ровно то, ради чего кликают. Теперь хвост
+ * (наличие, доставка, цена) считается сначала, а названию отдаётся остаток.
+ *
+ * **Без эмодзи и без рейтинга с одного отзыва** — по тем же причинам, что в
+ * `composeCategoryMeta`: звёзды Google из описания вырежет, а знаки под них
+ * потратятся.
+ */
+export function composeProductMeta(facts: ProductMetaFacts): string {
+  const city = facts.city || 'Алматы'
+  const name = (facts.name ?? '').trim()
+  const lower = name.toLowerCase()
+
+  const audience = [facts.gender, facts.age]
+    .filter((part): part is string => !!part && !lower.includes(part.toLowerCase()))
+    .join(' ')
+
+  const tail: string[] = []
+  if (facts.inStock)
+    tail.push('В наличии')
+  tail.push(deliveryLine(city, lower.includes(city.toLowerCase())))
+
+  const reviews = facts.reviewsCount ?? 0
+  if (facts.rating && reviews >= MIN_REVIEWS_FOR_SNIPPET) {
+    const rating = facts.rating.toFixed(1).replace('.', ',')
+    tail.push(`Рейтинг ${rating} из 5 по ${reviews} ${pluralRu(reviews, 'отзыву', 'отзывам', 'отзывам')}`)
+  }
+
+  // Части хвоста — отдельные предложения, поэтому с прописной.
+  if (facts.price && facts.price > 0)
+    tail.push(`От ${formatPrice(facts.price)} ₸`)
+
+  const tailText = tail.join('. ')
+  // Остаток лимита под название: минус хвост, точка с пробелом и точка в конце.
+  const budget = META_DESCRIPTION_LIMIT - tailText.length - 3
+  const head = truncateWords(audience ? `${name} ${audience}` : name, Math.max(budget, 40))
+
+  return clampDescription(`${head}. ${tailText}.`)
+}
+
 export interface CategoryMetaFacts {
   categoryName: string
   /**
@@ -189,23 +280,7 @@ export function composeCategoryMeta(facts: CategoryMetaFacts): string {
    * едет в строку доставки.
    */
   const cityMentioned = head.toLowerCase().includes(city.toLowerCase())
-  /*
-   * Сроки — из опубликованных условий `/terms`: по Алматы 1–3 рабочих дня.
-   * До 15 сентября 2026 здесь стояло «за 1 день»; за день магазин не возит, и
-   * то же «1–2 дня» из макета лендинга уже правилось на 1–3 по этой причине.
-   *
-   * Самовывоз остаётся: он не обещание на бумаге, а основной способ получения
-   * (`utils/orderStatus.ts` — 42 заказа из 45). Отдельная беда в том, что
-   * адрес выдачи нигде не опубликован: `pickup_points` пуста, и на оформлении
-   * блок с пунктом не рисуется — но это чинится заведением пункта в админке,
-   * а не вычёркиванием слова из сниппета.
-   */
-  const parts = [
-    head,
-    cityMentioned
-      ? 'Доставка 1–3 дня, самовывоз'
-      : `Доставка по ${city} 1–3 дня, самовывоз`,
-  ]
+  const parts = [head, deliveryLine(city, cityMentioned)]
 
   const reviews = facts.reviewsCount ?? 0
   if (facts.rating && reviews >= MIN_REVIEWS_FOR_SNIPPET) {
