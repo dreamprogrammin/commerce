@@ -17,8 +17,20 @@ const vercel = JSON.parse(
 describe('productSlugRedirectFor', () => {
   it('старый адрес карточки ведёт на живую страницу', () => {
     expect(
+      productSlugRedirectFor('/catalog/products/lego-marvel-76287-zheleznyy-chelovek-s-motociklom-i-halk-pervyy-konstruktor-dlya-detey-ot-4-let'),
+    ).toBe('/catalog/products/konstruktor-lego-marvel-76287-zheleznyy-chelovek-na-motocikle-protiv-halka-s-razrushaemym-domom')
+  })
+
+  it('адрес xx2028 намеренно не в карте', () => {
+    /*
+     * 17 сентября 2026 владелец сказал: «не хочу, чтобы это страница была».
+     * Вариант замены (410, 404 или 301 на раздел) не выбран, поэтому адрес
+     * остаётся в том состоянии, что на бою, — 404. Тест держит это решение,
+     * чтобы запись не вернулась случайно.
+     */
+    expect(
       productSlugRedirectFor('/catalog/products/akkordeon-detskiy-xx2028-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let'),
-    ).toBe('/catalog/products/akkordeon-detskiy-hih02-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let')
+    ).toBeNull()
   })
 
   it('обычная несуществующая карточка остаётся 404', () => {

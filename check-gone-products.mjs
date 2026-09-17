@@ -31,7 +31,6 @@ function check(ok, text) {
 
 /** Показы за 90 дней — чтобы было видно, чем платим за каждую строку. */
 const CASES = [
-  { from: '/catalog/products/akkordeon-detskiy-xx2028-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let', to: '/catalog/products/akkordeon-detskiy-hih02-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let', impressions: 165 },
   { from: '/catalog/products/batteries-aaa-2pcs', to: '/catalog/accessories/batteries', impressions: 8 },
   { from: '/catalog/products/batteries-aa-4pcs', to: '/catalog/products/batareyki-soni-palchikovye-solevye-tip-aa-15v-4-sht-v-upakovke-dlya-rc-igrushek', impressions: 2 },
   { from: '/catalog/products/radioupravlyaemaya-mashina-vnedorozhnik-2172-masshtab-1-16-so-zvukom-i-svetom-off-road-s-usb-zaryadkoy', to: '/catalog/boys/mashinki/radioupravlyaemye-mashinki', impressions: 2 },
@@ -56,6 +55,14 @@ console.log('\n3) обычная несуществующая карточка �
 {
   const r = await fetch(`${BASE}/catalog/products/takogo-tovara-net-i-ne-bylo-12345`, { redirect: 'manual' })
   check(r.status === 404, `${r.status} для выдуманного slug (ждём 404)`)
+}
+
+console.log('\n4) адрес xx2028 остаётся мёртвым — по слову владельца')
+{
+  // «Не хочу, чтобы это страница была», 17 сентября 2026. Вариант замены не
+  // выбран, поэтому держим то состояние, что уже на бою.
+  const r = await fetch(`${BASE}/catalog/products/akkordeon-detskiy-xx2028-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let`, { redirect: 'manual' })
+  check(r.status === 404, `${r.status} для xx2028 (ждём 404, редиректа быть не должно)`)
 }
 
 console.log(fails.length ? `\nПРОВАЛОВ: ${fails.length}` : '\nвсё зелено')
