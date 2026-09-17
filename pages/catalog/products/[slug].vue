@@ -19,6 +19,7 @@ import {
   BUCKET_NAME_CATEGORY,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
+  COURIER_DELIVERY_COST,
 } from '@/constants'
 import { productShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -973,7 +974,17 @@ useSchemaOrg([
     // ✅ 3. Штрихкод (только если существует)
     gtin: computed(() => product.value?.barcode || undefined),
 
+    /*
+     * Бренд — это производитель, а не продавец.
+     *
+     * Раньше при пустом бренде подставлялась «Ухтышка», и на 92 товарах из 178
+     * (замер по прод-базе 17 сентября 2026) разметка называла производителем
+     * магазин. Для робота SuboTech и аккордеона HiH02 это прямая неправда, а
+     * Google по этому полю сопоставляет товар с карточками других продавцов.
+     * Нет бренда в базе — поля нет: пропуск честнее выдумки.
+     */
     brand: computed(() => {
+      const manufacturer = brandName.value
       if (productLineName.value) {
         return {
           '@type': 'Brand' as const,
@@ -981,18 +992,22 @@ useSchemaOrg([
           ...(productLineLink.value && {
             url: `https://uhti.kz${productLineLink.value}`,
           }),
-          'parentOrganization': {
-            '@type': 'Brand' as const,
-            'name': brandName.value || 'Ухтышка',
-            ...(brandLink.value && {
-              url: `https://uhti.kz${brandLink.value}`,
-            }),
-          },
+          ...(manufacturer && {
+            parentOrganization: {
+              '@type': 'Brand' as const,
+              'name': manufacturer,
+              ...(brandLink.value && {
+                url: `https://uhti.kz${brandLink.value}`,
+              }),
+            },
+          }),
         }
       }
+      if (!manufacturer)
+        return undefined
       return {
         '@type': 'Brand' as const,
-        'name': brandName.value || 'Ухтышка',
+        'name': manufacturer,
         ...(brandLink.value && { url: `https://uhti.kz${brandLink.value}` }),
       }
     }),
@@ -1033,20 +1048,45 @@ useSchemaOrg([
             }
           : {}),
 
+        /*
+         * Условия — с /returns, слово в слово:
+         *  • «в течение 14 календарных дней» → merchantReturnDays 14;
+         *  • «Транспортные расходы при возврате или обмене товара надлежащего
+         *    качества оплачивает покупатель» → ReturnFeesCustomerResponsibility.
+         *    Здесь стоял FreeReturn, то есть разметка обещала бесплатный
+         *    возврат, которого магазин не даёт (бесплатен только возврат брака);
+         *  • «через курьера или в пункте самовывоза» → ReturnInStore. Стояло
+         *    ReturnByMail — почтой возвраты не принимаются вовсе.
+         */
         'hasMerchantReturnPolicy': {
           '@type': 'MerchantReturnPolicy' as const,
           'applicableCountry': 'KZ',
           'returnPolicyCategory':
             'https://schema.org/MerchantReturnFiniteReturnWindow',
           'merchantReturnDays': 14,
-          'returnMethod': 'https://schema.org/ReturnByMail',
-          'returnFees': 'https://schema.org/FreeReturn',
+          'returnMethod': 'https://schema.org/ReturnInStore',
+          'returnFees': 'https://schema.org/ReturnFeesCustomerResponsibility',
         },
+        /*
+         * Доставка — то, что реально считает касса и обещает блок на странице.
+         *
+         * Стоимость. Здесь стоял ноль на весь Казахстан, и Google по этому полю
+         * рисует «бесплатная доставка». Касса же берёт COURIER_DELIVERY_COST
+         * (cartStore.deliveryCost), а ноль получается только у самовывоза и от
+         * порога FREE_SHIPPING_THRESHOLD. Ставим обычную цену курьера:
+         * занизить своё же обещание безопасно, завысить — нет.
+         *
+         * Срок. Стояло 1–3 дня на всю страну, хотя блок доставки на этой же
+         * странице говорит «Курьером по Алматы 1–2 дня» и «По Казахстану 3–7
+         * дней, Kazpost или CDEK». Берём объединение: 1–7. Разнести по
+         * регионам двумя записями можно, но addressRegion для Алматы Google
+         * разбирает ненадёжно, а неразобранная запись хуже широкой честной.
+         */
         'shippingDetails': {
           '@type': 'OfferShippingDetails' as const,
           'shippingRate': {
             '@type': 'MonetaryAmount' as const,
-            'value': 0,
+            'value': COURIER_DELIVERY_COST,
             'currency': 'KZT',
           },
           'shippingDestination': {
@@ -1064,7 +1104,7 @@ useSchemaOrg([
             'transitTime': {
               '@type': 'QuantitativeValue' as const,
               'minValue': 1,
-              'maxValue': 3,
+              'maxValue': 7,
               'unitCode': 'DAY',
             },
           },
