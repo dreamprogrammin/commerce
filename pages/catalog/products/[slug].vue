@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   AttributeWithValue,
+  Database,
   IBreadcrumbItem,
   ProductImageRow,
   ProductWithImages,
@@ -91,7 +92,30 @@ if (productError.value) {
   })
 }
 
-if (!product.value) {
+/*
+ * Карточки нет — но, может быть, у неё просто сменился адрес.
+ *
+ * Прежние адреса пишет триггер `trg_product_slug_history` (миграция
+ * 20260917140000). Если старый slug нашёлся и товар жив — уводим 301-м на
+ * новый адрес: иначе каждое переименование в админке уносит накопленные
+ * позиции, как это случилось с «xx2028» (165 показов на позиции 4.8 в никуда).
+ *
+ * `navigateTo` на сервере не прерывает выполнение setup, а подменяет ответ
+ * целиком — поэтому после него НЕЛЬЗЯ бросать `createError`, иначе вместо
+ * редиректа уедет страница ошибки. Отсюда `else if`, а не два отдельных
+ * условия.
+ */
+const movedTo = product.value
+  ? null
+  : await findMovedProductSlug(useSupabaseClient<Database>(), slug.value)
+
+if (movedTo) {
+  await navigateTo(`/catalog/products/${movedTo}`, {
+    redirectCode: 301,
+    replace: true,
+  })
+}
+else if (!product.value) {
   throw createError({
     statusCode: 404,
     statusMessage: 'Товар не найден',
