@@ -10,6 +10,10 @@ import {
   countProductsByCategoryBrand,
   isBrandLandingIndexable,
 } from '~/utils/brandLanding'
+import {
+  countProductsByCategory,
+  isCategoryIndexable,
+} from '~/utils/categoryLanding'
 
 interface SitemapImage {
   loc: string
@@ -177,8 +181,36 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
 
     console.log(`✅ Sitemap: Загружено ${categories?.length || 0} категорий`)
 
+    /*
+     * Пустые категории в карту не идут — то же правило, что у бренд-лендингов
+     * выше, и та же функция, что у `robotsRule` на странице. Иначе в карте
+     * снова окажутся адреса, закрытые `noindex`.
+     *
+     * Замер 16 сентября 2026: 13 категорий из 64 без единого активного товара
+     * в ветке, и все тринадцать лежали в карте. За 90 дней — 347 показов и
+     * ноль кликов.
+     *
+     * Fail-open, как у брендов: если выборка товаров не удалась, число
+     * объявляется неизвестным, и карта отдаёт все категории. Разовая ошибка
+     * базы не должна выкашивать полкарты.
+     */
+    const canCountCategoryProducts = !!products && !!categories
+    const categoryProductCounts = canCountCategoryProducts
+      ? countProductsByCategory(products as any[], categories as any[])
+      : new Map<string, number>()
+
     if (categories && categories.length > 0) {
+      let empty = 0
       categories.forEach((category) => {
+        const productsCount = canCountCategoryProducts
+          ? (categoryProductCounts.get(category.id) ?? 0)
+          : null
+
+        if (canCountCategoryProducts && !isCategoryIndexable(category.slug, productsCount)) {
+          empty++
+          return
+        }
+
         sitemapRoutes.push({
           loc: category.href || `/catalog/${category.slug}`,
           lastmod: category.updated_at ?? new Date().toISOString(),
@@ -186,6 +218,10 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
           priority: 0.75,
         })
       })
+      // `warn`, а не `log`: линтер в проекте пропускает только warn и error,
+      // а строка нужна — по ней видно, почему карта вдруг короче.
+      if (empty > 0)
+        console.warn(`✅ Sitemap: пропущено пустых категорий: ${empty}`)
     }
     else {
       console.warn('⚠️ Категории не найдены в базе данных')
