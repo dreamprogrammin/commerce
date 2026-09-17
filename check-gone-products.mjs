@@ -41,7 +41,15 @@ console.log('\n1) старые адреса отвечают 301 на нужну
 for (const c of CASES) {
   const r = await fetch(`${BASE}${c.from}`, { redirect: 'manual' })
   const loc = r.headers.get('location')
-  check(r.status === 301, `${c.impressions} показов: ${r.status} (ждём 301) ${c.from.replace('/catalog/products/', '…/')}`)
+  /*
+   * 301 или 308 — оба «переехало навсегда», и Google их не различает.
+   * Разными они выходят потому, что редирект делают два разных механизма:
+   * `permanent: true` в vercel.json платформа исполняет как 308, а
+   * обработчик Nitro для локальной сборки отвечает 301. Проверено на бою
+   * 17 сентября 2026 после выкатки: все четыре адреса отдали 308 и увели
+   * куда надо.
+   */
+  check(r.status === 301 || r.status === 308, `${c.impressions} показов: ${r.status} (ждём 301 или 308) ${c.from.replace('/catalog/products/', '…/')}`)
   check(loc === c.to, `    ведёт на ${loc ?? '—'}`)
 }
 
