@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   AttributeWithValue,
+  Database,
   IBreadcrumbItem,
   ProductImageRow,
   ProductWithImages,
@@ -19,6 +20,7 @@ import {
   BUCKET_NAME_CATEGORY,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
+  COURIER_DELIVERY_COST,
 } from '@/constants'
 import { productShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -29,6 +31,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+import { composeProductMeta } from '@/utils/seoDescription'
 
 import { buildProductTitle } from '@/utils/seoTitle'
 
@@ -89,7 +92,30 @@ if (productError.value) {
   })
 }
 
-if (!product.value) {
+/*
+ * Карточки нет — но, может быть, у неё просто сменился адрес.
+ *
+ * Прежние адреса пишет триггер `trg_product_slug_history` (миграция
+ * 20260917140000). Если старый slug нашёлся и товар жив — уводим 301-м на
+ * новый адрес: иначе каждое переименование в админке уносит накопленные
+ * позиции, как это случилось с «xx2028» (165 показов на позиции 4.8 в никуда).
+ *
+ * `navigateTo` на сервере не прерывает выполнение setup, а подменяет ответ
+ * целиком — поэтому после него НЕЛЬЗЯ бросать `createError`, иначе вместо
+ * редиректа уедет страница ошибки. Отсюда `else if`, а не два отдельных
+ * условия.
+ */
+const movedTo = product.value
+  ? null
+  : await findMovedProductSlug(useSupabaseClient<Database>(), slug.value)
+
+if (movedTo) {
+  await navigateTo(`/catalog/products/${movedTo}`, {
+    redirectCode: 301,
+    replace: true,
+  })
+}
+else if (!product.value) {
   throw createError({
     statusCode: 404,
     statusMessage: 'Товар не найден',
@@ -472,15 +498,24 @@ const questionsCountLabel = computed(() =>
   pluralize(questionsCount.value, 'вопрос', 'вопроса', 'вопросов'),
 )
 
-/** Способы получения и преимущества — статика магазина, единая для всех товаров. */
+/*
+ * Способы получения и преимущества — статика магазина, единая для всех товаров.
+ *
+ * Сроки берутся с `/terms` и обязаны совпадать с ними слово в слово: по Алматы
+ * 1–3 рабочих дня, по Казахстану 3–7. До 17 сентября 2026 здесь и на
+ * оформлении стояло «1–2 дня» — обещание быстрее опубликованных условий,
+ * причём ровно в тот момент, когда покупатель выбирает способ доставки. То же
+ * расхождение уже разбирали в августе на макетах бренд-лендинга (см.
+ * `constants/brandStaticText.ts`), но до этих мест правка тогда не дошла.
+ */
 const PICKUP_ROWS = [
   { icon: 'lucide:store', title: 'Забрать в магазине', sub: 'Алматы — сегодня, бесплатно' },
-  { icon: 'lucide:truck', title: 'Курьером по Алматы', sub: '1–2 дня, при заказе до 14:00 — отправка в тот же день' },
+  { icon: 'lucide:truck', title: 'Курьером по Алматы', sub: '1–3 рабочих дня, при заказе до 14:00 — отправка в тот же день' },
   { icon: 'lucide:package', title: 'По Казахстану', sub: '3–7 дней, Kazpost или CDEK' },
 ]
 
 const PERKS = [
-  { icon: 'lucide:truck', text: 'Доставка 1–2 дня по Алматы' },
+  { icon: 'lucide:truck', text: 'Доставка 1–3 дня по Алматы' },
   { icon: 'lucide:shield-check', text: 'Гарантия и возврат 14 дней' },
   { icon: 'lucide:wallet', text: 'Оплата при получении' },
   { icon: 'lucide:coins', text: 'Кэшбэк бонусами до 10%' },
@@ -562,35 +597,26 @@ const metaDescription = computed(() => {
   if (product.value.seo_description)
     return product.value.seo_description
 
-  // Генерируем умное description: [Товар] [польза]. [Преимущество]. ⭐ [рейтинг]. [Доставка]. От [цена] ₸
-  const parts = []
-
-  // 1. Название + аудитория
-  if (audienceText.value) {
-    parts.push(`${product.value.name} ${audienceText.value}`)
-  }
-  else {
-    parts.push(product.value.name)
-  }
-
-  // 2. Социальное доказательство (рейтинг)
-  if (product.value.review_count > 0) {
-    parts.push(`⭐ ${product.value.avg_rating?.toFixed(1)} (${product.value.review_count} ${product.value.review_count === 1 ? 'отзыв' : product.value.review_count < 5 ? 'отзыва' : 'отзывов'})`)
-  }
-
-  // 3. Наличие
-  if (product.value.stock_quantity > 0) {
-    parts.push('В наличии')
-  }
-
-  // 4. Доставка
-  parts.push('Доставка по Алматы за 1 день')
-
-  // 5. Цена
-  const price = product.value.final_price || product.value.price
-  parts.push(`От ${formatPrice(price)} ₸`)
-
-  return `${parts.join('. ')}.`
+  /*
+   * Описания в базе нет — собираем сами. Сборка вынесена в
+   * `composeProductMeta`, потому что здесь она успела накопить три дефекта,
+   * и все три были видны на проде 17 сентября 2026:
+   *  • «Доставка по Алматы за 1 день» — обещание, которого магазин не даёт;
+   *  • «…от 3 лет от 3 лет» — возраст приклеивался вторым разом к названию,
+   *    в котором он уже стоял;
+   *  • рейтинг с одного отзыва и эмодзи-звезда, от которых в сниппете
+   *    остаются потраченные знаки.
+   * Плюс строка ничем не ограничивалась по длине.
+   */
+  return composeProductMeta({
+    name: product.value.name,
+    gender: genderText.value,
+    age: ageRangeText.value,
+    inStock: product.value.stock_quantity > 0,
+    rating: product.value.avg_rating,
+    reviewsCount: product.value.review_count,
+    price: product.value.final_price || product.value.price,
+  })
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
@@ -973,7 +999,17 @@ useSchemaOrg([
     // ✅ 3. Штрихкод (только если существует)
     gtin: computed(() => product.value?.barcode || undefined),
 
+    /*
+     * Бренд — это производитель, а не продавец.
+     *
+     * Раньше при пустом бренде подставлялась «Ухтышка», и на 92 товарах из 178
+     * (замер по прод-базе 17 сентября 2026) разметка называла производителем
+     * магазин. Для робота SuboTech и аккордеона HiH02 это прямая неправда, а
+     * Google по этому полю сопоставляет товар с карточками других продавцов.
+     * Нет бренда в базе — поля нет: пропуск честнее выдумки.
+     */
     brand: computed(() => {
+      const manufacturer = brandName.value
       if (productLineName.value) {
         return {
           '@type': 'Brand' as const,
@@ -981,18 +1017,22 @@ useSchemaOrg([
           ...(productLineLink.value && {
             url: `https://uhti.kz${productLineLink.value}`,
           }),
-          'parentOrganization': {
-            '@type': 'Brand' as const,
-            'name': brandName.value || 'Ухтышка',
-            ...(brandLink.value && {
-              url: `https://uhti.kz${brandLink.value}`,
-            }),
-          },
+          ...(manufacturer && {
+            parentOrganization: {
+              '@type': 'Brand' as const,
+              'name': manufacturer,
+              ...(brandLink.value && {
+                url: `https://uhti.kz${brandLink.value}`,
+              }),
+            },
+          }),
         }
       }
+      if (!manufacturer)
+        return undefined
       return {
         '@type': 'Brand' as const,
-        'name': brandName.value || 'Ухтышка',
+        'name': manufacturer,
         ...(brandLink.value && { url: `https://uhti.kz${brandLink.value}` }),
       }
     }),
@@ -1033,20 +1073,45 @@ useSchemaOrg([
             }
           : {}),
 
+        /*
+         * Условия — с /returns, слово в слово:
+         *  • «в течение 14 календарных дней» → merchantReturnDays 14;
+         *  • «Транспортные расходы при возврате или обмене товара надлежащего
+         *    качества оплачивает покупатель» → ReturnFeesCustomerResponsibility.
+         *    Здесь стоял FreeReturn, то есть разметка обещала бесплатный
+         *    возврат, которого магазин не даёт (бесплатен только возврат брака);
+         *  • «через курьера или в пункте самовывоза» → ReturnInStore. Стояло
+         *    ReturnByMail — почтой возвраты не принимаются вовсе.
+         */
         'hasMerchantReturnPolicy': {
           '@type': 'MerchantReturnPolicy' as const,
           'applicableCountry': 'KZ',
           'returnPolicyCategory':
             'https://schema.org/MerchantReturnFiniteReturnWindow',
           'merchantReturnDays': 14,
-          'returnMethod': 'https://schema.org/ReturnByMail',
-          'returnFees': 'https://schema.org/FreeReturn',
+          'returnMethod': 'https://schema.org/ReturnInStore',
+          'returnFees': 'https://schema.org/ReturnFeesCustomerResponsibility',
         },
+        /*
+         * Доставка — то, что реально считает касса и обещает блок на странице.
+         *
+         * Стоимость. Здесь стоял ноль на весь Казахстан, и Google по этому полю
+         * рисует «бесплатная доставка». Касса же берёт COURIER_DELIVERY_COST
+         * (cartStore.deliveryCost), а ноль получается только у самовывоза и от
+         * порога FREE_SHIPPING_THRESHOLD. Ставим обычную цену курьера:
+         * занизить своё же обещание безопасно, завысить — нет.
+         *
+         * Срок. Стояло 1–3 дня на всю страну, хотя блок доставки на этой же
+         * странице говорит «Курьером по Алматы 1–2 дня» и «По Казахстану 3–7
+         * дней, Kazpost или CDEK». Берём объединение: 1–7. Разнести по
+         * регионам двумя записями можно, но addressRegion для Алматы Google
+         * разбирает ненадёжно, а неразобранная запись хуже широкой честной.
+         */
         'shippingDetails': {
           '@type': 'OfferShippingDetails' as const,
           'shippingRate': {
             '@type': 'MonetaryAmount' as const,
-            'value': 0,
+            'value': COURIER_DELIVERY_COST,
             'currency': 'KZT',
           },
           'shippingDestination': {
@@ -1064,7 +1129,7 @@ useSchemaOrg([
             'transitTime': {
               '@type': 'QuantitativeValue' as const,
               'minValue': 1,
-              'maxValue': 3,
+              'maxValue': 7,
               'unitCode': 'DAY',
             },
           },

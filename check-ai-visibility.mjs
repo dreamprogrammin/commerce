@@ -96,6 +96,43 @@ for (const ua of AGENTS) {
   check((org?.sameAs ?? []).length >= 3, `профилей в sameAs: ${(org?.sameAs ?? []).length}`)
   check(!!org?.address?.addressLocality, `город в адресе: ${org?.address?.addressLocality}`)
 
+  /*
+   * Узел магазина на главной и узел организации описывают ОДИН бизнес, и
+   * расходиться им нельзя. 16 сентября 2026 они разошлись: оплату картой
+   * убрали с оформления и поправили организацию, а у магазина осталось
+   * «Карты». Разметка обещала способ оплаты, которого на сайте нет.
+   */
+  const home = await (await fetch(`${BASE}/`)).text()
+  const homeNodes = []
+  for (const raw of home.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)) {
+    try {
+      const data = JSON.parse(raw[1])
+      homeNodes.push(...(data['@graph'] ?? [data]))
+    }
+    catch {}
+  }
+  const store = homeNodes.find(n => String(n['@type']) === 'Store')
+  const homeOrg = homeNodes.find(n => String(n['@type']).includes('Organization'))
+  const asText = v => (Array.isArray(v) ? v.join(', ') : String(v ?? ''))
+
+  check(!!store, 'на главной есть узел магазина')
+  check(
+    !/карт/i.test(asText(store?.paymentAccepted)),
+    `способы оплаты без карты: ${asText(store?.paymentAccepted)}`,
+  )
+  check(
+    asText(store?.paymentAccepted) === asText(homeOrg?.paymentAccepted),
+    'оплата у магазина и организации написана одинаково',
+  )
+  check(
+    asText(store?.openingHours) === asText(homeOrg?.openingHours),
+    `часы совпадают: «${asText(store?.openingHours)}» и «${asText(homeOrg?.openingHours)}»`,
+  )
+  check(
+    store?.parentOrganization?.['@id'] === homeOrg?.['@id'],
+    'магазин связан с организацией через parentOrganization',
+  )
+
   const faq = nodes.find(n => n['@type'] === 'FAQPage')
   check((faq?.mainEntity ?? []).length >= 5, `вопросов в разметке: ${(faq?.mainEntity ?? []).length}`)
 

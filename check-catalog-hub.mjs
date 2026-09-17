@@ -170,5 +170,60 @@ for (const [path, expectedH1] of HUBS) {
   )
 }
 
+// ---------- 5. Подразделы со своими вопросами ----------
+/*
+ * У этих страниц текст написан в базе, а вопросы — в репозитории
+ * (`constants/categoryStaticText.ts`). Проверяем обе стороны механизма:
+ * свои вопросы показаны И шаблонные вопросы генератора скрыты.
+ *
+ * Зачем страж. Шаблонные подставляют название раздела как есть, и при
+ * дательном падеже выходит «Какие бренды Конструкторы Мальчикам можно
+ * купить?». Скрывает их одно условие на странице (`!categoryStatic`); уберут
+ * его при следующей правке — и вопросы вернутся молча, на самых ходовых
+ * страницах каталога.
+ *
+ * Разделы выбраны по Search Console: 473, 331, 305, 297, 237 и 200 показов за
+ * 90 дней.
+ */
+const WITH_OWN_FAQ = [
+  '/catalog/girls/kukly',
+  '/catalog/girls/kukly/kukly-lol',
+  '/catalog/constructors-root/konstruktory-malchikam',
+  '/catalog/kiddy/tolokar',
+  '/catalog/boys/mashinki',
+  '/catalog/girls/detskaya-kosmetika',
+]
+
+for (const path of WITH_OWN_FAQ) {
+  console.log(`\n5) свои вопросы ${path}`)
+  const page = await (await fetch(`${BASE}${path}`)).text()
+
+  const own = [...page.matchAll(/<h3[^>]*class="ssb__q"[^>]*>([\s\S]*?)<\/h3>/g)].map(m => strip(m[1]))
+  check(own.length >= 4, `своих вопросов: ${own.length}`)
+
+  const visible = strip(page.replace(/<script[\s\S]*?<\/script>/g, ' '))
+  check(
+    !/Что такое [А-ЯЁ][^?]{2,40}\?/.test(visible),
+    'шаблонных вопросов генератора нет',
+  )
+
+  const faqNode = [...page.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const parsed = JSON.parse(m[1])
+        return parsed['@graph'] ?? [parsed]
+      }
+      catch {
+        return []
+      }
+    })
+    .find(node => node?.['@type'] === 'FAQPage')
+  const asked = (faqNode?.mainEntity ?? []).map(q => q.name)
+  check(
+    asked.length >= 4 && asked.length === own.length && asked.every(q => own.includes(q)),
+    `разметка повторяет видимые вопросы (${asked.length} против ${own.length})`,
+  )
+}
+
 console.log(fails.length ? `\nКРАСНЫЙ: ${fails.length} провал(ов)` : '\nЗЕЛЁНЫЙ: каталог и разделы отвечают на вопросы, а не повторяют меню')
 process.exit(fails.length ? 1 : 0)

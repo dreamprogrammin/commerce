@@ -39,6 +39,7 @@ import {
   parseCatalogSlug,
 } from '@/utils/brandLanding'
 import { isWholeRange } from '@/utils/catalogFilterRange'
+import { isCategoryIndexable } from '@/utils/categoryLanding'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
@@ -1558,6 +1559,26 @@ const robotsRule = computed(() => {
     return { noindex: true, follow: true }
   }
 
+  /*
+   * Пустая категория в индексе — то же, что пустой бренд-лендинг, и правило
+   * здесь общее с картой сайта (обе стороны зовут `isCategoryIndexable`).
+   *
+   * Замер 16 сентября 2026: 13 категорий из 64 не имели ни одного активного
+   * товара во всей ветке, и все тринадцать лежали в карте. За 90 дней они
+   * собрали 347 показов и НОЛЬ кликов, причём часть стояла высоко —
+   * бизидоски на 6-м месте, мягкие игрушки на 4,8. Человек приходил по
+   * запросу и видел пустую полку.
+   *
+   * Считаем по ВСЕЙ ветке (`categoryProductsCount` обходит дерево вниз):
+   * иначе закрылись бы родительские разделы вроде «Кукол», где своих товаров
+   * ноль, а в подкатегориях девятнадцать.
+   *
+   * Список исключений — в `constants/index.ts`, туда владелец кладёт
+   * страницы, которые собирается наполнить.
+   */
+  if (!isCategoryIndexable(currentCategorySlug.value, categoryProductsCount.value))
+    return { noindex: true, follow: true }
+
   return { index: true, follow: true }
 })
 
@@ -2656,8 +2677,8 @@ else {
          рисуется текст из базы: тот разбирает HTML регулярками и ВЫРЕЗАЕТ
          ССЫЛКИ, а половина смысла этого текста — увести в подразделы. -->
     <CommonStaticSeoBlock
-      v-if="categoryStatic && seoBlocks.length === 0 && !hasActiveFilters"
-      :html="categoryStatic.html"
+      v-if="categoryStatic && !hasActiveFilters"
+      :html="seoBlocks.length > 0 ? undefined : categoryStatic.html"
       :faq="categoryStatic.faq"
     />
 
