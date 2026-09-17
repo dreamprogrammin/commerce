@@ -30,8 +30,12 @@
  *    что содержимое приходит через `v-html`.
  */
 defineProps<{
-  /** Готовый HTML: только h2, h3, p, ul, li, a. */
-  html: string
+  /**
+   * Готовый HTML: только h2, h3, p, ul, li, a. Может быть пустым — тогда блок
+   * рисует одни вопросы. Так он работает на разделах, где текст уже написан в
+   * базе: перебивать его нельзя, а шаблонные вопросы заменить надо.
+   */
+  html?: string
   /** Вопросы, которые ПОКАЗЫВАЮТСЯ здесь же и из которых собирается FAQPage. */
   faq: readonly { q: string, a: string }[]
 }>()
@@ -42,7 +46,7 @@ defineProps<{
     <div class="ssb__inner">
       <article>
         <!-- eslint-disable-next-line vue/no-v-html (текст свой, из репозитория) -->
-        <div class="ssb__text" v-html="html" />
+        <div v-if="html" class="ssb__text" v-html="html" />
 
         <h2 class="ssb__faq-title">
           Частые вопросы
