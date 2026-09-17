@@ -38,13 +38,21 @@ export interface ProductSlugRedirect {
   why: string
 }
 
+/*
+ * ОТСЮДА НАМЕРЕННО УБРАН адрес аккордеона `xx2028`.
+ *
+ * Он вёл 301-м на живую карточку HiH02 — тот же товар под новым артикулом, 42
+ * шт в наличии, 165 показов за 90 дней на средней позиции 4.8. 17 сентября
+ * 2026 владелец сказал прямо: «не хочу, чтобы это страница была». Вариант
+ * замены (410 Gone, обычный 404 или 301 на раздел музыкальных инструментов)
+ * он не выбрал — вопрос был прерван.
+ *
+ * Поэтому адрес оставлен в том состоянии, в каком он на бою: 404. Это самый
+ * обратимый из вариантов и единственный, который точно не противоречит
+ * сказанному. Возвращать запись — только по слову владельца; цена вопроса и
+ * варианты записаны в `docs/HANDOFF.md`, раздел «ЧТО ОСТАЛОСЬ НЕЗАКРЫТЫМ».
+ */
 export const PRODUCT_SLUG_REDIRECTS: readonly ProductSlugRedirect[] = [
-  {
-    from: '/catalog/products/akkordeon-detskiy-xx2028-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let',
-    to: '/catalog/products/akkordeon-detskiy-hih02-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let',
-    impressions: 165,
-    why: 'тот же аккордеон под новым артикулом, XX2028 остался в описании; в наличии 42 шт',
-  },
   {
     from: '/catalog/products/lego-marvel-76287-zheleznyy-chelovek-s-motociklom-i-halk-pervyy-konstruktor-dlya-detey-ot-4-let',
     to: '/catalog/products/konstruktor-lego-marvel-76287-zheleznyy-chelovek-na-motocikle-protiv-halka-s-razrushaemym-domom',
