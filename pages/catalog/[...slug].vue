@@ -2677,8 +2677,8 @@ else {
          рисуется текст из базы: тот разбирает HTML регулярками и ВЫРЕЗАЕТ
          ССЫЛКИ, а половина смысла этого текста — увести в подразделы. -->
     <CommonStaticSeoBlock
-      v-if="categoryStatic && seoBlocks.length === 0 && !hasActiveFilters"
-      :html="categoryStatic.html"
+      v-if="categoryStatic && !hasActiveFilters"
+      :html="seoBlocks.length > 0 ? undefined : categoryStatic.html"
       :faq="categoryStatic.faq"
     />
 
