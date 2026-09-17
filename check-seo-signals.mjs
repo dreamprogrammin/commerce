@@ -147,6 +147,56 @@ function h1Of(html) {
   )
 }
 
+// ---------- 5б. В карте сайта нет пустых категорий ----------
+/*
+ * Карта не должна предлагать роботу страницы, где нечего купить. 16 сентября
+ * 2026 таких было ТРИНАДЦАТЬ из 64: ни одного активного товара во всей ветке,
+ * и все тринадцать лежали в карте. За 90 дней они собрали 347 показов и ноль
+ * кликов, причём часть стояла высоко — бизидоски на 6-м месте, мягкие игрушки
+ * на 4,8. Человек приходил по запросу и видел пустую полку.
+ *
+ * Проверяем по РАЗМЕТКЕ, а не по базе: у стража нет доступа к базе, а карточки
+ * товара приходят в серверном HTML (класс `pc-`). Заодно это ловит случай,
+ * когда товары есть, но страница их не отдаёт роботу.
+ *
+ * Первая редакция проверяла обратное — что в карте нет закрытых `noindex`
+ * адресов, — и зеленела на бою: там пустые страницы открыты, и инвариант
+ * формально цел. Проверять надо именно наличие товара.
+ *
+ * Исключения владельца (`CATEGORIES_KEPT_INDEXABLE_WITHOUT_PRODUCTS`) страж
+ * знать не обязан: их немного, и они перечислены здесь же.
+ */
+{
+  console.log('\n5б) в карте сайта нет пустых категорий')
+  const KEPT_EMPTY = ['/catalog/kiddy/katalki']
+
+  const map = await get('/sitemap.xml')
+  const categoryUrls = [...map.body.matchAll(/<loc>([^<]*\/catalog\/[^<]*)<\/loc>/g)]
+    .map(m => m[1])
+    .filter(u => !u.includes('/products/') && !u.includes('/brand/'))
+
+  check(categoryUrls.length > 0, `категорий в карте: ${categoryUrls.length}`)
+
+  const empty = []
+  for (let i = 0; i < categoryUrls.length; i += 10) {
+    const batch = categoryUrls.slice(i, i + 10)
+    const counts = await Promise.all(batch.map(async (url) => {
+      const page = await (await fetch(url)).text()
+      return (page.match(/class="pc-/g) ?? []).length
+    }))
+    counts.forEach((cards, index) => {
+      const path = batch[index].replace(/^https?:\/\/[^/]+/, '')
+      if (cards === 0 && !KEPT_EMPTY.includes(path))
+        empty.push(path)
+    })
+  }
+
+  check(
+    empty.length === 0,
+    `пустых категорий в карте: ${empty.length}${empty.length ? ` — ${empty.slice(0, 4).join(', ')}` : ''}`,
+  )
+}
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым
