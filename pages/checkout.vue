@@ -674,7 +674,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 <Icon name="lucide:truck" class="size-[22px] shrink-0" />
                 <span class="flex flex-col items-start leading-[1.25]">
                   <span class="text-sm font-bold">Курьером</span>
-                  <span class="text-xs text-muted-foreground">за 1–2 дня по Алматы</span>
+                  <span class="text-xs text-muted-foreground">за 1–3 дня по Алматы</span>
                 </span>
               </button>
               <button
