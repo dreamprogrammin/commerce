@@ -30,6 +30,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+import { composeProductMeta } from '@/utils/seoDescription'
 
 import { buildProductTitle } from '@/utils/seoTitle'
 
@@ -563,35 +564,26 @@ const metaDescription = computed(() => {
   if (product.value.seo_description)
     return product.value.seo_description
 
-  // Генерируем умное description: [Товар] [польза]. [Преимущество]. ⭐ [рейтинг]. [Доставка]. От [цена] ₸
-  const parts = []
-
-  // 1. Название + аудитория
-  if (audienceText.value) {
-    parts.push(`${product.value.name} ${audienceText.value}`)
-  }
-  else {
-    parts.push(product.value.name)
-  }
-
-  // 2. Социальное доказательство (рейтинг)
-  if (product.value.review_count > 0) {
-    parts.push(`⭐ ${product.value.avg_rating?.toFixed(1)} (${product.value.review_count} ${product.value.review_count === 1 ? 'отзыв' : product.value.review_count < 5 ? 'отзыва' : 'отзывов'})`)
-  }
-
-  // 3. Наличие
-  if (product.value.stock_quantity > 0) {
-    parts.push('В наличии')
-  }
-
-  // 4. Доставка
-  parts.push('Доставка по Алматы за 1 день')
-
-  // 5. Цена
-  const price = product.value.final_price || product.value.price
-  parts.push(`От ${formatPrice(price)} ₸`)
-
-  return `${parts.join('. ')}.`
+  /*
+   * Описания в базе нет — собираем сами. Сборка вынесена в
+   * `composeProductMeta`, потому что здесь она успела накопить три дефекта,
+   * и все три были видны на проде 17 сентября 2026:
+   *  • «Доставка по Алматы за 1 день» — обещание, которого магазин не даёт;
+   *  • «…от 3 лет от 3 лет» — возраст приклеивался вторым разом к названию,
+   *    в котором он уже стоял;
+   *  • рейтинг с одного отзыва и эмодзи-звезда, от которых в сниппете
+   *    остаются потраченные знаки.
+   * Плюс строка ничем не ограничивалась по длине.
+   */
+  return composeProductMeta({
+    name: product.value.name,
+    gender: genderText.value,
+    age: ageRangeText.value,
+    inStock: product.value.stock_quantity > 0,
+    rating: product.value.avg_rating,
+    reviewsCount: product.value.review_count,
+    price: product.value.final_price || product.value.price,
+  })
 })
 
 const categoryName = computed(() => product.value?.categories?.name)
