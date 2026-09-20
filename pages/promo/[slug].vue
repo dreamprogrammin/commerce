@@ -80,6 +80,29 @@ if (!pending.value && !pageData.value?.campaign) {
   throw createError({ statusCode: 404, message: 'Акция не найдена' })
 }
 
+/*
+ * Пустая акция в индекс не идёт — то же правило, что у категорий и
+ * бренд-лендингов. Страница ставила себе `index, follow` всегда, даже когда
+ * товаров в кампании ноль: для поиска это страница ни о чём, и она же
+ * попадала бы в карту сайта.
+ *
+ * `useIndexableRobotsRule`, а не только мета-тег: именно `useRobotsRule`
+ * ставит итоговое значение и перебивает `useHead` — см. пояснение в
+ * `composables/useRobotsContent.ts`.
+ *
+ * Закрывается ЯВНЫМ `noindex: true`, а не отрицанием `index`. `@nuxtjs/robots`
+ * собирает строку перебором ключей и пропускает всё, чему присвоено `false`,
+ * поэтому `{ index: false }` разворачивалось просто в `follow` — разрешение
+ * индексировать. Поймано здесь же запуском: мета-тег говорил `noindex,
+ * follow`, а заголовок `x-robots-tag` — `follow`. Та же грабля описана в
+ * `pages/brand/[slug].vue`.
+ */
+const hasProducts = computed(() => products.value.length > 0)
+
+useIndexableRobotsRule(computed(() =>
+  hasProducts.value ? { index: true, follow: true } : { noindex: true, follow: true },
+))
+
 // SEO
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
@@ -113,7 +136,7 @@ useHead({
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: metaTitle },
     { name: 'twitter:description', content: metaDescription },
-    { name: 'robots', content: useRobotsContent('index, follow') },
+    { name: 'robots', content: useRobotsContent(hasProducts.value ? 'index, follow' : 'noindex, follow') },
   ],
 })
 </script>
