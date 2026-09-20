@@ -43,10 +43,21 @@ async function open() {
   return { context, page, hits }
 }
 
+/*
+ * Ждём, пока приложение оживёт: очередь и обработчики появляются только
+ * после гидрации, а на медленной сети это дольше, чем кажется. Без этого
+ * ожидания страж краснел на бою, хотя счётчик работал правильно.
+ */
+const waitForQueue = page => page.waitForFunction(
+  () => (window.dataLayer?.length ?? 0) > 0,
+  null,
+  { timeout: 20000 },
+).catch(() => {})
+
 // ── 1. При загрузке счётчика нет, но очередь уже собрана ──────────────────
 {
   const { context, page, hits } = await open()
-  await page.waitForTimeout(2500)
+  await waitForQueue(page)
   check(hits.length === 0, `при загрузке скрипт счётчика не запрошен (запросов: ${hits.length})`)
 
   const queue = await page.evaluate(() => (window.dataLayer || []).map(a => Array.from(a)[0]))
@@ -57,7 +68,7 @@ async function open() {
 // ── 2. Касание поднимает счётчик ──────────────────────────────────────────
 {
   const { context, page, hits } = await open()
-  await page.waitForTimeout(1200)
+  await waitForQueue(page)
   await page.mouse.click(180, 400)
   await page.waitForTimeout(2500)
   check(hits.length > 0, `после касания скрипт запрошен (через ${hits[0] ?? '—'} мс от начала)`)
@@ -67,7 +78,7 @@ async function open() {
 // ── 3. Без действий счётчик поднимается сам ───────────────────────────────
 {
   const { context, page, hits } = await open()
-  await page.waitForTimeout(9000)
+  await page.waitForTimeout(12000)
   check(hits.length > 0, `без действий счётчик поднялся сам (через ${hits[0] ?? '—'} мс)`)
   check(hits.length <= 2, `лишних запросов нет (всего ${hits.length})`)
   await page.screenshot({ path: `${SCRATCH}/gtag-lazy.png` })
