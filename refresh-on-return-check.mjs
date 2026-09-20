@@ -2,13 +2,19 @@
  * Обновляются ли личные данные при возврате на удержанную страницу.
  * Считаем запросы к профилю и заказам отдельно на каждом этапе.
  */
+import os from 'node:os'
+import process from 'node:process'
 import fs from 'node:fs'
 import { createServerClient } from '@supabase/ssr'
 import { chromium } from 'playwright'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
 const B = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'https://localhost:3111'
 // Сессия на ЛОКАЛЬНОЙ базе: проверяем личные данные, а заводить сессию на
 // проде нельзя.
-const S = '/tmp/claude-1000/-home-malik-projects-commerce/fce1d09c-dadc-46c6-9c49-deddaabffc17/scratchpad'
+const S = `${SCRATCH}`
 const sess = JSON.parse(fs.readFileSync(`${S}/session.json`, 'utf8'))
 const env = Object.fromEntries(fs.readFileSync('.env', 'utf8').split('\n').filter(l => l.includes('=')).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
 const jar = []

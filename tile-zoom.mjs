@@ -1,5 +1,11 @@
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
-const SC = '/tmp/claude-1000/-home-malik-projects-commerce/fce1d09c-dadc-46c6-9c49-deddaabffc17/scratchpad'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
+const SC = `${SCRATCH}`
 const TAG = process.argv.find(a => a.startsWith('--tag='))?.slice(6) || 'zoom'
 const b = await chromium.launch()
 const c = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true })

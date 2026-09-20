@@ -5,13 +5,18 @@
  * считывать». Был хвост UUID — «50B61F», «f973cb».
  *   node check-order-number.mjs
  */
+import os from 'node:os'
+import process from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'node:fs'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
 
 const SUPA = 'http://127.0.0.1:54321'
 const SERVICE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
 const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
-const CALLS = '/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/tg-calls.jsonl'
+const CALLS = process.env.TG_CALLS ?? `${SCRATCH}/tg-calls.jsonl`
 const CHAT = -1001234567890
 const OWNER = { id: 1321501590, first_name: 'Малик', username: 'owner' }
 const MARK = 'number-test@uhti.kz'

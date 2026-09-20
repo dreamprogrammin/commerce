@@ -9,9 +9,14 @@
  * Стенд — dev на ЛОКАЛЬНОЙ базе, вход по рецепту из docs/HANDOFF.md.
  *   node check-order-statuses.mjs
  */
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
 
 const BASE = process.env.BASE || 'http://localhost:3003'
 const SUPA = 'http://127.0.0.1:54321'
@@ -68,7 +73,7 @@ for (const status of ['new', 'processing', 'confirmed', 'shipped', 'delivered', 
     .find(t => /^(В обработке|Подтверждён|Доставляется|Выполнен|Отменён|completed|processing|confirmed|shipped|delivered|new|pending)$/.test(t)) ?? '—'
   console.log(`\n${status.padEnd(10)} герой: «${hero}» | плашка: «${badge}»`)
   if (status === 'confirmed' || status === 'completed') {
-    await page.screenshot({ path: `/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/order-${status}-fixed.png` })
+    await page.screenshot({ path: `${SCRATCH}/order-${status}-fixed.png` })
   }
   console.log(`           полоса: ${bar || '— нет'}`)
 }

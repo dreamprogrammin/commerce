@@ -4,8 +4,13 @@
  * docs/HANDOFF.md (пароль админу сервисным ключом + куки @supabase/ssr).
  *   node check-brand-form.mjs
  */
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
 import { createServerClient } from '@supabase/ssr'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
 
 const BASE = process.env.BASE || 'http://localhost:3003'
 const SUPA = 'http://127.0.0.1:54321'
@@ -61,7 +66,7 @@ if (title && h1) {
   const preview = await page.locator('.text-blue-600').first().textContent()
   console.log(`предпросмотр в Google: «${preview?.trim()}»`)
   await page.locator('#seo-h1').scrollIntoViewIfNeeded()
-  await page.screenshot({ path: '/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/brand-form.png', fullPage: false })
+  await page.screenshot({ path: `${SCRATCH}/brand-form.png`, fullPage: false })
 
   const save = page.getByRole('button', { name: /Сохранить|Обновить/i }).first()
   await save.click()

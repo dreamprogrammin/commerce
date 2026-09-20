@@ -1,7 +1,13 @@
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
 import { createServerClient } from '@supabase/ssr'
 import fs from 'node:fs'
-const S = '/tmp/claude-1000/-home-malik-projects-commerce/fce1d09c-dadc-46c6-9c49-deddaabffc17/scratchpad'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
+const S = `${SCRATCH}`
 const env = Object.fromEntries(fs.readFileSync('.env', 'utf8').split('\n').filter(l => l.includes('=')).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
 const browser = await chromium.launch()
 
