@@ -756,12 +756,12 @@ useIndexableRobotsRule({ index: true, follow: true })
            прямо на сервере. LQIP-подложки плиток по-прежнему догружаются
            на клиенте, они необязательные. -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <HomePopularCategories />
+        <LazyHomePopularCategories hydrate-on-visible />
       </div>
 
       <!-- Популярные бренды: данные берутся на сервере, гейт не нужен -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <HomeBrandsRail />
+        <LazyHomeBrandsRail hydrate-on-visible />
       </div>
 
       <!-- Акции и бонусы -->
@@ -796,8 +796,8 @@ useIndexableRobotsRule({ index: true, follow: true })
         <!-- Карточка дня и плитки: данные публичные, персонального в них нет —
              рисуются на сервере и в разметке есть сразу. -->
         <div class="home-promo-grid">
-          <HomeDealOfTheDayCard />
-          <HomePromoBenefitTiles />
+          <LazyHomeDealOfTheDayCard hydrate-on-visible />
+          <LazyHomePromoBenefitTiles hydrate-on-visible />
         </div>
       </div>
 
@@ -836,7 +836,7 @@ useIndexableRobotsRule({ index: true, follow: true })
            (почему — в комментарии внутри BestsellersGrid.vue). Прятать нечего,
            а скелетон здесь только удлинял путь до контента. -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
-        <HomeBestsellersGrid />
+        <LazyHomeBestsellersGrid hydrate-on-visible />
       </div>
 
       <!-- SEO-блок (сохранён).
