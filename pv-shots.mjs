@@ -1,6 +1,12 @@
 // Снимки просмотра фото: как выглядит по макету PhotoViewer.dc.html.
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
-const SC = '/tmp/claude-1000/-home-malik-projects-commerce/55af8941-0e66-410c-bfb7-8a8049dadce7/scratchpad'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
+const SC = `${SCRATCH}`
 const MODE = process.argv.find(a => a.startsWith('--mode='))?.slice(7) || 'desktop'
 const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'http://localhost:3003'
 const view = MODE === 'mobile'

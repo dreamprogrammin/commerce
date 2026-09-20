@@ -2,9 +2,15 @@
  * Нижняя навигация: нажатие должно работать как раньше, перетаскивание —
  * как дополнительная возможность.
  */
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
 const B = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'https://localhost:3111'
-const SC = '/tmp/claude-1000/-home-malik-projects-commerce/fce1d09c-dadc-46c6-9c49-deddaabffc17/scratchpad'
+const SC = `${SCRATCH}`
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true })
 await ctx.addInitScript(() => { try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())); sessionStorage.setItem('guest_bonus_modal_seen', 'true') } catch {} })
