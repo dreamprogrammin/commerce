@@ -1,6 +1,12 @@
 // Разбор занятости потока при возврате на главную по видам работы.
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
 import fs from 'node:fs'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
 const BASE = 'https://localhost:3111'
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true })
@@ -40,5 +46,5 @@ const rows = [...agg.entries()].map(([n, ms]) => ({ n, ms: Math.round(ms) })).fi
 const sum = rows.reduce((a, r) => a + r.ms, 0)
 console.log(`суммарно учтено ${sum} мс\n`)
 for (const r of rows.slice(0, 18)) console.log(String(r.ms).padStart(6), 'мс  ', r.n)
-fs.writeFileSync('/tmp/claude-1000/-home-malik-projects-commerce/fce1d09c-dadc-46c6-9c49-deddaabffc17/scratchpad/trace.json', JSON.stringify(rows, null, 2))
+fs.writeFileSync(`${SCRATCH}/trace.json`, JSON.stringify(rows, null, 2))
 await browser.close()

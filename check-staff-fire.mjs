@@ -12,12 +12,16 @@
  *
  *   node check-staff-fire.mjs
  */
-import { createClient } from '@supabase/supabase-js'
 import fs from 'node:fs'
+import os from 'node:os'
+import process from 'node:process'
+import { createClient } from '@supabase/supabase-js'
 
 const SUPA = 'http://127.0.0.1:54321'
 const SERVICE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
-const CALLS = process.env.TG_CALLS ?? '/tmp/tg-calls.jsonl'
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+const CALLS = process.env.TG_CALLS ?? `${SCRATCH}/tg-calls.jsonl`
 const CHAT = -1001234567890
 
 const OWNER = { id: 1321501590, first_name: 'Малик', username: 'owner' }

@@ -11,12 +11,17 @@
  * команде нет — доставка уходит владельцу.
  *   node check-courier-dm.mjs
  */
+import os from 'node:os'
+import process from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'node:fs'
 
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
 const SUPA = 'http://127.0.0.1:54321'
 const SERVICE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
-const CALLS = '/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/tg-calls.jsonl'
+const CALLS = process.env.TG_CALLS ?? `${SCRATCH}/tg-calls.jsonl`
 const ADMIN_CHAT = -1001234567890
 const SECRET = 'local-test-secret'
 const ORDER = 'd7a7ed7f-94dc-4895-8838-90562bf973cb'

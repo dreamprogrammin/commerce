@@ -77,6 +77,17 @@ export default defineNuxtConfig({
     id: process.env.NUXT_PUBLIC_GTAG_ID,
     loadingStrategy: 'defer',
     enabled: true,
+    /*
+     * Скрипт счётчика подгружает `plugins/gtag-lazy.client.ts` — по первому
+     * действию посетителя или через несколько секунд простоя. `defer`
+     * откладывал только загрузку, а исполнение всё равно попадало в самое
+     * дорогое окно: по замеру главной это 343 мс процессорного времени.
+     *
+     * Очередь `dataLayer` модуль создаёт и в ручном режиме, поэтому просмотр
+     * страницы и события покупок копятся с самого начала и уходят целиком,
+     * когда скрипт доедет.
+     */
+    initMode: 'manual',
     config: {
       id: process.env.NUXT_PUBLIC_GTAG_ID,
     },

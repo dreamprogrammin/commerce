@@ -3,7 +3,12 @@
  * Стенд — см. шапку check-landing-robots.mjs.
  *   BASE=http://localhost:3001 node check-brand-page.mjs
  */
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
 
 const BASE = process.env.BASE || 'http://localhost:3001'
 const browser = await chromium.launch()
@@ -17,7 +22,7 @@ for (const slug of ['cada', 'lego', 'mokatoys']) {
   const h1 = (await page.textContent('h1').catch(() => ''))?.trim()
   const about = await page.locator('.brand-description').count()
   const cards = await page.locator('a[href^="/catalog/products/"]').count()
-  await page.screenshot({ path: `/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/brand-${slug}.png`, fullPage: false })
+  await page.screenshot({ path: `${SCRATCH}/brand-${slug}.png`, fullPage: false })
   console.log(`${errors.length ? '❌' : '✅'} /brand/${slug} — код ${resp.status()} | H1 «${h1}» | блоков «О бренде» ${about} | карточек ${cards}`)
   if (errors.length) console.log('   ' + errors.join('\n   '))
   await page.close()

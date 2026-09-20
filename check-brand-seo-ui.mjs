@@ -4,9 +4,14 @@
  * с заглушкой вместо Anthropic API (см. check-brand-seo-fn.mjs).
  *   node check-brand-seo-ui.mjs
  */
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
 
 const BASE = process.env.BASE || 'http://localhost:3003'
 const SUPA = 'http://127.0.0.1:54321'
@@ -55,7 +60,7 @@ for (let i = 0; i < 12; i++) {
 console.log('адрес:', page.url())
 console.log('заголовок страницы:', (await page.title()))
 console.log('видимый текст (300):', (await page.locator('body').innerText()).replace(/\n+/g,' | ').slice(0,300))
-await page.screenshot({ path: '/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/admin-page.png' })
+await page.screenshot({ path: `${SCRATCH}/admin-page.png` })
 console.log('поле title:', await page.locator('#meta-title').count())
 console.log('заголовок секции SEO:', await page.locator('text=SEO оптимизация').count())
 console.log('название бренда в форме:', JSON.stringify(await page.inputValue('#brand-name').catch(() => null)))
@@ -70,7 +75,7 @@ await page.waitForTimeout(500)
 const dialog = page.locator('[data-slot="dialog-content"]:has-text("Сгенерированные тексты")')
 console.log('предпросмотр открылся, содержимое:')
 console.log('   ' + (await dialog.innerText()).replace(/\n+/g, '\n   ').slice(0, 700))
-await page.screenshot({ path: '/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/brand-seo-preview.png' })
+await page.screenshot({ path: `${SCRATCH}/brand-seo-preview.png` })
 
 await dialog.locator('button:has-text("Подставить в форму")').click()
 await page.waitForTimeout(1000)

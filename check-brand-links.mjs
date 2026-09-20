@@ -3,7 +3,12 @@
  * Стенд с прод-данными на чтение — см. шапку check-landing-robots.mjs.
  *   BASE=http://localhost:3001 node check-brand-links.mjs
  */
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
 
 const BASE = process.env.BASE || 'http://localhost:3001'
 const browser = await chromium.launch()
@@ -19,7 +24,7 @@ console.log(`блок найден: ${await nav.count() ? 'да' : 'НЕТ'} | �
 const chips = await nav.locator('a').allTextContents()
 console.log(`ссылки: ${chips.map(c => c.trim()).join(' · ')}`)
 await nav.scrollIntoViewIfNeeded()
-await page.screenshot({ path: '/tmp/claude-1000/-home-malik-projects-commerce/ead52e4f-284f-4c1d-83df-fa81cfc5e834/scratchpad/brand-links.png' })
+await page.screenshot({ path: `${SCRATCH}/brand-links.png` })
 
 await nav.locator('a').first().click()
 await page.waitForURL(/\/brand\//, { timeout: 90000 }).catch(() => {})

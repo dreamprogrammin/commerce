@@ -1,4 +1,10 @@
+import os from 'node:os'
+import process from 'node:process'
 import { chromium } from 'playwright'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true })
 await ctx.addInitScript(() => { try { localStorage.setItem('tg_modal_dismissed_at', String(Date.now())); sessionStorage.setItem('guest_bonus_modal_seen', 'true') } catch {} })
@@ -29,7 +35,7 @@ for (let i = 0; i < 12; i++) {
     }
   })
   console.log(`${String(Date.now() - t0).padStart(4)} мс  активен=${s.активный} ${s.href.padEnd(10)} путь=${s.путь}`)
-  if (i === 1) await p.screenshot({ path: '/tmp/claude-1000/-home-malik-projects-commerce/fce1d09c-dadc-46c6-9c49-deddaabffc17/scratchpad/tap-early.png' })
+  if (i === 1) await p.screenshot({ path: `${SCRATCH}/tap-early.png` })
   await p.waitForTimeout(30)
 }
 await browser.close()

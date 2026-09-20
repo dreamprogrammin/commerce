@@ -1,9 +1,15 @@
 // Снимки страниц профиля залогиненным — для сверки «до/после».
 // Только локальная база: на проде сессию заводить нельзя.
+import os from 'node:os'
+import process from 'node:process'
 import fs from 'node:fs'
 import { createServerClient } from '@supabase/ssr'
 import { chromium } from 'playwright'
-const S = '/tmp/claude-1000/-home-malik-projects-commerce/fce1d09c-dadc-46c6-9c49-deddaabffc17/scratchpad'
+
+// Куда класть скриншоты и журналы: SC из окружения, иначе системный tmp.
+const SCRATCH = process.env.SC || os.tmpdir()
+
+const S = `${SCRATCH}`
 const TAG = process.argv.find(a => a.startsWith('--tag='))?.slice(6) || 'pr'
 const env = Object.fromEntries(fs.readFileSync('.env', 'utf8').split('\n').filter(l => l.includes('=')).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
 const sess = JSON.parse(fs.readFileSync(`${S}/session.json`, 'utf8'))
