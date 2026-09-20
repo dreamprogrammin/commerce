@@ -458,6 +458,79 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       console.log(`✅ Sitemap: Загружено ${seen.size} brand landing страниц`)
     }
 
+    /*
+     * --- АКЦИИ (/promo/<слаг>) ---
+     *
+     * Ветки для них в карте не было вовсе: заведи владелец акцию — робот
+     * узнал бы о ней только случайно, по ссылке с витрины. Сейчас активных
+     * кампаний ноль, поэтому карта не меняется ни на строку, но как только
+     * первая появится, она попадёт в карту сама.
+     *
+     * В карту идут только НЕПУСТЫЕ акции — то же правило, что у категорий и
+     * брендов, и то же, что теперь стоит на самой странице
+     * (`pages/promo/[slug].vue`): кампания без единого активного товара
+     * закрыта `noindex`, и класть её в карту значило бы гонять робота на
+     * запрет.
+     *
+     * Даты правки у кампаний нет — в таблице только `created_at`, его и
+     * берём.
+     */
+    const { data: campaigns, error: campaignsError } = await client
+      .from('promo_campaigns')
+      .select('id, slug, created_at')
+      .eq('is_active', true)
+      .not('slug', 'is', null)
+      .limit(500)
+
+    if (campaignsError)
+      console.error('❌ Ошибка загрузки акций для sitemap:', campaignsError)
+
+    if (campaigns && campaigns.length > 0) {
+      /*
+       * Товары кампании считаем по связке, отсеивая снятые с продажи:
+       * `products!inner` с фильтром по `is_active` — то же, что делает сама
+       * страница акции.
+       */
+      const { data: campaignProducts, error: campaignProductsError } = await client
+        .from('promo_campaign_products')
+        .select('campaign_id, products!inner(id)')
+        .eq('products.is_active', true)
+        .limit(5000)
+
+      if (campaignProductsError)
+        console.error('❌ Ошибка загрузки товаров акций для sitemap:', campaignProductsError)
+
+      /*
+       * Fail-open, как у категорий и брендов: если выборка товаров не
+       * удалась, число объявляется неизвестным и в карту идут все активные
+       * акции. Разовая ошибка базы не должна выкашивать раздел целиком.
+       */
+      const canCountCampaignProducts = !!campaignProducts
+      const campaignsWithProducts = new Set(
+        (campaignProducts ?? []).map((row: any) => row.campaign_id as string),
+      )
+
+      let emptyCampaigns = 0
+      campaigns.forEach((campaign) => {
+        if (canCountCampaignProducts && !campaignsWithProducts.has(campaign.id)) {
+          emptyCampaigns++
+          return
+        }
+
+        sitemapRoutes.push({
+          loc: `/promo/${campaign.slug}`,
+          lastmod: campaign.created_at ?? new Date().toISOString(),
+          changefreq: 'daily',
+          priority: 0.7,
+        })
+      })
+
+      // Без строки об успехе: линтер пропускает только `warn` и `error`,
+      // а предупреждение ниже — то, ради чего в журнал вообще смотрят.
+      if (emptyCampaigns > 0)
+        console.warn(`⚠️ Sitemap: ${emptyCampaigns} акций без активных товаров закрыты noindex и в карту не попали`)
+    }
+
     // ✅ Итоговое логирование
     console.log(`✅ Sitemap: Всего сгенерировано ${sitemapRoutes.length} URLs`)
 
