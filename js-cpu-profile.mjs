@@ -24,7 +24,10 @@ for (let i = 0; i < profile.samples.length; i++) {
   const n = byId.get(profile.samples[i])
   const ms = Math.max(0, profile.timeDeltas[i] || 0) / 1000
   const url = n?.callFrame?.url || '(движок)'
-  const key = url ? url.split('/').pop() || url : '(движок)'
+  const fn = n?.callFrame?.functionName || '(без имени)'
+  const key = process.env.BY_FN
+    ? `${fn} — ${(url.split('/').pop() || url).slice(0, 24)}`
+    : (url ? url.split('/').pop() || url : '(движок)')
   self.set(key, (self.get(key) || 0) + ms)
 }
 console.log(`всего процессорного времени за замер: ${Math.round(total)} мс\n`)
