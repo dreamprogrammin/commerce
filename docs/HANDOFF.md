@@ -154,7 +154,10 @@
      оформление. Ради 0,08 с не стоит. И помнить: дробление «ядра» (vue,
      pinia, supabase) по чанкам уже ломало сайт ReferenceError — см.
      комментарий у manualChunks в `nuxt.config.ts`;
-   * **`<Toaster dir="ltr">` — ГОТОВО К ПРАВКЕ, ЗАМЕРЕНО.** `vue-sonner` 2.0.9
+   * **`<Toaster dir="ltr">` — СДЕЛАНО 21 сентября, В `dev`** (`2daf462`, мердж
+     `4981c38`), страж `check-toaster-dir.mjs`: на бою 1 вызов
+     `getComputedStyle(<html>)` на страницу, со сборкой правки — 0; уведомление
+     проверено браузером. `vue-sonner` 2.0.9
      по умолчанию `dir: "auto"` и тогда на КАЖДОЙ отрисовке зовёт
      `getDocumentDirection()` (`lib/index.js`, стр. 1165), а та — при
      отсутствии `dir` у `<html>` — `window.getComputedStyle(document
