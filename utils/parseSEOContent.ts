@@ -10,6 +10,43 @@ export interface SEOBlock {
   }>
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: '\u00A0',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: '\'',
+}
+
+/**
+ * Текст блока: теги срезаются, HTML-сущности раскрываются.
+ *
+ * Сущности раскрывать обязательно, и не ради красоты. На сервере
+ * `sanitizeHtml` отдаёт HTML как есть, а в браузере его пропускает DOMPurify,
+ * который сериализует неразрывный пробел как `&nbsp;`. Без раскрытия сервер
+ * рисовал «7 490 ₸», браузер после гидратации — буквально «7&nbsp;490 ₸», и
+ * Vue ругался на расхождение гидратации. Так было с текстом связок «раздел +
+ * бренд» (цены из formatPrice идут с неразрывным пробелом). Блоки рисуются
+ * интерполяцией `{{ }}`, поэтому раскрытый `<` остаётся текстом.
+ *
+ * Один проход одной регуляркой: `&amp;lt;` даёт `&lt;`, а не `<`.
+ */
+function blockText(inner: string): string {
+  return inner
+    .replace(/<[^>]*>/g, '')
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body: string) => {
+      if (body[0] === '#') {
+        const code = body[1] === 'x' || body[1] === 'X'
+          ? Number.parseInt(body.slice(2), 16)
+          : Number.parseInt(body.slice(1), 10)
+        return Number.isFinite(code) && code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : entity
+      }
+      return NAMED_ENTITIES[body.toLowerCase()] ?? entity
+    })
+    .trim()
+}
+
 /**
  * Парсит HTML в структурированные блоки для безопасного рендеринга.
  * Поддерживает data-icon на тегах h2/h3 и на дочерних span[data-icon].
@@ -37,7 +74,7 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
   let match: RegExpExecArray | null
   while ((match = h2Regex.exec(normalized)) !== null) {
     const iconMatch = match[1].match(/data-icon=["']([^"']+)["']/)
-    const text = match[2].replace(/<[^>]*>/g, '').trim()
+    const text = blockText(match[2])
     if (text)
       allMatches.push({ index: match.index, block: { type: 'h2', text, icon: iconMatch?.[1] } })
   }
@@ -45,14 +82,14 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
   // H3
   while ((match = h3Regex.exec(normalized)) !== null) {
     const iconMatch = match[1].match(/data-icon=["']([^"']+)["']/)
-    const text = match[2].replace(/<[^>]*>/g, '').trim()
+    const text = blockText(match[2])
     if (text)
       allMatches.push({ index: match.index, block: { type: 'h3', text, icon: iconMatch?.[1] } })
   }
 
   // P
   while ((match = pRegex.exec(normalized)) !== null) {
-    const text = match[2].replace(/<[^>]*>/g, '').trim()
+    const text = blockText(match[2])
     if (text)
       allMatches.push({ index: match.index, block: { type: 'p', text } })
   }
@@ -65,7 +102,7 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
 
     while ((liMatch = liRegex.exec(match[2])) !== null) {
       const liIconMatch = liMatch[1].match(/data-icon=["']([^"']+)["']/)
-      const text = liMatch[2].replace(/<[^>]*>/g, '').trim()
+      const text = blockText(liMatch[2])
       if (text)
         items.push({ text, icon: liIconMatch?.[1] })
     }
