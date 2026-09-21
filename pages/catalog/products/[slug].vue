@@ -20,7 +20,6 @@ import {
   BUCKET_NAME_CATEGORY,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
-  COURIER_DELIVERY_COST,
 } from '@/constants'
 import { productShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -30,6 +29,7 @@ import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsS
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
+import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 import { composeProductMeta } from '@/utils/seoDescription'
 
@@ -1041,12 +1041,10 @@ useSchemaOrg([
       if (!product.value)
         return undefined
       const p = product.value
-      // 🔥 Используем final_price из базы данных (с психологическим округлением)
-      const finalPrice = p.final_price || Math.round(Number(p.price))
-
       return {
         '@type': 'Offer' as const,
-        'price': finalPrice,
+        // final_price из базы — с психологическим округлением.
+        'price': offerPrice(p),
         'priceCurrency': 'KZT',
         'availability':
           p.stock_quantity > 0
@@ -1061,96 +1059,11 @@ useSchemaOrg([
           'url': 'https://uhti.kz',
         },
 
-        /*
-         * Скидка — так, как её понимает Google в товарных карточках выдачи.
-         *
-         * Правило из документации merchant listing: «Don't mark the active
-         * price with a priceType property» — текущая цена идёт в `price` без
-         * пометок, а старая, зачёркнутая, — в priceSpecification с
-         * StrikethroughPrice. Только этот тип и поддерживается.
-         *
-         * До 21 сентября 2026 было наоборот: в priceSpecification стояла
-         * ТЕКУЩАЯ цена с пометкой SalePrice, старой не было вовсе. Search
-         * Console отмечал на каждой такой карточке «Отсутствует поле
-         * validFrom», а показать в выдаче «было/стало» Google не мог — старую
-         * цену было неоткуда взять.
-         *
-         * Старая цена — `product.price`: ровно её страница показывает
-         * зачёркнутой (mainProductPrice.original). Разметка обязана совпадать
-         * с тем, что видит покупатель.
-         */
-        ...(p.discount_percentage > 0 && Math.round(Number(p.price)) > finalPrice
-          ? {
-              priceSpecification: {
-                '@type': 'UnitPriceSpecification',
-                'priceType': 'https://schema.org/StrikethroughPrice',
-                'price': Math.round(Number(p.price)),
-                'priceCurrency': 'KZT',
-              },
-            }
-          : {}),
-
-        /*
-         * Условия — с /returns, слово в слово:
-         *  • «в течение 14 календарных дней» → merchantReturnDays 14;
-         *  • «Транспортные расходы при возврате или обмене товара надлежащего
-         *    качества оплачивает покупатель» → ReturnFeesCustomerResponsibility.
-         *    Здесь стоял FreeReturn, то есть разметка обещала бесплатный
-         *    возврат, которого магазин не даёт (бесплатен только возврат брака);
-         *  • «через курьера или в пункте самовывоза» → ReturnInStore. Стояло
-         *    ReturnByMail — почтой возвраты не принимаются вовсе.
-         */
-        'hasMerchantReturnPolicy': {
-          '@type': 'MerchantReturnPolicy' as const,
-          'applicableCountry': 'KZ',
-          'returnPolicyCategory':
-            'https://schema.org/MerchantReturnFiniteReturnWindow',
-          'merchantReturnDays': 14,
-          'returnMethod': 'https://schema.org/ReturnInStore',
-          'returnFees': 'https://schema.org/ReturnFeesCustomerResponsibility',
-        },
-        /*
-         * Доставка — то, что реально считает касса и обещает блок на странице.
-         *
-         * Стоимость. Здесь стоял ноль на весь Казахстан, и Google по этому полю
-         * рисует «бесплатная доставка». Касса же берёт COURIER_DELIVERY_COST
-         * (cartStore.deliveryCost), а ноль получается только у самовывоза и от
-         * порога FREE_SHIPPING_THRESHOLD. Ставим обычную цену курьера:
-         * занизить своё же обещание безопасно, завысить — нет.
-         *
-         * Срок. Стояло 1–3 дня на всю страну, хотя блок доставки на этой же
-         * странице говорит «Курьером по Алматы 1–2 дня» и «По Казахстану 3–7
-         * дней, Kazpost или CDEK». Берём объединение: 1–7. Разнести по
-         * регионам двумя записями можно, но addressRegion для Алматы Google
-         * разбирает ненадёжно, а неразобранная запись хуже широкой честной.
-         */
-        'shippingDetails': {
-          '@type': 'OfferShippingDetails' as const,
-          'shippingRate': {
-            '@type': 'MonetaryAmount' as const,
-            'value': COURIER_DELIVERY_COST,
-            'currency': 'KZT',
-          },
-          'shippingDestination': {
-            '@type': 'DefinedRegion' as const,
-            'addressCountry': 'KZ',
-          },
-          'deliveryTime': {
-            '@type': 'ShippingDeliveryTime' as const,
-            'handlingTime': {
-              '@type': 'QuantitativeValue' as const,
-              'minValue': 0,
-              'maxValue': 1,
-              'unitCode': 'DAY',
-            },
-            'transitTime': {
-              '@type': 'QuantitativeValue' as const,
-              'minValue': 1,
-              'maxValue': 7,
-              'unitCode': 'DAY',
-            },
-          },
-        },
+        // Скидка, возврат и доставка — общие для всей разметки сайта:
+        // utils/offerSchema.ts, там же разбор, почему именно так.
+        ...strikethroughPrice(p),
+        'hasMerchantReturnPolicy': merchantReturnPolicy(),
+        'shippingDetails': offerShippingDetails(),
       }
     }),
 

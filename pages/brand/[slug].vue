@@ -17,6 +17,7 @@ import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
+import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
 
@@ -738,22 +739,18 @@ useHead({
                 '@id': `${brandUrl.value}#brand`,
                 'name': brand.value!.name,
               },
+              /*
+               * Условия продавца и скидка — те же, что на карточке товара
+               * (utils/offerSchema.ts). До 21 сентября 2026 здесь жила отдельная
+               * копия: текущая цена с пометкой SalePrice (Google ждёт её без пометок,
+               * а старую — как StrikethroughPrice), доставка 0 ₸, срок 1–3 дня,
+               * возврат почтой и бесплатно.
+               */
               'offers': {
                 '@type': 'Offer',
-                'price': product.final_price ?? product.price,
+                'price': offerPrice(product),
                 'priceCurrency': 'KZT',
-                // FIX: Price Drop Snippet для товаров со скидкой
-                ...(product.discount_percentage > 0
-                  ? {
-                      priceSpecification: {
-                        '@type': 'UnitPriceSpecification',
-                        'priceType': 'https://schema.org/SalePrice',
-                        'price': product.final_price ?? product.price,
-                        'priceCurrency': 'KZT',
-                      },
-                    }
-                  : {}),
-                // FIX: https вместо http
+                ...strikethroughPrice(product),
                 'availability':
                   product.stock_quantity > 0
                     ? 'https://schema.org/InStock'
@@ -765,44 +762,8 @@ useHead({
                   'name': siteName,
                   'url': siteUrl,
                 },
-                // FIX: добавлена политика возврата
-                'hasMerchantReturnPolicy': {
-                  '@type': 'MerchantReturnPolicy',
-                  'applicableCountry': 'KZ',
-                  'returnPolicyCategory':
-                    'https://schema.org/MerchantReturnFiniteReturnWindow',
-                  'merchantReturnDays': 14,
-                  'returnMethod': 'https://schema.org/ReturnByMail',
-                  'returnFees': 'https://schema.org/FreeReturn',
-                },
-                // FIX: добавлена доставка
-                'shippingDetails': {
-                  '@type': 'OfferShippingDetails',
-                  'shippingRate': {
-                    '@type': 'MonetaryAmount',
-                    'value': 0,
-                    'currency': 'KZT',
-                  },
-                  'shippingDestination': {
-                    '@type': 'DefinedRegion',
-                    'addressCountry': 'KZ',
-                  },
-                  'deliveryTime': {
-                    '@type': 'ShippingDeliveryTime',
-                    'handlingTime': {
-                      '@type': 'QuantitativeValue',
-                      'minValue': 0,
-                      'maxValue': 1,
-                      'unitCode': 'DAY',
-                    },
-                    'transitTime': {
-                      '@type': 'QuantitativeValue',
-                      'minValue': 1,
-                      'maxValue': 3,
-                      'unitCode': 'DAY',
-                    },
-                  },
-                },
+                'hasMerchantReturnPolicy': merchantReturnPolicy(),
+                'shippingDetails': offerShippingDetails(),
               },
               ...(product.avg_rating
                 && product.review_count

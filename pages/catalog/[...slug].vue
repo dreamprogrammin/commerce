@@ -49,6 +49,7 @@ import {
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
 import { isCategoryIndexable } from '@/utils/categoryLanding'
+import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
@@ -2123,53 +2124,28 @@ const schemaData = computed(() => {
                 'lg',
               ),
             }),
+            /*
+             * Условия продавца — те же, что на карточке товара
+             * (utils/offerSchema.ts). До 21 сентября 2026 здесь жила
+             * отдельная копия со старыми обещаниями: доставка 0 ₸, срок 1–3
+             * дня, возврат почтой и бесплатно. Google читал их как данные
+             * продавца на каждом разделе — по 10 товаров на страницу.
+             */
             'offers': {
               '@type': 'Offer',
-              'price': product.final_price || product.price,
+              'price': offerPrice(product),
               'priceCurrency': 'KZT',
+              ...strikethroughPrice(product),
               'availability':
                 product.stock_quantity > 0
                   ? 'https://schema.org/InStock'
                   : 'https://schema.org/OutOfStock',
               'url': `https://uhti.kz/catalog/products/${product.slug}`,
               'priceValidUntil': priceValidUntil,
+              'itemCondition': 'https://schema.org/NewCondition',
               'seller': { '@type': 'Organization', 'name': 'Ухтышка' },
-              'hasMerchantReturnPolicy': {
-                '@type': 'MerchantReturnPolicy',
-                'applicableCountry': 'KZ',
-                'returnPolicyCategory':
-                  'https://schema.org/MerchantReturnFiniteReturnWindow',
-                'merchantReturnDays': 14,
-                'returnMethod': 'https://schema.org/ReturnByMail',
-                'returnFees': 'https://schema.org/FreeReturn',
-              },
-              'shippingDetails': {
-                '@type': 'OfferShippingDetails',
-                'shippingDestination': {
-                  '@type': 'DefinedRegion',
-                  'addressCountry': 'KZ',
-                },
-                'shippingRate': {
-                  '@type': 'MonetaryAmount',
-                  'value': 0,
-                  'currency': 'KZT',
-                },
-                'deliveryTime': {
-                  '@type': 'ShippingDeliveryTime',
-                  'handlingTime': {
-                    '@type': 'QuantitativeValue',
-                    'minValue': 0,
-                    'maxValue': 1,
-                    'unitCode': 'DAY',
-                  },
-                  'transitTime': {
-                    '@type': 'QuantitativeValue',
-                    'minValue': 1,
-                    'maxValue': 3,
-                    'unitCode': 'DAY',
-                  },
-                },
-              },
+              'hasMerchantReturnPolicy': merchantReturnPolicy(),
+              'shippingDetails': offerShippingDetails(),
             },
             ...(Number(product.review_count) > 0
               && product.avg_rating && {
