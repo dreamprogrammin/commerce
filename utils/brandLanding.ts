@@ -81,6 +81,9 @@ export function buildBrandLandingPath(
 export interface BrandLandingCategoryNode {
   id: string
   parent_id: string | null
+  /** Имена нужны только decideBrandLanding — узнать раздел, названный брендом. */
+  name?: string | null
+  seo_h1?: string | null
 }
 
 /** Товар в виде, достаточном для подсчёта пар. */
@@ -159,4 +162,86 @@ export function isBrandLandingIndexable(
     return true
 
   return productsCount >= MIN_PRODUCTS_FOR_BRAND_LANDING
+}
+
+/**
+ * Решение по связке «раздел + бренд»: открывать ли её для индекса.
+ *
+ * Зачем отдельное правило. Фильтр по разделу включает подразделы, поэтому
+ * один и тот же набор товаров виден сразу на нескольких адресах: все 9
+ * машинок MokaToys — и в «Радиоуправляемых машинках», и в «Машинках», и в
+ * «Мальчикам». Открыть все — отдать Google три копии одной страницы. Открыть
+ * ни одной (как было до 21 сентября 2026, пока для связки не написан текст в
+ * category_brand_seo) — остаться без страниц под запросы вида «машинки moka».
+ *
+ * Правило:
+ *  • корневой раздел — никогда: это аудиторные хабы («Мальчикам»), а не
+ *    товарные разделы, и «Мальчикам MokaToys» — не запрос;
+ *  • меньше MIN_PRODUCTS_FOR_BRAND_LANDING товаров — закрыта, пустая полка;
+ *  • если в каком-то ПОДРАЗДЕЛЕ у бренда ровно столько же товаров — закрыта:
+ *    это дубль более точной связки, открыта будет та;
+ *  • раздел уже назван брендом («Куклы L.O.L» + L.O.L. Surprise) — закрыта:
+ *    страница раздела и есть страница бренда в нём, а связка повторила бы
+ *    её с теми же товарами и почти тем же заголовком;
+ *  • иначе открыта. Родитель с набором БОЛЬШЕ любого подраздела («Куклы +
+ *    L.O.L.»: 4 товара против 3 в «Куклах L.O.L.») — отдельная страница.
+ *
+ * Страница и карта сайта обязаны звать ОДНУ эту функцию: иначе в карте
+ * окажутся закрытые адреса или наоборот. Ссылки на связки со страницы
+ * бренда — тоже по ней.
+ */
+export type BrandLandingVerdict
+  = | { indexable: true }
+    | { indexable: false, reason: 'root-category' | 'few-products' | 'unknown-category' | 'category-names-brand' }
+    | { indexable: false, reason: 'same-as-child', sameAsChildId: string }
+
+/** Слова названия: без точек внутри («L.O.L.» → «lol»), в нижнем регистре. */
+function nameWords(name: string | null | undefined): string[] {
+  return (name ?? '')
+    .toLowerCase()
+    .replace(/[.'’·]/g, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+}
+
+/**
+ * Назван ли раздел брендом: первое слово бренда встречается словом в имени
+ * раздела. Короткие первые слова (MG Toys, RC Toys, My Little Home) не
+ * сравниваются — «my» и «rc» слишком легко совпасть случайно.
+ */
+export function categoryNamesBrand(
+  categoryNames: readonly (string | null | undefined)[],
+  brandName: string | null | undefined,
+): boolean {
+  const first = nameWords(brandName)[0]
+  if (!first || first.length < 3)
+    return false
+  return categoryNames.some(name => nameWords(name).includes(first))
+}
+
+export function decideBrandLanding(
+  categoryId: string,
+  brandId: string,
+  counts: ReadonlyMap<string, number>,
+  categories: readonly BrandLandingCategoryNode[],
+  brandName?: string | null,
+): BrandLandingVerdict {
+  const category = categories.find(c => c.id === categoryId)
+  if (!category)
+    return { indexable: false, reason: 'unknown-category' }
+  if (!category.parent_id)
+    return { indexable: false, reason: 'root-category' }
+  if (categoryNamesBrand([category.name, category.seo_h1], brandName))
+    return { indexable: false, reason: 'category-names-brand' }
+
+  const count = counts.get(brandLandingPairKey(categoryId, brandId)) ?? 0
+  if (count < MIN_PRODUCTS_FOR_BRAND_LANDING)
+    return { indexable: false, reason: 'few-products' }
+
+  for (const child of categories) {
+    if (child.parent_id === categoryId && (counts.get(brandLandingPairKey(child.id, brandId)) ?? 0) === count)
+      return { indexable: false, reason: 'same-as-child', sameAsChildId: child.id }
+  }
+
+  return { indexable: true }
 }

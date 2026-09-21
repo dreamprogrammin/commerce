@@ -3,6 +3,7 @@
 
 import type { Database, ProductLine, ProductLineInsert, ProductLineUpdate } from '@/types'
 import { toast } from 'vue-sonner'
+import { announceIconFixes, sanitizeIconRow } from '@/composables/admin/useIconNameGuard'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT_LINES } from '@/constants'
@@ -169,10 +170,14 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
         logoUrl = result.basePath
       }
 
+      // Битые имена иконок в описании — см. composables/admin/useIconNameGuard.ts
+      const { row: safeLine, report } = await sanitizeIconRow(lineData)
+      announceIconFixes(report)
+
       const { data: newLine, error } = await supabase
         .from('product_lines')
         .insert({
-          ...lineData,
+          ...safeLine,
           logo_url: logoUrl,
         })
         .select()
@@ -223,10 +228,14 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
         logoUrl = result.basePath
       }
 
+      // Битые имена иконок в описании — см. composables/admin/useIconNameGuard.ts
+      const { row: safeLine, report } = await sanitizeIconRow(lineData)
+      announceIconFixes(report)
+
       const { error } = await supabase
         .from('product_lines')
         .update({
-          ...lineData,
+          ...safeLine,
           logo_url: logoUrl,
         })
         .eq('id', id)

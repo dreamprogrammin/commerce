@@ -8,6 +8,7 @@ import {
   SITE_OG_IMAGE_SIZE,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
+import { SHOP } from '@/constants/shop'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -228,7 +229,7 @@ useSchemaOrg([
     'areaServed': { '@type': 'Country', 'name': 'Казахстан' },
     'currenciesAccepted': 'KZT',
     'paymentAccepted': 'Наличные при получении, перевод или QR через Kaspi',
-    'openingHours': 'Mo-Su 09:00-21:00',
+    'openingHours': SHOP.openingHours,
     'logo': {
       '@type': 'ImageObject',
       '@id': `${siteUrl}/#logo`,
@@ -248,7 +249,7 @@ useSchemaOrg([
       '@type': 'PostalAddress',
       'addressCountry': 'KZ',
       'addressLocality': 'Алматы',
-      'streetAddress': 'мкр. Шапагат, ул. Амангельды',
+      'streetAddress': SHOP.street,
       // Индекс назван владельцем 16 сентября 2026. Стоял 050058, OSM для этой
       // улицы давал 050024 — оба оказались мимо.
       'postalCode': '050061',
@@ -323,9 +324,19 @@ useSchemaOrg([
         и её фон перекрашивал бы карточку.
 
         Вид задан в assets/css/toast.css.
+
+        `dir="ltr"` — не про вид, а про скорость. По умолчанию у Toaster
+        `dir: "auto"`, и тогда на КАЖДОЙ отрисовке vue-sonner зовёт
+        getDocumentDirection(), а та без атрибута dir у <html> делает
+        window.getComputedStyle(document.documentElement) — принудительный
+        пересчёт стилей всей страницы. Замер 21 сентября 2026 на главной при
+        эмуляции телефона: 121 мс из 125, что тратит библиотека; с явным
+        направлением — 3 мс. Русский и казахский пишутся слева направо, так
+        что угадывать тут нечего. Страж — check-toaster-dir.mjs.
       -->
       <ClientOnly>
         <Toaster
+          dir="ltr"
           position="bottom-right"
           :offset="{ right: 22, bottom: 26 }"
           :mobile-offset="{ bottom: 96, left: 10, right: 10 }"

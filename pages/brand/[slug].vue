@@ -17,17 +17,9 @@ import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
+import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
-
-/** Категория в строке `category_brand_seo` — ровно то, что нужно для ссылки. */
-interface BrandLandingCategory {
-  id: string
-  name: string
-  slug: string | null
-  href: string | null
-  parent_id: string | null
-}
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -165,9 +157,13 @@ const { data: lineByProduct } = await useAsyncData(
  * робот до него просто не дошёл, карта сайта тут не помогла.
  *
  * Условие ровно то же, что у `robotsRule` на самой странице каталога и у
- * карты сайта: своя строка в `category_brand_seo` И живой товар по порогу
- * `MIN_PRODUCTS_FOR_BRAND_LANDING`. Ссылаться на адрес, закрытый `noindex`,
- * незачем — он и в карте отсутствует.
+ * карты сайта, — одна функция `decideBrandLanding`. Ссылаться на адрес,
+ * закрытый `noindex`, незачем — он и в карте отсутствует.
+ *
+ * До 21 сентября 2026 ссылки ставились только на связки со строкой в
+ * `category_brand_seo`, а подписью шло имя раздела как есть — на /brand/lego
+ * это было «Конструкторы Мальчикам». Теперь связка открыта и без написанного
+ * текста (он собирается из её товаров), а подпись — читаемое имя `seo_h1`.
  *
  * Товары считаются рекурсивно (`countProductsByCategoryBrand`), как их
  * отбирает `get_filtered_products`: иначе у родительской категории, где все
@@ -255,17 +251,13 @@ const { data: brandCategoryData } = await useAsyncData(
 
     const brandId = brand.value.id
 
-    const [seoRows, brandProducts, allCategories] = await Promise.all([
-      supabase
-        .from('category_brand_seo')
-        .select('categories!inner(id, name, slug, href, parent_id)')
-        .eq('brand_id', brandId),
+    const [brandProducts, allCategories] = await Promise.all([
       supabase
         .from('products')
         .select('category_id')
         .eq('brand_id', brandId)
         .eq('is_active', true),
-      supabase.from('categories').select('id, parent_id, name, slug'),
+      supabase.from('categories').select('id, parent_id, name, slug, href, seo_h1'),
     ])
 
     const categories = (allCategories.data ?? []) as {
@@ -273,6 +265,8 @@ const { data: brandCategoryData } = await useAsyncData(
       parent_id: string | null
       name: string
       slug: string | null
+      href: string | null
+      seo_h1: string | null
     }[]
 
     /*
@@ -301,10 +295,6 @@ const { data: brandCategoryData } = await useAsyncData(
     const topRootSlug = topRootId ? byId.get(topRootId)?.slug ?? null : null
     const topCategory = brandHeadingWord(topRootSlug)
 
-    const rows = (seoRows.data ?? []) as { categories: BrandLandingCategory | null }[]
-    if (rows.length === 0)
-      return { links: [], topCategory, topRootSlug }
-
     const counts = countProductsByCategoryBrand(
       (brandProducts.data ?? []).map(p => ({
         category_id: p.category_id,
@@ -316,14 +306,10 @@ const { data: brandCategoryData } = await useAsyncData(
     const seen = new Set<string>()
     const links: { name: string, path: string }[] = []
 
-    for (const row of rows) {
-      const category = row.categories
-      // Лендинги живут только у категорий с родителем — как в карте сайта.
-      if (!category?.slug || !category.parent_id)
+    for (const category of categories) {
+      if (!category.slug || !counts.has(brandLandingPairKey(category.id, brandId)))
         continue
-
-      const count = counts.get(brandLandingPairKey(category.id, brandId)) ?? 0
-      if (!isBrandLandingIndexable(count))
+      if (!decideBrandLanding(category.id, brandId, counts, categories, brand.value.name).indexable)
         continue
 
       const path = buildBrandLandingPath(
@@ -333,7 +319,7 @@ const { data: brandCategoryData } = await useAsyncData(
       if (seen.has(path))
         continue
       seen.add(path)
-      links.push({ name: category.name, path })
+      links.push({ name: category.seo_h1?.trim() || category.name, path })
     }
 
     return {
@@ -753,22 +739,18 @@ useHead({
                 '@id': `${brandUrl.value}#brand`,
                 'name': brand.value!.name,
               },
+              /*
+               * Условия продавца и скидка — те же, что на карточке товара
+               * (utils/offerSchema.ts). До 21 сентября 2026 здесь жила отдельная
+               * копия: текущая цена с пометкой SalePrice (Google ждёт её без пометок,
+               * а старую — как StrikethroughPrice), доставка 0 ₸, срок 1–3 дня,
+               * возврат почтой и бесплатно.
+               */
               'offers': {
                 '@type': 'Offer',
-                'price': product.final_price ?? product.price,
+                'price': offerPrice(product),
                 'priceCurrency': 'KZT',
-                // FIX: Price Drop Snippet для товаров со скидкой
-                ...(product.discount_percentage > 0
-                  ? {
-                      priceSpecification: {
-                        '@type': 'UnitPriceSpecification',
-                        'priceType': 'https://schema.org/SalePrice',
-                        'price': product.final_price ?? product.price,
-                        'priceCurrency': 'KZT',
-                      },
-                    }
-                  : {}),
-                // FIX: https вместо http
+                ...strikethroughPrice(product),
                 'availability':
                   product.stock_quantity > 0
                     ? 'https://schema.org/InStock'
@@ -780,44 +762,8 @@ useHead({
                   'name': siteName,
                   'url': siteUrl,
                 },
-                // FIX: добавлена политика возврата
-                'hasMerchantReturnPolicy': {
-                  '@type': 'MerchantReturnPolicy',
-                  'applicableCountry': 'KZ',
-                  'returnPolicyCategory':
-                    'https://schema.org/MerchantReturnFiniteReturnWindow',
-                  'merchantReturnDays': 14,
-                  'returnMethod': 'https://schema.org/ReturnByMail',
-                  'returnFees': 'https://schema.org/FreeReturn',
-                },
-                // FIX: добавлена доставка
-                'shippingDetails': {
-                  '@type': 'OfferShippingDetails',
-                  'shippingRate': {
-                    '@type': 'MonetaryAmount',
-                    'value': 0,
-                    'currency': 'KZT',
-                  },
-                  'shippingDestination': {
-                    '@type': 'DefinedRegion',
-                    'addressCountry': 'KZ',
-                  },
-                  'deliveryTime': {
-                    '@type': 'ShippingDeliveryTime',
-                    'handlingTime': {
-                      '@type': 'QuantitativeValue',
-                      'minValue': 0,
-                      'maxValue': 1,
-                      'unitCode': 'DAY',
-                    },
-                    'transitTime': {
-                      '@type': 'QuantitativeValue',
-                      'minValue': 1,
-                      'maxValue': 3,
-                      'unitCode': 'DAY',
-                    },
-                  },
-                },
+                'hasMerchantReturnPolicy': merchantReturnPolicy(),
+                'shippingDetails': offerShippingDetails(),
               },
               ...(product.avg_rating
                 && product.review_count

@@ -2,6 +2,7 @@ import type { CategoryInsert, CategoryRow, EditableCategory } from '@/types'
 import type { Database } from '@/types/supabase'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
+import { announceIconFixes, sanitizeIconRows } from '@/composables/admin/useIconNameGuard'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { generateImageVariants } from '@/utils/imageOptimizer'
@@ -353,14 +354,22 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
         }
       }
 
-      if (toUpdate.length > 0) {
-        const { error } = await supabase.from('categories').upsert(toUpdate)
+      // Битые имена иконок в текстах разделов — см.
+      // composables/admin/useIconNameGuard.ts. Обе пачки проверяются одним
+      // запросом к серверу иконок и одним предупреждением.
+      const { rows: checked, report } = await sanitizeIconRows([...toUpdate, ...toInsert])
+      announceIconFixes(report)
+      const safeUpdate = checked.slice(0, toUpdate.length)
+      const safeInsert = checked.slice(toUpdate.length)
+
+      if (safeUpdate.length > 0) {
+        const { error } = await supabase.from('categories').upsert(safeUpdate)
         if (error)
           throw error
       }
 
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from('categories').insert(toInsert)
+      if (safeInsert.length > 0) {
+        const { error } = await supabase.from('categories').insert(safeInsert)
         if (error)
           throw error
       }
