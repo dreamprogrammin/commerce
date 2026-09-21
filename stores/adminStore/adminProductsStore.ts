@@ -15,6 +15,7 @@ import type {
   ProductWithImages,
 } from '@/types'
 import { toast } from 'vue-sonner'
+import { announceIconFixes, sanitizeIconRow } from '@/composables/admin/useIconNameGuard'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
@@ -279,9 +280,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   ) {
     isSaving.value = true
     try {
+      // Битые имена иконок в описании — см. composables/admin/useIconNameGuard.ts
+      const { row: safeProduct, report } = await sanitizeIconRow(productData)
+      announceIconFixes(report)
+
       const { data: newProduct, error } = await supabase
         .from('products')
-        .insert(productData)
+        .insert(safeProduct)
         .select('id, name, slug')
         .single()
 
@@ -320,9 +325,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   ) {
     isSaving.value = true
     try {
+      // Битые имена иконок в описании — см. composables/admin/useIconNameGuard.ts
+      const { row: safeProduct, report } = await sanitizeIconRow(productData)
+      announceIconFixes(report)
+
       const { data: updatedProduct, error } = await supabase
         .from('products')
-        .update(productData)
+        .update(safeProduct)
         .eq('id', productId)
         .select('id, name, slug')
         .single()

@@ -2,6 +2,7 @@
 
 import type { Brand, BrandInsert, BrandUpdate, Database } from '@/types'
 import { toast } from 'vue-sonner'
+import { announceIconFixes, sanitizeIconRow } from '@/composables/admin/useIconNameGuard'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_BRANDS } from '@/constants'
@@ -144,9 +145,14 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         brandData.logo_url = result.basePath
       }
 
+      // Битые имена иконок в текстах — см. composables/admin/useIconNameGuard.ts.
+      // Сюда же приходит текст бренд-генератора: он проверял только написание имени.
+      const { row: safeBrand, report } = await sanitizeIconRow(brandData)
+      announceIconFixes(report)
+
       const { data: newBrand, error } = await supabase
         .from('brands')
-        .insert(brandData)
+        .insert(safeBrand)
         .select() // <-- 1. Запрашиваем созданную запись обратно
         .single() // <-- 2. Указываем, что ожидаем одну запись
 
@@ -186,7 +192,12 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         brandData.logo_url = result.basePath
       }
 
-      const { error } = await supabase.from('brands').update(brandData).eq('id', id)
+      // Битые имена иконок в текстах — см. composables/admin/useIconNameGuard.ts.
+      // Сюда же приходит текст бренд-генератора: он проверял только написание имени.
+      const { row: safeBrand, report } = await sanitizeIconRow(brandData)
+      announceIconFixes(report)
+
+      const { error } = await supabase.from('brands').update(safeBrand).eq('id', id)
       if (error)
         throw error
 
