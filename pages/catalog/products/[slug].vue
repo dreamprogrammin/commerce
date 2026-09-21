@@ -1061,13 +1061,30 @@ useSchemaOrg([
           'url': 'https://uhti.kz',
         },
 
-        // 🔥 ТИКЕТ 4: Показываем Google, что у нас скидка
-        ...(p.discount_percentage > 0
+        /*
+         * Скидка — так, как её понимает Google в товарных карточках выдачи.
+         *
+         * Правило из документации merchant listing: «Don't mark the active
+         * price with a priceType property» — текущая цена идёт в `price` без
+         * пометок, а старая, зачёркнутая, — в priceSpecification с
+         * StrikethroughPrice. Только этот тип и поддерживается.
+         *
+         * До 21 сентября 2026 было наоборот: в priceSpecification стояла
+         * ТЕКУЩАЯ цена с пометкой SalePrice, старой не было вовсе. Search
+         * Console отмечал на каждой такой карточке «Отсутствует поле
+         * validFrom», а показать в выдаче «было/стало» Google не мог — старую
+         * цену было неоткуда взять.
+         *
+         * Старая цена — `product.price`: ровно её страница показывает
+         * зачёркнутой (mainProductPrice.original). Разметка обязана совпадать
+         * с тем, что видит покупатель.
+         */
+        ...(p.discount_percentage > 0 && Math.round(Number(p.price)) > finalPrice
           ? {
               priceSpecification: {
                 '@type': 'UnitPriceSpecification',
-                'priceType': 'https://schema.org/SalePrice',
-                'price': finalPrice,
+                'priceType': 'https://schema.org/StrikethroughPrice',
+                'price': Math.round(Number(p.price)),
                 'priceCurrency': 'KZT',
               },
             }
