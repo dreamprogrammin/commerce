@@ -2,7 +2,6 @@
 import type { Database } from '@/types/supabase'
 import { Plus, Save, Search, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { useSeoTemplates } from '@/composables/useSeoTemplates'
 import { buildBrandLandingPath } from '@/utils/brandLanding'
 
 definePageMeta({ layout: 'admin' })
@@ -42,9 +41,29 @@ const form = ref({
 })
 
 const isSaving = ref(false)
-const isGenerating = ref(false)
 const isGeneratingFaq = ref(false)
-const { generateSeoForAllCategoryBrands } = useSeoTemplates()
+
+/*
+ * Кнопки «Автогенерация» и «Перезаписать все» ЖИЛИ ЗДЕСЬ и сняты 21 сентября
+ * 2026 вместе с composables/useSeoTemplates.ts.
+ *
+ * Они записывали в category_brand_seo снимок по шаблону, и снимок ломал
+ * страницу сильнее, чем помогал:
+ *  • название раздела шло как есть, в дательном падеже — на бою висели H1 и
+ *    заголовок «Конструкторы Мальчикам LEGO — купить в Алматы»;
+ *  • число моделей и цены замерзали на день генерации, а сохранённое
+ *    страница берёт первым;
+ *  • падежи не сходились: «широкий выбор конструкторы малышам Smoneo»,
+ *    «3 моделей»; текст обещал «официальный интернет-магазин» и «часто
+ *    выгоднее Kaspi»;
+ *  • «Автогенерация» обещала «существующие записи не будут изменены», но
+ *    safe_upsert_category_brand_seo переписывает H1, заголовок и описание
+ *    и у защищённых строк — текст владельца уцелел бы, его заголовки нет.
+ *
+ * Теперь пустые поля страница связки собирает сама, из её товаров, на
+ * каждом рендере: utils/brandLandingText.ts. Запись здесь нужна только
+ * для своего, написанного руками текста.
+ */
 
 onMounted(async () => {
   await Promise.all([loadEntries(), loadCategories(), loadBrands()])
@@ -72,55 +91,6 @@ async function handleGenerateFaq() {
   }
   finally {
     isGeneratingFaq.value = false
-  }
-}
-
-async function handleAutoGenerate() {
-  if (!confirm('Автоматически создать SEO-тексты для всех комбинаций категория+бренд (где ≥3 товаров)? Существующие записи не будут изменены.')) {
-    return
-  }
-
-  isGenerating.value = true
-  try {
-    const results = await generateSeoForAllCategoryBrands({ dryRun: false })
-
-    if (results) {
-      const newCount = results.length
-      toast.success(`Создано ${newCount} SEO-текстов`, {
-        description: 'Автогенерация завершена успешно',
-      })
-      await loadEntries()
-    }
-  }
-  catch (error: any) {
-    toast.error('Ошибка автогенерации', { description: error.message })
-  }
-  finally {
-    isGenerating.value = false
-  }
-}
-
-async function handleRegenerateAll() {
-  if (!confirm('⚠️ ВНИМАНИЕ: Это перезапишет ВСЕ существующие SEO-тексты новыми шаблонами. Продолжить?')) {
-    return
-  }
-
-  isGenerating.value = true
-  try {
-    const results = await generateSeoForAllCategoryBrands({ dryRun: false, overwrite: true })
-
-    if (results) {
-      toast.success(`Обновлено ${results.length} SEO-текстов`, {
-        description: 'Регенерация завершена успешно',
-      })
-      await loadEntries()
-    }
-  }
-  catch (error: any) {
-    toast.error('Ошибка регенерации', { description: error.message })
-  }
-  finally {
-    isGenerating.value = false
   }
 }
 
@@ -290,7 +260,8 @@ const previewUrl = computed(() => {
           SEO: Бренд + Категория
         </h1>
         <p class="text-muted-foreground mt-1">
-          Управление SEO-текстами для связки бренд+категория (Brand Landing Pages)
+          Свои тексты для связок раздел + бренд. Пустые поля страница собирает
+          сама из товаров связки: число моделей, цены «от … до …», список моделей.
         </p>
       </div>
       <div class="flex gap-2">
@@ -300,20 +271,6 @@ const previewUrl = computed(() => {
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
           {{ isGeneratingFaq ? 'Генерация FAQ...' : '❓ Генерация FAQ' }}
-        </Button>
-        <Button variant="outline" :disabled="isGenerating" @click="handleAutoGenerate">
-          <svg v-if="isGenerating" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          {{ isGenerating ? 'Генерация...' : '🤖 Автогенерация' }}
-        </Button>
-        <Button variant="destructive" :disabled="isGenerating" @click="handleRegenerateAll">
-          <svg v-if="isGenerating" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          {{ isGenerating ? 'Генерация...' : '🔄 Перезаписать все' }}
         </Button>
         <Button @click="openNewDialog">
           <Plus class="w-4 h-4 mr-2" />
@@ -457,7 +414,7 @@ const previewUrl = computed(() => {
             <Label>H1 заголовок</Label>
             <Input v-model="form.seo_h1" placeholder="Конструкторы LEGO для мальчиков в Алматы" />
             <p class="text-xs text-muted-foreground">
-              Если пусто — генерируется автоматически: «{Категория} {Бренд} в Алматы»
+              Если пусто — собирается сам: «Конструкторы LEGO для мальчиков в Алматы»
             </p>
           </div>
 
@@ -466,7 +423,7 @@ const previewUrl = computed(() => {
             <Label>Meta Title</Label>
             <Input v-model="form.seo_title" placeholder="Купить конструкторы LEGO для мальчиков | Ухтышка" />
             <p class="text-xs text-muted-foreground">
-              Если пусто — генерируется автоматически
+              Если пусто — собирается сам, с ценой «от»: «Конструкторы LEGO для мальчиков — от 6 190 ₸ | Ухтышка»
             </p>
           </div>
 
@@ -474,6 +431,9 @@ const previewUrl = computed(() => {
           <div class="space-y-2">
             <Label>Meta Description</Label>
             <Textarea v-model="form.seo_description" placeholder="Описание страницы для поисковых систем..." :rows="3" />
+            <p class="text-xs text-muted-foreground">
+              Число моделей и цены «от … до …» страница ставит впереди сама — писать их сюда не нужно.
+            </p>
           </div>
 
           <!-- SEO Text -->
@@ -485,7 +445,7 @@ const previewUrl = computed(() => {
               :rows="6"
             />
             <p class="text-xs text-muted-foreground">
-              Если пусто — генерируется автоматически. Поддерживает HTML.
+              Если пусто — собирается из товаров связки: факты и список моделей с ценами. Поддерживает HTML.
             </p>
           </div>
         </div>
