@@ -20,15 +20,6 @@ import { brandHeadingWord } from '@/utils/brandHeading'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
 
-/** Категория в строке `category_brand_seo` — ровно то, что нужно для ссылки. */
-interface BrandLandingCategory {
-  id: string
-  name: string
-  slug: string | null
-  href: string | null
-  parent_id: string | null
-}
-
 const route = useRoute()
 const supabase = useSupabaseClient()
 const productsStore = useProductsStore()
@@ -165,9 +156,13 @@ const { data: lineByProduct } = await useAsyncData(
  * робот до него просто не дошёл, карта сайта тут не помогла.
  *
  * Условие ровно то же, что у `robotsRule` на самой странице каталога и у
- * карты сайта: своя строка в `category_brand_seo` И живой товар по порогу
- * `MIN_PRODUCTS_FOR_BRAND_LANDING`. Ссылаться на адрес, закрытый `noindex`,
- * незачем — он и в карте отсутствует.
+ * карты сайта, — одна функция `decideBrandLanding`. Ссылаться на адрес,
+ * закрытый `noindex`, незачем — он и в карте отсутствует.
+ *
+ * До 21 сентября 2026 ссылки ставились только на связки со строкой в
+ * `category_brand_seo`, а подписью шло имя раздела как есть — на /brand/lego
+ * это было «Конструкторы Мальчикам». Теперь связка открыта и без написанного
+ * текста (он собирается из её товаров), а подпись — читаемое имя `seo_h1`.
  *
  * Товары считаются рекурсивно (`countProductsByCategoryBrand`), как их
  * отбирает `get_filtered_products`: иначе у родительской категории, где все
@@ -255,17 +250,13 @@ const { data: brandCategoryData } = await useAsyncData(
 
     const brandId = brand.value.id
 
-    const [seoRows, brandProducts, allCategories] = await Promise.all([
-      supabase
-        .from('category_brand_seo')
-        .select('categories!inner(id, name, slug, href, parent_id)')
-        .eq('brand_id', brandId),
+    const [brandProducts, allCategories] = await Promise.all([
       supabase
         .from('products')
         .select('category_id')
         .eq('brand_id', brandId)
         .eq('is_active', true),
-      supabase.from('categories').select('id, parent_id, name, slug'),
+      supabase.from('categories').select('id, parent_id, name, slug, href, seo_h1'),
     ])
 
     const categories = (allCategories.data ?? []) as {
@@ -273,6 +264,8 @@ const { data: brandCategoryData } = await useAsyncData(
       parent_id: string | null
       name: string
       slug: string | null
+      href: string | null
+      seo_h1: string | null
     }[]
 
     /*
@@ -301,10 +294,6 @@ const { data: brandCategoryData } = await useAsyncData(
     const topRootSlug = topRootId ? byId.get(topRootId)?.slug ?? null : null
     const topCategory = brandHeadingWord(topRootSlug)
 
-    const rows = (seoRows.data ?? []) as { categories: BrandLandingCategory | null }[]
-    if (rows.length === 0)
-      return { links: [], topCategory, topRootSlug }
-
     const counts = countProductsByCategoryBrand(
       (brandProducts.data ?? []).map(p => ({
         category_id: p.category_id,
@@ -316,14 +305,10 @@ const { data: brandCategoryData } = await useAsyncData(
     const seen = new Set<string>()
     const links: { name: string, path: string }[] = []
 
-    for (const row of rows) {
-      const category = row.categories
-      // Лендинги живут только у категорий с родителем — как в карте сайта.
-      if (!category?.slug || !category.parent_id)
+    for (const category of categories) {
+      if (!category.slug || !counts.has(brandLandingPairKey(category.id, brandId)))
         continue
-
-      const count = counts.get(brandLandingPairKey(category.id, brandId)) ?? 0
-      if (!isBrandLandingIndexable(count))
+      if (!decideBrandLanding(category.id, brandId, counts, categories, brand.value.name).indexable)
         continue
 
       const path = buildBrandLandingPath(
@@ -333,7 +318,7 @@ const { data: brandCategoryData } = await useAsyncData(
       if (seen.has(path))
         continue
       seen.add(path)
-      links.push({ name: category.name, path })
+      links.push({ name: category.seo_h1?.trim() || category.name, path })
     }
 
     return {

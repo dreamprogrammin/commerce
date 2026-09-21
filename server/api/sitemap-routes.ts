@@ -1,14 +1,11 @@
 import type { Database } from '@/types'
 import { serverSupabaseClient } from '#supabase/server'
-import {
-  BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS,
-  MIN_PRODUCTS_FOR_BRAND_LANDING,
-} from '@/constants'
+import { BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS } from '@/constants'
 import {
   brandLandingPairKey,
   buildBrandLandingPath,
   countProductsByCategoryBrand,
-  isBrandLandingIndexable,
+  decideBrandLanding,
 } from '~/utils/brandLanding'
 import {
   countProductsByCategory,
@@ -171,7 +168,9 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       .from('categories')
       // `id` и `parent_id` — для того же подсчёта пар: товар засчитывается
       // категории и всем её родителям, как это делает get_filtered_products.
-      .select('id, slug, href, parent_id, updated_at')
+      // `name` и `seo_h1` — decideBrandLanding узнаёт по ним раздел, уже
+      // названный брендом («Куклы L.O.L»).
+      .select('id, slug, href, parent_id, updated_at, name, seo_h1')
       .not('slug', 'is', null)
       .limit(1000)
 
@@ -230,7 +229,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     // --- БРЕНДЫ (БЕЗ query параметров) ---
     const { data: brands, error: brandsError } = await client
       .from('brands')
-      .select('id, slug, updated_at')
+      .select('id, slug, updated_at, name')
       .not('slug', 'is', null)
       .limit(1000) // ✅ Явно указываем лимит
 
@@ -373,89 +372,90 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
     }
 
     // --- BRAND LANDING PAGES (/catalog/<категория>/brand/<бренд>) ---
-    // ⚠️ Включаем в sitemap ТОЛЬКО те пары категория+бренд, для которых реально
-    // существует уникальный SEO-контент (category_brand_seo) — именно от него
-    // зависит index/noindex в pages/catalog/[...slug].vue (см. robotsRule).
-    // Раньше здесь брались все комбинации из products, из-за чего в sitemap
-    // попадали noindex-страницы (без уникального SEO-текста) — расхождение
-    // sitemap/индексации, найденное в SEO-аудите.
-    const { data: brandLandings, error: brandLandingsError } = await client
-      .from('category_brand_seo')
-      .select('updated_at, categories!inner(id, slug, href, parent_id), brands!inner(id, slug)')
-      .not('categories.slug', 'is', null)
-      .not('brands.slug', 'is', null)
-      .limit(10000)
-
-    if (brandLandingsError) {
-      console.error('❌ Ошибка загрузки brand landing для sitemap:', brandLandingsError)
-    }
-
     /*
-     * Товаров у каждой пары категория+бренд — считаем рекурсивно, как это
-     * делает сама страница (см. countProductsByCategoryBrand).
+     * Какие связки «раздел + бренд» идут в карту — решает decideBrandLanding
+     * (utils/brandLanding.ts), та же функция, что ставит index/noindex на
+     * самой странице. Разойтись они не могут: иначе в карте окажутся
+     * закрытые адреса.
      *
-     * Считать можно, только если обе выборки удались. Если хоть одна упала,
-     * таблица останется пустой, и любая пара покажет ноль товаров — карта
-     * потеряла бы все бренд-лендинги из-за разовой ошибки базы. Поэтому в
-     * таком случае число товаров объявляется неизвестным (`null`), и
-     * `isBrandLandingIndexable` пропускает адрес: тот же fail-open, что
-     * применён к брендам выше.
+     * До 21 сентября 2026 в карту шли только пары со строкой в
+     * category_brand_seo — написанным руками текстом, таких 14 на 63 пары с
+     * товарами. Теперь текст связки собирается из её товаров
+     * (utils/brandLandingText.ts), и открыть можно любую пару, где набор
+     * товаров свой: не меньше трёх и не дубль более точного подраздела.
+     *
+     * Если товары или разделы не загрузились, считать не из чего — тогда
+     * берём прежний путь через category_brand_seo без проверки числа: разовый
+     * сбой базы не должен выкидывать связки из карты (fail-open, как у
+     * брендов выше).
      */
-    const canCountBrandLandingProducts = !!products && !!categories
-    const brandLandingProductCounts = canCountBrandLandingProducts
-      ? countProductsByCategoryBrand(products as any[], categories as any[])
-      : new Map<string, number>()
+    const canDecideBrandLandings = !!products && !!categories && !!brands
+    const brandLandingSeen = new Set<string>()
 
-    if (brandLandings && brandLandings.length > 0) {
-      // Дедупликация — уникальные пары (categoryHref, brandSlug)
-      const seen = new Set<string>()
-      let thin = 0
-      brandLandings.forEach((item: any) => {
-        const category = item.categories
-        const brand = item.brands
-        if (!category || !brand)
-          return
-        // Brand landing только для категорий второго уровня (имеющих родителя)
-        if (!category.parent_id)
-          return
+    if (canDecideBrandLandings) {
+      const counts = countProductsByCategoryBrand(products as any[], categories as any[])
+      const categoryById = new Map((categories as any[]).map(c => [c.id, c]))
+      const brandById = new Map((brands as any[]).map(b => [b.id, b]))
 
-        /*
-         * Пустой лендинг в карту не идёт.
-         *
-         * Наличие строки в `category_brand_seo` говорит лишь о том, что текст
-         * когда-то написали; товары с тех пор могли разойтись. На 2 сентября
-         * 2026 три страницы из четырнадцати содержали ноль товаров и всё
-         * равно лежали в карте под `index, follow`. Условие обязано совпадать
-         * с `robotsRule` на странице — обе стороны зовут одну функцию.
-         */
-        const productsCount = canCountBrandLandingProducts
-          ? brandLandingProductCounts.get(
-            brandLandingPairKey(category.id, brand.id),
-          ) ?? 0
-          : null
-        if (!isBrandLandingIndexable(productsCount)) {
-          thin += 1
-          return
+      // Самая свежая правка товара в паре — повод роботу вернуться.
+      const newestInPair = new Map<string, string>()
+      for (const product of products as any[]) {
+        if (!product.brand_id || !product.category_id || !product.updated_at)
+          continue
+        let cid: string | null = product.category_id
+        const guard = new Set<string>()
+        while (cid && !guard.has(cid)) {
+          guard.add(cid)
+          const key = brandLandingPairKey(cid, product.brand_id)
+          if ((newestInPair.get(key) ?? '') < product.updated_at)
+            newestInPair.set(key, product.updated_at)
+          cid = categoryById.get(cid)?.parent_id ?? null
         }
+      }
 
+      let closed = 0
+      for (const key of counts.keys()) {
+        const [categoryId, brandId] = key.split('|')
+        const verdict = decideBrandLanding(categoryId, brandId, counts, categories as any[], brandById.get(brandId)?.name)
+        if (!verdict.indexable) {
+          closed += 1
+          continue
+        }
+        const category = categoryById.get(categoryId)
+        const brand = brandById.get(brandId)
+        if (!category || !brand?.slug)
+          continue
         const categoryPath = category.href || `/catalog/${category.slug}`
-        const key = `${categoryPath}|${brand.slug}`
-        if (seen.has(key))
-          return
-        seen.add(key)
+        const loc = buildBrandLandingPath(categoryPath, brand.slug)
+        if (brandLandingSeen.has(loc))
+          continue
+        brandLandingSeen.add(loc)
         sitemapRoutes.push({
-          loc: buildBrandLandingPath(categoryPath, brand.slug),
-          lastmod: item.updated_at ?? new Date().toISOString(),
+          loc,
+          lastmod: newestInPair.get(key) ?? category.updated_at ?? new Date().toISOString(),
           changefreq: 'weekly',
           priority: 0.65,
         })
-      })
-      if (thin > 0) {
-        console.warn(
-          `⚠️ Sitemap: ${thin} бренд-лендингов с числом товаров меньше ${MIN_PRODUCTS_FOR_BRAND_LANDING} закрыты noindex и в карту не попали`,
-        )
       }
-      console.log(`✅ Sitemap: Загружено ${seen.size} brand landing страниц`)
+      console.log(`✅ Sitemap: связок «раздел + бренд» открыто ${brandLandingSeen.size}, закрыто ${closed} (мало товаров, корневой раздел, дубль подраздела или раздел назван брендом)`)
+    }
+    else {
+      console.warn('⚠️ Sitemap: товары, разделы или бренды не загрузились — связки берутся из category_brand_seo без проверки числа товаров')
+      const { data: brandLandings } = await client
+        .from('category_brand_seo')
+        .select('updated_at, categories!inner(id, slug, href, parent_id), brands!inner(id, slug)')
+        .limit(10000)
+      for (const item of (brandLandings ?? []) as any[]) {
+        const category = item.categories
+        const brand = item.brands
+        if (!category?.parent_id || !brand?.slug)
+          continue
+        const loc = buildBrandLandingPath(category.href || `/catalog/${category.slug}`, brand.slug)
+        if (brandLandingSeen.has(loc))
+          continue
+        brandLandingSeen.add(loc)
+        sitemapRoutes.push({ loc, lastmod: item.updated_at ?? new Date().toISOString(), changefreq: 'weekly', priority: 0.65 })
+      }
     }
 
     /*

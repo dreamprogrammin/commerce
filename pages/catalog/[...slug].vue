@@ -27,7 +27,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
-import { useSeoTemplates } from '@/composables/useSeoTemplates'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/constants'
 import { categoryStaticFor } from '@/constants/categoryStaticText'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -35,9 +34,19 @@ import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import {
   buildBrandLandingPath,
-  isBrandLandingIndexable,
+  countProductsByCategoryBrand,
+  decideBrandLanding,
   parseCatalogSlug,
 } from '@/utils/brandLanding'
+import {
+  brandCategoryPhrase,
+  brandLandingFacts,
+  composeBrandLandingMeta,
+  composeBrandLandingSummary,
+  composeBrandLandingText,
+  composeBrandLandingTitle,
+  prependBrandLandingFacts,
+} from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
 import { isCategoryIndexable } from '@/utils/categoryLanding'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
@@ -96,7 +105,6 @@ const categoriesStore = useCategoriesStore()
 const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
-const { generateBrandCategoryDescription } = useSeoTemplates()
 
 const priceValidUntil = new Date(
   new Date().setFullYear(new Date().getFullYear() + 1),
@@ -372,6 +380,59 @@ const { data: activeBrandSeo } = await useAsyncData(
 
 const activeBrandSeoName = computed(() => activeBrandSeo.value?.name ?? null)
 
+/*
+ * Все товары связки «раздел + бренд» — одной выборкой, без страниц.
+ *
+ * Зачем отдельно от сетки. Сетка грузит по PAGE_SIZE = 12, а у LEGO в
+ * «Конструкторах мальчикам» 14 товаров: по показанному списку цены «от … до …»
+ * и правило об индексе считались бы по неполным данным. Правило
+ * (decideBrandLanding) к тому же смотрит, не совпадает ли набор с каким-то
+ * подразделом, — для этого нужны разделы ВСЕХ товаров связки.
+ *
+ * Набор тот же, что показывает фильтр: активные товары бренда во всей ветке
+ * раздела. Сбой выборки не закрывает страницу: без данных решение
+ * откладывается, и работает прежний fail-open.
+ */
+const { data: brandLandingAll } = await useAsyncData(
+  () => `brand-landing-all-${currentCategorySlug.value}-${activeBrandSlug.value ?? 'none'}`,
+  async () => {
+    const brandId = activeBrandSeo.value?.id
+    if (!activeBrandSlug.value || !brandId)
+      return null
+    if (!categoriesStore.allCategories.length)
+      await categoriesStore.fetchCategoryData()
+
+    const all = categoriesStore.allCategories
+    const root = all.find(c => c.slug === currentCategorySlug.value)
+    if (!root)
+      return null
+
+    // Ветка раздела: он сам и все потомки.
+    const branch = new Set<string>([root.id])
+    for (let grew = true; grew;) {
+      grew = false
+      for (const c of all) {
+        if (c.parent_id && branch.has(c.parent_id) && !branch.has(c.id)) {
+          branch.add(c.id)
+          grew = true
+        }
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('products')
+      .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, category_id, brand_id')
+      .eq('is_active', true)
+      .eq('brand_id', brandId)
+      .in('category_id', [...branch])
+    if (error)
+      throw error
+
+    return { categoryId: root.id, brandId, products: data ?? [] }
+  },
+  { watch: [currentCategorySlug, activeBrandSlug] },
+)
+
 /** id бренда из адреса — известен до первой выборки товаров. */
 const activeBrandIdFromQuery = computed(() => activeBrandSeo.value?.id ?? null)
 
@@ -434,22 +495,50 @@ const categoryStatic = computed(() =>
   activeBrand.value ? undefined : categoryStaticFor(currentCategorySlug.value),
 )
 
+/*
+ * Связка «раздел + бренд»: всё — из её собственных товаров.
+ *
+ * Название раздела берётся читаемое (`seo_h1`): в `name` у части разделов
+ * дательный падеж — «Мальчикам», «Конструкторы Мальчикам», — и на бою висели
+ * H1 и заголовок «Конструкторы Мальчикам LEGO». Бренд встаёт перед «для …»:
+ * «Конструкторы LEGO для мальчиков».
+ */
+const brandLandingProducts = computed(() => brandLandingAll.value?.products ?? [])
+const brandFacts = computed(() => brandLandingFacts(brandLandingProducts.value))
+const readableCategoryName = computed(
+  () => currentCategory.value?.seo_h1?.trim() || categoryName.value || '',
+)
+const brandPhrase = computed(() =>
+  activeBrandName.value ? brandCategoryPhrase(readableCategoryName.value, activeBrandName.value) : '',
+)
+const brandLandingVerdict = computed(() => {
+  const all = brandLandingAll.value
+  if (!all)
+    return null
+  const counts = countProductsByCategoryBrand(all.products, categoriesStore.allCategories)
+  return decideBrandLanding(
+    all.categoryId,
+    all.brandId,
+    counts,
+    categoriesStore.allCategories,
+    activeBrandName.value,
+  )
+})
+/** «9 моделей · от 7 490 до 18 890 ₸» — под H1 связки. */
+const brandLandingSummary = computed(() =>
+  activeBrandSlug.value ? composeBrandLandingSummary(brandFacts.value) : '',
+)
+
 const title = computed(() => {
   if (currentCategorySlug.value === 'all') {
     return 'Все товары'
   }
 
-  if (activeBrand.value) {
+  if (activeBrand.value || (activeBrandSlug.value && activeBrandName.value)) {
     if (categoryBrandSeo.value?.seo_h1) {
       return categoryBrandSeo.value.seo_h1
     }
-    const catName = categoryName.value || ''
-    const brandName = activeBrand.value.name
-    const prefix
-      = catName.toLowerCase() === brandName.toLowerCase()
-        ? catName
-        : `${catName} ${brandName}`
-    return `${prefix} в Алматы`
+    return `${brandPhrase.value} в Алматы`
   }
 
   return currentCategory.value?.seo_h1 || categoryStatic.value?.h1 || categoryName.value
@@ -512,19 +601,24 @@ const canonicalUrl = computed(() => {
       || currentCategory.value?.href
       || route.path
 
-  const hasUniqueSeoContent = activeBrandSlug.value && categoryBrandSeo.value
-
   /*
-   * Условие НАМЕРЕННО мягче, чем у `robotsRule`: бренд-лендинг с уникальным
-   * текстом, но с парой товаров, закрывается `noindex` и при этом сохраняет
-   * canonical на самого себя.
+   * Связка «раздел + бренд» ссылается canonical'ом на СЕБЯ — всегда, открыта
+   * она или закрыта.
    *
-   * Связка «noindex + canonical на ДРУГОЙ адрес» — противоречивые указания:
-   * Google переносит запрет на цель canonical, а целью здесь была бы страница
-   * категории, которую закрывать нельзя ни в коем случае. Ссылаться на себя
-   * при `noindex` безопасно и однозначно.
+   * Открытая: canonical на раздел сказал бы Google «эта страница — копия
+   * раздела», и связка в индекс не попала бы, как бы её ни открывал
+   * robotsRule. До 21 сентября 2026 на себя ссылались только связки со
+   * строкой в category_brand_seo; остальные указывали на раздел, и после
+   * открытия связок без написанного текста (decideBrandLanding) это
+   * перечеркнуло бы всё открытие — поймано стражем
+   * check-category-brand-landings.mjs.
+   *
+   * Закрытая: связка «noindex + canonical на ДРУГОЙ адрес» — противоречивые
+   * указания, Google переносит запрет на цель canonical, а целью была бы
+   * страница раздела, которую закрывать нельзя ни в коем случае. Ссылаться
+   * на себя при `noindex` безопасно и однозначно.
    */
-  if (hasUniqueSeoContent) {
+  if (activeBrandSlug.value) {
     return `${baseUrl}${buildBrandLandingPath(basePath, activeBrandSlug.value)}`
   }
 
@@ -647,23 +741,12 @@ const displayedProducts = computed<CatalogProduct[]>(() => {
   return accumulatedProducts.value
 })
 
-/**
- * Сколько товаров показывает бренд-лендинг — для решения об индексации.
- *
- * `null` означает «ещё не знаем»: запрос идёт или упал. Отличить это от
- * честного нуля важно — иначе разовая ошибка базы закрыла бы `noindex`
- * рабочую страницу, и держалось бы это до следующего обхода. Пока запрос
- * не завершён, `isLoadingProducts` истинно; как только данные пришли —
- * пусть и пустые — оно ложно, и ноль засчитывается как настоящий ноль.
- *
- * Значение SSR-безопасно: сетка засевается в кеш до отрисовки
- * (`useCatalogSsrData`), поэтому на сервере счёт уже известен. Проверено на
- * проде: пустой лендинг отдаёт в разметке блок «Скоро здесь появятся
- * товары», а не скелетон, — то есть загрузка на сервере завершилась.
+/*
+ * Здесь жил brandLandingProductsCount — число товаров связки по сетке. Им
+ * решалось, открывать ли связку, но сетка грузит по 12, а у связки бывает
+ * больше. С 21 сентября 2026 число и всё прочее считается по полной выборке
+ * brandLandingAll (см. выше), а решение — decideBrandLanding.
  */
-const brandLandingProductsCount = computed<number | null>(() =>
-  isLoadingProducts.value ? null : displayedProducts.value.length,
-)
 
 // --- 4. Функции-обработчики ---
 
@@ -1205,10 +1288,25 @@ function updateQueryParams() {
   router.replace({ query })
 }
 
+/*
+ * Бренд из адреса связки (`…/brand/<бренд>`) — это сама страница, а не фильтр
+ * посетителя, поэтому здесь он не считается. В счётчике на кнопке фильтров
+ * (activeFiltersCount) он остаётся: там это честное «выбран бренд».
+ *
+ * До 21 сентября 2026 считался — и на КАЖДОЙ связке текст внизу страницы
+ * прятало условие `!hasActiveFilters`: написанные руками тексты (восемь
+ * строк в category_brand_seo, по полторы-две тысячи знаков) лежали только в
+ * payload и в JSON-LD, а на странице их не было. JSON-LD при этом
+ * описывал невидимый текст. Поймано стражем check-category-brand-landings.mjs.
+ */
 const hasActiveFilters = computed(() => {
-  return (
-    activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity'
-  )
+  const brandIds = activeFilters.value.brandIds
+  const onlyLandingBrand
+    = !!activeBrandIdFromQuery.value
+      && brandIds.length === 1
+      && brandIds[0] === activeBrandIdFromQuery.value
+  const userFilters = activeFiltersCount.value - (onlyLandingBrand ? 1 : 0)
+  return userFilters > 0 || activeFilters.value.sortBy !== 'popularity'
 })
 
 const categoryDescription = computed(
@@ -1335,31 +1433,37 @@ const topBrands = computed(() => {
 })
 
 const metaDescription = computed(() => {
-  if (activeBrand.value && categoryBrandSeo.value) {
+  /*
+   * Связка «раздел + бренд» — своё описание ВСЕГДА, а не только когда для неё
+   * написан текст. До 21 сентября 2026 без строки в category_brand_seo сюда
+   * молча попадало описание всего раздела: у «Радиоуправляемых машинок
+   * MokaToys» стояло «24 модели» — это весь раздел, у MokaToys их 9. Теперь
+   * число моделей и цены «от … до …» — по товарам самой связки.
+   */
+  if (activeBrandSlug.value && activeBrandName.value && !categoryBrandSeo.value?.seo_description && brandFacts.value.count > 0)
+    return composeBrandLandingMeta(brandPhrase.value, brandFacts.value)
+
+  if ((activeBrand.value || activeBrandSlug.value) && categoryBrandSeo.value) {
     /*
      * Сохранённое описание показываем, только если оно не собрано СТАРЫМ
      * шаблоном: тот открывался эмодзи, вставлял звёзды с одного отзыва и
      * обещал доставку «за 1 день» — по условиям магазина это 1–3 рабочих дня.
      * Таких строк в базе пять из четырнадцати, остальные написаны руками.
      * Их не трогаем, а машинные собираем заново по нынешним правилам.
+     *
+     * Написанное руками — с числом моделей и ценами «от … до …» впереди:
+     * владелец писал эти тексты без цен, а цены в выдаче — то, ради чего
+     * связку открывают (см. prependBrandLandingFacts).
      */
     const stored = categoryBrandSeo.value.seo_description
     if (stored && !hasLegacyTemplateMarks(stored)) {
-      return stored
+      return prependBrandLandingFacts(stored, brandFacts.value)
     }
 
-    return generateBrandCategoryDescription({
-      brandName: activeBrand.value.name,
-      brandSlug: activeBrand.value.slug,
-      categoryName: categoryName.value,
-      categorySlug: currentCategorySlug.value,
-      productsCount:
-        categoryBrandSeo.value.products_count || displayedProducts.value.length,
-      minPrice: categoryBrandSeo.value.min_price || minPrice.value || 0,
-      maxPrice: categoryBrandSeo.value.min_price || 0,
-      rating: categoryBrandSeo.value.avg_rating || undefined,
-      reviewsCount: categoryBrandSeo.value.total_reviews || undefined,
-    })
+    // Сохранённое собрано старым шаблоном — собираем заново из товаров связки.
+    // Прежний сборщик брал «до» из min_price, то есть цена «до» никогда не
+    // была правильной.
+    return composeBrandLandingMeta(brandPhrase.value || categoryName.value, brandFacts.value)
   }
 
   /*
@@ -1403,17 +1507,9 @@ const metaTitle = computed(() => {
     if (categoryBrandSeo.value?.seo_title) {
       return categoryBrandSeo.value.seo_title
     }
-    const catName = categoryName.value
-    const brandName = activeBrandName.value
-    const prefix
-      = catName.toLowerCase() === brandName.toLowerCase()
-        ? catName
-        : `${catName} ${brandName}`
-
-    const priceText = minPrice.value
-      ? ` — от ${formatPrice(minPrice.value)} ₸`
-      : ''
-    return `${prefix}${priceText} | Ухтышка`
+    // Читаемое название раздела и цена «от» по товарам самой связки — см.
+    // brandPhrase и brandFacts выше.
+    return composeBrandLandingTitle(brandPhrase.value, brandFacts.value)
   }
 
   if (selectedSingleLine.value) {
@@ -1486,8 +1582,29 @@ const { data: currentCategorySeoText } = await useAsyncData(
 )
 
 const seoText = computed(() => {
-  if (activeBrand.value && categoryBrandSeo.value?.seo_text) {
-    return sanitizeHtml(categoryBrandSeo.value.seo_text)
+  /*
+   * Написанный текст связки — только если он РИСУЕТСЯ. parseHTMLToBlocks
+   * берёт блоки (h2/h3/p/ul) и пропускает голый текст без тегов, а такие в
+   * category_brand_seo были: шесть шаблонов старого генератора. На странице
+   * от них оставалось пустое место — лучше свой текст из товаров связки.
+   */
+  if ((activeBrand.value || activeBrandSlug.value) && categoryBrandSeo.value?.seo_text) {
+    const own = sanitizeHtml(categoryBrandSeo.value.seo_text)
+    if (parseHTMLToBlocks(own).length > 0)
+      return own
+  }
+
+  /*
+   * У связки без написанного текста — текст из её товаров
+   * (utils/brandLandingText.ts). Раньше здесь показывался текст ВСЕГО
+   * раздела: дубль, одинаковый на разделе и на каждой его связке.
+   */
+  if (activeBrandSlug.value && activeBrandName.value && brandFacts.value.count > 0) {
+    return sanitizeHtml(composeBrandLandingText({
+      phrase: brandPhrase.value,
+      brandName: activeBrandName.value,
+      products: brandLandingProducts.value,
+    }))
   }
 
   const text = currentCategorySeoText.value
@@ -1543,11 +1660,18 @@ const robotsRule = computed(() => {
    * карте появятся `noindex`-адреса. См. MIN_PRODUCTS_FOR_BRAND_LANDING.
    */
   if (activeBrandSlug.value) {
-    const indexable
-      = !!categoryBrandSeo.value
-        && isBrandLandingIndexable(brandLandingProductsCount.value)
-
-    return indexable
+    /*
+     * С 21 сентября 2026 решает decideBrandLanding — та же функция, что
+     * отбирает связки в карту сайта: не меньше трёх товаров, не корневой
+     * раздел и не дубль более точного подраздела. Написанный текст в
+     * category_brand_seo больше не условие: у связки без него теперь свой
+     * текст из её товаров (см. seoText).
+     *
+     * Пока выборки нет (или она упала) — открыто: закрывать рабочую
+     * страницу из-за сбоя запроса нельзя, прежний fail-open.
+     */
+    const verdict = brandLandingVerdict.value
+    return verdict === null || verdict.indexable
       ? { index: true, follow: true }
       : { noindex: true, follow: true }
   }
@@ -2136,6 +2260,13 @@ else {
     >
       {{ title }}
     </h1>
+    <!--
+      Связка «раздел + бренд»: сколько моделей и цены «от … до …». Считается
+      по ВСЕМ товарам связки, а не по первой странице сетки.
+    -->
+    <p v-if="brandLandingSummary" class="mb-2 text-sm text-muted-foreground">
+      {{ brandLandingSummary }}
+    </p>
     <CategoryRatingBlock
       v-if="showCategoryRating"
       :avg-rating="categoryRatingData!.avg_rating"
