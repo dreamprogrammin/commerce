@@ -1288,10 +1288,25 @@ function updateQueryParams() {
   router.replace({ query })
 }
 
+/*
+ * Бренд из адреса связки (`…/brand/<бренд>`) — это сама страница, а не фильтр
+ * посетителя, поэтому здесь он не считается. В счётчике на кнопке фильтров
+ * (activeFiltersCount) он остаётся: там это честное «выбран бренд».
+ *
+ * До 21 сентября 2026 считался — и на КАЖДОЙ связке текст внизу страницы
+ * прятало условие `!hasActiveFilters`: написанные руками тексты (восемь
+ * строк в category_brand_seo, по полторы-две тысячи знаков) лежали только в
+ * payload и в JSON-LD, а на странице их не было. JSON-LD при этом
+ * описывал невидимый текст. Поймано стражем check-category-brand-landings.mjs.
+ */
 const hasActiveFilters = computed(() => {
-  return (
-    activeFiltersCount.value > 0 || activeFilters.value.sortBy !== 'popularity'
-  )
+  const brandIds = activeFilters.value.brandIds
+  const onlyLandingBrand
+    = !!activeBrandIdFromQuery.value
+      && brandIds.length === 1
+      && brandIds[0] === activeBrandIdFromQuery.value
+  const userFilters = activeFiltersCount.value - (onlyLandingBrand ? 1 : 0)
+  return userFilters > 0 || activeFilters.value.sortBy !== 'popularity'
 })
 
 const categoryDescription = computed(
