@@ -24,6 +24,7 @@
  *
  *   node js-cpu-by-package.mjs http://localhost:3127/
  *   DRILL=vue-sonner,@nuxt/icon node js-cpu-by-package.mjs …   — разбор по функциям
+ *   MAPS_DIR=<папка>/public/_nuxt …   — карты не из .output (две сборки рядом)
  */
 import fs from 'node:fs'
 import process from 'node:process'
@@ -36,7 +37,7 @@ function mapFor(url) {
   const file = url.split('/_nuxt/')[1]
   if (!file) return null
   if (!maps.has(file)) {
-    const p = `.output/public/_nuxt/${file}.map`
+    const p = `${process.env.MAPS_DIR || '.output/public/_nuxt'}/${file}.map`
     maps.set(file, fs.existsSync(p) ? new TraceMap(fs.readFileSync(p, 'utf8')) : null)
   }
   return maps.get(file)
