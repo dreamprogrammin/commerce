@@ -69,6 +69,13 @@ async function getToken() {
   return json.access_token
 }
 
+/*
+ * `--by=query` (по умолчанию) — запросы; `--by=page` — страницы;
+ * `--by=query,page` — пары «запрос + страница», по ним и видно, какая
+ * страница показывается по какому запросу и на каком месте.
+ */
+const DIMS = (process.argv.find(a => a.startsWith('--by='))?.slice(5) ?? 'query').split(',')
+
 const iso = d => d.toISOString().slice(0, 10)
 const token = await getToken()
 
@@ -80,7 +87,7 @@ const res = await fetch(
     body: JSON.stringify({
       startDate: iso(new Date(Date.now() - days * 86400000)),
       endDate: iso(new Date()),
-      dimensions: ['query'],
+      dimensions: DIMS,
       rowLimit: 1000,
     }),
   },
@@ -90,9 +97,10 @@ if (data.error)
   throw new Error(`Search Console: ${data.error.message}`)
 
 const rows = data.rows ?? []
+const key = r => r.keys.join('  ←  ')
 const picked = words.length
-  ? rows.filter(r => words.some(w => r.keys[0].toLowerCase().includes(w)))
-  : rows.slice(0, 20)
+  ? rows.filter(r => words.some(w => key(r).toLowerCase().includes(w)))
+  : rows
 
 const sum = (list, key) => list.reduce((s, r) => s + r[key], 0)
 
@@ -101,6 +109,19 @@ console.log(`  показов ${sum(rows, 'impressions')}, кликов ${sum(ro
 if (words.length)
   console.log(`\nс словами [${words.join(', ')}]: запросов ${picked.length}, показов ${sum(picked, 'impressions')}, кликов ${sum(picked, 'clicks')}`)
 
+/*
+ * `--zero` — только то, где показы есть, а кликов нет: именно там лежит
+ * неиспользованный спрос. `--top=N` — сколько строк печатать.
+ */
+const onlyZero = process.argv.includes('--zero')
+const top = Number(process.argv.find(a => a.startsWith('--top='))?.slice(6) ?? 20)
+const list = (onlyZero ? picked.filter(r => r.clicks === 0) : picked)
+  .sort((a, b) => b.impressions - a.impressions)
+  .slice(0, top)
+
+if (onlyZero)
+  console.log(`\nбез единого клика: строк ${picked.filter(r => r.clicks === 0).length}, показов ${sum(picked.filter(r => r.clicks === 0), 'impressions')}`)
+
 console.log()
-for (const r of picked.sort((a, b) => b.impressions - a.impressions).slice(0, 20))
-  console.log(`  ${String(r.impressions).padStart(5)} показов ${String(r.clicks).padStart(4)} кликов  ${r.keys[0]}`)
+for (const r of list)
+  console.log(`  ${String(r.impressions).padStart(5)} показов ${String(r.clicks).padStart(3)} кликов  место ${r.position.toFixed(1).padStart(5)}  ${key(r)}`)
