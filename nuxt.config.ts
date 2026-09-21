@@ -1,6 +1,9 @@
 import process from 'node:process'
 import tailwindcss from '@tailwindcss/vite'
 
+/** Коллекции иконок, которыми пользуется сайт. Подробности — у `icon` ниже. */
+const ICON_COLLECTIONS = ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat', 'line-md', 'simple-icons', 'gravity-ui', 'mdi', 'logos', 'ic', 'solar']
+
 /**
  * Превью (`dev.uhti.kz`) — не боевой сайт, и в индексе ему не место.
  *
@@ -169,8 +172,25 @@ export default defineNuxtConfig({
     // задающий размер своим классом, тоже сильнее. Порядок слоёв Tailwind
     // при этом не меняется.
     cssLayer: 'icons',
+
+    // Список коллекций — один на обе настройки ниже, чтобы не разъехались.
+    //
+    // `collections` без значения @nuxt/icon заполняет ВСЕМИ коллекциями
+    // Iconify — их 177. А в 2.1.0 каждая иконка при создании делает
+    // `(options.collections || []).sort(...)` — сортировку НА МЕСТЕ
+    // реактивного массива из useAppConfig(), и каждая перестановка идёт через
+    // ловушки реактивности Vue. На главной 94 иконки. Замер 21 сентября 2026
+    // (js-cpu-by-package.mjs, эмуляция телефона /4): 39 мс на загрузке, плюс
+    // get/set по ~45 мс в верхушке боевого профиля.
+    //
+    // Сам список библиотеке нужен только для имён через дефис
+    // (`simple-icons-github` → `simple-icons:github`). У нас все 662 имени в
+    // коде и все имена в базе — через двоеточие, так что сужение ничего не
+    // меняет в том, КАКИЕ иконки находятся. Страж — check-icon-collections.mjs:
+    // он же проверяет, что каждая иконка на странице получила маску или фон.
+    collections: ICON_COLLECTIONS,
     serverBundle: {
-      collections: ['lucide', 'streamline-plump', 'streamline-emojis', 'fluent-emoji-flat', 'line-md', 'simple-icons', 'gravity-ui', 'mdi', 'logos', 'ic', 'solar'],
+      collections: ICON_COLLECTIONS,
     },
     clientBundle: {
       scan: true,
