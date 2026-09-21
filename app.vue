@@ -323,9 +323,19 @@ useSchemaOrg([
         и её фон перекрашивал бы карточку.
 
         Вид задан в assets/css/toast.css.
+
+        `dir="ltr"` — не про вид, а про скорость. По умолчанию у Toaster
+        `dir: "auto"`, и тогда на КАЖДОЙ отрисовке vue-sonner зовёт
+        getDocumentDirection(), а та без атрибута dir у <html> делает
+        window.getComputedStyle(document.documentElement) — принудительный
+        пересчёт стилей всей страницы. Замер 21 сентября 2026 на главной при
+        эмуляции телефона: 121 мс из 125, что тратит библиотека; с явным
+        направлением — 3 мс. Русский и казахский пишутся слева направо, так
+        что угадывать тут нечего. Страж — check-toaster-dir.mjs.
       -->
       <ClientOnly>
         <Toaster
+          dir="ltr"
           position="bottom-right"
           :offset="{ right: 22, bottom: 26 }"
           :mobile-offset="{ bottom: 96, left: 10, right: 10 }"
