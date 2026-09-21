@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SHOP, SHOP_ADDRESS_FULL } from '@/constants/shop'
 import { formatPrice } from '@/utils/formatPrice'
 
 const currentYear = new Date().getFullYear()
@@ -176,8 +177,10 @@ const { data: popularProducts } = useAsyncData('footer-popular-products', async 
             Контакты
           </h3>
           <div class="space-y-2 text-sm text-muted-foreground">
-            <p>г. Алматы, Казахстан</p>
-            <p>мкр. Шапагат, ул. Амангельды</p>
+            <p>{{ SHOP_ADDRESS_FULL }}</p>
+            <!-- Часы работы видимым текстом: их не было на страницах вовсе,
+                 только в разметке для роботов, а 42 заказа из 45 — самовывоз. -->
+            <p>{{ SHOP.openingHoursHuman }}</p>
             <div class="flex gap-3 mt-4">
               <a
                 href="https://wa.me/77025379473"

@@ -8,6 +8,7 @@ import {
   SITE_OG_IMAGE_SIZE,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
+import { SHOP } from '@/constants/shop'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -228,7 +229,7 @@ useSchemaOrg([
     'areaServed': { '@type': 'Country', 'name': 'Казахстан' },
     'currenciesAccepted': 'KZT',
     'paymentAccepted': 'Наличные при получении, перевод или QR через Kaspi',
-    'openingHours': 'Mo-Su 09:00-21:00',
+    'openingHours': SHOP.openingHours,
     'logo': {
       '@type': 'ImageObject',
       '@id': `${siteUrl}/#logo`,
@@ -248,7 +249,7 @@ useSchemaOrg([
       '@type': 'PostalAddress',
       'addressCountry': 'KZ',
       'addressLocality': 'Алматы',
-      'streetAddress': 'мкр. Шапагат, ул. Амангельды',
+      'streetAddress': SHOP.street,
       // Индекс назван владельцем 16 сентября 2026. Стоял 050058, OSM для этой
       // улицы давал 050024 — оба оказались мимо.
       'postalCode': '050061',
