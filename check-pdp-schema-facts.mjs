@@ -82,6 +82,24 @@ for (const page of PAGES) {
     check(node.brand?.name === page.brand, `бренд «${page.brand}»: ${node.brand?.name ?? '—'}`)
 
   check(typeof offer.price === 'number' && offer.price > 0, `цена ${offer.price}`)
+
+  /*
+   * Скидка — по правилам Google для товарных карточек (merchant listing):
+   * «Don't mark the active price with a priceType property», а старую цену
+   * помечать StrikethroughPrice — только этот тип и поддерживается. До 21
+   * сентября 2026 было наоборот: текущая цена стояла в priceSpecification с
+   * SalePrice, старой не было вовсе. Search Console выдавал на каждой такой
+   * карточке «Отсутствует поле validFrom», а зачёркнутую цену в выдаче Google
+   * показать не мог — её не из чего было взять.
+   *
+   * Все три карточки выше на 21 сентября со скидкой. Кончится скидка у
+   * какой-то из них — страж скажет об этом второй строкой, это ожидаемо.
+   */
+  const specs = [].concat(offer.priceSpecification ?? [])
+  const types = specs.map(x => String(x.priceType ?? '').split('/').pop())
+  check(!types.includes('SalePrice'), `текущая цена не помечена SalePrice: ${types.join(', ') || 'спецификаций нет'}`)
+  const strike = specs.find(x => String(x.priceType ?? '').endsWith('StrikethroughPrice'))
+  check(!!strike && strike.price > offer.price, `старая цена размечена StrikethroughPrice: ${strike ? `${strike.price} > ${offer.price}` : 'нет'}`)
   check(typeof offer.availability === 'string' && offer.availability.includes('schema.org/'), `наличие ${offer.availability}`)
 }
 
