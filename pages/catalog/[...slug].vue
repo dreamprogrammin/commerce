@@ -49,6 +49,7 @@ import {
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
 import { isCategoryIndexable } from '@/utils/categoryLanding'
+import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 
@@ -2110,7 +2111,8 @@ const schemaData = computed(() => {
                 url: `https://uhti.kz/brand/${product.brands.slug}`,
               }),
             },
-            ...(product.barcode && { gtin: product.barcode }),
+            // Только настоящий GTIN (utils/gtin.ts): «8497» из базы — не штрихкод.
+            ...(validGtin(product.barcode) && { gtin: validGtin(product.barcode) }),
             /*
              * `IMAGE_SIZES.CARD` третьим аргументом здесь НЕ работал: пока
              * `IMAGE_OPTIMIZATION_ENABLED = false`, `getImageUrl` игнорирует

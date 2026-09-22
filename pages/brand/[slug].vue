@@ -17,6 +17,7 @@ import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
+import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
@@ -731,8 +732,8 @@ useHead({
               'sku': getProductSku(product),
               // FIX: mpn дублирует sku для устранения варнингов Google
               'mpn': getProductSku(product),
-              // FIX: gtin из barcode если есть
-              ...(product.barcode ? { gtin: product.barcode } : {}),
+              // Только настоящий GTIN (utils/gtin.ts): «8497» из базы — не штрихкод.
+              ...(validGtin(product.barcode) ? { gtin: validGtin(product.barcode) } : {}),
               // FIX: brand без дублирования name
               'brand': {
                 '@type': 'Brand',
