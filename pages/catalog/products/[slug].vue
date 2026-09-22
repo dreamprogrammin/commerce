@@ -29,6 +29,7 @@ import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsS
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
+import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 import { composeProductMeta } from '@/utils/seoDescription'
@@ -996,8 +997,9 @@ useSchemaOrg([
     sku: productSku,
     mpn: productSku,
 
-    // ✅ 3. Штрихкод (только если существует)
-    gtin: computed(() => product.value?.barcode || undefined),
+    // ✅ 3. Штрихкод — только настоящий GTIN (utils/gtin.ts): «8497» из базы
+    // уходил сюда как штрихкод, хотя это четыре цифры.
+    gtin: computed(() => validGtin(product.value?.barcode) ?? undefined),
 
     /*
      * Бренд — это производитель, а не продавец.
@@ -1102,26 +1104,19 @@ useSchemaOrg([
       }))
     }),
 
-    // 🔥 ТИКЕТ 1: Связывание товаров для Deep Crawling
-    isAccessoryOrSparePartFor: computed(() => {
-      if (!accessories.value?.length)
-        return undefined
-      return accessories.value.map(acc => ({
-        '@type': 'Product' as const,
-        'name': acc.name,
-        'url': `https://uhti.kz/catalog/products/${acc.slug}`,
-      }))
-    }),
-
-    isSimilarTo: computed(() => {
-      if (!similarProducts.value?.length)
-        return undefined
-      return similarProducts.value.slice(0, 5).map(sim => ({
-        '@type': 'Product' as const,
-        'name': sim.name,
-        'url': `https://uhti.kz/catalog/products/${sim.slug}`,
-      }))
-    }),
+    /*
+     * `isAccessoryOrSparePartFor` и `isSimilarTo` ЖИЛИ ЗДЕСЬ и сняты
+     * 22 сентября 2026. Оба строились из запросов useQuery, которых сервер не
+     * ждёт, и в серверную разметку попадали как повезёт: на стенде без кеша
+     * аксессуары — в 1 рендере из 8, похожие — ни в одном. На бою ISR
+     * кешировал ту версию, что попалась. Вдобавок аксессуары стояли в
+     * `isAccessoryOrSparePartFor` — это значит «ЭТОТ товар — аксессуар для…»,
+     * то есть аккордеон объявлялся аксессуаром к батарейкам.
+     *
+     * Google эти поля не использует ни в одном расширенном результате, а
+     * ссылки из JSON-LD не обходит. Ссылки на аксессуары и похожие товары
+     * живут в самих блоках страницы — обычными <a>.
+     */
 
     // 🔥 Дополнительные свойства товара (атрибуты) для Google Merchant
     additionalProperty: schemaAdditionalProperties,

@@ -18,6 +18,7 @@
  *    strikethroughPrice (utils/offerSchema.ts).
  */
 
+import { validGtin } from './gtin'
 import { offerPrice, strikethroughPrice } from './offerSchema'
 import { decodeHtmlEntities } from './parseSEOContent'
 import { cleanProductName } from './productName'
@@ -72,25 +73,6 @@ export function feedDescription(html: string | null | undefined, fallback: strin
     .filter(Boolean)
   const joined = lines.join('\n')
   return cut(joined || cleanProductName(fallback), FEED_DESCRIPTION_LIMIT)
-}
-
-/**
- * GTIN — 8, 12, 13 или 14 цифр с верной контрольной цифрой, иначе null.
- * В базе единственный штрихкод — «8497»: это не GTIN, и отдать его значило
- * бы получить ошибку «неверный GTIN» вместо честного identifier_exists = no.
- */
-export function validGtin(code: string | null | undefined): string | null {
-  const digits = (code ?? '').replace(/\s+/g, '')
-  if (!/^(?:\d{8}|\d{12,14})$/.test(digits))
-    return null
-  const body = digits.slice(0, -1)
-  let sum = 0
-  for (let i = 0; i < body.length; i++) {
-    const n = Number(body[body.length - 1 - i])
-    sum += i % 2 === 0 ? n * 3 : n
-  }
-  const check = (10 - (sum % 10)) % 10
-  return check === Number(digits.at(-1)) ? digits : null
 }
 
 /** CDATA, в котором текст не может закрыть секцию раньше времени. */
