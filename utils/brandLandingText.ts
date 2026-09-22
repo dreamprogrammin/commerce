@@ -96,6 +96,12 @@ function priceRange(f: BrandLandingFacts): string {
 
 const models = (n: number) => `${n} ${pluralRu(n, 'модель', 'модели', 'моделей')}`
 
+/** «9 моделей от 7 490 до 18 890 ₸» — число и цены одной фразой. */
+export function modelsAndPrices(f: BrandLandingFacts): string {
+  const range = priceRange(f)
+  return `${models(f.count)}${range ? ` ${range}` : ''}`
+}
+
 /** Строка под заголовком страницы: «9 моделей · от 7 490 до 18 890 ₸». */
 export function composeBrandLandingSummary(f: BrandLandingFacts): string {
   if (!f.count)
@@ -106,9 +112,7 @@ export function composeBrandLandingSummary(f: BrandLandingFacts): string {
 
 /** Описание для выдачи: число моделей бренда и цены «от … до …». */
 export function composeBrandLandingMeta(phrase: string, f: BrandLandingFacts): string {
-  const range = priceRange(f)
-  const head = `${phrase} в Алматы: ${models(f.count)}${range ? ` ${range}` : ''}`
-  return clampDescription(`${head}. ${DELIVERY_SHORT}.`)
+  return clampDescription(`${phrase} в Алматы: ${modelsAndPrices(f)}. ${DELIVERY_SHORT}.`)
 }
 
 /**
@@ -124,8 +128,7 @@ export function prependBrandLandingFacts(stored: string, f: BrandLandingFacts): 
   const text = (stored ?? '').trim()
   if (!f.count)
     return text
-  const range = priceRange(f)
-  return clampDescription(`${models(f.count)}${range ? ` ${range}` : ''}. ${text}`)
+  return clampDescription(`${modelsAndPrices(f)}. ${text}`)
 }
 
 const TITLE_SUFFIX = ' | Ухтышка'

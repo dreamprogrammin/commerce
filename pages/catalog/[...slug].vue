@@ -1530,7 +1530,9 @@ const metaDescription = computed(() => {
       : null
 
   return composeCategoryMeta({
-    categoryName: categoryName.value,
+    // Читаемое имя (seo_h1): в `name` у четырёх разделов дательный падеж, и в
+    // выдаче стояло «Конструкторы девочкам в Алматы: 2 модели…».
+    categoryName: readableCategoryName.value,
     // Написанное руками вступление, если владелец его завёл, — оно идёт
     // первым, а факты дописываются следом.
     lead: currentCategory.value?.meta_description,
@@ -1578,7 +1580,7 @@ const metaTitle = computed(() => {
     return seoTitle
   }
 
-  return `${categoryName.value} купить в интернет-магазине Ухтышка Казахстан`
+  return `${readableCategoryName.value} купить в интернет-магазине Ухтышка Казахстан`
 })
 
 const metaKeywords = computed(() => {
