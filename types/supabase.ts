@@ -1636,11 +1636,13 @@ export interface Database {
           material_id: number | null
           material_ids: number[] | null
           max_age: number | null
+          max_age_months: number | null
           max_age_years: number | null
           meta_description: string | null
           meta_keywords: string[] | null
           meta_title: string | null
           min_age: number | null
+          min_age_months: number | null
           min_age_years: number | null
           min_stock_level: number
           name: string
@@ -1694,11 +1696,13 @@ export interface Database {
           material_id?: number | null
           material_ids?: number[] | null
           max_age?: number | null
+          max_age_months?: number | null
           max_age_years?: number | null
           meta_description?: string | null
           meta_keywords?: string[] | null
           meta_title?: string | null
           min_age?: number | null
+          min_age_months?: number | null
           min_age_years?: number | null
           min_stock_level?: number
           name: string
@@ -1752,11 +1756,13 @@ export interface Database {
           material_id?: number | null
           material_ids?: number[] | null
           max_age?: number | null
+          max_age_months?: number | null
           max_age_years?: number | null
           meta_description?: string | null
           meta_keywords?: string[] | null
           meta_title?: string | null
           min_age?: number | null
+          min_age_months?: number | null
           min_age_years?: number | null
           min_stock_level?: number
           name?: string

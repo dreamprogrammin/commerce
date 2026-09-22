@@ -32,6 +32,7 @@ import { formatPrice } from '@/utils/formatPrice'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+import { formatAgeRange, productAgeMonths } from '@/utils/productAge'
 import { composeProductMeta } from '@/utils/seoDescription'
 
 import { buildProductTitle } from '@/utils/seoTitle'
@@ -559,17 +560,14 @@ const metaTitle = computed(() => {
   return buildProductTitle(product.value.name)
 })
 
+// Возраст — в месяцах, словами как на коробке: «от 6 месяцев», «от 1 года»,
+// «от 4 до 12 лет». До 22 сентября 2026 здесь были годы и «от 1 лет»;
+// см. utils/productAge.ts.
 const ageRangeText = computed(() => {
   if (!product.value)
     return null
-  const { min_age_years: min, max_age_years: max } = product.value
-  if (min !== null && max !== null)
-    return min === max ? `${min} лет` : `от ${min} до ${max} лет`
-  if (min !== null)
-    return `от ${min} лет`
-  if (max !== null)
-    return `до ${max} лет`
-  return null
+  const { min, max } = productAgeMonths(product.value)
+  return formatAgeRange(min, max)
 })
 
 const genderText = computed(() => {
@@ -689,12 +687,9 @@ const metaKeywords = computed(() => {
     keywords.push(...product.value.seo_keywords)
   if (product.value) {
     keywords.push(product.value.name)
-    if (product.value.min_age_years !== null) {
-      keywords.push(
-        `игрушки от ${product.value.min_age_years} лет`,
-        `${product.value.min_age_years} года`,
-      )
-    }
+    const ageFrom = formatAgeRange(productAgeMonths(product.value).min, null)
+    if (ageFrom)
+      keywords.push(`игрушки ${ageFrom}`)
     if (product.value.gender === 'female')
       keywords.push('игрушки для девочек', 'подарок девочке')
     else if (product.value.gender === 'male')
