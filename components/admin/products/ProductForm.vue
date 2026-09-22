@@ -14,6 +14,7 @@ import type {
   ProductUpdate,
   ProductWithImages,
 } from '@/types'
+import type { AgeUnit } from '@/utils/productAge'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { VueDraggableNext } from 'vue-draggable-next'
@@ -34,6 +35,7 @@ import {
   getOptimizationInfo,
   optimizeImageBeforeUpload,
 } from '@/utils/imageOptimizer'
+import { ageToMonths, formatAgeRange, monthsToInput, productAgeMonths } from '@/utils/productAge'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
 import ProductLineForm from '../product-lines/ProductLineForm.vue'
@@ -168,6 +170,10 @@ const isSlugManuallyEdited = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isSettingUp = ref(false)
 
+// Возраст в админке — число и единица; см. блок «Возраст» ниже
+const minAge = ref<{ value: number | null, unit: AgeUnit }>({ value: null, unit: 'years' })
+const maxAge = ref<{ value: number | null, unit: AgeUnit }>({ value: null, unit: 'years' })
+
 // 🎯 Информация об оптимизации
 const optimizationInfo = computed(() => getOptimizationInfo())
 
@@ -181,6 +187,9 @@ function setupFormData(product: FullProduct | null | undefined) {
 
   if (product && product.id) {
     // ✏️ РЕЖИМ РЕДАКТИРОВАНИЯ
+    const productAge = productAgeMonths(product)
+    minAge.value = monthsToInput(productAge.min)
+    maxAge.value = monthsToInput(productAge.max)
     formData.value = {
       name: product.name,
       slug: product.slug,
@@ -193,6 +202,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       bonus_points_award: product.bonus_points_award,
       min_age_years: product.min_age_years,
       max_age_years: product.max_age_years,
+      min_age_months: productAge.min,
+      max_age_months: productAge.max,
       gender: product.gender as 'unisex' | 'male' | 'female' | null,
       accessory_ids: product.accessory_ids || [],
       is_accessory: product.is_accessory || false,
@@ -238,6 +249,8 @@ function setupFormData(product: FullProduct | null | undefined) {
   }
   else {
     // ✨ РЕЖИМ СОЗДАНИЯ
+    minAge.value = { value: null, unit: 'years' }
+    maxAge.value = { value: null, unit: 'years' }
     formData.value = {
       name: '',
       slug: '',
@@ -250,6 +263,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       bonus_points_award: 0,
       min_age_years: null,
       max_age_years: null,
+      min_age_months: null,
+      max_age_months: null,
       gender: 'unisex',
       accessory_ids: [],
       is_accessory: false,
@@ -784,27 +799,45 @@ const descriptionValue = computed({
   },
 })
 
-const minAgeYearsValue = computed({
+/*
+ * Возраст: число и единица, в базу — месяцы (`min_age_months`).
+ *
+ * Админ вписывает как на коробке — «6 лет» или «18 мес», месяцы считает
+ * utils/productAge.ts. Смена единицы число не пересчитывает: вписали «6» и
+ * выбрали «мес» — значит, 6 месяцев. Годы (`min_age_years`) в базе
+ * пересчитывает триггер — их по-прежнему читает выдача каталога.
+ */
+const minAgeValue = computed({
   get() {
-    return formData.value.min_age_years ?? undefined
+    return minAge.value.value ?? undefined
   },
   set(value) {
-    if (formData.value) {
-      formData.value.min_age_years = typeof value === 'number' ? value : null
-    }
+    minAge.value = { ...minAge.value, value: typeof value === 'number' ? value : null }
   },
 })
 
-const maxAgeYearsValue = computed({
+const maxAgeValue = computed({
   get() {
-    return formData.value.max_age_years ?? undefined
+    return maxAge.value.value ?? undefined
   },
   set(value) {
-    if (formData.value) {
-      formData.value.max_age_years = typeof value === 'number' ? value : null
-    }
+    maxAge.value = { ...maxAge.value, value: typeof value === 'number' ? value : null }
   },
 })
+
+// deep: единицу меняет v-model селекта прямо в объекте (`minAge.unit`), без
+// deep такой смены не видно — «3» + «лет» уходило в базу как 3 месяца.
+watch(minAge, (age) => {
+  formData.value.min_age_months = ageToMonths(age.value, age.unit)
+}, { deep: true })
+watch(maxAge, (age) => {
+  formData.value.max_age_months = ageToMonths(age.value, age.unit)
+}, { deep: true })
+
+/** Как возраст увидит покупатель — подсказка под полями. */
+const agePreview = computed(() =>
+  formatAgeRange(formData.value.min_age_months, formData.value.max_age_months),
+)
 
 // --- 12. АКТУАЛЬНАЯ ЦЕНА СО СКИДКОЙ ---
 
@@ -1898,30 +1931,70 @@ const seoKeywordsString = computed({
             </Select>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 pt-2">
+          <!-- Друг под другом, а не в две колонки: карточка стоит в узкой боковой
+               колонке, и рядом с селектом единицы поле числа сжималось до 20px. -->
+          <div class="grid gap-3 pt-2">
             <div>
-              <Label for="min_age_years">Мин. возраст (лет)</Label>
-              <Input
-                id="min_age_years"
-                v-model.number="minAgeYearsValue"
-                type="number"
-                placeholder="0"
-                min="0"
-                max="100"
-              />
+              <Label for="min_age">Возраст от</Label>
+              <div class="flex gap-2">
+                <Input
+                  id="min_age"
+                  v-model.number="minAgeValue"
+                  type="number"
+                  placeholder="—"
+                  min="0"
+                  step="any"
+                  class="min-w-0 flex-1"
+                />
+                <Select v-model="minAge.unit">
+                  <SelectTrigger class="w-24" aria-label="Единица возраста «от»">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="months">
+                      мес.
+                    </SelectItem>
+                    <SelectItem value="years">
+                      лет
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
-              <Label for="max_age_years">Макс. возраст (лет)</Label>
-              <Input
-                id="max_age_years"
-                v-model.number="maxAgeYearsValue"
-                type="number"
-                placeholder="100"
-                min="0"
-                max="100"
-              />
+              <Label for="max_age">Возраст до</Label>
+              <div class="flex gap-2">
+                <Input
+                  id="max_age"
+                  v-model.number="maxAgeValue"
+                  type="number"
+                  placeholder="—"
+                  min="0"
+                  step="any"
+                  class="min-w-0 flex-1"
+                />
+                <Select v-model="maxAge.unit">
+                  <SelectTrigger class="w-24" aria-label="Единица возраста «до»">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="months">
+                      мес.
+                    </SelectItem>
+                    <SelectItem value="years">
+                      лет
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
+          <p class="text-xs text-muted-foreground">
+            Как на коробке: малышам — месяцами (6 мес., 18 мес.), остальным — годами.
+            <template v-if="agePreview">
+              На сайте: <span class="font-medium text-foreground">{{ agePreview }}</span>
+            </template>
+          </p>
         </CardContent>
       </Card>
 

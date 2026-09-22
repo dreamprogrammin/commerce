@@ -40,13 +40,14 @@ describe('brandCategoryPhrase', () => {
 describe('brandLandingFacts', () => {
   it('считает по ТЕКУЩЕЙ цене, со скидкой', () => {
     const f = brandLandingFacts(products)
-    expect(f).toMatchObject({ count: 3, inStock: 2, min: 7490, max: 15990, minAge: 3 })
+    // Возраст в фактах — в месяцах (22.09.2026): 3 года = 36
+    expect(f).toMatchObject({ count: 3, inStock: 2, min: 7490, max: 15990, minAge: 36 })
   })
 
   it('верхний возраст — только если он есть у ВСЕХ товаров', () => {
     // У пожарной машины верхней границы нет: «от 3 до 12 лет» было бы неправдой про неё.
     expect(brandLandingFacts(products).maxAge).toBeNull()
-    expect(brandLandingFacts(products.slice(1)).maxAge).toBe(12)
+    expect(brandLandingFacts(products.slice(1)).maxAge).toBe(144)
   })
 
   it('пустой список — без цен', () => {
@@ -95,6 +96,17 @@ describe('composeBrandLandingText', () => {
     expect(composeBrandLandingText({ phrase: 'X', brandName: 'X', products: one })).toContain('для детей от 1 до 12 лет.')
     const baby = [{ ...products[0], min_age_years: 1, max_age_years: null }]
     expect(composeBrandLandingText({ phrase: 'X', brandName: 'X', products: baby })).toContain('для детей от 1 года.')
+  })
+
+  it('малышам — месяцами: месяцы из базы главнее лет', () => {
+    // Пирамидка «от 6 месяцев» в годах лежала как «1» — текст обещал «от 1 года».
+    const pyramid = [{ ...products[0], min_age_years: 1, max_age_years: null, min_age_months: 6, max_age_months: null }]
+    expect(composeBrandLandingText({ phrase: 'X', brandName: 'X', products: pyramid })).toContain('для детей от 6 месяцев.')
+    const mixed = [
+      { ...products[0], min_age_years: 1, max_age_years: 3, min_age_months: 6, max_age_months: 36 },
+      { ...products[1], min_age_years: 2, max_age_years: 3, min_age_months: 18, max_age_months: 36 },
+    ]
+    expect(composeBrandLandingText({ phrase: 'X', brandName: 'X', products: mixed })).toContain('для детей от 6 месяцев до 3 лет.')
   })
 
   it('модели по цене, от дешёвых: текст не скачет от порядка выборки', () => {

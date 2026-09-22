@@ -423,7 +423,7 @@ const { data: brandLandingAll } = await useAsyncData(
 
     const { data, error } = await supabase
       .from('products')
-      .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, category_id, brand_id')
+      .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, min_age_months, max_age_months, category_id, brand_id')
       .eq('is_active', true)
       .eq('brand_id', brandId)
       .in('category_id', [...branch])
