@@ -20,7 +20,8 @@ const NAMED_ENTITIES: Record<string, string> = {
 }
 
 /**
- * Текст блока: теги срезаются, HTML-сущности раскрываются.
+ * HTML-сущности → символы. Нужно тексту блоков (ниже) и фиду Merchant Center
+ * (utils/merchantFeed.ts).
  *
  * Сущности раскрывать обязательно, и не ради красоты. На сервере
  * `sanitizeHtml` отдаёт HTML как есть, а в браузере его пропускает DOMPurify,
@@ -32,19 +33,21 @@ const NAMED_ENTITIES: Record<string, string> = {
  *
  * Один проход одной регуляркой: `&amp;lt;` даёт `&lt;`, а не `<`.
  */
+export function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body: string) => {
+    if (body[0] === '#') {
+      const code = body[1] === 'x' || body[1] === 'X'
+        ? Number.parseInt(body.slice(2), 16)
+        : Number.parseInt(body.slice(1), 10)
+      return Number.isFinite(code) && code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : entity
+    }
+    return NAMED_ENTITIES[body.toLowerCase()] ?? entity
+  })
+}
+
+/** Текст блока: теги срезаются, сущности раскрываются. */
 function blockText(inner: string): string {
-  return inner
-    .replace(/<[^>]*>/g, '')
-    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body: string) => {
-      if (body[0] === '#') {
-        const code = body[1] === 'x' || body[1] === 'X'
-          ? Number.parseInt(body.slice(2), 16)
-          : Number.parseInt(body.slice(1), 10)
-        return Number.isFinite(code) && code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : entity
-      }
-      return NAMED_ENTITIES[body.toLowerCase()] ?? entity
-    })
-    .trim()
+  return decodeHtmlEntities(inner.replace(/<[^>]*>/g, '')).trim()
 }
 
 /**

@@ -1,5 +1,12 @@
 import { serverSupabaseClient } from '#supabase/server'
+import { feedItemXml } from '~/utils/merchantFeed'
 
+/*
+ * Фид для Google Merchant Center: /api/google-merchant-feed.
+ *
+ * Что и почему отдаётся в каждом поле — в utils/merchantFeed.ts, там же
+ * тесты. Здесь только выборка и сборка документа.
+ */
 export default defineEventHandler(async (event) => {
   const supabase = await serverSupabaseClient(event)
 
@@ -12,67 +19,59 @@ export default defineEventHandler(async (event) => {
       description,
       price,
       final_price,
+      discount_percentage,
       stock_quantity,
+      barcode,
       brand:brands(name),
-      category:categories(name, slug),
+      category:categories(name, seo_h1),
       product_images(image_url, display_order)
     `)
     .eq('is_active', true)
     .gt('price', 0)
     .order('name', { ascending: true })
 
-  // Полезно для отладки — убери после фикса
   if (error) {
     console.error('Supabase query error:', error)
     throw createError({ statusCode: 500, message: error.message })
   }
 
-  console.log(`Fetched ${products?.length ?? 0} products`)
-
   const baseUrl = 'https://uhti.kz'
 
   const items = (products || [])
-    .map((product) => {
-      // Сортируем по display_order, берём первое изображение
+    .map((product: any) => {
+      // Первое фото по display_order; без фото товар в фид не идёт.
       const images = product.product_images ?? []
-      const sortedImages = [...images].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
-      const firstImage = sortedImages[0]
+      const firstImage = [...images].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]
+      if (!firstImage?.image_url)
+        return null
 
-      if (!firstImage?.image_url) return null // Нет фото — пропускаем
-
-      // Если URL уже полный (начинается с http) - используем как есть
-      // Иначе формируем Supabase Storage URL
       let imageUrl = firstImage.image_url.startsWith('http')
         ? firstImage.image_url
         : `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/product-images/${firstImage.image_url}`
-      
-      // Если URL не заканчивается на расширение файла - добавляем _md.webp
-      if (!imageUrl.match(/\.(webp|jpg|jpeg|png)$/i)) {
-        imageUrl += '_md.webp'
-      }
-      const productUrl = `${baseUrl}/catalog/products/${product.slug}`
 
-      // Если final_price null — значит скидки нет, используем price
-      const effectivePrice = product.final_price ?? product.price
-      const hasDiscount = product.final_price !== null && product.price > product.final_price
-      const inStock = (product.stock_quantity ?? 0) > 0
+      /*
+       * Вариант `_lg`, а не `_md`: md — 600–800 px, lg — до 1440 px (замер
+       * 22 сентября 2026 по 40 товарам). Merchant Center с 31 января 2027
+       * требует не меньше 500×500 и просит не отдавать уменьшенные копии.
+       */
+      if (!/\.(?:webp|jpg|jpeg|png)$/i.test(imageUrl))
+        imageUrl += '_lg.webp'
 
-      return `
-    <item>
-      <g:id>${product.id}</g:id>
-      <g:title><![CDATA[${product.name}]]></g:title>
-      <g:description><![CDATA[${product.description || product.name}]]></g:description>
-      <g:link>${productUrl}</g:link>
-      <g:image_link>${imageUrl}</g:image_link>
-      <g:availability>${inStock ? 'in_stock' : 'out_of_stock'}</g:availability>
-      <g:price>${hasDiscount ? product.price : effectivePrice} KZT</g:price>
-      ${hasDiscount ? `<g:sale_price>${product.final_price} KZT</g:sale_price>` : ''}
-      <g:brand><![CDATA[${product.brand?.name || 'Ухтышка'}]]></g:brand>
-      <g:condition>new</g:condition>
-      <g:google_product_category>1253</g:google_product_category>
-      <g:product_type><![CDATA[${product.category?.name || 'Игрушки'}]]></g:product_type>
-      <g:identifier_exists>false</g:identifier_exists>
-    </item>`
+      return feedItemXml({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        price: product.price,
+        final_price: product.final_price,
+        discount_percentage: product.discount_percentage,
+        stock_quantity: product.stock_quantity,
+        barcode: product.barcode,
+        brandName: product.brand?.name ?? null,
+        // Читаемое имя раздела: в `name` у части разделов дательный падеж.
+        categoryName: product.category?.seo_h1 || product.category?.name || null,
+        imageUrl,
+      }, baseUrl)
     })
     .filter(Boolean)
     .join('\n')
@@ -83,7 +82,7 @@ export default defineEventHandler(async (event) => {
     <title>Ухтышка - Интернет-магазин игрушек</title>
     <link>${baseUrl}</link>
     <description>Широкий ассортимент качественных игрушек</description>
-    ${items}
+${items}
   </channel>
 </rss>`
 
