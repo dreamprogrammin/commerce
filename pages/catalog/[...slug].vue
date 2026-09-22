@@ -48,7 +48,7 @@ import {
   prependBrandLandingFacts,
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { isCategoryIndexable } from '@/utils/categoryLanding'
+import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
@@ -552,6 +552,47 @@ const pieceCountRange = ref<{ min: number, max: number } | null>(null)
 const subcategories = computed(() =>
   categoriesStore.getSubcategories(currentCategorySlug.value),
 )
+
+/*
+ * Подразделы обычными ссылками (CategorySubnav) — только те, где есть товар.
+ *
+ * Чипы подразделов наверху — фильтр этой же страницы, ссылок на подразделы
+ * в разметке для поиска не было вовсе (разбор 22 сентября 2026 — в
+ * компоненте). Число товаров считается по ветке, как у карты сайта и
+ * robots (utils/categoryLanding.ts): одна лёгкая выборка — только
+ * category_id активных товаров.
+ *
+ * На связке «раздел + бренд» блок не нужен: там подразделы — другие страницы
+ * без бренда, и ссылка увела бы из связки.
+ */
+const { data: productsInBranch } = await useAsyncData(
+  'catalog-products-in-branch',
+  async () => {
+    if (!categoriesStore.allCategories.length)
+      await categoriesStore.fetchCategoryData()
+    const { data, error } = await supabase
+      .from('products')
+      .select('category_id')
+      .eq('is_active', true)
+    if (error)
+      throw error
+    // В payload уходит не список товаров, а готовые числа по разделам — ~3 КБ.
+    return Object.fromEntries(countProductsByCategory(data ?? [], categoriesStore.allCategories))
+  },
+)
+const subcategoryLinks = computed(() => {
+  if (activeBrandSlug.value || !productsInBranch.value)
+    return []
+  const counts = productsInBranch.value
+  return subcategories.value
+    .map(category => ({ category, count: counts[category.id] ?? 0 }))
+    .filter(({ category, count }) => count > 0 && isCategoryIndexable(category.slug, count))
+    .map(({ category, count }) => ({
+      name: category.seo_h1?.trim() || category.name,
+      path: category.href || `/catalog/${category.slug}`,
+      count,
+    }))
+})
 
 const activeFiltersCount = computed(() => {
   let count = 0
@@ -2743,6 +2784,13 @@ else {
       v-if="availableProductLines.length > 0"
       :product-lines="availableProductLines"
       :brands="availableBrands"
+    />
+
+    <!-- Подразделы обычными ссылками: чипы наверху — фильтр, а не ссылки. -->
+    <CategorySubnav
+      v-if="subcategoryLinks.length > 0"
+      :category-name="readableCategoryName"
+      :links="subcategoryLinks"
     />
 
     <!-- ─── Отложенные блоки ─────────────────────────────────────────────
