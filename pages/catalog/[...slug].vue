@@ -1171,6 +1171,19 @@ watch(currentPageProducts, (newProducts) => {
   }
 })
 
+/*
+ * Выбран ли вариант атрибута. Сравнение — строками: `updateAttribute` хранит
+ * выбранное строками, из адреса (`?attr_pitanie=46`) оно тоже приходит
+ * строкой, а `option.id` — число. До 23 сентября 2026 шаблон сравнивал
+ * `.includes(option.id)` напрямую — выбранный вариант никогда не выглядел
+ * отмеченным, и снять его галочкой было нельзя, только кнопкой очистки.
+ * Пока атрибутов было два, этого не видели; ссылки из характеристик
+ * карточки приводят на страницу уже с фильтром.
+ */
+function isAttributeSelected(attributeSlug: string, optionId: string | number): boolean {
+  return (activeFilters.value.attributes[attributeSlug] || []).map(String).includes(String(optionId))
+}
+
 function updateAttribute(
   checked: boolean,
   attributeSlug: string,
@@ -1897,6 +1910,58 @@ if (
   }
 }
 
+/*
+ * Фильтры из адреса — поверх снимка, пришедшего с сервера.
+ *
+ * Страницы каталога отдаются через ISR, и сервер строит их без query; при
+ * переходе внутри сайта Nuxt берёт `_payload.json` того же пути (включён
+ * `payloadExtraction`) — тоже без query. В снимке фильтров адреса нет, и
+ * присвоение снимка целиком затирало то, что setup уже прочитал из адреса.
+ * 23 сентября 2026 на бою `/catalog/kiddy?materials=3`: первый запрос
+ * товаров уходил с материалом, второй — уже без него; ссылки из
+ * характеристик карточки (`?attr_pitanie=…`) при переходе с карточки не
+ * срабатывали ни разу из пяти.
+ *
+ * Бренд связки «раздел + бренд» живёт в пути — его не трогаем, как и
+ * `loadFilterData`.
+ */
+function withFiltersFromQuery(base: ActiveFilters): ActiveFilters {
+  const q = route.query
+  const list = (key: string, fallback: string[]) =>
+    q[key] !== undefined ? getArrayFromQuery(q[key]) : fallback
+  const num = (key: string, fallback: number) =>
+    q[key] !== undefined && Number.isFinite(Number(q[key])) ? Number(q[key]) : fallback
+
+  const attributes: ActiveFilters['attributes'] = { ...base.attributes }
+  for (const filter of availableFilters.value) {
+    const fromQuery = getArrayFromQuery(q[`attr_${filter.slug}`])
+    if (fromQuery.length > 0)
+      attributes[filter.slug] = fromQuery
+  }
+
+  const numericAttributes: ActiveFilters['numericAttributes'] = { ...base.numericAttributes }
+  for (const [id, range] of Object.entries(numericAttributeRanges.value)) {
+    if (q[`numeric_${id}_min`] !== undefined || q[`numeric_${id}_max`] !== undefined)
+      numericAttributes[Number(id)] = [num(`numeric_${id}_min`, range.min), num(`numeric_${id}_max`, range.max)]
+  }
+
+  return {
+    ...base,
+    sortBy: q.sort_by !== undefined ? getSortByFromQuery(q.sort_by) : base.sortBy,
+    subCategoryIds: list('subcategories', base.subCategoryIds),
+    brandIds: activeBrandSlug.value ? base.brandIds : list('brands', base.brandIds),
+    productLineIds: list('lines', base.productLineIds),
+    materialIds: list('materials', base.materialIds),
+    countryIds: list('countries', base.countryIds),
+    price: [num('price_min', base.price[0]), num('price_max', base.price[1])],
+    pieceCount: base.pieceCount
+      ? [num('piece_count_min', base.pieceCount[0]), num('piece_count_max', base.pieceCount[1])]
+      : base.pieceCount,
+    attributes,
+    numericAttributes,
+  }
+}
+
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
   availableProductLines.value = _filterPayload.value.productLines
@@ -1906,7 +1971,7 @@ if (import.meta.client && _filterPayload.value) {
   priceRange.value = _filterPayload.value.priceRange
   pieceCountRange.value = _filterPayload.value.pieceCountRange
   numericAttributeRanges.value = _filterPayload.value.numericRanges
-  activeFilters.value = _filterPayload.value.activeFilters
+  activeFilters.value = withFiltersFromQuery(_filterPayload.value.activeFilters)
   categoryBrandSeo.value = _filterPayload.value.categoryBrandSeo
   isLoadingFilters.value = false
 }
@@ -2473,9 +2538,7 @@ else {
                           <Checkbox
                             :id="`attr-${filter.slug}-${option.id}`"
                             :model-value="
-                              (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id)
+                              isAttributeSelected(filter.slug, option.id)
                             "
                             @update:model-value="
                               (checked) =>
@@ -2561,18 +2624,12 @@ else {
                           class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95"
                           :class="{
                             'border-primary ring-2 ring-primary ring-offset-2':
-                              (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id),
-                            'border-border': !(
-                              activeFilters.attributes[filter.slug] || []
-                            ).includes(option.id),
+                              isAttributeSelected(filter.slug, option.id),
+                            'border-border': !isAttributeSelected(filter.slug, option.id),
                           }"
                           @click="
                             () => {
-                              const isCurrentlyChecked = (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id);
+                              const isCurrentlyChecked = isAttributeSelected(filter.slug, option.id);
                               updateAttribute(
                                 !isCurrentlyChecked,
                                 filter.slug,

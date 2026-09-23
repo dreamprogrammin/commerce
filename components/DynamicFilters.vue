@@ -131,6 +131,13 @@ function updateSubCategory(checked: boolean, catId: string) {
   emit('update:modelValue', { ...props.modelValue, subCategoryIds: Array.from(newIds) })
 }
 
+// Выбранное хранится строками (`updateAttribute`, адрес), `option.id` — число:
+// сравниваем строками, иначе вариант не выглядит отмеченным и не снимается —
+// та же ошибка, что была в pages/catalog/[...slug].vue до 23 сентября 2026.
+function isAttributeSelected(attributeSlug: string, optionId: string | number): boolean {
+  return (props.modelValue.attributes[attributeSlug] || []).map(String).includes(String(optionId))
+}
+
 function updateAttribute(checked: boolean, attributeSlug: string, optionId: string | number) {
   const stringId = String(optionId)
   const currentSelection: string[] = (props.modelValue.attributes[attributeSlug] || []).map(String)
@@ -387,11 +394,11 @@ onUnmounted(() => {
           :key="option.id"
           type="button"
           class="df-row df-row--boxed"
-          :class="{ 'df-row--active': modelValue.attributes[filter.slug]?.includes(option.id) }"
-          @click="updateAttribute(!modelValue.attributes[filter.slug]?.includes(option.id), filter.slug, option.id)"
+          :class="{ 'df-row--active': isAttributeSelected(filter.slug, option.id) }"
+          @click="updateAttribute(!isAttributeSelected(filter.slug, option.id), filter.slug, option.id)"
         >
-          <span class="df-box" :class="{ 'df-box--active': modelValue.attributes[filter.slug]?.includes(option.id) }">
-            <Icon v-if="modelValue.attributes[filter.slug]?.includes(option.id)" name="lucide:check" class="df-box-icon" />
+          <span class="df-box" :class="{ 'df-box--active': isAttributeSelected(filter.slug, option.id) }">
+            <Icon v-if="isAttributeSelected(filter.slug, option.id)" name="lucide:check" class="df-box-icon" />
           </span>
           <span class="df-row-label">{{ option.value }}</span>
         </button>
@@ -406,9 +413,9 @@ onUnmounted(() => {
             type="button"
             :title="option.value"
             class="df-color-item"
-            :class="{ 'df-color-item--active': modelValue.attributes[filter.slug]?.includes(option.id) }"
+            :class="{ 'df-color-item--active': isAttributeSelected(filter.slug, option.id) }"
             @click="() => {
-              const isCurrentlyChecked = modelValue.attributes[filter.slug]?.includes(option.id);
+              const isCurrentlyChecked = isAttributeSelected(filter.slug, option.id);
               updateAttribute(!isCurrentlyChecked, filter.slug, option.id);
             }"
           >
