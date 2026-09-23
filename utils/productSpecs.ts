@@ -42,6 +42,10 @@ export const SPEC_ATTRIBUTES = {
   'vid-tehniki': 'Вид техники',
   'color': 'Цвет',
   'kolichestvo-detaley': 'Количество деталей',
+  'tip-katalki': 'Тип каталки',
+  'tip-nabora': 'Тип набора',
+  'tip-igrushki': 'Тип игрушки',
+  'tip-kukly': 'Тип куклы',
 } as const
 
 function plain(html: string | null | undefined): string {
@@ -133,6 +137,49 @@ function vehicle(name: string): Found {
   return null
 }
 
+// ── Тип — у каждого семейства разделов свой ────────────────────────────────
+/*
+ * Отдельный атрибут на семейство, а не один «Тип игрушки» на весь каталог:
+ * в форме админки выпадающий список показывает все варианты атрибута, и
+ * «Пирамидка» рядом с «Танком» только мешала бы. Варианты — только те, под
+ * которые на 23 сентября 2026 есть хотя бы два товара: ссылка из
+ * характеристики «Тип» на подборку из одного этого же товара бессмысленна.
+ * Тип — по названию: у этих товаров он там всегда.
+ */
+const TYPES: Record<string, [RegExp, string][]> = {
+  'tip-katalki': [
+    [/толокар/iu, 'Толокар'],
+    [/твистер|бибикар/iu, 'Каталка-твистер'],
+  ],
+  'tip-nabora': [
+    // Магазин — раньше кухни: «Игровой магазин мороженого», «Супермаркет — касса»
+    [/доктор|врач|медицинск/iu, 'Доктор'],
+    [/трюмо|салон красоты|парикмахер/iu, 'Трюмо'],
+    [/магазин|супермаркет|(?<!\p{L})касс/iu, 'Магазин'],
+    [/кухн|посуд|(?<!\p{L})плит[аыу](?!\p{L})|фастфуд/iu, 'Кухня'],
+  ],
+  'tip-igrushki': [
+    [/говорящ\p{L}*\s+(?:развивающ\p{L}*\s+)?книг|обучающ\p{L}*\s+говорящ\p{L}*\s+книг/iu, 'Говорящая книга'],
+    [/ноутбук/iu, 'Детский ноутбук'],
+    [/планшет/iu, 'Обучающий планшет'],
+    [/(?<!\p{L})столик/iu, 'Развивающий столик'],
+    [/бизиборд|бизикуб/iu, 'Бизиборд'],
+  ],
+  'tip-kukly': [
+    [/русалк|mermaid/iu, 'Кукла-русалка'],
+    [/шарнирн/iu, 'Шарнирная кукла'],
+  ],
+}
+
+function typeOf(slug: string, name: string): Found {
+  for (const [re, value] of TYPES[slug] ?? []) {
+    const found = first(name, re, value)
+    if (found)
+      return found
+  }
+  return null
+}
+
 // ── Цвет — только по названию: у цветовых вариантов он там всегда ──────────
 const COLORS: [string, string][] = [
   ['ж[её]лт', 'Жёлтый'],
@@ -185,6 +232,8 @@ export function explainSpecs(name: string, descriptionHtml?: string | null): Spe
   put('vid-tehniki', vehicle(name))
   put('color', color(name))
   put('kolichestvo-detaley', pieces(text))
+  for (const slug of Object.keys(TYPES) as (keyof typeof SPEC_ATTRIBUTES)[])
+    put(slug, typeOf(slug, name))
   return out
 }
 
