@@ -12,6 +12,7 @@ import type {
   ProductLine,
   SortByType,
 } from '@/types'
+import type { CategoryFacts } from '@/utils/categoryFacts'
 import { useQuery } from '@tanstack/vue-query'
 import { watchDebounced } from '@vueuse/core'
 import {
@@ -48,6 +49,7 @@ import {
   prependBrandLandingFacts,
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
+import { categoryFactsFromRows, topBrandNames } from '@/utils/categoryFacts'
 import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
@@ -1414,13 +1416,15 @@ const minPrice = computed(() => {
 })
 
 /**
- * Сколько активных товаров в категории вместе со всеми подкатегориями.
+ * Факты категории вместе со всеми подкатегориями: сколько активных товаров,
+ * самая низкая цена и сколько товаров у каждого бренда.
  *
- * Нужно ровно для одного — честного числа в мета-описании. Прежний шаблон
- * писал «В каталоге N моделей», подставляя длину ПЕРВОЙ СТРАНИЦЫ выдачи, а
- * это максимум 12 (`PAGE_SIZE`). У категории с полусотней товаров в выдаче
- * стояло «12 моделей»: число занижено втрое и вдобавок одинаково у половины
- * категорий.
+ * Нужны для мета-описания. Прежний шаблон писал «В каталоге N моделей»,
+ * подставляя длину ПЕРВОЙ СТРАНИЦЫ выдачи, а это максимум 12 (`PAGE_SIZE`).
+ * У категории с полусотней товаров в выдаче стояло «12 моделей»: число
+ * занижено втрое и вдобавок одинаково у половины категорий. С 23 сентября
+ * 2026 тот же запрос даёт и цену «от», и бренды по числу товаров — почему,
+ * см. `utils/categoryFacts.ts`.
  *
  * Дерево берём из хранилища — оно уже загружено выше (`catalog-meta-…`) и
  * приходит в серверную разметку, отдельного запроса за категориями не нужно.
@@ -1430,9 +1434,9 @@ const minPrice = computed(() => {
  * `null` означает «сосчитать не удалось»; описание тогда просто обходится без
  * количества, а не показывает ноль.
  */
-const { data: categoryProductsCount } = await useAsyncData(
-  () => `catalog-count-${currentCategorySlug.value}`,
-  async (): Promise<number | null> => {
+const { data: categoryFacts } = await useAsyncData(
+  () => `catalog-facts-${currentCategorySlug.value}`,
+  async (): Promise<CategoryFacts | null> => {
     if (currentCategorySlug.value === 'all')
       return null
 
@@ -1462,16 +1466,18 @@ const { data: categoryProductsCount } = await useAsyncData(
       }
     }
 
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('products')
-      .select('id', { count: 'exact', head: true })
+      .select('brand_id, price, final_price')
       .in('category_id', ids)
       .eq('is_active', true)
 
-    return error ? null : count
+    return error || !data ? null : categoryFactsFromRows(data)
   },
   { watch: [currentCategorySlug] },
 )
+
+const categoryProductsCount = computed(() => categoryFacts.value?.count ?? null)
 
 const categoryStats = computed(() => {
   let totalReviews = 0
@@ -1493,15 +1499,13 @@ const categoryStats = computed(() => {
   }
 })
 
+// По числу товаров в разделе. До 23 сентября 2026 сортировка шла по
+// `products_count`, которого RPC брендов не отдаёт, — и в описание попадали
+// первые три по алфавиту (см. utils/categoryFacts.ts).
 const topBrands = computed(() => {
-  if (!availableBrands.value || availableBrands.value.length === 0)
+  if (!availableBrands.value?.length || !categoryFacts.value)
     return []
-
-  return availableBrands.value
-    .slice()
-    .sort((a, b) => (b.products_count || 0) - (a.products_count || 0))
-    .slice(0, 3)
-    .map(b => b.name)
+  return topBrandNames(availableBrands.value, categoryFacts.value.brandCounts)
 })
 
 const metaDescription = computed(() => {
@@ -1566,7 +1570,8 @@ const metaDescription = computed(() => {
     // первым, а факты дописываются следом.
     lead: currentCategory.value?.meta_description,
     productsCount: categoryProductsCount.value,
-    minPrice: minPrice.value,
+    // Минимум по всей ветке; первая страница выдачи — только запасной вариант.
+    minPrice: categoryFacts.value?.minPrice ?? minPrice.value,
     topBrands: topBrands.value,
     city: 'Алматы',
     rating: ratingValue,
