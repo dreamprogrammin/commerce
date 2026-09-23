@@ -33,3 +33,11 @@ describe('parseHTMLToBlocks — сущности', () => {
     expect(parseHTMLToBlocks('<p>Смотрите <a href="/x">раздел</a> и <b>бренд</b></p>')[0].text).toBe('Смотрите раздел и бренд')
   })
 })
+
+describe('parseHTMLToBlocks — перенос строки внутри тега', () => {
+  it('абзац и пункт с переносом не выпадают', () => {
+    const blocks = parseHTMLToBlocks('<h2>Как\nвыбрать</h2><p>Первая строка\nвторая строка</p><ul><li>пункт\nс переносом</li></ul>')
+    expect(blocks.map(b => b.type)).toEqual(['h2', 'p', 'ul'])
+    expect(blocks[1]!.text).toBe('Первая строка\nвторая строка')
+  })
+})

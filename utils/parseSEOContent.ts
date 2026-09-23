@@ -65,10 +65,13 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
   const normalized = html.replace(/>\s+</g, '><')
 
   // Парсим каждый тип тега отдельно
-  const h2Regex = /<h2([^>]*)>(.*?)<\/h2>/gi
-  const h3Regex = /<h3([^>]*)>(.*?)<\/h3>/gi
-  const pRegex = /<p([^>]*)>(.*?)<\/p>/gi
-  const ulRegex = /<ul([^>]*)>(.*?)<\/ul>/gi
+  // `[\s\S]`, а не `.`: точка не берёт перенос строки, и абзац с переносом
+  // внутри выпадал из страницы целиком (найдено 23 сентября 2026; на бою
+  // таких текстов пока нет, но текст, набранный с переносами, пропал бы молча)
+  const h2Regex = /<h2([^>]*)>([\s\S]*?)<\/h2>/gi
+  const h3Regex = /<h3([^>]*)>([\s\S]*?)<\/h3>/gi
+  const pRegex = /<p([^>]*)>([\s\S]*?)<\/p>/gi
+  const ulRegex = /<ul([^>]*)>([\s\S]*?)<\/ul>/gi
 
   // Собираем все теги с их позициями для правильного порядка
   const allMatches: Array<{ index: number, block: SEOBlock }> = []
@@ -100,7 +103,7 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
   // UL
   while ((match = ulRegex.exec(normalized)) !== null) {
     const items: SEOBlock['items'] = []
-    const liRegex = /<li([^>]*)>(.*?)<\/li>/gi
+    const liRegex = /<li([^>]*)>([\s\S]*?)<\/li>/gi
     let liMatch: RegExpExecArray | null
 
     while ((liMatch = liRegex.exec(match[2])) !== null) {
