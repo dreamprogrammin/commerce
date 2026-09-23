@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { feedDescription, feedItemXml, feedTitle } from '@/utils/merchantFeed'
+import { feedAgeGroup, feedDescription, feedGender, feedItemGroups, feedItemXml, feedTitle } from '@/utils/merchantFeed'
 import { cleanProductName } from '@/utils/productName'
 
 /*
@@ -82,5 +82,107 @@ describe('feedItemXml', () => {
   it('текст не может закрыть CDATA раньше времени', () => {
     const xml = feedItemXml({ ...base, name: 'Набор ]]> <script>' }, 'https://uhti.kz')
     expect(xml).toContain('<g:title><![CDATA[Набор ]]]]><![CDATA[> <script>]]></g:title>')
+  })
+})
+
+/*
+ * Характеристики в фиде (23 сентября 2026): до этого у каждого товара было
+ * одно фото из ~6, ни возраста, ни пола, ни цвета, ни параметров.
+ */
+describe('характеристики в фиде', () => {
+  const full = {
+    ...base,
+    additionalImageUrls: ['https://img/x_lg.webp', 'https://img/2_lg.webp', 'https://img/2_lg.webp', 'https://img/3_lg.webp'],
+    minAgeMonths: 36,
+    gender: 'female',
+    color: 'Розовый',
+    details: [{ name: 'Тип куклы', value: 'Шарнирная кукла' }, { name: 'Возраст', value: 'от 3 лет' }],
+    itemGroupId: 'grp-1',
+  }
+  const xml = feedItemXml(full, 'https://uhti.kz')
+
+  it('дополнительные фото — без главного и без повторов', () => {
+    expect(xml.match(/<g:additional_image_link>/g)).toHaveLength(2)
+    expect(xml).not.toContain('<g:additional_image_link>https://img/x_lg.webp</g:additional_image_link>')
+  })
+
+  it('не больше 10 дополнительных фото', () => {
+    const many = Array.from({ length: 15 }, (_, i) => `https://img/${i}_lg.webp`)
+    expect(feedItemXml({ ...base, additionalImageUrls: many }, 'https://uhti.kz').match(/<g:additional_image_link>/g)).toHaveLength(10)
+  })
+
+  it('возраст, пол, цвет, группа вариантов, параметры', () => {
+    expect(xml).toContain('<g:age_group>toddler</g:age_group>')
+    expect(xml).toContain('<g:gender>female</g:gender>')
+    expect(xml).toContain('<g:color><![CDATA[Розовый]]></g:color>')
+    expect(xml).toContain('<g:item_group_id>grp-1</g:item_group_id>')
+    expect(xml).toContain('<g:product_detail><g:section_name>Характеристики</g:section_name><g:attribute_name><![CDATA[Тип куклы]]></g:attribute_name><g:attribute_value><![CDATA[Шарнирная кукла]]></g:attribute_value></g:product_detail>')
+  })
+
+  it('нет данных — нет полей', () => {
+    const bare = feedItemXml(base, 'https://uhti.kz')
+    expect(bare).not.toMatch(/age_group|<g:gender>|<g:color>|item_group_id|product_detail|additional_image_link/)
+  })
+})
+
+describe('feedAgeGroup — границы по спецификации Google', () => {
+  it.each([
+    [0, 'newborn'],
+    [2, 'newborn'],
+    [3, 'infant'],
+    [6, 'infant'],
+    [11, 'infant'],
+    [12, 'toddler'],
+    [18, 'toddler'],
+    [36, 'toddler'],
+    [59, 'toddler'],
+    [60, 'kids'],
+    [72, 'kids'],
+    [144, 'kids'],
+    [155, 'kids'],
+    [156, 'adult'],
+    [216, 'adult'],
+  ])('%s мес → %s', (months, group) => {
+    expect(feedAgeGroup(months)).toBe(group)
+  })
+
+  it('без возраста — без группы', () => {
+    expect(feedAgeGroup(null)).toBeNull()
+    expect(feedAgeGroup(undefined)).toBeNull()
+  })
+})
+
+describe('feedGender', () => {
+  it('только значения из спецификации', () => {
+    expect(feedGender('female')).toBe('female')
+    expect(feedGender('unisex')).toBe('unisex')
+    expect(feedGender(null)).toBeNull()
+    expect(feedGender('девочки')).toBeNull()
+  })
+})
+
+describe('feedItemGroups — связка вариантов только там, где у всех свой цвет', () => {
+  it('все с цветом и цвета разные — связка есть', () => {
+    const g = feedItemGroups([
+      { id: 'a', groupId: 'tolokar', color: 'Голубой' },
+      { id: 'b', groupId: 'tolokar', color: 'Жёлтый' },
+      { id: 'c', groupId: null, color: 'Розовый' },
+    ])
+    expect(g.get('a')).toBe('tolokar')
+    expect(g.get('b')).toBe('tolokar')
+    expect(g.has('c')).toBe(false)
+  })
+
+  it('у одного варианта цвета нет — вся группа без связки (танк «песочный камуфляж»)', () => {
+    const g = feedItemGroups([
+      { id: 'a', groupId: 'tank', color: 'Зелёный' },
+      { id: 'b', groupId: 'tank', color: null },
+    ])
+    expect(g.size).toBe(0)
+  })
+
+  it('одинаковые цвета или один товар в группе — без связки', () => {
+    expect(feedItemGroups([{ id: 'a', groupId: 'g', color: 'Чёрный' }, { id: 'b', groupId: 'g', color: 'Чёрный' }]).size).toBe(0)
+    expect(feedItemGroups([{ id: 'a', groupId: 'g', color: 'Чёрный' }]).size).toBe(0)
   })
 })
