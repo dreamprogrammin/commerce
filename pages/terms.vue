@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SHOP, SHOP_ADDRESS_FULL } from '@/constants/shop'
 import { pageShell } from '@/lib/shell'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
@@ -244,9 +245,11 @@ useHead({
           обратиться:
         </p>
         <ul class="list-disc space-y-1 pl-6">
-          <li>Телефон: +7 (702) 537-94-73</li>
+          <!-- Телефон и адрес — из `constants/shop.ts`: здесь адрес стоял без
+               дома 100, и нашёлся он только полным поиском по коду. -->
+          <li>Телефон: {{ SHOP.phoneHuman }}</li>
           <li>Email: info@uhti.kz</li>
-          <li>Адрес: г. Алматы, мкр. Шапагат, ул. Амангельды</li>
+          <li>Адрес: {{ SHOP_ADDRESS_FULL }}</li>
         </ul>
       </section>
 
