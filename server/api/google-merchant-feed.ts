@@ -1,5 +1,7 @@
 import { serverSupabaseClient } from '#supabase/server'
-import { feedItemXml } from '~/utils/merchantFeed'
+import { feedItemGroups, feedItemXml } from '~/utils/merchantFeed'
+import { formatAgeRange, productAgeMonths } from '~/utils/productAge'
+import { attributeSpecRows } from '~/utils/productSpecRows'
 
 /*
  * Фид для Google Merchant Center: /api/google-merchant-feed.
@@ -22,9 +24,18 @@ export default defineEventHandler(async (event) => {
       discount_percentage,
       stock_quantity,
       barcode,
+      gender,
+      min_age_months,
+      max_age_months,
+      min_age_years,
+      max_age_years,
+      model_group_id,
       brand:brands(name),
       category:categories(name, seo_h1),
-      product_images(image_url, display_order)
+      material:materials(name),
+      country:countries(name),
+      product_images(image_url, display_order),
+      product_attribute_values(option_id, numeric_value, attributes(name, slug, display_type, unit, attribute_options(id, value)))
     `)
     .eq('is_active', true)
     .gt('price', 0)
@@ -37,25 +48,50 @@ export default defineEventHandler(async (event) => {
 
   const baseUrl = 'https://uhti.kz'
 
+  /*
+   * Вариант `_lg`, а не `_md`: md — 600–800 px, lg — до 1440 px (замер
+   * 22 сентября 2026 по 40 товарам). Merchant Center с 31 января 2027
+   * требует не меньше 500×500 и просит не отдавать уменьшенные копии.
+   */
+  const imageUrlOf = (path: string) => {
+    const url = path.startsWith('http')
+      ? path
+      : `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/product-images/${path}`
+    return /\.(?:webp|jpg|jpeg|png)$/i.test(url) ? url : `${url}_lg.webp`
+  }
+
+  // Характеристики — те же строки, что видны на карточке (utils/productSpecRows.ts)
+  const specsOf = (product: any) => attributeSpecRows({
+    values: product.product_attribute_values,
+    categoryId: null,
+    categoryHref: null,
+  })
+
+  const groups = feedItemGroups((products || []).map((product: any) => ({
+    id: product.id,
+    groupId: product.model_group_id ?? null,
+    color: specsOf(product).find(r => r.key === 'attr-color')?.value ?? null,
+  })))
+
   const items = (products || [])
     .map((product: any) => {
-      // Первое фото по display_order; без фото товар в фид не идёт.
-      const images = product.product_images ?? []
-      const firstImage = [...images].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]
-      if (!firstImage?.image_url)
+      // Фото по display_order; без фото товар в фид не идёт.
+      const images = [...(product.product_images ?? [])]
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+        .filter(i => i.image_url)
+      if (!images.length)
         return null
+      const imageUrl = imageUrlOf(images[0].image_url)
 
-      let imageUrl = firstImage.image_url.startsWith('http')
-        ? firstImage.image_url
-        : `https://gvsdevsvzgcivpphcuai.supabase.co/storage/v1/object/public/product-images/${firstImage.image_url}`
-
-      /*
-       * Вариант `_lg`, а не `_md`: md — 600–800 px, lg — до 1440 px (замер
-       * 22 сентября 2026 по 40 товарам). Merchant Center с 31 января 2027
-       * требует не меньше 500×500 и просит не отдавать уменьшенные копии.
-       */
-      if (!/\.(?:webp|jpg|jpeg|png)$/i.test(imageUrl))
-        imageUrl += '_lg.webp'
+      const specs = specsOf(product)
+      const age = productAgeMonths(product)
+      const ageText = formatAgeRange(age.min, age.max)
+      const details = [
+        ...specs.map(r => ({ name: r.label, value: r.value })),
+        ...(ageText ? [{ name: 'Возраст', value: ageText }] : []),
+        ...(product.material?.name ? [{ name: 'Материал', value: product.material.name }] : []),
+        ...(product.country?.name ? [{ name: 'Страна производства', value: product.country.name }] : []),
+      ]
 
       return feedItemXml({
         id: product.id,
@@ -71,6 +107,12 @@ export default defineEventHandler(async (event) => {
         // Читаемое имя раздела: в `name` у части разделов дательный падеж.
         categoryName: product.category?.seo_h1 || product.category?.name || null,
         imageUrl,
+        additionalImageUrls: images.slice(1).map(i => imageUrlOf(i.image_url)),
+        minAgeMonths: age.min,
+        gender: product.gender ?? null,
+        color: specs.find(r => r.key === 'attr-color')?.value ?? null,
+        details,
+        itemGroupId: groups.get(product.id) ?? null,
       }, baseUrl)
     })
     .filter(Boolean)

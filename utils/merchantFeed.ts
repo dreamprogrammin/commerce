@@ -39,6 +39,77 @@ export interface FeedProduct {
   brandName: string | null
   categoryName: string | null
   imageUrl: string
+  /** Остальные фото по порядку; Merchant Center берёт до 10. */
+  additionalImageUrls?: readonly string[]
+  /** Возраст «от» в месяцах — для age_group. */
+  minAgeMonths?: number | null
+  /** 'female' | 'male' | 'unisex' — как в базе. */
+  gender?: string | null
+  color?: string | null
+  /** Характеристики для product_detail — те же строки, что на карточке. */
+  details?: readonly { name: string, value: string }[]
+  /** Группа цветовых вариантов — только если у каждого варианта есть свой цвет. */
+  itemGroupId?: string | null
+}
+
+export const FEED_ADDITIONAL_IMAGES_LIMIT = 10
+
+/*
+ * age_group — по спецификации Google: newborn до 3 месяцев, infant 3–12,
+ * toddler 1–5 лет, kids 5–13, adult старше. Берётся нижняя граница
+ * возраста: «от 3 лет» — это toddler, «от 6 лет» — kids. Для игрушек поле
+ * необязательное, но по нему Google подбирает товар к запросам вида
+ * «кукла для девочки 3 лет». Возраст в месяцах — с 22 сентября 2026.
+ */
+export function feedAgeGroup(minAgeMonths: number | null | undefined): string | null {
+  if (minAgeMonths === null || minAgeMonths === undefined || !Number.isFinite(minAgeMonths))
+    return null
+  if (minAgeMonths < 3)
+    return 'newborn'
+  if (minAgeMonths < 12)
+    return 'infant'
+  if (minAgeMonths < 60)
+    return 'toddler'
+  if (minAgeMonths < 156)
+    return 'kids'
+  return 'adult'
+}
+
+/*
+ * item_group_id — связка цветовых вариантов (model_group_id). Google требует
+ * у каждого товара группы значение, которым варианты различаются (для нас —
+ * цвет); без него товар группы отклоняется. На 23 сентября 2026 у танка
+ * «песочный камуфляж» цвета нет (песочного нет среди вариантов), и его
+ * группа уходит без связки. Связка — только если у всех вариантов группы в
+ * фиде цвет есть и цвета разные.
+ */
+export function feedItemGroups(
+  products: readonly { id: string, groupId: string | null, color: string | null }[],
+): Map<string, string> {
+  const groups = new Map<string, { id: string, color: string | null }[]>()
+  for (const p of products) {
+    if (!p.groupId)
+      continue
+    const list = groups.get(p.groupId) ?? []
+    list.push({ id: p.id, color: p.color?.trim() || null })
+    groups.set(p.groupId, list)
+  }
+  const out = new Map<string, string>()
+  for (const [groupId, list] of groups) {
+    const colors = list.map(x => x.color)
+    const ok = list.length > 1
+      && colors.every(Boolean)
+      && new Set(colors).size === colors.length
+    if (ok) {
+      for (const x of list)
+        out.set(x.id, groupId)
+    }
+  }
+  return out
+}
+
+export function feedGender(gender: string | null | undefined): string | null {
+  return gender === 'female' || gender === 'male' || gender === 'unisex' ? gender : null
 }
 
 /** Обрезка по границе слова, без висящего хвоста. */
@@ -100,6 +171,17 @@ export function feedItemXml(p: FeedProduct, baseUrl: string): string {
     `<g:google_product_category>1253</g:google_product_category>`,
     `<g:product_type>${cdata(p.categoryName?.trim() || 'Игрушки')}</g:product_type>`,
     gtin ? `<g:gtin>${gtin}</g:gtin>` : `<g:identifier_exists>no</g:identifier_exists>`,
+    ...[...new Set(p.additionalImageUrls ?? [])]
+      .filter(url => url && url !== p.imageUrl)
+      .slice(0, FEED_ADDITIONAL_IMAGES_LIMIT)
+      .map(url => `<g:additional_image_link>${url}</g:additional_image_link>`),
+    feedAgeGroup(p.minAgeMonths) ? `<g:age_group>${feedAgeGroup(p.minAgeMonths)}</g:age_group>` : '',
+    feedGender(p.gender) ? `<g:gender>${feedGender(p.gender)}</g:gender>` : '',
+    p.color?.trim() ? `<g:color>${cdata(p.color.trim())}</g:color>` : '',
+    p.itemGroupId ? `<g:item_group_id>${p.itemGroupId}</g:item_group_id>` : '',
+    ...(p.details ?? [])
+      .filter(d => d.name.trim() && d.value.trim())
+      .map(d => `<g:product_detail><g:section_name>Характеристики</g:section_name><g:attribute_name>${cdata(d.name.trim())}</g:attribute_name><g:attribute_value>${cdata(d.value.trim())}</g:attribute_value></g:product_detail>`),
   ].filter(Boolean)
   return `    <item>\n${lines.map(l => `      ${l}`).join('\n')}\n    </item>`
 }

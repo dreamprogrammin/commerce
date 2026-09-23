@@ -1113,6 +1113,31 @@ useSchemaOrg([
 
     // 🔥 Дополнительные свойства товара (атрибуты) для Google Merchant
     additionalProperty: schemaAdditionalProperties,
+
+    /*
+     * Цвет, материал и «для кого» — поля разметки товара, по которым Google
+     * сопоставляет его с запросами вида «кукла для девочки 3 лет». Значения
+     * те же, что видны на странице: строки характеристик и «Игрушка для
+     * девочек от 3 лет» под названием (23 сентября 2026). Возраст — в годах,
+     * как принято в schema.org: «от 6 месяцев» → 0.5.
+     */
+    color: computed(() => specRows.value.find(r => r.key === 'attr-color')?.value),
+    material: computed(() => product.value?.materials?.name || undefined),
+    audience: computed(() => {
+      if (!product.value)
+        return undefined
+      const { min, max } = productAgeMonths(product.value)
+      const gender = product.value.gender
+      const suggestedGender = gender === 'female' || gender === 'male' || gender === 'unisex' ? gender : undefined
+      if (min === null && max === null && !suggestedGender)
+        return undefined
+      return {
+        '@type': 'PeopleAudience' as const,
+        ...(min !== null && { suggestedMinAge: Math.round((min / 12) * 10) / 10 }),
+        ...(max !== null && { suggestedMaxAge: Math.round((max / 12) * 10) / 10 }),
+        ...(suggestedGender && { suggestedGender }),
+      }
+    }),
   }),
 ])
 

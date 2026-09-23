@@ -87,5 +87,33 @@ check(!fakeSale, `sale_price только при настоящей скидке
 check(!wrongOrder, `price выше sale_price${wrongOrder ? ` — нарушено у ${wrongOrder}` : ''}`)
 console.log(`        (со скидкой в фиде: ${count(i => field(i, 'sale_price'))}; скидка в базе без sale_price в фиде: ${missingSale} — там «старая» цена не выше текущей)`)
 
+/*
+ * Характеристики в фиде (23 сентября 2026). До этого у каждого товара было
+ * одно фото из ~6 и ни возраста, ни пола, ни цвета, ни параметров, хотя всё
+ * это есть в базе и видно на карточке.
+ */
+console.log('\nхарактеристики')
+const withImages = count(i => /<g:additional_image_link>/.test(i))
+check(withImages >= items.length * 0.8, `дополнительные фото у ${withImages} из ${items.length}`)
+const tooMany = count(i => (i.match(/<g:additional_image_link>/g) ?? []).length > 10)
+check(!tooMany, `не больше 10 дополнительных фото${tooMany ? ` — больше у ${tooMany}` : ''}`)
+const ageOk = new Set(['newborn', 'infant', 'toddler', 'kids', 'adult'])
+const withAge = count(i => ageOk.has(field(i, 'age_group') ?? ''))
+const badAge = count(i => field(i, 'age_group') !== null && !ageOk.has(field(i, 'age_group')))
+check(withAge >= items.length * 0.9 && !badAge, `age_group у ${withAge} из ${items.length}${badAge ? `, недопустимых ${badAge}` : ''}`)
+const badGender = count(i => field(i, 'gender') !== null && !['male', 'female', 'unisex'].includes(field(i, 'gender')))
+check(count(i => field(i, 'gender')) > 0 && !badGender, `gender — male/female/unisex${badGender ? ` — нарушено у ${badGender}` : ''}`)
+const details = count(i => /<g:product_detail>/.test(i))
+check(details > 0, `product_detail — у ${details} товаров`)
+// item_group_id: у каждого товара группы — цвет, цвета внутри группы разные
+const groups = new Map()
+for (const i of items) {
+  const g = field(i, 'item_group_id')
+  if (g)
+    groups.set(g, [...(groups.get(g) ?? []), field(i, 'color')])
+}
+const badGroups = [...groups.values()].filter(colors => colors.some(c => !c) || new Set(colors).size !== colors.length).length
+check(!badGroups, `связки вариантов: ${groups.size}, у всех вариантов свой цвет${badGroups ? ` — нарушено в ${badGroups}` : ''}`)
+
 console.log(fails.length ? `\nКРАСНЫЙ: ${fails.length} провал(ов)` : '\nвсё зелено')
 process.exit(fails.length ? 1 : 0)
