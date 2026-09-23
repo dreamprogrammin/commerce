@@ -36,6 +36,7 @@ import {
   optimizeImageBeforeUpload,
 } from '@/utils/imageOptimizer'
 import { ageToMonths, formatAgeRange, monthsToInput, productAgeMonths } from '@/utils/productAge'
+import { explainSpecs, matchSpecsToOptions } from '@/utils/productSpecs'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
 import ProductLineForm from '../product-lines/ProductLineForm.vue'
@@ -98,6 +99,8 @@ const isBrandDialogOpen = ref(false)
 const categoryAttributes = ref<AttributeWithValue[]>([])
 const productAttributeValues = ref<Record<number, number | null>>({})
 const numericAttributeValues = ref<Record<number, number | null>>({})
+// Какие характеристики подставлены из описания и по какой фразе — см. fillSpecsFromText
+const autoFilledSpecs = ref<Record<number, { value: number, evidence: string }>>({})
 const isProcessingImages = ref(false)
 
 // 🎨 Duplicate dialog
@@ -430,7 +433,80 @@ async function handleCategoryChange(categoryId: string | null) {
   }
   productAttributeValues.value = newSelectValues
   numericAttributeValues.value = newNumericValues
+  autoFilledSpecs.value = {}
+  // Новый товар — характеристики сразу из названия и описания; у
+  // существующего ничего не меняется без кнопки «Заполнить из описания».
+  if (!props.initialData?.id)
+    fillSpecsFromText()
 }
+
+/*
+ * Характеристики из названия и описания (utils/productSpecs.ts).
+ *
+ * Зачем (23 сентября 2026): владелец попросил, чтобы при добавлении товара
+ * характеристики заполнялись сами. Правила подставляют значение только в
+ * ПУСТОЕ поле или в то, что сами заполнили раньше, — выбор админа не
+ * трогают. Под подставленным полем видно, из какой фразы оно взято: правила
+ * — не истина, а подсказка, проверяет человек.
+ */
+function fillSpecsFromText(): number {
+  const explained = explainSpecs(formData.value.name || '', formData.value.description)
+  const values = Object.fromEntries(Object.entries(explained).map(([slug, e]) => [slug, e.value]))
+  const matched = matchSpecsToOptions(values, categoryAttributes.value)
+  const selects = { ...productAttributeValues.value }
+  const numbers = { ...numericAttributeValues.value }
+  const auto = { ...autoFilledSpecs.value }
+  let filled = 0
+
+  for (const attr of categoryAttributes.value) {
+    const isNumeric = attr.display_type === 'numeric'
+    const target = isNumeric ? numbers : selects
+    const current = target[attr.id] ?? null
+    const wasAuto = auto[attr.id] !== undefined && auto[attr.id]!.value === current
+    if (current !== null && !wasAuto)
+      continue
+
+    const suggested = isNumeric
+      ? (values[attr.slug] ? Number(values[attr.slug]) : null)
+      : (matched[attr.id] ?? null)
+    if (suggested === null || Number.isNaN(suggested)) {
+      // Фразу из описания убрали — убираем и подставленное по ней
+      if (wasAuto) {
+        target[attr.id] = null
+        delete auto[attr.id]
+      }
+      continue
+    }
+    if (current !== suggested)
+      filled++
+    target[attr.id] = suggested
+    auto[attr.id] = { value: suggested, evidence: explained[attr.slug]?.evidence ?? '' }
+  }
+
+  productAttributeValues.value = selects
+  numericAttributeValues.value = numbers
+  autoFilledSpecs.value = auto
+  return filled
+}
+
+function isAutoFilled(attrId: number, current: number | null | undefined): boolean {
+  return autoFilledSpecs.value[attrId] !== undefined && autoFilledSpecs.value[attrId]!.value === current
+}
+
+function handleFillSpecs() {
+  const filled = fillSpecsFromText()
+  if (filled > 0)
+    toast.success(`Из описания заполнено: ${filled}`, { description: 'Проверьте значения — правила подсказывают, а не решают.' })
+  else
+    toast.info('В названии и описании не нашлось, что добавить', { description: 'Заполненные вами поля не меняются.' })
+}
+
+// Новый товар: пока пишут название и описание, характеристики подтягиваются
+const refillSpecsWhileTyping = debounce(() => {
+  if (!props.initialData?.id && categoryAttributes.value.length)
+    fillSpecsFromText()
+}, 600)
+watch(() => [formData.value.name, formData.value.description], refillSpecsWhileTyping)
 
 watch(
   () => formData.value.category_id,
@@ -1393,10 +1469,25 @@ const seoKeywordsString = computed({
       <!-- 🏷️ Характеристики (Select/Color) -->
       <Card v-if="displayableAttributes.length > 0">
         <CardHeader>
-          <CardTitle>Характеристики</CardTitle>
-          <CardDescription>
-            Заполните значения для фильтров, привязанных к выбранной категории.
-          </CardDescription>
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-1.5">
+              <CardTitle>Характеристики</CardTitle>
+              <CardDescription>
+                Показываются на карточке товара и в фильтрах раздела. У нового
+                товара подставляются сами из названия и описания — проверьте.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="shrink-0"
+              @click="handleFillSpecs"
+            >
+              <Icon name="lucide:wand-2" class="mr-1.5 h-4 w-4" />
+              Заполнить из описания
+            </Button>
+          </div>
         </CardHeader>
         <CardContent class="space-y-4">
           <div v-for="attribute in displayableAttributes" :key="attribute.id">
@@ -1426,6 +1517,12 @@ const seoKeywordsString = computed({
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p
+              v-if="isAutoFilled(attribute.id, productAttributeValues[attribute.id])"
+              class="mt-1 text-xs text-muted-foreground"
+            >
+              Из описания: «{{ autoFilledSpecs[attribute.id]?.evidence }}»
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -1466,6 +1563,12 @@ const seoKeywordsString = computed({
                     : null)
               "
             />
+            <p
+              v-if="isAutoFilled(attribute.id, numericAttributeValues[attribute.id])"
+              class="mt-1 text-xs text-muted-foreground"
+            >
+              Из описания: «{{ autoFilledSpecs[attribute.id]?.evidence }}»
+            </p>
           </div>
         </CardContent>
       </Card>

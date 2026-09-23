@@ -520,6 +520,8 @@ export type ProductAttributeValueWithDetails
     attributes:
       | (Tables<'attributes'> & {
         attribute_options: Tables<'attribute_options'>[]
+        /** Разделы, где по атрибуту есть фильтр, — для ссылки из характеристик */
+        category_attributes?: { category_id: string }[] | null
       })
       | null
   }
