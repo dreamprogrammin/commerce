@@ -336,7 +336,8 @@ export interface ProductAccessoryLink {
 }
 
 export type FullProduct = ProductWithImages & {
-  categories: { name: string | null, slug: string | null } | null
+  /** href — канонический адрес раздела; короткий /catalog/<slug> отвечает редиректом 301 */
+  categories: { name: string | null, slug: string | null, href?: string | null } | null
   accessories?: ProductWithImages[]
 
   brands: Brand | null
