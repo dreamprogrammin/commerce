@@ -725,8 +725,17 @@ const productLineLogoUrl = computed(() => {
 const brandLink = computed(() =>
   brandSlug.value ? `/brand/${brandSlug.value}` : null,
 )
+/*
+ * Полный адрес раздела из базы (`categories.href`), а не `/catalog/<slug>`:
+ * короткий адрес отвечает редиректом 301 на полный. 23 сентября 2026 так
+ * вела ссылка «Категория» со всех 178 карточек — в характеристиках, в
+ * «Ещё в этих категориях» и в кнопке «назад» мобильной шапки. Короткий
+ * остаётся запасным, если в строке раздела адреса нет.
+ */
 const categoryLink = computed(() =>
-  categorySlug.value ? `/catalog/${categorySlug.value}` : null,
+  product.value?.categories?.href
+  || fullCategory.value?.href
+  || (categorySlug.value ? `/catalog/${categorySlug.value}` : null),
 )
 
 /**

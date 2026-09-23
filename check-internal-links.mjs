@@ -174,5 +174,30 @@ for (const path of ['/catalog/kiddy/tolokar', '/catalog/girls/kukly/kukly-lol'])
   check(hrefs.some(h => /^\/catalog\/[^/]+$/.test(h)), `${path}: есть ссылка на родительский раздел`)
 }
 
+/*
+ * Ссылки с карточки товара ведут на итоговый адрес, а не через редирект.
+ *
+ * 23 сентября 2026 «Категория» на всех 178 карточках вела на короткий
+ * `/catalog/<slug>`, который отвечает 301 на полный путь раздела. Ссылка
+ * живая, поэтому проверка выше её не ловила; но каждая такая ссылка — лишний
+ * круг для робота и для покупателя. Карточка берётся первая со страницы бренда.
+ */
+console.log('\nКарточка товара: ссылки без редиректов')
+{
+  const { hrefs: brandHrefs } = await hrefsOf('/brand/lego')
+  const pdp = brandHrefs.find(h => h.startsWith('/catalog/products/'))
+  check(!!pdp, `на /brand/lego нашлась карточка товара${pdp ? `: ${pdp.slice(0, 60)}` : ''}`)
+  if (pdp) {
+    const { hrefs } = await hrefsOf(pdp)
+    const redirecting = []
+    for (const h of hrefs.filter(x => x.startsWith('/catalog') || x.startsWith('/brand'))) {
+      const r = await fetch(`${BASE}${h}`, { redirect: 'manual' })
+      if (r.status >= 300 && r.status < 400)
+        redirecting.push(`${h} → ${r.headers.get('location')}`)
+    }
+    check(redirecting.length === 0, `ссылок на каталог и бренды с редиректом: ${redirecting.length}${redirecting.length ? ` — ${redirecting.join('; ')}` : ''}`)
+  }
+}
+
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: внутренние ссылки живые' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)
 process.exit(fails.length === 0 ? 0 : 1)

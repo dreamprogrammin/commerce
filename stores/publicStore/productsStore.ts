@@ -623,7 +623,7 @@ export const useProductsStore = defineStore('productsStore', () => {
       .select(
         `
         *,
-        categories(name, slug),
+        categories(name, slug, href),
         product_images(*),
         brands(*),
         product_lines(*),
