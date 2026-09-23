@@ -111,8 +111,16 @@ for (const p of paths) {
   if (r.mobileUsabilityResult)
     console.log(`  мобильный вид: ${r.mobileUsabilityResult.verdict}${(r.mobileUsabilityResult.issues ?? []).map(x => `\n     • ${x.issueType}: ${x.message}`).join('')}`)
   for (const rich of r.richResultsResult?.detectedItems ?? []) {
-    const bad = (rich.items ?? []).flatMap(it => it.issues ?? []).filter(x => x.severity === 'ERROR')
-    console.log(`  расширенные результаты «${rich.richResultType}»: ${r.richResultsResult.verdict}${bad.length ? ` — ошибок ${bad.length}: ${bad.map(b => b.issueMessage).join('; ')}` : ''}`)
+    /*
+     * Печатаем и ПРЕДУПРЕЖДЕНИЯ тоже: именно там живут замечания вроде
+     * «Отсутствует поле validFrom», из-за которых карточка теряет часть
+     * возможностей, хотя вердикт остаётся PASS. Сначала я их отфильтровал и
+     * увидел «всё хорошо» там, где Google показывает замечание.
+     */
+    const issues = (rich.items ?? []).flatMap(it => (it.issues ?? []).map(x => ({ ...x, name: it.name })))
+    console.log(`  расширенные результаты «${rich.richResultType}»: ${r.richResultsResult.verdict}`)
+    for (const x of issues)
+      console.log(`     ${x.severity === 'ERROR' ? '❌' : '⚠️'} ${x.issueMessage}${x.name ? ` — ${x.name}` : ''}`)
   }
   console.log()
 }
