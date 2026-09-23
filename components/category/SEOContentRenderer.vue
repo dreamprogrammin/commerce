@@ -49,7 +49,18 @@ const DEFAULT_LI_ICON = 'lucide:check-circle'
           v-else-if="block.type === 'p'"
           class="text-sm lg:text-base text-muted-foreground leading-relaxed mb-4"
         >
-          {{ block.text }}
+          <!-- Внутренние ссылки текста из базы — кусками (utils/parseSEOContent.ts).
+               Куски — в одну строку: перенос внутри ссылки Vue превращает в
+               пробел, и текст читался бы «LEGO : City». -->
+          <!-- eslint-disable vue/singleline-html-element-content-newline -->
+          <template v-if="block.parts">
+            <template v-for="(part, pi) in block.parts" :key="pi">
+              <NuxtLink v-if="part.href" :to="part.href" class="font-medium text-primary underline decoration-primary/30 underline-offset-2 transition-colors hover:decoration-primary">{{ part.text }}</NuxtLink>
+              <template v-else>{{ part.text }}</template>
+            </template>
+          </template>
+          <template v-else>{{ block.text }}</template>
+          <!-- eslint-enable vue/singleline-html-element-content-newline -->
         </p>
 
         <!-- UL -->
@@ -67,7 +78,15 @@ const DEFAULT_LI_ICON = 'lucide:check-circle'
               class="w-5 h-5 mt-0.5 shrink-0 text-green-500"
               aria-hidden="true"
             />
-            <span>{{ item.text }}</span>
+            <!-- eslint-disable vue/singleline-html-element-content-newline -->
+            <span v-if="item.parts">
+              <template v-for="(part, pi) in item.parts" :key="pi">
+                <NuxtLink v-if="part.href" :to="part.href" class="font-medium text-primary underline decoration-primary/30 underline-offset-2 transition-colors hover:decoration-primary">{{ part.text }}</NuxtLink>
+                <template v-else>{{ part.text }}</template>
+              </template>
+            </span>
+            <span v-else>{{ item.text }}</span>
+            <!-- eslint-enable vue/singleline-html-element-content-newline -->
           </li>
         </ul>
       </template>

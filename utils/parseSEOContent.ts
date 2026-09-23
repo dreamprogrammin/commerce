@@ -1,12 +1,24 @@
 export type SEOBlockType = 'h2' | 'h3' | 'p' | 'ul'
 
+/** Кусок абзаца: текст или внутренняя ссылка. */
+export interface SEOInline {
+  text: string
+  href?: string
+}
+
 export interface SEOBlock {
   type: SEOBlockType
   text?: string
   icon?: string
+  /**
+   * Абзац по кускам — только если в нём есть внутренняя ссылка. Рендер,
+   * который кусков не знает, рисует `text`, как раньше (ссылки теряются).
+   */
+  parts?: SEOInline[]
   items?: Array<{
     text: string
     icon?: string // иконка на каждом li если есть
+    parts?: SEOInline[]
   }>
 }
 
@@ -48,6 +60,70 @@ export function decodeHtmlEntities(text: string): string {
 /** Текст блока: теги срезаются, сущности раскрываются. */
 function blockText(inner: string): string {
   return decodeHtmlEntities(inner.replace(/<[^>]*>/g, '')).trim()
+}
+
+/*
+ * Внутренние ссылки в текстах из базы (23 сентября 2026).
+ *
+ * До этого `blockText` срезал все теги, и `<a>` тоже: ни один текст раздела
+ * из базы не мог сослаться на бренд или подраздел. А ссылка с текстом о
+ * конструкторах на страницу LEGO — один из немногих сигналов, которыми
+ * магазин сам может поднять страницу бренда: на неё с главной вела одна
+ * ссылка, с `/catalog` — ни одной.
+ *
+ * Пропускаются только адреса самого сайта — начинаются с `/`, не с `//`,
+ * без схем и кавычек. Всё остальное остаётся текстом. HTML не вставляется:
+ * рендер рисует куски интерполяцией и `NuxtLink`.
+ */
+const LINK = /<a\s[^>]*?href\s*=\s*(["'])([^"']*)\1[^>]*>([\s\S]*?)<\/a>/gi
+
+function safeHref(raw: string): string | null {
+  const href = decodeHtmlEntities(raw.trim())
+  return /^\/(?!\/)[\w\-./?=&%#]*$/.test(href) ? href : null
+}
+
+// Склеиваются только обычные пробелы и переносы: неразрывный пробел
+// (`\s` в JavaScript его тоже ловит) держит цены вроде «7 490 ₸» одной строкой
+function inlineText(html: string): string {
+  return decodeHtmlEntities(html.replace(/<[^>]*>/g, '')).replace(/[ \t\r\n\f\v]+/g, ' ')
+}
+
+function inlineParts(inner: string): SEOInline[] | undefined {
+  const parts: SEOInline[] = []
+  let last = 0
+  let hasLink = false
+  for (const m of inner.matchAll(LINK)) {
+    parts.push({ text: inlineText(inner.slice(last, m.index)) })
+    const href = safeHref(m[2]!)
+    const text = inlineText(m[3]!).trim()
+    if (href && text) {
+      parts.push({ text, href })
+      hasLink = true
+    }
+    else {
+      parts.push({ text: inlineText(m[3]!) })
+    }
+    last = m.index! + m[0].length
+  }
+  if (!hasLink)
+    return undefined
+  parts.push({ text: inlineText(inner.slice(last)) })
+
+  // Соседние текстовые куски — в один, пустые — прочь, края — без пробелов
+  const merged: SEOInline[] = []
+  for (const part of parts) {
+    const prev = merged[merged.length - 1]
+    if (!part.href && prev && !prev.href)
+      prev.text += part.text
+    else
+      merged.push({ ...part })
+  }
+  if (merged[0] && !merged[0].href)
+    merged[0].text = merged[0].text.trimStart()
+  const tail = merged[merged.length - 1]
+  if (tail && !tail.href)
+    tail.text = tail.text.trimEnd()
+  return merged.filter(part => part.href || part.text)
 }
 
 /**
@@ -96,8 +172,10 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
   // P
   while ((match = pRegex.exec(normalized)) !== null) {
     const text = blockText(match[2])
-    if (text)
-      allMatches.push({ index: match.index, block: { type: 'p', text } })
+    if (text) {
+      const parts = inlineParts(match[2])
+      allMatches.push({ index: match.index, block: { type: 'p', text, ...(parts && { parts }) } })
+    }
   }
 
   // UL
@@ -109,8 +187,10 @@ export function parseHTMLToBlocks(html: string): SEOBlock[] {
     while ((liMatch = liRegex.exec(match[2])) !== null) {
       const liIconMatch = liMatch[1].match(/data-icon=["']([^"']+)["']/)
       const text = blockText(liMatch[2])
-      if (text)
-        items.push({ text, icon: liIconMatch?.[1] })
+      if (text) {
+        const parts = inlineParts(liMatch[2])
+        items.push({ text, icon: liIconMatch?.[1], ...(parts && { parts }) })
+      }
     }
 
     if (items.length)
