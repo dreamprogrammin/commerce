@@ -443,14 +443,30 @@ const activeBrandName = computed(
   () => activeBrand.value?.name || activeBrandSeoName.value || null,
 )
 
+/*
+ * Первым звеном — «Каталог», и это не косметика.
+ *
+ * `/catalog` в Search Console 23 сентября 2026 числится «Crawled — currently
+ * not indexed», а последний обход — 28 апреля: на страницу не ведёт ни одной
+ * ссылки из серверной разметки. Единственная ссылка на неё — в мобильной
+ * нижней панели, которая рисуется уже в браузере. Крошки дают ссылку с
+ * каждой страницы раздела и карточки товара и заодно ставят хаб на своё
+ * место в разметке `BreadcrumbList`.
+ */
+const CATALOG_CRUMB: IBreadcrumbItem = { id: 'catalog', name: 'Каталог', href: '/catalog' }
+
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (currentCategorySlug.value === 'all') {
-    return [{ id: 'all', name: 'Все товары', href: '/catalog/all' }]
+    return [CATALOG_CRUMB, { id: 'all', name: 'Все товары', href: '/catalog/all' }]
   }
   const crumbs = categoriesStore.getBreadcrumbs(currentCategorySlug.value)
 
-  if (activeBrand.value && crumbs.length > 0) {
+  if (crumbs.length === 0)
+    return []
+
+  if (activeBrand.value) {
     return [
+      CATALOG_CRUMB,
       ...crumbs,
       {
         id: `brand-${activeBrand.value.id}`,
@@ -459,7 +475,7 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
     ]
   }
 
-  return crumbs
+  return [CATALOG_CRUMB, ...crumbs]
 })
 
 const currentCategory = computed(() => {

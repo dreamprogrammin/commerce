@@ -251,9 +251,11 @@ const digitColumns = ref<HTMLElement[]>([])
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (!product.value)
     return []
-  let crumbs: IBreadcrumbItem[] = []
+  // «Каталог» первым звеном: с карточек и разделов это единственная ссылка на
+  // хаб в серверной разметке — разбор в pages/catalog/[...slug].vue.
+  const crumbs: IBreadcrumbItem[] = [{ id: 'catalog', name: 'Каталог', href: '/catalog' }]
   if (product.value.categories?.slug)
-    crumbs = categoriesStore.getBreadcrumbs(product.value.categories.slug)
+    crumbs.push(...categoriesStore.getBreadcrumbs(product.value.categories.slug))
   crumbs.push({ id: product.value.id, name: product.value.name })
   return crumbs
 })
