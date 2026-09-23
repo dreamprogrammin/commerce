@@ -1171,6 +1171,19 @@ watch(currentPageProducts, (newProducts) => {
   }
 })
 
+/*
+ * Выбран ли вариант атрибута. Сравнение — строками: `updateAttribute` хранит
+ * выбранное строками, из адреса (`?attr_pitanie=46`) оно тоже приходит
+ * строкой, а `option.id` — число. До 23 сентября 2026 шаблон сравнивал
+ * `.includes(option.id)` напрямую — выбранный вариант никогда не выглядел
+ * отмеченным, и снять его галочкой было нельзя, только кнопкой очистки.
+ * Пока атрибутов было два, этого не видели; ссылки из характеристик
+ * карточки приводят на страницу уже с фильтром.
+ */
+function isAttributeSelected(attributeSlug: string, optionId: string | number): boolean {
+  return (activeFilters.value.attributes[attributeSlug] || []).map(String).includes(String(optionId))
+}
+
 function updateAttribute(
   checked: boolean,
   attributeSlug: string,
@@ -2473,9 +2486,7 @@ else {
                           <Checkbox
                             :id="`attr-${filter.slug}-${option.id}`"
                             :model-value="
-                              (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id)
+                              isAttributeSelected(filter.slug, option.id)
                             "
                             @update:model-value="
                               (checked) =>
@@ -2561,18 +2572,12 @@ else {
                           class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95"
                           :class="{
                             'border-primary ring-2 ring-primary ring-offset-2':
-                              (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id),
-                            'border-border': !(
-                              activeFilters.attributes[filter.slug] || []
-                            ).includes(option.id),
+                              isAttributeSelected(filter.slug, option.id),
+                            'border-border': !isAttributeSelected(filter.slug, option.id),
                           }"
                           @click="
                             () => {
-                              const isCurrentlyChecked = (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id);
+                              const isCurrentlyChecked = isAttributeSelected(filter.slug, option.id);
                               updateAttribute(
                                 !isCurrentlyChecked,
                                 filter.slug,
