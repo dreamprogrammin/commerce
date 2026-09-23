@@ -434,6 +434,16 @@ function scrollToShop() {
 // ==========================================================================
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
+
+/** Разделы в тексте главной — ссылками, см. шаблон. */
+const HOME_TEXT_LINKS = [
+  { name: 'Конструкторы LEGO', to: '/brand/lego' },
+  { name: 'Радиоуправляемые машинки', to: '/catalog/boys/mashinki/radioupravlyaemye-mashinki' },
+  { name: 'Конструкторы для детей', to: '/catalog/constructors-root' },
+  { name: 'Развивающие игрушки', to: '/catalog/kiddy/razvivayushchie-igrushki' },
+  { name: 'Куклы', to: '/catalog/girls/kukly' },
+  { name: 'Настольные игры', to: '/catalog/games/nastolnye-igry' },
+]
 /*
  * В заголовке НАМЕРЕННО оба написания названия.
  *
@@ -853,19 +863,25 @@ useIndexableRobotsRule({ index: true, follow: true })
           <div class="grid md:grid-cols-2 gap-8 text-muted-foreground">
             <div>
               <h3 class="text-xl font-semibold text-foreground mb-3">
-                Широкий ассортимент игрушек
+                Игрушки для детей всех возрастов
               </h3>
               <p class="mb-4">
-                В нашем интернет-магазине в Алматы вы найдете огромный выбор
-                детских игрушек для детей всех возрастов: от развивающих игрушек
-                для малышей до конструкторов и настольных игр для школьников.
+                В нашем интернет-магазине в Алматы — игрушки для детей с шести
+                месяцев: от развивающих игрушек для малышей до конструкторов и
+                настольных игр для школьников.
               </p>
+              <!--
+                Пункты — ссылками (23 сентября 2026). Список был простым
+                текстом, и с главной на радиоуправляемые машинки не вело ни
+                одной ссылки, на LEGO — одна. «Огромный выбор» убран: в
+                магазине 178 товаров, и обещание не про него.
+              -->
               <ul class="space-y-2 list-disc list-inside">
-                <li>Развивающие игрушки и игры</li>
-                <li>Конструкторы и пазлы</li>
-                <li>Куклы и машинки</li>
-                <li>Мягкие игрушки</li>
-                <li>Настольные игры</li>
+                <li v-for="link in HOME_TEXT_LINKS" :key="link.to">
+                  <NuxtLink :to="link.to" class="text-primary underline-offset-2 hover:underline">
+                    {{ link.name }}
+                  </NuxtLink>
+                </li>
               </ul>
             </div>
             <div>

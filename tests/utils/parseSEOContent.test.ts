@@ -33,3 +33,56 @@ describe('parseHTMLToBlocks — сущности', () => {
     expect(parseHTMLToBlocks('<p>Смотрите <a href="/x">раздел</a> и <b>бренд</b></p>')[0].text).toBe('Смотрите раздел и бренд')
   })
 })
+
+/*
+ * Внутренние ссылки в текстах из базы (23 сентября 2026): раньше `<a>`
+ * срезался вместе с остальными тегами, и текст раздела не мог сослаться ни
+ * на бренд, ни на подраздел.
+ */
+describe('parseHTMLToBlocks — внутренние ссылки', () => {
+  it('ссылка на страницу сайта — куском, текст вокруг с пробелами', () => {
+    const [p] = parseHTMLToBlocks('<p>Основа раздела — <a href="/brand/lego">LEGO</a>: City, Marvel и DC.</p>')
+    expect(p!.text).toBe('Основа раздела — LEGO: City, Marvel и DC.')
+    expect(p!.parts).toEqual([
+      { text: 'Основа раздела — ' },
+      { text: 'LEGO', href: '/brand/lego' },
+      { text: ': City, Marvel и DC.' },
+    ])
+  })
+
+  it('в пунктах списка — тоже', () => {
+    const [ul] = parseHTMLToBlocks('<ul><li data-icon="x"><a href="/brand/sluban">Sluban</a> — техника</li><li>Без ссылки</li></ul>')
+    expect(ul!.items![0]!.parts).toEqual([{ text: 'Sluban', href: '/brand/sluban' }, { text: ' — техника' }])
+    expect(ul!.items![1]!.parts).toBeUndefined()
+  })
+
+  it('чужие адреса и схемы — текстом, без ссылки', () => {
+    for (const href of ['https://evil.example/x', '//evil.example', 'javascript:alert(1)', '/a"onmouseover="x', 'mailto:a@b.c']) {
+      const [p] = parseHTMLToBlocks(`<p>Смотрите <a href='${href}'>здесь</a> подробнее.</p>`)
+      expect(p!.parts).toBeUndefined()
+      expect(p!.text).toBe('Смотрите здесь подробнее.')
+    }
+  })
+
+  it('сущности в тексте ссылки и вокруг раскрываются, переносы строк — пробелом', () => {
+    const [p] = parseHTMLToBlocks('<p>Наборы&nbsp;LEGO —\n<a href="/brand/lego/lego-city">LEGO&nbsp;City</a>\nи другие</p>')
+    expect(p!.parts).toEqual([
+      { text: 'Наборы LEGO — ' },
+      { text: 'LEGO City', href: '/brand/lego/lego-city' },
+      { text: ' и другие' },
+    ])
+  })
+
+  it('абзац без ссылок — как раньше, без кусков', () => {
+    const [p] = parseHTMLToBlocks('<p>Просто текст</p>')
+    expect(p).toEqual({ type: 'p', text: 'Просто текст' })
+  })
+})
+
+describe('parseHTMLToBlocks — перенос строки внутри тега', () => {
+  it('абзац и пункт с переносом не выпадают', () => {
+    const blocks = parseHTMLToBlocks('<h2>Как\nвыбрать</h2><p>Первая строка\nвторая строка</p><ul><li>пункт\nс переносом</li></ul>')
+    expect(blocks.map(b => b.type)).toEqual(['h2', 'p', 'ul'])
+    expect(blocks[1]!.text).toBe('Первая строка\nвторая строка')
+  })
+})

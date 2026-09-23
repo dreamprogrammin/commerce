@@ -65,6 +65,10 @@ export const catalogStaticHtml = `
 <a href="/catalog/creativity">Творчество</a>, <a href="/catalog/games">Игры</a>,
 <a href="/catalog/holyday">Отдых</a>. Один и тот же набор попадает и туда, и
 туда, поэтому начинайте с того раздела, которым вы думаете о подарке.</p>
+<p>Чаще всего у нас ищут <a href="/brand/lego">конструкторы LEGO</a>,
+<a href="/catalog/boys/mashinki/radioupravlyaemye-mashinki">радиоуправляемые машинки</a>,
+<a href="/catalog/kiddy/tolokar">толокары</a> и
+<a href="/catalog/girls/kukly/kukly-lol">куклы ЛОЛ</a>.</p>
 <p>Внутри раздела работают фильтры по цене, бренду, материалу и стране.
 Возраст, на который рассчитана игрушка, указан в карточке товара.</p>
 

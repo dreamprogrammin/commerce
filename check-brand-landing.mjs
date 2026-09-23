@@ -87,7 +87,9 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   check(hero.fullBleed >= 1430, `полоса во всю ширину (${hero.fullBleed}px при окне 1440)`)
   check(hero.blue && hero.studs, 'синий градиент и сетка шипов')
   check(hero.h1Size === '50px', `заголовок 50px (${hero.h1Size})`)
-  check(/Собирайте вместе с LEGO/.test(hero.h1Text ?? ''), `H1 «${hero.h1Text}»`)
+  // До 23 сентября 2026 здесь был лозунг «Собирайте вместе с LEGO»; H1 теперь
+  // под запросы «лего алматы» — раздел, бренд и город.
+  check(hero.h1Text === 'Конструкторы LEGO в Алматы', `H1 «${hero.h1Text}»`)
   check(hero.markBg === 'rgb(253, 199, 0)', `имя бренда на жёлтой плашке (${hero.markBg})`)
   check(/Официальный бренд/.test(hero.pill ?? ''), `плашка бренда: «${hero.pill}»`)
   check(hero.crumbs >= 1, `хлебные крошки в шапке (${hero.crumbs} ссылок)`)
