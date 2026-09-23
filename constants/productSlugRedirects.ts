@@ -77,6 +77,12 @@ export const PRODUCT_SLUG_REDIRECTS: readonly ProductSlugRedirect[] = [
     impressions: 2,
     why: 'артикула 2172 в базе нет; в разделе есть другие радиоуправляемые внедорожники',
   },
+  {
+    from: '/catalog/products/trenazhyor-igra-3-v-1-bozhya-korovka-296y-skakalka-kolcebros-raketa-muzyka-i-pult-dlya-detey',
+    to: '/catalog/products/trenazhyor-igra-3-v-1-bozhya-korovka-296y-skakalka-kolcebros-raketa-muzyka-i-pult-dlya-aktivnyh-detey',
+    impressions: 1,
+    why: 'та же карточка 296Y: название сменили на «для активных детей», старый адрес отдаёт 404 на позиции 2.0',
+  },
 ]
 
 /** Путь, куда вести старый адрес, или `null`, если это обычная несуществующая карточка. */
