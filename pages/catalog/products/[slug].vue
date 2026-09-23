@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  AttributeWithValue,
   Database,
   IBreadcrumbItem,
   ProductImageRow,
@@ -33,6 +32,7 @@ import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 import { formatAgeRange, productAgeMonths } from '@/utils/productAge'
+import { attributeSpecRows, filterLink } from '@/utils/productSpecRows'
 import { composeProductMeta } from '@/utils/seoDescription'
 
 import { buildProductTitle } from '@/utils/seoTitle'
@@ -646,22 +646,6 @@ const parentCategories = computed(() => {
     .filter(item => item.category)
 })
 
-const categoryAttributes = ref<AttributeWithValue[]>([])
-watch(
-  () => categorySlug.value,
-  async (newSlug) => {
-    if (newSlug) {
-      categoryAttributes.value
-        = await productsStore.fetchAttributesForCategory(newSlug)
-    }
-  },
-  { immediate: true },
-)
-
-const hasPieceCountAttribute = computed(() =>
-  categoryAttributes.value.some(attr => attr.display_type === 'number_range'),
-)
-
 interface ProductWithProductLine {
   product_lines?: { name: string, slug: string } | null
 }
@@ -736,6 +720,25 @@ const categoryLink = computed(() =>
   product.value?.categories?.href
   || fullCategory.value?.href
   || (categorySlug.value ? `/catalog/${categorySlug.value}` : null),
+)
+
+/*
+ * Характеристики из атрибутов товара — строками, со ссылками на раздел с
+ * фильтром по значению (utils/productSpecRows.ts). Здесь раньше догружались
+ * атрибуты раздела ради строки «Количество деталей», но она ждала тип
+ * `number_range`, которого в базе нет, и не показывалась никогда; а догрузка
+ * шла мимо SSR. Данные для строк приходят с самим товаром.
+ */
+const specRows = computed(() => attributeSpecRows({
+  values: product.value?.product_attribute_values,
+  categoryId: product.value?.category_id,
+  categoryHref: categoryLink.value,
+}))
+const materialLink = computed(() =>
+  filterLink(categoryLink.value, 'materials', product.value?.material_id),
+)
+const countryLink = computed(() =>
+  filterLink(categoryLink.value, 'countries', product.value?.origin_country_id),
 )
 
 /**
@@ -816,26 +819,10 @@ const similarGridProducts = computed(() =>
 const schemaAdditionalProperties = computed(() => {
   const properties: Array<{ '@type': 'PropertyValue', 'name': string, 'value': string }> = []
 
-  const pavs = product.value?.product_attribute_values
-  if (pavs?.length) {
-    const grouped = new Map<string, string[]>()
-    for (const pav of pavs) {
-      const attrName = pav.attributes?.name
-      if (!attrName)
-        continue
-      const option = pav.attributes?.attribute_options?.find(
-        o => o.id === pav.option_id,
-      )
-      if (!option?.value)
-        continue
-      if (!grouped.has(attrName))
-        grouped.set(attrName, [])
-      grouped.get(attrName)!.push(String(option.value))
-    }
-    for (const [name, values] of grouped.entries()) {
-      properties.push({ '@type': 'PropertyValue', 'name': name, 'value': values.join(', ') })
-    }
-  }
+  // Те же строки, что видны на странице: разметка не должна говорить больше
+  // видимого. Раньше сюда шли только варианты — число деталей терялось.
+  for (const row of specRows.value)
+    properties.push({ '@type': 'PropertyValue', 'name': row.label, 'value': row.value })
 
   // Бонусные баллы программы лояльности — реальный, не выдуманный сигнал
   // (см. SEO-аудит, находка S-5): additionalProperty вместо MemberProgram,
@@ -1513,6 +1500,24 @@ watchEffect(() => {
                 </dd>
               </div>
 
+              <div v-for="row in specRows" :key="row.key" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  {{ row.label }}
+                </dt>
+                <dd class="pdp-spec-value">
+                  <span
+                    v-if="row.swatch"
+                    class="pdp-spec-swatch"
+                    :style="{ backgroundColor: row.swatch }"
+                    aria-hidden="true"
+                  />
+                  <NuxtLink v-if="row.to" :to="row.to" class="text-primary hover:underline">
+                    {{ row.value }}
+                  </NuxtLink>
+                  <span v-else>{{ row.value }}</span>
+                </dd>
+              </div>
+
               <div v-if="ageRangeText" class="pdp-spec-row">
                 <dt class="pdp-spec-label">
                   Рекомендованный возраст
@@ -1527,7 +1532,10 @@ watchEffect(() => {
                   Материал
                 </dt>
                 <dd class="pdp-spec-value">
-                  {{ product.materials.name }}
+                  <NuxtLink v-if="materialLink" :to="materialLink" class="text-primary hover:underline">
+                    {{ product.materials.name }}
+                  </NuxtLink>
+                  <span v-else>{{ product.materials.name }}</span>
                 </dd>
               </div>
 
@@ -1536,16 +1544,10 @@ watchEffect(() => {
                   Страна производитель
                 </dt>
                 <dd class="pdp-spec-value">
-                  {{ product.countries.name }}
-                </dd>
-              </div>
-
-              <div v-if="hasPieceCountAttribute && product.piece_count" class="pdp-spec-row">
-                <dt class="pdp-spec-label">
-                  Количество деталей
-                </dt>
-                <dd class="pdp-spec-value">
-                  {{ product.piece_count }} шт
+                  <NuxtLink v-if="countryLink" :to="countryLink" class="text-primary hover:underline">
+                    {{ product.countries.name }}
+                  </NuxtLink>
+                  <span v-else>{{ product.countries.name }}</span>
                 </dd>
               </div>
 
@@ -2252,6 +2254,16 @@ watchEffect(() => {
     font-size: 14px;
     font-weight: 600;
     text-align: right;
+  }
+
+  .pdp-spec-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 6px;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    vertical-align: baseline;
   }
 
   /* ── Ещё в этих категориях ────────────────────────────────────────────────── */
