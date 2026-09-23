@@ -198,6 +198,7 @@ const facts = computed<BrandFact[]>(() => {
       :products="products"
       :lines="orderedLines"
       :breadcrumbs="breadcrumbs"
+      :heading-word="topCategory"
       @jump="jumpTo"
     />
 

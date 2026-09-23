@@ -25,6 +25,8 @@ const props = defineProps<{
   products: ProductWithGallery[]
   lines: ProductLine[]
   breadcrumbs: IBreadcrumbItem[]
+  /** Раздел каталога, где лежат товары бренда: «Конструкторы». Идёт в H1. */
+  headingWord?: string | null
 }>()
 
 const emit = defineEmits<{ jump: [key: 'series' | 'pick'] }>()
@@ -217,8 +219,19 @@ function addFlagship(event: MouseEvent) {
           {{ pillNote }}
         </span>
 
+        <!--
+          H1 — под то, что ищут: «лего алматы», «лего купить алматы»,
+          «конструктор лего» (Search Console, 90 дней на 23 сентября 2026:
+          617 показов, позиция 25,6). Здесь стоял лозунг «Собирайте вместе с
+          LEGO» — без раздела и без города. Бренд по-прежнему выделен.
+        -->
         <h1 class="blh__h1">
-          Собирайте вместе с <span class="blh__mark">{{ brand.name }}</span>
+          <template v-if="headingWord">
+            {{ headingWord }} <span class="blh__mark">{{ brand.name }}</span> в Алматы
+          </template>
+          <template v-else>
+            <span class="blh__mark">{{ brand.name }}</span> в Алматы
+          </template>
         </h1>
 
         <p v-if="lead" class="blh__lead">
