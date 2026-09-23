@@ -157,5 +157,22 @@ for (const path of MUST_RENDER) {
   check(response.status === 200, `${path} отвечает ${response.status}`)
 }
 
+/*
+ * Хаб `/catalog` должен быть виден роботу с обычных страниц.
+ *
+ * 23 сентября 2026 в Search Console он числился «Crawled — currently not
+ * indexed», последний обход — 28 апреля. Причина нашлась в разметке: крошки
+ * выбирали десктопный или мобильный вид скриптом после гидратации, и на
+ * сервере отдавался компактный мобильный вариант — одна кнопка «назад». Ни
+ * ссылки на `/catalog`, ни на родительский раздел в серверной разметке не
+ * было (components/global/Breadcrumbs.vue).
+ */
+console.log('\nХаб каталога в серверной разметке')
+for (const path of ['/catalog/kiddy/tolokar', '/catalog/girls/kukly/kukly-lol']) {
+  const { hrefs } = await hrefsOf(path)
+  check(hrefs.includes('/catalog'), `${path}: есть ссылка на /catalog`)
+  check(hrefs.some(h => /^\/catalog\/[^/]+$/.test(h)), `${path}: есть ссылка на родительский раздел`)
+}
+
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: внутренние ссылки живые' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)
 process.exit(fails.length === 0 ? 0 : 1)
