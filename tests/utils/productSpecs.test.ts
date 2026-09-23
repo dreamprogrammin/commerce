@@ -147,3 +147,39 @@ describe('matchSpecsToOptions — номера вариантов для фор�
     expect(matchSpecsToOptions(found, attributes)).toEqual({ 7: 71, 8: 80 })
   })
 })
+
+describe('тип — по названию, у каждого семейства свой', () => {
+  const t = (name: string) => extractSpecs(name)
+
+  it('толокар или каталка-твистер', () => {
+    expect(t('Толокар-машинка Sport 5566B голубой')['tip-katalki']).toBe('Толокар')
+    expect(t('Каталка-твистер Bibi Car Капибара KS105G зелёная')['tip-katalki']).toBe('Каталка-твистер')
+  })
+
+  it('игровой набор: магазин раньше кухни', () => {
+    expect(t('Игровой магазин мороженого 922-06C — 45 предметов')['tip-nabora']).toBe('Магазин')
+    expect(t('Игровой набор Супермаркет 668-83 — касса со светом и звуком')['tip-nabora']).toBe('Магазин')
+    expect(t('Игровой набор Доктор Tourist 008-605A чемодан 3в1')['tip-nabora']).toBe('Доктор')
+    expect(t('Игровой набор Трюмо Tourist 008-603A чемодан 3в1')['tip-nabora']).toBe('Трюмо')
+    expect(t('Игровой набор посуды Little Chef А432-83A — плита, чайник')['tip-nabora']).toBe('Кухня')
+    expect(t('Игровой набор рюкзак-трансформер Mickey Mouse D8989A Фастфуд — кухня')['tip-nabora']).toBe('Кухня')
+    expect(t('Игровой кулер My Little Home A1010-4 чёрный')['tip-nabora']).toBeUndefined()
+  })
+
+  it('развивающие: говорящая книга — не планшет, «столик» — отдельным словом', () => {
+    expect(t('Обучающая говорящая книга 3103 — алфавит, счёт')['tip-igrushki']).toBe('Говорящая книга')
+    expect(t('Говорящая развивающая книга QD-5055 — 21 тема')['tip-igrushki']).toBe('Говорящая книга')
+    expect(t('Говорящий планшет 66-2RUS — 112 карточек')['tip-igrushki']).toBe('Обучающий планшет')
+    expect(t('Детский ноутбук 7004 розовый — 35 функций')['tip-igrushki']).toBe('Детский ноутбук')
+    expect(t('Развивающий столик-робот HOLA HE8975 — 9 в 1')['tip-igrushki']).toBe('Развивающий столик')
+    expect(t('Huanger HE0811 синий — 3 в 1 бизиборд, пианино-слоник')['tip-igrushki']).toBe('Бизиборд')
+    expect(t('Говорящий казахский алфавит Сөйлейтін Әліппе 7064 — интерактивный плакат')['tip-igrushki']).toBeUndefined()
+  })
+
+  it('куклы: русалка или шарнирная', () => {
+    expect(t('Кукла DEFA Lucy 8188DF принцесса-русалка 29 см')['tip-kukly']).toBe('Кукла-русалка')
+    expect(t('Кукла русалка Mermaze Mermaidz Riviera 580812')['tip-kukly']).toBe('Кукла-русалка')
+    expect(t('Кукла шарнирная DEFA Lucy 8493 — 10 шарниров')['tip-kukly']).toBe('Шарнирная кукла')
+    expect(t('Кукла Barbie Extra GYJ78 в радужном платье')['tip-kukly']).toBeUndefined()
+  })
+})

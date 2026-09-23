@@ -154,7 +154,24 @@ try {
       const get = label => fields.find(f => f.label === label)
       for (const [label, expected] of [['Вид техники', 'Внедорожник'], ['Питание', 'Аккумулятор'], ['Масштаб', '1:16'], ['Частота управления', '2,4 ГГц'], ['Световые эффекты', 'Есть'], ['Звуковые эффекты', 'Есть'], ['Цвет', 'Красный']])
         check(get(label)?.value === expected && !!get(label)?.hint, `${label}: «${get(label)?.value ?? '—'}»${get(label)?.hint ? ' · с подсказкой «Из описания»' : ' · без подсказки'}`)
-      check(sql('SELECT count(*) FROM public.products') === productsBefore, 'товар не сохранялся')
+      // Тип — у кукол свой атрибут: «Тип куклы»
+      await admin.goto(`${BASE}/admin/products/new`, { waitUntil: 'domcontentloaded', timeout: 180000 })
+      await admin.locator('#name').waitFor({ timeout: 60000 })
+      await admin.waitForTimeout(1500)
+      await admin.locator('#name').fill('Кукла шарнирная DEFA Lucy 9999 — 29 см, питомец и аксессуары')
+      await admin.locator('button').filter({ hasText: 'Выберите категорию' }).first().click()
+      await admin.getByRole('option', { name: 'Куклы для девочек', exact: true }).click()
+      await admin.waitForTimeout(3000)
+      const dollType = await admin.evaluate(() => {
+        let box = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('Заполнить из описания')) ?? null
+        while (box && box.querySelectorAll('button[role="combobox"]').length === 0)
+          box = box.parentElement
+        const label = [...(box?.querySelectorAll('label') ?? [])].find(l => l.textContent?.trim() === 'Тип куклы')
+        return label?.parentElement?.querySelector('button[role="combobox"]')?.textContent?.trim() ?? null
+      })
+      check(dollType === 'Шарнирная кукла', `новая кукла: «Тип куклы» — «${dollType ?? 'поля нет'}»`)
+
+      check(sql('SELECT count(*) FROM public.products') === productsBefore, 'товары не сохранялись')
       await ctx.close()
     }
   }

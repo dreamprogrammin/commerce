@@ -43,6 +43,10 @@ export interface SpecRow {
 /** Порядок строк: сначала что это за игрушка, потом как работает, потом вид. */
 const ORDER = [
   'vid-tehniki',
+  'tip-katalki',
+  'tip-nabora',
+  'tip-igrushki',
+  'tip-kukly',
   'pitanie',
   'chastota-upravleniya',
   'masshtab',
