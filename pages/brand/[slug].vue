@@ -17,6 +17,8 @@ import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
+import { composeBrandMeta } from '@/utils/brandMeta'
+import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
@@ -372,6 +374,35 @@ const { data: recommendedProducts } = await useAsyncData(
 /** Ссылки на бренд-лендинги в категориях. */
 const brandCategoryLinks = computed(() => brandCategoryData.value?.links ?? [])
 
+/*
+ * Товары бренда для описания в выдаче (utils/brandMeta.ts): цены и серии.
+ * Отдельная лёгкая выборка — все активные товары бренда, а не первая
+ * страница сетки, иначе «от … до …» считалось бы по неполному списку.
+ */
+const { data: brandMetaProducts } = await useAsyncData(
+  `brand-meta-products-${brandSlug}`,
+  async () => {
+    if (!brand.value)
+      return []
+    const { data, error } = await supabase
+      .from('products')
+      .select('price, final_price, stock_quantity, product_lines(name)')
+      .eq('brand_id', brand.value.id)
+      .eq('is_active', true)
+    if (error) {
+      console.error('Не удалось загрузить товары бренда для описания:', error)
+      return []
+    }
+    return (data ?? []).map((p: any) => ({
+      price: p.price,
+      final_price: p.final_price,
+      stock_quantity: p.stock_quantity,
+      lineName: p.product_lines?.name ?? null,
+    }))
+  },
+  { watch: [brand] },
+)
+
 /**
  * Слово для заголовка: «Конструкторы» у LEGO, «Игрушки» у бренда из раздела
  * аудитории. Пустое, пока у бренда нет товаров ни в одной категории.
@@ -527,6 +558,21 @@ const metaTitle = computed(() => {
 const metaDescription = computed(() => {
   if (!brand.value)
     return `Товары бренда в ${siteName}`
+  /*
+   * Из товаров бренда: число моделей, цены «от … до …» и серии, которые
+   * реально есть (utils/brandMeta.ts). Написанное владельцем мета-описание
+   * остаётся — факты встают впереди. Запасные варианты ниже — только для
+   * бренда без товаров: кусок текста о бренде рекламировал серии, которых в
+   * магазине нет (у ZURU — X-Shot, 5 Surprise, Pets Alive).
+   */
+  const composed = composeBrandMeta({
+    word: topCategory.value,
+    brandName: brand.value.name,
+    products: brandMetaProducts.value ?? [],
+    lead: brand.value.meta_description,
+  })
+  if (composed)
+    return composed
   if (brand.value.meta_description)
     return brand.value.meta_description
   /*
@@ -731,8 +777,8 @@ useHead({
               'sku': getProductSku(product),
               // FIX: mpn дублирует sku для устранения варнингов Google
               'mpn': getProductSku(product),
-              // FIX: gtin из barcode если есть
-              ...(product.barcode ? { gtin: product.barcode } : {}),
+              // Только настоящий GTIN (utils/gtin.ts): «8497» из базы — не штрихкод.
+              ...(validGtin(product.barcode) ? { gtin: validGtin(product.barcode) } : {}),
               // FIX: brand без дублирования name
               'brand': {
                 '@type': 'Brand',

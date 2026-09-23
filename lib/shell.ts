@@ -1,4 +1,4 @@
-import type { MaybeRefOrGetter } from 'vue'
+import type { MaybeRefOrGetter, ShallowRef } from 'vue'
 
 /**
  * Настройки оболочки страницы для макета `Shell.vue`.
@@ -182,25 +182,74 @@ export const profilePageShell: Required<ShellOptions> = {
  * страницу нельзя, иначе шапка перестанет липнуть у остальных 31 бренда.
  *
  * Поэтому страница выставляет правку на время своей жизни, а оболочка
- * подмешивает её поверх `meta.shell`. Значение общее на приложение — в один
- * момент времени смонтирована одна страница, — и снимается в `onScopeDispose`,
- * то есть и при уходе со страницы, и при её удержании в кэше.
+ * подмешивает её поверх `meta.shell`.
+ *
+ * ГДЕ ЛЕЖИТ ПРАВКА — в `nuxtApp`, а не в переменной модуля. До 23 сентября
+ * 2026 была переменная модуля, и на этом стояли две ошибки, обе на бою:
+ *
+ * 1. Сервер. Модуль там один на все запросы, а `onScopeDispose` при серверной
+ *    отрисовке не вызывается. Правка лендинга LEGO переживала свой запрос, и
+ *    следующие страницы того же процесса уходили с нелипкой шапкой: на бою
+ *    в разметке `/about`, `/terms`, `/brands`, `/brand/mokatoys` стояло
+ *    `position:static`. Клиент ждал липкую — расхождение гидратации, в DOM
+ *    оставались `static` и распорка под fixed-шапку, и над шапкой висела
+ *    пустая полоса 74 px до первой прокрутки. `nuxtApp` на сервере свой у
+ *    каждого запроса.
+ * 2. Клиент. `<NuxtPage :keepalive>` в `app.vue` удерживает ВСЕ страницы
+ *    (атрибут главнее флага страницы), и при уходе с LEGO её scope не
+ *    умирал: шапка оставалась нелипкой на следующих страницах. Поэтому
+ *    правка снимается и при уходе в кэш, а при возврате ставится снова.
+ *
+ * И КОГДА — после монтирования, а не в `setup`. Пока страница грузится, её
+ * `<Suspense>` ждёт, и перерисовка макета в этот момент ломала удержание:
+ * `NuxtPage` при уходе пересоздавал `Suspense`, удержанная LEGO оставалась
+ * привязанной к уничтоженной границе, и возврат на неё падал с «Cannot read
+ * properties of null (reading 'suspenseId')». На бою с LEGO любой уход и
+ * «Назад» оставлял на экране прежнюю страницу под адресом `/brand/lego`.
+ * Без правки в `setup` — проверено отключением — возврат работает.
  */
-const shellOverride = shallowRef<MaybeRefOrGetter<Partial<ShellOptions> | null>>(null)
+type ShellOverrideSource = MaybeRefOrGetter<Partial<ShellOptions> | null>
+
+const overrideSlots = new WeakMap<object, ShallowRef<ShellOverrideSource>>()
+
+function overrideSlot(): ShallowRef<ShellOverrideSource> {
+  const nuxtApp = useNuxtApp()
+  let slot = overrideSlots.get(nuxtApp)
+  if (!slot) {
+    slot = shallowRef<ShellOverrideSource>(null)
+    overrideSlots.set(nuxtApp, slot)
+  }
+  return slot
+}
 
 /** Читает оболочка. */
 export function useShellOverride() {
-  return computed(() => toValue(shellOverride.value))
+  const slot = overrideSlot()
+  return computed(() => toValue(slot.value))
 }
 
 /**
  * Ставит страница. Принимает не снимок, а источник: страница `[slug].vue`
  * переживает смену параметра без пересоздания, и снимок остался бы от
- * прежнего бренда. Снимается сам, когда умрёт scope страницы.
+ * прежнего бренда.
+ *
+ * Ставится после монтирования (см. выше, почему не сразу) и снова при
+ * возврате из кэша — `onActivated` при первом монтировании не вызывается.
+ * Снимается при уходе в кэш и при уничтожении, причём только своя: следующая
+ * страница могла успеть поставить свою. На сервере не ставится вовсе:
+ * шапка там отрисована раньше страницы, и правка до неё всё равно не дошла бы.
  */
-export function setShellOverride(source: MaybeRefOrGetter<Partial<ShellOptions> | null>) {
-  shellOverride.value = source
-  onScopeDispose(() => {
-    shellOverride.value = null
-  })
+export function setShellOverride(source: ShellOverrideSource) {
+  const slot = overrideSlot()
+  const apply = () => {
+    slot.value = source
+  }
+  const release = () => {
+    if (slot.value === source)
+      slot.value = null
+  }
+  onMounted(apply)
+  onActivated(apply)
+  onDeactivated(release)
+  onScopeDispose(release)
 }

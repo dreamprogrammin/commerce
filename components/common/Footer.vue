@@ -3,6 +3,11 @@ import { SHOP, SHOP_ADDRESS_FULL } from '@/constants/shop'
 import { formatPrice } from '@/utils/formatPrice'
 
 const currentYear = new Date().getFullYear()
+
+const FOOTER_FOCUS_LINKS = [
+  { name: 'Конструкторы LEGO', to: '/brand/lego' },
+  { name: 'Радиоуправляемые машинки', to: '/catalog/boys/mashinki/radioupravlyaemye-mashinki' },
+]
 const supabase = useSupabaseClient()
 
 // lazy: true — не блокируем SSR-рендер страницы, футер загружается параллельно
@@ -63,19 +68,36 @@ const { data: popularProducts } = useAsyncData('footer-popular-products', async 
           <h3 class="font-semibold text-lg mb-4">
             Популярные категории
           </h3>
-          <ul v-if="footerCategories?.length" class="space-y-2 text-sm">
-            <li v-for="category in footerCategories" :key="category.id">
+          <ul class="space-y-2 text-sm">
+            <template v-if="footerCategories?.length">
+              <li v-for="category in footerCategories" :key="category.id">
+                <NuxtLink
+                  :to="category.href || `/catalog/${category.slug}`"
+                  class="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {{ category.name }}
+                </NuxtLink>
+              </li>
+            </template>
+            <template v-else>
+              <li v-for="i in 4" :key="`skeleton-${i}`">
+                <div class="h-4 bg-muted rounded animate-pulse w-3/4" />
+              </li>
+            </template>
+            <!--
+              Две страницы, которые владелец 23 сентября 2026 назвал главными
+              для поиска: по LEGO сайт на 25-м месте, по радиоуправляемым
+              машинкам — на 24-м. Ссылка из подвала стоит на каждой странице
+              сайта; до этого на них вели одна-две ссылки со всего сайта.
+              Вне v-if: от загрузки избранных разделов ссылки не зависят.
+            -->
+            <li v-for="link in FOOTER_FOCUS_LINKS" :key="link.to">
               <NuxtLink
-                :to="category.href || `/catalog/${category.slug}`"
+                :to="link.to"
                 class="text-muted-foreground hover:text-foreground transition-colors"
               >
-                {{ category.name }}
+                {{ link.name }}
               </NuxtLink>
-            </li>
-          </ul>
-          <ul v-else class="space-y-2 text-sm">
-            <li v-for="i in 4" :key="`skeleton-${i}`">
-              <div class="h-4 bg-muted rounded animate-pulse w-3/4" />
             </li>
           </ul>
         </div>

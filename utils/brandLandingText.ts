@@ -17,6 +17,7 @@
 
 import { categoryNamesBrand } from './brandLanding'
 import { formatPrice } from './formatPrice'
+import { formatAgeRange, productAgeMonths } from './productAge'
 import { clampDescription, DELIVERY_SHORT, pluralRu } from './seoDescription'
 import { truncateWords } from './seoTitle'
 
@@ -28,6 +29,9 @@ export interface BrandLandingProduct {
   stock_quantity: number | null
   min_age_years: number | null
   max_age_years: number | null
+  /** Возраст в месяцах — основной. В ответе базы его нет, пока не применена миграция 20260922120000. */
+  min_age_months?: number | null
+  max_age_months?: number | null
 }
 
 export interface BrandLandingFacts {
@@ -36,6 +40,7 @@ export interface BrandLandingFacts {
   /** Текущие цены — со скидкой, как на странице. */
   min: number | null
   max: number | null
+  /** Возраст в МЕСЯЦАХ — только если указан у всех товаров связки. */
   minAge: number | null
   maxAge: number | null
 }
@@ -80,8 +85,8 @@ export function brandLandingFacts(products: readonly BrandLandingProduct[]): Bra
     inStock: products.filter(p => (p.stock_quantity ?? 0) > 0).length,
     min: prices.length ? Math.min(...prices) : null,
     max: prices.length ? Math.max(...prices) : null,
-    minAge: ageBound(products.map(p => p.min_age_years), Math.min),
-    maxAge: ageBound(products.map(p => p.max_age_years), Math.max),
+    minAge: ageBound(products.map(p => productAgeMonths(p).min), Math.min),
+    maxAge: ageBound(products.map(p => productAgeMonths(p).max), Math.max),
   }
 }
 
@@ -96,6 +101,12 @@ function priceRange(f: BrandLandingFacts): string {
 
 const models = (n: number) => `${n} ${pluralRu(n, 'модель', 'модели', 'моделей')}`
 
+/** «9 моделей от 7 490 до 18 890 ₸» — число и цены одной фразой. */
+export function modelsAndPrices(f: BrandLandingFacts): string {
+  const range = priceRange(f)
+  return `${models(f.count)}${range ? ` ${range}` : ''}`
+}
+
 /** Строка под заголовком страницы: «9 моделей · от 7 490 до 18 890 ₸». */
 export function composeBrandLandingSummary(f: BrandLandingFacts): string {
   if (!f.count)
@@ -106,9 +117,7 @@ export function composeBrandLandingSummary(f: BrandLandingFacts): string {
 
 /** Описание для выдачи: число моделей бренда и цены «от … до …». */
 export function composeBrandLandingMeta(phrase: string, f: BrandLandingFacts): string {
-  const range = priceRange(f)
-  const head = `${phrase} в Алматы: ${models(f.count)}${range ? ` ${range}` : ''}`
-  return clampDescription(`${head}. ${DELIVERY_SHORT}.`)
+  return clampDescription(`${phrase} в Алматы: ${modelsAndPrices(f)}. ${DELIVERY_SHORT}.`)
 }
 
 /**
@@ -124,8 +133,7 @@ export function prependBrandLandingFacts(stored: string, f: BrandLandingFacts): 
   const text = (stored ?? '').trim()
   if (!f.count)
     return text
-  const range = priceRange(f)
-  return clampDescription(`${models(f.count)}${range ? ` ${range}` : ''}. ${text}`)
+  return clampDescription(`${modelsAndPrices(f)}. ${text}`)
 }
 
 const TITLE_SUFFIX = ' | Ухтышка'
@@ -171,10 +179,10 @@ export function composeBrandLandingText(input: {
   const f = brandLandingFacts(input.products)
   const range = priceRange(f)
   // «Для детей от 18 лет» — нелепость; с подросткового возраста просто «от N лет».
-  const forWhom = f.minAge !== null && f.minAge >= 14 ? '' : ' для детей'
-  const age = f.minAge !== null && f.maxAge !== null && f.maxAge > f.minAge
-    ? `,${forWhom} от ${f.minAge} до ${f.maxAge} ${pluralRu(f.maxAge, 'года', 'лет', 'лет')}`
-    : f.minAge !== null ? `,${forWhom} от ${f.minAge} ${pluralRu(f.minAge, 'года', 'лет', 'лет')}` : ''
+  const forWhom = f.minAge !== null && f.minAge >= 14 * 12 ? '' : ' для детей'
+  // Возраст словами, как на карточке: «от 6 месяцев», «от 1 до 12 лет».
+  const ageText = f.minAge !== null ? formatAgeRange(f.minAge, f.maxAge) : null
+  const age = ageText ? `,${forWhom} ${ageText}` : ''
   const stock = f.inStock === f.count
     ? 'Все модели в наличии.'
     : f.inStock > 0 ? `Сейчас в наличии ${f.inStock} из ${f.count}.` : 'Сейчас моделей нет в наличии.'

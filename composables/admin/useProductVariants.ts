@@ -52,6 +52,10 @@ export async function duplicateProductAsVariant(
     bonus_points_award: original.bonus_points_award,
     min_age_years: original.min_age_years,
     max_age_years: original.max_age_years,
+    // Месяцы — основной возраст: без них вариант пирамидки «от 6 месяцев»
+    // получил бы «от 1 года» (триггер вывел бы месяцы из лет).
+    min_age_months: original.min_age_months,
+    max_age_months: original.max_age_months,
     gender: original.gender,
     accessory_ids: original.accessory_ids,
     is_accessory: original.is_accessory,

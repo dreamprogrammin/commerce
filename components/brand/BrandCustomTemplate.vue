@@ -18,6 +18,7 @@
 import type { BrandFilterState } from '@/composables/useBrandPageFilters'
 import type { Brand, BrandFact, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import { brandStaticFaq, brandStaticText } from '@/constants/brandStaticText'
+import { formatAgeRange, productAgeMonths } from '@/utils/productAge'
 
 const props = defineProps<{
   brand: Brand
@@ -173,16 +174,14 @@ const facts = computed<BrandFact[]>(() => {
   if (props.productLines.length > 0)
     push('Серий', String(props.productLines.length))
 
-  const ages = products.value
-    .map(p => (p as any).min_age_years as number | null)
-    .filter((n): n is number => n != null)
-  if (ages.length > 0) {
-    const maxAges = products.value
-      .map(p => (p as any).max_age_years as number | null)
-      .filter((n): n is number => n != null)
-    const from = Math.min(...ages)
-    const to = maxAges.length ? Math.max(...maxAges) : null
-    push('Возраст', to ? `от ${from} до ${to} лет` : `от ${from} лет`)
+  // Возраст — в месяцах и словами, как на карточке («от 1 года», а не «от 1 лет»)
+  const ages = products.value.map(p => productAgeMonths(p as any))
+  const mins = ages.map(a => a.min).filter((n): n is number => n != null)
+  if (mins.length > 0) {
+    const maxes = ages.map(a => a.max).filter((n): n is number => n != null)
+    const age = formatAgeRange(Math.min(...mins), maxes.length ? Math.max(...maxes) : null)
+    if (age)
+      push('Возраст', age)
   }
 
   if (bonusShare.value > 0)
@@ -199,6 +198,7 @@ const facts = computed<BrandFact[]>(() => {
       :products="products"
       :lines="orderedLines"
       :breadcrumbs="breadcrumbs"
+      :heading-word="topCategory"
       @jump="jumpTo"
     />
 

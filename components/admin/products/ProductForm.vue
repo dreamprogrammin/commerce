@@ -14,6 +14,7 @@ import type {
   ProductUpdate,
   ProductWithImages,
 } from '@/types'
+import type { AgeUnit } from '@/utils/productAge'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { VueDraggableNext } from 'vue-draggable-next'
@@ -34,6 +35,8 @@ import {
   getOptimizationInfo,
   optimizeImageBeforeUpload,
 } from '@/utils/imageOptimizer'
+import { ageToMonths, formatAgeRange, monthsToInput, productAgeMonths } from '@/utils/productAge'
+import { explainSpecs, matchSpecsToOptions } from '@/utils/productSpecs'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
 import ProductLineForm from '../product-lines/ProductLineForm.vue'
@@ -96,6 +99,8 @@ const isBrandDialogOpen = ref(false)
 const categoryAttributes = ref<AttributeWithValue[]>([])
 const productAttributeValues = ref<Record<number, number | null>>({})
 const numericAttributeValues = ref<Record<number, number | null>>({})
+// Какие характеристики подставлены из описания и по какой фразе — см. fillSpecsFromText
+const autoFilledSpecs = ref<Record<number, { value: number, evidence: string }>>({})
 const isProcessingImages = ref(false)
 
 // 🎨 Duplicate dialog
@@ -168,6 +173,10 @@ const isSlugManuallyEdited = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isSettingUp = ref(false)
 
+// Возраст в админке — число и единица; см. блок «Возраст» ниже
+const minAge = ref<{ value: number | null, unit: AgeUnit }>({ value: null, unit: 'years' })
+const maxAge = ref<{ value: number | null, unit: AgeUnit }>({ value: null, unit: 'years' })
+
 // 🎯 Информация об оптимизации
 const optimizationInfo = computed(() => getOptimizationInfo())
 
@@ -181,6 +190,9 @@ function setupFormData(product: FullProduct | null | undefined) {
 
   if (product && product.id) {
     // ✏️ РЕЖИМ РЕДАКТИРОВАНИЯ
+    const productAge = productAgeMonths(product)
+    minAge.value = monthsToInput(productAge.min)
+    maxAge.value = monthsToInput(productAge.max)
     formData.value = {
       name: product.name,
       slug: product.slug,
@@ -193,6 +205,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       bonus_points_award: product.bonus_points_award,
       min_age_years: product.min_age_years,
       max_age_years: product.max_age_years,
+      min_age_months: productAge.min,
+      max_age_months: productAge.max,
       gender: product.gender as 'unisex' | 'male' | 'female' | null,
       accessory_ids: product.accessory_ids || [],
       is_accessory: product.is_accessory || false,
@@ -238,6 +252,8 @@ function setupFormData(product: FullProduct | null | undefined) {
   }
   else {
     // ✨ РЕЖИМ СОЗДАНИЯ
+    minAge.value = { value: null, unit: 'years' }
+    maxAge.value = { value: null, unit: 'years' }
     formData.value = {
       name: '',
       slug: '',
@@ -250,6 +266,8 @@ function setupFormData(product: FullProduct | null | undefined) {
       bonus_points_award: 0,
       min_age_years: null,
       max_age_years: null,
+      min_age_months: null,
+      max_age_months: null,
       gender: 'unisex',
       accessory_ids: [],
       is_accessory: false,
@@ -415,7 +433,80 @@ async function handleCategoryChange(categoryId: string | null) {
   }
   productAttributeValues.value = newSelectValues
   numericAttributeValues.value = newNumericValues
+  autoFilledSpecs.value = {}
+  // Новый товар — характеристики сразу из названия и описания; у
+  // существующего ничего не меняется без кнопки «Заполнить из описания».
+  if (!props.initialData?.id)
+    fillSpecsFromText()
 }
+
+/*
+ * Характеристики из названия и описания (utils/productSpecs.ts).
+ *
+ * Зачем (23 сентября 2026): владелец попросил, чтобы при добавлении товара
+ * характеристики заполнялись сами. Правила подставляют значение только в
+ * ПУСТОЕ поле или в то, что сами заполнили раньше, — выбор админа не
+ * трогают. Под подставленным полем видно, из какой фразы оно взято: правила
+ * — не истина, а подсказка, проверяет человек.
+ */
+function fillSpecsFromText(): number {
+  const explained = explainSpecs(formData.value.name || '', formData.value.description)
+  const values = Object.fromEntries(Object.entries(explained).map(([slug, e]) => [slug, e.value]))
+  const matched = matchSpecsToOptions(values, categoryAttributes.value)
+  const selects = { ...productAttributeValues.value }
+  const numbers = { ...numericAttributeValues.value }
+  const auto = { ...autoFilledSpecs.value }
+  let filled = 0
+
+  for (const attr of categoryAttributes.value) {
+    const isNumeric = attr.display_type === 'numeric'
+    const target = isNumeric ? numbers : selects
+    const current = target[attr.id] ?? null
+    const wasAuto = auto[attr.id] !== undefined && auto[attr.id]!.value === current
+    if (current !== null && !wasAuto)
+      continue
+
+    const suggested = isNumeric
+      ? (values[attr.slug] ? Number(values[attr.slug]) : null)
+      : (matched[attr.id] ?? null)
+    if (suggested === null || Number.isNaN(suggested)) {
+      // Фразу из описания убрали — убираем и подставленное по ней
+      if (wasAuto) {
+        target[attr.id] = null
+        delete auto[attr.id]
+      }
+      continue
+    }
+    if (current !== suggested)
+      filled++
+    target[attr.id] = suggested
+    auto[attr.id] = { value: suggested, evidence: explained[attr.slug]?.evidence ?? '' }
+  }
+
+  productAttributeValues.value = selects
+  numericAttributeValues.value = numbers
+  autoFilledSpecs.value = auto
+  return filled
+}
+
+function isAutoFilled(attrId: number, current: number | null | undefined): boolean {
+  return autoFilledSpecs.value[attrId] !== undefined && autoFilledSpecs.value[attrId]!.value === current
+}
+
+function handleFillSpecs() {
+  const filled = fillSpecsFromText()
+  if (filled > 0)
+    toast.success(`Из описания заполнено: ${filled}`, { description: 'Проверьте значения — правила подсказывают, а не решают.' })
+  else
+    toast.info('В названии и описании не нашлось, что добавить', { description: 'Заполненные вами поля не меняются.' })
+}
+
+// Новый товар: пока пишут название и описание, характеристики подтягиваются
+const refillSpecsWhileTyping = debounce(() => {
+  if (!props.initialData?.id && categoryAttributes.value.length)
+    fillSpecsFromText()
+}, 600)
+watch(() => [formData.value.name, formData.value.description], refillSpecsWhileTyping)
 
 watch(
   () => formData.value.category_id,
@@ -784,27 +875,45 @@ const descriptionValue = computed({
   },
 })
 
-const minAgeYearsValue = computed({
+/*
+ * Возраст: число и единица, в базу — месяцы (`min_age_months`).
+ *
+ * Админ вписывает как на коробке — «6 лет» или «18 мес», месяцы считает
+ * utils/productAge.ts. Смена единицы число не пересчитывает: вписали «6» и
+ * выбрали «мес» — значит, 6 месяцев. Годы (`min_age_years`) в базе
+ * пересчитывает триггер — их по-прежнему читает выдача каталога.
+ */
+const minAgeValue = computed({
   get() {
-    return formData.value.min_age_years ?? undefined
+    return minAge.value.value ?? undefined
   },
   set(value) {
-    if (formData.value) {
-      formData.value.min_age_years = typeof value === 'number' ? value : null
-    }
+    minAge.value = { ...minAge.value, value: typeof value === 'number' ? value : null }
   },
 })
 
-const maxAgeYearsValue = computed({
+const maxAgeValue = computed({
   get() {
-    return formData.value.max_age_years ?? undefined
+    return maxAge.value.value ?? undefined
   },
   set(value) {
-    if (formData.value) {
-      formData.value.max_age_years = typeof value === 'number' ? value : null
-    }
+    maxAge.value = { ...maxAge.value, value: typeof value === 'number' ? value : null }
   },
 })
+
+// deep: единицу меняет v-model селекта прямо в объекте (`minAge.unit`), без
+// deep такой смены не видно — «3» + «лет» уходило в базу как 3 месяца.
+watch(minAge, (age) => {
+  formData.value.min_age_months = ageToMonths(age.value, age.unit)
+}, { deep: true })
+watch(maxAge, (age) => {
+  formData.value.max_age_months = ageToMonths(age.value, age.unit)
+}, { deep: true })
+
+/** Как возраст увидит покупатель — подсказка под полями. */
+const agePreview = computed(() =>
+  formatAgeRange(formData.value.min_age_months, formData.value.max_age_months),
+)
 
 // --- 12. АКТУАЛЬНАЯ ЦЕНА СО СКИДКОЙ ---
 
@@ -1360,10 +1469,25 @@ const seoKeywordsString = computed({
       <!-- 🏷️ Характеристики (Select/Color) -->
       <Card v-if="displayableAttributes.length > 0">
         <CardHeader>
-          <CardTitle>Характеристики</CardTitle>
-          <CardDescription>
-            Заполните значения для фильтров, привязанных к выбранной категории.
-          </CardDescription>
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-1.5">
+              <CardTitle>Характеристики</CardTitle>
+              <CardDescription>
+                Показываются на карточке товара и в фильтрах раздела. У нового
+                товара подставляются сами из названия и описания — проверьте.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="shrink-0"
+              @click="handleFillSpecs"
+            >
+              <Icon name="lucide:wand-2" class="mr-1.5 h-4 w-4" />
+              Заполнить из описания
+            </Button>
+          </div>
         </CardHeader>
         <CardContent class="space-y-4">
           <div v-for="attribute in displayableAttributes" :key="attribute.id">
@@ -1393,6 +1517,12 @@ const seoKeywordsString = computed({
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p
+              v-if="isAutoFilled(attribute.id, productAttributeValues[attribute.id])"
+              class="mt-1 text-xs text-muted-foreground"
+            >
+              Из описания: «{{ autoFilledSpecs[attribute.id]?.evidence }}»
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -1433,6 +1563,12 @@ const seoKeywordsString = computed({
                     : null)
               "
             />
+            <p
+              v-if="isAutoFilled(attribute.id, numericAttributeValues[attribute.id])"
+              class="mt-1 text-xs text-muted-foreground"
+            >
+              Из описания: «{{ autoFilledSpecs[attribute.id]?.evidence }}»
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -1898,30 +2034,70 @@ const seoKeywordsString = computed({
             </Select>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 pt-2">
+          <!-- Друг под другом, а не в две колонки: карточка стоит в узкой боковой
+               колонке, и рядом с селектом единицы поле числа сжималось до 20px. -->
+          <div class="grid gap-3 pt-2">
             <div>
-              <Label for="min_age_years">Мин. возраст (лет)</Label>
-              <Input
-                id="min_age_years"
-                v-model.number="minAgeYearsValue"
-                type="number"
-                placeholder="0"
-                min="0"
-                max="100"
-              />
+              <Label for="min_age">Возраст от</Label>
+              <div class="flex gap-2">
+                <Input
+                  id="min_age"
+                  v-model.number="minAgeValue"
+                  type="number"
+                  placeholder="—"
+                  min="0"
+                  step="any"
+                  class="min-w-0 flex-1"
+                />
+                <Select v-model="minAge.unit">
+                  <SelectTrigger class="w-24" aria-label="Единица возраста «от»">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="months">
+                      мес.
+                    </SelectItem>
+                    <SelectItem value="years">
+                      лет
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
-              <Label for="max_age_years">Макс. возраст (лет)</Label>
-              <Input
-                id="max_age_years"
-                v-model.number="maxAgeYearsValue"
-                type="number"
-                placeholder="100"
-                min="0"
-                max="100"
-              />
+              <Label for="max_age">Возраст до</Label>
+              <div class="flex gap-2">
+                <Input
+                  id="max_age"
+                  v-model.number="maxAgeValue"
+                  type="number"
+                  placeholder="—"
+                  min="0"
+                  step="any"
+                  class="min-w-0 flex-1"
+                />
+                <Select v-model="maxAge.unit">
+                  <SelectTrigger class="w-24" aria-label="Единица возраста «до»">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="months">
+                      мес.
+                    </SelectItem>
+                    <SelectItem value="years">
+                      лет
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
+          <p class="text-xs text-muted-foreground">
+            Как на коробке: малышам — месяцами (6 мес., 18 мес.), остальным — годами.
+            <template v-if="agePreview">
+              На сайте: <span class="font-medium text-foreground">{{ agePreview }}</span>
+            </template>
+          </p>
         </CardContent>
       </Card>
 

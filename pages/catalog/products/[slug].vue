@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  AttributeWithValue,
   Database,
   IBreadcrumbItem,
   ProductImageRow,
@@ -29,8 +28,11 @@ import { useProductQuestionsStore } from '@/stores/publicStore/productQuestionsS
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
+import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+import { formatAgeRange, productAgeMonths } from '@/utils/productAge'
+import { attributeSpecRows, filterLink } from '@/utils/productSpecRows'
 import { composeProductMeta } from '@/utils/seoDescription'
 
 import { buildProductTitle } from '@/utils/seoTitle'
@@ -249,9 +251,11 @@ const digitColumns = ref<HTMLElement[]>([])
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (!product.value)
     return []
-  let crumbs: IBreadcrumbItem[] = []
+  // «Каталог» первым звеном: с карточек и разделов это единственная ссылка на
+  // хаб в серверной разметке — разбор в pages/catalog/[...slug].vue.
+  const crumbs: IBreadcrumbItem[] = [{ id: 'catalog', name: 'Каталог', href: '/catalog' }]
   if (product.value.categories?.slug)
-    crumbs = categoriesStore.getBreadcrumbs(product.value.categories.slug)
+    crumbs.push(...categoriesStore.getBreadcrumbs(product.value.categories.slug))
   crumbs.push({ id: product.value.id, name: product.value.name })
   return crumbs
 })
@@ -558,17 +562,14 @@ const metaTitle = computed(() => {
   return buildProductTitle(product.value.name)
 })
 
+// Возраст — в месяцах, словами как на коробке: «от 6 месяцев», «от 1 года»,
+// «от 4 до 12 лет». До 22 сентября 2026 здесь были годы и «от 1 лет»;
+// см. utils/productAge.ts.
 const ageRangeText = computed(() => {
   if (!product.value)
     return null
-  const { min_age_years: min, max_age_years: max } = product.value
-  if (min !== null && max !== null)
-    return min === max ? `${min} лет` : `от ${min} до ${max} лет`
-  if (min !== null)
-    return `от ${min} лет`
-  if (max !== null)
-    return `до ${max} лет`
-  return null
+  const { min, max } = productAgeMonths(product.value)
+  return formatAgeRange(min, max)
 })
 
 const genderText = computed(() => {
@@ -645,22 +646,6 @@ const parentCategories = computed(() => {
     .filter(item => item.category)
 })
 
-const categoryAttributes = ref<AttributeWithValue[]>([])
-watch(
-  () => categorySlug.value,
-  async (newSlug) => {
-    if (newSlug) {
-      categoryAttributes.value
-        = await productsStore.fetchAttributesForCategory(newSlug)
-    }
-  },
-  { immediate: true },
-)
-
-const hasPieceCountAttribute = computed(() =>
-  categoryAttributes.value.some(attr => attr.display_type === 'number_range'),
-)
-
 interface ProductWithProductLine {
   product_lines?: { name: string, slug: string } | null
 }
@@ -688,12 +673,9 @@ const metaKeywords = computed(() => {
     keywords.push(...product.value.seo_keywords)
   if (product.value) {
     keywords.push(product.value.name)
-    if (product.value.min_age_years !== null) {
-      keywords.push(
-        `игрушки от ${product.value.min_age_years} лет`,
-        `${product.value.min_age_years} года`,
-      )
-    }
+    const ageFrom = formatAgeRange(productAgeMonths(product.value).min, null)
+    if (ageFrom)
+      keywords.push(`игрушки ${ageFrom}`)
     if (product.value.gender === 'female')
       keywords.push('игрушки для девочек', 'подарок девочке')
     else if (product.value.gender === 'male')
@@ -727,8 +709,36 @@ const productLineLogoUrl = computed(() => {
 const brandLink = computed(() =>
   brandSlug.value ? `/brand/${brandSlug.value}` : null,
 )
+/*
+ * Полный адрес раздела из базы (`categories.href`), а не `/catalog/<slug>`:
+ * короткий адрес отвечает редиректом 301 на полный. 23 сентября 2026 так
+ * вела ссылка «Категория» со всех 178 карточек — в характеристиках, в
+ * «Ещё в этих категориях» и в кнопке «назад» мобильной шапки. Короткий
+ * остаётся запасным, если в строке раздела адреса нет.
+ */
 const categoryLink = computed(() =>
-  categorySlug.value ? `/catalog/${categorySlug.value}` : null,
+  product.value?.categories?.href
+  || fullCategory.value?.href
+  || (categorySlug.value ? `/catalog/${categorySlug.value}` : null),
+)
+
+/*
+ * Характеристики из атрибутов товара — строками, со ссылками на раздел с
+ * фильтром по значению (utils/productSpecRows.ts). Здесь раньше догружались
+ * атрибуты раздела ради строки «Количество деталей», но она ждала тип
+ * `number_range`, которого в базе нет, и не показывалась никогда; а догрузка
+ * шла мимо SSR. Данные для строк приходят с самим товаром.
+ */
+const specRows = computed(() => attributeSpecRows({
+  values: product.value?.product_attribute_values,
+  categoryId: product.value?.category_id,
+  categoryHref: categoryLink.value,
+}))
+const materialLink = computed(() =>
+  filterLink(categoryLink.value, 'materials', product.value?.material_id),
+)
+const countryLink = computed(() =>
+  filterLink(categoryLink.value, 'countries', product.value?.origin_country_id),
 )
 
 /**
@@ -809,26 +819,10 @@ const similarGridProducts = computed(() =>
 const schemaAdditionalProperties = computed(() => {
   const properties: Array<{ '@type': 'PropertyValue', 'name': string, 'value': string }> = []
 
-  const pavs = product.value?.product_attribute_values
-  if (pavs?.length) {
-    const grouped = new Map<string, string[]>()
-    for (const pav of pavs) {
-      const attrName = pav.attributes?.name
-      if (!attrName)
-        continue
-      const option = pav.attributes?.attribute_options?.find(
-        o => o.id === pav.option_id,
-      )
-      if (!option?.value)
-        continue
-      if (!grouped.has(attrName))
-        grouped.set(attrName, [])
-      grouped.get(attrName)!.push(String(option.value))
-    }
-    for (const [name, values] of grouped.entries()) {
-      properties.push({ '@type': 'PropertyValue', 'name': name, 'value': values.join(', ') })
-    }
-  }
+  // Те же строки, что видны на странице: разметка не должна говорить больше
+  // видимого. Раньше сюда шли только варианты — число деталей терялось.
+  for (const row of specRows.value)
+    properties.push({ '@type': 'PropertyValue', 'name': row.label, 'value': row.value })
 
   // Бонусные баллы программы лояльности — реальный, не выдуманный сигнал
   // (см. SEO-аудит, находка S-5): additionalProperty вместо MemberProgram,
@@ -996,8 +990,9 @@ useSchemaOrg([
     sku: productSku,
     mpn: productSku,
 
-    // ✅ 3. Штрихкод (только если существует)
-    gtin: computed(() => product.value?.barcode || undefined),
+    // ✅ 3. Штрихкод — только настоящий GTIN (utils/gtin.ts): «8497» из базы
+    // уходил сюда как штрихкод, хотя это четыре цифры.
+    gtin: computed(() => validGtin(product.value?.barcode) ?? undefined),
 
     /*
      * Бренд — это производитель, а не продавец.
@@ -1102,29 +1097,47 @@ useSchemaOrg([
       }))
     }),
 
-    // 🔥 ТИКЕТ 1: Связывание товаров для Deep Crawling
-    isAccessoryOrSparePartFor: computed(() => {
-      if (!accessories.value?.length)
-        return undefined
-      return accessories.value.map(acc => ({
-        '@type': 'Product' as const,
-        'name': acc.name,
-        'url': `https://uhti.kz/catalog/products/${acc.slug}`,
-      }))
-    }),
-
-    isSimilarTo: computed(() => {
-      if (!similarProducts.value?.length)
-        return undefined
-      return similarProducts.value.slice(0, 5).map(sim => ({
-        '@type': 'Product' as const,
-        'name': sim.name,
-        'url': `https://uhti.kz/catalog/products/${sim.slug}`,
-      }))
-    }),
+    /*
+     * `isAccessoryOrSparePartFor` и `isSimilarTo` ЖИЛИ ЗДЕСЬ и сняты
+     * 22 сентября 2026. Оба строились из запросов useQuery, которых сервер не
+     * ждёт, и в серверную разметку попадали как повезёт: на стенде без кеша
+     * аксессуары — в 1 рендере из 8, похожие — ни в одном. На бою ISR
+     * кешировал ту версию, что попалась. Вдобавок аксессуары стояли в
+     * `isAccessoryOrSparePartFor` — это значит «ЭТОТ товар — аксессуар для…»,
+     * то есть аккордеон объявлялся аксессуаром к батарейкам.
+     *
+     * Google эти поля не использует ни в одном расширенном результате, а
+     * ссылки из JSON-LD не обходит. Ссылки на аксессуары и похожие товары
+     * живут в самих блоках страницы — обычными <a>.
+     */
 
     // 🔥 Дополнительные свойства товара (атрибуты) для Google Merchant
     additionalProperty: schemaAdditionalProperties,
+
+    /*
+     * Цвет, материал и «для кого» — поля разметки товара, по которым Google
+     * сопоставляет его с запросами вида «кукла для девочки 3 лет». Значения
+     * те же, что видны на странице: строки характеристик и «Игрушка для
+     * девочек от 3 лет» под названием (23 сентября 2026). Возраст — в годах,
+     * как принято в schema.org: «от 6 месяцев» → 0.5.
+     */
+    color: computed(() => specRows.value.find(r => r.key === 'attr-color')?.value),
+    material: computed(() => product.value?.materials?.name || undefined),
+    audience: computed(() => {
+      if (!product.value)
+        return undefined
+      const { min, max } = productAgeMonths(product.value)
+      const gender = product.value.gender
+      const suggestedGender = gender === 'female' || gender === 'male' || gender === 'unisex' ? gender : undefined
+      if (min === null && max === null && !suggestedGender)
+        return undefined
+      return {
+        '@type': 'PeopleAudience' as const,
+        ...(min !== null && { suggestedMinAge: Math.round((min / 12) * 10) / 10 }),
+        ...(max !== null && { suggestedMaxAge: Math.round((max / 12) * 10) / 10 }),
+        ...(suggestedGender && { suggestedGender }),
+      }
+    }),
   }),
 ])
 
@@ -1512,6 +1525,24 @@ watchEffect(() => {
                 </dd>
               </div>
 
+              <div v-for="row in specRows" :key="row.key" class="pdp-spec-row">
+                <dt class="pdp-spec-label">
+                  {{ row.label }}
+                </dt>
+                <dd class="pdp-spec-value">
+                  <span
+                    v-if="row.swatch"
+                    class="pdp-spec-swatch"
+                    :style="{ backgroundColor: row.swatch }"
+                    aria-hidden="true"
+                  />
+                  <NuxtLink v-if="row.to" :to="row.to" class="text-primary hover:underline">
+                    {{ row.value }}
+                  </NuxtLink>
+                  <span v-else>{{ row.value }}</span>
+                </dd>
+              </div>
+
               <div v-if="ageRangeText" class="pdp-spec-row">
                 <dt class="pdp-spec-label">
                   Рекомендованный возраст
@@ -1526,7 +1557,10 @@ watchEffect(() => {
                   Материал
                 </dt>
                 <dd class="pdp-spec-value">
-                  {{ product.materials.name }}
+                  <NuxtLink v-if="materialLink" :to="materialLink" class="text-primary hover:underline">
+                    {{ product.materials.name }}
+                  </NuxtLink>
+                  <span v-else>{{ product.materials.name }}</span>
                 </dd>
               </div>
 
@@ -1535,16 +1569,10 @@ watchEffect(() => {
                   Страна производитель
                 </dt>
                 <dd class="pdp-spec-value">
-                  {{ product.countries.name }}
-                </dd>
-              </div>
-
-              <div v-if="hasPieceCountAttribute && product.piece_count" class="pdp-spec-row">
-                <dt class="pdp-spec-label">
-                  Количество деталей
-                </dt>
-                <dd class="pdp-spec-value">
-                  {{ product.piece_count }} шт
+                  <NuxtLink v-if="countryLink" :to="countryLink" class="text-primary hover:underline">
+                    {{ product.countries.name }}
+                  </NuxtLink>
+                  <span v-else>{{ product.countries.name }}</span>
                 </dd>
               </div>
 
@@ -2251,6 +2279,16 @@ watchEffect(() => {
     font-size: 14px;
     font-weight: 600;
     text-align: right;
+  }
+
+  .pdp-spec-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 6px;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    vertical-align: baseline;
   }
 
   /* ── Ещё в этих категориях ────────────────────────────────────────────────── */

@@ -7,24 +7,18 @@ const props = defineProps<{
   compact?: boolean // 🆕 Режим для страницы товара
 }>()
 
-// ✅ Медиа-запрос инициализируем на клиенте чтобы избежать hydration mismatch
-const isDesktop = ref(false)
-
-onMounted(() => {
-  // ✅ Определяем размер экрана на клиенте
-  isDesktop.value = window.innerWidth >= 768
-
-  // Слушаем изменения размера экрана
-  const handleResize = () => {
-    isDesktop.value = window.innerWidth >= 768
-  }
-  window.addEventListener('resize', handleResize)
-
-  // Очистка
-  onUnmounted(() => {
-    window.removeEventListener('resize', handleResize)
-  })
-})
+/*
+ * Ширина решается СТИЛЯМИ, а не скриптом.
+ *
+ * Раньше здесь стоял `isDesktop = ref(false)` с замером `window.innerWidth`
+ * в `onMounted`, и ветка выбиралась после гидратации. На сервере это значило
+ * мобильный вариант всегда, а он в компактном режиме — одна кнопка «назад».
+ * То есть в серверной разметке страницы раздела и карточки не было ни одной
+ * ссылки на родительские разделы и на `/catalog`: 23 сентября 2026 хаб
+ * `/catalog` в Search Console числился «Crawled — currently not indexed», а
+ * последний обход был 28 апреля. Теперь обе ветки рисуются на сервере, а
+ * видно по-прежнему одну — ту, что разрешил брейкпоинт `md`.
+ */
 
 // Родительская категория (для кнопки "Назад" на мобилке)
 const parentItem = computed(() => {
@@ -45,7 +39,7 @@ const currentItem = computed(() => {
 <template>
   <nav v-if="items && items.length > 0" aria-label="Breadcrumb" class="mb-4 md:mb-6">
     <!-- ДЕСКТОПНАЯ ВЕРСИЯ -->
-    <div v-if="isDesktop" class="space-y-4">
+    <div class="hidden md:block space-y-4">
       <!-- Breadcrumbs -->
       <ol class="flex items-center flex-wrap gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <li>
@@ -81,7 +75,7 @@ const currentItem = computed(() => {
     </div>
 
     <!-- МОБИЛЬНАЯ ВЕРСИЯ -->
-    <div v-else>
+    <div class="md:hidden">
       <!-- 🆕 Компактный режим (для страницы товара) -->
       <div v-if="compact" class="flex items-center">
         <NuxtLink

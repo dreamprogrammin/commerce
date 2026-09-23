@@ -336,7 +336,8 @@ export interface ProductAccessoryLink {
 }
 
 export type FullProduct = ProductWithImages & {
-  categories: { name: string | null, slug: string | null } | null
+  /** href — канонический адрес раздела; короткий /catalog/<slug> отвечает редиректом 301 */
+  categories: { name: string | null, slug: string | null, href?: string | null } | null
   accessories?: ProductWithImages[]
 
   brands: Brand | null
@@ -371,6 +372,9 @@ export interface ProductFormData {
   is_accessory: boolean
   min_age_years: number | null
   max_age_years: number | null
+  /** Возраст в месяцах — основной; годы пересчитывает триггер в базе. */
+  min_age_months?: number | null
+  max_age_months?: number | null
   sku: string | null
   brand_id: string | null
   product_line_id: string | null // Линейка продуктов (Barbie, Hot Wheels и т.д.)
@@ -516,6 +520,8 @@ export type ProductAttributeValueWithDetails
     attributes:
       | (Tables<'attributes'> & {
         attribute_options: Tables<'attribute_options'>[]
+        /** Разделы, где по атрибуту есть фильтр, — для ссылки из характеристик */
+        category_attributes?: { category_id: string }[] | null
       })
       | null
   }

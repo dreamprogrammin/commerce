@@ -12,6 +12,7 @@ import type {
   ProductLine,
   SortByType,
 } from '@/types'
+import type { CategoryFacts } from '@/utils/categoryFacts'
 import { useQuery } from '@tanstack/vue-query'
 import { watchDebounced } from '@vueuse/core'
 import {
@@ -48,7 +49,9 @@ import {
   prependBrandLandingFacts,
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { isCategoryIndexable } from '@/utils/categoryLanding'
+import { categoryFactsFromRows, topBrandNames } from '@/utils/categoryFacts'
+import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
+import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 
@@ -422,7 +425,7 @@ const { data: brandLandingAll } = await useAsyncData(
 
     const { data, error } = await supabase
       .from('products')
-      .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, category_id, brand_id')
+      .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, min_age_months, max_age_months, category_id, brand_id')
       .eq('is_active', true)
       .eq('brand_id', brandId)
       .in('category_id', [...branch])
@@ -442,14 +445,30 @@ const activeBrandName = computed(
   () => activeBrand.value?.name || activeBrandSeoName.value || null,
 )
 
+/*
+ * Первым звеном — «Каталог», и это не косметика.
+ *
+ * `/catalog` в Search Console 23 сентября 2026 числится «Crawled — currently
+ * not indexed», а последний обход — 28 апреля: на страницу не ведёт ни одной
+ * ссылки из серверной разметки. Единственная ссылка на неё — в мобильной
+ * нижней панели, которая рисуется уже в браузере. Крошки дают ссылку с
+ * каждой страницы раздела и карточки товара и заодно ставят хаб на своё
+ * место в разметке `BreadcrumbList`.
+ */
+const CATALOG_CRUMB: IBreadcrumbItem = { id: 'catalog', name: 'Каталог', href: '/catalog' }
+
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   if (currentCategorySlug.value === 'all') {
-    return [{ id: 'all', name: 'Все товары', href: '/catalog/all' }]
+    return [CATALOG_CRUMB, { id: 'all', name: 'Все товары', href: '/catalog/all' }]
   }
   const crumbs = categoriesStore.getBreadcrumbs(currentCategorySlug.value)
 
-  if (activeBrand.value && crumbs.length > 0) {
+  if (crumbs.length === 0)
+    return []
+
+  if (activeBrand.value) {
     return [
+      CATALOG_CRUMB,
       ...crumbs,
       {
         id: `brand-${activeBrand.value.id}`,
@@ -458,7 +477,7 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
     ]
   }
 
-  return crumbs
+  return [CATALOG_CRUMB, ...crumbs]
 })
 
 const currentCategory = computed(() => {
@@ -551,6 +570,47 @@ const pieceCountRange = ref<{ min: number, max: number } | null>(null)
 const subcategories = computed(() =>
   categoriesStore.getSubcategories(currentCategorySlug.value),
 )
+
+/*
+ * Подразделы обычными ссылками (CategorySubnav) — только те, где есть товар.
+ *
+ * Чипы подразделов наверху — фильтр этой же страницы, ссылок на подразделы
+ * в разметке для поиска не было вовсе (разбор 22 сентября 2026 — в
+ * компоненте). Число товаров считается по ветке, как у карты сайта и
+ * robots (utils/categoryLanding.ts): одна лёгкая выборка — только
+ * category_id активных товаров.
+ *
+ * На связке «раздел + бренд» блок не нужен: там подразделы — другие страницы
+ * без бренда, и ссылка увела бы из связки.
+ */
+const { data: productsInBranch } = await useAsyncData(
+  'catalog-products-in-branch',
+  async () => {
+    if (!categoriesStore.allCategories.length)
+      await categoriesStore.fetchCategoryData()
+    const { data, error } = await supabase
+      .from('products')
+      .select('category_id')
+      .eq('is_active', true)
+    if (error)
+      throw error
+    // В payload уходит не список товаров, а готовые числа по разделам — ~3 КБ.
+    return Object.fromEntries(countProductsByCategory(data ?? [], categoriesStore.allCategories))
+  },
+)
+const subcategoryLinks = computed(() => {
+  if (activeBrandSlug.value || !productsInBranch.value)
+    return []
+  const counts = productsInBranch.value
+  return subcategories.value
+    .map(category => ({ category, count: counts[category.id] ?? 0 }))
+    .filter(({ category, count }) => count > 0 && isCategoryIndexable(category.slug, count))
+    .map(({ category, count }) => ({
+      name: category.seo_h1?.trim() || category.name,
+      path: category.href || `/catalog/${category.slug}`,
+      count,
+    }))
+})
 
 const activeFiltersCount = computed(() => {
   let count = 0
@@ -1113,6 +1173,19 @@ watch(currentPageProducts, (newProducts) => {
   }
 })
 
+/*
+ * Выбран ли вариант атрибута. Сравнение — строками: `updateAttribute` хранит
+ * выбранное строками, из адреса (`?attr_pitanie=46`) оно тоже приходит
+ * строкой, а `option.id` — число. До 23 сентября 2026 шаблон сравнивал
+ * `.includes(option.id)` напрямую — выбранный вариант никогда не выглядел
+ * отмеченным, и снять его галочкой было нельзя, только кнопкой очистки.
+ * Пока атрибутов было два, этого не видели; ссылки из характеристик
+ * карточки приводят на страницу уже с фильтром.
+ */
+function isAttributeSelected(attributeSlug: string, optionId: string | number): boolean {
+  return (activeFilters.value.attributes[attributeSlug] || []).map(String).includes(String(optionId))
+}
+
 function updateAttribute(
   checked: boolean,
   attributeSlug: string,
@@ -1343,13 +1416,15 @@ const minPrice = computed(() => {
 })
 
 /**
- * Сколько активных товаров в категории вместе со всеми подкатегориями.
+ * Факты категории вместе со всеми подкатегориями: сколько активных товаров,
+ * самая низкая цена и сколько товаров у каждого бренда.
  *
- * Нужно ровно для одного — честного числа в мета-описании. Прежний шаблон
- * писал «В каталоге N моделей», подставляя длину ПЕРВОЙ СТРАНИЦЫ выдачи, а
- * это максимум 12 (`PAGE_SIZE`). У категории с полусотней товаров в выдаче
- * стояло «12 моделей»: число занижено втрое и вдобавок одинаково у половины
- * категорий.
+ * Нужны для мета-описания. Прежний шаблон писал «В каталоге N моделей»,
+ * подставляя длину ПЕРВОЙ СТРАНИЦЫ выдачи, а это максимум 12 (`PAGE_SIZE`).
+ * У категории с полусотней товаров в выдаче стояло «12 моделей»: число
+ * занижено втрое и вдобавок одинаково у половины категорий. С 23 сентября
+ * 2026 тот же запрос даёт и цену «от», и бренды по числу товаров — почему,
+ * см. `utils/categoryFacts.ts`.
  *
  * Дерево берём из хранилища — оно уже загружено выше (`catalog-meta-…`) и
  * приходит в серверную разметку, отдельного запроса за категориями не нужно.
@@ -1359,9 +1434,9 @@ const minPrice = computed(() => {
  * `null` означает «сосчитать не удалось»; описание тогда просто обходится без
  * количества, а не показывает ноль.
  */
-const { data: categoryProductsCount } = await useAsyncData(
-  () => `catalog-count-${currentCategorySlug.value}`,
-  async (): Promise<number | null> => {
+const { data: categoryFacts } = await useAsyncData(
+  () => `catalog-facts-${currentCategorySlug.value}`,
+  async (): Promise<CategoryFacts | null> => {
     if (currentCategorySlug.value === 'all')
       return null
 
@@ -1391,16 +1466,18 @@ const { data: categoryProductsCount } = await useAsyncData(
       }
     }
 
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('products')
-      .select('id', { count: 'exact', head: true })
+      .select('brand_id, price, final_price')
       .in('category_id', ids)
       .eq('is_active', true)
 
-    return error ? null : count
+    return error || !data ? null : categoryFactsFromRows(data)
   },
   { watch: [currentCategorySlug] },
 )
+
+const categoryProductsCount = computed(() => categoryFacts.value?.count ?? null)
 
 const categoryStats = computed(() => {
   let totalReviews = 0
@@ -1422,15 +1499,13 @@ const categoryStats = computed(() => {
   }
 })
 
+// По числу товаров в разделе. До 23 сентября 2026 сортировка шла по
+// `products_count`, которого RPC брендов не отдаёт, — и в описание попадали
+// первые три по алфавиту (см. utils/categoryFacts.ts).
 const topBrands = computed(() => {
-  if (!availableBrands.value || availableBrands.value.length === 0)
+  if (!availableBrands.value?.length || !categoryFacts.value)
     return []
-
-  return availableBrands.value
-    .slice()
-    .sort((a, b) => (b.products_count || 0) - (a.products_count || 0))
-    .slice(0, 3)
-    .map(b => b.name)
+  return topBrandNames(availableBrands.value, categoryFacts.value.brandCounts)
 })
 
 const metaDescription = computed(() => {
@@ -1488,12 +1563,15 @@ const metaDescription = computed(() => {
       : null
 
   return composeCategoryMeta({
-    categoryName: categoryName.value,
+    // Читаемое имя (seo_h1): в `name` у четырёх разделов дательный падеж, и в
+    // выдаче стояло «Конструкторы девочкам в Алматы: 2 модели…».
+    categoryName: readableCategoryName.value,
     // Написанное руками вступление, если владелец его завёл, — оно идёт
     // первым, а факты дописываются следом.
     lead: currentCategory.value?.meta_description,
     productsCount: categoryProductsCount.value,
-    minPrice: minPrice.value,
+    // Минимум по всей ветке; первая страница выдачи — только запасной вариант.
+    minPrice: categoryFacts.value?.minPrice ?? minPrice.value,
     topBrands: topBrands.value,
     city: 'Алматы',
     rating: ratingValue,
@@ -1536,7 +1614,7 @@ const metaTitle = computed(() => {
     return seoTitle
   }
 
-  return `${categoryName.value} купить в интернет-магазине Ухтышка Казахстан`
+  return `${readableCategoryName.value} купить в интернет-магазине Ухтышка Казахстан`
 })
 
 const metaKeywords = computed(() => {
@@ -1837,6 +1915,58 @@ if (
   }
 }
 
+/*
+ * Фильтры из адреса — поверх снимка, пришедшего с сервера.
+ *
+ * Страницы каталога отдаются через ISR, и сервер строит их без query; при
+ * переходе внутри сайта Nuxt берёт `_payload.json` того же пути (включён
+ * `payloadExtraction`) — тоже без query. В снимке фильтров адреса нет, и
+ * присвоение снимка целиком затирало то, что setup уже прочитал из адреса.
+ * 23 сентября 2026 на бою `/catalog/kiddy?materials=3`: первый запрос
+ * товаров уходил с материалом, второй — уже без него; ссылки из
+ * характеристик карточки (`?attr_pitanie=…`) при переходе с карточки не
+ * срабатывали ни разу из пяти.
+ *
+ * Бренд связки «раздел + бренд» живёт в пути — его не трогаем, как и
+ * `loadFilterData`.
+ */
+function withFiltersFromQuery(base: ActiveFilters): ActiveFilters {
+  const q = route.query
+  const list = (key: string, fallback: string[]) =>
+    q[key] !== undefined ? getArrayFromQuery(q[key]) : fallback
+  const num = (key: string, fallback: number) =>
+    q[key] !== undefined && Number.isFinite(Number(q[key])) ? Number(q[key]) : fallback
+
+  const attributes: ActiveFilters['attributes'] = { ...base.attributes }
+  for (const filter of availableFilters.value) {
+    const fromQuery = getArrayFromQuery(q[`attr_${filter.slug}`])
+    if (fromQuery.length > 0)
+      attributes[filter.slug] = fromQuery
+  }
+
+  const numericAttributes: ActiveFilters['numericAttributes'] = { ...base.numericAttributes }
+  for (const [id, range] of Object.entries(numericAttributeRanges.value)) {
+    if (q[`numeric_${id}_min`] !== undefined || q[`numeric_${id}_max`] !== undefined)
+      numericAttributes[Number(id)] = [num(`numeric_${id}_min`, range.min), num(`numeric_${id}_max`, range.max)]
+  }
+
+  return {
+    ...base,
+    sortBy: q.sort_by !== undefined ? getSortByFromQuery(q.sort_by) : base.sortBy,
+    subCategoryIds: list('subcategories', base.subCategoryIds),
+    brandIds: activeBrandSlug.value ? base.brandIds : list('brands', base.brandIds),
+    productLineIds: list('lines', base.productLineIds),
+    materialIds: list('materials', base.materialIds),
+    countryIds: list('countries', base.countryIds),
+    price: [num('price_min', base.price[0]), num('price_max', base.price[1])],
+    pieceCount: base.pieceCount
+      ? [num('piece_count_min', base.pieceCount[0]), num('piece_count_max', base.pieceCount[1])]
+      : base.pieceCount,
+    attributes,
+    numericAttributes,
+  }
+}
+
 if (import.meta.client && _filterPayload.value) {
   availableBrands.value = _filterPayload.value.brands
   availableProductLines.value = _filterPayload.value.productLines
@@ -1846,7 +1976,7 @@ if (import.meta.client && _filterPayload.value) {
   priceRange.value = _filterPayload.value.priceRange
   pieceCountRange.value = _filterPayload.value.pieceCountRange
   numericAttributeRanges.value = _filterPayload.value.numericRanges
-  activeFilters.value = _filterPayload.value.activeFilters
+  activeFilters.value = withFiltersFromQuery(_filterPayload.value.activeFilters)
   categoryBrandSeo.value = _filterPayload.value.categoryBrandSeo
   isLoadingFilters.value = false
 }
@@ -2110,7 +2240,8 @@ const schemaData = computed(() => {
                 url: `https://uhti.kz/brand/${product.brands.slug}`,
               }),
             },
-            ...(product.barcode && { gtin: product.barcode }),
+            // Только настоящий GTIN (utils/gtin.ts): «8497» из базы — не штрихкод.
+            ...(validGtin(product.barcode) && { gtin: validGtin(product.barcode) }),
             /*
              * `IMAGE_SIZES.CARD` третьим аргументом здесь НЕ работал: пока
              * `IMAGE_OPTIMIZATION_ENABLED = false`, `getImageUrl` игнорирует
@@ -2412,9 +2543,7 @@ else {
                           <Checkbox
                             :id="`attr-${filter.slug}-${option.id}`"
                             :model-value="
-                              (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id)
+                              isAttributeSelected(filter.slug, option.id)
                             "
                             @update:model-value="
                               (checked) =>
@@ -2500,18 +2629,12 @@ else {
                           class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95"
                           :class="{
                             'border-primary ring-2 ring-primary ring-offset-2':
-                              (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id),
-                            'border-border': !(
-                              activeFilters.attributes[filter.slug] || []
-                            ).includes(option.id),
+                              isAttributeSelected(filter.slug, option.id),
+                            'border-border': !isAttributeSelected(filter.slug, option.id),
                           }"
                           @click="
                             () => {
-                              const isCurrentlyChecked = (
-                                activeFilters.attributes[filter.slug] || []
-                              ).includes(option.id);
+                              const isCurrentlyChecked = isAttributeSelected(filter.slug, option.id);
                               updateAttribute(
                                 !isCurrentlyChecked,
                                 filter.slug,
@@ -2741,6 +2864,13 @@ else {
       v-if="availableProductLines.length > 0"
       :product-lines="availableProductLines"
       :brands="availableBrands"
+    />
+
+    <!-- Подразделы обычными ссылками: чипы наверху — фильтр, а не ссылки. -->
+    <CategorySubnav
+      v-if="subcategoryLinks.length > 0"
+      :category-name="readableCategoryName"
+      :links="subcategoryLinks"
     />
 
     <!-- ─── Отложенные блоки ─────────────────────────────────────────────

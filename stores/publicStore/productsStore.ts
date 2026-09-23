@@ -250,6 +250,52 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
   }
 
+  /** Родители всех разделов — одним запросом, чтобы собрать ветку раздела. */
+  let categoryParents: Map<string, string | null> | null = null
+
+  async function branchOf(categoryId: string): Promise<Set<string> | null> {
+    if (!categoryParents) {
+      const { data, error } = await supabase.from('categories').select('id, parent_id')
+      if (error || !data)
+        return null
+      categoryParents = new Map(data.map(c => [c.id, c.parent_id]))
+    }
+    const branch = new Set([categoryId])
+    for (let grew = true; grew;) {
+      grew = false
+      for (const [id, parent] of categoryParents) {
+        if (parent && branch.has(parent) && !branch.has(id)) {
+          branch.add(id)
+          grew = true
+        }
+      }
+    }
+    return branch
+  }
+
+  /** Варианты атрибутов, которые есть у активных товаров ветки раздела. `null` — узнать не вышло. */
+  async function presentOptionIds(categoryId: string, attributeIds: number[]): Promise<Set<number> | null> {
+    if (!attributeIds.length)
+      return new Set()
+    const branch = await branchOf(categoryId)
+    if (!branch)
+      return null
+    const { data, error } = await supabase
+      .from('product_attribute_values')
+      .select('option_id, products!inner(category_id, is_active)')
+      .in('attribute_id', attributeIds)
+      .not('option_id', 'is', null)
+      .eq('products.is_active', true)
+    if (error || !data)
+      return null
+    const ids = new Set<number>()
+    for (const row of data as unknown as { option_id: number, products: { category_id: string | null } | null }[]) {
+      if (row.products?.category_id && branch.has(row.products.category_id))
+        ids.add(row.option_id)
+    }
+    return ids
+  }
+
   async function fetchAttributesForCategory(
     categorySlug: string,
   ): Promise<AttributeWithValue[]> {
@@ -294,8 +340,32 @@ export const useProductsStore = defineStore('productsStore', () => {
       if (error)
         throw error
 
-      attributesByCategory.value[categorySlug] = data || []
-      return data || []
+      /*
+       * В фильтре — только варианты, которые есть у активных товаров раздела
+       * (вместе с подразделами, как считает и выдача get_filtered_products).
+       *
+       * Раньше панель показывала все варианты атрибута подряд. Пока атрибутов
+       * было два, это не мешало; с характеристиками 23 сентября 2026 цвет
+       * получил 13 вариантов, и в разделе, где товары четырёх цветов, девять
+       * кружков вели бы в пустую выдачу. Атрибут без единого варианта с
+       * товарами прячется целиком. Числовые — как были, у них свой диапазон.
+       * Не удалось узнать, что есть, — показываем всё, как раньше.
+       */
+      const attrs = data || []
+      const present = await presentOptionIds(
+        categoryData.id,
+        attrs.filter(a => a.display_type !== 'numeric').map(a => a.id),
+      )
+      const visible = present === null
+        ? attrs
+        : attrs
+            .map(a => a.display_type === 'numeric'
+              ? a
+              : { ...a, attribute_options: (a.attribute_options ?? []).filter(o => present.has(o.id)) })
+            .filter(a => a.display_type === 'numeric' || a.attribute_options.length > 0)
+
+      attributesByCategory.value[categorySlug] = visible
+      return visible
     }
     catch (error: any) {
       console.error('Ошибка загрузки атрибутов для фильтров:', error)
@@ -623,13 +693,13 @@ export const useProductsStore = defineStore('productsStore', () => {
       .select(
         `
         *,
-        categories(name, slug),
+        categories(name, slug, href),
         product_images(*),
         brands(*),
         product_lines(*),
         countries(*),
         materials(*),
-        product_attribute_values(*, attributes(*, attribute_options(*)))
+        product_attribute_values(*, attributes(*, attribute_options(*), category_attributes(category_id)))
       `,
       )
       .eq('slug', slug)

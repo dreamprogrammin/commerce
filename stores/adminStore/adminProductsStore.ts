@@ -20,6 +20,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { formatFileSize, generateBlurPlaceholder, generateImageVariants, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
+import { cleanProductName } from '@/utils/productName'
 
 // 🆕 Интерфейс для изображения с blur
 interface ImageWithBlur {
@@ -272,6 +273,15 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   // --- ЗАПИСЬ ДАННЫХ (Write) ---
 
   /**
+   * Название без пробелов по краям и двойных внутри — utils/productName.ts.
+   * 22 сентября 2026 у 8 товаров из 178 оно начиналось с пробела, и пробел
+   * уезжал в заголовок фида Merchant Center и в разметку Product.
+   */
+  function withCleanName<T extends { name?: string | null }>(row: T): T {
+    return typeof row.name === 'string' ? { ...row, name: cleanProductName(row.name) } : row
+  }
+
+  /**
    * 🆕 Создает товар с поддержкой blur placeholder
    */
   async function createProduct(
@@ -281,7 +291,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     isSaving.value = true
     try {
       // Битые имена иконок в описании — см. composables/admin/useIconNameGuard.ts
-      const { row: safeProduct, report } = await sanitizeIconRow(productData)
+      const { row: safeProduct, report } = await sanitizeIconRow(withCleanName(productData))
       announceIconFixes(report)
 
       const { data: newProduct, error } = await supabase
@@ -326,7 +336,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
     isSaving.value = true
     try {
       // Битые имена иконок в описании — см. composables/admin/useIconNameGuard.ts
-      const { row: safeProduct, report } = await sanitizeIconRow(productData)
+      const { row: safeProduct, report } = await sanitizeIconRow(withCleanName(productData))
       announceIconFixes(report)
 
       const { data: updatedProduct, error } = await supabase
