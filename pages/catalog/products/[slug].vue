@@ -20,6 +20,7 @@ import {
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
 } from '@/constants'
+import { SHOP } from '@/constants/shop'
 import { productShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -512,8 +513,16 @@ const questionsCountLabel = computed(() =>
  * расхождение уже разбирали в августе на макетах бренд-лендинга (см.
  * `constants/brandStaticText.ts`), но до этих мест правка тогда не дошла.
  */
+/*
+ * Самовывоз — с адресом и часами (аудит 24 сентября 2026: «Адрес самовывоза
+ * не назван там, где спрашивают», а им получают 42 заказа из 45). Стояло
+ * «Забрать в магазине — Алматы — сегодня, бесплатно» из макета: без адреса,
+ * а «сегодня» в опубликованных условиях нет. Данные — из constants/shop.ts,
+ * как на «Условиях».
+ */
+const PICKUP_LINE = `${SHOP.street}, ${SHOP.openingHoursHuman}`
 const PICKUP_ROWS = [
-  { icon: 'lucide:store', title: 'Забрать в магазине', sub: 'Алматы — сегодня, бесплатно' },
+  { icon: 'lucide:store', title: 'Самовывоз в Алматы — бесплатно', sub: PICKUP_LINE },
   { icon: 'lucide:truck', title: 'Курьером по Алматы', sub: '1–3 рабочих дня, при заказе до 14:00 — отправка в тот же день' },
   { icon: 'lucide:package', title: 'По Казахстану', sub: '3–7 дней, Kazpost или CDEK' },
 ]
@@ -1442,6 +1451,11 @@ watchEffect(() => {
                 <div v-for="perk in PERKS" :key="perk.text" class="pdp-perk">
                   <Icon :name="perk.icon" class="size-5 shrink-0 text-primary" />
                   <span class="text-[12.5px] font-semibold leading-tight">{{ perk.text }}</span>
+                </div>
+                <!-- Самовывоз — на десктопе блок «Способы получения» скрыт, адрес здесь -->
+                <div class="pdp-perk col-span-2">
+                  <Icon name="lucide:store" class="size-5 shrink-0 text-primary" />
+                  <span class="text-[12.5px] font-semibold leading-tight">Самовывоз бесплатно: {{ PICKUP_LINE }}</span>
                 </div>
               </div>
             </div>

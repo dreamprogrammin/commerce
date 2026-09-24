@@ -1,5 +1,8 @@
 import type { Database } from '@/types'
 import { serverSupabaseClient } from '#supabase/server'
+import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '~/constants'
+import { SHOP, SHOP_ADDRESS_FULL } from '~/constants/shop'
+import { formatPrice } from '~/utils/formatPrice'
 
 /**
  * `/llms.txt` — краткая карта сайта для языковых моделей.
@@ -22,6 +25,12 @@ import { serverSupabaseClient } from '#supabase/server'
  * `/returns` и продублированы ссылками на них же — если условия поменяются,
  * расхождение будет видно сразу.
  *
+ * Аудит 24 сентября 2026: файл не знал о самовывозе (42 заказа из 45),
+ * писал «стоимость зависит от адреса» при фиксированной цене курьера по
+ * Алматы и вёл на закрытые от индекса страницы — `/catalog/all`,
+ * `/catalog/new` и разделы без товаров. Адрес, часы и цены теперь из тех же
+ * констант, что «Условия» и корзина; разделы — только с товарами.
+ *
  * ИМЯ ФАЙЛА БЕЗ `.get` — НАМЕРЕННО. С суффиксом Nitro регистрирует маршрут
  * только на GET, и на бою `HEAD /llms.txt` отдавал 404 при живом `GET` (200).
  * Краулер, который сперва пробует HEAD, — а так делают и обходчики ИИ, и
@@ -37,20 +46,32 @@ const BRANDS_LIMIT = 20
 export default defineEventHandler(async (event): Promise<string> => {
   const client = await serverSupabaseClient<Database>(event)
 
-  const [categoriesResult, brandsResult] = await Promise.all([
+  const [categoriesResult, brandsResult, productsResult] = await Promise.all([
     client
       .from('categories')
       .select('id, name, slug, href, parent_id')
-      .is('parent_id', null)
       .order('name'),
     client
       .from('brands')
       .select('name, slug, products(count)')
       .eq('products.is_active', true)
       .limit(200),
+    client
+      .from('products')
+      .select('category_id')
+      .eq('is_active', true),
   ])
 
-  const roots = categoriesResult.data ?? []
+  // Раздел без товаров закрыт `noindex` — считаем товары по всей ветке
+  const categories = categoriesResult.data ?? []
+  const activeIn = new Map<string, number>()
+  for (const p of productsResult.data ?? []) {
+    if (p.category_id)
+      activeIn.set(p.category_id, (activeIn.get(p.category_id) ?? 0) + 1)
+  }
+  const branchCount = (id: string): number =>
+    (activeIn.get(id) ?? 0) + categories.filter(c => c.parent_id === id).reduce((sum, c) => sum + branchCount(c.id), 0)
+  const roots = categories.filter(c => c.parent_id === null && branchCount(c.id) > 0)
 
   const brands = (brandsResult.data ?? [])
     .map(brand => ({
@@ -89,7 +110,9 @@ export default defineEventHandler(async (event): Promise<string> => {
     '## Условия',
     '',
     '- Доставка: отправка из Алматы. По городу 1–3 рабочих дня, по остальным',
-    '  городам Казахстана 3–7 рабочих дней. Стоимость зависит от адреса.',
+    '  городам Казахстана 3–7 рабочих дней. Курьер по Алматы',
+    `  ${formatPrice(COURIER_DELIVERY_COST)} ₸, от ${formatPrice(FREE_SHIPPING_THRESHOLD)} ₸ — бесплатно; в другие города — по адресу.`,
+    `- Самовывоз в Алматы: бесплатно, ${SHOP_ADDRESS_FULL}, ${SHOP.openingHoursHuman}.`,
     '- Оплата: наличными при получении либо переводом или по QR через Kaspi.',
     '- Возврат и обмен: 14 календарных дней при сохранённых упаковке и',
     '  товарном виде; при заводском браке доставка за счёт магазина.',
@@ -99,14 +122,14 @@ export default defineEventHandler(async (event): Promise<string> => {
     '',
     '## Контакты',
     '',
+    `- Адрес (склад и самовывоз): ${SHOP_ADDRESS_FULL}, ${SHOP.openingHoursHuman}`,
     '- Телефон и WhatsApp: +7 702 537 94 73',
     '- Telegram: https://t.me/uhtikz',
     '- Почта: info@uhti.kz',
     '',
     '## Полезные страницы',
     '',
-    `- [Весь каталог](${SITE_URL}/catalog/all)`,
-    `- [Новинки](${SITE_URL}/catalog/new)`,
+    `- [Каталог](${SITE_URL}/catalog)`,
     `- [Акции](${SITE_URL}/catalog/promotions)`,
     `- [Все бренды](${SITE_URL}/brands)`,
     `- [О магазине](${SITE_URL}/about)`,
