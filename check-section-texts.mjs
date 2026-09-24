@@ -9,8 +9,9 @@
  * Алматы, по Казахстану 3–7. Тот же абзац — в восьми связках «раздел +
  * бренд». Тексты живут в базе (`categories.seo_text`,
  * `category_brand_seo.seo_text`), их меняет
- * `docs/SEO_SECTION_TEXTS_2026_09_24.sql` (запускает владелец). До его
- * запуска страж красный — так и видно, запущен ли он.
+ * `docs/SEO_SECTION_TEXTS_2026_09_24.sql`, а «Гармошки и аккордеоны» —
+ * `docs/CATALOG_MOVES_2026_09_25.sql` (оба запускает владелец). До их
+ * запуска страж красный — так и видно, запущены ли они.
  *
  * Что проверяет:
  *  1) на КАЖДОЙ странице раздела и связки из sitemap.xml — нет обещания
@@ -59,8 +60,17 @@ const REWRITTEN = [
     links: [
       ['/catalog/creativity/muzykalnye-instrumenty/pianino-i-sintezatory', 'пианино и синтезаторы'],
       ['/catalog/creativity/muzykalnye-instrumenty/gitary-i-dombry', 'домбра'],
+      ['/catalog/creativity/muzykalnye-instrumenty/garmoshki-i-akkordeony', 'аккордеон'],
     ],
     absent: /барабан|ксилофон/i,
+  },
+  // Аккордеон переехал сюда из корня «Музыкальных инструментов» —
+  // `docs/CATALOG_MOVES_2026_09_25.sql`; он же заменил шаблонный текст.
+  {
+    path: '/catalog/creativity/muzykalnye-instrumenty/garmoshki-i-akkordeony',
+    text: ['Детский аккордеон в Алматы', 'HiH02'],
+    links: [['/catalog/creativity/muzykalnye-instrumenty', 'музыкальные инструменты']],
+    absent: /растягивающ|многокнопочн/i,
   },
   {
     path: '/catalog/girls/detskaya-kosmetika',
