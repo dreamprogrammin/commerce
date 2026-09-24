@@ -43,7 +43,9 @@
 --  ПРОВЕРЕНО ЗАПУСКОМ на локальной базе с копией боевых строк, с откатом.
 
 -- ── 1. ПОМЕНЯТЬ ───────────────────────────────────────────────────────────
---  Ожидаемо: UPDATE 1 восемь раз, затем UPDATE 39 и UPDATE 8.
+--  Ожидаемо: UPDATE 1 восемь раз, затем UPDATE 39 и UPDATE 8. Если раньше
+--  запущен CATALOG_MOVES_2026_09_25.sql — UPDATE 38: текст «Гармошек и
+--  аккордеонов» он уже заменил целиком. Порядок двух файлов не важен.
 
 BEGIN;
 
@@ -77,7 +79,7 @@ UPDATE public.categories SET seo_text = replace($txt$<h2 data-icon="fluent-emoji
  WHERE slug = 'kukly' AND md5(seo_text) = 'ff137d7905a6202abf3580ff56f0daa9';
 
 UPDATE public.categories SET seo_text = replace($txt$<h2 data-icon="fluent-emoji-flat:musical-keyboard">Детские музыкальные инструменты в Алматы</h2>
-<p>Основа раздела — клавишные: <a href="/catalog/creativity/muzykalnye-instrumenty/pianino-i-sintezatory">пианино и синтезаторы</a>, от пианино «Играй и пой» с микрофоном до синтезатора на 61 клавишу с метрономом и автоаккомпанементом. Ещё есть детская <a href="/catalog/creativity/muzykalnye-instrumenty/gitary-i-dombry">домбра</a> с казахским орнаментом — две струны и три кнопки с мелодиями — и пластиковый аккордеон со звуковыми эффектами.</p>
+<p>Основа раздела — клавишные: <a href="/catalog/creativity/muzykalnye-instrumenty/pianino-i-sintezatory">пианино и синтезаторы</a>, от пианино «Играй и пой» с микрофоном до синтезатора на 61 клавишу с метрономом и автоаккомпанементом. Ещё есть детская <a href="/catalog/creativity/muzykalnye-instrumenty/gitary-i-dombry">домбра</a> с казахским орнаментом — две струны и три кнопки с мелодиями — и пластиковый <a href="/catalog/creativity/muzykalnye-instrumenty/garmoshki-i-akkordeony">аккордеон</a> со звуковыми эффектами.</p>
 
 <h2 data-icon="fluent-emoji-flat:light-bulb">Как выбрать инструмент</h2>
 <ul>
@@ -166,7 +168,8 @@ COMMIT;
 -- ── 2. ПРОВЕРИТЬ ──────────────────────────────────────────────────────────
 --  Ожидаемо: perepisano = 8; ostalos_kz, ostalos_1_3, karagandy_lat — нули
 --  в обеих строках; shablon_vybor — сколько разделов ещё с «широким
---  выбором» (на 24 сентября 39: это следующие заходы).
+--  выбором» (на 24 сентября 39, после файла переносов 38: это следующие
+--  заходы).
 
 SELECT 'разделы' AS gde,
        count(*) FILTER (WHERE seo_text LIKE '%Доставка по Алматы — 1–3 рабочих дня, по Казахстану — 3–7%'
