@@ -359,10 +359,10 @@ useHead({
                 offers: {
                   '@type': 'AggregateOffer',
                   'lowPrice': Math.min(
-                    ...filterState.products.value.map(p => Number(p.price)),
+                    ...filterState.products.value.map(p => offerPrice(p)),
                   ),
                   'highPrice': Math.max(
-                    ...filterState.products.value.map(p => Number(p.price)),
+                    ...filterState.products.value.map(p => offerPrice(p)),
                   ),
                   'priceCurrency': 'KZT',
                   'offerCount': filterState.products.value.length,
