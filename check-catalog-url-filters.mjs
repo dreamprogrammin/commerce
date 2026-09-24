@@ -13,6 +13,15 @@
  *
  * Только чтение. Нужен раздел с фильтром по атрибуту: берётся «Питание» у
  * радиоуправляемых машинок; нет его — проверяется только материал.
+ *
+ * Дополнено 24 сентября 2026. Страж смотрел только ПОСЛЕДНИЙ ответ на запрос
+ * товаров и не смотрел адрес, поэтому на бою краснел через раз. На деле адрес
+ * терял `?attr_…` каждый раз, если на машинки шли с другой страницы каталога:
+ * удержанная в кэше прежняя страница видела чужой адрес и переписывала его
+ * своими пустыми фильтрами. А путь «раздел → карточка → ссылка из
+ * характеристик на тот же раздел» возвращал удержанную страницу со старым
+ * состоянием — фильтр из ссылки не применялся вовсе. Теперь проверяется
+ * адрес, запрос с фильтром и то, что в сетке только товары с этим значением.
  */
 import process from 'node:process'
 import { chromium } from 'playwright'
@@ -34,6 +43,17 @@ const anon = (home.match(/eyJ[\w-]{20,}\.[\w-]{20,}\.[\w-]{20,}/) || [])[0]
 const rest = async path => (await fetch(`${supaUrl}/rest/v1/${path}`, { headers: { apikey: anon, authorization: `Bearer ${anon}` } })).json()
 const [accum] = await rest('attribute_options?select=id,attributes!inner(slug)&value=eq.Аккумулятор&attributes.slug=eq.pitanie')
 const [textile] = await rest('materials?select=id&name=eq.Текстиль')
+
+/** Карточки в сетке раздела: у всех ли выбранный вариант атрибута «Питание». */
+async function gridHasOnly(page, optionId) {
+  const slugs = await page.locator('.pc-card a[href^="/catalog/products/"]').evaluateAll(as =>
+    [...new Set(as.map(a => a.getAttribute('href').split('/').pop()))])
+  if (!slugs.length)
+    return { ok: false, text: 'в сетке нет карточек' }
+  const rows = await rest(`products?select=slug,product_attribute_values(option_id,attributes(slug))&slug=in.(${slugs.map(encodeURIComponent).join(',')})`)
+  const other = rows.filter(r => !r.product_attribute_values.some(v => v.attributes?.slug === 'pitanie' && String(v.option_id) === String(optionId)))
+  return { ok: other.length === 0, text: `карточек ${slugs.length}, без выбранного питания ${other.length}` }
+}
 
 /** Последний запрос товаров: что в нём было и сколько пришло. */
 function watchProducts(page) {
@@ -80,10 +100,14 @@ try {
         nuxt.$router.push(to)
       }, `${RC}?attr_pitanie=${accum.id}`)
       await page.waitForTimeout(5000)
-      const last = calls.at(-1)
-      const applied = !!last && /"p_attributes":\[\{"slug":"pitanie"/.test(last.body)
-      if (applied)
+      // Адрес сохранил фильтр, запрос с фильтром ушёл, в сетке только он
+      const withFilter = calls.some(c => /"p_attributes":\[\{"slug":"pitanie"/.test(c.body))
+      const keptInUrl = page.url().includes(`attr_pitanie=${accum.id}`)
+      const grid = await gridHasOnly(page, accum.id)
+      if (withFilter && keptInUrl && grid.ok)
         good++
+      else
+        console.log(`        попытка ${i}: запрос с фильтром ${withFilter ? 'да' : 'нет'}, в адресе ${keptInUrl ? 'да' : 'НЕТ'}, ${grid.text}`)
       if (i === 5) {
         await page.locator('button').filter({ hasText: /^\s*Питание/ }).first().click()
         await page.waitForTimeout(600)
@@ -95,7 +119,47 @@ try {
       }
       await page.close()
     }
-    check(good === 5, `фильтр применён при переходе: ${good} из 5`)
+    check(good === 5, `фильтр применён при переходе и остался в адресе: ${good} из 5`)
+
+    // ── 3) раздел → карточка → ссылка из характеристик на тот же раздел ─────
+    console.log('\n3) раздел → карточка → ссылка «Питание» из характеристик — три раза')
+    const open = async () => {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } })
+      await page.goto(`${BASE}${RC}`, { waitUntil: 'load' })
+      await page.waitForFunction(() => document.querySelector('#__nuxt')?.__vue_app__, null, { timeout: 60000 })
+      await page.waitForTimeout(2500)
+      return page
+    }
+    // Карточка из первой страницы выдачи, у которой есть ссылка «Питание»
+    let card = null
+    {
+      const page = await open()
+      const hrefs = await page.locator('.pc-card a[href^="/catalog/products/"]').evaluateAll(as => [...new Set(as.map(a => a.getAttribute('href')))])
+      await page.close()
+      for (const href of hrefs) {
+        if (/href="[^"]*attr_pitanie=/.test(await (await fetch(`${BASE}${href}`)).text())) {
+          card = href
+          break
+        }
+      }
+    }
+    check(!!card, `в выдаче есть карточка со ссылкой «Питание»: ${card ?? 'нет'}`)
+    for (let i = 1; i <= (card ? 3 : 0); i++) {
+      const page = await open()
+      await page.locator(`.pc-card a[href="${card}"]`).first().click()
+      await page.waitForURL(url => url.pathname === card, { timeout: 30000 })
+      await page.waitForTimeout(3000)
+      const link = page.locator('a[href*="attr_pitanie="]:visible').first()
+      const optionId = new URL(await link.getAttribute('href'), BASE).searchParams.get('attr_pitanie')
+      const calls = watchProducts(page)
+      await link.click()
+      await page.waitForURL(url => url.pathname === RC, { timeout: 30000 })
+      await page.waitForTimeout(4000)
+      const withFilter = calls.some(c => new RegExp(`"p_attributes":\\[\\{"slug":"pitanie","option_ids":\\["?${optionId}"?[,\\]]`).test(c.body))
+      const grid = await gridHasOnly(page, optionId)
+      check(page.url().includes(`attr_pitanie=${optionId}`) && withFilter && grid.ok, `попытка ${i}: в адресе ${page.url().includes(`attr_pitanie=${optionId}`) ? 'фильтр' : 'НЕТ фильтра'}, запрос с фильтром ${withFilter ? 'да' : 'НЕТ'}, ${grid.text}`)
+      await page.close()
+    }
   }
   else {
     console.log('\n2) атрибута «Питание» с «Аккумулятором» в базе нет — пропуск')
