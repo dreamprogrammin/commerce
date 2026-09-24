@@ -197,6 +197,28 @@ function h1Of(html) {
   )
 }
 
+// ---------- 5в. Связки из исключений владельца ----------
+/*
+ * `BRAND_LANDINGS_KEPT_INDEXABLE` (constants/index.ts): связка открыта и при
+ * товарах меньше порога. «Конструкторы мальчикам + Sluban» — 179 показов за
+ * 28 дней на 8,9 месте, а Sluban в разделе два, и до 25 сентября 2026 порог
+ * её закрывал. Та же пара у девочек в исключения не входит — по ней видно,
+ * что общее правило не сломано.
+ */
+{
+  console.log('\n5в) связки из исключений владельца')
+  const KEPT = '/catalog/constructors-root/konstruktory-malchikam/brand/sluban'
+  const RULE = '/catalog/constructors-root/konstruktory-devochkam/brand/sluban'
+  const [map, kept] = await Promise.all([get('/sitemap.xml'), get(KEPT)])
+  const inMap = path => map.body.includes(`${path}</loc>`)
+  const robots = kept.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? ''
+  const cards = (kept.body.match(/class="pc-/g) ?? []).length
+  check(inMap(KEPT), `${KEPT} — в карте сайта`)
+  check(robots !== '' && !/noindex/.test(robots), `открыта для индекса: «${robots.split(',')[0]}»`)
+  check(cards > 0, `товары на странице есть (узлов карточек: ${cards})`)
+  check(!inMap(RULE), `${RULE} — не в карте: у девочек две Sluban, общее правило`)
+}
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым

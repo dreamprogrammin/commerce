@@ -152,3 +152,23 @@ export const HOME_RESERVE_PARTS = {
  * которой роботу неоткуда дойти. По этой же причине константа одна.
  */
 export const MIN_PRODUCTS_FOR_BRAND_LANDING = 3
+
+/**
+ * Связки «раздел + бренд», которые остаются в индексе и при товарах меньше
+ * MIN_PRODUCTS_FOR_BRAND_LANDING. Пустая связка закрыта и здесь: без единого
+ * товара страницей нечего отвечать.
+ *
+ * Правило по умолчанию — порог выше. Список — осознанные исключения
+ * владельца, как CATEGORIES_KEPT_INDEXABLE_WITHOUT_PRODUCTS у разделов.
+ * Раздел — по slug, бренд — по имени: оба уже приходят в decideBrandLanding
+ * из всех трёх мест вызова (страница, карта сайта, страница бренда), и
+ * решение у них остаётся одним.
+ *
+ * `konstruktory-malchikam` + Sluban — решение владельца от 25 сентября 2026.
+ * Search Console за 28 дней: 179 показов, 8,9 место — одна из лучших страниц
+ * каталога. Активных Sluban в разделе стало два, порог её закрыл: `noindex`
+ * и нет в карте сайта. Свой текст в `category_brand_seo` у неё есть.
+ */
+export const BRAND_LANDINGS_KEPT_INDEXABLE: readonly { category: string, brand: string }[] = [
+  { category: 'konstruktory-malchikam', brand: 'Sluban' },
+]
