@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
+import { SHOP, SHOP_ADDRESS_FULL } from '@/constants/shop'
 import { pageShell } from '@/lib/shell'
+import { formatPrice } from '@/utils/formatPrice'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
 
@@ -127,10 +130,27 @@ useHead({
           <li>По Алматы: 1-3 рабочих дня</li>
           <li>По Казахстану: 3-7 рабочих дней</li>
         </ul>
-        <p>
-          Стоимость доставки рассчитывается индивидуально и зависит от адреса
-          получателя и веса заказа.
-        </p>
+        <!--
+          Здесь стояло «стоимость рассчитывается индивидуально» — а оформление
+          считает курьера по Алматы по константам ниже. Цифры берутся из них
+          же, чтобы условия и корзина не разошлись. Нашёл аудит 24 сентября
+          2026. Про другие города оставлено как было: там цена правда своя.
+        -->
+        <p>Стоимость доставки:</p>
+        <ul class="list-disc space-y-1 pl-6">
+          <li>
+            Курьером по Алматы — {{ formatPrice(COURIER_DELIVERY_COST) }}&nbsp;₸; при
+            заказе от {{ formatPrice(FREE_SHIPPING_THRESHOLD) }}&nbsp;₸ — бесплатно
+          </li>
+          <li>
+            Самовывоз — бесплатно: {{ SHOP_ADDRESS_FULL }},
+            {{ SHOP.openingHoursHuman }}
+          </li>
+          <li>
+            В другие города Казахстана — рассчитывается индивидуально и зависит
+            от адреса получателя и веса заказа
+          </li>
+        </ul>
         <p>
           При получении заказа Пользователь обязан проверить комплектность и
           целостность товара в присутствии курьера.
@@ -244,9 +264,11 @@ useHead({
           обратиться:
         </p>
         <ul class="list-disc space-y-1 pl-6">
-          <li>Телефон: +7 (702) 537-94-73</li>
+          <!-- Телефон и адрес — из `constants/shop.ts`: здесь адрес стоял без
+               дома 100, и нашёлся он только полным поиском по коду. -->
+          <li>Телефон: {{ SHOP.phoneHuman }}</li>
           <li>Email: info@uhti.kz</li>
-          <li>Адрес: г. Алматы, мкр. Шапагат, ул. Амангельды</li>
+          <li>Адрес: {{ SHOP_ADDRESS_FULL }}</li>
         </ul>
       </section>
 

@@ -49,6 +49,11 @@
       "permanent": true
     },
     {
+      "source": "/catalog/products/trenazhyor-igra-3-v-1-bozhya-korovka-296y-skakalka-kolcebros-raketa-muzyka-i-pult-dlya-detey",
+      "destination": "/catalog/products/trenazhyor-igra-3-v-1-bozhya-korovka-296y-skakalka-kolcebros-raketa-muzyka-i-pult-dlya-aktivnyh-detey",
+      "permanent": true
+    },
+    {
       "source": "/catalog/:path((?!.*/brand/).*)",
       "has": [
         {

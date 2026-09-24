@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SHOP, SHOP_ADDRESS_FULL } from '@/constants/shop'
 import { pageShell } from '@/lib/shell'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
@@ -105,6 +106,9 @@ useBreadcrumbSchema([{ name: 'О нас' }])
 // ни картинки. Остальные статические страницы (returns.vue, privacy-policy.vue)
 // уже описаны через useSeoMeta, здесь то же самое плюс og:image.
 // «Ухтышка» — единое наименование по всему сайту, см. pages/index.vue
+/** «Ежедневно с 9:00 до 22:00» — в справочнике со строчной, в списке строка начинается с заглавной. */
+const openingHoursCapitalized = SHOP.openingHoursHuman.charAt(0).toUpperCase() + SHOP.openingHoursHuman.slice(1)
+
 const TITLE = 'О нас — Ухтышка'
 const DESCRIPTION
   = 'Интернет-магазин игрушек Ухтышка в Алматы. Широкий ассортимент качественных игрушек для детей всех возрастов с доставкой по Казахстану.'
@@ -316,17 +320,18 @@ useSeoMeta({
               info@uhti.kz
             </a>
           </li>
-          <li>
-            <strong>Адрес:</strong> г. Алматы, мкр. Шапагат, ул. Амангельды
-          </li>
           <!--
-            Часы держим ровно те же, что в разметке `Store` на главной
-            (`pages/index.vue`, `openingHours: 'Mo-Su 09:00-21:00'`). До
-            15 сентября 2026 страница писала «с 10:00 до 20:00», и сайт
-            противоречил сам себе; какие часы верные — сказал владелец.
-            Меняете здесь — меняйте и там.
+            Адрес и часы — из `constants/shop.ts`, как разметка и подвал.
+            Здесь они стояли строкой и разошлись с сайтом: 21 сентября 2026
+            владелец назвал дом 100 и часы до 22:00, справочник и подвал
+            поправили, а эта страница осталась с «Амангельды» без дома и
+            «до 21:00» — её пропустил обрезанный поиск по коду. Нашёл
+            аудит 24 сентября.
           -->
-          <li><strong>Режим работы:</strong> Ежедневно с 9:00 до 21:00</li>
+          <li>
+            <strong>Адрес:</strong> {{ SHOP_ADDRESS_FULL }}
+          </li>
+          <li><strong>Режим работы:</strong> {{ openingHoursCapitalized }}</li>
         </ul>
       </section>
 

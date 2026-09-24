@@ -926,7 +926,9 @@ useIndexableRobotsRule({ index: true, follow: true })
                   name="lucide:headphones"
                   class="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5"
                 />
-                <span><strong>Поддержка 24/7</strong> - всегда рады помочь</span>
+                <!-- Было «Поддержка 24/7» при часах 9:00–22:00 в подвале той же
+                     страницы — нашёл аудит 24 сентября 2026. -->
+                <span><strong>Отвечаем {{ SHOP.openingHoursHuman }}</strong> — по телефону и в WhatsApp</span>
               </li>
             </ul>
             <div class="mt-6 pt-6 border-t">

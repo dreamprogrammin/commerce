@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SHOP, SHOP_ADDRESS_FULL } from '@/constants/shop'
 import { pageShell } from '@/lib/shell'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
@@ -68,9 +69,9 @@ useSeoMeta({
       <p>
         При возврате товара надлежащего качества мы вернем вам стоимость товара
         (за вычетом расходов на доставку) не позднее чем через
-        <strong>3-5 рабочих дней</strong> с момента получения товара на наш
-        склад. Деньги возвращаются тем же способом, которым был оплачен заказ
-        (на банковскую карту или наличными).
+        <strong>3-5 рабочих дней</strong> с момента получения товара в нашем
+        магазине. Деньги возвращаются тем же способом, которым был оплачен
+        заказ: наличными или переводом через Kaspi.
       </p>
 
       <h2>Обмен товара</h2>
@@ -84,10 +85,13 @@ useSeoMeta({
       <h2>Контактная информация</h2>
       <p>Для оформления возврата или обмена свяжитесь с нами:</p>
       <ul>
-        <li><strong>Телефон:</strong> +7-702-537-94-73</li>
-        <li><strong>WhatsApp:</strong> +7-702-537-94-73</li>
+        <!-- Адрес стоял «г. Алматы, Казахстан» — без улицы, куда нести
+             возврат; а деньги обещали «на банковскую карту», хотя картой
+             магазин не принимает. Нашёл аудит 24 сентября 2026. -->
+        <li><strong>Телефон:</strong> {{ SHOP.phoneHuman }}</li>
+        <li><strong>WhatsApp:</strong> {{ SHOP.phoneHuman }}</li>
         <li><strong>Email:</strong> info@uhti.kz</li>
-        <li><strong>Адрес:</strong> г. Алматы, Казахстан</li>
+        <li><strong>Адрес магазина:</strong> {{ SHOP_ADDRESS_FULL }}, {{ SHOP.openingHoursHuman }}</li>
       </ul>
 
       <p class="text-sm text-muted-foreground mt-8">
