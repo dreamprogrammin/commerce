@@ -74,6 +74,9 @@ const PAGES = [
     title: 'Конструкторы для мальчиков — LEGO, Sluban, CaDA | Ухтышка',
     h1: 'Конструкторы для мальчиков',
     text: ['Конструкторы для мальчиков: LEGO, Sluban, CaDA', 'Как выбрать конструктор мальчику'],
+    // Возраст по коробкам (24 сентября 2026): «Водная полиция» — 6+, а не 4+.
+    // Пока не запущен docs/LEGO_BOX_AGES_2026_09_24.sql, здесь красное.
+    textNot: ['до водной полиции на 278'],
     links: [
       ['/brand/lego', 'LEGO'],
       ['/brand/lego/lego-city', 'LEGO City'],
@@ -102,7 +105,11 @@ const PAGES = [
   {
     path: '/brand/lego',
     h1: 'Конструкторы LEGO в Алматы',
-    text: ['пожарный мотоцикл'],
+    text: ['пожарный мотоцикл', 'пожарный вертолёт'],
+    // 60411 — пожарно-спасательный вертолёт; «полицейский участок» было
+    // названием другого набора, перенесённым в карточку по ошибке. Название
+    // карточки в выдаче меняет тот же SQL — до него здесь красное.
+    textNot: ['полицейский участок'],
     links: [],
   },
 ]
@@ -144,7 +151,7 @@ function visibleText(html) {
 /** Ссылки серверной разметки: [href, видимый текст]. */
 function anchors(html) {
   const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ' ')
-  return [...body.matchAll(/<a\b[^>]*\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)]
+  return [...body.matchAll(/<a\s(?:[^>]*\s)?href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)]
     .map(m => [decode(m[1]), decode(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()])
 }
 function ldNode(html, type) {
@@ -192,7 +199,7 @@ for (const p of PAGES) {
   for (const t of p.text)
     check(text.includes(t), `в тексте «${t}»`)
   for (const t of p.textNot ?? [])
-    check(!text.includes(t), `в тексте нет «${t}»`)
+    check(!text.toLowerCase().includes(t.toLowerCase()), `в тексте нет «${t}»`)
   if (p.items) {
     const names = itemListNames(html)
     const stray = p.items.none
