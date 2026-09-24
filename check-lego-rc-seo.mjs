@@ -15,11 +15,15 @@
  *  3) выдуманных серий и старых обещаний нет; вопросы раздела — в FAQPage;
  *  4) подвал, главная и /catalog ведут на LEGO и на машинки;
  *  5) в браузере — гидратация без расхождений, а ссылка из текста раздела
- *     открывает страницу переходом внутри сайта, без перезагрузки.
+ *     открывает страницу переходом внутри сайта, без перезагрузки;
+ *  6) вертолёты, самолёты и квадрокоптер — в «Летающих игрушках», а не в
+ *     выдаче машинок (по списку товаров в разметке ItemList).
  *
  * Тексты в базе меняет `docs/SEO_LEGO_RC_2026_09_23.sql` (запускает
  * владелец). До его запуска пункты про тексты машинок и конструкторов
- * мальчикам краснеют — это ожидаемо, и так видно, запущен ли он.
+ * мальчикам краснеют — это ожидаемо, и так видно, запущен ли он. То же с
+ * `docs/SEO_FLYING_TOYS_2026_09_24.sql`: до него нет раздела летающих
+ * игрушек, ссылки на него, а в выдаче машинок стоят вертолёты.
  *
  *   node check-lego-rc-seo.mjs --base=http://localhost:3129
  *   node check-lego-rc-seo.mjs --base=https://uhti.kz
@@ -32,8 +36,11 @@ import { chromium } from 'playwright'
 
 const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'http://localhost:3129'
 const RC = '/catalog/boys/mashinki/radioupravlyaemye-mashinki'
+const FLY = '/catalog/boys/letayushchie-igrushki'
 const BOYS = '/catalog/constructors-root/konstruktory-malchikam'
 const HUB = '/catalog/constructors-root'
+/** Летающие модели — по названию товара. С 24 сентября 2026 у них свой раздел. */
+const FLYING = /вертол[её]т|квадрокоптер|самол[её]т/i
 
 const PAGES = [
   {
@@ -48,7 +55,18 @@ const PAGES = [
       ['/catalog/boys/mashinki/avtotreki', 'автотреки'],
       ['/catalog/boys/mashinki/parkingi-i-garazhi', 'паркинги и гаражи'],
       ['/catalog/boys/interaktivnye-igrushki/roboty', 'роботы на пульте'],
+      [FLY, 'летающие игрушки'],
     ],
+    textNot: ['летающие модели'],
+    items: { none: FLYING },
+  },
+  {
+    path: FLY,
+    title: 'Летающие игрушки для детей — купить в Алматы | Ухтышка',
+    h1: 'Летающие игрушки для детей',
+    text: ['Как выбрать летающую игрушку', 'Купить летающую игрушку в Алматы'],
+    links: [[RC, 'радиоуправляемые машинки']],
+    items: { all: FLYING },
   },
   {
     path: BOYS,
@@ -56,6 +74,9 @@ const PAGES = [
     title: 'Конструкторы для мальчиков — LEGO, Sluban, CaDA | Ухтышка',
     h1: 'Конструкторы для мальчиков',
     text: ['Конструкторы для мальчиков: LEGO, Sluban, CaDA', 'Как выбрать конструктор мальчику'],
+    // Возраст по коробкам (24 сентября 2026): «Водная полиция» — 6+, а не 4+.
+    // Пока не запущен docs/LEGO_BOX_AGES_2026_09_24.sql, здесь красное.
+    textNot: ['до водной полиции на 278'],
     links: [
       ['/brand/lego', 'LEGO'],
       ['/brand/lego/lego-city', 'LEGO City'],
@@ -84,7 +105,11 @@ const PAGES = [
   {
     path: '/brand/lego',
     h1: 'Конструкторы LEGO в Алматы',
-    text: ['пожарный мотоцикл'],
+    text: ['пожарный мотоцикл', 'пожарный вертолёт'],
+    // 60411 — пожарно-спасательный вертолёт; «полицейский участок» было
+    // названием другого набора, перенесённым в карточку по ошибке. Название
+    // карточки в выдаче меняет тот же SQL — до него здесь красное.
+    textNot: ['полицейский участок'],
     links: [],
   },
 ]
@@ -126,10 +151,10 @@ function visibleText(html) {
 /** Ссылки серверной разметки: [href, видимый текст]. */
 function anchors(html) {
   const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ' ')
-  return [...body.matchAll(/<a\b[^>]*\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)]
+  return [...body.matchAll(/<a\s(?:[^>]*\s)?href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)]
     .map(m => [decode(m[1]), decode(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()])
 }
-function faqPageQuestions(html) {
+function ldNode(html, type) {
   for (const m of html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)) {
     let data
     try {
@@ -139,12 +164,18 @@ function faqPageQuestions(html) {
       continue
     }
     const nodes = Array.isArray(data?.['@graph']) ? data['@graph'] : [data]
-    for (const n of nodes) {
-      if (n?.['@type'] === 'FAQPage')
-        return (n.mainEntity ?? []).map(q => q.name)
-    }
+    const found = nodes.find(n => n?.['@type'] === type)
+    if (found)
+      return found
   }
   return null
+}
+function faqPageQuestions(html) {
+  return ldNode(html, 'FAQPage')?.mainEntity?.map(q => q.name) ?? null
+}
+/** Названия товаров выдачи — из ItemList (первые десять). Видимый текст не годится: его тексты сами называют вертолёты. */
+function itemListNames(html) {
+  return (ldNode(html, 'ItemList')?.itemListElement ?? []).map(e => e.item?.name ?? '')
 }
 
 console.log(`сайт ${BASE}`)
@@ -167,6 +198,16 @@ for (const p of PAGES) {
   check(h1 === p.h1, `H1 «${h1}»`)
   for (const t of p.text)
     check(text.includes(t), `в тексте «${t}»`)
+  for (const t of p.textNot ?? [])
+    check(!text.toLowerCase().includes(t.toLowerCase()), `в тексте нет «${t}»`)
+  if (p.items) {
+    const names = itemListNames(html)
+    const stray = p.items.none
+      ? names.filter(n => p.items.none.test(n))
+      : names.filter(n => !p.items.all.test(n))
+    const what = p.items.none ? 'летающих нет' : 'все летающие'
+    check(names.length > 0 && !stray.length, `в выдаче ${names.length} товаров, ${what}${stray.length ? ` — «${stray[0].slice(0, 60)}»` : ''}`)
+  }
   const bad = text.match(FALSE_CLAIMS)
   check(!bad, `выдуманных серий и старых обещаний нет${bad ? ` — «${bad[0]}»` : ''}`)
   check(!/&lt;a\s|<a\s[^>]*>[^<]*&lt;/.test(html), 'сырого «<a» в тексте нет')
@@ -200,23 +241,36 @@ check(about.some(([h]) => h === RC) && about.some(([h]) => h === '/brand/lego'),
 console.log('\n== браузер')
 const browser = await chromium.launch()
 try {
-  for (const path of [RC, BOYS, HUB, '/brand/lego', '/']) {
+  for (const path of [RC, FLY, BOYS, HUB, '/brand/lego', '/']) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
     const mismatch = []
     page.on('console', (m) => {
       if (/Hydration/i.test(m.text()))
         mismatch.push(m.text())
     })
-    await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 120000 })
-    await page.waitForTimeout(2500)
-    check(!mismatch.length, `${path}: гидратация без расхождений${mismatch.length ? ` — ${mismatch[0].slice(0, 160)}` : ''}`)
+    // Недогрузившаяся страница — провал этой страницы, а не падение всего
+    // стража: иначе остальные страницы остаются непроверенными.
+    const loaded = await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 120000 })
+      .then(() => true, (e) => {
+        check(false, `${path}: страница не загрузилась — ${e.message.split('\n')[0]}`)
+        return false
+      })
+    if (loaded) {
+      await page.waitForTimeout(2500)
+      check(!mismatch.length, `${path}: гидратация без расхождений${mismatch.length ? ` — ${mismatch[0].slice(0, 160)}` : ''}`)
+    }
     await page.close()
   }
 
-  // Ссылка из текста раздела (он из базы) — переход внутри сайта
+  // Ссылка из текста раздела (он из базы) — переход внутри сайта.
+  // Клик ждёт гидратации: до неё любая ссылка — обычный переход с
+  // перезагрузкой. На dev-сервере её нет и через 2,5 с — страж краснел
+  // там, где на бою всё в порядке (проверено 24 сентября 2026).
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
   await page.goto(`${BASE}${RC}`, { waitUntil: 'load', timeout: 120000 })
-  await page.waitForTimeout(2500)
+  await page.waitForFunction(() => !!document.querySelector('#__nuxt')?.__vue_app__, null, { timeout: 60000 })
+    .catch(() => {})
+    .then(() => page.waitForTimeout(2500))
   await page.evaluate(() => {
     window.__noReload = true
   })
