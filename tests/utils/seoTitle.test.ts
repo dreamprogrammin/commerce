@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { buildProductTitle, PRODUCT_TITLE_SUFFIX, truncateWords } from '@/utils/seoTitle'
+import { buildProductTitle, modelCodes, PRODUCT_TITLE_SUFFIX, truncateWords } from '@/utils/seoTitle'
 
 // Реальные названия из каталога — по ним и выводилось правило
+/*
+ * Названия, на которых аудит 24 сентября 2026 поймал обрезку посреди модели и
+ * потерю кода. Старое правило (по слову до 48 знаков) на них падает.
+ */
+const AUDIT_NAMES = [
+  'Конструктор LEGO City 60401 Строительный паровой каток с водителем',
+  'Конструктор LEGO City 60410 Пожарно-спасательный мотоцикл с огнетушителем и женщиной-пожарной',
+  'Парковка с рулём «Город» URBAN RAIL TRANSIT T904A — автотрек с эскалатором, 4 машинками и игровым полем 52×38 см для детей от 3 лет',
+  'Развивающая башня-горка с шариками HUANGER HE0205 Обезьянка — 5 уровней, 3 шарика-погремушки, съёмные детали для малышей',
+  'Конструктор Sluban Girls Dream M38-B1174 Охота за сокровищами 404 детали',
+  'Толокар-машинка Sport 5566B голубой, со звуковыми и световыми эффектами, 60х28х37 см',
+]
+
 const REAL_NAMES = [
   'Говорящий планшет 66-2RUS — 112 карточек, 224 слова, 12 тем, русский и английский язык, 18×4×10 см для детей',
   'LEGO City 60355 Водная полиция',
@@ -73,10 +86,19 @@ describe('buildProductTitle', () => {
    * Ради этого всё и затевалось: до правки ни один из 172 товаров не влезал
    * в 60 знаков — средняя длина была 125, максимум 162. Тест падает на старом
    * шаблоне «[название] [материал] — от [цена] ₸ — Uhti.kz».
+   *
+   * С 24 сентября 2026 предел — 70, а « | Ухтышка» ставится, только когда
+   * влезает: при пределе 60 с суффиксом название резалось посреди модели
+   * («…60401 Строительный паровой» без «каток»), а имя сайта Google и так
+   * показывает отдельной строкой.
    */
-  it('любое реальное название укладывается в 60 знаков', () => {
-    for (const name of REAL_NAMES)
-      expect(buildProductTitle(name).length).toBeLessThanOrEqual(60)
+  it('любое реальное название — не длиннее 70 знаков, суффикс только если влезает', () => {
+    for (const name of [...REAL_NAMES, ...AUDIT_NAMES]) {
+      const title = buildProductTitle(name)
+      expect(title.length).toBeLessThanOrEqual(70)
+      if (!title.endsWith(PRODUCT_TITLE_SUFFIX))
+        expect(title.length).toBeGreaterThan(60)
+    }
   })
 
   it('не обрывает слово и не оставляет предлог', () => {
@@ -113,5 +135,44 @@ describe('buildProductTitle', () => {
     const title = buildProductTitle('Кран 8063E — большая стрела и пульт')
     expect(title).toContain('—')
     expect(title).toContain('большая стрела и пульт')
+  })
+})
+
+describe('buildProductTitle — модель целиком (аудит 24 сентября 2026)', () => {
+  it('не режет модель посреди словосочетания', () => {
+    expect(buildProductTitle(AUDIT_NAMES[0])).toBe('Конструктор LEGO City 60401 Строительный паровой каток с водителем')
+    expect(buildProductTitle(AUDIT_NAMES[1])).toBe(`Конструктор LEGO City 60410 Пожарно-спасательный мотоцикл${PRODUCT_TITLE_SUFFIX}`)
+  })
+
+  it('сохраняет код модели', () => {
+    expect(buildProductTitle(AUDIT_NAMES[2])).toBe(`Парковка с рулём «Город» URBAN RAIL TRANSIT T904A${PRODUCT_TITLE_SUFFIX}`)
+    expect(buildProductTitle(AUDIT_NAMES[3])).toContain('HUANGER HE0205 Обезьянка')
+  })
+
+  it('режет перед числом деталей, а не посреди названия набора', () => {
+    expect(buildProductTitle(AUDIT_NAMES[4])).toBe('Конструктор Sluban Girls Dream M38-B1174 Охота за сокровищами')
+  })
+
+  it('не оставляет на конце оборот без существительного', () => {
+    const title = buildProductTitle(AUDIT_NAMES[5])
+    expect(title).toBe(`Толокар-машинка Sport 5566B голубой${PRODUCT_TITLE_SUFFIX}`)
+    expect(title).not.toMatch(/со звуковыми/)
+  })
+})
+
+describe('modelCodes', () => {
+  it('находит коды моделей', () => {
+    expect(modelCodes('Конструктор LEGO City 60401 Строительный каток')).toEqual(['60401'])
+    expect(modelCodes('Бизикуб Hola Toys 806 Маленькая вселенная')).toEqual(['806'])
+    expect(modelCodes('Фотоаппарат Принцесса M12-M/U, поворотный экран')).toEqual(['M12-M/U'])
+    expect(modelCodes('Гараж Скорая помощь CLM-557')).toEqual(['CLM-557'])
+  })
+
+  it('размеры, масштабы, частоты и счёт деталей — не коды', () => {
+    expect(modelCodes('Толокар 60х28х37 см')).toEqual([])
+    expect(modelCodes('Книга 25×24 см, 1:16')).toEqual([])
+    expect(modelCodes('Машинка на радиоуправлении 2.4GHz')).toEqual([])
+    expect(modelCodes('Конструктор 417 деталей')).toEqual([])
+    expect(modelCodes('Чемодан 3в1')).toEqual([])
   })
 })
