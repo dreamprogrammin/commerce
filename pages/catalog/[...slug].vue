@@ -176,9 +176,23 @@ function cleanDescription(html: string | null, maxLength = 200): string {
  * Старые адреса с параметром не забыты: их редиректит на новый путь
  * `server/middleware/brand-query-redirect.ts`, постоянным 301.
  */
-const catalogSlugParts = computed(() =>
-  parseCatalogSlug(route.params.slug as string[] | undefined),
-)
+/*
+ * Раздел и бренд ЭТОЙ страницы — со снимка адреса при создании, а не с живого
+ * `route`.
+ *
+ * `<NuxtPage :keepalive>` держит в памяти все страницы (см. app.vue), а `route`
+ * у удержанной страницы живой: после перехода он показывает уже чужой адрес.
+ * До 24 сентября 2026 удержанная `/catalog/kiddy`, увидев адрес машинок, в фоне
+ * грузила фильтры и товары машинок и через 300 мс переписывала адрес своими
+ * пустыми фильтрами — `?attr_pitanie=22` пропадал при любом переходе на
+ * машинки с другой страницы каталога. А при переходе в карточку товара
+ * `route.params.slug` становился строкой, и разбор пути падал на `.filter`.
+ * Экземпляр страницы всегда обслуживает один путь (ключ страницы — путь),
+ * поэтому снимок верен весь её век.
+ */
+const ownPath = route.path
+const ownSlugParts = parseCatalogSlug(route.params.slug as string[] | undefined)
+const catalogSlugParts = computed(() => ownSlugParts)
 
 const activeBrandSlug = computed(() => catalogSlugParts.value.brandSlug)
 
@@ -1298,20 +1312,21 @@ function resetAllFilters() {
   }
 }
 
-function updateQueryParams() {
+/** Параметры адреса, которыми страница описывает свои фильтры. */
+function queryFromFilters(filters: ActiveFilters): Record<string, any> {
   const query: Record<string, any> = {}
 
-  if (activeFilters.value.sortBy !== 'popularity') {
-    query.sort_by = activeFilters.value.sortBy
+  if (filters.sortBy !== 'popularity') {
+    query.sort_by = filters.sortBy
   }
 
-  if (activeFilters.value.subCategoryIds.length > 0) {
-    query.subcategories = activeFilters.value.subCategoryIds
+  if (filters.subCategoryIds.length > 0) {
+    query.subcategories = filters.subCategoryIds
   }
 
-  if (activeBrandSlug.value && activeFilters.value.brandIds.length === 1) {
+  if (activeBrandSlug.value && filters.brandIds.length === 1) {
     const matchedBrand = availableBrands.value.find(
-      b => b.id === activeFilters.value.brandIds[0],
+      b => b.id === filters.brandIds[0],
     )
     /*
      * Бренд лендинга уже лежит в ПУТИ (`activeBrandSlug` читается из
@@ -1326,40 +1341,66 @@ function updateQueryParams() {
      * и он едет списком `brands`.
      */
     if (!matchedBrand || matchedBrand.slug !== activeBrandSlug.value) {
-      query.brands = activeFilters.value.brandIds
+      query.brands = filters.brandIds
     }
   }
-  else if (activeFilters.value.brandIds.length > 0) {
-    query.brands = activeFilters.value.brandIds
+  else if (filters.brandIds.length > 0) {
+    query.brands = filters.brandIds
   }
 
-  if (activeFilters.value.productLineIds.length > 0) {
-    query.lines = activeFilters.value.productLineIds
+  if (filters.productLineIds.length > 0) {
+    query.lines = filters.productLineIds
   }
 
-  if (activeFilters.value.materialIds.length > 0) {
-    query.materials = activeFilters.value.materialIds
+  if (filters.materialIds.length > 0) {
+    query.materials = filters.materialIds
   }
 
-  if (activeFilters.value.countryIds.length > 0) {
-    query.countries = activeFilters.value.countryIds
+  if (filters.countryIds.length > 0) {
+    query.countries = filters.countryIds
   }
 
-  if (activeFilters.value.price[0] !== priceRange.value.min) {
-    query.price_min = activeFilters.value.price[0]
+  if (filters.price[0] !== priceRange.value.min) {
+    query.price_min = filters.price[0]
   }
 
-  if (activeFilters.value.price[1] !== priceRange.value.max) {
-    query.price_max = activeFilters.value.price[1]
+  if (filters.price[1] !== priceRange.value.max) {
+    query.price_max = filters.price[1]
   }
 
-  Object.entries(activeFilters.value.attributes).forEach(([slug, values]) => {
+  Object.entries(filters.attributes).forEach(([slug, values]) => {
     if (values.length > 0) {
       query[`attr_${slug}`] = values
     }
   })
 
-  router.replace({ query })
+  return query
+}
+
+function updateQueryParams() {
+  // Адрес пишет только страница, чей он сейчас: удержанная в кэше иначе
+  // переписала бы адрес другой страницы своими фильтрами (см. `ownPath`).
+  if (route.path !== ownPath)
+    return
+  router.replace({ query: queryFromFilters(activeFilters.value) })
+}
+
+const FILTER_QUERY_KEYS = new Set(['sort_by', 'subcategories', 'brands', 'lines', 'materials', 'countries', 'price_min', 'price_max'])
+
+/** Фильтры из адреса в одном виде — чтобы сравнить адрес с состоянием. */
+function filterQuerySignature(query: Record<string, unknown>): string {
+  const entries: [string, string[]][] = []
+  for (const [key, value] of Object.entries(query)) {
+    if (!FILTER_QUERY_KEYS.has(key) && !key.startsWith('attr_'))
+      continue
+    const list = (Array.isArray(value) ? value : [value])
+      .filter(v => v !== null && v !== undefined && v !== '')
+      .map(String)
+      .sort()
+    if (list.length > 0)
+      entries.push([key, list])
+  }
+  return JSON.stringify(entries.sort(([a], [b]) => a.localeCompare(b)))
 }
 
 /*
@@ -2030,6 +2071,44 @@ const showCategoryRating = computed(
     && categoryRatingData.value.total_reviews >= 3
     && categoryRatingData.value.avg_rating > 0,
 )
+
+/** Фильтры без выбора. Бренд связки — из пути: это сама страница, не фильтр. */
+function defaultFilters(): ActiveFilters {
+  const numericAttributes: ActiveFilters['numericAttributes'] = {}
+  for (const [id, range] of Object.entries(numericAttributeRanges.value))
+    numericAttributes[Number(id)] = [range.min, range.max]
+  return {
+    sortBy: getSortByFromQuery(undefined),
+    subCategoryIds: [],
+    price: [priceRange.value.min, priceRange.value.max],
+    pieceCount: pieceCountRange.value ? [pieceCountRange.value.min, pieceCountRange.value.max] : null,
+    brandIds: activeBrandSlug.value ? activeFilters.value.brandIds : [],
+    productLineIds: [],
+    materialIds: [],
+    countryIds: [],
+    attributes: Object.fromEntries(availableFilters.value.map(f => [f.slug, []])),
+    numericAttributes,
+  }
+}
+
+/*
+ * Адрес ЭТОЙ страницы поменялся не ею самой — фильтры берутся из адреса.
+ *
+ * Так бывает, когда удержанная страница раздела возвращается из кэша по ссылке
+ * с другими параметрами: из характеристик карточки ведут сюда же с `?attr_…`.
+ * До 24 сентября 2026 страница возвращалась со старым состоянием, и фильтр из
+ * ссылки не применялся вовсе: в адресе `?attr_pitanie=23`, на экране весь
+ * раздел, запроса товаров нет. «Назад» по истории приводит на тот адрес,
+ * который страница писала сама, — тогда состояние, прокрутка и догруженные
+ * товары остаются как были. Чужие адреса (страница в кэше) пропускаются.
+ */
+watch(() => route.fullPath, () => {
+  if (route.path !== ownPath)
+    return
+  if (filterQuerySignature(route.query) === filterQuerySignature(queryFromFilters(activeFilters.value)))
+    return
+  activeFilters.value = withFiltersFromQuery(defaultFilters())
+})
 
 // ─── ОПТИМИЗАЦИЯ: stringify вместо deep watcher ────────────────────────────────
 // deep: true на большом объекте — дорогая операция на каждое изменение
