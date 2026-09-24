@@ -65,6 +65,55 @@ describe('decideBrandLanding', () => {
   })
 })
 
+/*
+ * Исключения владельца — BRAND_LANDINGS_KEPT_INDEXABLE. «Конструкторы
+ * мальчикам + Sluban» 25 сентября 2026: 179 показов за 28 дней, 8,9 место,
+ * а активных Sluban в разделе два — порог в три товара её закрывал.
+ */
+describe('decideBrandLanding: исключения владельца', () => {
+  const tree = [
+    { id: 'constructors', parent_id: null, slug: 'constructors-root' },
+    { id: 'km', parent_id: 'constructors', slug: 'konstruktory-malchikam', name: 'Конструкторы мальчикам', seo_h1: 'Конструкторы для мальчиков' },
+    { id: 'kd', parent_id: 'constructors', slug: 'konstruktory-devochkam', name: 'Конструкторы девочкам', seo_h1: 'Конструкторы для девочек' },
+  ]
+  const pairs = countProductsByCategoryBrand([
+    { brand_id: 'sluban', category_id: 'km' },
+    { brand_id: 'sluban', category_id: 'km' },
+    { brand_id: 'sluban', category_id: 'kd' },
+    { brand_id: 'sluban', category_id: 'kd' },
+    { brand_id: 'cada', category_id: 'km' },
+    { brand_id: 'cada', category_id: 'km' },
+  ], tree)
+
+  it('связка Sluban в «Конструкторах мальчикам» открыта и при двух товарах', () => {
+    expect(decideBrandLanding('km', 'sluban', pairs, tree, 'Sluban')).toEqual({ indexable: true })
+  })
+
+  it('имя бренда сравнивается без учёта регистра', () => {
+    expect(decideBrandLanding('km', 'sluban', pairs, tree, 'SLUBAN')).toEqual({ indexable: true })
+  })
+
+  it('тот же бренд в другом разделе — по общему правилу', () => {
+    expect(decideBrandLanding('kd', 'sluban', pairs, tree, 'Sluban'))
+      .toEqual({ indexable: false, reason: 'few-products' })
+  })
+
+  it('другой бренд с двумя товарами в том же разделе — по общему правилу', () => {
+    expect(decideBrandLanding('km', 'cada', pairs, tree, 'CaDA'))
+      .toEqual({ indexable: false, reason: 'few-products' })
+  })
+
+  it('без единого товара закрыта и связка из исключений', () => {
+    expect(decideBrandLanding('km', 'sluban', new Map(), tree, 'Sluban'))
+      .toEqual({ indexable: false, reason: 'few-products' })
+  })
+
+  it('без имени бренда исключение не узнать — общее правило', () => {
+    expect(decideBrandLanding('km', 'sluban', pairs, tree))
+      .toEqual({ indexable: false, reason: 'few-products' })
+  })
+})
+
 describe('categoryNamesBrand', () => {
   it('узнаёт бренд в названии раздела, точки внутри не мешают', () => {
     expect(categoryNamesBrand(['Куклы L.O.L'], 'L.O.L. Surprise')).toBe(true)
