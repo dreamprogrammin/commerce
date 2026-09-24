@@ -113,9 +113,87 @@ function trimDangling(text: string): string {
   return text.slice(0, end)
 }
 
-/** Сколько знаков отдаём названию: 48 + ' | Ухтышка' (10) = не больше 58. */
-export const PRODUCT_TITLE_NAME_LIMIT = 48
+/**
+ * Название с « | Ухтышка» — не длиннее 60 знаков: 60 + 10 = 70.
+ * Без суффикса — не длиннее 70.
+ */
+export const PRODUCT_TITLE_NAME_LIMIT = 60
+export const PRODUCT_TITLE_MAX = 70
 export const PRODUCT_TITLE_SUFFIX = ' | Ухтышка'
+
+/*
+ * Где в названии можно закончить: перед запятой, скобкой, числом деталей и
+ * оборотом с предлогом или «и» — «…паровой каток | с водителем», «…Охота за
+ * сокровищами | 404 детали». Оборот уточняет, а суть — до него.
+ */
+const PHRASE_BOUNDARY = /,\s|\s\(|\s(?=\d+\s(?:детал|минифигур))|\s(?:[сивуко]|со|на|для|из|во|против|без|под|над|от|до|при|по|через|за|об)\s/giu
+
+/*
+ * Оборванный оборот: предлог и прилагательное без существительного — «со
+ * звуковыми». Только однозначные окончания прилагательных: «-ой», «-ей» бывают
+ * и у существительных — «с горкой», «с машинкой», — такой конец законный.
+ */
+const DANGLING_MODIFIER = /\s(?:с|со|на|для|в|во|из|без|под|над|от|до|при|по|за|против)\s\S+(?:ыми|ими|ым|им|ых|их|ую|юю|ого|его|ому|ему)$/iu
+
+/** Единицы и счёт после числа: «417 деталей», «55 см» — это не код модели. */
+const NOT_A_CODE_NEXT = /^(?:детал|минифигур|см|мм|м$|лет|год|мес|шт|кг|г$|л$|мин|v$|в$|мп$|гц|ггц)/iu
+
+/**
+ * Коды моделей в названии: «60401», «HE0205», «T904A», «CLM-557», «M12-M/U».
+ * Цифры с буквами или три цифры и больше; размеры (в том числе через русскую
+ * «х»: «60х28х37»), масштабы, дроби и счёт деталей — не коды.
+ */
+export function modelCodes(text: string): string[] {
+  const words = text.split(/\s+/)
+  const codes: string[] = []
+  words.forEach((raw, i) => {
+    const word = raw.replace(/^[«"(]+|[»"),;:.]+$/gu, '')
+    if (!/\d/.test(word) || /[×xх:.°%]/iu.test(word.replace(/^\p{L}+/u, '')) || /^\d+в\d+$/iu.test(word))
+      return
+    const hasLetter = /\p{L}/u.test(word)
+    const digits = word.replace(/\D/g, '').length
+    if (!hasLetter && digits < 3)
+      return
+    if (!hasLetter && NOT_A_CODE_NEXT.test(words[i + 1] ?? ''))
+      return
+    codes.push(word)
+  })
+  return codes
+}
+
+/**
+ * Название для заголовка карточки.
+ *
+ * Что было не так (аудит 24 сентября 2026). Название резалось по слову до 48
+ * знаков, и у 87 товаров из 174 обрезка приходилась на саму модель:
+ * «Конструктор LEGO City 60401 Строительный паровой» — без «каток»,
+ * «…60430 Межзвёздный» — без «корабль»; терялись и коды моделей — T904A,
+ * HE0205, CLM-557, M12-M/U.
+ *
+ * Теперь: название короче лимита — целиком; иначе модель — всё до « — »,
+ * описание после тире отбрасывается целиком; модель длиннее 70 — обрезается
+ * по границе оборота, и только так, чтобы коды моделей остались, а на конце не
+ * повис оборот без существительного.
+ */
+export function productTitleName(name: string | null | undefined): string {
+  const clean = (name ?? '').trim().replace(/\s+/g, ' ')
+  if (clean.length <= PRODUCT_TITLE_NAME_LIMIT)
+    return trimDangling(clean)
+
+  const head = trimDangling(clean.split(' — ')[0])
+  if (head.length <= PRODUCT_TITLE_MAX)
+    return head
+
+  const codes = modelCodes(head)
+  const cuts = [...head.matchAll(PHRASE_BOUNDARY)]
+    .map(m => trimDangling(head.slice(0, m.index)))
+    .filter(cut => cut.length >= 20 && cut.length <= PRODUCT_TITLE_MAX && !DANGLING_MODIFIER.test(cut) && codes.every(code => cut.includes(code)))
+    .sort((a, b) => b.length - a.length)
+  if (cuts[0])
+    return cuts[0]
+
+  return truncateWords(head, PRODUCT_TITLE_MAX)
+}
 
 /**
  * Заголовок карточки товара.
@@ -125,9 +203,13 @@ export const PRODUCT_TITLE_SUFFIX = ' | Ухтышка'
  *    попадает из Product/offers в разметке;
  *  • материал приклеивался к названию вторым разом («…HiH02 пластик — …
  *    пластик»), хотя в названии он уже есть у большинства товаров.
- * Освободившиеся знаки отданы самому названию — оно и есть то, что ищут.
+ *
+ * « | Ухтышка» — только когда влезает: сайт Google и так показывает отдельной
+ * строкой над заголовком, а знаки названия важнее.
  */
 export function buildProductTitle(name: string | null | undefined): string {
-  const truncated = truncateWords(name ?? '', PRODUCT_TITLE_NAME_LIMIT)
-  return truncated ? truncated + PRODUCT_TITLE_SUFFIX : `Товар${PRODUCT_TITLE_SUFFIX}`
+  const title = productTitleName(name)
+  if (!title)
+    return `Товар${PRODUCT_TITLE_SUFFIX}`
+  return title.length <= PRODUCT_TITLE_NAME_LIMIT ? title + PRODUCT_TITLE_SUFFIX : title
 }
