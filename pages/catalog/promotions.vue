@@ -81,6 +81,18 @@ const robotsIndexable = useRobotsContent('index, follow')
 const robotsEmpty = useRobotsContent('noindex, follow')
 const robots = computed(() => (products.value?.length ? robotsIndexable : robotsEmpty))
 
+/*
+ * И заголовок `X-Robots-Tag` тоже. `useRobotsContent` выше ставит только
+ * мета-тег, а заголовок ставит модуль robots по своему правилу — и на пустом
+ * листинге он отдавал `index, follow` при мета `noindex, follow`. Поймано
+ * аудитом 24 сентября 2026 на бою (/catalog/new). Закрываем явным
+ * `noindex: true`: при `{ index: false }` модуль выбрасывает ключ и в
+ * заголовке остаётся голое `follow` — см. pages/promo/[slug].vue.
+ */
+useIndexableRobotsRule(computed(() =>
+  products.value?.length ? { index: true, follow: true } : { noindex: true, follow: true },
+))
+
 // SEO мета-теги
 useHead({
   title: metaTitle,
