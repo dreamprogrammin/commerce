@@ -1465,7 +1465,8 @@ const minPrice = computed(() => {
  * У категории с полусотней товаров в выдаче стояло «12 моделей»: число
  * занижено втрое и вдобавок одинаково у половины категорий. С 23 сентября
  * 2026 тот же запрос даёт и цену «от», и бренды по числу товаров — почему,
- * см. `utils/categoryFacts.ts`.
+ * см. `utils/categoryFacts.ts`. С 25 сентября — ещё остаток и возраст: из них
+ * собираются абзац и вопросы с цифрами раздела (`categoryLive` ниже).
  *
  * Дерево берём из хранилища — оно уже загружено выше (`catalog-meta-…`) и
  * приходит в серверную разметку, отдельного запроса за категориями не нужно.
@@ -1509,7 +1510,7 @@ const { data: categoryFacts } = await useAsyncData(
 
     const { data, error } = await supabase
       .from('products')
-      .select('brand_id, price, final_price')
+      .select('brand_id, price, final_price, stock_quantity, min_age_months')
       .in('category_id', ids)
       .eq('is_active', true)
 
@@ -1519,6 +1520,30 @@ const { data: categoryFacts } = await useAsyncData(
 )
 
 const categoryProductsCount = computed(() => categoryFacts.value?.count ?? null)
+
+/*
+ * Цифры раздела словами — абзац и вопросы из `live` в
+ * `constants/categoryStaticText.ts` (план аудита, п. 17). Факты те же, что у
+ * мета-описания, — по всей ветке, а не по первой странице сетки.
+ *
+ * Только на самом разделе. На связке «раздел + бренд» цифры всего раздела
+ * были бы неправдой: у «Радиоуправляемых машинок MokaToys» не 18 моделей, а
+ * 9. Связку узнаём по адресу, а не по `activeBrand`: тот пуст, пока не
+ * загружен список брендов.
+ */
+const categoryLive = computed(() => {
+  const live = categoryStatic.value?.live
+  const facts = categoryFacts.value
+  return live && facts && !activeBrandSlug.value ? { live, facts } : null
+})
+const categoryFactsParagraph = computed(() =>
+  categoryLive.value?.live.paragraph?.(categoryLive.value.facts) ?? null,
+)
+/** Вопросы раздела: сначала с цифрами, потом написанные. Из них же — `FAQPage`. */
+const categoryFaq = computed(() => [
+  ...(categoryLive.value?.live.faq?.(categoryLive.value.facts) ?? []),
+  ...(categoryStatic.value?.faq ?? []),
+])
 
 const categoryStats = computed(() => {
   let totalReviews = 0
@@ -1748,7 +1773,16 @@ const seoText = computed(() => {
 const seoBlocks = computed(() => {
   if (!seoText.value)
     return []
-  return parseHTMLToBlocks(seoText.value)
+  const blocks = parseHTMLToBlocks(seoText.value)
+  /*
+   * Абзац с цифрами — сразу за первым абзацем текста: там раздел описывает
+   * ассортимент словами, и число моделей с ценами его продолжает. На связке
+   * с брендом `categoryFactsParagraph` пуст — цифры раздела к ней не идут.
+   */
+  const paragraph = categoryFactsParagraph.value
+  if (paragraph)
+    blocks.splice(blocks.findIndex(b => b.type === 'p') + 1, 0, { type: 'p', text: paragraph })
+  return blocks
 })
 
 /*
@@ -2384,10 +2418,10 @@ const schemaData = computed(() => {
    * `/catalog/girls` это выглядит как «Что такое Девочкам?» и «Сколько стоят
    * Девочкам в Алматы?». Такое нельзя отдавать поиску расширенным сниппетом.
    */
-  if (categoryStatic.value?.faq.length) {
+  if (categoryFaq.value.length) {
     schemas.push({
       '@type': 'FAQPage',
-      'mainEntity': categoryStatic.value.faq.map(item => ({
+      'mainEntity': categoryFaq.value.map(item => ({
         '@type': 'Question',
         'name': item.q,
         'acceptedAnswer': { '@type': 'Answer', 'text': item.a },
@@ -2997,7 +3031,7 @@ else {
     <CommonStaticSeoBlock
       v-if="categoryStatic && !hasActiveFilters"
       :html="seoBlocks.length > 0 ? undefined : categoryStatic.html"
-      :faq="categoryStatic.faq"
+      :faq="categoryFaq"
     />
 
     <!-- FAQ блок для категории — рисуется НА СЕРВЕРЕ.
