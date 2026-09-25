@@ -245,6 +245,9 @@ function addFlagship(event: MouseEvent) {
           {{ lead }}
         </p>
 
+        <!-- Самовывоз у заголовка — план аудита, п. 16. -->
+        <CommonPickupLine tone="inverse" />
+
         <div class="blh__buttons">
           <button type="button" class="blh__cta" @click="emit('jump', 'pick')">
             Подобрать набор
