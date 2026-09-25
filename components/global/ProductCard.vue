@@ -544,6 +544,14 @@ async function onWish() {
   .pc-wish:hover {
     transform: scale(1.1);
   }
+  /* Область нажатия — 44×44 при видимом круге 38×38 (план по аудиту, п. 21:
+     норма 44–48 px, мерили 38 и на телефоне, и на компьютере). Круг и тени
+     не меняются: невидимый слой выходит на 3px за каждую сторону кнопки. */
+  .pc-wish::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+  }
 
   .pc-add {
     border: 1px solid rgb(255 255 255 / 0.9);
