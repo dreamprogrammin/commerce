@@ -52,9 +52,16 @@ const collections = computed(() =>
   }),
 )
 
+/*
+ * Серий в наличии — те, где есть товар. Мозаика ниже показывает и пустые (с
+ * плашкой «Скоро в наличии»), а подзаголовок стоял «7 серий бренда» при
+ * четырёх с товаром у LEGO (аудит 24 сентября 2026).
+ */
 const subtitle = computed(() => {
-  const n = props.lines.length
-  return `${n} ${pluralRu(n, 'серия', 'серии', 'серий')} бренда — выберите свою`
+  const inStock = props.lines.filter(line => (props.lineCounts[line.id] ?? 0) > 0).length
+  const soon = props.lines.length - inStock
+  const head = `${inStock} ${pluralRu(inStock, 'серия', 'серии', 'серий')} в наличии`
+  return soon > 0 ? `${head}, ещё ${soon} — скоро` : `${head} — выберите свою`
 })
 
 const found = computed(() => {

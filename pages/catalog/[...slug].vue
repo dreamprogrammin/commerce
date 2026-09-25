@@ -2299,7 +2299,9 @@ const schemaData = computed(() => {
   if (displayedProducts.value.length > 0) {
     schemas.push({
       '@type': 'ItemList',
-      'numberOfItems': displayedProducts.value.length,
+      // Столько, сколько элементов в списке, а не всех показанных товаров
+      // (аудит 24 сентября 2026: число не совпадало с длиной списка)
+      'numberOfItems': Math.min(displayedProducts.value.length, 10),
       'itemListElement': displayedProducts.value
         .slice(0, 10)
         .map((product, index) => ({

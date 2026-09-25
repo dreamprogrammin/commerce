@@ -8,7 +8,7 @@ import {
   SITE_OG_IMAGE_SIZE,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
-import { SHOP } from '@/constants/shop'
+import { SHOP, SHOP_ALTERNATE_NAMES } from '@/constants/shop'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -222,6 +222,8 @@ useSchemaOrg([
     '@type': ['Organization', 'OnlineStore'],
     '@id': `${siteUrl}/#organization`,
     'name': siteName,
+    // Как ещё ищут магазин — см. constants/shop.ts
+    'alternateName': SHOP_ALTERNATE_NAMES,
     'legalName': 'ИП Ухтышка',
     'url': siteUrl,
     'telephone': '+7-702-537-94-73',
@@ -275,6 +277,8 @@ useSchemaOrg([
     '@type': 'WebSite',
     '@id': `${siteUrl}/#website`,
     'name': siteName,
+    // По `alternateName` у WebSite Google выбирает имя сайта над заголовком в выдаче
+    'alternateName': SHOP_ALTERNATE_NAMES,
     'url': siteUrl,
     'publisher': { '@id': `${siteUrl}/#organization` },
     'inLanguage': 'ru-KZ',
