@@ -72,3 +72,22 @@ export function composeBrandMeta(input: {
     `${subject} в Алматы: ${modelsAndPrices(facts)}${lines.length ? ` — ${lines.join(', ')}` : ''}. ${DELIVERY_SHORT}.`,
   )
 }
+
+/**
+ * Описание пустого бренда — товаров нет ни одного.
+ *
+ * Восемь таких страниц открыты для индекса ради спроса (см.
+ * `BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS`), а описанием в выдаче шло «Купить
+ * игрушки BOWA в Казахстане…». Человек кликал — и попадал на пустую сетку.
+ * Теперь строка в выдаче говорит, как есть, и называет те же разделы, что
+ * блок на самой странице (`emptyBrandAlternatives`).
+ */
+export function composeEmptyBrandMeta(
+  brandName: string,
+  alternatives: readonly { label: string }[],
+): string {
+  const where = alternatives.length
+    ? `Похожие игрушки — в ${alternatives.length === 1 ? 'разделе' : 'разделах'} ${alternatives.map(a => `«${a.label}»`).join(' и ')}`
+    : 'Игрушки других брендов — в каталоге'
+  return clampDescription(`Товаров ${brandName.trim()} сейчас нет в наличии. ${where} интернет-магазина Ухтышка в Алматы.`)
+}

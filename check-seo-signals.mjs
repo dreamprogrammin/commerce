@@ -249,6 +249,39 @@ for (const path of ['/brand/cada', '/brand/mokatoys', '/brand/lego']) {
     check(questions.length >= 5, `${path}: FAQPage на месте`)
 }
 
+// ---------- 5д. Пустые бренды ----------
+/*
+ * План по аудиту, п. 10. Восемь брендов без товаров открыты для индекса
+ * ради спроса (BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS), а над пустой сеткой
+ * стояли «Оригинал», «Официальный поставщик» и фильтры, в выдаче — «Купить
+ * игрушки BOWA…». Теперь страница говорит, что товаров нет, и ведёт в
+ * похожий раздел. Если у бренда появится товар, проверка пустой страницы для
+ * него пропускается — это уже обычный бренд.
+ */
+console.log('\n5д) пустые бренды')
+for (const [path, name, alt] of [
+  ['/brand/bowa', 'BOWA', '/catalog/girls/igrovye-nabory'],
+  ['/brand/eva-puzzle', 'Eva Puzzle', null],
+]) {
+  const page = await get(path)
+  if (/class="pc-/.test(page.body)) {
+    check(true, `${path}: у бренда появились товары — проверка пустой страницы не нужна`)
+    continue
+  }
+  const description = page.body.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? ''
+  const robots = page.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? ''
+  // Видимый текст: dev-сервер оставляет в разметке комментарии шаблона.
+  const text = page.body.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ')
+  check(text.includes(`Товаров ${name} сейчас нет в наличии`), `${path}: на странице сказано, что товаров нет`)
+  check(!text.includes('Официальный поставщик'), `${path}: без «Официальный поставщик» над пустой сеткой`)
+  check(description.startsWith(`Товаров ${name} сейчас нет в наличии`), `${path}: описание честное — «${description.slice(0, 60)}…»`)
+  check(!/noindex/.test(robots), `${path}: страница остаётся в индексе, как решил владелец`)
+  if (alt)
+    check(page.body.includes(`href="${alt}"`), `${path}: ведёт в похожий раздел ${alt}`)
+}
+const regular = await get('/brand/cada')
+check(regular.body.includes('Официальный поставщик'), '/brand/cada: у бренда с товарами полоса доверия на месте')
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым

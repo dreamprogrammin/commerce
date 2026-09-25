@@ -12,12 +12,12 @@ import {
   BUCKET_NAME_PRODUCT_LINES,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
-import { brandStaticFaq } from '@/constants/brandStaticText'
+import { brandStaticFaq, emptyBrandAlternatives } from '@/constants/brandStaticText'
 import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
-import { composeBrandMeta } from '@/utils/brandMeta'
+import { composeBrandMeta, composeEmptyBrandMeta } from '@/utils/brandMeta'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 
@@ -520,6 +520,8 @@ setShellOverride(() => (isCustomPage.value ? { header: 'static' } : null))
 
 /** Вопросы из статики: те же, что показаны на лендинге блоком «Частые вопросы». */
 const staticFaq = computed(() => brandStaticFaq(brand.value?.slug))
+/** Куда вести с пустой страницы бренда: и в блоке на странице, и в описании. */
+const brandAlternatives = computed(() => emptyBrandAlternatives(brand.value?.slug))
 const pageLayout = computed(
   () => (brand.value as any)?.page_layout as BrandPageLayout | null,
 )
@@ -573,6 +575,13 @@ const metaDescription = computed(() => {
   })
   if (composed)
     return composed
+  /*
+   * Пустой бренд (план по аудиту, п. 10): ниже шли «Купить игрушки BOWA в
+   * Казахстане…» из базы, а на странице ни одного товара. Строка в выдаче
+   * говорит, как есть, и называет те же разделы, что блок на странице.
+   */
+  if (brandHasProducts.value === false)
+    return composeEmptyBrandMeta(brand.value.name, brandAlternatives.value)
   if (brand.value.meta_description)
     return brand.value.meta_description
   /*
@@ -994,6 +1003,8 @@ useIndexableRobotsRule(
         :questions="brandQuestions"
         :other-brands="otherBrands"
         :top-category="topCategory"
+        :has-products="brandHasProducts"
+        :alternatives="brandAlternatives"
       />
 
       <!--
