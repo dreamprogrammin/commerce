@@ -1,6 +1,6 @@
 import type { CatalogFaqItem } from './catalogStaticText'
-import type { CategoryFacts } from '@/utils/categoryFacts'
-import { ageBreakdown, allAgesKnown, composeCategoryFactsParagraph, countCheaperThan, countPhrase } from '@/utils/categoryFacts'
+import type { CategoryFacts, NounForms } from '@/utils/categoryFacts'
+import { ageBreakdown, allAgesKnown, composeCategoryFactsParagraph, countCheaperThan, countPhrase, factsTopBrands } from '@/utils/categoryFacts'
 import { formatPrice, formatTenge } from '@/utils/formatPrice'
 import { DELIVERY_PRICE, FREE_FROM, PICKUP } from './catalogStaticText'
 
@@ -72,6 +72,42 @@ export interface CategoryStaticContent {
   live?: {
     paragraph?: (facts: CategoryFacts) => string | null
     faq?: (facts: CategoryFacts) => CatalogFaqItem[]
+  }
+}
+
+/*
+ * Конструкторы — цифры, как у машинок (25 сентября 2026; владелец — «давай»
+ * на «подключить такие же цифры к конструкторам»). Бренды в абзаце — с числом
+ * наборов: «LEGO (14)» отвечает на «лего алматы». Вопроса о возрасте с
+ * цифрами нет: и у хаба, и у раздела мальчикам свой уже есть, второй был бы
+ * дублем на той же странице.
+ */
+const CONSTRUCTORS: NounForms = ['конструктор', 'конструктора', 'конструкторов']
+
+function constructorsParagraph(facts: CategoryFacts): string | null {
+  return composeCategoryFactsParagraph(facts, { forms: CONSTRUCTORS, brands: factsTopBrands(facts) })
+}
+
+/**
+ * «От 5 890 до 79 890 ₸. Сейчас в разделе 33 конструктора, 7 из них дешевле
+ * 10 000 ₸, 27 — дешевле 20 000 ₸. …» Два рубежа, а не один, как у машинок:
+ * разброс цен у конструкторов вчетверо шире.
+ */
+function constructorsPriceFaq(q: string) {
+  return (facts: CategoryFacts): CatalogFaqItem[] => {
+    if (!facts.count || facts.minPrice === null || facts.maxPrice === null)
+      return []
+    const price = facts.minPrice === facts.maxPrice
+      ? formatTenge(facts.minPrice)
+      : `От ${formatPrice(facts.minPrice)} до ${formatTenge(facts.maxPrice)}`
+    const bands = [10_000, 20_000]
+      .map(limit => ({ limit, n: countCheaperThan(facts, limit) }))
+      .filter(({ n }) => n > 0 && n < facts.prices.length)
+      .map(({ limit, n }, i) => `${n}${i === 0 ? ' из них' : ' —'} дешевле ${formatTenge(limit)}`)
+    return [{
+      q,
+      a: `${price}. Сейчас в разделе ${countPhrase(facts.count, CONSTRUCTORS)}${bands.length ? `, ${bands.join(', ')}` : ''}. Точная цена — в карточке набора, самовывоз в Алматы бесплатный.`,
+    }]
   }
 }
 
@@ -253,6 +289,10 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
 
   'constructors-root': {
     h1: 'Конструкторы для детей',
+    live: {
+      paragraph: constructorsParagraph,
+      faq: constructorsPriceFaq('Сколько стоит детский конструктор в Ухтышке?'),
+    },
     html: `
 <h2>Что есть в разделе</h2>
 <p>Наборы разложены по тому, кому они по силам:
@@ -295,6 +335,10 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
 <a href="/brands">Бренды</a>.</p>
 `.trim(),
     faq: [
+      {
+        q: 'Где купить конструктор в Алматы?',
+        a: `В интернет-магазине «Ухтышка»: заказ на сайте uhti.kz, самовывоз бесплатно — ${PICKUP}. Курьер по Алматы — ${DELIVERY_PRICE}, от ${FREE_FROM} — бесплатно, 1–3 рабочих дня; по Казахстану — 3–7 рабочих дней. Платить заранее не нужно.`,
+      },
       {
         q: 'С какого возраста ребёнку конструктор?',
         a: 'С двух лет, если детали крупные и соединяются ладонью. Сборка по инструкции начинается ближе к пяти: до этого ребёнок строит свободно и ломает построенное, и набор нужен такой, который это переживает. Большие наборы на несколько сотен деталей — с шести-восьми.',
@@ -556,6 +600,10 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
   },
 
   'konstruktory-malchikam': {
+    live: {
+      paragraph: constructorsParagraph,
+      faq: constructorsPriceFaq('Сколько стоит конструктор для мальчика в Ухтышке?'),
+    },
     faq: [
       {
         q: 'С какого возраста конструктор мальчику?',

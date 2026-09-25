@@ -49,7 +49,7 @@ import {
   prependBrandLandingFacts,
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { categoryFactsFromRows, topBrandNames } from '@/utils/categoryFacts'
+import { categoryFactsFromRows, insertAfterFirstParagraph, topBrandNames } from '@/utils/categoryFacts'
 import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
@@ -1510,7 +1510,7 @@ const { data: categoryFacts } = await useAsyncData(
 
     const { data, error } = await supabase
       .from('products')
-      .select('brand_id, price, final_price, stock_quantity, min_age_months')
+      .select('brand_id, price, final_price, stock_quantity, min_age_months, brands(name)')
       .in('category_id', ids)
       .eq('is_active', true)
 
@@ -1539,6 +1539,16 @@ const categoryLive = computed(() => {
 const categoryFactsParagraph = computed(() =>
   categoryLive.value?.live.paragraph?.(categoryLive.value.facts) ?? null,
 )
+/*
+ * Текст раздела из репозитория — с тем же абзацем цифр, что встаёт в текст из
+ * базы (`seoBlocks` ниже). Нужен разделам без текста в базе: у хаба
+ * «Конструкторы» текст лежит здесь, в `categoryStaticText.ts`.
+ */
+const categoryStaticHtml = computed(() => {
+  const html = categoryStatic.value?.html
+  const paragraph = categoryFactsParagraph.value
+  return html && paragraph ? insertAfterFirstParagraph(html, paragraph) : html
+})
 /** Вопросы раздела: сначала с цифрами, потом написанные. Из них же — `FAQPage`. */
 const categoryFaq = computed(() => [
   ...(categoryLive.value?.live.faq?.(categoryLive.value.facts) ?? []),
@@ -3030,7 +3040,7 @@ else {
          ССЫЛКИ, а половина смысла этого текста — увести в подразделы. -->
     <CommonStaticSeoBlock
       v-if="categoryStatic && !hasActiveFilters"
-      :html="seoBlocks.length > 0 ? undefined : categoryStatic.html"
+      :html="seoBlocks.length > 0 ? undefined : categoryStaticHtml"
       :faq="categoryFaq"
     />
 
