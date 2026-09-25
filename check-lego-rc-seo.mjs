@@ -22,7 +22,9 @@
  *     «с какого возраста», «где забрать» — с теми числами, что лежат в базе.
  *     Страж считает их сам, по REST, своим кодом, а не кодом сайта;
  *  8) то же у хаба «Конструкторы» и «Конструкторов для мальчиков»: абзац с
- *     брендами и возрастом, вопрос «сколько стоит», у хаба — «где купить».
+ *     брендами и возрастом, вопрос «сколько стоит», у хаба — «где купить»;
+ *  9) `/llms.txt`: блок машинок с теми же цифрами, что на странице, и серии
+ *     LEGO с числом наборов, ценами и возрастом — только непустые.
  *
  * Тексты в базе меняет `docs/SEO_LEGO_RC_2026_09_23.sql` (запускает
  * владелец). До его запуска пункты про тексты машинок и конструкторов
@@ -380,6 +382,40 @@ for (const page of CONSTRUCTOR_PAGES) {
 }
 const legoBoys = visibleText(await (await fetch(`${BASE}${BOYS}/brand/lego`)).text())
 check(!legoBoys.includes('Сейчас в разделе') && !legoBoys.includes('Сколько стоит конструктор для мальчика'), 'на связке «мальчикам + LEGO» цифр и вопросов всего раздела нет')
+
+// ── llms.txt: машинки и серии LEGO ──────────────────────────────────────────
+/*
+ * План аудита, п. 18 (25 сентября 2026): в `/llms.txt` модели нечего было
+ * процитировать про машинки и LEGO, кроме имён. Строка машинок обязана
+ * совпадать с абзацем на странице раздела, серии LEGO — с базой; пустые серии
+ * (их страницы закрыты noindex) не называются. На бою файл кешируется на час.
+ */
+console.log('\n== llms.txt: машинки и серии LEGO')
+function setsWord(n) {
+  const form = n % 10 === 1 && n % 100 !== 11 ? 'набор' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'набора' : 'наборов'
+  return `${n} ${form}`
+}
+const llms = (await (await fetch(`${BASE}/llms.txt`)).text()).replace(/\s+/g, ' ')
+check(llms.includes(`## Радиоуправляемые машинки - [Радиоуправляемые машинки для детей](https://uhti.kz${RC}). ${lead}`), `llms.txt: машинки — ссылкой и теми же цифрами, что на странице: «${lead}»`)
+check(llms.includes(`(https://uhti.kz${FLY}). Сейчас в разделе`), 'llms.txt: рядом — летающие игрушки, с цифрами')
+const [legoBrand] = await rest('brands?select=id&slug=eq.lego')
+const legoSeries = await rest(`product_lines?select=id,name,slug&brand_id=eq.${legoBrand.id}`)
+const legoSets = await rest(`products?select=product_line_id,price,final_price,min_age_months&is_active=eq.true&brand_id=eq.${legoBrand.id}`)
+check(llms.includes('## Серии LEGO'), 'llms.txt: есть блок «Серии LEGO»')
+for (const series of legoSeries) {
+  const sets = legoSets.filter(p => p.product_line_id === series.id)
+  const url = `(https://uhti.kz/brand/lego/${series.slug})`
+  if (!sets.length) {
+    check(!llms.includes(url), `llms.txt: пустой серии ${series.name} нет`)
+    continue
+  }
+  const pr = sets.map(p => Number(p.final_price || p.price)).sort((a, b) => a - b)
+  const seriesRange = pr[0] === pr.at(-1) ? `за ${fmt(pr[0])} ₸` : `от ${fmt(pr[0])} до ${fmt(pr.at(-1))} ₸`
+  const youngest = Math.min(...sets.map(p => p.min_age_months ?? Infinity))
+  const age = Number.isFinite(youngest) && youngest % 12 === 0 ? `, с ${yearsGen(youngest / 12)}` : ''
+  const want = `- [${series.name}]${url} — ${setsWord(sets.length)} ${seriesRange}${age}`
+  check(llms.includes(want), `llms.txt: «${want}»`)
+}
 
 // ── подвал, главная, /catalog ───────────────────────────────────────────────
 console.log('\n== подвал и тексты-хабы')

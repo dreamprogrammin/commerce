@@ -1,7 +1,9 @@
 import type { Database } from '@/types'
+import type { CategoryFactRow, NounForms } from '~/utils/categoryFacts'
 import { serverSupabaseClient } from '#supabase/server'
 import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '~/constants'
 import { SHOP, SHOP_ADDRESS_FULL } from '~/constants/shop'
+import { categoryFactsFromRows, composeCategoryFactsParagraph, countPhrase, priceRangePhrase, sinceAge } from '~/utils/categoryFacts'
 import { formatPrice } from '~/utils/formatPrice'
 
 /**
@@ -31,6 +33,13 @@ import { formatPrice } from '~/utils/formatPrice'
  * `/catalog/new` и разделы без товаров. Адрес, часы и цены теперь из тех же
  * констант, что «Условия» и корзина; разделы — только с товарами.
  *
+ * С 25 сентября (план аудита, п. 18) — блоки «Радиоуправляемые машинки» и
+ * «Серии LEGO»: владелец двигает их в топ, а модели здесь нечего было
+ * процитировать, кроме имени раздела. Цифры собирают те же функции, что абзац
+ * на странице раздела (`utils/categoryFacts.ts`), — файл и страница говорят
+ * одно и то же. Пустые серии (Friends, Technic, Ninjago) не называются: их
+ * страницы закрыты `noindex`.
+ *
  * ИМЯ ФАЙЛА БЕЗ `.get` — НАМЕРЕННО. С суффиксом Nitro регистрирует маршрут
  * только на GET, и на бою `HEAD /llms.txt` отдавал 404 при живом `GET` (200).
  * Краулер, который сперва пробует HEAD, — а так делают и обходчики ИИ, и
@@ -43,23 +52,30 @@ const SITE_URL = 'https://uhti.kz'
 /** Сколько брендов перечислять: дальше идут бренды с одним-двумя товарами. */
 const BRANDS_LIMIT = 20
 
+/** Разделы блока «Радиоуправляемые машинки»: машинки и летающие модели, переехавшие от них 24 сентября. */
+const RC_SLUGS = ['radioupravlyaemye-mashinki', 'letayushchie-igrushki']
+const SETS: NounForms = ['набор', 'набора', 'наборов']
+
 export default defineEventHandler(async (event): Promise<string> => {
   const client = await serverSupabaseClient<Database>(event)
 
-  const [categoriesResult, brandsResult, productsResult] = await Promise.all([
+  const [categoriesResult, brandsResult, productsResult, linesResult] = await Promise.all([
     client
       .from('categories')
-      .select('id, name, slug, href, parent_id')
+      .select('id, name, slug, href, parent_id, seo_h1')
       .order('name'),
     client
       .from('brands')
-      .select('name, slug, products(count)')
+      .select('id, name, slug, products(count)')
       .eq('products.is_active', true)
       .limit(200),
     client
       .from('products')
-      .select('category_id')
+      .select('category_id, product_line_id, brand_id, price, final_price, stock_quantity, min_age_months')
       .eq('is_active', true),
+    client
+      .from('product_lines')
+      .select('id, name, slug, brand_id'),
   ])
 
   // Раздел без товаров закрыт `noindex` — считаем товары по всей ветке
@@ -72,6 +88,37 @@ export default defineEventHandler(async (event): Promise<string> => {
   const branchCount = (id: string): number =>
     (activeIn.get(id) ?? 0) + categories.filter(c => c.parent_id === id).reduce((sum, c) => sum + branchCount(c.id), 0)
   const roots = categories.filter(c => c.parent_id === null && branchCount(c.id) > 0)
+
+  const products = productsResult.data ?? []
+  const branchIds = (id: string): string[] =>
+    [id, ...categories.filter(c => c.parent_id === id).flatMap(c => branchIds(c.id))]
+
+  // Раздел строкой с цифрами — те же, что в абзаце на его странице
+  const rcLines = RC_SLUGS.flatMap((slug) => {
+    const category = categories.find(c => c.slug === slug)
+    if (!category)
+      return []
+    const ids = new Set(branchIds(category.id))
+    const rows: CategoryFactRow[] = products.filter(p => p.category_id && ids.has(p.category_id))
+    const paragraph = composeCategoryFactsParagraph(categoryFactsFromRows(rows))
+    // Пустой раздел закрыт `noindex` — называть его модели незачем
+    return paragraph
+      ? [`- [${category.seo_h1 || category.name}](${SITE_URL}${category.href || `/catalog/${category.slug}`}). ${paragraph}`]
+      : []
+  })
+
+  // Серии LEGO — только с товарами, по числу наборов
+  const lego = (brandsResult.data ?? []).find(b => b.slug === 'lego')
+  const legoLines = (linesResult.data ?? [])
+    .filter(line => lego && line.brand_id === lego.id && line.slug)
+    .map(line => ({ line, facts: categoryFactsFromRows(products.filter(p => p.product_line_id === line.id)) }))
+    .filter(({ facts }) => facts.count > 0)
+    .sort((a, b) => b.facts.count - a.facts.count || a.line.name.localeCompare(b.line.name, 'ru'))
+    .map(({ line, facts }) => {
+      const range = priceRangePhrase(facts)
+      const youngest = facts.ageGroups[0]
+      return `- [${line.name}](${SITE_URL}/brand/lego/${line.slug}) — ${countPhrase(facts.count, SETS)}${range ? ` ${range}` : ''}${youngest ? `, ${sinceAge(youngest[0])}` : ''}`
+    })
 
   const brands = (brandsResult.data ?? [])
     .map(brand => ({
@@ -101,6 +148,8 @@ export default defineEventHandler(async (event): Promise<string> => {
       category => `- [${category.name}](${SITE_URL}${category.href || `/catalog/${category.slug}`})`,
     ),
     '',
+    ...(rcLines.length ? ['## Радиоуправляемые машинки', '', ...rcLines, ''] : []),
+    ...(legoLines.length ? ['## Серии LEGO', '', ...legoLines, ''] : []),
     '## Бренды',
     '',
     ...brands.map(
