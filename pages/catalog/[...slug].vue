@@ -2499,6 +2499,8 @@ else {
     <p v-if="brandLandingSummary" class="mb-2 text-sm text-muted-foreground">
       {{ brandLandingSummary }}
     </p>
+    <!-- Самовывоз у заголовка — план аудита, п. 16 (разбор в компоненте). -->
+    <CommonPickupLine class="mb-2" />
     <CategoryRatingBlock
       v-if="showCategoryRating"
       :avg-rating="categoryRatingData!.avg_rating"

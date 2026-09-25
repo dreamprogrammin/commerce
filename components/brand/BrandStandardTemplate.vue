@@ -141,6 +141,9 @@ function toggleSeoExpanded() {
                 {{ brand.seo_h1 || brand.name }}
               </h1>
 
+              <!-- Самовывоз у заголовка — план аудита, п. 16. -->
+              <CommonPickupLine align="center" />
+
               <!-- Brand Trust Score -->
               <div
                 v-if="brandStats && brandStats.total_reviews_count > 0"

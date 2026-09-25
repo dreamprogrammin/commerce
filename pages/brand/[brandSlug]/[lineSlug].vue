@@ -676,6 +676,9 @@ useIndexableRobotsRule(
                 }}</span>
               </NuxtLink>
 
+              <!-- Самовывоз у заголовка — план аудита, п. 16. -->
+              <CommonPickupLine align="center" />
+
               <!-- Brand Trust Score для линейки -->
               <div
                 v-if="lineStats && lineStats.total_reviews_count > 0"
