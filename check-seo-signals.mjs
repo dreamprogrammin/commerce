@@ -282,6 +282,36 @@ for (const [path, name, alt] of [
 const regular = await get('/brand/cada')
 check(regular.body.includes('Официальный поставщик'), '/brand/cada: у бренда с товарами полоса доверия на месте')
 
+// ---------- 5е. Производитель в разметке списка товаров ----------
+/*
+ * План по аудиту, п. 7. На карточке товара «Ухтышку» вместо пустого бренда
+ * убрали 17 сентября 2026, а ItemList разделов называл магазин
+ * производителем у каждого товара без бренда — у 92 из 178. Инвариант: в
+ * ItemList нет бренда «Ухтышка»; у кого бренд есть — он со ссылкой на
+ * страницу бренда.
+ */
+console.log('\n5е) производитель в ItemList разделов')
+for (const path of ['/catalog/boys/mashinki', '/catalog/girls/igrovye-nabory']) {
+  const page = await get(path)
+  const items = [...page.body.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const data = JSON.parse(m[1])
+        return Array.isArray(data['@graph']) ? data['@graph'] : [data]
+      }
+      catch {
+        return []
+      }
+    })
+    .find(node => node?.['@type'] === 'ItemList')
+    ?.itemListElement
+    ?.map(e => e.item) ?? []
+  const store = items.filter(i => i?.brand?.name === 'Ухтышка').length
+  const branded = items.filter(i => i?.brand)
+  check(items.length > 0 && store === 0, `${path}: товаров в ItemList ${items.length}, с брендом «Ухтышка» ${store}`)
+  check(branded.every(i => /^https:\/\/uhti\.kz\/brand\//.test(i.brand.url ?? '')), `${path}: у ${branded.length} товаров с брендом — ссылка на страницу бренда`)
+}
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым

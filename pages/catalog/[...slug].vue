@@ -2357,14 +2357,24 @@ const schemaData = computed(() => {
             'description': cleanDescription(product.description) || product.name,
             'url': `https://uhti.kz/catalog/products/${product.slug}`,
             'sku': product.sku || product.id,
-            'mpn': product.sku || product.id,
-            'brand': {
-              '@type': 'Brand',
-              'name': product.brands?.name || 'Ухтышка',
-              ...(product.brands?.slug && {
-                url: `https://uhti.kz/brand/${product.brands.slug}`,
-              }),
-            },
+            // MPN — код модели производителя; id из базы им не является.
+            ...(product.sku && { mpn: product.sku }),
+            /*
+             * Бренд — производитель, а не магазин (план по аудиту, п. 7). На
+             * карточке товара «Ухтышку» вместо пустого бренда убрали 17
+             * сентября 2026, а здесь она оставалась: у 92 товаров из 178
+             * разметка раздела называла производителем магазин. Нет бренда в
+             * базе — нет поля, как на карточке и в фиде.
+             */
+            ...(product.brands?.name && {
+              brand: {
+                '@type': 'Brand',
+                'name': product.brands.name,
+                ...(product.brands.slug && {
+                  url: `https://uhti.kz/brand/${product.brands.slug}`,
+                }),
+              },
+            }),
             // Только настоящий GTIN (utils/gtin.ts): «8497» из базы — не штрихкод.
             ...(validGtin(product.barcode) && { gtin: validGtin(product.barcode) }),
             /*
