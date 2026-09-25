@@ -9,7 +9,6 @@ import {
   BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS,
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
-  BUCKET_NAME_PRODUCT_LINES,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
 import { brandStaticFaq, emptyBrandAlternatives } from '@/constants/brandStaticText'
@@ -676,7 +675,14 @@ useHead({
   // Google Rich Results Test помечает такие блоки как "unknown type"
   // (см. SEO-аудит, находка S-1).
   script: computed(() => [
-    // Brand Schema с линейками как subOrganization
+    /*
+     * Brand. Линеек здесь больше нет: они стояли в `subOrganization`, а у типа
+     * `Brand` такого свойства нет — оно есть только у `Organization`, и
+     * проверка разметки его отбрасывала (аудит 24 сентября 2026). К тому же в
+     * список шли и пустые серии — Friends, Technic, Ninjago у LEGO с нулём
+     * товаров и `noindex`. Страницы серий поисковик видит по ссылкам мозаики
+     * и по карте сайта.
+     */
     brand.value && {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
@@ -690,24 +696,6 @@ useHead({
         'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         ...(brand.value.seo_keywords?.length && {
           keywords: brand.value.seo_keywords.join(', '),
-        }),
-        ...(brandProductLines.value.length > 0 && {
-          subOrganization: brandProductLines.value.map(line => ({
-            '@type': 'Brand',
-            '@id': `${siteUrl}/brand/${brand.value!.slug}/${line.slug}#brand`,
-            'name': line.name,
-            'url': `${siteUrl}/brand/${brand.value!.slug}/${line.slug}`,
-            ...(line.logo_url && {
-              logo: getVariantUrl(
-                BUCKET_NAME_PRODUCT_LINES,
-                line.logo_url,
-                'sm',
-              ),
-            }),
-            ...(line.description && {
-              description: cleanDescription(line.description, 200),
-            }),
-          })),
         }),
       }),
     },
@@ -750,7 +738,9 @@ useHead({
         '@context': 'https://schema.org',
         '@type': 'ItemList',
         'name': `Товары бренда ${brand.value.name}`,
-        'numberOfItems': filterState.products.value.length,
+        // Столько, сколько элементов в списке, а не всех товаров бренда: у
+        // LEGO стояло 14 при 10 элементах (аудит 24 сентября 2026)
+        'numberOfItems': Math.min(filterState.products.value.length, 10),
         'itemListElement': filterState.products.value
           .slice(0, 10)
           .map((product, index) => ({

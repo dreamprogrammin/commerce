@@ -10,6 +10,8 @@
  *
  *   node check-ai-visibility.mjs --base=http://localhost:3008
  */
+import process from 'node:process'
+
 const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'http://localhost:3008'
 
 const fails = []
@@ -111,7 +113,7 @@ for (const ua of AGENTS) {
     }
     catch {}
   }
-  const store = homeNodes.find(n => String(n['@type']) === 'Store')
+  const store = homeNodes.find(n => ['Store', 'ToyStore'].includes(String(n['@type'])))
   const homeOrg = homeNodes.find(n => String(n['@type']).includes('Organization'))
   const asText = v => (Array.isArray(v) ? v.join(', ') : String(v ?? ''))
 
@@ -133,11 +135,41 @@ for (const ua of AGENTS) {
     'магазин связан с организацией через parentOrganization',
   )
 
+  /*
+   * Аудит 24 сентября 2026: тип `Store` вместо `ToyStore`, нет
+   * `openingHoursSpecification` и `alternateName`.
+   */
+  check(store?.['@type'] === 'ToyStore', `тип магазина — ToyStore (${store?.['@type']})`)
+  const hours = asText(store?.openingHours).match(/(\d\d:\d\d)-(\d\d:\d\d)/)
+  const spec = [].concat(store?.openingHoursSpecification ?? [])[0]
+  check(
+    !!spec && (spec.dayOfWeek ?? []).length === 7 && spec.opens === hours?.[1] && spec.closes === hours?.[2],
+    `часы по дням совпадают со строкой часов: ${spec ? `${(spec.dayOfWeek ?? []).length} дн., ${spec.opens}–${spec.closes}` : 'нет'}`,
+  )
+  const website = homeNodes.find(n => String(n['@type']) === 'WebSite')
+  check(
+    [homeOrg, website, store].every(n => asText(n?.alternateName).includes('uhti.kz')),
+    `другие написания имени у организации, сайта и магазина: ${asText(homeOrg?.alternateName)}`,
+  )
+
   const faq = nodes.find(n => n['@type'] === 'FAQPage')
   check((faq?.mainEntity ?? []).length >= 5, `вопросов в разметке: ${(faq?.mainEntity ?? []).length}`)
 
   const product = nodes.find(n => n['@type'] === 'ItemList')
   check(!!product, 'список товаров в разметке есть')
+  check(
+    !!product && product.numberOfItems === (product.itemListElement ?? []).length,
+    `numberOfItems равен длине списка: ${product?.numberOfItems} и ${(product?.itemListElement ?? []).length}`,
+  )
+  const brandNode = nodes.find(n => n['@type'] === 'Brand')
+  check(!!brandNode && !('subOrganization' in brandNode), 'у Brand нет subOrganization — у этого типа такого свойства нет')
+
+  // «7 серий» при четырёх с товаром (аудит 24 сентября 2026): в шапке и в
+  // подзаголовке мозаики — только серии, где есть товар
+  const lego = await (await fetch(`${BASE}/brand/lego`)).text()
+  const inStock = Number(lego.match(/(\d+) сери[яий] в наличии/)?.[1] ?? 0)
+  const heroSeries = Number(lego.match(/blh__stat-num[^>]*>(\d+)<\/span>\s*<span[^>]*blh__stat-label[^>]*>сери/)?.[1] ?? 0)
+  check(inStock > 0 && heroSeries === inStock, `серии LEGO: в шапке ${heroSeries}, в наличии ${inStock}`)
 }
 
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: страница готова для ИИ-поисковиков' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)

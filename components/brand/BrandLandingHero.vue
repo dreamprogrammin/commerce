@@ -24,6 +24,8 @@ const props = defineProps<{
   /** Товары бренда — первый идёт витриной. */
   products: ProductWithGallery[]
   lines: ProductLine[]
+  /** Сколько товаров в каждой серии — в цифрах шапки только серии с товаром. */
+  lineCounts?: Record<string, number>
   breadcrumbs: IBreadcrumbItem[]
   /** Раздел каталога, где лежат товары бренда: «Конструкторы». Идёт в H1. */
   headingWord?: string | null
@@ -119,10 +121,15 @@ const stats = computed(() => {
       label: pluralRu(inStockCount.value, 'набор', 'набора', 'наборов'),
     },
   ]
-  if (props.lines.length > 0) {
+  // Серии с товаром, а не все: у LEGO стояло «7 серий» при четырёх в
+  // наличии (аудит 24 сентября 2026)
+  const seriesInStock = props.lineCounts
+    ? props.lines.filter(line => (props.lineCounts![line.id] ?? 0) > 0).length
+    : props.lines.length
+  if (seriesInStock > 0) {
     rows.push({
-      num: String(props.lines.length),
-      label: pluralRu(props.lines.length, 'серия', 'серии', 'серий'),
+      num: String(seriesInStock),
+      label: pluralRu(seriesInStock, 'серия', 'серии', 'серий'),
     })
   }
   rows.push({ num: '1–3 дня', label: 'доставка по Алматы' })
