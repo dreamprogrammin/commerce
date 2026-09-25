@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { composeBrandMeta, topLines } from '@/utils/brandMeta'
+import { composeBrandMeta, composeEmptyBrandMeta, topLines } from '@/utils/brandMeta'
 import { META_DESCRIPTION_LIMIT } from '@/utils/seoDescription'
 
 /*
@@ -43,5 +43,24 @@ describe('composeBrandMeta', () => {
 
   it('товаров нет — null, страница берёт запасные варианты', () => {
     expect(composeBrandMeta({ word: 'Игрушки', brandName: 'Zuru', products: [] })).toBeNull()
+  })
+})
+
+describe('composeEmptyBrandMeta', () => {
+  it('говорит, что товаров нет, и называет раздел с похожим', () => {
+    expect(composeEmptyBrandMeta('BOWA', [{ label: 'Игровые наборы' }]))
+      .toBe('Товаров BOWA сейчас нет в наличии. Похожие игрушки — в разделе «Игровые наборы» интернет-магазина Ухтышка в Алматы.')
+  })
+
+  it('два раздела — через «и»', () => {
+    const text = composeEmptyBrandMeta('SOBA', [{ label: 'Автотреки' }, { label: 'Радиоуправляемые машинки' }])
+    expect(text).toContain('в разделах «Автотреки» и «Радиоуправляемые машинки»')
+    expect(text.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+  })
+
+  it('без похожего — ведёт в каталог, не обещает «купить»', () => {
+    const text = composeEmptyBrandMeta('Eva Puzzle', [])
+    expect(text).toBe('Товаров Eva Puzzle сейчас нет в наличии. Игрушки других брендов — в каталоге интернет-магазина Ухтышка в Алматы.')
+    expect(text).not.toMatch(/купить/i)
   })
 })

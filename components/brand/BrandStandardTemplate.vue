@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BrandFilterState } from '@/composables/useBrandPageFilters'
+import type { BrandAlternative } from '@/constants/brandStaticText'
 import type { Brand, IBreadcrumbItem, ProductLine, ProductWithGallery } from '@/types'
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS, BUCKET_NAME_PRODUCT_LINES } from '@/constants'
 import { useCartStore } from '@/stores/publicStore/cartStore'
+import { pluralRu } from '@/utils/seoDescription'
 
 interface BrandQuestion {
   id: string
@@ -35,9 +37,26 @@ const props = defineProps<{
    * показывается он, а надстрочник не рисуется — иначе выйдет повтор.
    */
   topCategory?: string | null
+  /**
+   * Есть ли у бренда хоть один активный товар — считается на сервере и не
+   * зависит от фильтров. `false` — пустой бренд; `null` или не передано —
+   * не знаем, и страница выглядит как обычно.
+   */
+  hasProducts?: boolean | null
+  /** Разделы с похожим для пустого бренда — `emptyBrandAlternatives`. */
+  alternatives?: readonly BrandAlternative[]
 }>()
 
 const fs = props.filterState
+
+/*
+ * Пустой бренд (план по аудиту, п. 10). Восемь таких страниц открыты для
+ * индекса ради спроса, и над пустой сеткой стояли «Оригинал», полоса
+ * «Официальный поставщик · Сертификаты на каждую модель» и фильтры по
+ * ценам, которых нет. Решаем по признаку со страницы, а не по пустой
+ * выдаче: выдача пуста и тогда, когда товары есть, но фильтры отсекли все.
+ */
+const isEmptyBrand = computed(() => props.hasProducts === false)
 const { getVariantUrl } = useSupabaseStorage()
 
 /*
@@ -160,19 +179,24 @@ function toggleSeoExpanded() {
 
               <div class="flex flex-wrap gap-2 justify-center md:justify-start">
                 <span
+                  v-if="isEmptyBrand"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs md:text-sm font-medium"
+                >
+                  <Package class="w-3.5 h-3.5" />
+                  Нет в наличии
+                </span>
+                <!-- Склонение — pluralRu: самодельное «1 / меньше 5 / иначе»
+                     давало «0 товара» и «21 товаров». -->
+                <span
+                  v-else
                   class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-medium"
                 >
                   <Package class="w-3.5 h-3.5" />
                   {{ fs.products.value.length }}
-                  {{
-                    fs.products.value.length === 1
-                      ? "товар"
-                      : fs.products.value.length < 5
-                        ? "товара"
-                        : "товаров"
-                  }}
+                  {{ pluralRu(fs.products.value.length, "товар", "товара", "товаров") }}
                 </span>
                 <span
+                  v-if="!isEmptyBrand"
                   class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs md:text-sm font-medium"
                 >
                   <ShieldCheck class="w-3.5 h-3.5" />
@@ -195,8 +219,9 @@ function toggleSeoExpanded() {
     </div>
 
     <!-- Полоса доверия. Порт секции TRUST из макета: обещания магазина,
-         одинаковые для всех брендов. -->
-    <BrandTrustRow />
+         одинаковые для всех брендов. У пустого бренда их не к чему
+         приложить: обещание поставщика над пустой сеткой. -->
+    <BrandTrustRow v-if="!isEmptyBrand" />
 
     <!-- Коллекции — карточки с логотипами -->
     <div v-if="productLines && productLines.length > 0">
@@ -254,7 +279,8 @@ function toggleSeoExpanded() {
       <h2 class="text-xl md:text-3xl font-bold">
         Каталог товаров
       </h2>
-      <div class="flex items-center gap-2">
+      <!-- У пустого бренда фильтровать и сортировать нечего. -->
+      <div v-if="!isEmptyBrand" class="flex items-center gap-2">
         <!-- Mobile filter button -->
         <Button
           variant="outline"
@@ -278,7 +304,7 @@ function toggleSeoExpanded() {
     <!-- Sidebar + Products grid -->
     <div class="flex gap-6">
       <!-- Desktop Sidebar -->
-      <aside class="hidden lg:block w-64 shrink-0">
+      <aside v-if="!isEmptyBrand" class="hidden lg:block w-64 shrink-0">
         <BrandFilterSidebar :state="fs" />
       </aside>
 
@@ -307,21 +333,74 @@ function toggleSeoExpanded() {
             >
               <Package class="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
             </div>
-            <h3 class="text-lg md:text-xl font-semibold mb-2">
-              Товаров пока нет
-            </h3>
-            <p
-              class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm"
-            >
-              К сожалению, товары бренда {{ brand.name }} временно отсутствуют в
-              продаже.
-            </p>
-            <NuxtLink to="/catalog/all">
-              <Button variant="outline">
-                <ArrowLeft class="w-4 h-4 mr-2" />
-                Вернуться в каталог
+            <!-- Пустой бренд: честно и с выходом туда, где похожее есть. -->
+            <template v-if="isEmptyBrand">
+              <h3 class="text-lg md:text-xl font-semibold mb-2">
+                Товаров {{ brand.name }} сейчас нет в наличии
+              </h3>
+              <p
+                class="text-sm md:text-base text-muted-foreground mb-4 max-w-sm"
+              >
+                {{
+                  alternatives?.length
+                    ? `Похожие игрушки — в ${alternatives.length === 1 ? "разделе" : "разделах"}:`
+                    : "Игрушки других брендов — в каталоге."
+                }}
+              </p>
+              <div
+                v-if="alternatives?.length"
+                class="flex flex-wrap justify-center gap-2 mb-4 md:mb-6"
+              >
+                <NuxtLink
+                  v-for="alt in alternatives"
+                  :key="alt.href"
+                  :to="alt.href"
+                  class="inline-flex items-center rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {{ alt.label }}
+                </NuxtLink>
+              </div>
+              <NuxtLink to="/catalog">
+                <Button variant="outline">
+                  <ArrowLeft class="w-4 h-4 mr-2" />
+                  Весь каталог
+                </Button>
+              </NuxtLink>
+            </template>
+
+            <!-- Товары есть, но фильтры отсекли все: здесь стояло «товары
+                 бренда временно отсутствуют в продаже», и это была неправда. -->
+            <template v-else-if="fs.activeFiltersCount.value > 0">
+              <h3 class="text-lg md:text-xl font-semibold mb-2">
+                Ничего не нашлось
+              </h3>
+              <p
+                class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm"
+              >
+                По выбранным фильтрам товаров {{ brand.name }} нет.
+              </p>
+              <Button variant="outline" @click="fs.resetFilters()">
+                Сбросить фильтры
               </Button>
-            </NuxtLink>
+            </template>
+
+            <template v-else>
+              <h3 class="text-lg md:text-xl font-semibold mb-2">
+                Товаров пока нет
+              </h3>
+              <p
+                class="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-sm"
+              >
+                К сожалению, товары бренда {{ brand.name }} временно отсутствуют в
+                продаже.
+              </p>
+              <NuxtLink to="/catalog/all">
+                <Button variant="outline">
+                  <ArrowLeft class="w-4 h-4 mr-2" />
+                  Вернуться в каталог
+                </Button>
+              </NuxtLink>
+            </template>
           </CardContent>
         </Card>
       </main>
