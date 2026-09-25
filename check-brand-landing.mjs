@@ -211,12 +211,21 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
   check(start.cards === 8, `в сетке восемь товаров (${start.cards})`)
   check(!start.reset, 'кнопки сброса нет, пока ничего не выбрано')
 
-  // Ползунок возраста сужает выдачу.
+  /*
+   * Ползунок возраста сужает выдачу — двигаем ВЕРХНЮЮ границу: «до 5 лет».
+   *
+   * До 25 сентября 2026 двигалась нижняя, «от 10», и выдача «сужалась»
+   * только потому, что у набора 76290 не был указан возраст и его отсекало.
+   * Возраст ему проставили (7+), и «от 10 лет» законно показывает все 14:
+   * набор 4+ десятилетнему подходит, верхней границы у него нет. «До 5 лет»
+   * оставляет наборы 4+ и 5+ — пожарный мотоцикл, Железного человека,
+   * паровой каток, пожарный вертолёт.
+   */
   const total = Number(start.found?.match(/\d+/)?.[0] ?? 0)
   await page.evaluate(() => {
-    const input = document.querySelectorAll('.rf__input')[0]
+    const input = document.querySelectorAll('.rf__input')[1]
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-    setter.call(input, '10')
+    setter.call(input, '5')
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   await page.waitForTimeout(700)
@@ -226,7 +235,8 @@ const DESKTOP = { viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 
     reset: !!document.querySelector('.blp__reset'),
   }))
   check(narrowed.found > 0 && narrowed.found < total, `ползунок возраста сужает выдачу (${total} → ${narrowed.found})`)
-  check(/^10/.test(narrowed.cap ?? ''), `подпись показывает новый отрезок («${narrowed.cap}»)`)
+  // Между числом и «лет» — неразрывный пробел (RangeFilter), \s его ловит
+  check(/5\sлет$/.test(narrowed.cap ?? ''), `подпись показывает новый отрезок («${narrowed.cap}»)`)
   check(narrowed.reset, 'появилась кнопка «Сбросить»')
 
   await page.click('.blp__reset')
