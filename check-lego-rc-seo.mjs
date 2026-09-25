@@ -17,7 +17,10 @@
  *  5) в браузере — гидратация без расхождений, а ссылка из текста раздела
  *     открывает страницу переходом внутри сайта, без перезагрузки;
  *  6) вертолёты, самолёты и квадрокоптер — в «Летающих игрушках», а не в
- *     выдаче машинок (по списку товаров в разметке ItemList).
+ *     выдаче машинок (по списку товаров в разметке ItemList);
+ *  7) цифры машинок (план аудита, п. 17): абзац и вопросы «сколько стоит»,
+ *     «с какого возраста», «где забрать» — с теми числами, что лежат в базе.
+ *     Страж считает их сам, по REST, своим кодом, а не кодом сайта.
  *
  * Тексты в базе меняет `docs/SEO_LEGO_RC_2026_09_23.sql` (запускает
  * владелец). До его запуска пункты про тексты машинок и конструкторов
@@ -223,6 +226,72 @@ for (const p of PAGES) {
   }
 }
 
+// ── цифры «Радиоуправляемых машинок» ───────────────────────────────────────
+/*
+ * План аудита, п. 17 (25 сентября 2026): «нет цифр для цитаты» — число
+ * моделей и цены стояли только в описании для выдачи. Страница считает их из
+ * товаров раздела; здесь они считаются заново, по REST с публичным ключом, и
+ * сверяются с серверной разметкой. На бою страница из ISR (до 30 минут):
+ * сразу после смены цены или остатка возможен одиночный красный — повторить.
+ */
+console.log('\n== цифры «Радиоуправляемых машинок»')
+const rcNumbersHome = await (await fetch(`${BASE}/`)).text()
+const supaUrl = rcNumbersHome.match(/supabase:\{url:"([^"]+)"/)?.[1]
+const anon = rcNumbersHome.match(/eyJ[\w-]{20,}\.[\w-]{20,}\.[\w-]{20,}/)?.[0]
+async function rest(query) {
+  return (await fetch(`${supaUrl}/rest/v1/${query}`, { headers: { apikey: anon, authorization: `Bearer ${anon}` } })).json()
+}
+const cats = await rest('categories?select=id,slug,parent_id')
+const rcIds = [cats.find(c => c.slug === 'radioupravlyaemye-mashinki').id]
+for (let i = 0; i < rcIds.length; i++)
+  rcIds.push(...cats.filter(c => c.parent_id === rcIds[i]).map(c => c.id))
+const rcProducts = await rest(`products?select=price,final_price,stock_quantity,min_age_months&is_active=eq.true&category_id=in.(${rcIds.join(',')})`)
+const prices = rcProducts.map(p => Number(p.final_price || p.price)).filter(n => n > 0).sort((a, b) => a - b)
+const count = rcProducts.length
+const inStock = rcProducts.filter(p => (p.stock_quantity ?? 0) > 0).length
+const cheap = prices.filter(n => n < 10000).length
+const byAge = new Map()
+for (const p of rcProducts) {
+  if (p.min_age_months !== null)
+    byAge.set(p.min_age_months, (byAge.get(p.min_age_months) ?? 0) + 1)
+}
+const ages = [...byAge.entries()].sort((a, b) => a[0] - b[0])
+const agesKnown = ages.reduce((sum, [, n]) => sum + n, 0)
+const fmt = n => String(n).replace(/\B(?=(?:\d{3})+(?!\d))/g, ' ')
+function models(n) {
+  const form = n % 10 === 1 && n % 100 !== 11 ? 'модель' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'модели' : 'моделей'
+  return `${n} ${form}`
+}
+const range = prices[0] === prices.at(-1) ? `за ${fmt(prices[0])} ₸` : `от ${fmt(prices[0])} до ${fmt(prices.at(-1))} ₸`
+console.log(`  по базе: ${models(count)}, в наличии ${inStock}, ${range}, дешевле 10 000 ₸ — ${cheap}, возраст (мес × моделей): ${ages.map(([m, n]) => `${m}×${n}`).join(', ')}`)
+
+const rcHtml = await (await fetch(`${BASE}${RC}`)).text()
+const rcText = visibleText(rcHtml)
+const lead = `Сейчас в разделе ${models(count)} ${range}, ${inStock === count ? 'все в наличии' : `в наличии ${inStock} из ${count}`}.`
+const leadAt = rcText.indexOf(lead)
+check(leadAt >= 0, `абзац с цифрами: «${lead}»`)
+check(leadAt > rcText.indexOf('Из брендов больше всего') && leadAt < rcText.indexOf('Как выбрать радиоуправляемую машинку'), 'абзац — сразу за первым абзацем текста раздела')
+const agesLead = ages.length === 1 && agesKnown === count ? 'Все — для детей' : `${ages[0]?.[1]} из них`
+check(rcText.slice(leadAt, leadAt + lead.length + 80).includes(agesLead), `в абзаце возраст: «…${agesLead}…»`)
+
+const qa = [...rcHtml.matchAll(/<h3 class="ssb__q"[^>]*>([\s\S]*?)<\/h3>\s*<p class="ssb__a"[^>]*>([\s\S]*?)<\/p>/g)]
+  .map(m => [visibleText(m[1]).trim(), visibleText(m[2]).trim()])
+const [priceQa, ageQa, pickupQa] = qa
+check(priceQa?.[0] === 'Сколько стоит радиоуправляемая машинка в Ухтышке?', `первый вопрос — «${priceQa?.[0]}»`)
+const priceHead = range.replace(/^от/, 'От').replace(/^за /, '')
+const cheapText = cheap > 0 && cheap < prices.length ? `, ${cheap} из них дешевле 10 000 ₸` : ''
+check(!!priceQa?.[1].startsWith(`${priceHead}. Сейчас в разделе ${models(count)}${cheapText}.`), `цена в ответе: «${priceQa?.[1].slice(0, 90)}…»`)
+check(ageQa?.[0] === 'С какого возраста радиоуправляемые машинки в Ухтышке?', `второй вопрос — «${ageQa?.[0]}»`)
+const ageHead = ages.length === 1 && agesKnown === count ? `Все ${models(count)} раздела` : `${models(ages[0]?.[1] ?? 0)} из ${count}`
+check(!!ageQa?.[1].includes(ageHead), `возраст в ответе: «${ageQa?.[1]}»`)
+check(pickupQa?.[0] === 'Где забрать радиоуправляемую машинку в Алматы?' && /Амангельды, 100/.test(pickupQa?.[1] ?? '') && /с 9:00 до 22:00/.test(pickupQa?.[1] ?? ''), `третий — где забрать, с адресом и часами: «${pickupQa?.[1].slice(0, 80)}…»`)
+const faqLd = ldNode(rcHtml, 'FAQPage')?.mainEntity?.map(q => [q.name, q.acceptedAnswer?.text?.replace(/\s+/g, ' ')]) ?? []
+check(qa.length > 0 && JSON.stringify(faqLd) === JSON.stringify(qa), `FAQPage совпадает с видимыми вопросами слово в слово (${faqLd.length} / ${qa.length})`)
+
+// Связка «машинки + бренд» — у неё свои цифры, цифры всего раздела ей чужие.
+const mokaText = visibleText(await (await fetch(`${BASE}${RC}/brand/mokatoys`)).text())
+check(!mokaText.includes('Сейчас в разделе') && !mokaText.includes('Сколько стоит радиоуправляемая машинка в Ухтышке?'), 'на связке с MokaToys цифр и вопросов всего раздела нет')
+
 // ── подвал, главная, /catalog ───────────────────────────────────────────────
 console.log('\n== подвал и тексты-хабы')
 const homeHtml = await (await fetch(`${BASE}/`)).text()
@@ -284,6 +353,39 @@ try {
   check(page.url().endsWith('/catalog/boys/mashinki/avtotreki') && kept, `ссылка из текста: переход внутри сайта (${page.url().replace(BASE, '')}, ${kept ? 'без перезагрузки' : 'С ПЕРЕЗАГРУЗКОЙ'})`)
   check(h1 === 'Автотреки для мальчиков', `открылась страница «${h1}»`)
   await page.close()
+
+  // На машинки — переходом внутри сайта: цифры приходят не в серверной
+  // разметке, а в данных перехода (_payload.json), и абзац должен быть и там.
+  const nav = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  // Расхождения гидратации и исключения страницы. Прочие ошибки консоли —
+  // шум стенда: у локальной сборки нет ни ID Google-тега, ни картинок.
+  const navErrors = []
+  nav.on('console', (m) => {
+    if (/Hydration/i.test(m.text()))
+      navErrors.push(m.text())
+  })
+  nav.on('pageerror', e => navErrors.push(e.message))
+  await nav.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 })
+  await nav.waitForFunction(() => !!document.querySelector('#__nuxt')?.__vue_app__, null, { timeout: 60000 })
+    .catch(() => {})
+    .then(() => nav.waitForTimeout(2500))
+  await nav.evaluate(() => {
+    window.__noReload = true
+  })
+  const rcLink = nav.locator(`a[href="${RC}"]`).first()
+  await rcLink.scrollIntoViewIfNeeded()
+  await rcLink.click()
+  await nav.waitForURL(u => u.pathname === RC, { timeout: 20000 }).catch(() => {})
+  await nav.waitForTimeout(2500)
+  const navState = await nav.evaluate(() => ({
+    kept: window.__noReload === true,
+    lead: [...document.querySelectorAll('p')].map(p => p.textContent.replace(/\s+/g, ' ').trim()).find(t => t.startsWith('Сейчас в разделе')) ?? null,
+    firstQ: document.querySelector('.ssb__q')?.textContent?.trim() ?? null,
+  }))
+  check(navState.kept && !!navState.lead?.startsWith(lead), `с главной внутри сайта: абзац «${navState.lead}»${navState.kept ? '' : ' — С ПЕРЕЗАГРУЗКОЙ'}`)
+  check(navState.firstQ === 'Сколько стоит радиоуправляемая машинка в Ухтышке?', `и вопросы с цифрами первыми: «${navState.firstQ}»`)
+  check(!navErrors.length, `без расхождений гидратации и исключений${navErrors.length ? ` — ${navErrors[0].slice(0, 160)}` : ''}`)
+  await nav.close()
 }
 finally {
   await browser.close()

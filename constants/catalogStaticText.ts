@@ -33,7 +33,7 @@
  *    то, и другое.
  */
 
-import { formatPrice } from '@/utils/formatPrice'
+import { formatTenge } from '@/utils/formatPrice'
 import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from './index'
 import { SHOP } from './shop'
 
@@ -45,14 +45,14 @@ import { SHOP } from './shop'
  * здесь то, что происходит на самом деле; расхождение с `/terms` вынесено в
  * отчёт владельцу.
  */
-const DELIVERY_PRICE = `${formatPrice(COURIER_DELIVERY_COST)} ₸`
-const FREE_FROM = `${formatPrice(FREE_SHIPPING_THRESHOLD)} ₸`
+export const DELIVERY_PRICE = formatTenge(COURIER_DELIVERY_COST)
+export const FREE_FROM = formatTenge(FREE_SHIPPING_THRESHOLD)
 /*
  * Пункт самовывоза — адресом и часами, а не «назовут при подтверждении»:
  * им получают 42 заказа из 45, и ответ «где забрать» должен быть здесь же
  * (аудит 24 сентября 2026). Данные — из constants/shop.ts, как на «Условиях».
  */
-const PICKUP = `${SHOP.street}, ${SHOP.openingHoursHuman}`
+export const PICKUP = `${SHOP.street}, ${SHOP.openingHoursHuman}`
 
 export interface CatalogFaqItem {
   q: string

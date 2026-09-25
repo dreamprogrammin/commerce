@@ -1,4 +1,8 @@
 import type { CatalogFaqItem } from './catalogStaticText'
+import type { CategoryFacts } from '@/utils/categoryFacts'
+import { ageBreakdown, allAgesKnown, composeCategoryFactsParagraph, countCheaperThan, countPhrase } from '@/utils/categoryFacts'
+import { formatPrice, formatTenge } from '@/utils/formatPrice'
+import { DELIVERY_PRICE, FREE_FROM, PICKUP } from './catalogStaticText'
 
 /**
  * Текст и вопросы для КОРНЕВЫХ разделов каталога.
@@ -24,7 +28,9 @@ import type { CatalogFaqItem } from './catalogStaticText'
  * ПРАВИЛА, по которым написано (те же, что у статики бренда и каталога):
  *
  * 1. Никаких чисел, которые протухают: ни количества товаров, ни цен. Они
- *    живут в выдаче и в мета-описании, где считаются по базе.
+ *    живут в выдаче и в мета-описании, где считаются по базе, — и в `live`:
+ *    абзац и вопросы с цифрами собираются из фактов раздела при каждой
+ *    сборке страницы (с 25 сентября 2026, п. 17 плана аудита).
  * 2. Ссылки ведут на РЕАЛЬНЫЕ подразделы, проверенные по карте сайта. Робот
  *    читает их как связь «раздел → подраздел», а человеку это короткий путь
  *    к нужной полке.
@@ -53,6 +59,20 @@ export interface CategoryStaticContent {
    */
   html?: string
   faq: CatalogFaqItem[]
+  /**
+   * Цифры раздела — из его товаров, при каждой сборке страницы: сколько
+   * моделей, цены «от … до …», наличие, возраст. Рукописный текст таких
+   * чисел держать не может — они меняются с каждой поставкой.
+   *
+   * `paragraph` встаёт в текст раздела из базы сразу после первого абзаца;
+   * нет текста в базе — нет и абзаца. `faq` — вопросы с цифрами, они идут
+   * первыми, перед `faq`, и так же уходят в разметку `FAQPage`. Нет фактов
+   * (запрос не удался) — нет ни абзаца, ни этих вопросов, а не пустые цифры.
+   */
+  live?: {
+    paragraph?: (facts: CategoryFacts) => string | null
+    faq?: (facts: CategoryFacts) => CatalogFaqItem[]
+  }
 }
 
 export const categoryStaticText: Record<string, CategoryStaticContent> = {
@@ -448,9 +468,49 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
    * время их полёта и возраст отсюда убраны. Ссылки на новый раздел здесь
    * нет намеренно: её даёт текст раздела из базы, а ссылка из кода,
    * выкаченная раньше SQL, вела бы на 404.
+   *
+   * 25 сентября 2026 (план аудита, п. 17: «нет цифр для цитаты») — абзац с
+   * цифрами и три коммерческих вопроса: сколько стоит, с какого возраста, где
+   * забрать. Цифры — из товаров раздела при каждой сборке страницы (`live`).
+   * Возрастной вопрос не повторяет «Мальчикам»: там совет, с какого возраста
+   * ребёнку давать пульт, здесь — что есть в магазине. Рубеж «дешевле
+   * 10 000 ₸» — половина раздела на 25 сентября: 9 моделей из 18.
    */
   'radioupravlyaemye-mashinki': {
+    live: {
+      paragraph: facts => composeCategoryFactsParagraph(facts),
+      faq: (facts) => {
+        const out: CatalogFaqItem[] = []
+        if (facts.count && facts.minPrice !== null && facts.maxPrice !== null) {
+          const price = facts.minPrice === facts.maxPrice
+            ? formatTenge(facts.minPrice)
+            : `От ${formatPrice(facts.minPrice)} до ${formatTenge(facts.maxPrice)}`
+          const cheap = countCheaperThan(facts, 10_000)
+          const cheapText = cheap > 0 && cheap < facts.prices.length ? `, ${cheap} из них дешевле ${formatTenge(10_000)}` : ''
+          out.push({
+            q: 'Сколько стоит радиоуправляемая машинка в Ухтышке?',
+            a: `${price}. Сейчас в разделе ${countPhrase(facts.count)}${cheapText}. Точная цена — в карточке модели, самовывоз в Алматы бесплатный.`,
+          })
+        }
+        const ages = ageBreakdown(facts)
+        if (ages.length) {
+          const [first, ...rest] = ages
+          const text = ages.length === 1 && allAgesKnown(facts)
+            ? `Все ${countPhrase(facts.count)} раздела — для детей ${first![0]}.`
+            : `${first![0].charAt(0).toUpperCase()}${first![0].slice(1)} — ${countPhrase(first![1])} из ${facts.count}${rest.map(([since, n]) => `, ${since} — ${n}`).join('')}.`
+          out.push({
+            q: 'С какого возраста радиоуправляемые машинки в Ухтышке?',
+            a: allAgesKnown(facts) ? `${text} Возраст указан в карточке каждой модели.` : text,
+          })
+        }
+        return out
+      },
+    },
     faq: [
+      {
+        q: 'Где забрать радиоуправляемую машинку в Алматы?',
+        a: `Самовывозом, бесплатно: ${PICKUP}. Выберите самовывоз при оформлении — заказ подтвердят по телефону, платить заранее не нужно. Курьер по Алматы — ${DELIVERY_PRICE}, от ${FREE_FROM} — бесплатно, доставка занимает 1–3 рабочих дня.`,
+      },
       {
         q: 'Что значит 2,4 ГГц на пульте радиоуправляемой машинки?',
         a: 'Это частота, на которой пульт связан с машинкой. На 2,4 ГГц пульт и машинка настраиваются друг на друга, поэтому несколько машинок едут рядом и не мешают друг другу — удобно, когда играют двое. Пульты на 27 МГц проще, но две машинки на одной частоте перебивают друг друга. Частота указана в характеристиках модели.',
