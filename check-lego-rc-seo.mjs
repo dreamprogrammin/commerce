@@ -20,7 +20,9 @@
  *     выдаче машинок (по списку товаров в разметке ItemList);
  *  7) цифры машинок (план аудита, п. 17): абзац и вопросы «сколько стоит»,
  *     «с какого возраста», «где забрать» — с теми числами, что лежат в базе.
- *     Страж считает их сам, по REST, своим кодом, а не кодом сайта.
+ *     Страж считает их сам, по REST, своим кодом, а не кодом сайта;
+ *  8) то же у хаба «Конструкторы» и «Конструкторов для мальчиков»: абзац с
+ *     брендами и возрастом, вопрос «сколько стоит», у хаба — «где купить».
  *
  * Тексты в базе меняет `docs/SEO_LEGO_RC_2026_09_23.sql` (запускает
  * владелец). До его запуска пункты про тексты машинок и конструкторов
@@ -291,6 +293,79 @@ check(qa.length > 0 && JSON.stringify(faqLd) === JSON.stringify(qa), `FAQPage с
 // Связка «машинки + бренд» — у неё свои цифры, цифры всего раздела ей чужие.
 const mokaText = visibleText(await (await fetch(`${BASE}${RC}/brand/mokatoys`)).text())
 check(!mokaText.includes('Сейчас в разделе') && !mokaText.includes('Сколько стоит радиоуправляемая машинка в Ухтышке?'), 'на связке с MokaToys цифр и вопросов всего раздела нет')
+
+// ── цифры конструкторов ─────────────────────────────────────────────────────
+/*
+ * То же для хаба «Конструкторы» и «Конструкторов для мальчиков» (25 сентября
+ * 2026): число наборов, цены, наличие, ведущие бренды с числом («LEGO (14)»),
+ * разброс возраста — и первым вопрос «сколько стоит». Считается заново, по
+ * REST, со своим склонением.
+ */
+console.log('\n== цифры конструкторов')
+function constructorsWord(n) {
+  const form = n % 10 === 1 && n % 100 !== 11 ? 'конструктор' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'конструктора' : 'конструкторов'
+  return `${n} ${form}`
+}
+const yearsGen = n => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'года' : 'лет'}`
+async function branchFacts(slug) {
+  const ids = [cats.find(c => c.slug === slug).id]
+  for (let i = 0; i < ids.length; i++)
+    ids.push(...cats.filter(c => c.parent_id === ids[i]).map(c => c.id))
+  const rows = await rest(`products?select=price,final_price,stock_quantity,min_age_months,brands(name)&is_active=eq.true&category_id=in.(${ids.join(',')})`)
+  const byBrand = new Map()
+  const byAgeMonths = new Map()
+  for (const p of rows) {
+    if (p.brands?.name)
+      byBrand.set(p.brands.name, (byBrand.get(p.brands.name) ?? 0) + 1)
+    if (p.min_age_months !== null)
+      byAgeMonths.set(p.min_age_months, (byAgeMonths.get(p.min_age_months) ?? 0) + 1)
+  }
+  return {
+    count: rows.length,
+    inStock: rows.filter(p => (p.stock_quantity ?? 0) > 0).length,
+    prices: rows.map(p => Number(p.final_price || p.price)).filter(n => n > 0).sort((a, b) => a - b),
+    brands: [...byBrand.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru')).slice(0, 3),
+    ages: [...byAgeMonths.entries()].sort((a, b) => a[0] - b[0]),
+  }
+}
+const CONSTRUCTOR_PAGES = [
+  { path: HUB, slug: 'constructors-root', after: 'Наборы разложены по тому', before: 'Как выбрать по возрасту', priceQ: 'Сколько стоит детский конструктор в Ухтышке?', whereQ: 'Где купить конструктор в Алматы?' },
+  { path: BOYS, slug: 'konstruktory-malchikam', after: 'Конструкторы для мальчиков: LEGO, Sluban, CaDA', before: 'Как выбрать конструктор мальчику', priceQ: 'Сколько стоит конструктор для мальчика в Ухтышке?' },
+]
+for (const page of CONSTRUCTOR_PAGES) {
+  const f = await branchFacts(page.slug)
+  const cRange = f.prices[0] === f.prices.at(-1) ? `за ${fmt(f.prices[0])} ₸` : `от ${fmt(f.prices[0])} до ${fmt(f.prices.at(-1))} ₸`
+  console.log(`  ${page.path}: по базе ${constructorsWord(f.count)}, в наличии ${f.inStock}, ${cRange}; ${f.brands.map(([b, n]) => `${b} ${n}`).join(', ')}; возраст (мес × наборов): ${f.ages.map(([m, n]) => `${m}×${n}`).join(', ')}`)
+  const html = await (await fetch(`${BASE}${page.path}`)).text()
+  const text = visibleText(html)
+  const head = `Сейчас в разделе ${constructorsWord(f.count)} ${cRange}, ${f.inStock === f.count ? 'все в наличии' : `в наличии ${f.inStock} из ${f.count}`}.`
+  const items = f.brands.map(([b, n]) => `${b} (${n})`)
+  const brandsText = `Больше всего — ${items.length > 1 ? `${items.slice(0, -1).join(', ')} и ${items.at(-1)}` : items[0]}.`
+  const at = text.indexOf(head)
+  check(at >= 0, `${page.path}: абзац «${head}»`)
+  check(at > text.indexOf(page.after) && at < text.indexOf(page.before), `${page.path}: абзац — за первым абзацем текста раздела`)
+  check(text.slice(at + head.length).trimStart().startsWith(brandsText), `${page.path}: «${brandsText}»`)
+  if (f.ages.length > 3 && f.ages.every(([m]) => m % 12 === 0)) {
+    const [mode, n] = f.ages.reduce((best, g) => g[1] > best[1] ? g : best)
+    const agesText = `Возраст — от ${f.ages[0][0] / 12} до ${yearsGen(f.ages.at(-1)[0] / 12)}, чаще всего с ${yearsGen(mode / 12)}: ${n} из ${f.count}.`
+    check(text.includes(agesText), `${page.path}: «${agesText}»`)
+  }
+
+  const pairs = [...html.matchAll(/<h3 class="ssb__q"[^>]*>([\s\S]*?)<\/h3>\s*<p class="ssb__a"[^>]*>([\s\S]*?)<\/p>/g)]
+    .map(m => [visibleText(m[1]).trim(), visibleText(m[2]).trim()])
+  const bands = [[10000, '10 000'], [20000, '20 000']]
+    .map(([limit, label]) => [label, f.prices.filter(x => x < limit).length])
+    .filter(([, n]) => n > 0 && n < f.prices.length)
+    .map(([label, n], i) => `${n}${i === 0 ? ' из них' : ' —'} дешевле ${label} ₸`)
+  const priceHead = `${cRange.replace(/^от/, 'От').replace(/^за /, '')}. Сейчас в разделе ${constructorsWord(f.count)}${bands.length ? `, ${bands.join(', ')}` : ''}.`
+  check(pairs[0]?.[0] === page.priceQ && !!pairs[0]?.[1].startsWith(priceHead), `${page.path}: первый вопрос «${pairs[0]?.[0]}» — «${pairs[0]?.[1].slice(0, 110)}…»`)
+  if (page.whereQ)
+    check(pairs[1]?.[0] === page.whereQ && /Амангельды, 100/.test(pairs[1]?.[1] ?? '') && /с 9:00 до 22:00/.test(pairs[1]?.[1] ?? ''), `${page.path}: второй — «${pairs[1]?.[0]}», с адресом и часами`)
+  const ld = ldNode(html, 'FAQPage')?.mainEntity?.map(q => [q.name, q.acceptedAnswer?.text?.replace(/\s+/g, ' ')]) ?? []
+  check(pairs.length > 0 && JSON.stringify(ld) === JSON.stringify(pairs), `${page.path}: FAQPage совпадает с видимыми вопросами (${ld.length} / ${pairs.length})`)
+}
+const legoBoys = visibleText(await (await fetch(`${BASE}${BOYS}/brand/lego`)).text())
+check(!legoBoys.includes('Сейчас в разделе') && !legoBoys.includes('Сколько стоит конструктор для мальчика'), 'на связке «мальчикам + LEGO» цифр и вопросов всего раздела нет')
 
 // ── подвал, главная, /catalog ───────────────────────────────────────────────
 console.log('\n== подвал и тексты-хабы')

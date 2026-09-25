@@ -5,6 +5,8 @@ import {
   ageBreakdown,
   categoryFactsFromRows,
   composeCategoryFactsParagraph,
+  factsTopBrands,
+  insertAfterFirstParagraph,
   priceRangePhrase,
   sinceAge,
   stockPhrase,
@@ -58,6 +60,7 @@ describe('categoryFactsFromRows', () => {
       maxPrice: null,
       prices: [],
       brandCounts: {},
+      brandNames: {},
       ageGroups: [],
     })
   })
@@ -208,5 +211,88 @@ describe('«Радиоуправляемые машинки»: вопросы с
     expect(pickup!.a).toContain(SHOP.street)
     expect(pickup!.a).toContain(SHOP.openingHoursHuman)
     expect(plain(pickup!.a)).toContain('Курьер по Алматы — 1 000 ₸, от 15 000 ₸ — бесплатно')
+  })
+})
+
+/*
+ * Хаб «Конструкторы» на бою 25 сентября 2026: 33 набора, 32 в наличии, от
+ * 5 890 до 79 890 ₸ (7 дешевле 10 000, 27 дешевле 20 000), восемь разных
+ * возрастов от 3 до 12 лет, LEGO 14 · Smoneo 8 · Sluban 4. Цены — не боевые
+ * поштучно, а с теми же рубежами.
+ */
+function spread<T>(pairs: [T, number][]): T[] {
+  return pairs.flatMap(([value, n]) => Array.from({ length: n }, () => value))
+}
+const HUB_AGES = spread([[36, 11], [48, 2], [60, 2], [72, 12], [84, 1], [96, 2], [120, 2], [144, 1]])
+const HUB_BRANDS = spread<string | null>([['LEGO', 14], ['Smoneo', 8], ['Sluban', 4], ['CaDA', 2], ['Feelo', 2], ['Gudi', 2], [null, 1]])
+const HUB_PRICES = [5_890, ...spread([[8_990, 6], [14_990, 20], [24_990, 5]]), 79_890]
+const HUB = categoryFactsFromRows(HUB_AGES.map((age, i) => ({
+  brand_id: HUB_BRANDS[i] ? HUB_BRANDS[i]!.toLowerCase() : null,
+  brands: HUB_BRANDS[i] ? { name: HUB_BRANDS[i]! } : null,
+  price: HUB_PRICES[i]!,
+  final_price: null,
+  stock_quantity: i === 32 ? 0 : 2,
+  min_age_months: age,
+})))
+const HUB_STATIC = categoryStaticText['constructors-root']!
+
+describe('конструкторы: цифры', () => {
+  it('ведущие бренды — по фактам самого раздела, с числом наборов', () => {
+    expect(factsTopBrands(HUB)).toEqual([
+      { name: 'LEGO', count: 14 },
+      { name: 'Smoneo', count: 8 },
+      { name: 'Sluban', count: 4 },
+    ])
+  })
+
+  it('абзац хаба: бренды с числом и разброс возраста вместо перечня из восьми', () => {
+    expect(plain(HUB_STATIC.live!.paragraph!(HUB))).toBe(
+      'Сейчас в разделе 33 конструктора от 5 890 до 79 890 ₸, в наличии 32 из 33. '
+      + 'Больше всего — LEGO (14), Smoneo (8) и Sluban (4). '
+      + 'Возраст — от 3 до 12 лет, чаще всего с 6 лет: 12 из 33.',
+    )
+  })
+
+  it('«мальчикам»: при равенстве брендов — по алфавиту, самый частый возраст при равенстве — младший', () => {
+    const ages = spread([[36, 1], [48, 2], [60, 2], [72, 8], [84, 1], [96, 2], [120, 2], [144, 1]])
+    const brands = spread([['LEGO', 14], ['Sluban', 2], ['CaDA', 2], ['Feelo', 1]])
+    const facts = categoryFactsFromRows(ages.map((age, i) => ({
+      brand_id: brands[i]!.toLowerCase(),
+      brands: { name: brands[i]! },
+      price: i === 0 ? 6_190 : i === 18 ? 79_890 : 12_990,
+      final_price: null,
+      stock_quantity: 1,
+      min_age_months: age,
+    })))
+    expect(plain(categoryStaticText['konstruktory-malchikam']!.live!.paragraph!(facts))).toBe(
+      'Сейчас в разделе 19 конструкторов от 6 190 до 79 890 ₸, все в наличии. '
+      + 'Больше всего — LEGO (14), CaDA (2) и Sluban (2). '
+      + 'Возраст — от 3 до 12 лет, чаще всего с 6 лет: 8 из 19.',
+    )
+    const tie = categoryFactsFromRows(spread([[48, 2], [36, 2], [72, 1], [96, 1]]).map(age => ({ brand_id: null, price: 5_000, final_price: null, stock_quantity: 1, min_age_months: age })))
+    expect(plain(composeCategoryFactsParagraph(tie))).toContain('чаще всего с 3 лет: 2 из 6')
+  })
+
+  it('сколько стоит — два рубежа цены', () => {
+    const [price] = HUB_STATIC.live!.faq!(HUB)
+    expect(price!.q).toBe('Сколько стоит детский конструктор в Ухтышке?')
+    expect(plain(price!.a)).toBe(
+      'От 5 890 до 79 890 ₸. Сейчас в разделе 33 конструктора, 7 из них дешевле 10 000 ₸, 27 — дешевле 20 000 ₸. '
+      + 'Точная цена — в карточке набора, самовывоз в Алматы бесплатный.',
+    )
+    expect(price!.a).not.toMatch(/\d ₸|\d \d{3}/)
+  })
+
+  it('где купить — первым среди написанных вопросов хаба, с адресом и часами', () => {
+    const [where] = HUB_STATIC.faq
+    expect(where!.q).toBe('Где купить конструктор в Алматы?')
+    expect(where!.a).toContain(SHOP.street)
+    expect(where!.a).toContain(SHOP.openingHoursHuman)
+  })
+
+  it('абзац встаёт в HTML сразу за первым абзацем, с экранированием', () => {
+    expect(insertAfterFirstParagraph('<h2>А</h2><p>первый</p><h2>Б</h2><p>второй</p>', 'цифры & <цены>'))
+      .toBe('<h2>А</h2><p>первый</p>\n<p>цифры &amp; &lt;цены&gt;</p><h2>Б</h2><p>второй</p>')
+    expect(insertAfterFirstParagraph('<ul><li>пункт</li></ul>', 'цифры')).toBe('<p>цифры</p>\n<ul><li>пункт</li></ul>')
   })
 })
