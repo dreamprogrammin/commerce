@@ -219,6 +219,36 @@ function h1Of(html) {
   check(!inMap(RULE), `${RULE} — не в карте: у девочек две Sluban, общее правило`)
 }
 
+// ---------- 5г. FAQPage на страницах брендов — только видимые вопросы ----------
+/*
+ * Аудит 24 сентября 2026: рядовые бренды (/brand/cada, /brand/mokatoys)
+ * отдавали FAQPage с тремя общими вопросами, которых на странице нет, —
+ * Google требует, чтобы разметка повторяла видимый текст. Инвариант: каждый
+ * вопрос из FAQPage есть в видимом тексте. У LEGO вопросы свои и видимые —
+ * разметка должна остаться.
+ */
+console.log('\n5г) FAQPage на страницах брендов')
+for (const path of ['/brand/cada', '/brand/mokatoys', '/brand/lego']) {
+  const page = await get(path)
+  const faq = [...page.body.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const data = JSON.parse(m[1])
+        return Array.isArray(data['@graph']) ? data['@graph'] : [data]
+      }
+      catch {
+        return []
+      }
+    })
+    .find(node => node?.['@type'] === 'FAQPage')
+  const questions = (faq?.mainEntity ?? []).map(q => q.name)
+  const text = page.body.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
+  const unseen = questions.filter(q => !text.includes(q))
+  check(unseen.length === 0, `${path}: вопросов в FAQPage ${questions.length}, не видно на странице ${unseen.length}${unseen.length ? ` — «${unseen[0]}»` : ''}`)
+  if (path === '/brand/lego')
+    check(questions.length >= 5, `${path}: FAQPage на месте`)
+}
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым
