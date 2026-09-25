@@ -97,7 +97,8 @@ const PAGES = [
     slug: 'constructors-root',
     title: 'Детские конструкторы — купить в Алматы | Ухтышка',
     h1: 'Конструкторы для детей',
-    description: 'Детские конструкторы в Алматы — для мальчиков и девочек от 2 лет.',
+    // Возраст в описании сверяется ниже, с самым младшим набором по базе
+    description: 'Детские конструкторы в Алматы — для мальчиков и девочек от',
     text: ['Какие марки здесь есть'],
     links: [
       ['/brand/lego/lego-city', 'City'],
@@ -329,7 +330,7 @@ async function branchFacts(slug) {
   }
 }
 const CONSTRUCTOR_PAGES = [
-  { path: HUB, slug: 'constructors-root', after: 'Наборы разложены по тому', before: 'Как выбрать по возрасту', priceQ: 'Сколько стоит детский конструктор в Ухтышке?', whereQ: 'Где купить конструктор в Алматы?' },
+  { path: HUB, slug: 'constructors-root', after: 'Наборы разложены по тому', before: 'Как выбрать по возрасту', priceQ: 'Сколько стоит детский конструктор в Ухтышке?', whereQ: 'Где купить конструктор в Алматы?', youngestInDescription: true },
   { path: BOYS, slug: 'konstruktory-malchikam', after: 'Конструкторы для мальчиков: LEGO, Sluban, CaDA', before: 'Как выбрать конструктор мальчику', priceQ: 'Сколько стоит конструктор для мальчика в Ухтышке?' },
 ]
 for (const page of CONSTRUCTOR_PAGES) {
@@ -363,6 +364,19 @@ for (const page of CONSTRUCTOR_PAGES) {
     check(pairs[1]?.[0] === page.whereQ && /Амангельды, 100/.test(pairs[1]?.[1] ?? '') && /с 9:00 до 22:00/.test(pairs[1]?.[1] ?? ''), `${page.path}: второй — «${pairs[1]?.[0]}», с адресом и часами`)
   const ld = ldNode(html, 'FAQPage')?.mainEntity?.map(q => [q.name, q.acceptedAnswer?.text?.replace(/\s+/g, ' ')]) ?? []
   check(pairs.length > 0 && JSON.stringify(ld) === JSON.stringify(pairs), `${page.path}: FAQPage совпадает с видимыми вопросами (${ld.length} / ${pairs.length})`)
+
+  /*
+   * Вступление описания хаба лежит в базе и называет возраст руками. 23
+   * сентября там стало «от 2 лет» — тогда у Smoneo 55013 и 55015 было 2+; 24
+   * сентября их поправили по коробке на 3+, а описание осталось. Исправление —
+   * docs/SEO_CONSTRUCTORS_HUB_AGE_2026_09_25.sql (запускает владелец), до него
+   * здесь красное.
+   */
+  if (page.youngestInDescription && f.ages[0]?.[0] % 12 === 0) {
+    const desc = decode(html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '')
+    const want = `для мальчиков и девочек от ${yearsGen(f.ages[0][0] / 12)}.`
+    check(desc.includes(want), `${page.path}: описание в выдаче — младший возраст по базе, «${want}» (сейчас «${desc.slice(0, 66)}…»)`)
+  }
 }
 const legoBoys = visibleText(await (await fetch(`${BASE}${BOYS}/brand/lego`)).text())
 check(!legoBoys.includes('Сейчас в разделе') && !legoBoys.includes('Сколько стоит конструктор для мальчика'), 'на связке «мальчикам + LEGO» цифр и вопросов всего раздела нет')
