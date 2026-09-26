@@ -77,6 +77,61 @@ Supabase раздаёт права на новые функции. `CREATE OR RE
 администратора. Блок `$verify$` в конце миграции — готовая проверка, его
 можно гнать отдельно.
 
+⚠️ **Найдено по дороге, НЕ ЧИНИЛОСЬ — функции заказов открыты без входа.**
+Тот же разбор дампа прода (24.09; миграций на эти функции с тех пор нет):
+ещё 14 функций `SECURITY DEFINER` исполняются ролью `anon` (любым, у кого
+публичный ключ из разметки) и пишут в базу, не проверяя, кто зовёт.
+
+* `confirm_and_process_order(uuid)` — подтверждает заказ в статусе `new`:
+  статус `confirmed`, остатки списаны, уходят уведомления. **Проверено
+  запуском** на стенде со схемой прода: без входа подтвердил чужой заказ.
+  В коде репозитория не вызывается.
+* `cancel_order(uuid, text, text)` — отменяет заказ в статусах от `new` до
+  `shipped`, возвращает остатки и бонусы; владельца не проверяет,
+  `p_cancelled_by` берёт от вызывающего. **Проверено запуском:** без входа
+  отменил чужой заказ с пометкой `cancelled_by = 'admin'`. id заказа виден в
+  адресе `/order/success/<id>` — в истории браузера и в аналитике. Законные
+  вызовы: сайт (`useUserOrders.ts`, покупатель отменяет свой) и эдж-функция
+  `cancel-order` (`service_role`).
+* `process_confirmed_order(uuid)` — ставит дату активации бонусов и по
+  замыслу начисляет приветственные 500; статус заказа не проверяет, повтор
+  защищён. Законно её зовёт триггер `trigger_auto_confirm_order`.
+  **Подозрение на отдельный баг:** ветка с профилем там на той же ловушке, что
+  ниже (`SELECT * INTO` + `IF v_user_profile IS NOT NULL`), и в прогоне через
+  этот триггер не сработала: баланс 0, `has_received_welcome_bonus = false`.
+  Если так и на бою — при подтверждении заказа приветственный бонус не
+  начисляется и дата активации ставится веткой «без профиля». Флаг ставят ещё
+  `create_offline_sale` и `recalculate_pending_balances`, так что вывод — только
+  по данным. Проверить (чтение) в SQL-редакторе:
+  `SELECT count(*), count(*) FILTER (WHERE has_received_welcome_bonus) FROM public.profiles;`
+  и `SELECT status, count(*), count(bonuses_activation_date) FROM public.orders WHERE user_id IS NOT NULL GROUP BY status;`
+* `process_confirmed_guest_checkout(uuid)` — по телу, каждый вызов снова
+  прибавляет `sales_count` подтверждённому гостевому заказу (защиты от
+  повтора нет): накрутка сортировки «популярные». Запуском не проверял.
+* `redeem_promo_code(text, numeric, uuid)` — зная код, можно сжечь его
+  использования. Запуском не проверял; кто её зовёт — не разбирал.
+* Плановые задачи `activate_pending_bonuses`, `activate_pending_order_bonuses`,
+  `expire_bonuses`, `recalculate_pending_balances`,
+  `check_birthday_notifications`, `check_expiring_bonuses`,
+  `check_abandoned_carts`, `cleanup_expired_guest_checkouts` — открыты `anon`,
+  хотя по замыслу их зовёт `pg_cron`. Вред от внепланового вызова не оценивал.
+* **Не подтвердилось** (поправка к собственному предположению): «новый
+  покупатель сам подтверждает свой заказ, получает 1000 приветственных
+  бонусов и отменяет заказ» — в прогоне бонус не начислился. Ветка бонусов в
+  `confirm_and_process_order` не срабатывает вообще: `IF v_user_profile IS
+  NOT NULL` для записи истинно, только если заполнены ВСЕ поля профиля, и
+  функция пишет «Профиль не найден».
+* `create_guest_checkout` открыта гостям по замыслу — это оформление заказа.
+
+**Предложение (ждёт слова владельца, отдельной миграцией):** у всех,
+кроме `cancel_order` и `create_guest_checkout`, — `REVOKE EXECUTE … FROM
+PUBLIC, anon, authenticated` (`service_role`, `pg_cron` и триггеры
+продолжат работать); в `cancel_order` через API — только свой заказ
+(`orders.user_id = auth.uid()`), только `p_cancelled_by = 'client'` и только
+те статусы, в которых сайт показывает кнопку «Отменить»; `anon` — снять.
+Перед этим проверить: от чьего имени работают задания `pg_cron` и не зовёт
+ли что-то вне репозитория эти функции ключом `anon`/`authenticated`.
+
 ⚠️ **Ловушка окружения, новая: Docker Desktop завис.** `docker ps`,
 `docker exec` и даже `curl --unix-socket ~/.docker/run/docker.sock
 http://localhost/_ping` висят; собственная панель Docker Desktop висит на
