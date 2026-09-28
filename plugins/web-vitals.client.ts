@@ -31,6 +31,8 @@
  * трогает `document` при импорте.
  */
 
+import { analyticsDisabled, safeLocalStorage } from '@/utils/analyticsOptOut'
+
 /** Метрики, у которых порог «хорошо» задан в долях, а не в миллисекундах. */
 const UNITLESS = new Set(['CLS'])
 
@@ -57,6 +59,11 @@ export default defineNuxtPlugin(() => {
    * нельзя: они смешались бы с боевыми и испортили медианы.
    */
   if (!gtagId)
+    return
+
+  // Учёт выключен (автоматический браузер, устройство владельца) — метрики
+  // тоже не собираем: счётчик не поднимется, и отправлять их будет некуда
+  if (analyticsDisabled({ webdriver: navigator.webdriver === true, search: window.location.search, storage: safeLocalStorage() }))
     return
 
   whenIdle(async () => {
