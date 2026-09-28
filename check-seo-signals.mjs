@@ -122,6 +122,25 @@ function h1Of(html) {
   const count = Number(legoLine?.match(/(\d+)\s*$/)?.[1] ?? 0)
   check(count > 0, `у LEGO указано число живых товаров: «${legoLine?.trim()}»`)
 
+  /*
+   * «Товаров в наличии» у каждого бренда файла — с остатком, по базе. До 28
+   * сентября 2026 файл считал все активные товары: у Sluban и L.O.L.
+   * Surprise стояло 4 при трёх в наличии.
+   */
+  const home = (await get('/')).body
+  const supaUrl = home.match(/supabase:\{url:"([^"]+)"/)?.[1]
+  const anon = home.match(/eyJ[\w-]{20,}\.[\w-]{20,}\.[\w-]{20,}/)?.[0]
+  const stock = await (await fetch(`${supaUrl}/rest/v1/products?select=stock_quantity,brands(slug)&is_active=eq.true&stock_quantity=gt.0`, { headers: { apikey: anon, authorization: `Bearer ${anon}` } })).json()
+  const inStock = {}
+  for (const p of stock) {
+    if (p.brands?.slug)
+      inStock[p.brands.slug] = (inStock[p.brands.slug] ?? 0) + 1
+  }
+  const wrong = [...file.body.matchAll(/\/brand\/([\w-]+)\) — товаров в наличии: (\d+)/g)]
+    .filter(([, slug, n]) => Number(n) !== (inStock[slug] ?? 0))
+    .map(([, slug, n]) => `${slug}: ${n} при ${inStock[slug] ?? 0}`)
+  check(!wrong.length, `«товаров в наличии» у брендов — по остатку в базе${wrong.length ? ` — ${wrong.join('; ')}` : ''}`)
+
   // Цифра должна совпадать с тем, что показывает сама страница бренда.
   const lego = await get('/brand/lego')
   // Число живёт в соседней ячейке справки: `<dt>Товаров в наличии</dt><dd …>14</dd>`.

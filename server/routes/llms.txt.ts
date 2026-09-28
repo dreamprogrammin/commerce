@@ -64,10 +64,14 @@ export default defineEventHandler(async (event): Promise<string> => {
       .from('categories')
       .select('id, name, slug, href, parent_id, seo_h1')
       .order('name'),
+    // «Товаров в наличии» — с остатком, как на странице бренда. До 28
+    // сентября 2026 считались все активные: у Sluban и L.O.L. Surprise
+    // стояло 4 при трёх в наличии.
     client
       .from('brands')
       .select('id, name, slug, products(count)')
       .eq('products.is_active', true)
+      .gt('products.stock_quantity', 0)
       .limit(200),
     client
       .from('products')
