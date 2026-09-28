@@ -2,7 +2,7 @@ import type { Database } from '@/types'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 import { BUCKET_NAME_REVIEWS } from '@/constants'
-import { optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
+import { optimizeForUpload } from '@/utils/optimizeForUpload'
 import { useAuthStore } from '../auth'
 
 export interface ReviewImage {
@@ -141,8 +141,8 @@ export const useReviewsStore = defineStore('reviewsStore', () => {
       let fileToUpload = file
       let blur = blurPlaceholder || null
 
-      if (shouldOptimizeImage(file)) {
-        const result = await optimizeImageBeforeUpload(file)
+      const result = await optimizeForUpload(file)
+      if (result) {
         fileToUpload = result.file
         if (result.blurPlaceholder) {
           blur = result.blurPlaceholder
