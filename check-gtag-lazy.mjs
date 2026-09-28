@@ -8,6 +8,16 @@
  *   3. скрипт приезжает и по касанию, и сам по себе через несколько секунд
  *      (иначе из статистики выпали бы все, кто ушёл, ничего не нажав).
  *
+ * И с 28 сентября 2026 — кого НЕ считать (utils/analyticsOptOut.ts):
+ *   4. автоматический браузер (`navigator.webdriver`) — счётчик не поднимается
+ *      ни по касанию, ни сам: проверки сайта пачкали статистику;
+ *   5. выключатель владельца: `?no_analytics=1` — подтверждение на экране,
+ *      счётчик молчит и на следующих заходах без параметра; `?no_analytics=0`
+ *      возвращает учёт.
+ *
+ * Проверки 1–3 и 5 изображают обычного посетителя: `navigator.webdriver`
+ * подменён на `false`. Иначе счётчик теперь справедливо не поднимется.
+ *
  * Стенд — боевая сборка, собранная с ТЕСТОВЫМ идентификатором:
  *   NUXT_PUBLIC_GTAG_ID=G-TEST00000 pnpm build
  *   node .output/server/index.mjs
@@ -30,8 +40,15 @@ const check = (ok, label) => {
 
 const browser = await chromium.launch()
 
-async function open() {
-  const context = await browser.newContext({ ...devices['Pixel 5'] })
+/** Обычный посетитель — браузер не сообщает, что он автоматический. */
+function asPerson(context) {
+  return context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false }))
+}
+
+async function open({ automated = false, context: given, path = '/' } = {}) {
+  const context = given ?? await browser.newContext({ ...devices['Pixel 5'] })
+  if (!automated && !given)
+    await asPerson(context)
   const page = await context.newPage()
   const hits = []
   const t0 = Date.now()
@@ -39,7 +56,7 @@ async function open() {
     if (IS_GTAG(r.url()))
       hits.push(Date.now() - t0)
   })
-  await page.goto(BASE, { waitUntil: 'load', timeout: 180000 })
+  await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 180000 })
   return { context, page, hits }
 }
 
@@ -82,6 +99,48 @@ const waitForQueue = page => page.waitForFunction(
   check(hits.length > 0, `без действий счётчик поднялся сам (через ${hits[0] ?? '—'} мс)`)
   check(hits.length <= 2, `лишних запросов нет (всего ${hits.length})`)
   await page.screenshot({ path: `${SCRATCH}/gtag-lazy.png` })
+  await context.close()
+}
+
+// ── 4. Автоматический браузер не считается ────────────────────────────────
+{
+  const { context, page, hits } = await open({ automated: true })
+  await page.waitForTimeout(3000)
+  await page.mouse.click(180, 400)
+  await page.waitForTimeout(9000)
+  check(hits.length === 0, `автоматический браузер: счётчик не поднялся ни по касанию, ни сам (запросов: ${hits.length})`)
+  await context.close()
+}
+
+// ── 5. Выключатель владельца ──────────────────────────────────────────────
+{
+  const context = await browser.newContext({ ...devices['Pixel 5'] })
+  await asPerson(context)
+  const toastShown = page => page.waitForSelector('[data-sonner-toast]', { timeout: 15000 })
+    .then(el => el.textContent())
+    .catch(() => '')
+
+  const off = await open({ context, path: '/?no_analytics=1' })
+  const offText = await toastShown(off.page)
+  check(offText.includes('выключен'), `?no_analytics=1 — подтверждение на экране: «${offText.trim()}»`)
+  await off.page.mouse.click(180, 400)
+  await off.page.waitForTimeout(9000)
+  const flag = await off.page.evaluate(() => localStorage.getItem('uhti:no-analytics'))
+  check(off.hits.length === 0 && flag === '1', `?no_analytics=1 — счётчик молчит (запросов: ${off.hits.length}), флаг записан: ${flag}`)
+  await off.page.close()
+
+  const later = await open({ context, path: '/' })
+  await later.page.mouse.click(180, 400)
+  await later.page.waitForTimeout(9000)
+  check(later.hits.length === 0, `следующий заход без параметра — счётчик по-прежнему молчит (запросов: ${later.hits.length})`)
+  await later.page.close()
+
+  const on = await open({ context, path: '/?no_analytics=0' })
+  const onText = await toastShown(on.page)
+  check(onText.includes('включён'), `?no_analytics=0 — подтверждение на экране: «${onText.trim()}»`)
+  await on.page.mouse.click(180, 400)
+  await on.page.waitForTimeout(2500)
+  check(on.hits.length > 0, `?no_analytics=0 — учёт вернулся, скрипт запрошен (запросов: ${on.hits.length})`)
   await context.close()
 }
 
