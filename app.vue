@@ -214,10 +214,13 @@ useSchemaOrg([
      * подвал и разделы 4–5 пользовательского соглашения, ничего не
      * придумано.
      *
-     * Часы работы ПОЯВИЛИСЬ 16 сентября 2026. Раньше их тут не было именно
-     * потому, что они нигде не публиковались; теперь они названы владельцем и
-     * стоят на `/about` и в узле магазина на главной — значит и здесь им
-     * место, и все три написания обязаны совпадать.
+     * Часы работы, способы оплаты и валюта — НЕ здесь, а у узла магазина на
+     * главной (`ToyStore`, pages/index.vue), который ссылается сюда через
+     * parentOrganization. `openingHours`, `paymentAccepted` и
+     * `currenciesAccepted` — свойства LocalBusiness, у Organization и
+     * OnlineStore их в schema.org нет: проверка разметки их отбрасывала
+     * (аудит 24 сентября 2026; убраны отсюда 28 сентября). Стояли здесь с 16
+     * сентября, когда узла магазина ещё не было.
      */
     '@type': ['Organization', 'OnlineStore'],
     '@id': `${siteUrl}/#organization`,
@@ -229,9 +232,6 @@ useSchemaOrg([
     'telephone': '+7-702-537-94-73',
     'email': 'info@uhti.kz',
     'areaServed': { '@type': 'Country', 'name': 'Казахстан' },
-    'currenciesAccepted': 'KZT',
-    'paymentAccepted': 'Наличные при получении, перевод или QR через Kaspi',
-    'openingHours': SHOP.openingHours,
     'logo': {
       '@type': 'ImageObject',
       '@id': `${siteUrl}/#logo`,
