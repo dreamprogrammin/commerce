@@ -98,11 +98,19 @@ const currentAccessories = computed(() =>
   activeCategory.value ? groupedAccessories.value[activeCategory.value] : [],
 )
 
-onMounted(() => {
+function updateIsMobile() {
   isMobile.value = window.innerWidth < 1024
-  window.addEventListener('resize', () => {
-    isMobile.value = window.innerWidth < 1024
-  })
+}
+
+onMounted(() => {
+  updateIsMobile()
+  window.addEventListener('resize', updateIsMobile)
+})
+
+// Без этого каждое открытие карточки оставляло на window ещё один слушатель,
+// и он держал в памяти уже ушедший со страницы блок
+onUnmounted(() => {
+  window.removeEventListener('resize', updateIsMobile)
 })
 
 function openCategory(key: CategoryKey) {
