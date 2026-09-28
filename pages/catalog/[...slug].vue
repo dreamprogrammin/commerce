@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LocationQueryValue } from 'vue-router'
+import type { LocationQuery, LocationQueryValue } from 'vue-router'
 import type {
   AttributeFilter,
   AttributeWithValue,
@@ -194,6 +194,28 @@ const ownPath = route.path
 const ownSlugParts = parseCatalogSlug(route.params.slug as string[] | undefined)
 const catalogSlugParts = computed(() => ownSlugParts)
 
+/*
+ * Фильтры из адреса при ПЕРВОЙ отрисовке не читаются — ни на сервере, ни при
+ * гидратации.
+ *
+ * Страницы каталога на Vercel отдаются через ISR, и сервер строит их БЕЗ
+ * query. Браузер же при гидратации видел фильтр в адресе и рисовал другое:
+ * кнопки фильтров активны, сетка иная, текст раздела скрыт. На бою 28
+ * сентября 2026 — расхождение гидратации на каждом прямом заходе по
+ * отфильтрованной ссылке (`?materials=`, `?sort_by=`, `?attr_…`, `?brands=`
+ * — два захода из двух); это и было «плавающее» расхождение, которое ловили
+ * стражи 25–26 сентября. Сервер без ISR (стенд, dev) теперь строит так же,
+ * как бой.
+ *
+ * Фильтры из адреса применяются сразу после монтирования (onMounted ниже, у
+ * наблюдателя за адресом). При переходе внутри сайта гидратации нет — там они
+ * читаются при создании страницы, и первый же запрос товаров уходит с ними.
+ */
+let rendersWithoutQuery = import.meta.server || useNuxtApp().isHydrating
+function filterQuery(): LocationQuery {
+  return rendersWithoutQuery ? {} : route.query
+}
+
 const activeBrandSlug = computed(() => catalogSlugParts.value.brandSlug)
 
 /*
@@ -317,17 +339,34 @@ interface ActiveFilters {
 }
 
 const activeFilters = ref<ActiveFilters>({
-  sortBy: getSortByFromQuery(route.query.sort_by),
-  subCategoryIds: getArrayFromQuery(route.query.subcategories),
+  sortBy: getSortByFromQuery(filterQuery().sort_by),
+  subCategoryIds: getArrayFromQuery(filterQuery().subcategories),
   price: [0, 50000],
   pieceCount: null,
-  brandIds: getArrayFromQuery(route.query.brands),
-  productLineIds: getArrayFromQuery(route.query.lines),
-  materialIds: getArrayFromQuery(route.query.materials),
-  countryIds: getArrayFromQuery(route.query.countries),
-  attributes: {},
+  brandIds: getArrayFromQuery(filterQuery().brands),
+  productLineIds: getArrayFromQuery(filterQuery().lines),
+  materialIds: getArrayFromQuery(filterQuery().materials),
+  countryIds: getArrayFromQuery(filterQuery().countries),
+  attributes: attributesFromQuery(filterQuery()),
   numericAttributes: {},
 })
+
+/*
+ * Характеристики из адреса (`?attr_pitanie=22`) — сразу, не дожидаясь
+ * описаний фильтров. Иначе при переходе на раздел по ссылке из характеристик
+ * карточки первый запрос товаров уходил без фильтра, а второй — с ним
+ * (28.09.2026). Разбор тот же, что у withFiltersFromQuery: строки из адреса
+ * как есть, — ключ запроса совпадает, и второго запроса нет.
+ */
+function attributesFromQuery(q: LocationQuery): ActiveFilters['attributes'] {
+  const out: ActiveFilters['attributes'] = {}
+  for (const [key, value] of Object.entries(q)) {
+    const ids = key.startsWith('attr_') ? getArrayFromQuery(value) : []
+    if (ids.length > 0)
+      out[key.slice(5)] = ids
+  }
+  return out
+}
 
 const filteredProductLines = computed(() => {
   const selectedBrands = activeFilters.value.brandIds
@@ -894,26 +933,26 @@ async function loadFilterData(slug: string) {
 
     // ── Читаем query params и сразу инициализируем activeFilters ────────────
     // Это нужно до первого рендера, чтобы товары грузились с правильными фильтрами
-    const priceMinFromQuery = route.query.price_min
-      ? Number(route.query.price_min)
+    const priceMinFromQuery = filterQuery().price_min
+      ? Number(filterQuery().price_min)
       : priceMin
-    const priceMaxFromQuery = route.query.price_max
-      ? Number(route.query.price_max)
+    const priceMaxFromQuery = filterQuery().price_max
+      ? Number(filterQuery().price_max)
       : priceMax
 
-    const pieceCountMinFromQuery = route.query.piece_count_min
-      ? Number(route.query.piece_count_min)
+    const pieceCountMinFromQuery = filterQuery().piece_count_min
+      ? Number(filterQuery().piece_count_min)
       : pieceCountRangeData?.min_count
-    const pieceCountMaxFromQuery = route.query.piece_count_max
-      ? Number(route.query.piece_count_max)
+    const pieceCountMaxFromQuery = filterQuery().piece_count_max
+      ? Number(filterQuery().piece_count_max)
       : pieceCountRangeData?.max_count
 
     // Бренды по slug из URL (временно без полного списка брендов)
-    const resolvedBrandIds = getArrayFromQuery(route.query.brands)
+    const resolvedBrandIds = getArrayFromQuery(filterQuery().brands)
 
     activeFilters.value = {
-      sortBy: getSortByFromQuery(route.query.sort_by),
-      subCategoryIds: getArrayFromQuery(route.query.subcategories),
+      sortBy: getSortByFromQuery(filterQuery().sort_by),
+      subCategoryIds: getArrayFromQuery(filterQuery().subcategories),
       price: [priceMinFromQuery, priceMaxFromQuery],
       pieceCount: pieceCountRangeData
         ? [
@@ -922,9 +961,9 @@ async function loadFilterData(slug: string) {
           ]
         : null,
       brandIds: resolvedBrandIds,
-      productLineIds: getArrayFromQuery(route.query.lines),
-      materialIds: getArrayFromQuery(route.query.materials),
-      countryIds: getArrayFromQuery(route.query.countries),
+      productLineIds: getArrayFromQuery(filterQuery().lines),
+      materialIds: getArrayFromQuery(filterQuery().materials),
+      countryIds: getArrayFromQuery(filterQuery().countries),
       attributes: {},
       numericAttributes: {},
     }
@@ -934,7 +973,7 @@ async function loadFilterData(slug: string) {
 
     // ── ШАГ 2: Brand SEO — нужен для H1/title, грузим если есть brand в URL ─
     /*
-     * Бренд берётся из пути, а не из `route.query.brand`. Это же значение
+     * Бренд берётся из пути, а не из `filterQuery().brand`. Это же значение
      * решает, покажется ли уникальный SEO-текст пары категория+бренд и
      * встанет ли canonical на бренд-лендинг вместо категории — при чтении
      * из query после переезда на путь обе вещи молча ломались.
@@ -1024,15 +1063,15 @@ async function loadFilterData(slug: string) {
       const newAttributeFilters: Record<string, (string | number)[]> = {}
       for (const attr of availableFilters.value) {
         const queryKey = `attr_${attr.slug}`
-        const queryValue = route.query[queryKey]
+        const queryValue = filterQuery()[queryKey]
         newAttributeFilters[attr.slug] = getArrayFromQuery(queryValue)
       }
 
       const initNumericAttrs: Record<number, [number, number]> = {}
       Object.entries(newNumericRanges).forEach(([attrId, range]) => {
         const id = Number(attrId)
-        const queryMin = route.query[`numeric_${id}_min`]
-        const queryMax = route.query[`numeric_${id}_max`]
+        const queryMin = filterQuery()[`numeric_${id}_min`]
+        const queryMax = filterQuery()[`numeric_${id}_max`]
         initNumericAttrs[id] = [
           queryMin ? Number(queryMin) : range.min,
           queryMax ? Number(queryMax) : range.max,
@@ -1040,7 +1079,7 @@ async function loadFilterData(slug: string) {
       })
 
       // Резолвим brand id по slug теперь, когда есть список брендов
-      let resolvedBrandIdsWithSlug = getArrayFromQuery(route.query.brands)
+      let resolvedBrandIdsWithSlug = getArrayFromQuery(filterQuery().brands)
       if (brandSlugParam && availableBrands.value.length > 0) {
         const brandBySlug = availableBrands.value.find(
           b => b.slug === brandSlugParam,
@@ -2016,7 +2055,7 @@ if (
  * `loadFilterData`.
  */
 function withFiltersFromQuery(base: ActiveFilters): ActiveFilters {
-  const q = route.query
+  const q = filterQuery()
   const list = (key: string, fallback: string[]) =>
     q[key] !== undefined ? getArrayFromQuery(q[key]) : fallback
   const num = (key: string, fallback: number) =>
@@ -2146,6 +2185,16 @@ function defaultFilters(): ActiveFilters {
  * который страница писала сама, — тогда состояние, прокрутка и догруженные
  * товары остаются как были. Чужие адреса (страница в кэше) пропускаются.
  */
+// Фильтры из адреса — после гидратации: первая отрисовка шла без них, как
+// у сервера (см. rendersWithoutQuery).
+onMounted(() => {
+  if (!rendersWithoutQuery)
+    return
+  rendersWithoutQuery = false
+  if (filterQuerySignature(route.query) !== filterQuerySignature(queryFromFilters(activeFilters.value)))
+    activeFilters.value = withFiltersFromQuery(activeFilters.value)
+})
+
 watch(() => route.fullPath, () => {
   if (route.path !== ownPath)
     return

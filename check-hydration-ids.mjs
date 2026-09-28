@@ -13,6 +13,13 @@
  * существующие элементы. Правка — встроенный модуль в nuxt.config.ts
  * (keepServerPrefetchOnClient).
  *
+ * Второй раздел — прямой заход по отфильтрованной ссылке. ISR на Vercel
+ * строит страницу без query, а браузер при гидратации видел фильтр в адресе и
+ * рисовал другое: «Hydration completed but contains mismatches» на каждом
+ * таком заходе (бой, 28 сентября 2026) — это и было «плавающее» расхождение
+ * 25–26 сентября. Правка — rendersWithoutQuery в pages/catalog/[...slug].vue.
+ * Стенд без ISR проверять за прокси, срезающим query (как бой).
+ *
  *   node check-hydration-ids.mjs --base=http://localhost:3127
  *
  * Только чтение. Скрипт — из корня репозитория (Playwright из node_modules).
@@ -35,9 +42,17 @@ function check(ok, text) {
     fails.push(text)
 }
 
+const FILTERED = [
+  '/catalog/kiddy?materials=3',
+  '/catalog/boys/mashinki/radioupravlyaemye-mashinki?sort_by=price_asc',
+  '/catalog/boys/mashinki/radioupravlyaemye-mashinki?attr_pitanie=22',
+  '/catalog/boys/mashinki/radioupravlyaemye-mashinki?price_min=10000',
+]
+
 console.log(`сайт ${BASE}`)
 const browser = await chromium.launch()
 try {
+  console.log('\n== меню: кнопка и меню ссылаются друг на друга')
   for (const path of PAGES) {
     // На телефоне фильтры — шторкой, выпадающие меню — на десктопе
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
@@ -70,6 +85,20 @@ try {
       r.labelledbyIsTrigger && r.controlsIsDialog,
       `${path}: меню «${r.name}» ссылается на свою кнопку (${r.labelledby}${r.labelledbyIsTrigger ? '' : ` — а у кнопки ${r.triggerId}`})`,
     )
+    await page.close()
+  }
+
+  console.log('\n== прямой заход по отфильтрованной ссылке — без расхождения гидратации')
+  for (const path of FILTERED) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const mismatch = []
+    page.on('console', (m) => {
+      if (/Hydration/i.test(m.text()))
+        mismatch.push(m.text())
+    })
+    await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 120000 })
+    await page.waitForTimeout(3000)
+    check(!mismatch.length, `${path}${mismatch.length ? ` — ${mismatch[0].slice(0, 90)}` : ''}`)
     await page.close()
   }
 }
