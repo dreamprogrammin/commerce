@@ -131,6 +131,29 @@ export default defineNuxtConfig({
     'nuxt-gtag',
     // 🔥 Отключаем Storybook в dev режиме
     ...(process.env.NODE_ENV === 'production' ? ['@nuxtjs/storybook'] : []),
+    /*
+     * onServerPrefetch — не вычищать из клиентской сборки.
+     *
+     * Nuxt по умолчанию убирает его вызовы из браузерного кода (в боевой
+     * сборке; в режиме разработки — нет). А Vue 3.5 считает компонент с
+     * onServerPrefetch асинхронной границей, и по границам строит useId(). На
+     * сервере иконки @nuxt/icon (onServerPrefetch у них безусловный) — границы,
+     * в браузере — нет, и все id после них расходились: на разделах каталога
+     * «reka-popover-trigger-v-0-7-4» с сервера против «…v-0-0-4» в браузере у
+     * каждого выпадающего фильтра и сортировки (28 сентября 2026: семь иконок
+     * шапки — семь лишних границ). Боевая сборка такие расхождения атрибутов
+     * не проверяет и в консоль не пишет — видно только со сборкой, где
+     * `__VUE_PROD_HYDRATION_MISMATCH_DETAILS__`. Цена — несколько пустых
+     * хуков в браузерном коде.
+     *
+     * Настройкой не выключить: Nuxt склеивает свой список с нашим (defu), а не
+     * заменяет, — поэтому вычёркиваем после сборки настроек.
+     */
+    function keepServerPrefetchOnClient(_options: unknown, nuxt: { options: { optimization: { treeShake: { composables: { client: Record<string, string[]> } } } } }) {
+      const client = nuxt.options.optimization.treeShake.composables.client
+      if (client?.vue)
+        client.vue = client.vue.filter(name => name !== 'onServerPrefetch')
+    },
   ],
 
   gtag: {
