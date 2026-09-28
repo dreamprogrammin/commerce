@@ -49,6 +49,10 @@ try {
     const tab = await ctx.newPage()
     const problems = []
     tab.on('console', (m) => {
+      // Номер счётчика Google задан только боевой сборке; на стенде модуль
+      // ругается, когда plugins/gtag-lazy.client.ts поднимает его через 5 с
+      if (m.text().includes('[nuxt-gtag] Missing Google tag ID'))
+        return
       if (/Hydration/i.test(m.text()) || m.type() === 'error')
         problems.push(m.text())
     })
