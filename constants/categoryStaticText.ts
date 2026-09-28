@@ -88,28 +88,63 @@ function constructorsParagraph(facts: CategoryFacts): string | null {
   return composeCategoryFactsParagraph(facts, { forms: CONSTRUCTORS, brands: factsTopBrands(facts) })
 }
 
+interface PriceFaqOptions {
+  /** Как называть товар в числе: «7 моделей», «33 конструктора». */
+  forms?: NounForms
+  /**
+   * Рубежи «N из них дешевле …». Рубеж, ниже которого нет ни одного товара
+   * или ниже которого все, не пишется.
+   */
+  bands?: readonly number[]
+  /** Чья карточка: «в карточке модели», «в карточке набора». */
+  card?: string
+}
+
 /**
- * «От 5 890 до 79 890 ₸. Сейчас в разделе 33 конструктора, 7 из них дешевле
- * 10 000 ₸, 27 — дешевле 20 000 ₸. …» Два рубежа, а не один, как у машинок:
- * разброс цен у конструкторов вчетверо шире.
+ * Вопрос «сколько стоит» с цифрами раздела: «От 8 890 до 13 390 ₸. Сейчас в
+ * разделе 7 моделей, 4 из них дешевле 10 000 ₸. Точная цена — в карточке
+ * модели, самовывоз в Алматы бесплатный.»
  */
-function constructorsPriceFaq(q: string) {
+function priceFaq(q: string, { forms, bands = [10_000], card = 'модели' }: PriceFaqOptions = {}) {
   return (facts: CategoryFacts): CatalogFaqItem[] => {
     if (!facts.count || facts.minPrice === null || facts.maxPrice === null)
       return []
     const price = facts.minPrice === facts.maxPrice
       ? formatTenge(facts.minPrice)
       : `От ${formatPrice(facts.minPrice)} до ${formatTenge(facts.maxPrice)}`
-    const bands = [10_000, 20_000]
+    const cheaper = bands
       .map(limit => ({ limit, n: countCheaperThan(facts, limit) }))
       .filter(({ n }) => n > 0 && n < facts.prices.length)
       .map(({ limit, n }, i) => `${n}${i === 0 ? ' из них' : ' —'} дешевле ${formatTenge(limit)}`)
     return [{
       q,
-      a: `${price}. Сейчас в разделе ${countPhrase(facts.count, CONSTRUCTORS)}${bands.length ? `, ${bands.join(', ')}` : ''}. Точная цена — в карточке набора, самовывоз в Алматы бесплатный.`,
+      a: `${price}. Сейчас в разделе ${countPhrase(facts.count, forms)}${cheaper.length ? `, ${cheaper.join(', ')}` : ''}. Точная цена — в карточке ${card}, самовывоз в Алматы бесплатный.`,
     }]
   }
 }
+
+/**
+ * «От 5 890 до 79 890 ₸. Сейчас в разделе 33 конструктора, 7 из них дешевле
+ * 10 000 ₸, 27 — дешевле 20 000 ₸. …» Два рубежа, а не один, как у машинок:
+ * разброс цен у конструкторов вчетверо шире.
+ */
+function constructorsPriceFaq(q: string) {
+  return priceFaq(q, { forms: CONSTRUCTORS, bands: [10_000, 20_000], card: 'набора' })
+}
+
+/**
+ * «Где купить … в Алматы?» — один ответ для всех разделов: адрес, часы и цены
+ * доставки берутся из констант, поэтому с условиями магазина не разъедутся.
+ */
+function whereToBuyFaq(q: string): CatalogFaqItem {
+  return {
+    q,
+    a: `В интернет-магазине «Ухтышка»: заказ на сайте uhti.kz, самовывоз бесплатно — ${PICKUP}. Курьер по Алматы — ${DELIVERY_PRICE}, от ${FREE_FROM} — бесплатно, 1–3 рабочих дня; по Казахстану — 3–7 рабочих дней. Платить заранее не нужно.`,
+  }
+}
+
+/** Наборы L.O.L. — раздел и тексты называют их наборами, а не моделями. */
+const SETS: NounForms = ['набор', 'набора', 'наборов']
 
 export const categoryStaticText: Record<string, CategoryStaticContent> = {
   'girls': {
@@ -335,10 +370,7 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
 <a href="/brands">Бренды</a>.</p>
 `.trim(),
     faq: [
-      {
-        q: 'Где купить конструктор в Алматы?',
-        a: `В интернет-магазине «Ухтышка»: заказ на сайте uhti.kz, самовывоз бесплатно — ${PICKUP}. Курьер по Алматы — ${DELIVERY_PRICE}, от ${FREE_FROM} — бесплатно, 1–3 рабочих дня; по Казахстану — 3–7 рабочих дней. Платить заранее не нужно.`,
-      },
+      whereToBuyFaq('Где купить конструктор в Алматы?'),
       {
         q: 'С какого возраста ребёнку конструктор?',
         a: 'С двух лет, если детали крупные и соединяются ладонью. Сборка по инструкции начинается ближе к пяти: до этого ребёнок строит свободно и ломает построенное, и набор нужен такой, который это переживает. Большие наборы на несколько сотен деталей — с шести-восьми.',
@@ -397,8 +429,20 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
     ],
   },
 
+  /*
+   * 28 сентября 2026 — цифры, как у машинок (владелец — «давай»). Самая
+   * показываемая страница разделов: Search Console за 28 дней — 315 показов,
+   * 4 клика, место 12,3; за 90 дней среди запросов «кукла лол купить»,
+   * «сколько стоит кукла лол», «кукла лол цена», а цены и места покупки
+   * текст раздела не называл. Бренд в абзаце не повторяется: он в H1.
+   */
   'kukly-lol': {
+    live: {
+      paragraph: facts => composeCategoryFactsParagraph(facts, { forms: SETS }),
+      faq: priceFaq('Сколько стоит кукла ЛОЛ в Ухтышке?', { forms: SETS, card: 'набора' }),
+    },
     faq: [
+      whereToBuyFaq('Где купить куклу ЛОЛ в Алматы?'),
       {
         q: 'Что находится внутри набора L.O.L. Surprise?',
         a: 'Слои упаковки, а в них — одежда, обувь, аксессуары, наклейки и сама фигурка. Что именно достанется, заранее неизвестно: в этом и смысл. Разворачивание занимает несколько минут и само по себе становится частью игры.',
@@ -448,11 +492,26 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
     ],
   },
 
+  /*
+   * 28 сентября 2026 — цифры, как у машинок (владелец — «давай»). Search
+   * Console за 28 дней — 279 показов, 0 кликов, место 13,1; за 90 дней —
+   * «купить машинку толокар», «бибикар купить», «машина каталка купить».
+   *
+   * Совет «примерно с года» — общий, а модели раздела на 28 сентября — с 2 и
+   * с 3 лет, и абзац с цифрами говорит это рядом. Поэтому ответ отсылает к
+   * возрасту производителя в карточке. Переписывать ли сам совет — решает
+   * владелец (как с советом «с двух лет» у хаба «Конструкторы»).
+   */
   'tolokar': {
+    live: {
+      paragraph: facts => composeCategoryFactsParagraph(facts),
+      faq: priceFaq('Сколько стоит толокар в Ухтышке?'),
+    },
     faq: [
+      whereToBuyFaq('Где купить толокар в Алматы?'),
       {
         q: 'С какого возраста ребёнку толокар?',
-        a: 'Примерно с года, когда ребёнок уверенно стоит и делает первые шаги. Проверьте две вещи: ноги должны доставать до пола всей стопой, а сам толокар — не опрокидываться, если опереться на край. До года на нём разве что катают: толокар везёт взрослый.',
+        a: 'Примерно с года, когда ребёнок уверенно стоит и делает первые шаги. Проверьте две вещи: ноги должны доставать до пола всей стопой, а сам толокар — не опрокидываться, если опереться на край. До года на нём разве что катают: толокар везёт взрослый. С какого возраста модель рекомендует производитель, написано в её карточке.',
       },
       {
         q: 'Чем толокар отличается от каталки?',
@@ -524,18 +583,7 @@ export const categoryStaticText: Record<string, CategoryStaticContent> = {
     live: {
       paragraph: facts => composeCategoryFactsParagraph(facts),
       faq: (facts) => {
-        const out: CatalogFaqItem[] = []
-        if (facts.count && facts.minPrice !== null && facts.maxPrice !== null) {
-          const price = facts.minPrice === facts.maxPrice
-            ? formatTenge(facts.minPrice)
-            : `От ${formatPrice(facts.minPrice)} до ${formatTenge(facts.maxPrice)}`
-          const cheap = countCheaperThan(facts, 10_000)
-          const cheapText = cheap > 0 && cheap < facts.prices.length ? `, ${cheap} из них дешевле ${formatTenge(10_000)}` : ''
-          out.push({
-            q: 'Сколько стоит радиоуправляемая машинка в Ухтышке?',
-            a: `${price}. Сейчас в разделе ${countPhrase(facts.count)}${cheapText}. Точная цена — в карточке модели, самовывоз в Алматы бесплатный.`,
-          })
-        }
+        const out = priceFaq('Сколько стоит радиоуправляемая машинка в Ухтышке?')(facts)
         const ages = ageBreakdown(facts)
         if (ages.length) {
           const [first, ...rest] = ages

@@ -296,3 +296,94 @@ describe('конструкторы: цифры', () => {
     expect(insertAfterFirstParagraph('<ul><li>пункт</li></ul>', 'цифры')).toBe('<p>цифры</p>\n<ul><li>пункт</li></ul>')
   })
 })
+
+/*
+ * «Куклы ЛОЛ» и «Толокары» на бою 28 сентября 2026 — две самые показываемые
+ * страницы разделов в Search Console (315 и 279 показов за 28 дней, места 12
+ * и 13), по запросам «сколько стоит кукла лол», «кукла лол купить», «купить
+ * машинку толокар». Цены и возраст — боевые.
+ */
+const LOL = categoryFactsFromRows([
+  [10_290, 16],
+  [10_790, 14],
+  [12_590, 0],
+  [12_690, 16],
+].map(([price, stock]) => ({
+  brand_id: 'lol',
+  brands: { name: 'L.O.L. Surprise' },
+  price: price!,
+  final_price: null,
+  stock_quantity: stock!,
+  min_age_months: 36,
+})))
+const LOL_STATIC = categoryStaticText['kukly-lol']!
+
+const TOLOKAR = categoryFactsFromRows([
+  ...spread([[{ price: 9_990, final: 8_890, stock: 3, age: 24 }, 4]]),
+  ...spread([[{ price: 14_990, final: 13_390, stock: 2, age: 36 }, 3]]),
+].map(p => ({ brand_id: null, price: p.price, final_price: p.final, stock_quantity: p.stock, min_age_months: p.age })))
+const TOLOKAR_STATIC = categoryStaticText.tolokar!
+
+describe('«Куклы ЛОЛ» и «Толокары»: цифры', () => {
+  it('абзац ЛОЛ: наборы, цены, наличие, один возраст на всех; бренд не повторяется', () => {
+    expect(plain(LOL_STATIC.live!.paragraph!(LOL))).toBe(
+      'Сейчас в разделе 4 набора от 10 290 до 12 690 ₸, в наличии 3 из 4. Все — для детей с 3 лет.',
+    )
+  })
+
+  it('сколько стоит кукла ЛОЛ — цены и число наборов; рубеж 10 000 ₸ не пишется, когда дешевле нет ни одного', () => {
+    const [price] = LOL_STATIC.live!.faq!(LOL)
+    expect(price!.q).toBe('Сколько стоит кукла ЛОЛ в Ухтышке?')
+    expect(plain(price!.a)).toBe(
+      'От 10 290 до 12 690 ₸. Сейчас в разделе 4 набора. Точная цена — в карточке набора, самовывоз в Алматы бесплатный.',
+    )
+  })
+
+  it('абзац толокаров: цены со скидкой и два возраста', () => {
+    expect(plain(TOLOKAR_STATIC.live!.paragraph!(TOLOKAR))).toBe(
+      'Сейчас в разделе 7 моделей от 8 890 до 13 390 ₸, все в наличии. С 2 лет — 4 из них, с 3 лет — 3.',
+    )
+  })
+
+  it('сколько стоит толокар — цены, число моделей и сколько дешевле 10 000 ₸', () => {
+    const [price] = TOLOKAR_STATIC.live!.faq!(TOLOKAR)
+    expect(price!.q).toBe('Сколько стоит толокар в Ухтышке?')
+    expect(plain(price!.a)).toBe(
+      'От 8 890 до 13 390 ₸. Сейчас в разделе 7 моделей, 4 из них дешевле 10 000 ₸. Точная цена — в карточке модели, самовывоз в Алматы бесплатный.',
+    )
+  })
+
+  it('где купить — первым среди написанных вопросов, с адресом, часами и ценой курьера', () => {
+    for (const [entry, q] of [[LOL_STATIC, 'Где купить куклу ЛОЛ в Алматы?'], [TOLOKAR_STATIC, 'Где купить толокар в Алматы?']] as const) {
+      const [where] = entry.faq
+      expect(where!.q).toBe(q)
+      expect(where!.a).toContain(SHOP.street)
+      expect(where!.a).toContain(SHOP.openingHoursHuman)
+      expect(plain(where!.a)).toContain('Курьер по Алматы — 1 000 ₸, от 15 000 ₸ — бесплатно')
+    }
+  })
+
+  it('совет «примерно с года» у толокаров отсылает к возрасту производителя в карточке', () => {
+    // Модели раздела — с 2 и 3 лет, и абзац с цифрами говорит это рядом с советом
+    const age = TOLOKAR_STATIC.faq.find(item => item.q === 'С какого возраста ребёнку толокар?')
+    expect(age!.a).toContain('Примерно с года')
+    expect(age!.a).toContain('С какого возраста модель рекомендует производитель, написано в её карточке')
+  })
+
+  it('₸ не отрывается от числа и пустой раздел ничего не обещает', () => {
+    const texts = [
+      LOL_STATIC.live!.paragraph!(LOL),
+      TOLOKAR_STATIC.live!.paragraph!(TOLOKAR),
+      ...LOL_STATIC.live!.faq!(LOL).map(item => item.a),
+      ...TOLOKAR_STATIC.live!.faq!(TOLOKAR).map(item => item.a),
+      LOL_STATIC.faq[0]!.a,
+      TOLOKAR_STATIC.faq[0]!.a,
+    ]
+    for (const text of texts)
+      expect(text).not.toMatch(/\d ₸|\d \d{3}/)
+    for (const entry of [LOL_STATIC, TOLOKAR_STATIC]) {
+      expect(entry.live!.paragraph!(categoryFactsFromRows([]))).toBeNull()
+      expect(entry.live!.faq!(categoryFactsFromRows([]))).toEqual([])
+    }
+  })
+})
