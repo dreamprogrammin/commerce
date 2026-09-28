@@ -1,7 +1,8 @@
 import type { UserOrder } from '@/composables/orders/useUserOrders'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockChannel, mockQueryBuilder, mockRouter, mockSupabaseClient } from '../setup'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { mockChannel, mockQueryBuilder, mockRouter, mockSupabaseClient, mockToast } from '../setup'
 
 const mockOrder: UserOrder = {
   id: 'order-123',
@@ -244,6 +245,54 @@ describe('useUserOrders', () => {
       const { latestOrder } = useUserOrders()
 
       expect(latestOrder.value).toBeNull()
+    })
+  })
+
+  /*
+   * cancel_order отказывает не исключением, а текстом «Ошибка: …». До 28
+   * сентября 2026 сайт считал любой такой ответ успехом и писал «Заказ
+   * успешно отменён» — например, на повторное нажатие.
+   */
+  describe('cancelOrder', () => {
+    beforeEach(() => {
+      mockToast.success.mockClear()
+      mockToast.error.mockClear()
+      vi.spyOn(useProfileStore(), 'loadProfile').mockResolvedValue(undefined as never)
+    })
+
+    it('отказ базы текстом — не успех: ошибка с причиной и перечитанный список', async () => {
+      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { cancelOrder } = useUserOrders()
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'Ошибка: Заказ уже отменён', error: null })
+
+      const result = await cancelOrder('order-123')
+
+      expect(result).toEqual({ success: false, error: 'Заказ уже отменён' })
+      expect(mockToast.success).not.toHaveBeenCalled()
+      expect(mockToast.error).toHaveBeenCalledWith('Не удалось отменить заказ', { description: 'Заказ уже отменён' })
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('orders')
+    })
+
+    it('успех с возвратом бонусов — пишет про бонусы', async () => {
+      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { cancelOrder } = useUserOrders()
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'Заказ order-123 успешно отменён. Возвращено бонусов: 150', error: null })
+
+      const result = await cancelOrder('order-123')
+
+      expect(result.success).toBe(true)
+      expect(mockToast.success).toHaveBeenCalledWith('Заказ успешно отменён', { description: 'Бонусы возвращены на ваш счёт' })
+    })
+
+    it('успех без списанных бонусов — без строки про бонусы', async () => {
+      const { useUserOrders } = await import('@/composables/orders/useUserOrders')
+      const { cancelOrder } = useUserOrders()
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'Заказ order-123 успешно отменён', error: null })
+
+      const result = await cancelOrder('order-123')
+
+      expect(result.success).toBe(true)
+      expect(mockToast.success).toHaveBeenCalledWith('Заказ успешно отменён', { description: undefined })
     })
   })
 })
