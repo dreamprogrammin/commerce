@@ -122,14 +122,19 @@ for (const ua of AGENTS) {
     !/карт/i.test(asText(store?.paymentAccepted)),
     `способы оплаты без карты: ${asText(store?.paymentAccepted)}`,
   )
+  /*
+   * Часы, оплата и валюта — свойства LocalBusiness: у магазина (ToyStore)
+   * они к месту, у организации (Organization + OnlineStore) их в schema.org
+   * нет — проверка разметки их отбрасывала. До 28 сентября 2026 здесь
+   * проверялось, что у обоих узлов они совпадают.
+   */
+  const localOnly = ['openingHours', 'paymentAccepted', 'currenciesAccepted']
   check(
-    asText(store?.paymentAccepted) === asText(homeOrg?.paymentAccepted),
-    'оплата у магазина и организации написана одинаково',
+    localOnly.every(k => asText(store?.[k]) !== ''),
+    `у магазина есть часы, оплата и валюта: «${asText(store?.openingHours)}», «${asText(store?.paymentAccepted)}», «${asText(store?.currenciesAccepted)}»`,
   )
-  check(
-    asText(store?.openingHours) === asText(homeOrg?.openingHours),
-    `часы совпадают: «${asText(store?.openingHours)}» и «${asText(homeOrg?.openingHours)}»`,
-  )
+  const stray = localOnly.filter(k => homeOrg && k in homeOrg)
+  check(!stray.length, `у организации нет свойств LocalBusiness${stray.length ? ` — есть ${stray.join(', ')}` : ''}`)
   check(
     store?.parentOrganization?.['@id'] === homeOrg?.['@id'],
     'магазин связан с организацией через parentOrganization',
