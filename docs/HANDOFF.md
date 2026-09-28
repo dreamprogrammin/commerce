@@ -91,11 +91,35 @@ done
 * `cancel_order` сообщает об отказах текстом («Ошибка: Заказ уже отменён»),
   а не исключением; сайт (`useUserOrders.ts`) такой ответ считает успехом и
   пишет «Заказ успешно отменён» — например, при повторном нажатии.
-* Подозрение про бонусы усилилось (см. раздел 26 сентября ниже): в прогоне
-  подтверждение заказа персоналом через триггер не поставило заказу
-  покупателя `bonuses_activation_date` — ветка с профилем в
-  `process_confirmed_order` не срабатывает. Проверить на данных (чтение):
-  `SELECT transaction_type, status, count(*), count(activation_date) FROM public.bonus_transactions GROUP BY 1, 2 ORDER BY 1, 2;`
+* **Бонусы покупателей, похоже, не активируются — разбор по коду (27.09),
+  ждёт данных.** Зачисляют бонусы `activate_pending_bonuses` (ночное задание
+  `pg_cron`) и `activate_my_pending_bonuses` — обе берут только заказы с
+  `orders.bonuses_activation_date <= NOW()`. Для заказа покупателя эту дату
+  ставит лишь `process_confirmed_order` (триггер подтверждения), внутри ветки
+  `IF v_user_profile IS NOT NULL` — а для записи это истинно, только если
+  заполнены ВСЕ поля. Необязательных полей в `profiles` пять: `first_name`,
+  `last_name`, `phone`, `telegram_chat_id`, `avatar_url`. Покупатель без
+  привязанного Telegram или телефона → дата не ставится → бонусы вечно в
+  ожидании, приветственные 500 не начисляются. В прогоне на стенде так и
+  вышло. Проверить на бою (чтение):
+
+  ```sql
+  SELECT (p.first_name IS NOT NULL AND p.last_name IS NOT NULL AND p.phone IS NOT NULL
+          AND p.telegram_chat_id IS NOT NULL AND p.avatar_url IS NOT NULL) AS all_filled,
+         count(*) AS orders, count(o.bonuses_activation_date) AS with_activation_date
+    FROM public.orders o JOIN public.profiles p ON p.id = o.user_id
+   WHERE o.status IN ('confirmed', 'processing', 'shipped', 'delivered')
+   GROUP BY 1;
+  SELECT count(*) AS stuck_tx, sum(bt.amount) AS stuck_bonuses
+    FROM public.bonus_transactions bt JOIN public.orders o ON o.id = bt.order_id
+   WHERE bt.status = 'pending' AND o.bonuses_activation_date IS NULL
+     AND o.status IN ('confirmed', 'processing', 'shipped', 'delivered');
+  ```
+
+  Подтвердится (у `all_filled = false` дат нет) — правка: в
+  `process_confirmed_order` `IF FOUND` вместо проверки записи на NULL, и
+  разовый SQL на уже подтверждённые заказы. Как считать им дату и давать ли
+  приветственные 500 задним числом — решение владельца.
 
 ## 26 сентября: генераторы вопросов — только администратор — МИГРАЦИЯ ПРИМЕНЕНА, НА БОЮ ПРОВЕРЕНО
 
