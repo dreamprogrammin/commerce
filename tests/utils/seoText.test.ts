@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { plainExcerpt, truncateAtWord } from '@/utils/seoText'
+import { leadExcerpt, plainExcerpt, truncateAtWord } from '@/utils/seoText'
 
 /*
  * Почему этот файл появился. На бою 15 сентября 2026 мета-описание
@@ -56,5 +56,65 @@ describe('plainExcerpt', () => {
 
   it('пустой ввод даёт пустую строку', () => {
     expect(plainExcerpt(null, 40)).toBe('')
+  })
+})
+
+/*
+ * Описание бренда — вёрстка: заголовок, абзац, список, снова заголовок. На
+ * бою 26 сентября 2026 `Brand.description` у 29 брендов из 30 с описанием
+ * начиналось заголовком, приклеенным к абзацу без точки: «…машины для
+ * настоящих гонщиков Moka Toys — китайский производитель…». А у `/brand/hstar`,
+ * где вёрстка лежит в `seo_description`, так же склеивалось мета-описание.
+ */
+describe('leadExcerpt', () => {
+  const mokaToys = '<h2 data-icon="fluent-emoji-flat:racing-car">Moka Toys — радиоуправляемые машины для настоящих гонщиков</h2>\n'
+    + '<p>Moka Toys — китайский производитель радиоуправляемых игрушек. В ассортименте — дрифт-кары и внедорожники.</p>\n'
+    + '<h2>Купить Moka Toys в Казахстане — магазин Ухтышка</h2>\n'
+    + '<p>Доставка по Алматы — 1–3 рабочих дня.</p>'
+
+  it('берёт первый абзац, а не заголовок', () => {
+    expect(leadExcerpt(mokaToys, 300)).toBe(
+      'Moka Toys — китайский производитель радиоуправляемых игрушек. В ассортименте — дрифт-кары и внедорожники.',
+    )
+  })
+
+  it('не приклеивает заголовок к абзацу', () => {
+    expect(leadExcerpt(mokaToys, 300)).not.toContain('гонщиков Moka Toys')
+  })
+
+  it('пропускает абзацы про доставку, самовывоз и наличие', () => {
+    const html = '<p>Какие модели сейчас в наличии, видно в каталоге.</p><p>Доставка по Алматы — 1–3 дня.</p><p>CaDA — конструкторы с моторами.</p>'
+    expect(leadExcerpt(html, 300)).toBe('CaDA — конструкторы с моторами.')
+  })
+
+  it('абзац о бренде с фразой про доставку в конце не пропускает', () => {
+    // Ровно случай Mermaze: о бренде, а последняя фраза — про доставку.
+    const html = '<h2>Mermaze Mermaidz — русалки</h2><p>Mermaze Mermaidz — бренд кукол-русалок от MGA Entertainment. В Ухтышке — куклы с доставкой по Алматы.</p>'
+    expect(leadExcerpt(html, 300)).toBe(
+      'Mermaze Mermaidz — бренд кукол-русалок от MGA Entertainment. В Ухтышке — куклы с доставкой по Алматы.',
+    )
+  })
+
+  it('снимает разметку внутри абзаца', () => {
+    expect(leadExcerpt('<p><strong>LEGO</strong> — датский <a href="/x">производитель</a>.</p>', 300)).toBe(
+      'LEGO — датский производитель.',
+    )
+  })
+
+  it('режет по границе слова', () => {
+    expect(leadExcerpt(mokaToys, 60)).toBe('Moka Toys — китайский производитель радиоуправляемых')
+  })
+
+  it('без абзацев — весь текст, как plainExcerpt', () => {
+    const plain = 'Машины Hstar в Ухтышке — RC-дрифт в масштабах 1:24 и 1:43.'
+    expect(leadExcerpt(plain, 40)).toBe(plainExcerpt(plain, 40))
+  })
+
+  it('только абзацы про магазин — пусто, чтобы сработал запасной текст', () => {
+    expect(leadExcerpt('<h2>Купить</h2><p>Самовывоз из мкр. Шапагат.</p>', 300)).toBe('')
+  })
+
+  it('пустой ввод даёт пустую строку', () => {
+    expect(leadExcerpt(null, 300)).toBe('')
   })
 })

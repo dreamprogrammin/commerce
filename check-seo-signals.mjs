@@ -331,6 +331,65 @@ for (const path of ['/catalog/boys/mashinki', '/catalog/girls/igrovye-nabory']) 
   check(branded.every(i => /^https:\/\/uhti\.kz\/brand\//.test(i.brand.url ?? '')), `${path}: у ${branded.length} товаров с брендом — ссылка на страницу бренда`)
 }
 
+// ---------- 5ж. Описание бренда и серии без приклеенного заголовка ----------
+/*
+ * Описание бренда и серии — вёрстка: заголовок, абзац, список. Текст для
+ * разметки и запасного мета-описания снимался с неё целиком, и заголовок
+ * приклеивался к абзацу без точки — на бою 26–28 сентября 2026 у 29 брендов
+ * из 30 с описанием и у всех 13 серий: «…машины для настоящих гонщиков Moka
+ * Toys — китайский производитель…». У Smashers Dino Island так выглядело
+ * мета-описание в выдаче. Инвариант: ни в `Brand.description`, ни в
+ * мета-описании нет заголовка из описания. Заголовки берутся из базы, а не
+ * со страницы: лендинг LEGO свои заголовки описания не выводит.
+ */
+console.log('\n5ж) описание бренда и серии без приклеенного заголовка')
+{
+  const home = await get('/')
+  const supaUrl = home.body.match(/supabase:\{url:"([^"]+)"/)?.[1]
+  const anon = home.body.match(/eyJ[\w-]{20,}\.[\w-]{20,}\.[\w-]{20,}/)?.[0]
+  const rest = async path => supaUrl && anon
+    ? (await fetch(`${supaUrl}/rest/v1/${path}`, { headers: { apikey: anon, authorization: `Bearer ${anon}` } })).json()
+    : []
+  const headingsOf = html => [...(html ?? '').matchAll(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/g)]
+    .map(m => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  const brandNodeOf = body => [...body.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const data = JSON.parse(m[1])
+        return Array.isArray(data['@graph']) ? data['@graph'] : [data]
+      }
+      catch {
+        return []
+      }
+    })
+    .find(node => node?.['@type'] === 'Brand')
+
+  const pages = [
+    ['/brand/mokatoys', 'brands', 'mokatoys'],
+    ['/brand/cada', 'brands', 'cada'],
+    ['/brand/lego', 'brands', 'lego'],
+    ['/brand/lego/lego-city', 'product_lines', 'lego-city'],
+    ['/brand/zuru/smashers-dino-island', 'product_lines', 'smashers-dino-island'],
+  ]
+  const rows = [
+    ...await rest(`brands?select=slug,description&slug=in.(${pages.filter(p => p[1] === 'brands').map(p => p[2]).join(',')})`),
+    ...await rest(`product_lines?select=slug,description&slug=in.(${pages.filter(p => p[1] === 'product_lines').map(p => p[2]).join(',')})`),
+  ]
+  check(rows.length === pages.length, `описания прочитаны из базы (${rows.length} из ${pages.length})`)
+
+  for (const [path, , slug] of pages) {
+    const page = await get(path)
+    const description = brandNodeOf(page.body)?.description ?? ''
+    const meta = page.body.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? ''
+    const headings = headingsOf(rows.find(r => r.slug === slug)?.description)
+    const glued = headings.find(h => description.includes(h) || meta.includes(h))
+    check(description.length > 0 && description.length <= 300, `${path}: Brand.description есть, ${description.length} знаков`)
+    check(!glued, `${path}: в Brand.description и мета-описании нет заголовка описания${glued ? ` — «${glued}»` : ''}`)
+    console.log(`        ${description.slice(0, 110)}…`)
+  }
+}
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым

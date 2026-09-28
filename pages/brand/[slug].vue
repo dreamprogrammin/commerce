@@ -589,12 +589,17 @@ const metaDescription = computed(() => {
    * 20 августа `/brand/hstar` отдавал в описании две тысячи знаков HTML
    * (`<h2 data-icon="…">`, списки, абзацы). Поле заполнено разметкой только
    * у одного бренда из 32, поэтому дефект и дожил незамеченным.
+   *
+   * Из вёрстки берётся первый абзац о бренде (`leadExcerpt`): снятая
+   * целиком, она приклеивала заголовок к абзацу без точки. Абзаца о бренде
+   * нет — пустая строка, и берётся следующий вариант.
    */
-  if (brand.value.seo_description)
-    return plainExcerpt(brand.value.seo_description, 160)
-  if (brand.value.description) {
-    return `${plainExcerpt(brand.value.description, 140)}. Доставка по Казахстану.`
-  }
+  const seoLead = leadExcerpt(brand.value.seo_description, 160)
+  if (seoLead)
+    return seoLead
+  const lead = leadExcerpt(brand.value.description, 140)
+  if (lead)
+    return `${lead.replace(/[.!?…]+$/, '')}. Доставка по Казахстану.`
   return `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
 
@@ -627,11 +632,13 @@ const ogImageSrc = computed(
  * Правильный источник виден на соседней странице линейки
  * (`pages/brand/[brandSlug]/[lineSlug].vue`) — там читается `description`.
  *
- * `plainExcerpt`, а не `substring`: обрезка по границе слова, иначе в
- * разметку уезжает оборванное слово.
+ * `leadExcerpt`, а не `plainExcerpt`: описание — вёрстка, и снятая целиком
+ * она приклеивала заголовок к абзацу без точки — «…для настоящих гонщиков
+ * Moka Toys — китайский производитель…» (26 сентября 2026, у 29 брендов из
+ * 30 с описанием). Берётся первый абзац о самом бренде, по границе слова.
  */
 const brandDescriptionText = computed(() =>
-  plainExcerpt(brand.value?.description, 300),
+  leadExcerpt(brand.value?.description, 300),
 )
 
 defineOgImage({
