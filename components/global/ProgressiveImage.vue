@@ -115,6 +115,20 @@ const showPlaceholder = computed(
 )
 
 /**
+ * Крутилка и пульсация — только пока файл действительно грузится.
+ *
+ * У ленивой картинки до подлёта к экрану `src` пуст (`shouldLoad` ложен), и
+ * `load` не наступит, пока к ней не долистают. Раньше крутилка и
+ * `animate-pulse` всё это время работали: 28 сентября 2026 на карточке товара
+ * 14 таких анимаций ниже первого экрана, на главной 4, и главный поток
+ * пересчитывал их стили на каждом кадре — 300–330 мс за 5 секунд простоя при
+ * CPU ×4 (пауза анимаций убирала пересчёт целиком). Размытая подложка
+ * остаётся — она просто не анимируется. На сервере `shouldLoad` у ленивой
+ * картинки тоже ложен, так что гидратация видит ту же разметку.
+ */
+const isLoading = computed(() => hasRealSource.value && shouldLoad.value)
+
+/**
  * Оптимизированный URL (кешированный, стабильный)
  */
 const optimizedImageUrl = computed(() => {
@@ -281,7 +295,8 @@ const isDev = computed(() => import.meta.env.DEV)
       v-if="showPlaceholder"
       class="absolute inset-0 transition-opacity duration-300"
       :class="{
-        'bg-gradient-to-br animate-pulse': placeholderType === 'shimmer',
+        'bg-gradient-to-br': placeholderType === 'shimmer',
+        'animate-pulse': placeholderType === 'shimmer' && isLoading,
         'backdrop-blur-xl bg-muted/30': placeholderType === 'blur',
         'bg-muted': placeholderType === 'color',
       }"
@@ -305,8 +320,8 @@ const isDev = computed(() => import.meta.env.DEV)
       <!-- Fallback если нет blurDataUrl -->
       <div
         v-else-if="placeholderType === 'lqip'"
-        class="absolute inset-0 bg-gradient-to-br animate-pulse"
-        :class="placeholderColor"
+        class="absolute inset-0 bg-gradient-to-br"
+        :class="[placeholderColor, { 'animate-pulse': isLoading }]"
       />
 
       <!-- Shimmer градиент -->
@@ -333,7 +348,7 @@ const isDev = computed(() => import.meta.env.DEV)
 
       <!-- Маленький спиннер (только для LQIP и blur) -->
       <div
-        v-if="hasRealSource && (placeholderType === 'lqip' || placeholderType === 'blur')"
+        v-if="isLoading && (placeholderType === 'lqip' || placeholderType === 'blur')"
         class="absolute inset-0 flex items-center justify-center"
       >
         <div class="w-6 h-6 border-2 border-white/40 border-t-white/80 rounded-full animate-spin" />
@@ -341,7 +356,7 @@ const isDev = computed(() => import.meta.env.DEV)
 
       <!-- Обычный спиннер для shimmer/color -->
       <div
-        v-if="hasRealSource && (placeholderType === 'shimmer' || placeholderType === 'color')"
+        v-if="isLoading && (placeholderType === 'shimmer' || placeholderType === 'color')"
         class="absolute inset-0 flex items-center justify-center"
       >
         <div class="w-10 h-10 border-4 border-muted-foreground/10 border-t-muted-foreground/30 rounded-full animate-spin" />
