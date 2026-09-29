@@ -232,9 +232,15 @@ const metaDescription = computed(() => {
     return `Товары линейки в ${siteName}`
   if (productLine.value.seo_description)
     return productLine.value.seo_description
-  if (productLine.value.description) {
-    return `${cleanDescription(productLine.value.description, 140)}. Доставка по Казахстану.`
-  }
+  /*
+   * Первый абзац о серии (`leadExcerpt`), а не вся вёрстка: снятая целиком,
+   * она приклеивала заголовок к абзацу и резала посреди слова — у Smashers
+   * Dino Island в выдаче стояло «…найди динозавра Smashers Dino Island —
+   * серия… в доисторичес. Доставка по Казахстану.» (28 сентября 2026).
+   */
+  const lead = leadExcerpt(productLine.value.description, 140)
+  if (lead)
+    return `${lead.replace(/[.!?…]+$/, '')}. Доставка по Казахстану.`
   return `Каталог товаров ${productLine.value.name} от бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
 
@@ -254,21 +260,16 @@ const seoBlocks = computed(() => {
   return parseHTMLToBlocks(productLine.value.description)
 })
 
-// Извлекаем текст из seo_content для Schema.org
-const seoContentText = computed(() => {
-  if (!seoBlocks.value.length)
-    return ''
-  return seoBlocks.value
-    .map((block) => {
-      if (block.type === 'ul') {
-        return block.items.map(item => item.text).join(' ')
-      }
-      return block.text
-    })
-    .filter(Boolean)
-    .join(' ')
-    .substring(0, 300)
-})
+/*
+ * Текст о серии для разметки `Brand` — первый абзац описания. Раньше сюда
+ * шли все блоки подряд через пробел и `substring(0, 300)`: заголовок
+ * приклеивался к абзацу, а конец обрывался посреди слова — «LEGO City —
+ * городские приключения для юных строителей LEGO City — одна из самых
+ * популярных линеек… для детей от 5 д» (28 сентября 2026, все 13 серий).
+ */
+const seoContentText = computed(() =>
+  leadExcerpt(productLine.value?.description, 300),
+)
 
 defineOgImage({
   url: ogImageSrc.value,
