@@ -2,6 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildOrderKeyboard } from '../_shared/orderActions.ts'
 import { updateTelegramMessage, escapeMarkdown } from '../_shared/telegramUtils.ts'
 import { closeCourierOffers } from '../_shared/courierOffers.ts'
+import { sendOrderEmail } from '../_shared/orderEmail.ts'
+import type { OrderEmailKind } from '../_shared/orderEmailTemplate.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,6 +81,15 @@ Deno.serve(async (req) => {
         persistSession: false,
       },
     })
+
+    // Письмо покупателю — отдельно от Telegram и до него: у заказа может не
+    // быть карточки в рабочем чате, а письмо уйти должно. Сбой почты не мешает.
+    try {
+      console.log(`📧 ${await sendOrderEmail(supabase, table, record.id, record.status as OrderEmailKind)}`)
+    }
+    catch (e) {
+      console.error('📧 Письмо не отправлено:', e)
+    }
 
     /*
      * Заказ доставлен или отменён — курьеру больше нечего нажимать, гасим

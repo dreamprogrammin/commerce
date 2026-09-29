@@ -134,6 +134,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     indexnowKey: process.env.INDEXNOW_KEY || '07d3f5086f59e65326ce9d66b1d1f57c',
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    // Сервисный аккаунт Google для отчёта «Что добавляют в корзину» в админке
+    // (server/utils/ga4.ts): JSON ключа целиком. Пусто — блок пишет «не настроено».
+    gaServiceAccount: process.env.GA_SERVICE_ACCOUNT_JSON || '',
+    ga4PropertyId: process.env.GA4_PROPERTY_ID || '477985479',
     public: {
       siteUrl: 'https://uhti.kz',
     },
