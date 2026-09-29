@@ -290,8 +290,9 @@ function toggleBonuses() {
   bonusesInput.value = bonusesToSpend.value
 }
 
-// Проверка готовности формы к отправке
-const isFormValid = computed(() => {
+// Данные доставки заполнены: контакты, адрес курьеру или пункт самовывоза.
+// Из этого же собирается готовность формы — без галочки согласия.
+const isShippingReady = computed(() => {
   const { name, email, phone } = orderForm.value
 
   // Базовые поля
@@ -308,11 +309,43 @@ const isFormValid = computed(() => {
   if (!isCourier.value && pickupPoints.value.length > 0 && !pickupPointId.value)
     return false
 
-  // Согласие с условиями
-  if (!agreedToTerms.value)
-    return false
-
   return true
+})
+
+// Проверка готовности формы к отправке
+const isFormValid = computed(() => isShippingReady.value && agreedToTerms.value)
+
+/*
+ * Шаги оформления в Google Analytics (29 сентября 2026) — между «начал
+ * оформление» и «купил». Страница одна, доставка и оплата выбраны по
+ * умолчанию, поэтому «шаг» — не клик по варианту, а готовность данных:
+ * add_shipping_info — один раз за заход, когда доставка заполнена;
+ * add_payment_info — когда «Оформить» прошло проверку формы.
+ */
+const { trackAddShippingInfo, trackAddPaymentInfo } = useEcommerceTracking()
+
+function trackedItems() {
+  return items.value.map(item => ({
+    id: item.product.id,
+    name: item.product.name,
+    price: item.product.final_price || item.product.price,
+    quantity: item.quantity,
+  }))
+}
+
+let shippingTracked = false
+function trackShippingOnce() {
+  if (shippingTracked || !isShippingReady.value || !items.value.length)
+    return
+  shippingTracked = true
+  trackAddShippingInfo(trackedItems(), subtotal.value, deliveryMethod.value)
+}
+watch(isShippingReady, trackShippingOnce)
+// Страница удерживается (`keepalive`): каждый приход — новый заход. У
+// вошедшего с заполненным профилем доставка может быть готова сразу.
+onActivated(() => {
+  shippingTracked = false
+  trackShippingOnce()
 })
 
 // Предупреждение об адресе показываем только после попытки оформить —
@@ -423,6 +456,8 @@ async function placeOrder() {
     toast.error('Укажите адрес доставки')
     return
   }
+
+  trackAddPaymentInfo(trackedItems(), subtotal.value, orderForm.value.paymentMethod)
 
   // Форматируем номер для отправки в бэк: +77771234567
   const formattedPhone = `+${phoneDigits.value}`
