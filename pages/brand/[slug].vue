@@ -53,16 +53,22 @@ function getProductSku(product: { sku?: string | null, id: string }): string {
 // 1. Умная загрузка информации о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(
   `brand-${brandSlug}`,
+  /*
+   * Один бренд по адресу, а не все. Раньше страница звала
+   * `productsStore.fetchAllBrands()` — `select('*')` по всем брендам — и
+   * искала свой в списке. Хранилище целиком уходило в `__NUXT_DATA__`: на бою
+   * 29 сентября 2026 каждая страница бренда везла описания всех 43 брендов
+   * (у `/brand/hstar` 109 КБ данных, у `/brand/lego` 150 КБ).
+   */
   async () => {
-    let foundBrand = productsStore.brands.find(b => b.slug === brandSlug)
-
-    if (!foundBrand) {
-      if (productsStore.brands.length === 0) {
-        await productsStore.fetchAllBrands()
-        foundBrand = productsStore.brands.find(b => b.slug === brandSlug)
-      }
-    }
-    return foundBrand || null
+    const { data, error } = await supabase
+      .from('brands')
+      .select('*')
+      .eq('slug', brandSlug)
+      .maybeSingle()
+    if (error)
+      console.error('Не удалось загрузить бренд:', error)
+    return data ?? null
   },
 )
 
