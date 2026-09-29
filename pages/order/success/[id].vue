@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import confetti from 'canvas-confetti'
 import { storeToRefs } from 'pinia'
+import { toast } from 'vue-sonner'
 import TelegramBanner from '@/components/profile/TelegramBanner.vue'
 // Оба не автоимпортятся: композабл лежит во вложенной папке, константа — в @/constants.
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
@@ -238,8 +239,39 @@ function imageUrl(path: string | null) {
   return path ? getVariantUrl(BUCKET_NAME_PRODUCT, path, 'sm') : null
 }
 
+/*
+ * Ссылка на страницу статуса (29 сентября 2026). Уйдя отсюда, гость свой
+ * заказ больше не видел — теперь у заказа есть страница /order/t/<код>, её
+ * можно сохранить. Код отдаёт сервер: из базы гость его не прочитает (RLS).
+ */
+const statusCode = ref<string | null>(null)
+const statusUrl = computed(() => statusCode.value ? `${useRequestURL().origin}/order/t/${statusCode.value}` : '')
+const statusCopied = ref(false)
+
+async function fetchStatusCode() {
+  try {
+    const { code } = await $fetch<{ code: string }>('/api/order-status-link', { query: { order: fullOrderId.value } })
+    statusCode.value = code
+  }
+  catch {
+    // Ссылки нет — блок просто не покажется
+  }
+}
+
+async function copyStatusUrl() {
+  try {
+    await navigator.clipboard.writeText(statusUrl.value)
+    statusCopied.value = true
+    setTimeout(() => (statusCopied.value = false), 2500)
+  }
+  catch {
+    toast.error('Не удалось скопировать — выделите ссылку вручную')
+  }
+}
+
 onMounted(async () => {
   personalizationStore.invalidate()
+  fetchStatusCode()
 
   // Номер нужен и гостю, и авторизованному — он на этой странице главный.
   await fetchOrderNumber()
@@ -333,7 +365,7 @@ onMounted(async () => {
             -->
             <span class="flex items-start gap-[9px] text-sm leading-[1.45] text-muted-foreground">
               <span class="leading-[1.45] text-primary">•</span>
-              Статус заказа пришлём в Telegram — нажмите кнопку ниже
+              Статус заказа — по ссылке ниже: сохраните её. А в Telegram пришлём, когда он изменится
             </span>
           </span>
         </div>
@@ -370,6 +402,34 @@ onMounted(async () => {
               <Icon name="lucide:trash-2" class="size-[17px]" />
             </button>
           </div>
+        </section>
+
+        <!-- ============ ГОСТЬ: СТРАНИЦА СТАТУСА ПО ССЫЛКЕ ============ -->
+        <section
+          v-if="!isAuthenticated && statusUrl"
+          class="os-card-blue flex flex-col gap-3 px-6 py-[22px]"
+        >
+          <span class="flex items-center gap-4">
+            <span class="os-badge os-badge--blue">
+              <Icon name="lucide:link" class="size-5 text-primary" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-[3px]">
+              <span class="text-[17px] font-bold">Статус заказа — по ссылке</span>
+              <span class="text-sm leading-[1.4] text-muted-foreground">
+                Сохраните её: по ней заказ можно проверить в любой момент, без входа
+              </span>
+            </span>
+          </span>
+          <span class="break-all rounded-[12px] bg-white/70 px-3 py-2 text-[13px] text-muted-foreground">{{ statusUrl }}</span>
+          <span class="flex flex-wrap gap-2">
+            <NuxtLink :to="`/order/t/${statusCode}`" class="os-cta h-[42px] px-5">
+              Открыть
+            </NuxtLink>
+            <Button variant="outline" class="h-[42px] rounded-full" @click="copyStatusUrl">
+              <Icon :name="statusCopied ? 'lucide:check' : 'lucide:copy'" class="size-4 mr-2" />
+              {{ statusCopied ? 'Скопировано' : 'Скопировать ссылку' }}
+            </Button>
+          </span>
         </section>
 
         <!-- ============ ГОСТЬ: СЛЕДИТЬ В TELEGRAM ============ -->
