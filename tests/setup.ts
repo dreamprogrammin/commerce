@@ -1,7 +1,7 @@
 import { config } from '@vue/test-utils'
 import { defineStore } from 'pinia'
 import { vi } from 'vitest'
-import { computed, onMounted, onUnmounted, ref, toRaw, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, toRaw, watch } from 'vue'
 
 // Make Pinia and Vue composables available globally (Nuxt auto-imports)
 globalThis.defineStore = defineStore
@@ -9,6 +9,7 @@ globalThis.ref = ref
 globalThis.computed = computed
 globalThis.toRaw = toRaw
 globalThis.watch = watch
+globalThis.nextTick = nextTick
 globalThis.onMounted = onMounted
 globalThis.onUnmounted = onUnmounted
 

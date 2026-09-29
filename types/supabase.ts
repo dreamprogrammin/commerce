@@ -1166,6 +1166,7 @@ export interface Database {
           bonuses_spent: number
           cancelled_by: string | null
           comment: string | null
+          confirmation_processed_at: string | null
           created_at: string
           customer_name: string | null
           customer_phone: string | null
@@ -1196,6 +1197,7 @@ export interface Database {
           bonuses_spent?: number
           cancelled_by?: string | null
           comment?: string | null
+          confirmation_processed_at?: string | null
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null
@@ -1226,6 +1228,7 @@ export interface Database {
           bonuses_spent?: number
           cancelled_by?: string | null
           comment?: string | null
+          confirmation_processed_at?: string | null
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null

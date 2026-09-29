@@ -71,13 +71,13 @@ export function truncateWords(text: string, limit: number): string {
   // Первое слово само длиннее лимита (артикул, длинное составное) — отдаём его
   // целиком: обрубок вида «Синт» хуже, чем небольшой выход за лимит.
   if (lastSpace <= 0)
-    return trimDangling(clean.split(/\s+/)[0])
+    return trimDangling(clean.split(/\s+/)[0]!)
 
   const words = head.slice(0, lastSpace).split(/\s+/)
 
   // Хвост из служебных слов и однобуквенных огрызков смысла не несёт
   while (words.length > 1) {
-    const last = words[words.length - 1].toLowerCase().replace(/[.,;:()]/g, '')
+    const last = words[words.length - 1]!.toLowerCase().replace(/[.,;:()]/g, '')
     if (TRAILING_STOP_WORDS.has(last) || last.length <= 2 || /^[—–-]+$/.test(last))
       words.pop()
     else break
@@ -108,7 +108,7 @@ function dropDashStub(text: string): string {
 
 function trimDangling(text: string): string {
   let end = text.length
-  while (end > 0 && DANGLING.includes(text[end - 1]))
+  while (end > 0 && DANGLING.includes(text[end - 1]!))
     end--
   return text.slice(0, end)
 }
@@ -180,7 +180,7 @@ export function productTitleName(name: string | null | undefined): string {
   if (clean.length <= PRODUCT_TITLE_NAME_LIMIT)
     return trimDangling(clean)
 
-  const head = trimDangling(clean.split(' — ')[0])
+  const head = trimDangling(clean.split(' — ')[0]!)
   if (head.length <= PRODUCT_TITLE_MAX)
     return head
 

@@ -238,6 +238,20 @@ export function useUserOrders() {
         return { success: false, error: cancelError.message }
       }
 
+      /*
+       * Отказ cancel_order возвращает не исключением, а текстом «Ошибка: …»:
+       * «Заказ уже отменён», «в статусе … нельзя отменить», «не найден». Без
+       * этой проверки сайт писал «Заказ успешно отменён» — например, на
+       * повторное нажатие (найдено 27 сентября 2026, docs/HANDOFF.md). Список
+       * перечитываем: раз отменить нельзя, статус на экране устарел.
+       */
+      if (typeof data === 'string' && data.startsWith('Ошибка')) {
+        const reason = data.replace(/^Ошибка:\s*/, '')
+        toast.error('Не удалось отменить заказ', { description: reason })
+        await fetchOrders()
+        return { success: false, error: reason }
+      }
+
       // 🔥 КРИТИЧНО: Обновляем профиль для актуализации баланса бонусов СНАЧАЛА
       await profileStore.loadProfile(true)
 
@@ -247,8 +261,12 @@ export function useUserOrders() {
       // ✅ Принудительно триггерим реактивность через nextTick
       await nextTick()
 
+      // Про бонусы — только если база их вернула: «…успешно отменён.
+      // Возвращено бонусов: 150». Без списанных бонусов строка была неправдой.
       toast.success('Заказ успешно отменён', {
-        description: 'Бонусы возвращены на ваш счёт',
+        description: typeof data === 'string' && data.includes('Возвращено бонусов')
+          ? 'Бонусы возвращены на ваш счёт'
+          : undefined,
       })
 
       return { success: true, data }
@@ -262,7 +280,9 @@ export function useUserOrders() {
     }
   }
 
-  // Проверить можно ли отменить заказ
+  // Проверить можно ли отменить заказ. Те же статусы для покупателя проверяет
+  // cancel_order в базе (миграция 20260927120000) — менять вместе, иначе
+  // кнопка «Отменить» будет упираться в отказ.
   const canCancelOrder = (status: string) => {
     return status === 'new' || status === 'confirmed'
   }

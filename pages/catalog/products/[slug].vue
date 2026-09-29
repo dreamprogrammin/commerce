@@ -482,7 +482,18 @@ const mainThumbUrl = computed(() => {
   return image ? getVariantUrl(BUCKET_NAME_PRODUCT, image.image_url, 'sm') : null
 })
 
-const questionsCount = computed(() => productQuestions.value?.length ?? 0)
+/*
+ * Плитки «отзывы» и «вопросы» под ценой на телефоне (план по аудиту, п. 20).
+ * У 174 из 178 карточек отзывов нет, и плитка показывала «0.0 · 0 отзывов» —
+ * читается как оценка ноль. А «3 вопроса» — это вопросы магазина, которые
+ * генератор кладёт в каждую карточку (возраст, доставка, возврат), а не
+ * вопросы покупателей. Теперь без отзывов — «Отзывов пока нет», а счётчик
+ * считает только вопросы покупателей; нет их — «Вопросы и ответы».
+ */
+const hasReviews = computed(() => (product.value?.review_count ?? 0) > 0)
+const questionsCount = computed(
+  () => productQuestions.value?.filter(q => !q.is_auto_generated).length ?? 0,
+)
 
 function pluralize(count: number, one: string, few: string, many: string) {
   const mod10 = count % 10
@@ -1308,19 +1319,35 @@ watchEffect(() => {
               <!-- Рейтинг и вопросы — плитки только на мобильных -->
               <div class="mt-3.5 grid grid-cols-2 gap-2.5 lg:hidden">
                 <a href="#reviews" class="pdp-tile">
-                  <Icon name="gravity-ui:star-fill" class="size-[22px] shrink-0 text-rating" />
+                  <Icon
+                    name="gravity-ui:star-fill"
+                    class="size-[22px] shrink-0"
+                    :class="hasReviews ? 'text-rating' : 'text-muted-foreground/40'"
+                  />
                   <span class="min-w-0">
-                    <span class="block text-base font-extrabold">
-                      {{ (product.avg_rating ?? 0).toFixed(1) }}
-                    </span>
-                    <span class="block text-xs font-semibold text-primary">{{ reviewCountLabel }}</span>
+                    <template v-if="hasReviews">
+                      <span class="block text-base font-extrabold">
+                        {{ (product.avg_rating ?? 0).toFixed(1) }}
+                      </span>
+                      <span class="block text-xs font-semibold text-primary">{{ reviewCountLabel }}</span>
+                    </template>
+                    <template v-else>
+                      <span class="block text-base font-extrabold">Отзывов</span>
+                      <span class="block text-xs font-semibold text-primary">пока нет</span>
+                    </template>
                   </span>
                 </a>
                 <a href="#questions" class="pdp-tile">
                   <Icon name="lucide:message-circle" class="size-[22px] shrink-0 text-primary" />
                   <span class="min-w-0">
-                    <span class="block text-base font-extrabold">{{ questionsCount }}</span>
-                    <span class="block text-xs font-semibold text-primary">{{ questionsCountLabel }}</span>
+                    <template v-if="questionsCount > 0">
+                      <span class="block text-base font-extrabold">{{ questionsCount }}</span>
+                      <span class="block text-xs font-semibold text-primary">{{ questionsCountLabel }}</span>
+                    </template>
+                    <template v-else>
+                      <span class="block text-base font-extrabold">Вопросы</span>
+                      <span class="block text-xs font-semibold text-primary">и ответы</span>
+                    </template>
                   </span>
                 </a>
               </div>

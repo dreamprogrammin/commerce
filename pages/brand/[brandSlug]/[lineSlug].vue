@@ -391,7 +391,8 @@ useHead({
               '@context': 'https://schema.org',
               '@type': 'ItemList',
               'name': `Товары ${productLine.value.name} от ${brand.value.name}`,
-              'numberOfItems': filterState.products.value.length,
+              // Столько, сколько элементов в списке (см. страницу бренда)
+              'numberOfItems': Math.min(filterState.products.value.length, 10),
               'itemListElement': filterState.products.value
                 .slice(0, 10)
                 .map((product, index) => ({
@@ -674,6 +675,9 @@ useIndexableRobotsRule(
                   brand.name
                 }}</span>
               </NuxtLink>
+
+              <!-- Самовывоз у заголовка — план аудита, п. 16. -->
+              <CommonPickupLine align="center" />
 
               <!-- Brand Trust Score для линейки -->
               <div

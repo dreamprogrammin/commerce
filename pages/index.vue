@@ -10,7 +10,7 @@ import {
   HOME_CHIPS_CATEGORY_LIMIT,
   HOME_STATIC_CHIPS,
 } from '@/constants/homePlaceholders'
-import { SHOP } from '@/constants/shop'
+import { SHOP, SHOP_ALTERNATE_NAMES } from '@/constants/shop'
 import { homeShell } from '@/lib/shell'
 import { carouselContainerVariants, sectionSpacingVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
@@ -501,11 +501,18 @@ useSeoMeta({
   ),
 })
 
+/*
+ * `ToyStore`, а не `Store`, и часы по дням (аудит 24 сентября 2026): тип
+ * магазина игрушек точнее говорит поиску, что здесь продаётся, а
+ * `openingHoursSpecification` — вид часов, который Google разбирает для
+ * карточки организации; строка `openingHours` осталась рядом.
+ */
 const storeSchema = {
   '@context': 'https://schema.org',
-  '@type': 'Store',
+  '@type': 'ToyStore',
   '@id': `${siteUrl}/#store`,
   'name': `${siteName} - Магазин детских игрушек`,
+  'alternateName': [siteName, ...SHOP_ALTERNATE_NAMES],
   'url': siteUrl,
   'image': ogImageUrl,
   'description': metaDescription,
@@ -520,6 +527,12 @@ const storeSchema = {
   'paymentAccepted': 'Наличные при получении, перевод или QR через Kaspi',
   'currenciesAccepted': 'KZT',
   'openingHours': SHOP.openingHours,
+  'openingHoursSpecification': [{
+    '@type': 'OpeningHoursSpecification',
+    'dayOfWeek': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    'opens': SHOP.opens,
+    'closes': SHOP.closes,
+  }],
   'address': {
     '@type': 'PostalAddress',
     'addressCountry': 'KZ',

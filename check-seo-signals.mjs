@@ -122,6 +122,25 @@ function h1Of(html) {
   const count = Number(legoLine?.match(/(\d+)\s*$/)?.[1] ?? 0)
   check(count > 0, `у LEGO указано число живых товаров: «${legoLine?.trim()}»`)
 
+  /*
+   * «Товаров в наличии» у каждого бренда файла — с остатком, по базе. До 28
+   * сентября 2026 файл считал все активные товары: у Sluban и L.O.L.
+   * Surprise стояло 4 при трёх в наличии.
+   */
+  const home = (await get('/')).body
+  const supaUrl = home.match(/supabase:\{url:"([^"]+)"/)?.[1]
+  const anon = home.match(/eyJ[\w-]{20,}\.[\w-]{20,}\.[\w-]{20,}/)?.[0]
+  const stock = await (await fetch(`${supaUrl}/rest/v1/products?select=stock_quantity,brands(slug)&is_active=eq.true&stock_quantity=gt.0`, { headers: { apikey: anon, authorization: `Bearer ${anon}` } })).json()
+  const inStock = {}
+  for (const p of stock) {
+    if (p.brands?.slug)
+      inStock[p.brands.slug] = (inStock[p.brands.slug] ?? 0) + 1
+  }
+  const wrong = [...file.body.matchAll(/\/brand\/([\w-]+)\) — товаров в наличии: (\d+)/g)]
+    .filter(([, slug, n]) => Number(n) !== (inStock[slug] ?? 0))
+    .map(([, slug, n]) => `${slug}: ${n} при ${inStock[slug] ?? 0}`)
+  check(!wrong.length, `«товаров в наличии» у брендов — по остатку в базе${wrong.length ? ` — ${wrong.join('; ')}` : ''}`)
+
   // Цифра должна совпадать с тем, что показывает сама страница бренда.
   const lego = await get('/brand/lego')
   // Число живёт в соседней ячейке справки: `<dt>Товаров в наличии</dt><dd …>14</dd>`.
@@ -195,6 +214,121 @@ function h1Of(html) {
     empty.length === 0,
     `пустых категорий в карте: ${empty.length}${empty.length ? ` — ${empty.slice(0, 4).join(', ')}` : ''}`,
   )
+}
+
+// ---------- 5в. Связки из исключений владельца ----------
+/*
+ * `BRAND_LANDINGS_KEPT_INDEXABLE` (constants/index.ts): связка открыта и при
+ * товарах меньше порога. «Конструкторы мальчикам + Sluban» — 179 показов за
+ * 28 дней на 8,9 месте, а Sluban в разделе два, и до 25 сентября 2026 порог
+ * её закрывал. Та же пара у девочек в исключения не входит — по ней видно,
+ * что общее правило не сломано.
+ */
+{
+  console.log('\n5в) связки из исключений владельца')
+  const KEPT = '/catalog/constructors-root/konstruktory-malchikam/brand/sluban'
+  const RULE = '/catalog/constructors-root/konstruktory-devochkam/brand/sluban'
+  const [map, kept] = await Promise.all([get('/sitemap.xml'), get(KEPT)])
+  const inMap = path => map.body.includes(`${path}</loc>`)
+  const robots = kept.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? ''
+  const cards = (kept.body.match(/class="pc-/g) ?? []).length
+  check(inMap(KEPT), `${KEPT} — в карте сайта`)
+  check(robots !== '' && !/noindex/.test(robots), `открыта для индекса: «${robots.split(',')[0]}»`)
+  check(cards > 0, `товары на странице есть (узлов карточек: ${cards})`)
+  check(!inMap(RULE), `${RULE} — не в карте: у девочек две Sluban, общее правило`)
+}
+
+// ---------- 5г. FAQPage на страницах брендов — только видимые вопросы ----------
+/*
+ * Аудит 24 сентября 2026: рядовые бренды (/brand/cada, /brand/mokatoys)
+ * отдавали FAQPage с тремя общими вопросами, которых на странице нет, —
+ * Google требует, чтобы разметка повторяла видимый текст. Инвариант: каждый
+ * вопрос из FAQPage есть в видимом тексте. У LEGO вопросы свои и видимые —
+ * разметка должна остаться.
+ */
+console.log('\n5г) FAQPage на страницах брендов')
+for (const path of ['/brand/cada', '/brand/mokatoys', '/brand/lego']) {
+  const page = await get(path)
+  const faq = [...page.body.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const data = JSON.parse(m[1])
+        return Array.isArray(data['@graph']) ? data['@graph'] : [data]
+      }
+      catch {
+        return []
+      }
+    })
+    .find(node => node?.['@type'] === 'FAQPage')
+  const questions = (faq?.mainEntity ?? []).map(q => q.name)
+  const text = page.body.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
+  const unseen = questions.filter(q => !text.includes(q))
+  check(unseen.length === 0, `${path}: вопросов в FAQPage ${questions.length}, не видно на странице ${unseen.length}${unseen.length ? ` — «${unseen[0]}»` : ''}`)
+  if (path === '/brand/lego')
+    check(questions.length >= 5, `${path}: FAQPage на месте`)
+}
+
+// ---------- 5д. Пустые бренды ----------
+/*
+ * План по аудиту, п. 10. Восемь брендов без товаров открыты для индекса
+ * ради спроса (BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS), а над пустой сеткой
+ * стояли «Оригинал», «Официальный поставщик» и фильтры, в выдаче — «Купить
+ * игрушки BOWA…». Теперь страница говорит, что товаров нет, и ведёт в
+ * похожий раздел. Если у бренда появится товар, проверка пустой страницы для
+ * него пропускается — это уже обычный бренд.
+ */
+console.log('\n5д) пустые бренды')
+for (const [path, name, alt] of [
+  ['/brand/bowa', 'BOWA', '/catalog/girls/igrovye-nabory'],
+  ['/brand/eva-puzzle', 'Eva Puzzle', null],
+]) {
+  const page = await get(path)
+  if (/class="pc-/.test(page.body)) {
+    check(true, `${path}: у бренда появились товары — проверка пустой страницы не нужна`)
+    continue
+  }
+  const description = page.body.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? ''
+  const robots = page.body.match(/<meta name="robots" content="([^"]*)"/)?.[1] ?? ''
+  // Видимый текст: dev-сервер оставляет в разметке комментарии шаблона.
+  const text = page.body.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ')
+  check(text.includes(`Товаров ${name} сейчас нет в наличии`), `${path}: на странице сказано, что товаров нет`)
+  check(!text.includes('Официальный поставщик'), `${path}: без «Официальный поставщик» над пустой сеткой`)
+  check(description.startsWith(`Товаров ${name} сейчас нет в наличии`), `${path}: описание честное — «${description.slice(0, 60)}…»`)
+  check(!/noindex/.test(robots), `${path}: страница остаётся в индексе, как решил владелец`)
+  if (alt)
+    check(page.body.includes(`href="${alt}"`), `${path}: ведёт в похожий раздел ${alt}`)
+}
+const regular = await get('/brand/cada')
+check(regular.body.includes('Официальный поставщик'), '/brand/cada: у бренда с товарами полоса доверия на месте')
+
+// ---------- 5е. Производитель в разметке списка товаров ----------
+/*
+ * План по аудиту, п. 7. На карточке товара «Ухтышку» вместо пустого бренда
+ * убрали 17 сентября 2026, а ItemList разделов называл магазин
+ * производителем у каждого товара без бренда — у 92 из 178. Инвариант: в
+ * ItemList нет бренда «Ухтышка»; у кого бренд есть — он со ссылкой на
+ * страницу бренда.
+ */
+console.log('\n5е) производитель в ItemList разделов')
+for (const path of ['/catalog/boys/mashinki', '/catalog/girls/igrovye-nabory']) {
+  const page = await get(path)
+  const items = [...page.body.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const data = JSON.parse(m[1])
+        return Array.isArray(data['@graph']) ? data['@graph'] : [data]
+      }
+      catch {
+        return []
+      }
+    })
+    .find(node => node?.['@type'] === 'ItemList')
+    ?.itemListElement
+    ?.map(e => e.item) ?? []
+  const store = items.filter(i => i?.brand?.name === 'Ухтышка').length
+  const branded = items.filter(i => i?.brand)
+  check(items.length > 0 && store === 0, `${path}: товаров в ItemList ${items.length}, с брендом «Ухтышка» ${store}`)
+  check(branded.every(i => /^https:\/\/uhti\.kz\/brand\//.test(i.brand.url ?? '')), `${path}: у ${branded.length} товаров с брендом — ссылка на страницу бренда`)
 }
 
 // ---------- 6. Описание бренд-лендинга ----------

@@ -235,3 +235,57 @@ export function brandStaticFaq(slug: string | null | undefined): BrandFaqItem[] 
     return []
   return BRAND_STATIC_CONTENT[slug]?.faq ?? []
 }
+
+/** Раздел, куда ведёт пустая страница бренда. */
+export interface BrandAlternative {
+  href: string
+  label: string
+}
+
+/**
+ * Куда вести с пустой страницы бренда — разделы, где сейчас есть похожее.
+ *
+ * Зачем (25 сентября 2026, план по аудиту, п. 10). Восемь брендов без единого
+ * товара открыты для индекса решением владельца от 20 августа
+ * (`BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS`): у их страниц есть показы, у MG
+ * Toys — второе место. Человек приходил из поиска и видел над пустой сеткой
+ * «Официальный поставщик» и «Богатый выбор». Теперь страница прямо говорит,
+ * что товаров нет, и ведёт туда, где похожее есть.
+ *
+ * Связи «бренд — раздел» в базе нет, а своих товаров у пустого бренда нет
+ * вовсе, поэтому список ручной. Основание — что бренд выпускает, по его же
+ * описанию в базе; разделы — только непустые на 25 сентября. Бренды, для
+ * которых похожего у нас нет (коврики EVA Puzzle, воздушные пушки Air
+ * Blaster) или нет описания (RC Toys, Shantou Yisheng), получают только
+ * ссылку на каталог.
+ *
+ * Как только у бренда появится товар, строка перестаёт что-либо значить:
+ * блок пустой страницы не показывается.
+ */
+export const EMPTY_BRAND_ALTERNATIVES: Readonly<Record<string, readonly BrandAlternative[]>> = {
+  // Сюжетно-ролевые наборы: кухни, мастерские, медицинские.
+  'bowa': [{ href: '/catalog/girls/igrovye-nabory', label: 'Игровые наборы' }],
+  // Игровые наборы и миниатюры с фигурками.
+  'koala-diary': [{ href: '/catalog/girls/igrovye-nabory', label: 'Игровые наборы' }],
+  // Блочные конструкторы: Marvel, Minecraft, техника.
+  'mg-toys': [{ href: '/catalog/constructors-root/konstruktory-malchikam', label: 'Конструкторы для мальчиков' }],
+  // Гоночные автотреки с машинками на пульте.
+  'soba': [
+    { href: '/catalog/boys/mashinki/avtotreki', label: 'Автотреки' },
+    { href: '/catalog/boys/mashinki/radioupravlyaemye-mashinki', label: 'Радиоуправляемые машинки' },
+  ],
+  // Игрушки для детей до 6 лет: погремушки, развивающие наборы.
+  'fivestar-toys': [{ href: '/catalog/kiddy/razvivayushchie-igrushki', label: 'Развивающие игрушки' }],
+  // Машинки, каталки, песочные наборы.
+  'polese': [
+    { href: '/catalog/boys/mashinki', label: 'Машинки' },
+    { href: '/catalog/kiddy', label: 'Игрушки для малышей' },
+  ],
+}
+
+/** Разделы с похожим для пустой страницы бренда. Пусто — ведём в каталог. */
+export function emptyBrandAlternatives(slug: string | null | undefined): readonly BrandAlternative[] {
+  if (!slug)
+    return []
+  return EMPTY_BRAND_ALTERNATIVES[slug] ?? []
+}

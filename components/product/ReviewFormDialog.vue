@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
-import { optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
+import { optimizeForUpload } from '@/utils/optimizeForUpload'
 import StarRating from './StarRating.vue'
 
 const props = defineProps<{
@@ -42,8 +42,8 @@ async function handleImageSelect(event: Event) {
     let processedFile = file
     let blur: string | undefined
 
-    if (shouldOptimizeImage(file)) {
-      const result = await optimizeImageBeforeUpload(file)
+    const result = await optimizeForUpload(file)
+    if (result) {
       processedFile = result.file
       blur = result.blurPlaceholder || undefined
     }

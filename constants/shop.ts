@@ -26,6 +26,10 @@
  * эдж-функции живут в Deno и файлы фронта не импортируют. Меняете здесь —
  * поменяйте и там, иначе чат с покупателем и сайт снова разойдутся.
  */
+/** Часы работы — из них собраны `openingHours` и `openingHoursSpecification`. */
+const OPENS = '09:00'
+const CLOSES = '22:00'
+
 export const SHOP = {
   /** Название для людей. */
   name: 'Ухтышка',
@@ -43,10 +47,21 @@ export const SHOP = {
   postalCode: '050061',
 
   /** Часы в виде для разметки Schema.org. */
-  openingHours: 'Mo-Su 09:00-22:00',
+  openingHours: `Mo-Su ${OPENS}-${CLOSES}`,
+  /** Открытие и закрытие — для `openingHoursSpecification`. */
+  opens: OPENS,
+  closes: CLOSES,
   /** Те же часы для людей — и для сообщений бота. */
   openingHoursHuman: 'ежедневно с 9:00 до 22:00',
 } as const
+
+/*
+ * Другие написания названия — для `alternateName` в разметке (аудит 24
+ * сентября 2026: «сущность бренда размыта»). По «uhti» латиницей магазин
+ * ищут — Search Console с августа 2026, и поэтому «uhti.kz» стоит в заголовке
+ * главной. Кириллическое «Ухтышка» — основное имя (`name`).
+ */
+export const SHOP_ALTERNATE_NAMES = ['Uhti', 'uhti.kz']
 
 /** Полный адрес одной строкой: «г. Алматы, мкр. Шапагат, ул. Амангельды, 100». */
 export const SHOP_ADDRESS_FULL = `г. ${SHOP.city}, ${SHOP.street}`

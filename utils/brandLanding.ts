@@ -12,7 +12,7 @@
  * адрес стал бы неоднозначным. Проверка на это есть в `parseCatalogSlug`.
  */
 
-import { MIN_PRODUCTS_FOR_BRAND_LANDING } from '@/constants'
+import { BRAND_LANDINGS_KEPT_INDEXABLE, MIN_PRODUCTS_FOR_BRAND_LANDING } from '@/constants'
 
 /** Служебный сегмент пути. */
 export const BRAND_SEGMENT = 'brand'
@@ -84,6 +84,8 @@ export interface BrandLandingCategoryNode {
   /** Имена нужны только decideBrandLanding — узнать раздел, названный брендом. */
   name?: string | null
   seo_h1?: string | null
+  /** Только для исключений владельца — BRAND_LANDINGS_KEPT_INDEXABLE. */
+  slug?: string | null
 }
 
 /** Товар в виде, достаточном для подсчёта пар. */
@@ -178,6 +180,8 @@ export function isBrandLandingIndexable(
  *  • корневой раздел — никогда: это аудиторные хабы («Мальчикам»), а не
  *    товарные разделы, и «Мальчикам MokaToys» — не запрос;
  *  • меньше MIN_PRODUCTS_FOR_BRAND_LANDING товаров — закрыта, пустая полка;
+ *    кроме исключений владельца (BRAND_LANDINGS_KEPT_INDEXABLE), если в
+ *    связке есть хоть один товар;
  *  • если в каком-то ПОДРАЗДЕЛЕ у бренда ровно столько же товаров — закрыта:
  *    это дубль более точной связки, открыта будет та;
  *  • раздел уже назван брендом («Куклы L.O.L» + L.O.L. Surprise) — закрыта:
@@ -219,6 +223,17 @@ export function categoryNamesBrand(
   return categoryNames.some(name => nameWords(name).includes(first))
 }
 
+/** Связка из исключений владельца. Имя бренда — без учёта регистра и пробелов по краям. */
+function isKeptBrandLanding(
+  categorySlug: string | null | undefined,
+  brandName: string | null | undefined,
+): boolean {
+  const brand = brandName?.trim().toLowerCase()
+  if (!categorySlug || !brand)
+    return false
+  return BRAND_LANDINGS_KEPT_INDEXABLE.some(k => k.category === categorySlug && k.brand.toLowerCase() === brand)
+}
+
 export function decideBrandLanding(
   categoryId: string,
   brandId: string,
@@ -235,7 +250,7 @@ export function decideBrandLanding(
     return { indexable: false, reason: 'category-names-brand' }
 
   const count = counts.get(brandLandingPairKey(categoryId, brandId)) ?? 0
-  if (count < MIN_PRODUCTS_FOR_BRAND_LANDING)
+  if (count < MIN_PRODUCTS_FOR_BRAND_LANDING && !(count > 0 && isKeptBrandLanding(category.slug, brandName)))
     return { indexable: false, reason: 'few-products' }
 
   for (const child of categories) {

@@ -1,5 +1,5 @@
 /*
- * Тексты и вопросы «Толокаров», «Кукол L.O.L» и «Конструкторов для девочек».
+ * Тексты и вопросы «Толокаров», «Каталок», «Кукол L.O.L» и «Конструкторов для девочек».
  *
  * Почему это проверяется (22 сентября 2026). Три страницы стоят на 12–19
  * месте, и тексты на них обещали то, чего нет: «широкий выбор» при 2–3
@@ -8,8 +8,15 @@
  * `docs/SEO_CATEGORY_TEXTS_2026_09_22.sql` (запускает владелец), вопросы —
  * в `constants/categoryStaticText.ts`.
  *
+ * 25 сентября 2026 сюда добавлены «Каталки» (план по аудиту, п. 14): два
+ * разных раздела, каталку катят или идут за ней, на толокар садятся, и
+ * тексты ведут друг на друга. Текст «Каталок» и перенос ходунка-каталки в
+ * раздел — `docs/SEO_KATALKI_TOLOKAR_2026_09_25.sql`; до его запуска пункты
+ * «Каталок» и ссылка из «Толокаров» краснеют.
+ *
  * Что проверяет на каждой странице:
- *  1) текст из базы — новые заголовки на месте, старых обещаний нет;
+ *  1) текст из базы — новые заголовки на месте, старых обещаний нет, ссылки
+ *     на соседний раздел — настоящие <a href>, нужный товар в ItemList;
  *  2) свои вопросы — все из `categoryStaticText.ts` видны и попали в разметку
  *     FAQPage, шаблонных вопросов генератора («Часто задаваемые вопросы») нет;
  *  3) в браузере после гидратации текст и вопросы на месте, в тексте нет
@@ -31,6 +38,14 @@ const PAGES = [
     slug: 'tolokar',
     path: '/catalog/kiddy/tolokar',
     h2: ['Толокар для детей — первая машинка малыша', 'Как выбрать толокар', 'Купить толокар в Алматы'],
+    links: [['/catalog/kiddy/katalki', 'каталки']],
+  },
+  {
+    slug: 'katalki',
+    path: '/catalog/kiddy/katalki',
+    h2: ['Каталки для первых шагов', 'Как выбрать каталку', 'Купить каталку в Алматы'],
+    links: [['/catalog/kiddy/tolokar', 'толокары']],
+    item: /Ходунок-каталка/,
   },
   {
     slug: 'kukly-lol',
@@ -104,6 +119,28 @@ for (const p of PAGES) {
     check(text.includes(h), `заголовок текста «${h}»`)
   const old = text.match(OLD_PROMISES)
   check(!old, `старых обещаний нет${old ? ` — «${old[0]}»` : ''}`)
+  const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ' ')
+  for (const [href, label] of p.links ?? []) {
+    const linked = [...body.matchAll(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)]
+      .some(m => m[1] === href && m[2].replace(/<[^>]+>/g, '').trim() === label)
+    check(linked, `ссылка «${label}» → ${href}`)
+  }
+  if (p.item) {
+    const names = [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+      .flatMap((m) => {
+        try {
+          const data = JSON.parse(m[1])
+          return Array.isArray(data['@graph']) ? data['@graph'] : [data]
+        }
+        catch {
+          return []
+        }
+      })
+      .find(n => n?.['@type'] === 'ItemList')
+      ?.itemListElement
+      ?.map(e => e.item?.name ?? '') ?? []
+    check(names.some(n => p.item.test(n)), `в выдаче есть ${p.item.source} (товаров в ItemList: ${names.length})`)
+  }
 
   // 2) свои вопросы
   const qs = staticQuestions(p.slug)

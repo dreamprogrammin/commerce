@@ -4,10 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/core/profileStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
-import {
-  optimizeImageBeforeUpload,
-  shouldOptimizeImage,
-} from '@/utils/imageOptimizer'
+import { optimizeForUpload } from '@/utils/optimizeForUpload'
 import ReviewCard from './ReviewCard.vue'
 import StarRating from './StarRating.vue'
 
@@ -92,8 +89,8 @@ async function handleImageSelect(event: Event) {
     let processedFile = file
     let blur: string | undefined
 
-    if (shouldOptimizeImage(file)) {
-      const result = await optimizeImageBeforeUpload(file)
+    const result = await optimizeForUpload(file)
+    if (result) {
       processedFile = result.file
       blur = result.blurPlaceholder || undefined
     }

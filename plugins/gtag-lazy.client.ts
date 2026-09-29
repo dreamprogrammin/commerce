@@ -19,6 +19,9 @@
  * счётчик никому не мешает.
  */
 
+import { toast } from 'vue-sonner'
+import { analyticsDisabled, applyAnalyticsParam, safeLocalStorage } from '@/utils/analyticsOptOut'
+
 /** Через сколько поднять счётчик, если посетитель ничего не делает. */
 const IDLE_FALLBACK_MS = 5000
 
@@ -28,6 +31,24 @@ export default defineNuxtPlugin({
   name: 'gtag-lazy',
   parallel: true,
   setup() {
+    /*
+     * Автоматические браузеры и устройства владельца не считаем — см.
+     * utils/analyticsOptOut.ts. Без внешнего скрипта очередь dataLayer
+     * никуда не уходит, так что и события покупок остаются на месте.
+     */
+    const search = window.location.search
+    const storage = safeLocalStorage()
+    const changed = applyAnalyticsParam(search, storage)
+    if (changed) {
+      // Подтверждение владельцу: ссылка сработала. После оживления страницы —
+      // Toaster лежит в <ClientOnly> и до гидратации его ещё нет.
+      onNuxtReady(() => toast(changed === 'off'
+        ? 'Учёт посещений в этом браузере выключен'
+        : 'Учёт посещений в этом браузере снова включён'))
+    }
+    if (analyticsDisabled({ webdriver: navigator.webdriver === true, search, storage }))
+      return
+
     const { initialize } = useGtag()
 
     let started = false

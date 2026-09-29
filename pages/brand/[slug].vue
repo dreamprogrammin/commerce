@@ -9,15 +9,14 @@ import {
   BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS,
   BUCKET_NAME_BRANDS,
   BUCKET_NAME_PRODUCT,
-  BUCKET_NAME_PRODUCT_LINES,
   SITE_OG_IMAGE_URL,
 } from '@/constants'
-import { brandStaticFaq } from '@/constants/brandStaticText'
+import { brandStaticFaq, emptyBrandAlternatives } from '@/constants/brandStaticText'
 import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
-import { composeBrandMeta } from '@/utils/brandMeta'
+import { composeBrandMeta, composeEmptyBrandMeta } from '@/utils/brandMeta'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 
@@ -520,6 +519,8 @@ setShellOverride(() => (isCustomPage.value ? { header: 'static' } : null))
 
 /** Вопросы из статики: те же, что показаны на лендинге блоком «Частые вопросы». */
 const staticFaq = computed(() => brandStaticFaq(brand.value?.slug))
+/** Куда вести с пустой страницы бренда: и в блоке на странице, и в описании. */
+const brandAlternatives = computed(() => emptyBrandAlternatives(brand.value?.slug))
 const pageLayout = computed(
   () => (brand.value as any)?.page_layout as BrandPageLayout | null,
 )
@@ -573,6 +574,13 @@ const metaDescription = computed(() => {
   })
   if (composed)
     return composed
+  /*
+   * Пустой бренд (план по аудиту, п. 10): ниже шли «Купить игрушки BOWA в
+   * Казахстане…» из базы, а на странице ни одного товара. Строка в выдаче
+   * говорит, как есть, и называет те же разделы, что блок на странице.
+   */
+  if (brandHasProducts.value === false)
+    return composeEmptyBrandMeta(brand.value.name, brandAlternatives.value)
   if (brand.value.meta_description)
     return brand.value.meta_description
   /*
@@ -667,7 +675,14 @@ useHead({
   // Google Rich Results Test помечает такие блоки как "unknown type"
   // (см. SEO-аудит, находка S-1).
   script: computed(() => [
-    // Brand Schema с линейками как subOrganization
+    /*
+     * Brand. Линеек здесь больше нет: они стояли в `subOrganization`, а у типа
+     * `Brand` такого свойства нет — оно есть только у `Organization`, и
+     * проверка разметки его отбрасывала (аудит 24 сентября 2026). К тому же в
+     * список шли и пустые серии — Friends, Technic, Ninjago у LEGO с нулём
+     * товаров и `noindex`. Страницы серий поисковик видит по ссылкам мозаики
+     * и по карте сайта.
+     */
     brand.value && {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
@@ -681,24 +696,6 @@ useHead({
         'image': brandLogoUrl.value || SITE_OG_IMAGE_URL,
         ...(brand.value.seo_keywords?.length && {
           keywords: brand.value.seo_keywords.join(', '),
-        }),
-        ...(brandProductLines.value.length > 0 && {
-          subOrganization: brandProductLines.value.map(line => ({
-            '@type': 'Brand',
-            '@id': `${siteUrl}/brand/${brand.value!.slug}/${line.slug}#brand`,
-            'name': line.name,
-            'url': `${siteUrl}/brand/${brand.value!.slug}/${line.slug}`,
-            ...(line.logo_url && {
-              logo: getVariantUrl(
-                BUCKET_NAME_PRODUCT_LINES,
-                line.logo_url,
-                'sm',
-              ),
-            }),
-            ...(line.description && {
-              description: cleanDescription(line.description, 200),
-            }),
-          })),
         }),
       }),
     },
@@ -741,7 +738,9 @@ useHead({
         '@context': 'https://schema.org',
         '@type': 'ItemList',
         'name': `Товары бренда ${brand.value.name}`,
-        'numberOfItems': filterState.products.value.length,
+        // Столько, сколько элементов в списке, а не всех товаров бренда: у
+        // LEGO стояло 14 при 10 элементах (аудит 24 сентября 2026)
+        'numberOfItems': Math.min(filterState.products.value.length, 10),
         'itemListElement': filterState.products.value
           .slice(0, 10)
           .map((product, index) => ({
@@ -835,35 +834,23 @@ useHead({
      * здесь лежали три общих вопроса, которых в разметке страницы не было
      * вовсе: Google такие блоки игнорирует, а то и считает нарушением.
      *
-     * Для брендов без статики остаётся прежняя тройка — она хотя бы отвечает
-     * на то, что у таких страниц спрашивают, и менять её этой правкой я не
-     * стал.
+     * Для брендов без статики разметки нет. До 25 сентября 2026 им уходила
+     * общая тройка («Где купить…», «Как быстро доставляют…», «Какая
+     * гарантия…»), которой на странице не было, — аудит 24 сентября нашёл её
+     * на /brand/cada и /brand/mokatoys: три вопроса в JSON-LD, ноль на
+     * странице. Google требует, чтобы разметка повторяла видимый текст. Что у
+     * таких брендов видно — вопросы из `brand_questions` (BrandFaqList), — в
+     * FAQPage намеренно не идёт, причина записана в самом компоненте.
      */
-    brand.value && {
+    brand.value && staticFaq.value.length > 0 && {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
-        'mainEntity': (staticFaq.value.length
-          ? staticFaq.value.map(item => ({ name: item.q, text: item.a }))
-          : [
-              {
-                name: `Где купить товары бренда ${brand.value.name} в Казахстане?`,
-                text: `Оригинальные товары бренда ${brand.value.name} можно купить в интернет-магазине ${siteName} с доставкой по всему Казахстану. Мы предлагаем широкий ассортимент продукции с гарантией качества.`,
-              },
-              {
-                name: `Как быстро доставляют товары ${brand.value.name}?`,
-                text: 'Доставка по Алматы осуществляется в течение 1-3 дней. По другим городам Казахстана срок доставки составляет 3-7 дней в зависимости от региона.',
-              },
-              {
-                name: `Какая гарантия на товары ${brand.value.name}?`,
-                text: `Все товары бренда ${brand.value.name} в нашем магазине оригинальные и имеют официальную гарантию производителя. Возврат и обмен возможен в течение 14 дней.`,
-              },
-            ]
-        ).map(item => ({
+        'mainEntity': staticFaq.value.map(item => ({
           '@type': 'Question',
-          'name': item.name,
-          'acceptedAnswer': { '@type': 'Answer', 'text': item.text },
+          'name': item.q,
+          'acceptedAnswer': { '@type': 'Answer', 'text': item.a },
         })),
       }),
     },
@@ -1006,6 +993,8 @@ useIndexableRobotsRule(
         :questions="brandQuestions"
         :other-brands="otherBrands"
         :top-category="topCategory"
+        :has-products="brandHasProducts"
+        :alternatives="brandAlternatives"
       />
 
       <!--
