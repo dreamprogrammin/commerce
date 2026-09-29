@@ -10,8 +10,25 @@
 
 export type OrderEmailKind = 'created' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
 
-/** Статусы, о которых пишем. `new` и `processing` — внутренняя кухня магазина. */
-export const EMAIL_STATUSES: readonly OrderEmailKind[] = ['confirmed', 'shipped', 'delivered', 'cancelled']
+/**
+ * Статусы, о которых пишем, — только когда покупателю нужно что-то сделать
+ * или узнать важное (решение владельца 29 сентября 2026: не спамить на
+ * каждую смену). «Подтверждён» — менеджер и так звонит; «доставлен» —
+ * человек знает сам. Всё остальное видно по ссылке на странице статуса.
+ * Обычный заказ — два письма: «принят» и «готов к выдаче» / «курьер везёт».
+ */
+export const EMAIL_STATUSES: readonly OrderEmailKind[] = ['shipped', 'cancelled']
+
+/**
+ * Одна тема на все письма заказа: по ней почта складывает их в одну цепочку
+ * «Заказ №…». Gmail и Mail.ru обычно склеивают письма с одной темой от одного
+ * отправителя; гарантия — только с заголовками `References` на настоящий
+ * message_id первого письма, а его Resend отдаёт лишь после отправки.
+ */
+export function orderEmailSubject(orderNumber: number | string): string {
+  return `Заказ №${orderNumber} — Ухтышка`
+}
+
 
 export interface OrderEmailData {
   kind: OrderEmailKind
@@ -45,27 +62,27 @@ export function orderEmailCopy(d: Pick<OrderEmailData, 'kind' | 'orderNumber' | 
   switch (d.kind) {
     case 'created':
       return {
-        subject: `Заказ ${no} принят — Ухтышка`,
+        subject: orderEmailSubject(d.orderNumber),
         heading: `Спасибо! Заказ ${no} принят`,
         lead: 'Менеджер свяжется с вами, чтобы подтвердить детали. Платить заранее не нужно.',
       }
     case 'confirmed':
       return {
-        subject: `Заказ ${no} подтверждён — Ухтышка`,
+        subject: orderEmailSubject(d.orderNumber),
         heading: `Заказ ${no} подтверждён`,
         lead: pickup ? 'Собираем заказ. Напишем, когда его можно будет забрать.' : 'Собираем заказ и скоро передадим курьеру.',
       }
     case 'shipped':
       return pickup
-        ? { subject: `Заказ ${no} готов к выдаче — Ухтышка`, heading: `Заказ ${no} готов к выдаче`, lead: `Забрать можно здесь: ${where}, ${hours}.` }
-        : { subject: `Заказ ${no} передан курьеру — Ухтышка`, heading: `Заказ ${no} в пути`, lead: 'Курьер уже везёт заказ. Он позвонит перед приездом.' }
+        ? { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} готов к выдаче`, lead: `Забрать можно здесь: ${where}, ${hours}.` }
+        : { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} в пути`, lead: 'Курьер уже везёт заказ. Он позвонит перед приездом.' }
     case 'delivered':
       return pickup
-        ? { subject: `Заказ ${no} выдан — Ухтышка`, heading: `Заказ ${no} выдан`, lead: 'Спасибо за покупку! Будем рады вашему отзыву о товаре на сайте.' }
-        : { subject: `Заказ ${no} доставлен — Ухтышка`, heading: `Заказ ${no} доставлен`, lead: 'Спасибо за покупку! Будем рады вашему отзыву о товаре на сайте.' }
+        ? { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} выдан`, lead: 'Спасибо за покупку! Будем рады вашему отзыву о товаре на сайте.' }
+        : { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} доставлен`, lead: 'Спасибо за покупку! Будем рады вашему отзыву о товаре на сайте.' }
     case 'cancelled':
       return {
-        subject: `Заказ ${no} отменён — Ухтышка`,
+        subject: orderEmailSubject(d.orderNumber),
         heading: `Заказ ${no} отменён`,
         lead: `Если это ошибка или остались вопросы — позвоните нам: ${d.shop.phoneHuman}.`,
       }

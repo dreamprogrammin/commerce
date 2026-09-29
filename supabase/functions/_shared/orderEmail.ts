@@ -105,6 +105,10 @@ export async function sendOrderEmail(
       html: message.html,
       text: message.text,
       tags: [{ name: 'kind', value: kind }],
+      // Склейка в одну переписку — только одинаковой темой. Свой Message-ID
+      // Resend не принимает (ставит идентификатор SES), поэтому In-Reply-To
+      // на него указывал бы в никуда; для надёжной склейки нужно хранить
+      // настоящий message_id первого письма в заказе (см. docs/HANDOFF.md).
     }),
   })
   if (!res.ok)
