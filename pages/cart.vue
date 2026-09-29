@@ -42,7 +42,7 @@ const { items, subtotal, totalItems, deliveryCost, isFreeShipping }
   = storeToRefs(cartStore)
 const { isLoggedIn } = storeToRefs(authStore)
 const { getVariantUrl } = useSupabaseStorage()
-const { trackBeginCheckout } = useEcommerceTracking()
+const { trackBeginCheckout, trackViewCart } = useEcommerceTracking()
 const { triggerHaptic } = useHaptic()
 
 // Прогресс бесплатной доставки
@@ -172,18 +172,28 @@ function handleLogin() {
   modalStore.openLoginModal()
 }
 
+/** Товары корзины в виде, в каком их ждут события Analytics. */
+function trackedItems() {
+  return items.value.map(item => ({
+    id: item.product.id,
+    name: item.product.name,
+    price: unitPrice(item.product),
+    quantity: item.quantity,
+  }))
+}
+
 function handleCheckout() {
-  trackBeginCheckout(
-    items.value.map(item => ({
-      id: item.product.id,
-      name: item.product.name,
-      price: unitPrice(item.product),
-      quantity: item.quantity,
-    })),
-    subtotal.value,
-  )
+  trackBeginCheckout(trackedItems(), subtotal.value)
   navigateTo('/checkout')
 }
+
+// «Открыл корзину» — на каждом приходе на страницу: она удерживается
+// (`keepalive`), и onMounted сработал бы только в первый раз, а onActivated
+// срабатывает и на первом показе. Пустую корзину не шлём — в воронке это не шаг.
+onActivated(() => {
+  if (items.value.length)
+    trackViewCart(trackedItems(), subtotal.value)
+})
 
 // --- ЛЕНТА РЕКОМЕНДАЦИЙ ---
 const railRef = ref<HTMLElement | null>(null)
