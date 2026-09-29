@@ -373,19 +373,14 @@ watch(
   { immediate: true },
 )
 
-// Модалка для гостей (один раз за сессию)
-const hasSeenModalKey = 'guest_bonus_modal_seen'
-
-onMounted(() => {
-  const hasSeenModal = sessionStorage.getItem(hasSeenModalKey)
-
-  if (!isLoggedIn.value && items.value.length > 0 && !hasSeenModal) {
-    setTimeout(() => {
-      showGuestModal.value = true
-      sessionStorage.setItem(hasSeenModalKey, 'true')
-    }, 800)
-  }
-})
+/*
+ * Окно «Получите подарок!» само больше не открывается (29 сентября 2026,
+ * решение владельца). Оно всплывало через 0,8 с после входа на оформление и
+ * закрывало форму: пока гость его не закроет, ввести ничего нельзя, а
+ * «один раз за сессию» значило — на каждом новом заходе. Приглашение
+ * осталось в самой форме: плашка под контактами и блок «Списание бонусов»
+ * открывают то же окно по нажатию.
+ */
 
 function applyBonuses() {
   // Проверка 1: Достаточно ли бонусов на балансе
@@ -689,7 +684,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             >
               <Icon name="lucide:gift" class="size-[18px] shrink-0 text-bonus" />
               <span class="text-xs leading-[1.4]">
-                Войдите, чтобы копить и списывать бонусы — до 10% кэшбэка с каждого заказа
+                <b>1000 бонусов за первый заказ</b> — войдите через Google. Копите и списывайте бонусы: до 10% кэшбэка с каждого заказа
               </span>
             </button>
           </section>
