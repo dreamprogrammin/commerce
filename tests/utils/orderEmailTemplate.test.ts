@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildOrderEmail, EMAIL_STATUSES, orderEmailCopy, tenge } from '../../supabase/functions/_shared/orderEmailTemplate'
+import { buildOrderEmail, EMAIL_STATUSES, orderEmailCopy, orderEmailSubject, tenge } from '../../supabase/functions/_shared/orderEmailTemplate'
 
 /**
  * Письма покупателю о заказе (29 сентября 2026): форма оформления обещает
@@ -10,8 +10,16 @@ const SHOP = { phoneHuman: '+7 (702) 537-94-73', phoneHref: 'tel:+77025379473', 
 const BASE = { orderNumber: 1004, statusUrl: 'https://uhti.kz/order/t/ec55733a3fec', total: 18480, shop: SHOP }
 
 describe('письма о заказе', () => {
-  it('пишем только о смене статуса, важной покупателю', () => {
-    expect(EMAIL_STATUSES).toEqual(['confirmed', 'shipped', 'delivered', 'cancelled'])
+  it('пишем только когда покупателю нужно что-то сделать или узнать важное', () => {
+    // Решение владельца: обычный заказ — два письма, «принят» и «готов / везут»
+    expect(EMAIL_STATUSES).toEqual(['shipped', 'cancelled'])
+  })
+
+  it('все письма заказа — одна тема и одна цепочка', () => {
+    const kinds = ['created', 'shipped', 'cancelled'] as const
+    const subjects = kinds.map(kind => orderEmailCopy({ ...BASE, kind, deliveryMethod: 'pickup' }).subject)
+    expect(new Set(subjects)).toEqual(new Set([orderEmailSubject(1004)]))
+    expect(orderEmailSubject(1004)).toBe('Заказ №1004 — Ухтышка')
   })
 
   it('«заказ принят» — состав, доставка, итог и ссылка на статус', () => {
@@ -22,7 +30,7 @@ describe('письма о заказе', () => {
       deliveryCost: 1000,
       items: [{ name: 'Толокар <Sport>', quantity: 2, price: 8890 }],
     })
-    expect(m.subject).toBe('Заказ №1004 принят — Ухтышка')
+    expect(m.subject).toBe('Заказ №1004 — Ухтышка')
     expect(m.html).toContain('https://uhti.kz/order/t/ec55733a3fec')
     expect(m.html).toContain('Толокар &lt;Sport&gt; × 2')
     expect(m.html).toContain(tenge(17780))
@@ -33,7 +41,7 @@ describe('письма о заказе', () => {
   it('«передан»: курьеру — в пути, самовывоз — готов к выдаче с адресом и часами', () => {
     expect(orderEmailCopy({ ...BASE, kind: 'shipped', deliveryMethod: 'courier' }).heading).toBe('Заказ №1004 в пути')
     const pickup = orderEmailCopy({ ...BASE, kind: 'shipped', deliveryMethod: 'pickup', pickup: { name: 'Шапагат', address: 'ул. Амангельды, 100', hours: '9:00–22:00' } })
-    expect(pickup.subject).toBe('Заказ №1004 готов к выдаче — Ухтышка')
+    expect(pickup.heading).toBe('Заказ №1004 готов к выдаче')
     expect(pickup.lead).toBe('Забрать можно здесь: Шапагат, ул. Амангельды, 100, 9:00–22:00.')
   })
 
