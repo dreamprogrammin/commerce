@@ -29,20 +29,6 @@ const { getVariantUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
-// ─── Утилита: очистка HTML + обрезка ────────────────────────────────────────
-function cleanDescription(
-  html: string | null | undefined,
-  maxLength = 200,
-): string {
-  if (!html)
-    return ''
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, maxLength)
-}
-
 // ─── Утилита: короткий SKU ───────────────────────────────────────────────────
 function getProductSku(product: { sku?: string | null, id: string }): string {
   if (product.sku)
@@ -763,9 +749,10 @@ useHead({
               '@type': 'Product',
               'name': product.name,
               'url': `${siteUrl}/catalog/products/${product.slug}`,
-              // FIX: очищаем HTML и обрезаем до 200 символов
+              // Из запроса каталога описание приходит без вёрстки и уже
+              // обрезанным: по границе слова и без недописанного хвоста.
               ...(product.description && {
-                description: cleanDescription(product.description, 200),
+                description: dropBrokenTail(leadExcerpt(product.description, 200)),
               }),
               /*
                * Вариант с суффиксом, а не голый путь. В `product_images.image_url`
