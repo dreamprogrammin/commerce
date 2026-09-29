@@ -52,6 +52,7 @@ const navLinks = [
   { to: '/admin/returns', label: 'Возвраты' },
   { to: '/admin/sales', label: 'Продажи' },
   { to: '/admin/reports', label: 'Отчёты' },
+  { to: '/admin/carts', label: 'Корзины' },
   { to: '/admin/promotions', label: 'Акции' },
   { to: '/admin/broadcast', label: 'Рассылка' },
   { to: '/admin/kaspi-export', label: 'Выгрузка Kaspi' },
