@@ -1,3 +1,5 @@
+interface CheckoutItem { id: string | number, name: string, price: number, quantity: number }
+
 export function useEcommerceTracking() {
   const { gtag } = useGtag()
 
@@ -68,7 +70,37 @@ export function useEcommerceTracking() {
     })
   }
 
+  /*
+   * Шаги между «начал оформление» и «купил» (29 сентября 2026). Без них не
+   * видно, на каком шаге человек уходит. Имена и поля — стандартные события
+   * GA4: отчёт «Воронка покупок» собирается из них сам.
+   */
+  const gaItems = (items: CheckoutItem[]) => items.map(item => ({
+    item_id: String(item.id),
+    item_name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+  }))
+
+  /** Открыл корзину с товарами. */
+  const trackViewCart = (items: CheckoutItem[], totalValue: number) => {
+    gtag('event', 'view_cart', { currency: 'KZT', value: totalValue, items: gaItems(items) })
+  }
+
+  /** Заполнил данные доставки: контакты и адрес или пункт самовывоза. */
+  const trackAddShippingInfo = (items: CheckoutItem[], totalValue: number, shippingTier: string) => {
+    gtag('event', 'add_shipping_info', { currency: 'KZT', value: totalValue, shipping_tier: shippingTier, items: gaItems(items) })
+  }
+
+  /** Нажал «Оформить», и форма прошла проверку. */
+  const trackAddPaymentInfo = (items: CheckoutItem[], totalValue: number, paymentType: string) => {
+    gtag('event', 'add_payment_info', { currency: 'KZT', value: totalValue, payment_type: paymentType, items: gaItems(items) })
+  }
+
   return {
+    trackViewCart,
+    trackAddShippingInfo,
+    trackAddPaymentInfo,
     trackViewItem,
     trackAddToCart,
     trackRemoveFromCart,
