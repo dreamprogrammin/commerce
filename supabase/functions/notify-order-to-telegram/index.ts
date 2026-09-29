@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { sendOrderEmail } from '../_shared/orderEmail.ts'
 import { buildOrderKeyboard } from '../_shared/orderActions.ts'
 import { escapeMarkdown } from '../_shared/telegramUtils.ts'
 
@@ -151,6 +152,14 @@ Deno.serve(async (req) => {
         persistSession: false
       }
     })
+
+    // Письмо «Заказ принят» — отдельно от Telegram, сбой почты не мешает ему
+    try {
+      console.log(`📧 ${await sendOrderEmail(supabaseAdmin, tableName as 'orders' | 'guest_checkouts', orderId, 'created')}`)
+    }
+    catch (e) {
+      console.error('📧 Письмо не отправлено:', e)
+    }
 
     let orderData: OrderData | null = null
     let orderError: { message: string } | null = null
