@@ -890,25 +890,17 @@ const seoBlocks = computed(() => {
   return parseHTMLToBlocks(content)
 })
 
-// Извлекаем текст из seo_content для Schema.org description
-const seoContentText = computed(() => {
-  if (!seoBlocks.value.length)
-    return metaDescription.value
-
-  const joined = seoBlocks.value
-    .map((block) => {
-      if (block.type === 'ul') {
-        return block.items.map(item => item.text).join(' ')
-      }
-      return block.text
-    })
-    .filter(Boolean)
-    .join(' ')
-  // По границе слова, а не по счётчику: раньше описание в разметке `Product`
-  // обрывалось посреди слова — «…доставим по вс». Google берёт его в сниппет
-  // как есть. 500 знаков — рекомендация Google.
-  return truncateAtWord(joined, 500)
-})
+/*
+ * Текст для `Product.description` — первый абзац описания, по границе слова
+ * (500 знаков — рекомендация Google). Раньше сюда шли все блоки через
+ * пробел, и заголовок, с которого начинаются все 178 описаний, приклеивался к
+ * абзацу: «…эпичная битва в ваших руках Мстители против…» (29 сентября 2026).
+ * Ещё раньше текст обрывался посреди слова — «…доставим по вс».
+ */
+const seoContentText = computed(() =>
+  leadExcerpt(product.value?.seo_content || product.value?.description, 500)
+  || metaDescription.value,
+)
 
 // см. composables/useRobotsContent.ts — на превью правило закрывается флагом
 useIndexableRobotsRule(robotsRule)

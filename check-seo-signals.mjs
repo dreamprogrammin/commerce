@@ -390,6 +390,75 @@ console.log('\n5ж) описание бренда и серии без прик�
   }
 }
 
+// ---------- 5з. Описания товаров и статья раздела без склейки ----------
+/*
+ * Все 178 описаний товаров начинаются с заголовка, и в разметке он
+ * приклеивался к абзацу: на карточке — блоки через пробел, в списках раздела
+ * и серии — теги снимались вовсе без пробела и текст резался `substring`
+ * посреди слова. Так же собирался `articleBody` статьи раздела. Инвариант:
+ * ни в `Product.description`, ни в `articleBody` нет заголовка из исходного
+ * текста, и описание не кончается обрубком слова.
+ */
+console.log('\n5з) описания товаров и статья раздела без склейки')
+{
+  const home = await get('/')
+  const supaUrl = home.body.match(/supabase:\{url:"([^"]+)"/)?.[1]
+  const anon = home.body.match(/eyJ[\w-]{20,}\.[\w-]{20,}\.[\w-]{20,}/)?.[0]
+  const rest = async path => (await fetch(`${supaUrl}/rest/v1/${path}`, { headers: { apikey: anon, authorization: `Bearer ${anon}` } })).json()
+  const headingsOf = html => [...(html ?? '').matchAll(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/g)]
+    .map(m => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  const nodesOf = body => [...body.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => {
+      try {
+        const data = JSON.parse(m[1])
+        return Array.isArray(data['@graph']) ? data['@graph'] : [data]
+      }
+      catch {
+        return []
+      }
+    })
+  const products = await rest('products?select=slug,description&is_active=eq.true')
+  const bySlug = Object.fromEntries(products.map(p => [p.slug, p]))
+  const glueIn = (text, slug) => headingsOf(bySlug[slug]?.description).find(h => text.includes(h))
+
+  // Карточка товара
+  const pdpSlug = 'konstruktor-lego-marvel-76290-mstiteli-protiv-leviafana-halk-loki-i-kapitan-amerika'
+  const pdp = await get(`/catalog/products/${pdpSlug}`)
+  const productNode = nodesOf(pdp.body).find(n => n?.['@type'] === 'Product')
+  const glued = glueIn(productNode?.description ?? '', pdpSlug)
+  check(!glued, `карточка: в Product.description нет заголовка${glued ? ` — «${glued}»` : ''}`)
+
+  /*
+   * Списки раздела, серии и бренда. Заголовок здесь не проверяется: товары
+   * в список приходят из запроса каталога уже без вёрстки, заголовок слит с
+   * абзацем ещё там, и страница отделить его не может (29 сентября 2026 —
+   * лечится только запросом). Проверяется то, что делает страница: слова не
+   * слипаются и текст не обрывается посреди слова.
+   */
+  const plainOf = html => (html ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+  for (const path of ['/catalog/boys/mashinki', '/brand/lego/lego-city', '/brand/cada']) {
+    const page = await get(path)
+    const items = nodesOf(page.body).flatMap(n => [n, n?.mainEntity].filter(Boolean)).filter(n => n?.['@type'] === 'ItemList').flatMap(n => n.itemListElement ?? []).map(e => e.item).filter(i => i?.url)
+    const bad = items.filter((i) => {
+      const text = i.description ?? ''
+      const source = plainOf(bySlug[i.url.split('/').pop()]?.description)
+      const last = text.split(' ').pop().replace(/[.,!?…:;»)]+$/u, '')
+      const whole = !source || !last || new RegExp(`(?<!\\p{L})${last.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\p{L})`, 'u').test(source)
+      return /[\u0430-\u044F\u0451][\u0410-\u042F\u0401]/.test(text) || !whole
+    })
+    check(items.length > 0 && bad.length === 0, `${path}: товаров в ItemList ${items.length}, слипшихся или оборванных посреди слова ${bad.length}${bad[0] ? ` — «…${bad[0].description.slice(-50)}»` : ''}`)
+  }
+
+  // Статья раздела
+  const section = await get('/catalog/boys/mashinki')
+  const article = nodesOf(section.body).map(n => n?.mainEntity).find(n => n?.['@type'] === 'Article')
+  const cat = (await rest('categories?select=seo_text&slug=eq.mashinki'))[0]
+  const body = article?.articleBody ?? ''
+  const gluedHead = headingsOf(cat?.seo_text).find(h => body.includes(h))
+  check(body.length > 0 && !gluedHead && !/[\u0430-\u044F\u0451][\u0410-\u042F\u0401]/.test(body), `/catalog/boys/mashinki: articleBody ${body.length} знаков, без заголовков и слипшихся слов${gluedHead ? ` — «${gluedHead}»` : ''}`)
+}
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым

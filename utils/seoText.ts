@@ -202,3 +202,44 @@ export function leadExcerpt(
   const lead = paragraphs.find(paragraph => !isShopParagraph(paragraph))
   return lead ? truncateAtWord(lead, maxLength) : ''
 }
+
+/**
+ * Весь текст статьи без заголовков — для `articleBody` разделов.
+ *
+ * Раньше теги снимались без пробела, и заголовок срастался со следующим
+ * словом («…в Алматы</h2><p>Машинки» → «АлматыМашинки»), а конец резался
+ * посреди слова. Здесь берутся абзацы и пункты списков по порядку, каждый
+ * кончается знаком препинания (у пунктов его обычно нет — ставится точка),
+ * заголовки пропускаются, обрезка по границе слова. Нет ни абзацев, ни
+ * пунктов — весь текст, как `plainExcerpt`.
+ */
+export function bodyExcerpt(
+  html: string | null | undefined,
+  maxLength: number,
+): string {
+  if (!html)
+    return ''
+
+  const blocks = [...html.matchAll(/<(p|li)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
+    .map(match => paragraphText(match[2] ?? ''))
+    .filter(Boolean)
+    .map(text => /[.!?…:;]$/.test(text) ? text : `${text}.`)
+  if (blocks.length === 0)
+    return plainExcerpt(html, maxLength)
+
+  return truncateAtWord(blocks.join(' '), maxLength)
+}
+
+/**
+ * Отбрасывает недописанное последнее слово у текста, пришедшего уже
+ * обрезанным. Товары в списки раздела и бренда приходят из запроса каталога
+ * без вёрстки и с оборванным концом — «…может собрать собс» (29 сентября
+ * 2026). Признак обрыва — нет знака препинания в конце; тогда последнее
+ * слово снимается, а за ним и служебные слова (`truncateAtWord`).
+ */
+export function dropBrokenTail(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed.includes(' ') || /[.!?…»")]$/.test(trimmed))
+    return trimmed
+  return truncateAtWord(trimmed, trimmed.length - 1)
+}

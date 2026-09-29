@@ -35,20 +35,6 @@ const isSeoExpanded = ref(false)
 
 // ─── Утилиты ────────────────────────────────────────────────────────────────
 
-// Очистка HTML + обрезка
-function cleanDescription(
-  html: string | null | undefined,
-  maxLength = 200,
-): string {
-  if (!html)
-    return ''
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, maxLength)
-}
-
 // Короткий SKU из БД, fallback — первые 10 символов id
 function getProductSku(product: { sku?: string | null, id: string }): string {
   if (product.sku)
@@ -63,11 +49,14 @@ function buildProductDescription(
   lineName: string,
   maxLength = 200,
 ): string {
+  /*
+   * Первый абзац описания, а не весь текст без тегов: теги снимались без
+   * пробела, заголовок срастался с абзацем, а `substring` резал посреди
+   * слова (29 сентября 2026).
+   */
   const prefix = `${brandName} ${lineName}: `
-  const base
-    = cleanDescription(product.description, maxLength - prefix.length)
-      || product.name
-  return `${prefix}${base}`.substring(0, maxLength)
+  const base = leadExcerpt(product.description, maxLength - prefix.length) || product.name
+  return truncateAtWord(`${prefix}${base}`, maxLength)
 }
 
 // ─── 1. Загрузка бренда ─────────────────────────────────────────────────────

@@ -154,16 +154,6 @@ onUnmounted(() => {
   window.removeEventListener('scroll', onWindowScroll)
 })
 
-function cleanDescription(html: string | null, maxLength = 200): string {
-  if (!html)
-    return ''
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, maxLength)
-}
-
 // --- 1.5. Brand Landing ---
 /*
  * Бренд и категория разбираются из пути: `/catalog/boys/brand/mattel`.
@@ -2338,7 +2328,10 @@ const schemaData = computed(() => {
         '@type': 'Article',
         'headline': title.value,
         'image': SITE_OG_IMAGE_URL,
-        'articleBody': cleanDescription(seoText.value, 500),
+        // Абзацы и пункты без заголовков (`bodyExcerpt`): раньше заголовки
+        // шли в текст, теги снимались без пробела, а конец резался посреди
+        // слова (29 сентября 2026).
+        'articleBody': bodyExcerpt(seoText.value, 500),
         'author': {
           '@type': 'Organization',
           'name': 'Ухтышка',
@@ -2403,7 +2396,9 @@ const schemaData = computed(() => {
           'item': {
             '@type': 'Product',
             'name': product.name,
-            'description': cleanDescription(product.description) || product.name,
+            // Из запроса каталога описание приходит без вёрстки и уже
+            // обрезанным — недописанное слово снимает `dropBrokenTail`.
+            'description': dropBrokenTail(leadExcerpt(product.description, 200)) || product.name,
             'url': `https://uhti.kz/catalog/products/${product.slug}`,
             'sku': product.sku || product.id,
             // MPN — код модели производителя; id из базы им не является.
