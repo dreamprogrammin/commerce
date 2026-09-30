@@ -22,7 +22,8 @@ import process from 'node:process'
 
 const CONFIG = `${os.homedir()}/.config/claude-seo/google-api.json`
 const config = JSON.parse(fs.readFileSync(CONFIG, 'utf8'))
-const sa = JSON.parse(fs.readFileSync(config.service_account_path, 'utf8'))
+// Путь в конфиге claude-seo записан с `~` — сама ОС его не раскрывает
+const sa = JSON.parse(fs.readFileSync(config.service_account_path.replace(/^~(?=\/)/, os.homedir()), 'utf8'))
 
 /** Свойство доменное — см. пояснение в `gsc-queries.mjs`. */
 const configured = config.default_property ?? 'sc-domain:uhti.kz'

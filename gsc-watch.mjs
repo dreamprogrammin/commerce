@@ -54,7 +54,8 @@ process.on('unhandledRejection', die)
  */
 const CONFIG = process.env.GSC_CONFIG || `${os.homedir()}/.config/claude-seo/google-api.json`
 const config = JSON.parse(fs.readFileSync(CONFIG, 'utf8'))
-const SA_PATH = process.env.GSC_SA_PATH || config.service_account_path
+// Путь в конфиге claude-seo записан с `~` — сама ОС его не раскрывает
+const SA_PATH = process.env.GSC_SA_PATH || config.service_account_path.replace(/^~(?=\/)/, os.homedir())
 const sa = JSON.parse(fs.readFileSync(SA_PATH, 'utf8'))
 
 const configured = config.default_property ?? 'sc-domain:uhti.kz'

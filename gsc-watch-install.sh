@@ -32,7 +32,7 @@ if [ "${1:-}" = "--off" ]; then
 fi
 
 # Ключ: путь берём из конфига claude-seo, как и сам наблюдатель.
-SA_SRC="$(node -e "const c=require('$HOME/.config/claude-seo/google-api.json');process.stdout.write(c.service_account_path||'')" 2>/dev/null)"
+SA_SRC="$(node -e "const c=require('$HOME/.config/claude-seo/google-api.json');process.stdout.write((c.service_account_path||'').replace(/^~(?=\/)/,require('os').homedir()))" 2>/dev/null)"
 if [ -z "$SA_SRC" ] || [ ! -f "$SA_SRC" ]; then
   echo "не нашёл ключ Search Console (service_account_path в ~/.config/claude-seo/google-api.json)" >&2
   exit 1
