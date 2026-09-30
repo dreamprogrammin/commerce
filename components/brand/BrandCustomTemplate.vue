@@ -171,8 +171,11 @@ const facts = computed<BrandFact[]>(() => {
   if (inStock > 0)
     push('Товаров в наличии', String(inStock))
 
-  if (props.productLines.length > 0)
-    push('Серий', String(props.productLines.length))
+  // Серии с товаром, как в шапке (BrandLandingHero): до 30 сентября 2026 здесь
+  // считались все — у LEGO «Серий 7» при четырёх в наличии на той же странице
+  const series = props.productLines.filter(line => (lineCounts.value[line.id] ?? 0) > 0).length
+  if (series > 0)
+    push('Серий', String(series))
 
   // Возраст — в месяцах и словами, как на карточке («от 1 года», а не «от 1 лет»)
   const ages = products.value.map(p => productAgeMonths(p as any))

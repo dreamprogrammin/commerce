@@ -196,6 +196,9 @@ for (const ua of AGENTS) {
   const inStock = Number(lego.match(/(\d+) сери[яий] в наличии/)?.[1] ?? 0)
   const heroSeries = Number(lego.match(/blh__stat-num[^>]*>(\d+)<\/span>\s*<span[^>]*blh__stat-label[^>]*>сери/)?.[1] ?? 0)
   check(inStock > 0 && heroSeries === inStock, `серии LEGO: в шапке ${heroSeries}, в наличии ${inStock}`)
+  // То же в «Коротко о бренде»: там до 30 сентября считались все серии («Серий 7»)
+  const factSeries = Number(lego.match(/Серий<\/dt>\s*<dd[^>]*>(\d+)/)?.[1] ?? 0)
+  check(factSeries === inStock, `серии LEGO: в «Коротко о бренде» ${factSeries}, в наличии ${inStock}`)
 }
 
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: страница готова для ИИ-поисковиков' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)
