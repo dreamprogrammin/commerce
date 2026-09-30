@@ -4,6 +4,7 @@ import { BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS } from '@/constants'
 import {
   brandLandingPairKey,
   buildBrandLandingPath,
+  countProductsByBrand,
   countProductsByCategoryBrand,
   decideBrandLanding,
 } from '~/utils/brandLanding'
@@ -394,6 +395,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
 
     if (canDecideBrandLandings) {
       const counts = countProductsByCategoryBrand(products as any[], categories as any[])
+      const brandTotals = countProductsByBrand(products as any[])
       const categoryById = new Map((categories as any[]).map(c => [c.id, c]))
       const brandById = new Map((brands as any[]).map(b => [b.id, b]))
 
@@ -416,7 +418,7 @@ export default defineEventHandler(async (event): Promise<SitemapRoute[]> => {
       let closed = 0
       for (const key of counts.keys()) {
         const [categoryId, brandId] = key.split('|')
-        const verdict = decideBrandLanding(categoryId, brandId, counts, categories as any[], brandById.get(brandId)?.name)
+        const verdict = decideBrandLanding(categoryId, brandId, counts, categories as any[], brandById.get(brandId)?.name, brandTotals.get(brandId))
         if (!verdict.indexable) {
           closed += 1
           continue

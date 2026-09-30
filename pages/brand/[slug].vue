@@ -288,13 +288,12 @@ const { data: brandCategoryData } = await useAsyncData(
     const topRootSlug = topRootId ? byId.get(topRootId)?.slug ?? null : null
     const topCategory = brandHeadingWord(topRootSlug)
 
-    const counts = countProductsByCategoryBrand(
-      (brandProducts.data ?? []).map(p => ({
-        category_id: p.category_id,
-        brand_id: brandId,
-      })),
-      categories,
-    )
+    const brandLandingRefs = (brandProducts.data ?? []).map(p => ({
+      category_id: p.category_id,
+      brand_id: brandId,
+    }))
+    const counts = countProductsByCategoryBrand(brandLandingRefs, categories)
+    const brandTotal = countProductsByBrand(brandLandingRefs).get(brandId)
 
     const seen = new Set<string>()
     const links: { name: string, path: string }[] = []
@@ -302,7 +301,7 @@ const { data: brandCategoryData } = await useAsyncData(
     for (const category of categories) {
       if (!category.slug || !counts.has(brandLandingPairKey(category.id, brandId)))
         continue
-      if (!decideBrandLanding(category.id, brandId, counts, categories, brand.value.name).indexable)
+      if (!decideBrandLanding(category.id, brandId, counts, categories, brand.value.name, brandTotal).indexable)
         continue
 
       const path = buildBrandLandingPath(

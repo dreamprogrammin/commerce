@@ -12,7 +12,7 @@
  * адрес стал бы неоднозначным. Проверка на это есть в `parseCatalogSlug`.
  */
 
-import { BRAND_LANDINGS_KEPT_INDEXABLE, MIN_PRODUCTS_FOR_BRAND_LANDING } from '@/constants'
+import { BRAND_HUBS, BRAND_LANDINGS_KEPT_INDEXABLE, MIN_PRODUCTS_FOR_BRAND_LANDING } from '@/constants'
 
 /** Служебный сегмент пути. */
 export const BRAND_SEGMENT = 'brand'
@@ -187,6 +187,9 @@ export function isBrandLandingIndexable(
  *  • раздел уже назван брендом («Куклы L.O.L» + L.O.L. Surprise) — закрыта:
  *    страница раздела и есть страница бренда в нём, а связка повторила бы
  *    её с теми же товарами и почти тем же заголовком;
+ *  • бренд из BRAND_HUBS, и в связке ВСЕ его товары (`brandTotal`) —
+ *    закрыта: главная у такого бренда — `/brand/<бренд>`, а связка с тем же
+ *    набором её дублирует. Без `brandTotal` правило молчит (fail-open);
  *  • иначе открыта. Родитель с набором БОЛЬШЕ любого подраздела («Куклы +
  *    L.O.L.»: 4 товара против 3 в «Куклах L.O.L.») — отдельная страница.
  *
@@ -196,7 +199,7 @@ export function isBrandLandingIndexable(
  */
 export type BrandLandingVerdict
   = | { indexable: true }
-    | { indexable: false, reason: 'root-category' | 'few-products' | 'unknown-category' | 'category-names-brand' }
+    | { indexable: false, reason: 'root-category' | 'few-products' | 'unknown-category' | 'category-names-brand' | 'same-as-brand' }
     | { indexable: false, reason: 'same-as-child', sameAsChildId: string }
 
 /** Слова названия: без точек внутри («L.O.L.» → «lol»), в нижнем регистре. */
@@ -223,6 +226,28 @@ export function categoryNamesBrand(
   return categoryNames.some(name => nameWords(name).includes(first))
 }
 
+/** Бренд, у которого главная — страница бренда (BRAND_HUBS). Без учёта регистра. */
+export function isBrandHub(brandName: string | null | undefined): boolean {
+  const brand = brandName?.trim().toLowerCase()
+  return !!brand && BRAND_HUBS.some(b => b.toLowerCase() === brand)
+}
+
+/**
+ * Сколько товаров у каждого бренда — тех же, что считает
+ * countProductsByCategoryBrand: с брендом и разделом. Это `brandTotal` для
+ * decideBrandLanding.
+ */
+export function countProductsByBrand(
+  products: readonly BrandLandingProductRef[],
+): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const product of products) {
+    if (product.brand_id && product.category_id)
+      counts.set(product.brand_id, (counts.get(product.brand_id) ?? 0) + 1)
+  }
+  return counts
+}
+
 /** Связка из исключений владельца. Имя бренда — без учёта регистра и пробелов по краям. */
 function isKeptBrandLanding(
   categorySlug: string | null | undefined,
@@ -240,6 +265,7 @@ export function decideBrandLanding(
   counts: ReadonlyMap<string, number>,
   categories: readonly BrandLandingCategoryNode[],
   brandName?: string | null,
+  brandTotal?: number | null,
 ): BrandLandingVerdict {
   const category = categories.find(c => c.id === categoryId)
   if (!category)
@@ -257,6 +283,9 @@ export function decideBrandLanding(
     if (child.parent_id === categoryId && (counts.get(brandLandingPairKey(child.id, brandId)) ?? 0) === count)
       return { indexable: false, reason: 'same-as-child', sameAsChildId: child.id }
   }
+
+  if (brandTotal != null && count >= brandTotal && isBrandHub(brandName) && !isKeptBrandLanding(category.slug, brandName))
+    return { indexable: false, reason: 'same-as-brand' }
 
   return { indexable: true }
 }

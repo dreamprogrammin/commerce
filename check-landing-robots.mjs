@@ -18,7 +18,9 @@ import { chromium } from 'playwright'
 
 const BASE = process.env.BASE || 'http://localhost:3001'
 const PAGES = [
-  ['/catalog/constructors-root/konstruktory-malchikam/brand/lego', 'index'],
+  ['/catalog/constructors-root/konstruktory-malysham/brand/smoneo', 'index'],
+  // С 30 сентября 2026 закрыта: LEGO — бренд-хаб (BRAND_HUBS), в связке все его наборы
+  ['/catalog/constructors-root/konstruktory-malchikam/brand/lego', 'noindex'],
   ['/catalog/boys/mashinki/avtotreki/brand/soba', 'noindex'],
   ['/catalog/constructors-root/konstruktory-malchikam', 'index'],
 ]
