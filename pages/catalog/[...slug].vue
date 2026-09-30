@@ -37,6 +37,7 @@ import {
   buildBrandLandingPath,
   countProductsByCategoryBrand,
   decideBrandLanding,
+  isBrandHub,
   parseCatalogSlug,
 } from '@/utils/brandLanding'
 import {
@@ -466,16 +467,28 @@ const { data: brandLandingAll } = await useAsyncData(
       }
     }
 
-    const { data, error } = await supabase
-      .from('products')
-      .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, min_age_months, max_age_months, category_id, brand_id')
-      .eq('is_active', true)
-      .eq('brand_id', brandId)
-      .in('category_id', [...branch])
+    // У бренда-хаба (BRAND_HUBS) связка закрыта, если в ней ВСЕ его товары, —
+    // для этого нужно их общее число. Сбой счётчика — null, правило молчит.
+    const [{ data, error }, total] = await Promise.all([
+      supabase
+        .from('products')
+        .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, min_age_months, max_age_months, category_id, brand_id')
+        .eq('is_active', true)
+        .eq('brand_id', brandId)
+        .in('category_id', [...branch]),
+      isBrandHub(activeBrandSeo.value?.name)
+        ? supabase
+            .from('products')
+            .select('id', { count: 'exact', head: true })
+            .eq('is_active', true)
+            .eq('brand_id', brandId)
+            .not('category_id', 'is', null)
+        : null,
+    ])
     if (error)
       throw error
 
-    return { categoryId: root.id, brandId, products: data ?? [] }
+    return { categoryId: root.id, brandId, products: data ?? [], brandTotal: total?.count ?? null }
   },
   { watch: [currentCategorySlug, activeBrandSlug] },
 )
@@ -585,6 +598,7 @@ const brandLandingVerdict = computed(() => {
     counts,
     categoriesStore.allCategories,
     activeBrandName.value,
+    all.brandTotal,
   )
 })
 /** «9 моделей · от 7 490 до 18 890 ₸» — под H1 связки. */
