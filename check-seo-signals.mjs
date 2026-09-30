@@ -459,6 +459,42 @@ console.log('\n5з) описания товаров и статья раздел
   check(body.length > 0 && !gluedHead && !/[\u0430-\u044F\u0451][\u0410-\u042F\u0401]/.test(body), `/catalog/boys/mashinki: articleBody ${body.length} знаков, без заголовков и слипшихся слов${gluedHead ? ` — «${gluedHead}»` : ''}`)
 }
 
+// ---------- 5и. Цифры в тексте раздела и бренда ----------
+/*
+ * Аудит 30 сентября 2026, «ИИ-поиск»: цифры для цитаты («8 моделей от 7 390
+ * до 25 390 ₸») были только в мета-описании, в тексте — нет. Абзац с цифрами
+ * стоял у пяти разделов; теперь у всех разделов с текстом и у брендов.
+ * Инварианты: абзац есть, число моделей в нём то же, что в мета-описании; у
+ * пустого бренда и у связки «раздел + бренд» абзаца нет — цифры всего раздела
+ * там были бы неправдой.
+ */
+console.log('\n5и) цифры в тексте раздела и бренда')
+{
+  const visible = html => html.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<script\b[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;|\u00A0/g, ' ').replace(/\s+/g, ' ')
+  const metaOf = html => (html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '').replace(/\u00A0/g, ' ')
+  const countIn = s => s.match(/(\d+) (модел|набор|конструктор)/)?.[1]
+  for (const [path, lead] of [
+    ['/catalog/girls/igrovye-nabory', 'Сейчас в разделе'],
+    ['/catalog/kiddy/razvivayushchie-igrushki', 'Сейчас в разделе'],
+    ['/brand/zuru', 'Сейчас в Ухтышке'],
+    ['/brand/cada', 'Сейчас в Ухтышке'],
+  ]) {
+    const page = await get(path)
+    const text = visible(page.body)
+    const i = text.indexOf(lead)
+    const sentence = i < 0 ? '' : text.slice(i, i + 120)
+    const meta = metaOf(page.body)
+    check(i >= 0 && countIn(sentence) === countIn(meta), `${path}: «${sentence.slice(0, 70) || 'абзаца нет'}…» — число как в мета-описании (${countIn(meta) ?? '—'})`)
+  }
+  for (const [path, lead] of [
+    ['/brand/bowa', 'Сейчас в Ухтышке'],
+    ['/catalog/constructors-root/konstruktory-malchikam/brand/sluban', 'Сейчас в разделе'],
+  ]) {
+    const text = visible((await get(path)).body)
+    check(!text.includes(lead), `${path}: без «${lead}…» — цифр к этой странице нет`)
+  }
+}
+
 // ---------- 6. Описание бренд-лендинга ----------
 /*
  * У пяти связок «категория + бренд» из четырнадцати описание собрано старым

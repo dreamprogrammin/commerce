@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { LocationQuery, LocationQueryValue } from 'vue-router'
+import type { CategoryStaticContent } from '@/constants/categoryStaticText'
 import type {
   AttributeFilter,
   AttributeWithValue,
@@ -50,7 +51,7 @@ import {
   prependBrandLandingFacts,
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { categoryFactsFromRows, insertAfterFirstParagraph, topBrandNames } from '@/utils/categoryFacts'
+import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph, topBrandNames } from '@/utils/categoryFacts'
 import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
@@ -1574,10 +1575,17 @@ const categoryProductsCount = computed(() => categoryFacts.value?.count ?? null)
  * 9. Связку узнаём по адресу, а не по `activeBrand`: тот пуст, пока не
  * загружен список брендов.
  */
+/*
+ * У разделов без своей настройки в `categoryStaticText.ts` — общий абзац
+ * «Сейчас в разделе N моделей от … до … ₸» без вопросов. Аудит 30 сентября
+ * 2026 («ИИ-поиск»): цифры для цитаты были только в мета-описании, а абзац —
+ * у пяти разделов из 53 с текстом.
+ */
+const DEFAULT_LIVE: NonNullable<CategoryStaticContent['live']> = { paragraph: f => composeCategoryFactsParagraph(f) }
 const categoryLive = computed(() => {
-  const live = categoryStatic.value?.live
+  const live = categoryStatic.value?.live ?? DEFAULT_LIVE
   const facts = categoryFacts.value
-  return live && facts && !activeBrandSlug.value ? { live, facts } : null
+  return facts && !activeBrandSlug.value ? { live, facts } : null
 })
 const categoryFactsParagraph = computed(() =>
   categoryLive.value?.live.paragraph?.(categoryLive.value.facts) ?? null,

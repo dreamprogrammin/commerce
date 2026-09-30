@@ -17,6 +17,7 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
 import { composeBrandMeta, composeEmptyBrandMeta } from '@/utils/brandMeta'
+import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph } from '@/utils/categoryFacts'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 
@@ -376,7 +377,7 @@ const { data: brandMetaProducts } = await useAsyncData(
       return []
     const { data, error } = await supabase
       .from('products')
-      .select('price, final_price, stock_quantity, product_lines(name)')
+      .select('price, final_price, stock_quantity, min_age_months, product_lines(name)')
       .eq('brand_id', brand.value.id)
       .eq('is_active', true)
     if (error) {
@@ -387,6 +388,7 @@ const { data: brandMetaProducts } = await useAsyncData(
       price: p.price,
       final_price: p.final_price,
       stock_quantity: p.stock_quantity,
+      min_age_months: p.min_age_months ?? null,
       lineName: p.product_lines?.name ?? null,
     }))
   },
@@ -605,6 +607,33 @@ const metaKeywords = computed(() => {
 const ogImageSrc = computed(
   () => brandLogoUrl.value || SITE_OG_IMAGE_URL,
 )
+
+/*
+ * Цифры бренда словами — «Сейчас в Ухтышке 8 моделей ZURU от 7 390 до
+ * 25 390 ₸, все в наличии. Все — для детей с 3 лет.» — в текст «О бренде»
+ * сразу за первым абзацем. Аудит 30 сентября 2026 («ИИ-поиск»): цифры для
+ * цитаты были только в мета-описании. Товаров нет — абзаца нет. Меняется
+ * только текст для шаблона: `Brand.description` в разметке по-прежнему
+ * первый абзац о бренде.
+ */
+const brandFactsParagraph = computed(() => {
+  if (!brand.value || !brandMetaProducts.value?.length)
+    return null
+  const facts = categoryFactsFromRows(brandMetaProducts.value.map(p => ({
+    brand_id: brand.value!.id,
+    price: p.price,
+    final_price: p.final_price,
+    stock_quantity: p.stock_quantity,
+    min_age_months: p.min_age_months,
+  })))
+  return composeCategoryFactsParagraph(facts, { where: 'в Ухтышке', subject: brand.value.name })
+})
+const brandForTemplate = computed(() => {
+  const b = brand.value
+  if (!b?.description || !brandFactsParagraph.value)
+    return b
+  return { ...b, description: insertAfterFirstParagraph(b.description, brandFactsParagraph.value) }
+})
 
 /**
  * Текст «О бренде» простой строкой — для JSON-LD.
@@ -984,7 +1013,7 @@ useIndexableRobotsRule(
     <!-- Стандартный шаблон -->
     <div v-else :class="`${containerClass} py-4 md:py-8`">
       <BrandStandardTemplate
-        :brand="brand"
+        :brand="brandForTemplate"
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
