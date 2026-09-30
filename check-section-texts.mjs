@@ -141,7 +141,15 @@ const paths = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
   .filter(p => p.startsWith('/catalog/') && !p.startsWith('/catalog/products/'))
 console.log(`\n== ${paths.length} страниц разделов и связок из sitemap.xml`)
 check(paths.length > 30, `в карте сайта ${paths.length} разделов и связок`)
+/*
+ * Шаблон про ассортимент (30 сентября 2026, docs/SEO_SECTION_TEXTS_CLEANUP_
+ * 2026_09_30.sql): «В Ухтышке представлен широкий выбор…», «Выбирайте,
+ * заказывайте прямо сейчас…», «В нашем каталоге вы найдёте…» — перечень
+ * того, чего в магазине может не быть; у девяти разделов товаров нет вовсе.
+ */
+const ASSORTMENT_TEMPLATE = /(широк|больш|огромн|богат)(ий|ой|ого|ый) выбор|заказывайте|вы найд[её]те|в нашем (каталоге|интернет-магазине)/i
 let clean = 0
+let honest = 0
 for (const path of paths) {
   const res = await fetch(`${BASE}${path}`)
   const text = visibleText(await res.text())
@@ -150,8 +158,14 @@ for (const path of paths) {
     clean++
   else
     check(false, `${path}: ${res.status !== 200 ? `ответ ${res.status}` : `«…${bad}…»`}`)
+  const tpl = around(text, ASSORTMENT_TEMPLATE)
+  if (res.status === 200 && !tpl)
+    honest++
+  else if (res.status === 200)
+    check(false, `${path}: шаблон про ассортимент — «…${tpl}…»`)
 }
 check(clean === paths.length, `без обещания «1–3 дня по всему Казахстану» и «Карагандy»: ${clean} из ${paths.length}`)
+check(honest === paths.length, `без «широкого выбора», «заказывайте» и «вы найдёте»: ${honest} из ${paths.length}`)
 
 // ── 2. переписанные разделы ─────────────────────────────────────────────────
 for (const p of REWRITTEN) {
