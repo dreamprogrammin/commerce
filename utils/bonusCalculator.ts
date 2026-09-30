@@ -10,7 +10,8 @@
  * Формула: FLOOR(price / 100) * 100 - 10
  * Исключение: Для товаров < 500₸ округляем до 10 (без -10)
  *
- * ВАЖНО: Должна совпадать с SQL формулой в products.final_price
+ * ВАЖНО: Должна совпадать с SQL формулой в products.final_price.
+ * Применяется ТОЛЬКО к цене со скидкой — см. calculateFinalPrice.
  */
 export function roundToMarketingPrice(price: number): number {
   if (price <= 0)
@@ -28,7 +29,7 @@ export function roundToMarketingPrice(price: number): number {
 /**
  * Единая формула расчёта бонусов.
  * Должна совпадать с SQL: ROUND(final_price * percent / 100)
- * где final_price = roundToMarketingPrice(price * (100 - discount_percentage) / 100)
+ * где final_price = calculateFinalPrice(price, discount_percentage)
  */
 export function calculateBonusPoints(
   price: number,
@@ -37,13 +38,7 @@ export function calculateBonusPoints(
 ): number {
   if (price <= 0 || bonusPercent <= 0)
     return 0
-  const discount = discountPercentage > 0 ? discountPercentage : 0
-
-  // Сначала применяем скидку
-  const priceWithDiscount = (price * (100 - discount)) / 100
-
-  // Затем применяем психологическое округление
-  const finalPrice = roundToMarketingPrice(priceWithDiscount)
+  const finalPrice = calculateFinalPrice(price, discountPercentage)
 
   // Рассчитываем бонусы от округленной цены
   return Math.round((finalPrice * bonusPercent) / 100)
@@ -58,7 +53,11 @@ export function calculateFinalPrice(
 ): number {
   if (price <= 0)
     return 0
-  const discount = discountPercentage > 0 ? discountPercentage : 0
-  const priceWithDiscount = (price * (100 - discount)) / 100
+  // Без скидки — ровно введённая цена, как в products.final_price с
+  // 30 сентября 2026. Раньше округление срезало 100 ₸ и с неё: 1 290 → 1 190,
+  // и плитка каталога расходилась с кассой.
+  if (!(discountPercentage > 0))
+    return price
+  const priceWithDiscount = (price * (100 - discountPercentage)) / 100
   return roundToMarketingPrice(priceWithDiscount)
 }
