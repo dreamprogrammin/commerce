@@ -231,6 +231,13 @@ export interface FactsParagraphOptions {
    * алматы». У машинок не передаются: текст раздела и так называет MokaToys.
    */
   brands?: readonly { name: string, count: number }[]
+  /**
+   * Где: «в разделе» — по умолчанию. У бренда — «в Ухтышке» (30 сентября
+   * 2026: цифры для цитаты ИИ-поиска — аудит, раздел «ИИ-поиск»).
+   */
+  where?: string
+  /** Что после числа: имя бренда — «8 моделей ZURU». */
+  subject?: string
 }
 
 /**
@@ -242,7 +249,9 @@ export function composeCategoryFactsParagraph(f: CategoryFacts, options: FactsPa
   if (!f.count)
     return null
   const range = priceRangePhrase(f)
-  const head = `Сейчас в разделе ${countPhrase(f.count, options.forms)}${range ? ` ${range}` : ''}, ${stockPhrase(f)}.`
+  const where = options.where ?? 'в разделе'
+  const subject = options.subject ? ` ${options.subject}` : ''
+  const head = `Сейчас ${where} ${countPhrase(f.count, options.forms)}${subject}${range ? ` ${range}` : ''}, ${stockPhrase(f)}.`
   const brands = options.brands?.length
     ? options.brands.length === 1 && options.brands[0]!.count === f.count
       ? `Все — ${options.brands[0]!.name}.`

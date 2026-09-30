@@ -138,6 +138,16 @@ describe('цифры раздела словами', () => {
     expect(composeCategoryFactsParagraph(categoryFactsFromRows([]))).toBeNull()
   })
 
+  it('бренд: «в Ухтышке» и имя бренда после числа', () => {
+    const facts = categoryFactsFromRows([
+      { brand_id: 'zuru', price: 7_390, final_price: null, stock_quantity: 2, min_age_months: 36 },
+      { brand_id: 'zuru', price: 25_390, final_price: null, stock_quantity: 1, min_age_months: 36 },
+    ])
+    expect(plain(composeCategoryFactsParagraph(facts, { where: 'в Ухтышке', subject: 'ZURU' }))).toBe(
+      'Сейчас в Ухтышке 2 модели ZURU от 7 390 до 25 390 ₸, все в наличии. Все — для детей с 3 лет.',
+    )
+  })
+
   it('наличие и цены — во всех видах', () => {
     expect(stockPhrase({ ...RC, inStock: 16 })).toBe('в наличии 16 из 18')
     expect(plain(priceRangePhrase({ ...RC, minPrice: null, maxPrice: null }))).toBe('')
