@@ -142,6 +142,9 @@ export default defineNuxtConfig({
     // (server/utils/ga4.ts): JSON ключа целиком. Пусто — блок пишет «не настроено».
     gaServiceAccount: process.env.GA_SERVICE_ACCOUNT_JSON || '',
     ga4PropertyId: process.env.GA4_PROPERTY_ID || '477985479',
+    // Токен сброса кеша ISR на Vercel — тот же, что `nitro.vercel.config.bypassToken`
+    // ниже. Пусто — сброс после сохранения товара молча пропускается.
+    isrBypassToken: process.env.ISR_BYPASS_TOKEN || '',
     public: {
       siteUrl: 'https://uhti.kz',
     },
@@ -767,6 +770,22 @@ export default defineNuxtConfig({
     esbuild: {
       options: {
         target: 'esnext',
+      },
+    },
+    /*
+     * Сброс кеша ISR по запросу (30 сентября 2026). Nitro кладёт токен в
+     * настройки ISR каждой страницы (`*.prerender-config.json`), и запрос
+     * к адресу с заголовком `x-prerender-revalidate: <токен>` пересобирает
+     * её сразу. Зовёт `server/api/admin/revalidate-product.post.ts` после
+     * сохранения товара в админке: иначе новая цена доезжала до карточки
+     * только через час, а корзина и касса брали её из базы сразу.
+     *
+     * Токен секретный: с ним же открывается обход кеша (Draft Mode).
+     * Переменная ISR_BYPASS_TOKEN на Vercel, не короче 32 знаков.
+     */
+    vercel: {
+      config: {
+        bypassToken: process.env.ISR_BYPASS_TOKEN || undefined,
       },
     },
   },
