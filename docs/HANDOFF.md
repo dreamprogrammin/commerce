@@ -22,6 +22,17 @@ JS/CSS — `nuxt.config.ts:99`, правка в одну строку; (2) **у 
 наличии на `/brand/lego`. План — в конце документа; находки агентов, которые я не
 повторял, — отдельным разделом. Сырые отчёты — в скретчпаде сессии
 (`uhti.kz-audit/findings/`), в репозиторий не переносились.
+**Слепок для сравнения (seo-drift) снят 30 сентября в 07:00 UTC** — 14 страниц: `/`,
+`/catalog`, `/catalog/girls`, `/catalog/boys`, «Толокары», «Конструкторы мальчикам»,
+«Куклы L.O.L.», «Радиоуправляемые машинки», `/brand/lego`, `/brand/cada`,
+`/brand/zuru`, карточки LEGO 76290 и робот-собака BG1544, `/about`; все 200. Без
+Core Web Vitals (`--skip-cwv`: PageSpeed скачет на 5–14 баллов). База —
+`~/.cache/claude-seo/drift/baselines.db` **только на этой Linux-машине**, в git не
+едет. Сравнить: `export CLAUDE_PLUGIN_ROOT=~/.claude/plugins/cache/agricidaniel-claude-seo/claude-seo/2.4.1 CLAUDE_PLUGIN_DATA=~/.claude/plugins/data/claude-seo-agricidaniel-claude-seo`,
+затем `$CLAUDE_PLUGIN_ROOT/scripts/claude-seo run drift_compare.py <url>` (или `/seo drift compare <url>`).
+После выкатки `dev` изменения ожидаемы: разметка (описания без склейки), `/brand/lego`
+(нет блока «LEGO в категориях»). Разборщик плагина склеивает H1 без пробелов
+(«КонструкторыLEGOв Алматы») — это его особенность, на странице пробелы есть.
 Ссылка LEGO из текста «Конструкторов мальчикам» на бою проверена в 06:40 UTC:
 «конструкторы LEGO» ведёт на `/brand/lego`, старой ссылки нет (страница пересобрана
 в 06:11). Грабля: у тега есть `class`, поэтому `grep 'href="/brand/lego">'` её не
