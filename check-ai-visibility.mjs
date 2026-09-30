@@ -55,6 +55,23 @@ for (const ua of AGENTS) {
     : `не названы: ${missing.join(', ')}`)
   check(!/User-agent:\s*\*[\s\S]*?Disallow:\s*\/\s*$/m.test(robots), 'общего запрета `Disallow: /` нет')
 
+  /*
+   * Файлы сборки (/_nuxt) открыты для Google. До 30 сентября 2026 в robots.txt
+   * стоял `Disallow: /_nuxt` — он длиннее `Allow: /`, и Google выбирает самое
+   * длинное совпадение: весь JS и CSS сайта был закрыт, страницу нельзя было
+   * отрисовать так, как её видит покупатель. Проверяется настоящий файл с
+   * главной по правилам группы `*`.
+   */
+  const home = await (await fetch(`${BASE}/`)).text()
+  const asset = home.match(/(?:href|src)="(\/_nuxt\/[^"]+\.(?:css|js))"/)?.[1]
+  const star = robots.split(/\n(?=User-agent:)/i).find(g => /^User-agent:\s*\*\s*$/im.test(g)) ?? ''
+  const rules = [...star.matchAll(/^(Allow|Disallow):\s*(\S+)/gim)].map(m => ({ allow: /^allow$/i.test(m[1]), path: m[2] }))
+  const matches = path => rules.filter(r => new RegExp(`^${r.path.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}`).test(path))
+  const winner = asset ? matches(asset).sort((a, b) => b.path.length - a.path.length || Number(b.allow) - Number(a.allow))[0] : null
+  check(!!asset && (!winner || winner.allow), asset
+    ? `файл сборки ${asset} для Google ${!winner || winner.allow ? 'открыт' : `ЗАКРЫТ правилом Disallow: ${winner.path}`}`
+    : 'на главной не нашлось файла /_nuxt — проверить нечего')
+
   const header = (await fetch(`${BASE}/brand/lego`)).headers.get('x-robots-tag') ?? ''
   check(/index/.test(header) && !/noindex/.test(header), `заголовок страницы: ${header || 'нет'}`)
 }
