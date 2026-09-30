@@ -282,6 +282,18 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   }
 
   /**
+   * Сброс кеша страниц товара на Vercel (карточка, разделы, бренд, главная —
+   * вместе с их данными). В фоне и без ошибок наружу: сохранение от него не
+   * зависит. Без него новая цена доезжала до карточки через час, а касса
+   * брала её сразу (30 сентября 2026) — см. server/api/admin/revalidate-product.post.ts.
+   */
+  function revalidateProductPages(body: { productId: string } | { slug: string, categoryId: string | null, brandId: string | null }) {
+    $fetch('/api/admin/revalidate-product', { method: 'POST', body }).catch((error) => {
+      console.warn('[revalidate] не удалось сбросить кеш страниц товара', error)
+    })
+  }
+
+  /**
    * 🆕 Создает товар с поддержкой blur placeholder
    */
   async function createProduct(
@@ -310,6 +322,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (newProduct.slug) {
         notifySearchEngines(newProduct.slug)
       }
+      revalidateProductPages({ productId: newProduct.id })
 
       toast.success(`Товар "${newProduct.name}" успешно создан.`)
       return newProduct
@@ -356,6 +369,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       if (updatedProduct.slug) {
         notifySearchEngines(updatedProduct.slug)
       }
+      revalidateProductPages({ productId })
 
       toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
       return updatedProduct
@@ -405,6 +419,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       toast.success(`Товар "${productToDelete.name}" успешно удален.`, {
         id: toastId,
       })
+      if (productToDelete.slug) {
+        revalidateProductPages({
+          slug: productToDelete.slug,
+          categoryId: productToDelete.category_id,
+          brandId: productToDelete.brand_id,
+        })
+      }
     }
     catch (error: any) {
       toast.error('Ошибка удаления товара', {
