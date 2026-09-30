@@ -29,20 +29,6 @@ const { getVariantUrl } = useSupabaseStorage()
 const brandSlug = route.params.slug as string
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
-// ─── Утилита: очистка HTML + обрезка ────────────────────────────────────────
-function cleanDescription(
-  html: string | null | undefined,
-  maxLength = 200,
-): string {
-  if (!html)
-    return ''
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, maxLength)
-}
-
 // ─── Утилита: короткий SKU ───────────────────────────────────────────────────
 function getProductSku(product: { sku?: string | null, id: string }): string {
   if (product.sku)
@@ -53,16 +39,22 @@ function getProductSku(product: { sku?: string | null, id: string }): string {
 // 1. Умная загрузка информации о бренде
 const { data: brand, pending: brandPending } = await useAsyncData(
   `brand-${brandSlug}`,
+  /*
+   * Один бренд по адресу, а не все. Раньше страница звала
+   * `productsStore.fetchAllBrands()` — `select('*')` по всем брендам — и
+   * искала свой в списке. Хранилище целиком уходило в `__NUXT_DATA__`: на бою
+   * 29 сентября 2026 каждая страница бренда везла описания всех 43 брендов
+   * (у `/brand/hstar` 109 КБ данных, у `/brand/lego` 150 КБ).
+   */
   async () => {
-    let foundBrand = productsStore.brands.find(b => b.slug === brandSlug)
-
-    if (!foundBrand) {
-      if (productsStore.brands.length === 0) {
-        await productsStore.fetchAllBrands()
-        foundBrand = productsStore.brands.find(b => b.slug === brandSlug)
-      }
-    }
-    return foundBrand || null
+    const { data, error } = await supabase
+      .from('brands')
+      .select('*')
+      .eq('slug', brandSlug)
+      .maybeSingle()
+    if (error)
+      console.error('Не удалось загрузить бренд:', error)
+    return data ?? null
   },
 )
 
@@ -296,13 +288,12 @@ const { data: brandCategoryData } = await useAsyncData(
     const topRootSlug = topRootId ? byId.get(topRootId)?.slug ?? null : null
     const topCategory = brandHeadingWord(topRootSlug)
 
-    const counts = countProductsByCategoryBrand(
-      (brandProducts.data ?? []).map(p => ({
-        category_id: p.category_id,
-        brand_id: brandId,
-      })),
-      categories,
-    )
+    const brandLandingRefs = (brandProducts.data ?? []).map(p => ({
+      category_id: p.category_id,
+      brand_id: brandId,
+    }))
+    const counts = countProductsByCategoryBrand(brandLandingRefs, categories)
+    const brandTotal = countProductsByBrand(brandLandingRefs).get(brandId)
 
     const seen = new Set<string>()
     const links: { name: string, path: string }[] = []
@@ -310,7 +301,7 @@ const { data: brandCategoryData } = await useAsyncData(
     for (const category of categories) {
       if (!category.slug || !counts.has(brandLandingPairKey(category.id, brandId)))
         continue
-      if (!decideBrandLanding(category.id, brandId, counts, categories, brand.value.name).indexable)
+      if (!decideBrandLanding(category.id, brandId, counts, categories, brand.value.name, brandTotal).indexable)
         continue
 
       const path = buildBrandLandingPath(
@@ -757,9 +748,10 @@ useHead({
               '@type': 'Product',
               'name': product.name,
               'url': `${siteUrl}/catalog/products/${product.slug}`,
-              // FIX: очищаем HTML и обрезаем до 200 символов
+              // Из запроса каталога описание приходит без вёрстки и уже
+              // обрезанным: по границе слова и без недописанного хвоста.
               ...(product.description && {
-                description: cleanDescription(product.description, 200),
+                description: dropBrokenTail(leadExcerpt(product.description, 200)),
               }),
               /*
                * Вариант с суффиксом, а не голый путь. В `product_images.image_url`

@@ -55,6 +55,30 @@ for (const ua of AGENTS) {
     : `не названы: ${missing.join(', ')}`)
   check(!/User-agent:\s*\*[\s\S]*?Disallow:\s*\/\s*$/m.test(robots), 'общего запрета `Disallow: /` нет')
 
+  /*
+   * Файлы сборки (/_nuxt) открыты для Google. До 30 сентября 2026 в robots.txt
+   * стоял `Disallow: /_nuxt` — он длиннее `Allow: /`, и Google выбирает самое
+   * длинное совпадение: весь JS и CSS сайта был закрыт, страницу нельзя было
+   * отрисовать так, как её видит покупатель. Проверяется настоящий файл с
+   * главной по правилам группы `*`.
+   */
+  const home = await (await fetch(`${BASE}/`)).text()
+  const asset = home.match(/(?:href|src)="(\/_nuxt\/[^"]+\.(?:css|js))"/)?.[1]
+  const star = robots.split(/\n(?=User-agent:)/i).find(g => /^User-agent:\s*\*\s*$/im.test(g)) ?? ''
+  const rules = [...star.matchAll(/^(Allow|Disallow):\s*(\S+)/gim)].map(m => ({ allow: /^allow$/i.test(m[1]), path: m[2] }))
+  const matches = path => rules.filter(r => new RegExp(`^${r.path.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}`).test(path))
+  const winner = asset ? matches(asset).sort((a, b) => b.path.length - a.path.length || Number(b.allow) - Number(a.allow))[0] : null
+  check(!!asset && (!winner || winner.allow), asset
+    ? `файл сборки ${asset} для Google ${!winner || winner.allow ? 'открыт' : `ЗАКРЫТ правилом Disallow: ${winner.path}`}`
+    : 'на главной не нашлось файла /_nuxt — проверить нечего')
+
+  // Условия возврата — ссылкой из подвала каждой страницы (до 30 сентября 2026 не было)
+  check(home.includes('href="/returns"'), `ссылка на /returns на главной ${home.includes('href="/returns"') ? 'есть' : 'ОТСУТСТВУЕТ'}`)
+
+  // Сайт на одном языке: hreflang на казахскую версию, которой нет, — неверный сигнал.
+  const hreflangs = [...home.matchAll(/hreflang="([^"]+)"/g)].map(m => m[1])
+  check(!hreflangs.includes('kk'), hreflangs.length ? `hreflang на главной: ${hreflangs.join(', ')}` : 'hreflang нет — сайт на одном языке')
+
   const header = (await fetch(`${BASE}/brand/lego`)).headers.get('x-robots-tag') ?? ''
   check(/index/.test(header) && !/noindex/.test(header), `заголовок страницы: ${header || 'нет'}`)
 }
@@ -175,6 +199,9 @@ for (const ua of AGENTS) {
   const inStock = Number(lego.match(/(\d+) сери[яий] в наличии/)?.[1] ?? 0)
   const heroSeries = Number(lego.match(/blh__stat-num[^>]*>(\d+)<\/span>\s*<span[^>]*blh__stat-label[^>]*>сери/)?.[1] ?? 0)
   check(inStock > 0 && heroSeries === inStock, `серии LEGO: в шапке ${heroSeries}, в наличии ${inStock}`)
+  // То же в «Коротко о бренде»: там до 30 сентября считались все серии («Серий 7»)
+  const factSeries = Number(lego.match(/Серий<\/dt>\s*<dd[^>]*>(\d+)/)?.[1] ?? 0)
+  check(factSeries === inStock, `серии LEGO: в «Коротко о бренде» ${factSeries}, в наличии ${inStock}`)
 }
 
 console.log(fails.length === 0 ? '\nЗЕЛЁНЫЙ: страница готова для ИИ-поисковиков' : `\nКРАСНЫЙ: ${fails.length} провал(ов)`)

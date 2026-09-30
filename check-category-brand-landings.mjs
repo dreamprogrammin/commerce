@@ -6,7 +6,8 @@
  * была лента товаров и цены от до»):
  *  • открыта для индекса ровно та связка, которую открывает decideBrandLanding
  *    (utils/brandLanding.ts): не корень, не меньше трёх товаров, не дубль
- *    более точного подраздела, не раздел, уже названный брендом;
+ *    более точного подраздела, не раздел, уже названный брендом, и не
+ *    связка бренда-хаба (BRAND_HUBS, LEGO с 30 сентября) со всеми его товарами;
  *  • у открытой: под H1 строка «N моделей · от X до Y ₸», в описании для
  *    выдачи то же число и те же цены, свой текст со списком моделей, если
  *    руками текст не написан; в H1 и title нет дательного падежа
@@ -69,6 +70,7 @@ const byId = new Map(categories.map(c => [c.id, c]))
 const brandById = new Map(brands.map(b => [b.id, b]))
 const storedByKey = new Map(stored.map(s => [L.brandLandingPairKey(s.category_id, s.brand_id), s]))
 const counts = L.countProductsByCategoryBrand(products, categories)
+const brandTotals = L.countProductsByBrand(products)
 
 function branchOf(id) {
   const set = new Set([id])
@@ -91,7 +93,7 @@ for (const key of counts.keys()) {
   const brand = brandById.get(brandId)
   if (!category?.slug || !brand?.slug)
     continue
-  const verdict = L.decideBrandLanding(categoryId, brandId, counts, categories, brand.name)
+  const verdict = L.decideBrandLanding(categoryId, brandId, counts, categories, brand.name, brandTotals.get(brandId))
   const branch = branchOf(categoryId)
   const items = products.filter(p => p.brand_id === brandId && branch.has(p.category_id))
   pairs.push({

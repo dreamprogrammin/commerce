@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { categoryNamesBrand, countProductsByCategoryBrand, decideBrandLanding } from '@/utils/brandLanding'
+import { categoryNamesBrand, countProductsByBrand, countProductsByCategoryBrand, decideBrandLanding, isBrandHub } from '@/utils/brandLanding'
 
 /*
  * Дерево как на бою: «Мальчикам» → «Машинки» → «Радиоуправляемые машинки»,
@@ -111,6 +111,54 @@ describe('decideBrandLanding: исключения владельца', () => {
   it('без имени бренда исключение не узнать — общее правило', () => {
     expect(decideBrandLanding('km', 'sluban', pairs, tree))
       .toEqual({ indexable: false, reason: 'few-products' })
+  })
+})
+
+/*
+ * Бренды-хабы — BRAND_HUBS. LEGO 30 сентября 2026: главная — `/brand/lego`,
+ * а все 14 наборов лежат в «Конструкторах мальчикам», и связка повторяла
+ * страницу бренда под другим адресом.
+ */
+describe('decideBrandLanding: связка бренда-хаба', () => {
+  const tree = [
+    { id: 'constructors', parent_id: null, slug: 'constructors-root' },
+    { id: 'km', parent_id: 'constructors', slug: 'konstruktory-malchikam', name: 'Конструкторы мальчикам', seo_h1: 'Конструкторы для мальчиков' },
+    { id: 'kd', parent_id: 'constructors', slug: 'konstruktory-devochkam', name: 'Конструкторы девочкам', seo_h1: 'Конструкторы для девочек' },
+  ]
+  const onlyBoys = Array.from({ length: 14 }, () => ({ brand_id: 'lego', category_id: 'km' }))
+  const withGirls = [...onlyBoys, ...Array.from({ length: 3 }, () => ({ brand_id: 'lego', category_id: 'kd' }))]
+  const smoneo = Array.from({ length: 8 }, () => ({ brand_id: 'smoneo', category_id: 'km' }))
+
+  it('все товары бренда в одной связке — закрыта', () => {
+    const pairs = countProductsByCategoryBrand(onlyBoys, tree)
+    const total = countProductsByBrand(onlyBoys).get('lego')
+    expect(total).toBe(14)
+    expect(decideBrandLanding('km', 'lego', pairs, tree, 'LEGO', total))
+      .toEqual({ indexable: false, reason: 'same-as-brand' })
+  })
+
+  it('появились LEGO для девочек — обе связки открываются сами', () => {
+    const pairs = countProductsByCategoryBrand(withGirls, tree)
+    const total = countProductsByBrand(withGirls).get('lego')
+    expect(decideBrandLanding('km', 'lego', pairs, tree, 'LEGO', total)).toEqual({ indexable: true })
+    expect(decideBrandLanding('kd', 'lego', pairs, tree, 'LEGO', total)).toEqual({ indexable: true })
+  })
+
+  it('бренд не из BRAND_HUBS с тем же совпадением — открыт, как решено 21 сентября', () => {
+    const pairs = countProductsByCategoryBrand(smoneo, tree)
+    expect(decideBrandLanding('km', 'smoneo', pairs, tree, 'Smoneo', 8)).toEqual({ indexable: true })
+  })
+
+  it('без числа товаров бренда правило молчит', () => {
+    const pairs = countProductsByCategoryBrand(onlyBoys, tree)
+    expect(decideBrandLanding('km', 'lego', pairs, tree, 'LEGO')).toEqual({ indexable: true })
+    expect(decideBrandLanding('km', 'lego', pairs, tree, 'LEGO', null)).toEqual({ indexable: true })
+  })
+
+  it('имя бренда сравнивается без учёта регистра; товар без раздела не считается', () => {
+    expect(isBrandHub(' lego ')).toBe(true)
+    expect(isBrandHub('Sluban')).toBe(false)
+    expect(countProductsByBrand([{ brand_id: 'lego', category_id: null }, { brand_id: 'lego', category_id: 'km' }]).get('lego')).toBe(1)
   })
 })
 

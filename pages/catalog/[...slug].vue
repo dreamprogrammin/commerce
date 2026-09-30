@@ -37,6 +37,7 @@ import {
   buildBrandLandingPath,
   countProductsByCategoryBrand,
   decideBrandLanding,
+  isBrandHub,
   parseCatalogSlug,
 } from '@/utils/brandLanding'
 import {
@@ -153,16 +154,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('scroll', onWindowScroll)
 })
-
-function cleanDescription(html: string | null, maxLength = 200): string {
-  if (!html)
-    return ''
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, maxLength)
-}
 
 // --- 1.5. Brand Landing ---
 /*
@@ -476,16 +467,28 @@ const { data: brandLandingAll } = await useAsyncData(
       }
     }
 
-    const { data, error } = await supabase
-      .from('products')
-      .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, min_age_months, max_age_months, category_id, brand_id')
-      .eq('is_active', true)
-      .eq('brand_id', brandId)
-      .in('category_id', [...branch])
+    // У бренда-хаба (BRAND_HUBS) связка закрыта, если в ней ВСЕ его товары, —
+    // для этого нужно их общее число. Сбой счётчика — null, правило молчит.
+    const [{ data, error }, total] = await Promise.all([
+      supabase
+        .from('products')
+        .select('name, slug, price, final_price, stock_quantity, min_age_years, max_age_years, min_age_months, max_age_months, category_id, brand_id')
+        .eq('is_active', true)
+        .eq('brand_id', brandId)
+        .in('category_id', [...branch]),
+      isBrandHub(activeBrandSeo.value?.name)
+        ? supabase
+            .from('products')
+            .select('id', { count: 'exact', head: true })
+            .eq('is_active', true)
+            .eq('brand_id', brandId)
+            .not('category_id', 'is', null)
+        : null,
+    ])
     if (error)
       throw error
 
-    return { categoryId: root.id, brandId, products: data ?? [] }
+    return { categoryId: root.id, brandId, products: data ?? [], brandTotal: total?.count ?? null }
   },
   { watch: [currentCategorySlug, activeBrandSlug] },
 )
@@ -595,6 +598,7 @@ const brandLandingVerdict = computed(() => {
     counts,
     categoriesStore.allCategories,
     activeBrandName.value,
+    all.brandTotal,
   )
 })
 /** «9 моделей · от 7 490 до 18 890 ₸» — под H1 связки. */
@@ -2338,7 +2342,10 @@ const schemaData = computed(() => {
         '@type': 'Article',
         'headline': title.value,
         'image': SITE_OG_IMAGE_URL,
-        'articleBody': cleanDescription(seoText.value, 500),
+        // Абзацы и пункты без заголовков (`bodyExcerpt`): раньше заголовки
+        // шли в текст, теги снимались без пробела, а конец резался посреди
+        // слова (29 сентября 2026).
+        'articleBody': bodyExcerpt(seoText.value, 500),
         'author': {
           '@type': 'Organization',
           'name': 'Ухтышка',
@@ -2403,7 +2410,9 @@ const schemaData = computed(() => {
           'item': {
             '@type': 'Product',
             'name': product.name,
-            'description': cleanDescription(product.description) || product.name,
+            // Из запроса каталога описание приходит без вёрстки и уже
+            // обрезанным — недописанное слово снимает `dropBrokenTail`.
+            'description': dropBrokenTail(leadExcerpt(product.description, 200)) || product.name,
             'url': `https://uhti.kz/catalog/products/${product.slug}`,
             'sku': product.sku || product.id,
             // MPN — код модели производителя; id из базы им не является.
