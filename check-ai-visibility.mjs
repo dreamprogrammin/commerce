@@ -72,6 +72,9 @@ for (const ua of AGENTS) {
     ? `файл сборки ${asset} для Google ${!winner || winner.allow ? 'открыт' : `ЗАКРЫТ правилом Disallow: ${winner.path}`}`
     : 'на главной не нашлось файла /_nuxt — проверить нечего')
 
+  // Условия возврата — ссылкой из подвала каждой страницы (до 30 сентября 2026 не было)
+  check(home.includes('href="/returns"'), `ссылка на /returns на главной ${home.includes('href="/returns"') ? 'есть' : 'ОТСУТСТВУЕТ'}`)
+
   // Сайт на одном языке: hreflang на казахскую версию, которой нет, — неверный сигнал.
   const hreflangs = [...home.matchAll(/hreflang="([^"]+)"/g)].map(m => m[1])
   check(!hreflangs.includes('kk'), hreflangs.length ? `hreflang на главной: ${hreflangs.join(', ')}` : 'hreflang нет — сайт на одном языке')

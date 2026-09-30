@@ -174,6 +174,16 @@ const { data: popularProducts } = useAsyncData('footer-popular-products', async 
                 О магазине
               </NuxtLink>
             </li>
+            <!-- До 30 сентября 2026 на /returns не вело ни одной ссылки, кроме
+                 текста /terms, — условия возврата были не найти (аудит). -->
+            <li>
+              <NuxtLink
+                to="/returns"
+                class="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Возврат и обмен
+              </NuxtLink>
+            </li>
             <li>
               <NuxtLink
                 to="/privacy-policy"
