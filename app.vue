@@ -177,14 +177,15 @@ useHead({
     // Убираем query параметры для canonical URL (фильтры, utm-метки и т.д.)
     const canonicalPath = route.path
     const canonicalUrl = `${siteUrl}${canonicalPath}`
-    const currentPath = route.fullPath
-    const currentUrl = `${siteUrl}${currentPath}`
 
+    /*
+     * Без hreflang: сайт на одном языке. До 30 сентября 2026 здесь стояли
+     * `ru`, `kk` и `x-default` на ОДИН И ТОТ ЖЕ адрес — то есть разметка
+     * объявляла казахскую версию, которой нет. Нашёл аудит 30 сентября.
+     * Появится казахская версия со своими адресами — тогда и вернуть.
+     */
     return [
       { rel: 'canonical', href: canonicalUrl },
-      { rel: 'alternate', hreflang: 'ru', href: currentUrl },
-      { rel: 'alternate', hreflang: 'kk', href: currentUrl },
-      { rel: 'alternate', hreflang: 'x-default', href: currentUrl },
     ]
   },
   /*
