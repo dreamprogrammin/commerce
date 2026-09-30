@@ -63,8 +63,13 @@ function toggle(index: number) {
             class="bfq__icon"
           />
         </button>
+        <!--
+          v-show, не v-if: ответ обязан быть в серверной разметке. С v-if он
+          появлялся в HTML только после нажатия, и поисковик с ИИ видели одни
+          вопросы (аудит 30 сентября 2026).
+        -->
         <p
-          v-if="openIndex === index"
+          v-show="openIndex === index"
           :id="`bfq-panel-${row.id}`"
           class="bfq__answer"
         >
