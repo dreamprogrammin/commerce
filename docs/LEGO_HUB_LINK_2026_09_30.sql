@@ -25,10 +25,12 @@ SET seo_text = replace(
 WHERE id = '2df67fed-6f86-4121-bb4d-bae3d049cd38'
   AND md5(seo_text) = 'a6688bc6491709a9ba61d031922259c8';
 
--- Проверка: должно вернуть new_link = true, old_link = false
+-- Проверка: должно вернуть old_link = false, brand_links = 2, as_expected = true.
+-- (Одна ссылка на /brand/lego в тексте была и до правки — поэтому считаем их
+-- число, а не просто наличие.)
 SELECT slug,
-       position('href="/brand/lego"' in seo_text) > 0 AS new_link,
        position('konstruktory-malchikam/brand/lego' in seo_text) > 0 AS old_link,
+       (SELECT count(*) FROM regexp_matches(seo_text, 'href="/brand/lego"', 'g')) AS brand_links,
        md5(seo_text) = 'b5fc2fe7758dc5d0f9faf856bd630e90' AS as_expected
 FROM public.categories
 WHERE id = '2df67fed-6f86-4121-bb4d-bae3d049cd38';
