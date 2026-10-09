@@ -162,13 +162,14 @@ async function loadLineStats() {
   }
 }
 
-watchEffect(() => {
-  if (productLine.value && brand.value) {
-    filterState.loadProducts()
-    filterState.loadFilterData()
-    loadLineStats()
-  }
-})
+// Справочники фильтров и статистика — один раз в браузере; товары грузит сам
+// `useQuery`. Почему не `watchEffect` с `loadProducts()` — см. pages/brand/[slug].vue.
+watch(() => [brand.value?.id, productLine.value?.id] as const, ([brandId, lineId]) => {
+  if (!brandId || !lineId || import.meta.server)
+    return
+  filterState.loadFilterData()
+  loadLineStats()
+}, { immediate: true })
 
 // ─── 4. Breadcrumbs ─────────────────────────────────────────────────────────
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {

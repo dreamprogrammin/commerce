@@ -260,11 +260,6 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
     { immediate: true },
   )
 
-  // Обратная совместимость — вызывается из страниц, но теперь query сам обновляется
-  function loadProducts() {
-    query.refetch()
-  }
-
   // ── Load filter metadata ──
   async function loadFilterData() {
     await Promise.allSettled([
@@ -357,7 +352,6 @@ export function useBrandPageFilters(options: UseBrandPageFiltersOptions) {
     hideProductLines,
 
     // Methods
-    loadProducts,
     loadFilterData,
     resetFilters,
     toggleProductLine,

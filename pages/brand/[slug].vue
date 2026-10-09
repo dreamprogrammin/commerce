@@ -480,13 +480,24 @@ const { data: brandHasProducts } = await useAsyncData(
   { watch: [brand] },
 )
 
-watchEffect(() => {
-  if (brand.value) {
-    loadBrandStats()
-    filterState.loadProducts()
-    filterState.loadFilterData()
-  }
-})
+/*
+ * Статистика бренда и справочники фильтров — один раз в браузере, когда бренд
+ * известен (9 октября 2026).
+ *
+ * Был `watchEffect` с `filterState.loadProducts()` внутри. Он следил за всем,
+ * что синхронно читали вызываемые функции, и перезапускался при их изменении,
+ * а `loadProducts()` — это `query.refetch()` мимо свежести кеша. На
+ * `/brand/lego` все товары бренда (по 200 на страницу) запрашивались из
+ * браузера 4 раза подряд, статистика — 5, справочники — дважды; и ещё раз
+ * товары — на сервере при каждой пересборке. Товары грузит сам `useQuery` в
+ * `useBrandPageFilters`: посев с сервера, ключ — бренд и фильтры.
+ */
+watch(() => brand.value?.id, (id) => {
+  if (!id || import.meta.server)
+    return
+  loadBrandStats()
+  filterState.loadFilterData()
+}, { immediate: true })
 
 // Хлебные крошки
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
