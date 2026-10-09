@@ -91,7 +91,9 @@ const PAGES = [
       ['/brand/lego/lego-dc', 'LEGO DC'],
       ['/brand/sluban', 'Sluban'],
       ['/brand/cada', 'CaDA'],
-      [`${BOYS}/brand/lego`, 'конструкторы LEGO для мальчиков'],
+      // 30 сентября 2026 связка «Конструкторы мальчикам + LEGO» закрыта как
+      // дубль /brand/lego, и ссылка из текста ведёт на страницу бренда.
+      ['/brand/lego', 'конструкторы LEGO'],
     ],
   },
   {

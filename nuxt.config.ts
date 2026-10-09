@@ -123,6 +123,27 @@ const ROBOTS_PRIVATE_PATHS = [
  *
  * Массив — новый на каждый вызов: Nitro дописывает в него на месте.
  */
+/*
+ * Сроки кеша страниц ISR (9 октября 2026).
+ *
+ * Supabase предупредил: тариф Free, Egress 5,98 из 5 ГБ (120%), с 6 ноября
+ * проект ограничат, если превышение повторится. Замер: почти весь Egress —
+ * серверные пересборки страниц ISR (с 15 сентября ~2 100 в сутки при сотне
+ * живых визитов в неделю — роботы приходят, кеш истёк, страница собирается
+ * заново; одна сборка тянет из базы 40–220 КБ). Раздел пересобирался ~14 раз в
+ * сутки при сроке 30 минут, бренд ~10, карточка ~4, главная ~117 — подробно в
+ * docs/HANDOFF.md.
+ *
+ * Поэтому срок — сутки (главная и акции — час). Свежесть держит сброс по
+ * событию, а не срок: сохранение товара, раздела, бренда, серии, акции,
+ * баннера в админке, продажа в кассе и заказ на сайте сбрасывают кеш нужных
+ * страниц сразу (server/utils/isrRevalidate.ts), SQL владельца —
+ * `node revalidate.mjs`. Сбой базы в момент пересборки в кеш не ляжет: на
+ * сервере он даёт 503 (utils/ssrDbError.ts), и Vercel оставляет прежнюю копию.
+ */
+const ISR_DAY = 86400
+const ISR_HOUR = 3600
+
 function isrIgnoringQuery(expiration: number | false) {
   return { expiration, allowQuery: [] as string[] }
 }
@@ -587,7 +608,7 @@ export default defineNuxtConfig({
        * ни компоненты, которые она рендерит на сервере, к `route.query` не
        * обращаются.
        */
-      '/': { isr: isrIgnoringQuery(600) },
+      '/': { isr: isrIgnoringQuery(ISR_HOUR) },
       /*
        * Кеш страниц категорий. Включён после того, как бренд-лендинги
        * переехали с `?brand=` на путь `/catalog/<категория>/brand/<бренд>`.
@@ -649,7 +670,7 @@ export default defineNuxtConfig({
        * правильно даже когда выдача нефильтрованная — глазами не видно, на
        * этом уже ошибались.
        */
-      '/catalog/**': { isr: isrIgnoringQuery(1800) },
+      '/catalog/**': { isr: isrIgnoringQuery(ISR_DAY) },
       // Было `swr: 1800` — пресет и его превращает в «до следующей выкатки»
       '/catalog': { isr: isrIgnoringQuery(false) },
       /*
@@ -686,14 +707,25 @@ export default defineNuxtConfig({
        * выкатки и сам не обновляется, а тут список товаров, куда приходят
        * новинки и откуда уходит распроданное.
        */
-      '/brand/**': { isr: isrIgnoringQuery(1800) },
+      '/brand/**': { isr: isrIgnoringQuery(ISR_DAY) },
       /*
        * `/about` с 15 сентября 2026 считает факты по базе (число товаров,
        * бренды, разделы), а меняются они редко — час кеша здесь ничего не
        * портит и снимает три запроса с каждого захода. Параметров страница
        * не читает, персонального не рисует.
        */
-      '/about': { isr: isrIgnoringQuery(3600) },
+      '/about': { isr: isrIgnoringQuery(ISR_DAY) },
+      /*
+       * До 9 октября 2026 эти страницы собирались на КАЖДЫЙ заход: правила
+       * не было вовсе. Параметров адреса и персонального они не читают
+       * (проверено по `pages/brands/index.vue`, `returns.vue`, `terms.vue`,
+       * `privacy-policy.vue`, `promo/[slug].vue`). Акции — час: у них сроки.
+       */
+      '/brands': { isr: isrIgnoringQuery(ISR_DAY) },
+      '/returns': { isr: isrIgnoringQuery(ISR_DAY) },
+      '/terms': { isr: isrIgnoringQuery(ISR_DAY) },
+      '/privacy-policy': { isr: isrIgnoringQuery(ISR_DAY) },
+      '/promo/**': { isr: isrIgnoringQuery(ISR_HOUR) },
       /*
        * Карточка товара — `isr`, как главная, каталог и бренды. Было
        * `swr: 3600` плюс явный `Cache-Control`, и это давало две беды разом.
@@ -716,7 +748,7 @@ export default defineNuxtConfig({
        * сортировку в каталоге, здесь не мешает: карточка `route.query` не
        * читает.
        */
-      '/catalog/products/**': { isr: isrIgnoringQuery(3600) },
+      '/catalog/products/**': { isr: isrIgnoringQuery(ISR_DAY) },
       // Корзина и оформление рисуются только на клиенте.
       //
       // Их состояние живёт в localStorage (cartStore персистится под ключом

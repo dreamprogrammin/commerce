@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { LocationQuery, LocationQueryValue } from 'vue-router'
+import type { CategoryStaticContent } from '@/constants/categoryStaticText'
 import type {
   AttributeFilter,
   AttributeWithValue,
@@ -50,11 +51,12 @@ import {
   prependBrandLandingFacts,
 } from '@/utils/brandLandingText'
 import { isWholeRange } from '@/utils/catalogFilterRange'
-import { categoryFactsFromRows, insertAfterFirstParagraph, topBrandNames } from '@/utils/categoryFacts'
+import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph, topBrandNames } from '@/utils/categoryFacts'
 import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
+import { failSsrOnDbError } from '@/utils/ssrDbError'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
 // DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
@@ -408,23 +410,27 @@ const activeBrand = computed(() => {
  * `activeFilters.brandIds` тот же самый id, и `catalogFilters` останется
  * прежним — ни повторной выборки, ни рассинхрона гидратации.
  */
-const { data: activeBrandSeo } = await useAsyncData(
+const { data: activeBrandSeo, error: activeBrandSeoError } = await useAsyncData(
   () => `brand-seo-${activeBrandSlug.value ?? 'none'}`,
   async () => {
     const slug = activeBrandSlug.value
     if (!slug)
       return null
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('brands')
       .select('id, name')
       .eq('slug', slug)
       .maybeSingle()
+    // Сбой запроса — не «бренда нет»: иначе ниже 404 лёг бы в кеш ISR
+    if (error)
+      throw error
 
     return (data as { id: string, name: string | null } | null) ?? null
   },
   { watch: [activeBrandSlug] },
 )
+failSsrOnDbError(activeBrandSeoError.value, 'бренд')
 
 const activeBrandSeoName = computed(() => activeBrandSeo.value?.name ?? null)
 
@@ -1574,10 +1580,17 @@ const categoryProductsCount = computed(() => categoryFacts.value?.count ?? null)
  * 9. Связку узнаём по адресу, а не по `activeBrand`: тот пуст, пока не
  * загружен список брендов.
  */
+/*
+ * У разделов без своей настройки в `categoryStaticText.ts` — общий абзац
+ * «Сейчас в разделе N моделей от … до … ₸» без вопросов. Аудит 30 сентября
+ * 2026 («ИИ-поиск»): цифры для цитаты были только в мета-описании, а абзац —
+ * у пяти разделов из 53 с текстом.
+ */
+const DEFAULT_LIVE: NonNullable<CategoryStaticContent['live']> = { paragraph: f => composeCategoryFactsParagraph(f) }
 const categoryLive = computed(() => {
-  const live = categoryStatic.value?.live
+  const live = categoryStatic.value?.live ?? DEFAULT_LIVE
   const facts = categoryFacts.value
-  return live && facts && !activeBrandSlug.value ? { live, facts } : null
+  return facts && !activeBrandSlug.value ? { live, facts } : null
 })
 const categoryFactsParagraph = computed(() =>
   categoryLive.value?.live.paragraph?.(categoryLive.value.facts) ?? null,
@@ -1952,6 +1965,12 @@ const [{ data: _categoriesData }, { data: _filterPayload }] = await Promise.all(
  * `all` — не категория, а весь каталог: и `/catalog`, и `/catalog/all`
  * приходят сюда именно с этим слагом.
  */
+/*
+ * Пустой список на сервере — сбой загрузки (см. выше), а не «категорий нет»:
+ * 503, чтобы недособранная страница не легла в кеш ISR (utils/ssrDbError.ts).
+ */
+failSsrOnDbError(categoriesStore.allCategories.length === 0, 'разделы')
+
 if (
   currentCategorySlug.value !== 'all'
   && categoriesStore.allCategories.length > 0

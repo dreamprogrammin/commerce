@@ -133,7 +133,9 @@ const { data: accessories, isLoading: accessoriesLoading } = useQuery({
       return []
     return await productsStore.fetchProductsByIds(product.value.accessory_ids)
   },
-  enabled: computed(() => !!product.value?.accessory_ids?.length),
+  // Только в браузере: блок под <ClientOnly>, а на сервере запрос уходил
+  // впустую — и тратил трафик Supabase на каждой пересборке (9 октября 2026)
+  enabled: computed(() => import.meta.client && !!product.value?.accessory_ids?.length),
   staleTime: 10 * 60 * 1000,
   gcTime: 30 * 60 * 1000,
 })
@@ -148,7 +150,9 @@ const { data: similarProducts, isLoading: similarProductsLoading } = useQuery({
       ...(product.value.accessory_ids || []),
     ])
   },
-  enabled: computed(() => !!product.value?.category_id),
+  // Только в браузере — см. выше у аксессуаров: на сервере это был самый
+  // тяжёлый запрос пересборки карточки (до 115 КБ)
+  enabled: computed(() => import.meta.client && !!product.value?.category_id),
   staleTime: 15 * 60 * 1000,
   gcTime: 30 * 60 * 1000,
 })

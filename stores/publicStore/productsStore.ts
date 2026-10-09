@@ -680,6 +680,10 @@ export const useProductsStore = defineStore('productsStore', () => {
       return { products: trimmed, hasMore }
     }
     catch (error: any) {
+      // На сервере — наверх: пустая сетка с 200 легла бы в кеш ISR на весь
+      // срок (utils/ssrDbError.ts). Вызывающий превращает ошибку в 503.
+      if (import.meta.server)
+        throw error
       toast.error('Ошибка при загрузке товаров', {
         description: error.message,
       })
@@ -836,25 +840,34 @@ export const useProductsStore = defineStore('productsStore', () => {
     }
 
     try {
-      let query = supabase
+      /*
+       * Только то, что рисует плитка (9 октября 2026). Было `*` — все 62
+       * столбца товара с описаниями и SEO-текстами — и все картинки с
+       * размытыми превью (~1,8 КБ каждое) по ВСЕМУ разделу: у LEGO 115 КБ
+       * сжатых данных на один показ карточки, а страница берёт 12 товаров.
+       * Адреса картинок нужны все (плитка листает галерею), превью — только
+       * у первой (`cover`): остальные слайды грузятся при пролистывании.
+       */
+      const { data, error } = await supabase
         .from('products')
-        .select('*, product_images(*)')
+        .select('id, name, slug, price, final_price, discount_percentage, stock_quantity, bonus_points_award, is_new, avg_rating, review_count, brand_id, category_id, product_images(id, image_url, display_order), cover:product_images(blur_placeholder)')
         .eq('category_id', categoryId)
         .eq('is_active', true)
         .not('id', 'in', `(${excludeIds.join(',')})`)
-        .order('display_order', {
-          referencedTable: 'product_images',
-          ascending: true,
-        })
-
-      if (limit && limit > 0) {
-        query = query.limit(limit)
-      }
-      const { data, error } = await query
+        .order('display_order', { referencedTable: 'product_images', ascending: true })
+        .order('display_order', { referencedTable: 'cover', ascending: true })
+        .limit(1, { referencedTable: 'cover' })
+        .limit(limit && limit > 0 ? limit : 12)
       if (error)
         throw error
 
-      return data || []
+      return (data ?? []).map(({ cover, product_images, ...product }) => ({
+        ...product,
+        product_images: (product_images ?? []).map((image, index) => ({
+          ...image,
+          blur_placeholder: index === 0 ? (cover?.[0]?.blur_placeholder ?? null) : null,
+        })),
+      })) as unknown as AccessoryProduct[]
     }
     catch (error: any) {
       toast.error('Ошибка при загрузке похожих товаров', {

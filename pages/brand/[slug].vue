@@ -17,8 +17,10 @@ import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { brandHeadingWord } from '@/utils/brandHeading'
 import { composeBrandMeta, composeEmptyBrandMeta } from '@/utils/brandMeta'
+import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph } from '@/utils/categoryFacts'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
+import { failSsrOnDbError } from '@/utils/ssrDbError'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
 
@@ -37,7 +39,7 @@ function getProductSku(product: { sku?: string | null, id: string }): string {
 }
 
 // 1. Умная загрузка информации о бренде
-const { data: brand, pending: brandPending } = await useAsyncData(
+const { data: brand, pending: brandPending, error: brandError } = await useAsyncData(
   `brand-${brandSlug}`,
   /*
    * Один бренд по адресу, а не все. Раньше страница звала
@@ -52,11 +54,13 @@ const { data: brand, pending: brandPending } = await useAsyncData(
       .select('*')
       .eq('slug', brandSlug)
       .maybeSingle()
+    // Сбой запроса — не «бренда нет»: иначе 404 лёг бы в кеш ISR
     if (error)
-      console.error('Не удалось загрузить бренд:', error)
+      throw error
     return data ?? null
   },
 )
+failSsrOnDbError(brandError.value, 'бренд')
 
 // 🔥 301 редирект для несуществующих брендов (защита SEO)
 if (!brand.value && !brandPending.value) {
@@ -376,7 +380,7 @@ const { data: brandMetaProducts } = await useAsyncData(
       return []
     const { data, error } = await supabase
       .from('products')
-      .select('price, final_price, stock_quantity, product_lines(name)')
+      .select('price, final_price, stock_quantity, min_age_months, product_lines(name)')
       .eq('brand_id', brand.value.id)
       .eq('is_active', true)
     if (error) {
@@ -387,6 +391,7 @@ const { data: brandMetaProducts } = await useAsyncData(
       price: p.price,
       final_price: p.final_price,
       stock_quantity: p.stock_quantity,
+      min_age_months: p.min_age_months ?? null,
       lineName: p.product_lines?.name ?? null,
     }))
   },
@@ -475,13 +480,24 @@ const { data: brandHasProducts } = await useAsyncData(
   { watch: [brand] },
 )
 
-watchEffect(() => {
-  if (brand.value) {
-    loadBrandStats()
-    filterState.loadProducts()
-    filterState.loadFilterData()
-  }
-})
+/*
+ * Статистика бренда и справочники фильтров — один раз в браузере, когда бренд
+ * известен (9 октября 2026).
+ *
+ * Был `watchEffect` с `filterState.loadProducts()` внутри. Он следил за всем,
+ * что синхронно читали вызываемые функции, и перезапускался при их изменении,
+ * а `loadProducts()` — это `query.refetch()` мимо свежести кеша. На
+ * `/brand/lego` все товары бренда (по 200 на страницу) запрашивались из
+ * браузера 4 раза подряд, статистика — 5, справочники — дважды; и ещё раз
+ * товары — на сервере при каждой пересборке. Товары грузит сам `useQuery` в
+ * `useBrandPageFilters`: посев с сервера, ключ — бренд и фильтры.
+ */
+watch(() => brand.value?.id, (id) => {
+  if (!id || import.meta.server)
+    return
+  loadBrandStats()
+  filterState.loadFilterData()
+}, { immediate: true })
 
 // Хлебные крошки
 const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
@@ -605,6 +621,33 @@ const metaKeywords = computed(() => {
 const ogImageSrc = computed(
   () => brandLogoUrl.value || SITE_OG_IMAGE_URL,
 )
+
+/*
+ * Цифры бренда словами — «Сейчас в Ухтышке 8 моделей ZURU от 7 390 до
+ * 25 390 ₸, все в наличии. Все — для детей с 3 лет.» — в текст «О бренде»
+ * сразу за первым абзацем. Аудит 30 сентября 2026 («ИИ-поиск»): цифры для
+ * цитаты были только в мета-описании. Товаров нет — абзаца нет. Меняется
+ * только текст для шаблона: `Brand.description` в разметке по-прежнему
+ * первый абзац о бренде.
+ */
+const brandFactsParagraph = computed(() => {
+  if (!brand.value || !brandMetaProducts.value?.length)
+    return null
+  const facts = categoryFactsFromRows(brandMetaProducts.value.map(p => ({
+    brand_id: brand.value!.id,
+    price: p.price,
+    final_price: p.final_price,
+    stock_quantity: p.stock_quantity,
+    min_age_months: p.min_age_months,
+  })))
+  return composeCategoryFactsParagraph(facts, { where: 'в Ухтышке', subject: brand.value.name })
+})
+const brandForTemplate = computed(() => {
+  const b = brand.value
+  if (!b?.description || !brandFactsParagraph.value)
+    return b
+  return { ...b, description: insertAfterFirstParagraph(b.description, brandFactsParagraph.value) }
+})
 
 /**
  * Текст «О бренде» простой строкой — для JSON-LD.
@@ -984,7 +1027,7 @@ useIndexableRobotsRule(
     <!-- Стандартный шаблон -->
     <div v-else :class="`${containerClass} py-4 md:py-8`">
       <BrandStandardTemplate
-        :brand="brand"
+        :brand="brandForTemplate"
         :product-lines="brandProductLines"
         :breadcrumbs="breadcrumbs"
         :filter-state="filterState"
