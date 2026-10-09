@@ -27,6 +27,30 @@ organization remains over quota» (тариф Free; ограничение = 402
 картинки в `get_filtered_products`. Журнал Supabase (`/analytics/endpoints/logs`)
 на 9.10 отвечает «Backend error» даже на `SELECT 1`.
 
+**9 октября — сброс кеша ISR везде, где меняются данные — КОД В DEV (`feat/isr-revalidation-coverage`).**
+Готовит суточный кеш страниц. Сервер: `server/utils/isrRevalidate.ts` (чистые
+`productPages`, `pathsForRequest`, `sanitizePaths`, `uuidList`, `withPayloads`;
+`loadRevalidateData` — из базы ровно нужное; `revalidateOnVercel` — не больше 6
+запросов разом), `server/utils/runRevalidation.ts`. Маршруты:
+`/api/admin/revalidate` (только админ; `productIds`, `categoryIds`, `brandIds`,
+`lineIds`, `campaignIds`, `paths`, `scope:'catalog'`), прежний
+`/api/admin/revalidate-product` — через то же, и **публичный
+`/api/revalidate-order`** (`{orderId}`; заказ не старше 15 мин, иначе «skipped»;
+повтор по тому же заказу на экземпляре — пропуск; сбрасывает страницы его
+товаров). Страницы товара теперь: карточка, разделы цепочки, связки «раздел +
+бренд» на некорневых разделах, бренд, серия, главная — каждая с `_payload.json`.
+Вызовы: корзина после заказа (`/api/revalidate-order`), касса (`completeSale`),
+бренды, серии, оба сохранения разделов (`scope:'catalog'`, 124 страницы),
+акции (создание — товары, завершение — по `campaignIds`), баннеры (`/`).
+Ручной сброс после SQL владельца: **`node revalidate.mjs /brand/mermaze …`**
+или `--all` (~300 адресов ≈ 50 МБ трафика Supabase). **Проверено:** тесты
+`isrRevalidate` 14 (новые на прежней версии красные); стенд с боевой базой
+(чтение): админские — 401 без входа, `revalidate-order` — 400 / 404 / «старше
+15 минут» на настоящих старых заказах; сбор адресов на боевых данных — товар 9
+страниц (с двумя связками и серией), бренд LEGO + 7 серий, акция → 2 товара → 9
+страниц, дерево — 124. **Не проверено:** вызовы из админки целиком (сохранение =
+запись в бой) и сам сброс на Vercel до выкатки — проверять на `dev.uhti.kz`.
+
 **9 октября — сбой базы при серверной сборке больше не ложится в кеш ISR (503) — КОД В DEV (`fix/ssr-db-errors-503`).**
 Было: `fetchProducts` глушил ошибку → раздел/бренд/серия собирались с пустой
 сеткой и 200; запрос бренда (страница бренда, серия, связка) и серии при ошибке

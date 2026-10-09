@@ -161,6 +161,8 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
 
       toast.success(`Бренд "${newBrand.name}" успешно создан.`)
       await fetchBrands()
+      // Кеш страниц суточный: страница бренда и список брендов — сразу
+      revalidatePages({ brandIds: [newBrand.id], paths: ['/brands'] })
 
       // 🔍 SEO: Уведомляем поисковики о новом бренде
       if (newBrand.slug) {
@@ -203,6 +205,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
 
       toast.success(`Бренд "${brandData.name}" успешно обновлен.`)
       await fetchBrands() // Обновляем список
+      revalidatePages({ brandIds: [id], paths: ['/brands'] })
 
       // 🔍 SEO: Уведомляем поисковики об обновлённом бренде
       if (brandData.slug) {
@@ -232,6 +235,7 @@ export const useAdminBrandsStore = defineStore('adminBrandsStore', () => {
         throw error
 
       toast.success(`Бренд "${brandToDelete.name}" удален.`)
+      revalidatePages({ paths: [...(brandToDelete.slug ? [`/brand/${brandToDelete.slug}`] : []), '/brands'] })
       // Обновляем локальное состояние
       brands.value = brands.value.filter(b => b.id !== brandToDelete.id)
     }

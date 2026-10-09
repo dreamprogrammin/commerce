@@ -53,11 +53,14 @@ export function useAdminBanners() {
     }
     else {
       toast.success('Баннер удален')
+      revalidatePages({ paths: ['/'] })
       refresh()
     }
   }
 
   function handleFormSaved() {
+    // Баннеры показываются только на главной (components/home/Banners.vue)
+    revalidatePages({ paths: ['/'] })
     refresh()
   }
 
