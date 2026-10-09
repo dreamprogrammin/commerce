@@ -127,6 +127,7 @@ export const useAdminPromotionsStore = defineStore('adminPromotionsStore', () =>
         throw error
 
       toast.success('Акция создана! Скидки применены к товарам.')
+      revalidatePages({ productIds: data.productIds })
       await fetchCampaigns()
       return campaignId as string
     }
@@ -152,6 +153,7 @@ export const useAdminPromotionsStore = defineStore('adminPromotionsStore', () =>
         throw error
 
       toast.success('Акция завершена. Скидки восстановлены.')
+      revalidatePages({ campaignIds: [campaignId] })
       await fetchCampaigns()
       return true
     }

@@ -222,6 +222,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
 
       const result = data as OfflineSaleResult
       lastSaleResult.value = result
+      // Остаток проданных товаров — на сайте сразу (кеш страниц суточный)
+      revalidatePages({ productIds: cartItems.map(item => item.product_id) })
 
       // Сбрасываем корзину и клиента после успешной продажи
       clearCart()

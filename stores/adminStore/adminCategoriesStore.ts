@@ -236,6 +236,8 @@ export const useAdminCategoriesStore = defineStore('adminCategoriesStore', () =>
     catch (e) {
       console.warn('Не удалось сбросить кеш категорий:', e)
     }
+    // Страницы сайта в кеше на сутки: разделы, бренды, главная, /catalog — заново
+    revalidatePages({ scope: 'catalog' })
   }
 
   async function saveChanges(tree: EditableCategory[]) {

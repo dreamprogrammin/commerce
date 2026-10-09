@@ -714,6 +714,10 @@ export const useCartStore = defineStore(
           total.value,
         )
 
+        // Остаток на карточках проданных товаров — сразу, а не через сутки
+        // кеша страниц (server/api/revalidate-order.post.ts). В фоне.
+        $fetch('/api/revalidate-order', { method: 'POST', body: { orderId } }).catch(() => {})
+
         // ✅ Очищаем корзину ТОЛЬКО для авторизованных пользователей
         // Для гостей сохраняем корзину в localStorage, чтобы не пришлось заново набирать
         if (user.value) {

@@ -187,6 +187,8 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
         throw error
 
       toast.success(`Линейка "${newLine.name}" успешно создана.`)
+      // Кеш страниц суточный: серия и страница её бренда — сразу
+      revalidatePages({ lineIds: [newLine.id] })
       await fetchProductLines()
 
       if (newLine.slug) {
@@ -245,6 +247,7 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
 
       toast.success(`Линейка "${lineData.name}" успешно обновлена.`)
       await fetchProductLines()
+      revalidatePages({ lineIds: [id] })
 
       if (lineData.slug) {
         notifySearchEngines(lineData.slug)
@@ -280,6 +283,8 @@ export const useAdminProductLinesStore = defineStore('adminProductLinesStore', (
 
       toast.success(`Линейка "${line.name}" удалена.`)
       productLines.value = productLines.value.filter(l => l.id !== line.id)
+      // Строки серии уже нет — бренд перечисляет оставшиеся серии
+      revalidatePages({ brandIds: line.brand_id ? [line.brand_id] : [] })
 
       return true
     }
