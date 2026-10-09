@@ -27,6 +27,18 @@ organization remains over quota» (тариф Free; ограничение = 402
 картинки в `get_filtered_products`. Журнал Supabase (`/analytics/endpoints/logs`)
 на 9.10 отвечает «Backend error» даже на `SELECT 1`.
 
+**9 октября — «похожие» и «аксессуары» на карточке — КОД В DEV (`perf/similar-products-slim`).**
+Оба запроса — `useQuery` для блоков под `<ClientOnly>`, но выполнялись и на
+сервере впустую: «похожие» (`products?select=*,product_images(*)` по всему
+разделу) — самый тяжёлый запрос пересборки карточки, до 115 КБ. Теперь
+`enabled` — только в браузере; `fetchSimilarProducts` берёт 13 полей плитки
+(было 62), не больше 12 товаров, адреса всех картинок и `blur_placeholder` только
+у первой (`cover:product_images(...)` с `limit 1`). Замер через прокси —
+серверная сборка карточки: LEGO 76290 126 → 12 КБ, робот-собака 50 → 12 КБ;
+ответ «похожих» в браузере 41 КБ без сжатия (было 115 КБ сжатыми). Браузер:
+12 плиток, картинки и превью на месте, ошибок 0 (скриншот 390 px). vitest —
+40 старых. `vue-tsc` не запускался.
+
 **9 октября — кеш страниц на сутки — КОД В DEV (`perf/isr-daily-cache`).**
 `nuxt.config.ts`: `ISR_DAY`/`ISR_HOUR` с обоснованием. Сутки: `/catalog/**`,
 `/brand/**`, `/catalog/products/**`, `/about` и впервые `/brands`, `/returns`,
