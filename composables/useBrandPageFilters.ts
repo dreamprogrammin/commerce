@@ -8,6 +8,7 @@ import type {
 } from '@/types'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { failSsrOnDbError } from '@/utils/ssrDbError'
 
 export type BrandPageContext = 'brand' | 'line'
 
@@ -80,7 +81,7 @@ export async function useBrandPageSsrProducts(
   const productsStore = useProductsStore()
   const lineId = productLineId?.value
 
-  const { data } = await useAsyncData(
+  const { data, error } = await useAsyncData(
     `ssr-brand-products-${brandId.value}-${lineId ?? 'all'}`,
     async () => {
       const result = await productsStore.fetchProducts(
@@ -105,6 +106,7 @@ export async function useBrandPageSsrProducts(
     },
     { server: true },
   )
+  failSsrOnDbError(error.value, 'товары бренда')
 
   return data.value ?? null
 }

@@ -1,6 +1,7 @@
 import type { IProductFilters, ProductWithGallery } from '@/types'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
+import { failSsrOnDbError } from '@/utils/ssrDbError'
 
 export interface CatalogPage {
   products: ProductWithGallery[]
@@ -77,11 +78,12 @@ export async function useCatalogSsrData(
   const productStore = useProductsStore()
   const ssrKey = `ssr-catalog-${JSON.stringify(buildQueryKey(filters, currentPage))}`
 
-  const { data } = await useAsyncData(
+  const { data, error } = await useAsyncData(
     ssrKey,
     () => productStore.fetchProducts(unref(filters), unref(currentPage), pageSize),
     { server: true },
   )
+  failSsrOnDbError(error.value, 'каталог')
 
   return data.value ?? null
 }

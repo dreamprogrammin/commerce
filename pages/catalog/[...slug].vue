@@ -56,6 +56,7 @@ import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLa
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
+import { failSsrOnDbError } from '@/utils/ssrDbError'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
 // DynamicFilters: 28KB + MobileCatalogDrawer — основные виновники
@@ -409,23 +410,27 @@ const activeBrand = computed(() => {
  * `activeFilters.brandIds` тот же самый id, и `catalogFilters` останется
  * прежним — ни повторной выборки, ни рассинхрона гидратации.
  */
-const { data: activeBrandSeo } = await useAsyncData(
+const { data: activeBrandSeo, error: activeBrandSeoError } = await useAsyncData(
   () => `brand-seo-${activeBrandSlug.value ?? 'none'}`,
   async () => {
     const slug = activeBrandSlug.value
     if (!slug)
       return null
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('brands')
       .select('id, name')
       .eq('slug', slug)
       .maybeSingle()
+    // Сбой запроса — не «бренда нет»: иначе ниже 404 лёг бы в кеш ISR
+    if (error)
+      throw error
 
     return (data as { id: string, name: string | null } | null) ?? null
   },
   { watch: [activeBrandSlug] },
 )
+failSsrOnDbError(activeBrandSeoError.value, 'бренд')
 
 const activeBrandSeoName = computed(() => activeBrandSeo.value?.name ?? null)
 
@@ -1960,6 +1965,12 @@ const [{ data: _categoriesData }, { data: _filterPayload }] = await Promise.all(
  * `all` — не категория, а весь каталог: и `/catalog`, и `/catalog/all`
  * приходят сюда именно с этим слагом.
  */
+/*
+ * Пустой список на сервере — сбой загрузки (см. выше), а не «категорий нет»:
+ * 503, чтобы недособранная страница не легла в кеш ISR (utils/ssrDbError.ts).
+ */
+failSsrOnDbError(categoriesStore.allCategories.length === 0, 'разделы')
+
 if (
   currentCategorySlug.value !== 'all'
   && categoriesStore.allCategories.length > 0

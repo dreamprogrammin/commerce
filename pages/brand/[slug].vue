@@ -20,6 +20,7 @@ import { composeBrandMeta, composeEmptyBrandMeta } from '@/utils/brandMeta'
 import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph } from '@/utils/categoryFacts'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
+import { failSsrOnDbError } from '@/utils/ssrDbError'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
 
@@ -38,7 +39,7 @@ function getProductSku(product: { sku?: string | null, id: string }): string {
 }
 
 // 1. Умная загрузка информации о бренде
-const { data: brand, pending: brandPending } = await useAsyncData(
+const { data: brand, pending: brandPending, error: brandError } = await useAsyncData(
   `brand-${brandSlug}`,
   /*
    * Один бренд по адресу, а не все. Раньше страница звала
@@ -53,11 +54,13 @@ const { data: brand, pending: brandPending } = await useAsyncData(
       .select('*')
       .eq('slug', brandSlug)
       .maybeSingle()
+    // Сбой запроса — не «бренда нет»: иначе 404 лёг бы в кеш ISR
     if (error)
-      console.error('Не удалось загрузить бренд:', error)
+      throw error
     return data ?? null
   },
 )
+failSsrOnDbError(brandError.value, 'бренд')
 
 // 🔥 301 редирект для несуществующих брендов (защита SEO)
 if (!brand.value && !brandPending.value) {
