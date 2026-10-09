@@ -61,7 +61,8 @@ export function withPayloads(pages: readonly string[]): string[] {
 /**
  * Страницы, где виден товар: карточка, его раздел и все разделы выше (списки
  * показывают товары подразделов), связки «раздел + бренд» на этих разделах
- * (кроме корневых), страница бренда и серии, главная (хиты, новинки).
+ * (кроме корневых), страница бренда и серии, главная (хиты, новинки), списки
+ * новинок и акций (`/catalog/new`, `/catalog/promotions` — тоже суточный кеш).
  */
 export function productPages(target: RevalidateTarget, categories: readonly RevalidateCategory[]): string[] {
   const byId = new Map(categories.map(c => [c.id, c]))
@@ -81,7 +82,7 @@ export function productPages(target: RevalidateTarget, categories: readonly Reva
     if (target.lineSlug)
       pages.push(`/brand/${target.brandSlug}/${target.lineSlug}`)
   }
-  pages.push('/')
+  pages.push('/catalog/new', '/catalog/promotions', '/')
   return pages
 }
 
@@ -185,7 +186,7 @@ export function pathsForRequest(req: RevalidateRequest, data: RevalidateData): s
       if (slug && l.slug)
         pages.push(`/brand/${slug}/${l.slug}`)
     }
-    pages.push('/', '/catalog', '/brands')
+    pages.push('/', '/catalog', '/catalog/new', '/catalog/promotions', '/brands')
   }
 
   pages.push(...sanitizePaths(req.paths))

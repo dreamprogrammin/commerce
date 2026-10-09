@@ -27,6 +27,19 @@ organization remains over quota» (тариф Free; ограничение = 402
 картинки в `get_filtered_products`. Журнал Supabase (`/analytics/endpoints/logs`)
 на 9.10 отвечает «Backend error» даже на `SELECT 1`.
 
+**9 октября — кеш страниц на сутки — КОД В DEV (`perf/isr-daily-cache`).**
+`nuxt.config.ts`: `ISR_DAY`/`ISR_HOUR` с обоснованием. Сутки: `/catalog/**`,
+`/brand/**`, `/catalog/products/**`, `/about` и впервые `/brands`, `/returns`,
+`/terms`, `/privacy-policy` (до этого собирались на каждый заход, параметров и
+персонального не читают). Час: главная (было 10 мин), `/promo/**`. `/catalog` —
+как был (`false`). Сброс страниц товара теперь включает `/catalog/new` и
+`/catalog/promotions`, дерево разделов — тоже. Проверено сборкой пресетом
+vercel: сроки во всех `*.prerender-config.json` (у `/_payload.json` главной
+конфиг локально не создаётся — тот же известный EACCES на symlink). Ожидание по
+замеру: сборок в сутки ~2 100 → ~300–500 (разделы ~920 → ≤~130, бренды ~420 →
+≤~100, карточки ~660 → ≤~180, главная ~117 → ≤24). **Проверить после выкатки:**
+Egress в панели Supabase через 3–5 дней; `usage.api-counts` — REST в сутки.
+
 **9 октября — сброс кеша ISR везде, где меняются данные — КОД В DEV (`feat/isr-revalidation-coverage`).**
 Готовит суточный кеш страниц. Сервер: `server/utils/isrRevalidate.ts` (чистые
 `productPages`, `pathsForRequest`, `sanitizePaths`, `uuidList`, `withPayloads`;

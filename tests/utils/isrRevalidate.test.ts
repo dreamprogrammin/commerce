@@ -34,6 +34,10 @@ describe('revalidationPaths', () => {
       '/catalog/boys/_payload.json',
       '/brand/mokatoys',
       '/brand/mokatoys/_payload.json',
+      '/catalog/new',
+      '/catalog/new/_payload.json',
+      '/catalog/promotions',
+      '/catalog/promotions/_payload.json',
       '/',
       '/_payload.json',
     ])
@@ -48,12 +52,12 @@ describe('revalidationPaths', () => {
     expect(revalidationPaths({ productSlug: 'batareyka', categoryId: 'nohref' }, categories))
       .toContain('/catalog/accessories/_payload.json')
     expect(revalidationPaths({ productSlug: 'x' }, categories))
-      .toEqual(['/catalog/products/x', '/catalog/products/x/_payload.json', '/', '/_payload.json'])
+      .toEqual(['/catalog/products/x', '/catalog/products/x/_payload.json', '/catalog/new', '/catalog/new/_payload.json', '/catalog/promotions', '/catalog/promotions/_payload.json', '/', '/_payload.json'])
   })
 
   it('петля parent_id в данных не зацикливает', () => {
     const loop = [{ id: 'a', parent_id: 'b', slug: 'a', href: '/catalog/a' }, { id: 'b', parent_id: 'a', slug: 'b', href: '/catalog/b' }]
-    expect(revalidationPaths({ productSlug: 'x', categoryId: 'a' }, loop).filter(p => p.startsWith('/catalog/') && !p.includes('products'))).toHaveLength(4)
+    expect(revalidationPaths({ productSlug: 'x', categoryId: 'a' }, loop).filter(p => /^\/catalog\/[ab]\b/.test(p))).toHaveLength(4)
   })
 })
 
@@ -122,7 +126,7 @@ describe('pathsForRequest', () => {
 
   it('дерево разделов — все разделы, бренды, серии, главная, /catalog и /brands', () => {
     const paths = pathsForRequest({ scope: 'catalog' }, data)
-    for (const p of ['/catalog/accessories', '/brand/mokatoys', '/brand/lego/lego-dc', '/', '/catalog', '/brands'])
+    for (const p of ['/catalog/accessories', '/brand/mokatoys', '/brand/lego/lego-dc', '/', '/catalog', '/catalog/new', '/catalog/promotions', '/brands'])
       expect(paths).toContain(p)
   })
 
