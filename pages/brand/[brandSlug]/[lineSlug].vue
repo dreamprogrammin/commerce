@@ -22,6 +22,7 @@ import {
 } from '@/constants'
 import { carouselContainerVariants } from '@/lib/variants'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
+import { failSsrOnDbError, isRowNotFound } from '@/utils/ssrDbError'
 
 const route = useRoute()
 const supabase = useSupabaseClient()
@@ -60,7 +61,7 @@ function buildProductDescription(
 }
 
 // ─── 1. Загрузка бренда ─────────────────────────────────────────────────────
-const { data: brand, pending: brandPending } = await useAsyncData(
+const { data: brand, pending: brandPending, error: brandError } = await useAsyncData(
   `brand-${brandSlug}`,
   async () => {
     const { data, error } = await supabase
@@ -69,13 +70,16 @@ const { data: brand, pending: brandPending } = await useAsyncData(
       .eq('slug', brandSlug)
       .single()
 
+    // Не нашлось — «нет»; сбой запроса — наверх, иначе 404 лёг бы в кеш ISR
     if (error) {
-      console.error('Error fetching brand:', error)
-      return null
+      if (isRowNotFound(error))
+        return null
+      throw error
     }
     return data as Brand
   },
 )
+failSsrOnDbError(brandError.value, 'бренд')
 
 // 🔥 301 редирект для несуществующего бренда (защита SEO)
 if (!brand.value && !brandPending.value) {
@@ -83,7 +87,7 @@ if (!brand.value && !brandPending.value) {
 }
 
 // ─── 2. Загрузка линейки ────────────────────────────────────────────────────
-const { data: productLine, pending: linePending } = await useAsyncData(
+const { data: productLine, pending: linePending, error: lineError } = await useAsyncData(
   `product-line-${brandSlug}-${lineSlug}`,
   async () => {
     if (!brand.value)
@@ -97,13 +101,15 @@ const { data: productLine, pending: linePending } = await useAsyncData(
       .single()
 
     if (error) {
-      console.error('Error fetching product line:', error)
-      return null
+      if (isRowNotFound(error))
+        return null
+      throw error
     }
     return data as ProductLine
   },
   { watch: [brand] },
 )
+failSsrOnDbError(lineError.value, 'серию')
 
 // 🔥 301 редирект для несуществующей линейки (защита SEO)
 if (brand.value && !productLine.value && !linePending.value) {

@@ -680,6 +680,10 @@ export const useProductsStore = defineStore('productsStore', () => {
       return { products: trimmed, hasMore }
     }
     catch (error: any) {
+      // На сервере — наверх: пустая сетка с 200 легла бы в кеш ISR на весь
+      // срок (utils/ssrDbError.ts). Вызывающий превращает ошибку в 503.
+      if (import.meta.server)
+        throw error
       toast.error('Ошибка при загрузке товаров', {
         description: error.message,
       })
