@@ -92,9 +92,31 @@ Search Console, Indexing API и GA4 требуют сервисного акка
 
 ## Скиллы проекта (ничего делать не нужно)
 
-В отличие от плагинов, эти скиллы лежат прямо в репозитории и появляются автоматически после `git pull`:
+В отличие от плагинов, эти скиллы лежат прямо в репозитории и появляются автоматически после `git pull`. Источники и хеши всех скиллов зафиксированы в `skills-lock.json`.
 
-- `.claude/skills/shadcn-component-review` — ревью shadcn-компонентов (источник: `mattbx/shadcn-skills`, зафиксирован в `skills-lock.json`)
-- `.agents/skills/shadcn-vue` — справочник по shadcn-vue (источник: `unovue/shadcn-vue`, зафиксирован в `skills-lock.json`)
+- `.claude/skills/shadcn-component-review` — ревью shadcn-компонентов (источник: `mattbx/shadcn-skills`)
+- `.claude/skills/supabase` — всё про Supabase: чек-лист безопасности (RLS, `SECURITY DEFINER`, ключи), CLI, отладка (источник: `supabase/agent-skills`)
+- `.claude/skills/supabase-postgres-best-practices` — правила Postgres: схема, индексы, RLS, запросы, блокировки (источник: `supabase/agent-skills`)
+- `.claude/skills/vercel-cli` — справочник по Vercel CLI: сборки, логи, переменные окружения, домены, кеш (источник: `vercel/vercel`)
+- `.claude/skills/web-design-guidelines` — ревью вёрстки по Web Interface Guidelines; правила подгружает из сети при каждом ревью (источник: `vercel-labs/agent-skills`)
+- `.agents/skills/shadcn-vue` — справочник по shadcn-vue (источник: `unovue/shadcn-vue`). **Claude Code его не видит:** 9 октября 2026 (Claude Code 2.1.295) его не было в списке скиллов сессии, хотя шапка `SKILL.md` в порядке, а скиллы из `.claude/skills` там были. Похоже, папку `.agents/skills` Claude Code не читает.
 
 Не путать: `shadcn-vue@claude-skills` (плагин выше) и `shadcn-vue` в `.agents/skills` — это два разных источника с похожим названием.
+
+### Как добавить скилл
+
+Установщик `skills` (skills.sh), запущенный агентом, сам переходит в неинтерактивный режим и ничего не спрашивает. Поэтому папку и способ установки задавать флагами явно:
+
+```
+npx skills add <owner/repo> --list                          # что есть в репозитории, без установки
+npx skills add <owner/repo> -a claude-code -s <имя> --copy -y
+```
+
+Без `-g` скилл ставится в репозиторий. С `--copy` файлы ложатся настоящей папкой в `.claude/skills/<имя>` — так лежат все скиллы выше. Обновить: `npx skills update -p`. Перед установкой прочитать `SKILL.md`: скилл работает с полными правами агента.
+
+### Скиллы и правила проекта
+
+Скиллы — общие советы вендоров. Где они расходятся с CLAUDE.md, действует CLAUDE.md. Известные расхождения:
+
+- `supabase` советует менять схему, выполняя SQL прямо в базе (`execute_sql`, `supabase db query`), а миграцию снимать через `supabase db pull`. У нас база одна и боевая, миграции применяет CI, тела функций снимаются с прода (CLAUDE.md, п. 5–11).
+- `vercel-cli` описывает выкатку (`vercel --prod` и др.). Выкатка — только по прямому указанию владельца (CLAUDE.md, «Ветки и выкатка»).
