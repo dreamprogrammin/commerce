@@ -54,7 +54,7 @@ import { isWholeRange } from '@/utils/catalogFilterRange'
 import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph, topBrandNames } from '@/utils/categoryFacts'
 import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
-import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
+import { merchantReturnPolicy, offerPrice, offerShippingDetails, stablePriceValidUntil, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 import { failSsrOnDbError } from '@/utils/ssrDbError'
 
@@ -113,11 +113,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
-const priceValidUntil = new Date(
-  new Date().setFullYear(new Date().getFullYear() + 1),
-)
-  .toISOString()
-  .split('T')[0]
+const priceValidUntil = stablePriceValidUntil(12)
 
 const abortController = ref<AbortController | null>(null)
 
