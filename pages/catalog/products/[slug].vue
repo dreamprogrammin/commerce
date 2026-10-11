@@ -30,7 +30,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useReviewsStore } from '@/stores/publicStore/reviewsStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { validGtin } from '@/utils/gtin'
-import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
+import { merchantReturnPolicy, offerPrice, offerShippingDetails, stablePriceValidUntil, strikethroughPrice } from '@/utils/offerSchema'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 import { formatAgeRange, productAgeMonths } from '@/utils/productAge'
 import { attributeSpecRows, filterLink } from '@/utils/productSpecRows'
@@ -53,9 +53,7 @@ const { trackViewItem } = useEcommerceTracking()
 const { flyToCart } = useCartFly()
 const { generateBrandLogoAlt } = useSeoAltText()
 
-const priceValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-  .toISOString()
-  .split('T')[0]
+const priceValidUntil = stablePriceValidUntil(1)
 
 const slug = computed(() => route.params.slug as string)
 
