@@ -45,8 +45,13 @@ CPU на рендер (замер на macOS-машине): карточка ~11
 **Проверить:** панель Vercel → Usage, суточные графики ISR Writes / Active CPU /
 Fast Origin Transfer — 10–12 октября против 1–8, и дни после того, как эти правки
 окажутся на бою. **Не проверено:** по сжатым или сырым байтам Vercel считает
-единицы ISR и Origin Transfer; период счётчика (скользящие 30 дней или с 29
-сентября); процессор Vercel против этой машины.
+единицы ISR и Origin Transfer; процессор Vercel против этой машины.
+Период счётчика (12 октября, docs `plans/hobby`): расчётных периодов у Hobby
+нет, «if you exceed your usage limits on the Hobby plan, you will have to wait
+until 30 days have passed before you can use the feature again». Отсюда вывод —
+окно скользящее, 30 дней; в самой панели не сверено. Что именно выключается
+при превышении (пауза проекта или одна функция), docs и KB «Why has my account
+or deployment been paused?» не говорят; 12 октября `uhti.kz` — 200, `HIT`.
 Ловушки: `vercel usage` (404) и `vercel metrics` (`payment_required`, даже за час)
 на Hobby не работают — расход только в панели; логи функций за последний час —
 `vercel logs --project commerce --scope malik-babazovs-projects --environment
