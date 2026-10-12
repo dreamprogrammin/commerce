@@ -46,12 +46,17 @@ CPU на рендер (замер на macOS-машине): карточка ~11
 Fast Origin Transfer — 10–12 октября против 1–8, и дни после того, как эти правки
 окажутся на бою. **Не проверено:** по сжатым или сырым байтам Vercel считает
 единицы ISR и Origin Transfer; процессор Vercel против этой машины.
-Период счётчика (12 октября, docs `plans/hobby`): расчётных периодов у Hobby
-нет, «if you exceed your usage limits on the Hobby plan, you will have to wait
-until 30 days have passed before you can use the feature again». Отсюда вывод —
-окно скользящее, 30 дней; в самой панели не сверено. Что именно выключается
-при превышении (пауза проекта или одна функция), docs и KB «Why has my account
-or deployment been paused?» не говорят; 12 октября `uhti.kz` — 200, `HIT`.
+Период счётчика (12 октября): у Hobby окно СКОЛЬЗЯЩЕЕ, 30 дней, сброса в
+определённый день нет. Docs `plans/hobby`: расчётных периодов нет, превысив
+лимит — «wait until 30 days have passed»; сотрудник Vercel на форуме
+(community.vercel.com/t/4504, январь 2025): «usage calculations are always
+looking back at the previous 30 days». Дни с копиями по `utm` (до 29 сентября)
+выпадут из окна около 29 октября, со сроками 10/30/60 мин (до 9 октября) —
+около 8 ноября. Окно под лимитом, если в среднем в сутки: ISR Writes < 6,7 тыс.,
+Active CPU < 8 мин, Fast Origin Transfer < 330 МБ — сверять по суточным
+графикам панели. Что именно выключается при превышении (пауза проекта или одна
+функция), docs и KB «Why has my account or deployment been paused?» не
+говорят; 12 октября `uhti.kz` — 200, `HIT`.
 Ловушки: `vercel usage` (404) и `vercel metrics` (`payment_required`, даже за час)
 на Hobby не работают — расход только в панели; логи функций за последний час —
 `vercel logs --project commerce --scope malik-babazovs-projects --environment
@@ -645,6 +650,9 @@ ISR-правил; служебный `__isr_route` Nitro дописывает с
 (1 из 3 прогонов) — не от неё. Совет «поставить `swr: 604800`» разобран и
 отклонён: утечку query не закрывает, а `swr` пресет превращает в «до
 выкатки». Расчётный период Vercel: Aug 30 – Sep 29, сброс 29 сентября.
+⚠️ Поправка 12 октября: неверно — у Hobby окно скользящее, сброса 29 сентября
+не было; панель тогда просто показывала последние 30 дней (см. запись
+«Vercel Hobby сверх лимитов»).
 Разбивку записей по адресам на бесплатном тарифе не получить
 (`vercel metrics` требует Observability Plus) — смотреть общий счётчик в
 Usage за первую неделю нового периода. Локальная сборка с
