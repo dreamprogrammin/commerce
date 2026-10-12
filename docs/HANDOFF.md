@@ -166,6 +166,12 @@ maintain off-site backups»; Pro — 7 дней ежедневных), свои�
 9 октября ~1 ГБ на период — сверить панель), но резервные копии закрыть: либо
 Supabase Pro, либо своя ночная выгрузка (можно на сервер в РК вместе с копией
 ПДн). Решения нет.
+Когда на Pro (совет 12 октября): сейчас — запрет коммерции на Hobby действует уже,
+пауза может прийти в любой день; кодом ничего готовить не нужно. Апгрейд текущей
+команды (Settings → Billing → Upgrade), НЕ триал: триал по docs `pro-plan/trials`
+только для новой команды (перенос проекта и домена), 14 дней, пауза при 100%
+лимитов триала. «When you upgrade to Pro, the pause status on your account will
+get lifted». После апгрейда — Spend Management: уведомления, без остановки сайта.
 Ловушки: `vercel usage` (404) и `vercel metrics` (`payment_required`, даже за час)
 на Hobby не работают — расход только в панели; логи функций за последний час —
 `vercel logs --project commerce --scope malik-babazovs-projects --environment
