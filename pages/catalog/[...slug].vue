@@ -54,7 +54,7 @@ import { isWholeRange } from '@/utils/catalogFilterRange'
 import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph, topBrandNames } from '@/utils/categoryFacts'
 import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
-import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
+import { merchantReturnPolicy, offerPrice, offerShippingDetails, stablePriceValidUntil, strikethroughPrice } from '@/utils/offerSchema'
 import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 import { failSsrOnDbError } from '@/utils/ssrDbError'
 
@@ -113,11 +113,7 @@ const containerClass = carouselContainerVariants({ contained: 'always' })
 const { getVariantUrl } = useSupabaseStorage()
 const { sanitizeHtml } = useSafeHtml()
 
-const priceValidUntil = new Date(
-  new Date().setFullYear(new Date().getFullYear() + 1),
-)
-  .toISOString()
-  .split('T')[0]
+const priceValidUntil = stablePriceValidUntil(12)
 
 const abortController = ref<AbortController | null>(null)
 
@@ -2146,7 +2142,11 @@ const currentCategoryId = computed(() => {
   return cat?.id || null
 })
 
-const { data: categoryRatingData } = useQuery({
+const categoryRatingEnabled = computed(
+  () => !!currentCategoryId.value && currentCategorySlug.value !== 'all',
+)
+
+const { data: categoryRatingData, suspense: categoryRatingSuspense } = useQuery({
   queryKey: ['category-rating', currentCategoryId],
   queryFn: async () => {
     if (!currentCategoryId.value || currentCategorySlug.value === 'all')
@@ -2164,11 +2164,33 @@ const { data: categoryRatingData } = useQuery({
     }
     return data as { avg_rating: number, total_reviews: number } | null
   },
-  enabled: computed(
-    () => !!currentCategoryId.value && currentCategorySlug.value !== 'all',
-  ),
+  enabled: categoryRatingEnabled,
   staleTime: 5 * 60 * 1000,
   gcTime: 10 * 60 * 1000,
+})
+
+/*
+ * Рейтинг ждём на сервере — тот же приём, что у слайдов главной
+ * (`home-slides-ssr` в pages/index.vue), и по той же причине.
+ *
+ * `useQuery` без ожидания: сервер запрос запускал, но рендер не ждал, и в HTML
+ * уходило то состояние, которое успевало сложиться. Замер 10 октября 2026,
+ * сборка с боевыми данными: в 1 рендере из 10 рейтинга в HTML не было. Цена:
+ * блок рейтинга и рейтинг в мета-описании раздела — то есть и то, что видит
+ * Google, — то были, то нет; без рейтинга в HTML браузер запрашивал его сам;
+ * а разный HTML у одной и той же страницы — платная запись ISR при каждой
+ * пересборке (check-isr-stable-html.mjs).
+ *
+ * `suspense()` — только при `enabled`: у выключенного запроса обещание не
+ * разрешается никогда, и рендер бы повис.
+ */
+useAsyncData('category-rating-ssr', async () => {
+  if (categoryRatingEnabled.value)
+    await categoryRatingSuspense()
+  return true
+}, {
+  server: true,
+  getCachedData: (key, nuxtApp) => nuxtApp.payload.data[key] || nuxtApp.static.data[key],
 })
 
 const showCategoryRating = computed(

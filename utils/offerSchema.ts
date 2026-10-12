@@ -121,3 +121,21 @@ export function strikethroughPrice(product: {
     },
   }
 }
+
+/**
+ * `priceValidUntil` в разметке Offer — последний день месяца через
+ * `monthsAhead` месяцев (по UTC).
+ *
+ * Было «сегодня + 30 дней» на карточке и «сегодня + год» в разделе: дата
+ * менялась каждые сутки, а с ней — HTML страницы. Vercel списывает запись
+ * ISR, только когда пересобранная страница отличается от прежней (docs:
+ * «ISR usage and pricing»), так что при суточном кеше каждая пересборка была
+ * платной, даже если товар не менялся. Конец месяца меняется раз в месяц и
+ * всегда впереди: при `monthsAhead = 1` — не меньше чем на 27 суток, то есть
+ * и страница, пролежавшая в кеше сутки, не покажет Google прошедшую дату.
+ */
+export function stablePriceValidUntil(monthsAhead: number, now: Date = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthsAhead + 1, 0))
+    .toISOString()
+    .slice(0, 10)
+}

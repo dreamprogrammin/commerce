@@ -1,5 +1,6 @@
 import type { DehydratedState, VueQueryPluginOptions } from '@tanstack/vue-query'
 import { dehydrate, hydrate, QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { withoutUpdateTimes } from '@/utils/stableQueryState'
 
 export default defineNuxtPlugin((nuxt) => {
   const vueQueryState = useState<DehydratedState | null>('vue-query')
@@ -32,10 +33,12 @@ export default defineNuxtPlugin((nuxt) => {
     hydrate(queryClient, vueQueryState.value)
   }
 
-  // Dehydration on server (for SSR)
+  // Dehydration on server (for SSR). Без времени запроса: иначе две пересборки
+  // страницы никогда не совпадают и каждая — платная запись ISR
+  // (utils/stableQueryState.ts).
   if (import.meta.server) {
     nuxt.hooks.hook('app:rendered', () => {
-      vueQueryState.value = dehydrate(queryClient)
+      vueQueryState.value = withoutUpdateTimes(dehydrate(queryClient))
     })
   }
 
