@@ -21,16 +21,17 @@ describe('productSlugRedirectFor', () => {
     ).toBe('/catalog/products/konstruktor-lego-marvel-76287-zheleznyy-chelovek-na-motocikle-protiv-halka-s-razrushaemym-domom')
   })
 
-  it('адрес xx2028 намеренно не в карте', () => {
+  it('адрес xx2028 ведёт на карточку HiH02 — решение владельца 12 октября 2026', () => {
     /*
-     * 17 сентября 2026 владелец сказал: «не хочу, чтобы это страница была».
-     * Вариант замены (410, 404 или 301 на раздел) не выбран, поэтому адрес
-     * остаётся в том состоянии, что на бою, — 404. Тест держит это решение,
-     * чтобы запись не вернулась случайно.
+     * 17 сентября 2026 владелец сказал «не хочу, чтобы это страница была», и
+     * запись сняли (адрес отдавал 404). Чужой артикул XX2028 из текста
+     * карточки HiH02 убран 19 сентября; 12 октября владелец выбрал из
+     * вариантов (301 на карточку, 301 на раздел, 410, оставить 404) — 301 на
+     * карточку HiH02. Тест держит это решение.
      */
     expect(
       productSlugRedirectFor('/catalog/products/akkordeon-detskiy-xx2028-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let'),
-    ).toBeNull()
+    ).toBe('/catalog/products/akkordeon-detskiy-hih02-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let')
   })
 
   it('обычная несуществующая карточка остаётся 404', () => {
