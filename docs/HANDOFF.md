@@ -157,6 +157,15 @@ Cloudflare `ALA` (Алматы) — от региона базы не завис
 с `cacheControl: 31536000` (запись в бой, ~0,23 ГБ Egress — только по слову,
 сначала показать команду); эффект мерить после — вытеснение из ALA не
 исключено. Решения нет.
+⚠️ РЕЗЕРВНЫХ КОПИЙ БАЗЫ НЕТ (12 октября): на Free у Supabase нет ни ежедневных
+копий, ни PITR (docs `platform/backups`: Free — «regularly export … `db dump` and
+maintain off-site backups»; Pro — 7 дней ежедневных), своих выгрузок в проекте
+нет (в `.github/workflows` только миграции). Файлы Storage в копии базы не входят
+и на Pro. Выводы владельцу 12 октября: Vercel Pro нужен из-за запрета коммерции
+на Hobby (код его не снимает); Supabase Pro по лимитам не нужен (Egress после
+9 октября ~1 ГБ на период — сверить панель), но резервные копии закрыть: либо
+Supabase Pro, либо своя ночная выгрузка (можно на сервер в РК вместе с копией
+ПДн). Решения нет.
 Ловушки: `vercel usage` (404) и `vercel metrics` (`payment_required`, даже за час)
 на Hobby не работают — расход только в панели; логи функций за последний час —
 `vercel logs --project commerce --scope malik-babazovs-projects --environment
