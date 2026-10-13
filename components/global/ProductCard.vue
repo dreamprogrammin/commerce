@@ -263,7 +263,7 @@ async function onWish() {
           <div
             v-for="(image, index) in galleryImages"
             :key="`slide-${index}`"
-            class="h-full w-full shrink-0 [scroll-snap-align:center]"
+            class="pc-slide"
           >
             <!-- sizes объявлен по ФАКТИЧЕСКОЙ ширине картинки, а не колонки:
                  замер 25 августа 2026 — 153px на экране 390px и 222px на 1440px.
@@ -293,7 +293,7 @@ async function onWish() {
                  вечно и всё это время анимировались. Замер на главной: 91 штука
                  в непрерывной анимации и на 3-й секунде, и на 12-й — счётчик
                  не менялся вовсе. Статичная плашка держит ту же геометрию. -->
-            <div v-else class="h-full w-full bg-muted" aria-hidden="true" />
+            <div v-else class="pc-ph" aria-hidden="true" />
           </div>
         </div>
 
@@ -302,23 +302,27 @@ async function onWish() {
         </div>
       </NuxtLink>
 
+      <!-- Плашки — простой div, а не shadcn `Badge`: тот несёт в КАЖДУЮ
+           карточку ~640 байт классов фокуса, `aria-invalid`, `svg` и `dark:`,
+           которые на некликабельной плашке не срабатывают (а `.dark` на сайте
+           не включается вовсе). Здесь ровно те утилиты, что после слияния
+           классов `cn()` действовали и раньше; вычисленные стили и размеры
+           сверены поэлементно (разница — только `transition` фокуса). -->
       <!-- 🆕 Новинка -->
-      <Badge
+      <div
         v-if="product.is_new"
-        variant="secondary"
-        class="pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full border-transparent bg-success px-2.5 py-1 text-[11.5px] font-bold text-white shadow-lg"
+        class="pointer-events-none absolute left-2.5 top-2.5 z-10 inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-transparent bg-success px-2.5 py-1 text-[11.5px] font-bold text-white shadow-lg"
       >
         Новинка
-      </Badge>
+      </div>
 
       <!-- 🏷️ Скидка -->
-      <Badge
+      <div
         v-if="priceDetails.hasDiscount"
-        variant="destructive"
-        class="pointer-events-none absolute bottom-2.5 left-2.5 z-10 rounded-full px-[11px] py-[5px] text-[13px] font-extrabold shadow-lg"
+        class="pointer-events-none absolute bottom-2.5 left-2.5 z-10 inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-transparent bg-destructive px-[11px] py-[5px] text-[13px] font-extrabold text-white shadow-lg"
       >
         −{{ priceDetails.percent }}%
-      </Badge>
+      </div>
 
       <!-- ❤️ Избранное -->
       <button
@@ -342,8 +346,8 @@ async function onWish() {
         <span
           v-for="(_, index) in galleryImages"
           :key="`dot-${index}`"
-          class="h-1.5 rounded-full shadow-[0_1px_3px_rgb(0_0_0_/_0.3)] transition-[width] duration-200"
-          :class="index === activeIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/60'"
+          class="pc-dot"
+          :class="{ 'pc-dot--on': index === activeIndex }"
         />
       </div>
     </div>
@@ -515,6 +519,44 @@ async function onWish() {
       inset 0 -2px 4px rgb(15 23 42 / 0.07),
       inset 0 0 0 1px rgb(255 255 255 / 0.5),
       0 1px 0 rgb(15 23 42 / 0.05);
+  }
+
+  /* Слайд галереи, подложка непосещённого слайда и точки — свои классы, а
+     не наборы утилит: их по 6–7 в КАЖДОЙ карточке, и утилиты стоили ~900
+     байт разметки на карточку (замер 13 октября 2026, /catalog/promotions).
+     Объявления — те же, что у прежних утилит Tailwind (h-full w-full
+     shrink-0 [scroll-snap-align:center]; h-full w-full bg-muted; h-1.5
+     rounded-full shadow-[0_1px_3px_rgb(0_0_0_/_0.3)] transition-[width]
+     duration-200, w-1.5 bg-white/60 и w-4 bg-white), вычисленные стили
+     сверены поэлементно. */
+  .pc-slide {
+    height: 100%;
+    width: 100%;
+    flex-shrink: 0;
+    scroll-snap-align: center;
+  }
+  .pc-ph {
+    height: 100%;
+    width: 100%;
+    background-color: var(--muted);
+  }
+  .pc-dot {
+    height: calc(var(--spacing) * 1.5);
+    width: calc(var(--spacing) * 1.5);
+    border-radius: 3.40282e38px;
+    background-color: color-mix(in oklab, var(--color-white) 60%, transparent);
+    --tw-shadow: 0 1px 3px var(--tw-shadow-color, rgb(0 0 0 / 0.3));
+    box-shadow:
+      var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow),
+      var(--tw-shadow);
+    --tw-duration: 0.2s;
+    transition-property: width;
+    transition-duration: 0.2s;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+  }
+  .pc-dot--on {
+    width: calc(var(--spacing) * 4);
+    background-color: var(--color-white);
   }
 
   .pc-scroll {
