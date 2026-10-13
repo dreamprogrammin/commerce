@@ -1,4 +1,20 @@
 import type { AdditionalMenuItem, BrandForFilter, CategoryMenuItem, CategoryRow, Database } from '@/types'
+import { isCategoryIndexable } from '@/utils/categoryLanding'
+
+/**
+ * Показывать ли раздел посетителю в меню и на хабе `/catalog`.
+ *
+ * Правило то же, что у `noindex` и карты сайта (`isCategoryIndexable`): в
+ * ветке нет активного товара — раздела в навигации нет; исключения владельца
+ * (`CATEGORIES_KEPT_INDEXABLE_WITHOUT_PRODUCTS`) остаются. Появится товар —
+ * раздел вернётся сам. Без `products_in_branch` (счёт не удался) — показывать:
+ * прятать навигацию из-за сбоя запроса нельзя.
+ */
+export function isCategoryShown(category: Pick<CategoryRow, 'slug' | 'products_in_branch'>): boolean {
+  if (category.products_in_branch === undefined || category.products_in_branch === null)
+    return true
+  return isCategoryIndexable(category.slug, category.products_in_branch)
+}
 
 export const useCategoriesStore = defineStore('categories', () => {
   const supabase = useSupabaseClient<Database>()
@@ -21,7 +37,7 @@ export const useCategoriesStore = defineStore('categories', () => {
    * каждой пересборке дерева.
    */
   const menuTree = computed<CategoryMenuItem[]>(() => {
-    const menuItems = allCategories.value.filter(c => c.display_in_menu)
+    const menuItems = allCategories.value.filter(c => c.display_in_menu && isCategoryShown(c))
     const categoryMap = new Map<string, CategoryMenuItem>()
     const rootItems: CategoryMenuItem[] = []
 

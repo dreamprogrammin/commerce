@@ -34,7 +34,7 @@ import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/
 import { CATEGORY_PAGE_COLUMNS } from '@/constants/categoryColumns'
 import { categoryStaticFor } from '@/constants/categoryStaticText'
 import { carouselContainerVariants } from '@/lib/variants'
-import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { isCategoryShown, useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import {
   buildBrandLandingPath,
@@ -681,8 +681,14 @@ const title = computed(() => {
 const priceRange = ref({ min: 0, max: 50000 })
 const pieceCountRange = ref<{ min: number, max: number } | null>(null)
 
+/*
+ * Пустые подразделы (0 товаров в ветке) не показываются ни чипом фильтра, ни
+ * в разметке SiteNavigationElement — правило то же, что у меню и `noindex`
+ * (`isCategoryShown`). Иначе чип «Металлические машинки» давал пустую выдачу,
+ * а разметка ссылалась на закрытые от индекса страницы.
+ */
 const subcategories = computed(() =>
-  categoriesStore.getSubcategories(currentCategorySlug.value),
+  categoriesStore.getSubcategories(currentCategorySlug.value).filter(isCategoryShown),
 )
 
 /*
