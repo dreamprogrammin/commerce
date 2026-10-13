@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { Database } from '@/types'
+import type { BaseProduct, Database } from '@/types'
 import { catalogRootShell } from '@/lib/shell'
 
 import { carouselContainerVariants } from '@/lib/variants'
+import { PRODUCT_TILE_SELECT, toProductTiles } from '@/utils/productTiles'
 
 definePageMeta({ layout: 'shell', shell: catalogRootShell })
 
@@ -26,23 +27,14 @@ const { data: products, pending } = await useAsyncData(
   async () => {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        product_images (
-          id,
-          image_url,
-          display_order,
-          blur_placeholder
-        ),
-        categories (
-          id,
-          name,
-          slug
-        )
-      `)
+      // Только поля плитки и превью первых карточек — см. utils/productTiles.ts.
+      .select(PRODUCT_TILE_SELECT)
       .eq('is_on_promotion', true)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
+      .order('display_order', { referencedTable: 'product_images', ascending: true })
+      .order('display_order', { referencedTable: 'cover', ascending: true })
+      .limit(1, { referencedTable: 'cover' })
       .limit(50)
 
     if (error) {
@@ -50,7 +42,7 @@ const { data: products, pending } = await useAsyncData(
       return []
     }
 
-    return data || []
+    return toProductTiles(data ?? []) as unknown as BaseProduct[]
   },
   {
     lazy: true,
@@ -145,9 +137,10 @@ useHead({
       <!-- Список товаров -->
       <div v-else-if="products && products.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         <ProductCard
-          v-for="product in products"
+          v-for="(product, index) in products"
           :key="product.id"
           :product="product"
+          :position="index"
         />
       </div>
 
