@@ -65,12 +65,17 @@ console.log('\n3) обычная несуществующая карточка �
   check(r.status === 404, `${r.status} для выдуманного slug (ждём 404)`)
 }
 
-console.log('\n4) адрес xx2028 остаётся мёртвым — по слову владельца')
+console.log('\n4) адрес xx2028 ведёт на карточку HiH02 — по слову владельца')
 {
-  // «Не хочу, чтобы это страница была», 17 сентября 2026. Вариант замены не
-  // выбран, поэтому держим то состояние, что уже на бою.
+  // 17 сентября 2026 запись сняли («не хочу, чтобы это страница была»), адрес
+  // отдавал 404. 12 октября владелец выбрал 301 на карточку HiH02 — тот же
+  // аккордеон под новым артикулом (constants/productSlugRedirects.ts).
   const r = await fetch(`${BASE}/catalog/products/akkordeon-detskiy-xx2028-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let`, { redirect: 'manual' })
-  check(r.status === 404, `${r.status} для xx2028 (ждём 404, редиректа быть не должно)`)
+  const location = new URL(r.headers.get('location') || '/', BASE).pathname
+  check(
+    [301, 308].includes(r.status) && location === '/catalog/products/akkordeon-detskiy-hih02-plastik-zvukovye-effekty-yarkiy-dizayn-dlya-detey-ot-3-let',
+    `${r.status} → ${location} для xx2028 (ждём постоянный редирект на HiH02)`,
+  )
 }
 
 console.log(fails.length ? `\nПРОВАЛОВ: ${fails.length}` : '\nвсё зелено')
