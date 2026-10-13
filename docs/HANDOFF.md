@@ -17,8 +17,10 @@ URL Inspection по `sitemap.xml` (`sc-domain:uhti.kz`): в индексе **253
   `kiddy/razvivayushchie-igrushki`; карточка Smoneo «Паровозик»; `/returns`. Обходы
   апрель–сентябрь, то есть до текстов разделов.
 - «URL is unknown to Google» — 16: `/about`, 7 брендов (dgt-games, king-becket, malplay,
-  shantou-jinxing, sima-land, sobebear, tourist), 2 связки, 6 карточек. Карту в GSC
-  отправляли последний раз 3 июля.
+  shantou-jinxing, sima-land, sobebear, tourist), 2 связки, 6 карточек. Карту Google
+  скачивает сам — последний раз 12 октября 17:51 UTC, то есть дело не в карте (дата
+  «3 июля» в выводе скилла — последняя РУЧНАЯ отправка, не чтение; `lastDownloaded`
+  скилл не показывает, видно через API `sitemaps.get`).
 - «Discovered — currently not indexed» — 7 (бренды biai, bst, rong-xian-yi, subotech; связки
   mokatoys, mermaze; LEGO 60411).
 - «noindex» 5 и «soft 404» 1 — вердикты по СТАРЫМ обходам, сейчас эти страницы открыты
@@ -41,7 +43,10 @@ URL Inspection по `sitemap.xml` (`sc-domain:uhti.kz`): в индексе **253
 **Предложено владельцу:** в GSC «Запросить индексирование» для Sluban-мальчики, связок
 Hola Toys/Huanger/ZURU, толокара, робота-собаки и ключевых разделов из «Crawled»; заново
 отправить sitemap. Через API этого не сделать: Indexing API — только для вакансий и
-трансляций.
+трансляций. **Карта переотправлена 13 октября 01:07 UTC** по слову владельца
+(`sitemaps.submit` через `google_auth.get_service_account_credentials` скилла с
+`SCOPES['gsc_write']`, интерпретатор `~/Library/Application Support/claude-seo/.venv`;
+своей команды отправки в скилле 2.3.1 нет): `lastSubmitted` 2026-10-13, ошибок 0.
 **Ловушки:** на macOS в `~/.config/claude-seo/google-api.json` `default_property` =
 `https://uhti.kz/` — на него 403; работать с `sc-domain:uhti.kz` (`--site-url` у
 `gsc_inspect.py`, `--property` у `gsc_query.py`). Пакет из 300 адресов шёл ~50 минут;
