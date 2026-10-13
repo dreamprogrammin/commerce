@@ -1,10 +1,47 @@
-import type { AdditionalMenuItem, CategoryMenuItem, CategoryRow, Database } from '@/types'
+import type { AdditionalMenuItem, BrandForFilter, CategoryMenuItem, CategoryRow, Database } from '@/types'
 
 export const useCategoriesStore = defineStore('categories', () => {
   const supabase = useSupabaseClient<Database>()
 
   const allCategories = ref<CategoryRow[]>([])
-  const menuTree = ref<CategoryMenuItem[]>([])
+  /** Бренды пунктов меню конструкторов (мобильный каталог) по id категории. */
+  const menuBrands = ref<Record<string, BrandForFilter[]>>({})
+
+  /*
+   * Дерево меню — производное от `allCategories`, а не своё состояние.
+   *
+   * Состояние Pinia целиком уезжает в HTML каждой страницы (`__NUXT_DATA__`).
+   * Дерево, собранное из копий строк, везло все категории второй раз со всеми
+   * полями: 33 КБ из 131 КБ данных главной (замер 13 октября 2026), столько же
+   * на каждом разделе и каждой карточке. `computed` в состояние не попадает и
+   * собирается одинаково на сервере и в браузере из одних и тех же строк.
+   *
+   * Бренды для мобильного каталога лежат отдельно (`menuBrands`) и
+   * подклеиваются при сборке: вписанные прямо в пункты, они терялись бы при
+   * каждой пересборке дерева.
+   */
+  const menuTree = computed<CategoryMenuItem[]>(() => {
+    const menuItems = allCategories.value.filter(c => c.display_in_menu)
+    const categoryMap = new Map<string, CategoryMenuItem>()
+    const rootItems: CategoryMenuItem[] = []
+
+    for (const item of menuItems) {
+      const brands = menuBrands.value[item.id]
+      const categoryItem: CategoryMenuItem = brands
+        ? { ...item, children: [], brands, brandsLoaded: true }
+        : { ...item, children: [] }
+      categoryMap.set(item.id, categoryItem)
+      if (item.is_root_category)
+        rootItems.push(categoryItem)
+    }
+
+    for (const item of menuItems) {
+      if (item.parent_id)
+        categoryMap.get(item.parent_id)?.children?.push(categoryMap.get(item.id)!)
+    }
+
+    return rootItems
+  })
   const additionalMenuItems = ref<AdditionalMenuItem[]>([])
   const isLoading = ref(false)
   const brandsLoading = ref(false)
@@ -49,26 +86,8 @@ export const useCategoriesStore = defineStore('categories', () => {
        * сетевого круга вовсе.
        */
       const fetchedCategories = (await $fetch<CategoryRow[]>('/api/categories')) || []
+      // Дерево меню (`menuTree`) соберётся из этих строк само.
       allCategories.value = fetchedCategories
-
-      const menuItems = fetchedCategories.filter(c => c.display_in_menu)
-      const categoryMap = new Map<string, CategoryMenuItem>()
-      const rootItems: CategoryMenuItem[] = []
-
-      menuItems.forEach((item) => {
-        const categoryItem: CategoryMenuItem = { ...item, children: [] }
-        categoryMap.set(item.id, categoryItem)
-        if (item.is_root_category)
-          rootItems.push(categoryItem)
-      })
-
-      menuItems.forEach((item) => {
-        if (item.parent_id) {
-          const parent = categoryMap.get(item.parent_id)
-          parent?.children?.push(categoryMap.get(item.id)!)
-        }
-      })
-      menuTree.value = rootItems
       return fetchedCategories
     }
     catch (e) {
@@ -88,9 +107,8 @@ export const useCategoriesStore = defineStore('categories', () => {
    * PUBLIC_CATEGORY_COLUMNS): в SSR-разметке подложки категорий не
    * участвуют ни на одной странице, а весили половину документа.
    *
-   * Патчатся ОБА хранилища. `menuTree` собирается из копий строк
-   * (`{ ...item, children: [] }`), поэтому правка `allCategories` до него
-   * не доезжает, а `HomePopularCategories` читает подложку именно из дерева.
+   * Правится только `allCategories`: `menuTree` собирается из него, так что
+   * `HomePopularCategories`, читающий подложку из дерева, увидит её тоже.
    */
   async function loadCategoryBlurPlaceholders() {
     if (import.meta.server)
@@ -120,16 +138,6 @@ export const useCategoriesStore = defineStore('categories', () => {
           ? { ...category, blur_placeholder: blurById.get(category.id)! }
           : category,
       )
-
-      const patchTree = (items: CategoryMenuItem[]) => {
-        for (const item of items) {
-          if (blurById.has(item.id))
-            item.blur_placeholder = blurById.get(item.id)!
-          if (item.children?.length)
-            patchTree(item.children)
-        }
-      }
-      patchTree(menuTree.value)
 
       blurLoaded.value = true
     }
@@ -205,16 +213,15 @@ export const useCategoriesStore = defineStore('categories', () => {
         level2Categories.map(cat => productsStore.fetchBrandsForCategory(cat.slug)),
       )
 
+      // В отдельную карту, а не в пункты: дерево пересобирается из
+      // allCategories, и вписанное в пункт пропало бы при первой пересборке.
+      const loaded: Record<string, BrandForFilter[]> = {}
       results.forEach((result, index) => {
-        const cat = level2Categories[index]
-        if (result.status === 'fulfilled') {
-          cat.brands = result.value.slice(0, 6)
-        }
-        else {
-          cat.brands = []
-        }
-        cat.brandsLoaded = true
+        loaded[level2Categories[index]!.id] = result.status === 'fulfilled'
+          ? result.value.slice(0, 6)
+          : []
       })
+      menuBrands.value = { ...menuBrands.value, ...loaded }
 
       brandsLoadedForMenu.value = true
     }
@@ -229,6 +236,7 @@ export const useCategoriesStore = defineStore('categories', () => {
   async function forceRefetch() {
     allCategories.value = []
     additionalMenuItems.value = []
+    menuBrands.value = {}
     brandsLoadedForMenu.value = false
     // Иначе после перезагрузки списка подложки уже не догрузятся:
     // флаг остался бы поднятым, а сами значения ушли вместе со строками.
