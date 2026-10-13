@@ -1,5 +1,6 @@
 import imageCompression from 'browser-image-compression'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS, IMAGE_VARIANTS_WIDE, OPTIMIZATION_RECOMMENDATIONS } from '@/config/images'
+import { stripWebpIcc } from '@/utils/webpIcc'
 
 /**
  * 🎨 Результат генерации blur placeholder
@@ -221,7 +222,8 @@ export async function generateBlurPlaceholder(
     maxWidthOrHeight: maxSize,
     useWebWorker: true,
   })
-  const dataUrl = await imageCompression.getDataUrlFromFile(compressed)
+  // Профиль sRGB, который вшивает canvas Chrome, — 39% превью; см. utils/webpIcc.ts.
+  const dataUrl = stripWebpIcc(await imageCompression.getDataUrlFromFile(compressed))
   return { dataUrl, width: maxSize, height: maxSize }
 }
 
