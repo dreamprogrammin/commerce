@@ -13,7 +13,9 @@ export interface AdminReviewImage {
 export interface AdminReview {
   id: string
   product_id: string
-  user_id: string
+  /** NULL — отзыв гостя по ссылке из письма: профиля нет, имя в `author_name`. */
+  user_id: string | null
+  author_name: string | null
   order_id: string | null
   rating: number
   text: string | null
@@ -39,7 +41,7 @@ export const useAdminReviewsStore = defineStore('adminReviewsStore', () => {
   const isLoading = ref(false)
   const unpublishedCount = ref(0)
 
-  const selectQuery = 'id, product_id, user_id, order_id, rating, text, is_published, created_at, updated_at, profiles!product_reviews_profile_id_fkey(first_name, last_name, avatar_url), products!product_reviews_product_id_fkey(name, slug), review_images(id, image_url, blur_placeholder, display_order)'
+  const selectQuery = 'id, product_id, user_id, author_name, order_id, rating, text, is_published, created_at, updated_at, profiles!product_reviews_profile_id_fkey(first_name, last_name, avatar_url), products!product_reviews_product_id_fkey(name, slug), review_images(id, image_url, blur_placeholder, display_order)'
 
   async function fetchAllReviews(filter: 'all' | 'unpublished' = 'unpublished') {
     isLoading.value = true

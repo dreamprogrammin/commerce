@@ -16,8 +16,13 @@ export type OrderEmailKind = 'created' | 'confirmed' | 'shipped' | 'delivered' |
  * каждую смену). «Подтверждён» — менеджер и так звонит; «доставлен» —
  * человек знает сам. Всё остальное видно по ссылке на странице статуса.
  * Обычный заказ — два письма: «принят» и «готов к выдаче» / «курьер везёт».
+ *
+ * 13 октября 2026 владелец добавил третье — «доставлен / выдан»: теперь у
+ * него есть дело. В нём кнопка «Оставить отзыв» у каждого товара — ссылка
+ * без входа (`review_invites`): раньше отзыв можно было написать, только
+ * войдя в аккаунт, а гость не мог вовсе. Без настоящих отзывов нет и звёзд в выдаче.
  */
-export const EMAIL_STATUSES: readonly OrderEmailKind[] = ['shipped', 'cancelled']
+export const EMAIL_STATUSES: readonly OrderEmailKind[] = ['shipped', 'delivered', 'cancelled']
 
 /**
  * Одна тема на все письма заказа: по ней почта складывает их в одну цепочку
@@ -38,11 +43,15 @@ export interface OrderEmailData {
   total: number
   deliveryCost?: number
   items?: { name: string, quantity: number, price: number }[]
+  /** Только в письме «доставлен»: товар и ссылка на отзыв без входа. */
+  reviewLinks?: { name: string, url: string }[]
   pickup?: { name?: string | null, address?: string | null, hours?: string | null } | null
   shop: { phoneHuman: string, phoneHref: string, address: string, hours: string }
 }
 
 const isPickup = (m: string | null) => m === 'pickup'
+
+const REVIEW_LEAD = 'Спасибо за покупку! Оцените товары — это займёт минуту, входить на сайт не нужно.'
 
 /** 18480 → «18 480 ₸» с неразрывными пробелами — как на сайте. */
 export function tenge(n: number): string {
@@ -77,9 +86,10 @@ export function orderEmailCopy(d: Pick<OrderEmailData, 'kind' | 'orderNumber' | 
         ? { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} готов к выдаче`, lead: `Забрать можно здесь: ${where}, ${hours}.` }
         : { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} в пути`, lead: 'Курьер уже везёт заказ. Он позвонит перед приездом.' }
     case 'delivered':
+      // Письмо уходит только со ссылками на отзыв (orderEmail.ts) — о них и речь
       return pickup
-        ? { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} выдан`, lead: 'Спасибо за покупку! Будем рады вашему отзыву о товаре на сайте.' }
-        : { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} доставлен`, lead: 'Спасибо за покупку! Будем рады вашему отзыву о товаре на сайте.' }
+        ? { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} выдан`, lead: REVIEW_LEAD }
+        : { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} доставлен`, lead: REVIEW_LEAD }
     case 'cancelled':
       return {
         subject: orderEmailSubject(d.orderNumber),
@@ -101,6 +111,14 @@ export function buildOrderEmail(d: OrderEmailData): { subject: string, html: str
     + `<tr><td style="padding:8px 0;font-weight:700">Итого</td><td style="padding:8px 0;text-align:right;font-weight:700">${tenge(d.total)}</td></tr></table>`
     : ''
 
+  const reviews = d.kind === 'delivered' ? (d.reviewLinks ?? []) : []
+  const reviewBlock = reviews.length
+    ? `<p style="font-size:15px;font-weight:700;margin:0 0 8px">Оцените покупку</p>`
+    + `<table role="presentation" width="100%" style="border-collapse:collapse;font-size:14px;margin:0 0 20px">${reviews.map(r =>
+      `<tr><td style="padding:8px 10px 8px 0;border-bottom:1px solid #eee;line-height:1.4">${escapeHtml(r.name)}</td>`
+      + `<td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap"><a href="${escapeHtml(r.url)}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:8px 14px;border-radius:999px">Оставить отзыв</a></td></tr>`).join('')}</table>`
+    : ''
+
   const html = `<!doctype html><html lang="ru"><body style="margin:0;background:#f4f6fa;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a">
 <table role="presentation" width="100%" style="background:#f4f6fa;padding:24px 12px"><tr><td align="center">
 <table role="presentation" width="100%" style="max-width:520px;background:#fff;border-radius:16px;padding:28px">
@@ -108,7 +126,7 @@ export function buildOrderEmail(d: OrderEmailData): { subject: string, html: str
 <div style="font-size:20px;font-weight:800;color:#2563eb;margin-bottom:18px">Ухтышка</div>
 <h1 style="font-size:22px;margin:0 0 10px">${escapeHtml(heading)}</h1>
 <p style="font-size:15px;line-height:1.5;margin:0 0 18px">${escapeHtml(lead)}</p>
-${totals}
+${totals}${reviewBlock}
 <a href="${escapeHtml(d.statusUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">Статус заказа</a>
 <p style="font-size:13px;color:#666;line-height:1.5;margin:22px 0 0">Вопросы по заказу — <a href="${escapeHtml(d.shop.phoneHref)}" style="color:#2563eb">${escapeHtml(d.shop.phoneHuman)}</a>, ${escapeHtml(d.shop.hours)}.<br>${escapeHtml(d.shop.address)}.<br>Это автоматическое письмо — отвечать на него не нужно.</p>
 </td></tr></table></td></tr></table></body></html>`
@@ -118,6 +136,7 @@ ${totals}
     '',
     lead,
     ...(items.length ? ['', ...items.map(i => `${i.name} × ${i.quantity} — ${tenge(i.price * i.quantity)}`), ...(d.deliveryCost ? [`Доставка — ${tenge(d.deliveryCost)}`] : []), `Итого — ${tenge(d.total)}`] : []),
+    ...(reviews.length ? ['', 'Оцените покупку:', ...reviews.map(r => `${r.name} — ${r.url}`)] : []),
     '',
     `Статус заказа: ${d.statusUrl}`,
     '',

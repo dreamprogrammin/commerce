@@ -1534,7 +1534,9 @@ export interface Database {
       }
       product_reviews: {
         Row: {
+          author_name: string | null
           created_at: string | null
+          guest_checkout_id: string | null
           id: string
           is_published: boolean | null
           order_id: string | null
@@ -1542,10 +1544,12 @@ export interface Database {
           rating: number
           text: string | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          author_name?: string | null
           created_at?: string | null
+          guest_checkout_id?: string | null
           id?: string
           is_published?: boolean | null
           order_id?: string | null
@@ -1553,10 +1557,12 @@ export interface Database {
           rating: number
           text?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          author_name?: string | null
           created_at?: string | null
+          guest_checkout_id?: string | null
           id?: string
           is_published?: boolean | null
           order_id?: string | null
@@ -1564,9 +1570,16 @@ export interface Database {
           rating?: number
           text?: string | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'product_reviews_guest_checkout_id_fkey'
+            columns: ['guest_checkout_id']
+            isOneToOne: false
+            referencedRelation: 'guest_checkouts'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'product_reviews_order_id_fkey'
             columns: ['order_id']
@@ -2092,6 +2105,81 @@ export interface Database {
           },
         ]
       }
+      review_invites: {
+        Row: {
+          author_name: string | null
+          created_at: string
+          expires_at: string
+          guest_checkout_id: string | null
+          order_id: string | null
+          product_id: string
+          review_id: string | null
+          token: string
+          used_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          created_at?: string
+          expires_at?: string
+          guest_checkout_id?: string | null
+          order_id?: string | null
+          product_id: string
+          review_id?: string | null
+          token: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          created_at?: string
+          expires_at?: string
+          guest_checkout_id?: string | null
+          order_id?: string | null
+          product_id?: string
+          review_id?: string | null
+          token?: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'review_invites_guest_checkout_id_fkey'
+            columns: ['guest_checkout_id']
+            isOneToOne: false
+            referencedRelation: 'guest_checkouts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'review_invites_order_id_fkey'
+            columns: ['order_id']
+            isOneToOne: false
+            referencedRelation: 'orders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'review_invites_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'review_invites_review_id_fkey'
+            columns: ['review_id']
+            isOneToOne: false
+            referencedRelation: 'product_reviews'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'review_invites_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       server_carts: {
         Row: {
           id: string
@@ -2516,6 +2604,14 @@ export interface Database {
         }
         Returns: string
       }
+      create_review_invites: {
+        Args: { p_order_id: string, p_table: string }
+        Returns: {
+          product_id: string
+          product_name: string
+          token: string
+        }[]
+      }
       create_user_order:
         | {
           Args: {
@@ -2935,6 +3031,18 @@ export interface Database {
         }[]
       }
       get_restock_list: { Args: never, Returns: Json }
+      get_review_invite: {
+        Args: { p_token: string }
+        Returns: {
+          author_name: string | null
+          image_url: string | null
+          is_guest: boolean | null
+          product_id: string | null
+          product_name: string | null
+          product_slug: string | null
+          status: string
+        }[]
+      }
       get_reviews_by_brand: {
         Args: { p_brand_id: string, p_limit?: number, p_offset?: number }
         Returns: {
@@ -3034,6 +3142,15 @@ export interface Database {
           price: number
           stock_quantity: number
         }[]
+      }
+      submit_review_by_invite: {
+        Args: {
+          p_author_name?: string
+          p_rating: number
+          p_text: string
+          p_token: string
+        }
+        Returns: string
       }
       toggle_stock_alert: { Args: { p_product_id: string }, Returns: Json }
       validate_promo_code: {
