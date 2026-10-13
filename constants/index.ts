@@ -82,6 +82,13 @@ export const SITE_OG_IMAGE_SIZE = 1024
  * снова будете смотреть Search Console: у бренда мог появиться товар (тогда
  * строка тут просто перестаёт что-либо значить) или, наоборот, спрос мог
  * пропасть. Проверяется отчётом по страницам с фильтром `/brand/`.
+ *
+ * Пересмотр 13 октября 2026 (90 дней по 10 октября): mg-toys 65 показов и
+ * 3 клика, eva-puzzle 59 и 5, fivestar-toys 9, bowa 7, koala-diary 4 —
+ * остаются. `rc-toys` (1 показ), `shantou-yisheng` и `soba` (0) спрос
+ * потеряли, а первые два Google и так не брал в индекс («просканирована, не
+ * проиндексирована») — убраны из списка по слову владельца: закрываются
+ * `noindex` и уходят из карты, как остальные пустые бренды.
  */
 export const BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS: readonly string[] = [
   'bowa',
@@ -89,9 +96,6 @@ export const BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS: readonly string[] = [
   'fivestar-toys',
   'koala-diary',
   'mg-toys',
-  'rc-toys',
-  'shantou-yisheng',
-  'soba',
 ]
 
 export const BANNER_PLACEMENTS = {
