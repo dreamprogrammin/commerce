@@ -225,7 +225,7 @@ const categoryBrandSeo = useState<{
   seo_title: string | null
   seo_description: string | null
   seo_text: string | null
-} | null>('catalog-brand-seo', () => null)
+} | null>(`catalog-brand-seo:${ownPath}`, () => null)
 const brandSeoLoading = ref(false)
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
@@ -283,16 +283,23 @@ const availableFilters = ref<FilterAttribute[]>([])
  * воспроизводится.
  *
  * `useState` Nuxt сериализует сам, поэтому значения переживают гидратацию и
- * пустого окна не возникает. Ключ постоянный, без слага: при переходе в
- * другую категорию `loadFilterData` перезапишет списки — ровно так же, как
- * это делали обычные `ref`.
+ * пустого окна не возникает.
+ *
+ * Ключ — СО СВОИМ ПУТЁМ (`ownPath`), как и у `categoryBrandSeo` выше. Здесь
+ * стоял постоянный ключ, один на все страницы каталога, а `<NuxtPage
+ * :keepalive>` держит в памяти несколько экземпляров сразу: открытая страница
+ * переписывала списки удержанной. На бою 13 октября 2026: «Девочкам + Cufan»
+ * → `/catalog` → «Мальчикам» → «Назад» ×2 — у Cufan «Другие бренды» и линейки
+ * мальчиков со ссылками вида `/catalog/girls/brand/hstar`, связка не узнавала
+ * свой бренд и показывала вопросы раздела вместо своих, а фоновая
+ * перерисовка скрытой страницы падала в консоль с `insertBefore`.
  *
  * Остальные списки (материалы, страны, атрибуты) оставлены обычными `ref`:
  * они управляют содержимым фильтров, а те до открытия скрыты, и их
  * заполнение ничего в потоке страницы не двигает.
  */
-const availableBrands = useState<BrandForFilter[]>('catalog-brands', () => [])
-const availableProductLines = useState<ProductLine[]>('catalog-lines', () => [])
+const availableBrands = useState<BrandForFilter[]>(`catalog-brands:${ownPath}`, () => [])
+const availableProductLines = useState<ProductLine[]>(`catalog-lines:${ownPath}`, () => [])
 const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
