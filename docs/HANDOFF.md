@@ -7,7 +7,7 @@
 
 ⚠️ **Поправка к прежней шапке:** здесь стояло «Всё выкачено» — это было верно на момент той выкатки; правки, легшие в `dev` после неё, помечены в своих разделах.
 
-**13 октября — облегчение HTML страниц (лимиты Vercel): шаг 1 и порядок ключей В DEV, шаги 2–3 — ПЛАН.**
+**13 октября — облегчение HTML страниц (лимиты Vercel): шаги 1–2 и порядок ключей В DEV, шаг 3 — ПЛАН.**
 Зачем: из лимитов Hobby ближе всех к краю Fast Origin Transfer, а он и записи ISR
 (единица — 8 КБ) зависят от веса каждого ответа функции. Сырой HTML на бою:
 `/catalog/promotions` 514 КБ (96% — разметка 50 карточек по ~10 КБ), главная 386
@@ -49,7 +49,33 @@ brotli 34–46 КБ. Почти все данные страницы — сто�
    сервер → поднять (`node .output/server/index.mjs` с боевыми данными на чтение) →
    СРАЗУ два рендера подряд → сравнить побайтно; ждём «совпадают» 3 из 3. Потом влить
    в `dev` (`--no-ff`) и проверить на превью.
-3. **ПЛАН, шаг 2 — тяжёлые поля категорий только своему разделу.** Убрать из
+3. **СДЕЛАНО 13 октября (Linux), в `dev`: шаг 2 — тяжёлые поля категорий только своему
+   разделу.** Из `PUBLIC_CATEGORY_COLUMNS` убраны `description`, `seo_*` (кроме `seo_h1`),
+   `meta_*`, `canonical_url`, `og_*`, даты. Страница раздела берёт
+   `CATEGORY_PAGE_COLUMNS` (`slug`, `seo_text`, `seo_title`, `seo_keywords`,
+   `meta_title`, `meta_description`, `meta_keywords`, `canonical_url`) одним запросом
+   `category-details-<slug>` (бывший `currentCategorySeoText`, поднят выше
+   `currentCategory`) и подмешивает в `currentCategory`, только если `slug` ответа
+   совпал с текущим. Отклонения от плана: `description` категории НЕ берётся и там —
+   его читает лишь `categoryDescription`, который нигде не выводится (ESLint
+   «never used», было и до правки); `og_*` и `seo_description` категорий не читает
+   никто. Замер (сборка с боевыми данными на чтение), данные `__NUXT_DATA__` до →
+   после: главная 80 → 38 КБ, `/catalog` 76 → 34, «Куклы» 116 → 74, «Батарейки»
+   86 → 44, связка Sluban 94 → 52, карточка 78 → 35; сырой HTML главной 334 → 292.
+   Проверено: на 11 страницах (главная, хаб, `/catalog/all`, «Девочкам», «Куклы»,
+   «Батарейки», связки Sluban и Hola Toys, акции, `/brand/lego`, карточка)
+   `<head>`, видимый текст и JSON-LD побайтно как до правки (`meta_title` заполнен у
+   «Девочкам» и «Куклы», `seo_title` у 53 разделов — подмешивание задействовано);
+   клиентский маршрут из 7 переходов (girls → kukly → girls → связка cufan →
+   /catalog → boys → связка hstar) на сборках до/после совпал по title,
+   description, canonical, keywords, h1/h2, JSON-LD. Тест
+   `tests/constants/categoryColumns.test.ts` 3/3 (на прежних колонках 2 красные),
+   vitest 40 падений (база), ESLint — те же 2 старые ошибки страницы. На превью
+   `dev.uhti.kz` не смотрел.
+   **Найдено попутно, НЕ чинилось:** при клиентском переходе `/catalog` →
+   `/catalog/boys` в консоли `NotFoundError: Failed to execute 'insertBefore' on
+   'Node'` — есть и на `dev` до правки. Источник не искал. Исходный план шага 2:
+   **План, шаг 2 — тяжёлые поля категорий только своему разделу.** Убрать из
    `constants/categoryColumns.ts` (`PUBLIC_CATEGORY_COLUMNS`): `description`,
    `seo_title`, `seo_keywords`, `meta_title`, `meta_description`, `meta_keywords`,
    `seo_description`, `canonical_url`, `og_title`, `og_description`, `og_image`,

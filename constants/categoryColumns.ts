@@ -25,6 +25,16 @@
  * Перечислено списком, а не вычитанием: PostgREST не умеет «всё кроме», а
  * `select('*')` вернул бы поле обратно при любом изменении схемы.
  *
+ * Тяжёлые поля текущего раздела — SEO-заголовки и описания, ключевые
+ * слова, `canonical_url` — тоже не здесь. Их читает только
+ * страница раздела (`pages/catalog/[...slug].vue`) и только у СВОЕЙ категории,
+ * поэтому она достаёт их одной строкой вместе с `seo_text`
+ * (`CATEGORY_PAGE_COLUMNS`). В общей выборке они ехали на каждую страницу
+ * сайта за всеми 65 категориями: `description` один давал четверть данных
+ * главной. Даты, `seo_description` и `og_*` категорий публично не читает
+ * никто — у карты сайта свой запрос. `seo_h1` остаётся: им подписаны ссылки
+ * на подразделы и бренды.
+ *
  * Список лежит здесь, а не в сторе, потому что читателей два: сам стор и
  * серверный обработчик `server/api/categories.get.ts`, который кеширует
  * выборку. Нитро не может импортировать из `stores/` — там Pinia и
@@ -35,28 +45,34 @@ export const PUBLIC_CATEGORY_COLUMNS = [
   'name',
   'slug',
   'href',
-  'description',
   'parent_id',
   'is_root_category',
   'display_in_menu',
   'display_order',
   'image_url',
   'icon_name',
-  'created_at',
-  'updated_at',
   'is_featured',
   'featured_order',
-  'seo_title',
   'seo_h1',
-  'seo_keywords',
   'allowed_brand_ids',
   'allowed_product_line_ids',
+].join(', ')
+
+/**
+ * Поля, которые страница раздела достаёт точечно для своей категории.
+ * `seo_description` и `og_*` у категорий не читает никто, их нет и тут.
+ * `description` тоже нет: на странице его читает только `categoryDescription`,
+ * а тот не выводится нигде (ESLint: «assigned a value but never used»).
+ * `slug` — чтобы при переходе между разделами не подмешать к новому разделу
+ * поля прежнего, пока запрос ещё в пути.
+ */
+export const CATEGORY_PAGE_COLUMNS = [
+  'slug',
+  'seo_text',
+  'seo_title',
+  'seo_keywords',
   'meta_title',
   'meta_description',
   'meta_keywords',
-  'seo_description',
   'canonical_url',
-  'og_title',
-  'og_description',
-  'og_image',
 ].join(', ')
