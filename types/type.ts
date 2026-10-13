@@ -549,7 +549,10 @@ export type BannerUpdate = Database['public']['Tables']['banners']['Update']
 // Product Reviews
 export interface ProductReviewRow {
   id: string
-  user_id: string
+  /** NULL — отзыв гостя по ссылке из письма (`author_name`, `guest_checkout_id`). */
+  user_id: string | null
+  author_name: string | null
+  guest_checkout_id: string | null
   product_id: string
   order_id: string | null
   rating: number

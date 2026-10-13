@@ -56,6 +56,8 @@ const ROBOTS_PRIVATE_PATHS = [
   '/forgot-password',
   '/login',
   '/order',
+  // Отзыв по ссылке из письма: у каждой ссылки свой токен, искать нечего
+  '/review',
   '/profile',
   '/register',
   '/reset-password',
@@ -398,6 +400,7 @@ export default defineNuxtConfig({
       '/confirm/**',
       '/forgot-password/**',
       '/order/**',
+      '/review/**',
       '/profile/**',
       '/register/**',
       '/reset-password/**',

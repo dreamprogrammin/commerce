@@ -31,6 +31,13 @@ function formatDate(dateStr: string) {
   })
 }
 
+/** Отзыв гостя (по ссылке из письма) подписан именем из формы — профиля у него нет. */
+function authorLabel(r: { user_id: string | null, author_name: string | null, profiles: { first_name: string | null, last_name: string | null } | null }) {
+  if (!r.user_id)
+    return `${r.author_name || 'Покупатель'} · гость, по ссылке из письма`
+  return [r.profiles?.first_name, r.profiles?.last_name].filter(Boolean).join(' ') || 'Пользователь'
+}
+
 function getThumbUrl(imageUrl: string) {
   return getImageUrl(BUCKET_NAME_REVIEWS, imageUrl, IMAGE_PRESETS.REVIEW_THUMB)
 }
@@ -125,7 +132,7 @@ function getThumbUrl(imageUrl: string) {
             </div>
 
             <p class="text-xs text-muted-foreground mt-2">
-              {{ [r.profiles?.first_name, r.profiles?.last_name].filter(Boolean).join(' ') || 'Пользователь' }} · {{ formatDate(r.created_at) }}
+              {{ authorLabel(r) }} · {{ formatDate(r.created_at) }}
             </p>
           </div>
 

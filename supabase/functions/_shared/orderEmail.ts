@@ -16,7 +16,9 @@ import { PICKUP_POINT } from './shopInfo.ts'
 // deno-lint-ignore no-explicit-any
 type Supabase = any
 
-const SITE = 'https://uhti.kz'
+// SITE_URL на бою не задан (как и у track-order) — переопределяется только
+// на стенде, чтобы ссылки из письма вели на локальный сайт
+const SITE = Deno.env.get('SITE_URL') ?? 'https://uhti.kz'
 // Адрес и часы — из shopInfo.ts, зеркала `constants/shop.ts`; телефон — оттуда же
 // на сайте (`SHOP.phoneHuman`), в shopInfo его нет
 const SHOP = {
@@ -71,6 +73,30 @@ export async function sendOrderEmail(
     }))
   }
 
+  let reviewLinks: { name: string, url: string }[] | undefined
+  if (kind === 'delivered') {
+    /*
+     * Письмо «доставлен» шлём ради ссылок на отзыв без входа (13 октября
+     * 2026). Без них оно не нужно: «доставлен» человек знает и сам (решение
+     * владельца 29 сентября) — поэтому нет ссылок, нет и письма.
+     */
+    const { data: invites, error: invitesError } = await supabase.rpc('create_review_invites', { p_table: table, p_order_id: orderId })
+    if (invitesError)
+      return `ссылки на отзыв не выпущены (${invitesError.message}) — письмо не отправлялось`
+    const links = (invites ?? []) as { product_name: string, token: string }[]
+    if (!links.length)
+      return 'отзывы на все товары уже есть — письмо не отправлялось'
+    /*
+     * Ссылка ведёт на страницу сайта, а сайт выкатывается отдельно от
+     * функций: база и функции у превью и боя общие, а uhti.kz крутит свою
+     * сборку. Пока страницы `/review/<токен>` там нет, письмо со ссылками
+     * в 404 хуже, чем никакого, — проверяем первую ссылку.
+     */
+    if (!await pageIsLive(`${SITE}/review/${links[0]!.token}`))
+      return 'страницы отзыва на сайте ещё нет — письмо не отправлялось'
+    reviewLinks = links.map(l => ({ name: l.product_name, url: `${SITE}/review/${l.token}` }))
+  }
+
   let pickup = null
   if (order.pickup_point_id) {
     const { data } = await supabase.from('pickup_points').select('name, address, working_hours').eq('id', order.pickup_point_id).maybeSingle()
@@ -86,6 +112,7 @@ export async function sendOrderEmail(
     total: Number(order.final_amount ?? 0),
     deliveryCost: Number(order.delivery_cost ?? 0),
     items,
+    reviewLinks,
     pickup,
     shop: SHOP,
   })
@@ -113,5 +140,19 @@ export async function sendOrderEmail(
   })
   if (!res.ok)
     return `Resend ответил ${res.status}: ${(await res.text()).slice(0, 200)}`
-  return `письмо «${kind}» отправлено`
+  return `письмо «${kind}» отправлено${reviewLinks ? `, ссылок на отзыв: ${reviewLinks.length}` : ''}`
+}
+
+/**
+ * Страница отвечает 200. Сбой сети или тайм-аут — тоже «нет»: повтора нет,
+ * письмо по этому заказу просто не уйдёт, как и до 13 октября.
+ */
+async function pageIsLive(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) })
+    return res.status === 200
+  }
+  catch {
+    return false
+  }
 }
