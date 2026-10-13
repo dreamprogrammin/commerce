@@ -5,6 +5,7 @@ import type {
   AttributeFilter,
   AttributeWithValue,
   BrandForFilter,
+  CategoryRow,
   Country,
   IBreadcrumbItem,
   IProductFilters,
@@ -30,6 +31,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/constants'
+import { CATEGORY_PAGE_COLUMNS } from '@/constants/categoryColumns'
 import { categoryStaticFor } from '@/constants/categoryStaticText'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
@@ -538,12 +540,58 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   return [CATALOG_CRUMB, ...crumbs]
 })
 
+/**
+ * Тяжёлые поля текущей категории — точечным запросом, одной строкой:
+ * `seo_text`, SEO-заголовки, ключевые слова, `canonical_url` (список —
+ * `CATEGORY_PAGE_COLUMNS`).
+ *
+ * В `categoriesStore` эти поля намеренно не выбираются: стор уезжает в
+ * payload каждой страницы сайта со всеми 65 категориями, а нужны поля только
+ * здесь и только своей категории. `seo_text` один весил 76 КБ на все
+ * категории, `description` — четверть данных главной.
+ *
+ * Урок коммита c8e77b5: `seo_text` тогда убрали из общей выборки, не заметив
+ * здешнего потребителя, и на превью пропали три заголовка и `articleBody`.
+ * Поэтому поля не выброшены, а переехали сюда и подмешиваются в
+ * `currentCategory` — читатели ниже их не заметили.
+ *
+ * Стоит ВЫШЕ `currentCategory`: тот читает результат при объявлении.
+ */
+const { data: currentCategoryDetails } = await useAsyncData(
+  () => `category-details-${currentCategorySlug.value}`,
+  async () => {
+    const slug = currentCategorySlug.value
+    if (!slug || slug === 'all')
+      return null
+
+    const { data } = await supabase
+      .from('categories')
+      .select(CATEGORY_PAGE_COLUMNS)
+      .eq('slug', slug)
+      .maybeSingle()
+
+    return (data as Partial<CategoryRow> | null) ?? null
+  },
+  { watch: [currentCategorySlug] },
+)
+
+const currentCategorySeoText = computed(() => currentCategoryDetails.value?.seo_text ?? null)
+
 const currentCategory = computed(() => {
   if (!categoriesStore.allCategories.length)
     return null
-  return categoriesStore.allCategories.find(
+  const base = categoriesStore.allCategories.find(
     c => c.slug === currentCategorySlug.value,
   )
+  if (!base)
+    return base
+  /*
+   * Поля подмешиваются, только если запрос был за ЭТОТ раздел: при переходе
+   * slug меняется раньше, чем приходит ответ, и без проверки новый раздел
+   * на мгновение получил бы заголовок и canonical прежнего.
+   */
+  const details = currentCategoryDetails.value
+  return details?.slug === base.slug ? { ...base, ...details } : base
 })
 
 const categoryOgImageUrl = computed(() => {
@@ -1756,37 +1804,6 @@ const metaKeywords = computed(() => {
   }
   return null
 })
-
-/**
- * SEO-текст текущей категории — точечным запросом, одной строкой.
- *
- * В `categoriesStore` это поле намеренно не выбирается: оно весит 76 КБ
- * на все 64 категории и раздувало payload на каждой странице сайта.
- * Но выбросить его совсем нельзя — на странице категории оно рисует
- * SEO-блок и попадает в `articleBody` разметки Schema.org.
- *
- * Именно это я и сломал коммитом c8e77b5: убрал поле из общей выборки,
- * не заметив здешнего потребителя. На превью пропали три заголовка
- * и `articleBody`, текста на странице стало 2620 знаков против 4913
- * на проде. Тут — восстановление, но уже без общего раздувания.
- */
-const { data: currentCategorySeoText } = await useAsyncData(
-  () => `category-seo-text-${currentCategorySlug.value}`,
-  async () => {
-    const slug = currentCategorySlug.value
-    if (!slug || slug === 'all')
-      return null
-
-    const { data } = await supabase
-      .from('categories')
-      .select('seo_text')
-      .eq('slug', slug)
-      .maybeSingle()
-
-    return (data as { seo_text: string | null } | null)?.seo_text ?? null
-  },
-  { watch: [currentCategorySlug] },
-)
 
 const seoText = computed(() => {
   /*
