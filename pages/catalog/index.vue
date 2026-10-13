@@ -5,7 +5,7 @@ import { useIsMobile } from '@/composables/useIsMobile'
 import { BUCKET_NAME_CATEGORY } from '@/constants'
 import { catalogFaq, catalogStaticHtml } from '@/constants/catalogStaticText'
 import { catalogRootShell } from '@/lib/shell'
-import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { isCategoryShown, useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 import { promoEmoji, promoGradientClass, promoSubtitle } from '@/utils/promoTiles'
 
@@ -80,9 +80,19 @@ if (import.meta.client) {
   )
 }
 
+/*
+ * Пустые разделы на хабе не показываются — ни плиткой, ни в разметке
+ * ItemList. Правило общее с меню и `noindex` (`isCategoryShown`): 13 октября
+ * 2026 здесь стояли плитки «Игрушечное оружие», «Коврики», «Плюшевые
+ * игрушки» и «Ролевые наборы» без единого товара.
+ */
+const shownCategories = computed<CategoryRow[]>(() =>
+  (catalogData.value?.categories || []).filter(isCategoryShown),
+)
+
 // Получаем подкатегории второго уровня
 const secondLevelCategories = computed<CategoryRow[]>(() => {
-  const allCats = catalogData.value?.categories || []
+  const allCats = shownCategories.value
 
   return allCats
     .filter((cat) => {
@@ -213,7 +223,7 @@ useIndexableRobotsRule({
 
 const showSkeleton = computed(() => pending.value && !catalogData.value)
 const additionalItems = computed(() => catalogData.value?.additional || [])
-const allCategories = computed<CategoryRow[]>(() => catalogData.value?.categories || [])
+const allCategories = computed<CategoryRow[]>(() => shownCategories.value)
 
 // Определяем размер карточки
 function getCategorySize(category: CategoryRow): 'small' | 'medium' | 'large' {

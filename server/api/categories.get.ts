@@ -1,4 +1,5 @@
 import { PUBLIC_CATEGORY_COLUMNS } from '~/constants/categoryColumns'
+import { countProductsByCategory } from '~/utils/categoryLanding'
 
 /**
  * Список категорий с серверным кешем.
@@ -24,6 +25,13 @@ import { PUBLIC_CATEGORY_COLUMNS } from '~/constants/categoryColumns'
  * `maxAge` 600 с при `staleMaxAge` 3600: правка категории в админке доедет
  * до витрины за десять минут, а если Supabase в этот момент недоступна,
  * посетитель получит вчерашний список вместо ошибки.
+ *
+ * `products_in_branch` — сколько активных товаров во всей ветке раздела (тем
+ * же `countProductsByCategory`, что у карты сайта и robots страницы). По нему
+ * меню и хаб `/catalog` прячут пустые разделы: 13 октября 2026 в мега-меню
+ * стояли 11 разделов без единого товара («Игрушечное оружие», «Коврики»…),
+ * и покупатель попадал на пустую полку. Не удалось посчитать — поля нет, и
+ * разделы показываются как раньше.
  */
 export default defineCachedEventHandler(
   async () => {
@@ -31,16 +39,31 @@ export default defineCachedEventHandler(
       supabase: { url: string, key: string }
     }
 
-    return await $fetch<unknown[]>(`${supabase.url}/rest/v1/categories`, {
-      query: {
-        select: PUBLIC_CATEGORY_COLUMNS,
-        order: 'display_order',
-      },
-      headers: {
-        apikey: supabase.key,
-        Authorization: `Bearer ${supabase.key}`,
-      },
-    })
+    const headers = {
+      apikey: supabase.key,
+      Authorization: `Bearer ${supabase.key}`,
+    }
+    const [categories, products] = await Promise.all([
+      $fetch<{ id: string, parent_id: string | null }[]>(`${supabase.url}/rest/v1/categories`, {
+        query: {
+          select: PUBLIC_CATEGORY_COLUMNS,
+          order: 'display_order',
+        },
+        headers,
+      }),
+      $fetch<{ category_id: string | null }[]>(`${supabase.url}/rest/v1/products`, {
+        query: { select: 'category_id', is_active: 'eq.true' },
+        headers,
+      }).catch(() => null),
+    ])
+
+    if (!products)
+      return categories
+    const counts = countProductsByCategory(products, categories)
+    return categories.map(category => ({
+      ...category,
+      products_in_branch: counts.get(category.id) ?? 0,
+    }))
   },
   {
     name: 'categories',

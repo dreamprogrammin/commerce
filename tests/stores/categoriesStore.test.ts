@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { isCategoryShown, useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 
 /*
  * Состояние Pinia целиком уезжает в HTML каждой страницы (`__NUXT_DATA__`).
@@ -92,5 +92,43 @@ describe('categoriesStore: дерево меню', () => {
     store.allCategories = [...store.allCategories]
     expect(constructorsChild().brands).toHaveLength(1)
     expect(constructorsChild().brandsLoaded).toBe(true)
+  })
+})
+
+/*
+ * Пустые разделы в меню не показываются (13 октября 2026: 11 разделов без
+ * единого товара стояли в мега-меню). Число товаров в ветке приходит из
+ * `/api/categories` полем `products_in_branch`.
+ */
+describe('categoriesStore: пустые разделы', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('раздел без товаров в ветке из меню пропадает, с товаром — остаётся', async () => {
+    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue([
+      row('girls', { products_in_branch: 5 }),
+      row('kukly', { parent_id: 'girls', is_root_category: false, products_in_branch: 5 }),
+      row('kukly-aksessuary', { parent_id: 'girls', is_root_category: false, products_in_branch: 0 }),
+      row('boys', { products_in_branch: 0 }),
+    ]))
+    const store = useCategoriesStore()
+    await store.fetchCategoryData()
+
+    expect(store.menuTree.map(c => c.slug)).toEqual(['girls'])
+    expect(store.menuTree[0]!.children!.map(c => c.slug)).toEqual(['kukly'])
+  })
+
+  it('исключения владельца остаются и пустыми', () => {
+    expect(isCategoryShown({ slug: 'katalki', products_in_branch: 0 })).toBe(true)
+  })
+
+  it('без счёта (запрос не удался) — показывать, как раньше', () => {
+    expect(isCategoryShown({ slug: 'boys' })).toBe(true)
+    expect(isCategoryShown({ slug: 'boys', products_in_branch: 0 })).toBe(false)
   })
 })
