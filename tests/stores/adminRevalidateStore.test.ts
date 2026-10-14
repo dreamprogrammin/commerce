@@ -1,10 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStore'
+import { DELAY_MS, useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStore'
 import { buildRevalidateRequests, mergeRevalidateBody } from '@/utils/revalidatePages'
 
 /*
- * Правки админки копятся и уходят одним пакетом через минуту после последней:
+ * Правки админки копятся и уходят одним пакетом через DELAY_MS после последней:
  * десять товаров подряд пересобирали главную и раздел десять раз — записи ISR
  * сверх лимита Vercel Hobby (14 октября 2026).
  */
@@ -58,17 +58,21 @@ describe('очередь сброса кеша', () => {
     vi.unstubAllGlobals()
   })
 
-  it('две правки подряд — один запрос через минуту после ПОСЛЕДНЕЙ', async () => {
+  it('пауза — 10 минут: товар заводится дольше минуты', () => {
+    expect(DELAY_MS).toBe(10 * 60_000)
+  })
+
+  it('две правки подряд — один запрос через DELAY_MS после ПОСЛЕДНЕЙ', async () => {
     const queue = useAdminRevalidateStore()
     queue.enqueue({ productIds: [A] })
-    await vi.advanceTimersByTimeAsync(40_000)
+    await vi.advanceTimersByTimeAsync(DELAY_MS * 0.7)
     queue.enqueue({ productIds: [B] })
     expect(queue.changes).toBe(2)
 
-    await vi.advanceTimersByTimeAsync(40_000)
+    await vi.advanceTimersByTimeAsync(DELAY_MS * 0.7)
     expect(adminFetch).not.toHaveBeenCalled()
 
-    await vi.advanceTimersByTimeAsync(20_000)
+    await vi.advanceTimersByTimeAsync(DELAY_MS * 0.3)
     expect(adminFetch).toHaveBeenCalledTimes(1)
     expect(adminFetch.mock.calls[0]![1].body).toEqual({ productIds: [A, B] })
     expect(queue.changes).toBe(0)
@@ -81,7 +85,7 @@ describe('очередь сброса кеша', () => {
     queue.enqueue({ paths: ['/'] })
     await queue.flushNow()
     expect(adminFetch).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(120_000)
+    await vi.advanceTimersByTimeAsync(DELAY_MS * 2)
     expect(adminFetch).toHaveBeenCalledTimes(1)
   })
 
