@@ -915,6 +915,18 @@ const agePreview = computed(() =>
   formatAgeRange(formData.value.min_age_months, formData.value.max_age_months),
 )
 
+/** Что форма уже знает о товаре — в блок ДАННЫЕ промпта (constants/adminPrompts.ts). */
+const promptData = computed(() => ({
+  name: formData.value?.name,
+  brand: brands.value.find(b => b.id === formData.value?.brand_id)?.name,
+  category: categoriesStore.allCategories.find(c => c.id === formData.value?.category_id)?.name,
+  sku: formData.value?.sku,
+  specs: formData.value?.piece_count ? `${formData.value.piece_count} деталей` : null,
+  age: agePreview.value,
+  price: formData.value?.price || null,
+  description: formData.value?.description,
+}))
+
 // --- 12. АКТУАЛЬНАЯ ЦЕНА СО СКИДКОЙ ---
 
 const discountedPrice = computed(() => {
@@ -1118,8 +1130,9 @@ const seoKeywordsString = computed({
     <div class="lg:col-span-2 space-y-6">
       <!-- ℹ️ Основная информация -->
       <Card>
-        <CardHeader>
+        <CardHeader class="flex flex-row items-center justify-between gap-3 space-y-0">
           <CardTitle>Основная информация</CardTitle>
+          <AdminAiPromptButton kind="product" :data="promptData" />
         </CardHeader>
         <CardContent class="space-y-4">
           <div>
