@@ -11,12 +11,13 @@ const BASE = { orderNumber: 1004, statusUrl: 'https://uhti.kz/order/t/ec55733a3f
 
 describe('письма о заказе', () => {
   it('пишем только когда покупателю нужно что-то сделать или узнать важное', () => {
-    // Решение владельца: обычный заказ — два письма, «принят» и «готов / везут»
-    expect(EMAIL_STATUSES).toEqual(['shipped', 'cancelled'])
+    // Решение владельца 29 сентября: «принят» и «готов / везут»; 13 октября
+    // добавлено «доставлен» — ради ссылок на отзыв без входа
+    expect(EMAIL_STATUSES).toEqual(['shipped', 'delivered', 'cancelled'])
   })
 
   it('все письма заказа — одна тема и одна цепочка', () => {
-    const kinds = ['created', 'shipped', 'cancelled'] as const
+    const kinds = ['created', 'shipped', 'delivered', 'cancelled'] as const
     const subjects = kinds.map(kind => orderEmailCopy({ ...BASE, kind, deliveryMethod: 'pickup' }).subject)
     expect(new Set(subjects)).toEqual(new Set([orderEmailSubject(1004)]))
     expect(orderEmailSubject(1004)).toBe('Заказ №1004 — Ухтышка')
@@ -53,6 +54,31 @@ describe('письма о заказе', () => {
     expect(orderEmailCopy({ ...BASE, kind: 'delivered', deliveryMethod: 'pickup' }).heading).toBe('Заказ №1004 выдан')
     expect(orderEmailCopy({ ...BASE, kind: 'delivered', deliveryMethod: 'courier' }).heading).toBe('Заказ №1004 доставлен')
     expect(orderEmailCopy({ ...BASE, kind: 'cancelled', deliveryMethod: 'courier' }).lead).toContain(SHOP.phoneHuman)
+  })
+
+  it('«доставлен» — кнопка «Оставить отзыв» у каждого товара, ссылки и в текстовой версии', () => {
+    const reviewLinks = [
+      { name: 'Кукла <LOL>', url: 'https://uhti.kz/review/aaa' },
+      { name: 'Толокар', url: 'https://uhti.kz/review/bbb' },
+    ]
+    const m = buildOrderEmail({ ...BASE, kind: 'delivered', deliveryMethod: 'pickup', reviewLinks })
+    expect(m.html.match(/>Оставить отзыв</g)).toHaveLength(2)
+    expect(m.html).toContain('href="https://uhti.kz/review/aaa"')
+    expect(m.html).toContain('Кукла &lt;LOL&gt;')
+    expect(m.text).toContain('Кукла <LOL> — https://uhti.kz/review/aaa')
+    expect(m.text).toContain('Толокар — https://uhti.kz/review/bbb')
+    expect(m.text).toContain('входить на сайт не нужно')
+    expect(m.html).toContain('https://uhti.kz/order/t/ec55733a3fec')
+  })
+
+  it('ссылки на отзыв — только в письме «доставлен»', () => {
+    const reviewLinks = [{ name: 'Толокар', url: 'https://uhti.kz/review/bbb' }]
+    for (const kind of ['created', 'confirmed', 'shipped', 'cancelled'] as const) {
+      const m = buildOrderEmail({ ...BASE, kind, deliveryMethod: 'courier', reviewLinks })
+      expect(m.html).not.toContain('Оставить отзыв')
+      expect(m.text).not.toContain('/review/')
+    }
+    expect(buildOrderEmail({ ...BASE, kind: 'delivered', deliveryMethod: 'courier' }).html).not.toContain('Оцените покупку')
   })
 
   it('письмо о статусе — без состава, но со ссылкой; ₸ не отрывается от числа', () => {

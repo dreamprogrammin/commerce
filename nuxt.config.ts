@@ -56,6 +56,8 @@ const ROBOTS_PRIVATE_PATHS = [
   '/forgot-password',
   '/login',
   '/order',
+  // Отзыв по ссылке из письма: у каждой ссылки свой токен, искать нечего
+  '/review',
   '/profile',
   '/register',
   '/reset-password',
@@ -398,6 +400,7 @@ export default defineNuxtConfig({
       '/confirm/**',
       '/forgot-password/**',
       '/order/**',
+      '/review/**',
       '/profile/**',
       '/register/**',
       '/reset-password/**',
@@ -898,7 +901,13 @@ export default defineNuxtConfig({
     },
     clientOptions: {
       auth: {
-        // ✅ Используем localStorage вместо cookie storage для лучшей совместимости
+        // ⚠️ НЕ трогать без разбора. Хранилище — куки, а не localStorage (как
+        // утверждал прежний комментарий). Из-за этого ключа серверный клиент
+        // ищет куку `supabase-auth-token`, а браузер пишет `sb-<проект>-auth-token`,
+        // — и SSR не видит входа. Это НАРОЧНО оставлено так: увидев сессию,
+        // `@nuxtjs/supabase` положит токены вошедшего в payload страницы, а
+        // страницы кешируются ISR и отдаются всем. Админка показывает себя
+        // серверу токеном в заголовке — utils/adminFetch.ts, requireAdmin.
         storageKey: 'supabase-auth-token',
         // ✅ Включаем автоматическое обновление токена
         autoRefreshToken: true,

@@ -14,11 +14,13 @@ import type {
   ProductUpdate,
   ProductWithImages,
 } from '@/types'
+import type { DeletedProductTarget } from '@/utils/revalidatePages'
 import { toast } from 'vue-sonner'
 import { announceIconFixes, sanitizeIconRow } from '@/composables/admin/useIconNameGuard'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStore'
 import { formatFileSize, generateBlurPlaceholder, generateImageVariants, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
 import { cleanProductName } from '@/utils/productName'
 
@@ -287,10 +289,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
    * зависит. Без него новая цена доезжала до карточки через час, а касса
    * брала её сразу (30 сентября 2026) — см. server/api/admin/revalidate-product.post.ts.
    */
-  function revalidateProductPages(body: { productId: string } | { slug: string, categoryId: string | null, brandId: string | null }) {
-    $fetch('/api/admin/revalidate-product', { method: 'POST', body }).catch((error) => {
-      console.warn('[revalidate] не удалось сбросить кеш страниц товара', error)
-    })
+  function revalidateProductPages(body: { productId: string } | DeletedProductTarget) {
+    // В очередь, а не сразу: см. stores/adminStore/adminRevalidateStore.ts.
+    const queue = useAdminRevalidateStore()
+    if ('productId' in body)
+      queue.enqueue({ productIds: [body.productId] })
+    else
+      queue.enqueueDeletedProduct(body)
   }
 
   /**
@@ -352,6 +357,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       const { row: safeProduct, report } = await sanitizeIconRow(withCleanName(productData))
       announceIconFixes(report)
 
+      // Прежний адрес — см. ниже, сброс кеша старой карточки.
+      const { data: before } = await supabase
+        .from('products')
+        .select('slug')
+        .eq('id', productId)
+        .maybeSingle()
+
       const { data: updatedProduct, error } = await supabase
         .from('products')
         .update(safeProduct)
@@ -370,6 +382,16 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         notifySearchEngines(updatedProduct.slug)
       }
       revalidateProductPages({ productId })
+      /*
+       * Сменилось название — сменился и адрес. Сброс по `productId` считает
+       * страницы по НОВОМУ слагу, и старая карточка оставалась в кеше Vercel
+       * до суток со старым текстом, хотя страница умеет уводить прежний адрес
+       * 301-м на новый (slug history). Найдено 14 октября 2026 на превью:
+       * MOKA 2260 переименован в MokaToys 2260B, старый адрес — `HIT` со
+       * старым заголовком. Сброс старого адреса пересобирает его в редирект.
+       */
+      if (before?.slug && before.slug !== updatedProduct.slug)
+        useAdminRevalidateStore().enqueue({ paths: [`/catalog/products/${before.slug}`] })
 
       toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
       return updatedProduct

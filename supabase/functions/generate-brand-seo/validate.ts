@@ -97,5 +97,13 @@ export function checkLengths(item: GeneratedBrandSeo): string[] {
   if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(`${item.meta_title}${item.seo_h1}${item.seo_description}`))
     warnings.push('В тексте остались эмодзи')
 
+  // Сроки — как на /terms: Алматы 1–3 рабочих дня, Казахстан 3–7. Модель уже
+  // писала «за 1 день» (факты функции обещали это до 14 октября 2026).
+  const all = `${item.meta_title} ${item.seo_description} ${item.description}`
+  if (/за\s+1\s+день|за\s+один\s+день|по\s+(всему\s+)?казахстану[^.]{0,40}1[–-]3/i.test(all))
+    warnings.push('Неверное обещание доставки: по условиям Алматы 1–3 рабочих дня, Казахстан 3–7')
+  if (/(широк|больш|огромн|богат)(ий|ой|ого|ый)\s+(выбор|ассортимент)|заказывайте|прямо сейчас|вы найд[её]те/i.test(all))
+    warnings.push('Шаблонная вода («широкий выбор», «заказывайте прямо сейчас») — переписать')
+
   return warnings
 }

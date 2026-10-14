@@ -5,6 +5,7 @@ import type {
   AttributeFilter,
   AttributeWithValue,
   BrandForFilter,
+  CategoryRow,
   Country,
   IBreadcrumbItem,
   IProductFilters,
@@ -30,9 +31,10 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useCatalogQuery, useCatalogSsrData } from '@/composables/useCatalogQuery'
 import { useSafeHtml } from '@/composables/useSafeHtml'
 import { BUCKET_NAME_CATEGORY, BUCKET_NAME_PRODUCT, SITE_OG_IMAGE_URL } from '@/constants'
+import { CATEGORY_PAGE_COLUMNS } from '@/constants/categoryColumns'
 import { categoryStaticFor } from '@/constants/categoryStaticText'
 import { carouselContainerVariants } from '@/lib/variants'
-import { useCategoriesStore } from '@/stores/publicStore/categoriesStore'
+import { isCategoryShown, useCategoriesStore } from '@/stores/publicStore/categoriesStore'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
 import {
   buildBrandLandingPath,
@@ -223,7 +225,7 @@ const categoryBrandSeo = useState<{
   seo_title: string | null
   seo_description: string | null
   seo_text: string | null
-} | null>('catalog-brand-seo', () => null)
+} | null>(`catalog-brand-seo:${ownPath}`, () => null)
 const brandSeoLoading = ref(false)
 
 // --- 2. ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
@@ -281,16 +283,23 @@ const availableFilters = ref<FilterAttribute[]>([])
  * воспроизводится.
  *
  * `useState` Nuxt сериализует сам, поэтому значения переживают гидратацию и
- * пустого окна не возникает. Ключ постоянный, без слага: при переходе в
- * другую категорию `loadFilterData` перезапишет списки — ровно так же, как
- * это делали обычные `ref`.
+ * пустого окна не возникает.
+ *
+ * Ключ — СО СВОИМ ПУТЁМ (`ownPath`), как и у `categoryBrandSeo` выше. Здесь
+ * стоял постоянный ключ, один на все страницы каталога, а `<NuxtPage
+ * :keepalive>` держит в памяти несколько экземпляров сразу: открытая страница
+ * переписывала списки удержанной. На бою 13 октября 2026: «Девочкам + Cufan»
+ * → `/catalog` → «Мальчикам» → «Назад» ×2 — у Cufan «Другие бренды» и линейки
+ * мальчиков со ссылками вида `/catalog/girls/brand/hstar`, связка не узнавала
+ * свой бренд и показывала вопросы раздела вместо своих, а фоновая
+ * перерисовка скрытой страницы падала в консоль с `insertBefore`.
  *
  * Остальные списки (материалы, страны, атрибуты) оставлены обычными `ref`:
  * они управляют содержимым фильтров, а те до открытия скрыты, и их
  * заполнение ничего в потоке страницы не двигает.
  */
-const availableBrands = useState<BrandForFilter[]>('catalog-brands', () => [])
-const availableProductLines = useState<ProductLine[]>('catalog-lines', () => [])
+const availableBrands = useState<BrandForFilter[]>(`catalog-brands:${ownPath}`, () => [])
+const availableProductLines = useState<ProductLine[]>(`catalog-lines:${ownPath}`, () => [])
 const availableMaterials = ref<Material[]>([])
 const availableCountries = ref<Country[]>([])
 const isLoadingFilters = ref(true)
@@ -538,12 +547,58 @@ const breadcrumbs = computed<IBreadcrumbItem[]>(() => {
   return [CATALOG_CRUMB, ...crumbs]
 })
 
+/**
+ * Тяжёлые поля текущей категории — точечным запросом, одной строкой:
+ * `seo_text`, SEO-заголовки, ключевые слова, `canonical_url` (список —
+ * `CATEGORY_PAGE_COLUMNS`).
+ *
+ * В `categoriesStore` эти поля намеренно не выбираются: стор уезжает в
+ * payload каждой страницы сайта со всеми 65 категориями, а нужны поля только
+ * здесь и только своей категории. `seo_text` один весил 76 КБ на все
+ * категории, `description` — четверть данных главной.
+ *
+ * Урок коммита c8e77b5: `seo_text` тогда убрали из общей выборки, не заметив
+ * здешнего потребителя, и на превью пропали три заголовка и `articleBody`.
+ * Поэтому поля не выброшены, а переехали сюда и подмешиваются в
+ * `currentCategory` — читатели ниже их не заметили.
+ *
+ * Стоит ВЫШЕ `currentCategory`: тот читает результат при объявлении.
+ */
+const { data: currentCategoryDetails } = await useAsyncData(
+  () => `category-details-${currentCategorySlug.value}`,
+  async () => {
+    const slug = currentCategorySlug.value
+    if (!slug || slug === 'all')
+      return null
+
+    const { data } = await supabase
+      .from('categories')
+      .select(CATEGORY_PAGE_COLUMNS)
+      .eq('slug', slug)
+      .maybeSingle()
+
+    return (data as Partial<CategoryRow> | null) ?? null
+  },
+  { watch: [currentCategorySlug] },
+)
+
+const currentCategorySeoText = computed(() => currentCategoryDetails.value?.seo_text ?? null)
+
 const currentCategory = computed(() => {
   if (!categoriesStore.allCategories.length)
     return null
-  return categoriesStore.allCategories.find(
+  const base = categoriesStore.allCategories.find(
     c => c.slug === currentCategorySlug.value,
   )
+  if (!base)
+    return base
+  /*
+   * Поля подмешиваются, только если запрос был за ЭТОТ раздел: при переходе
+   * slug меняется раньше, чем приходит ответ, и без проверки новый раздел
+   * на мгновение получил бы заголовок и canonical прежнего.
+   */
+  const details = currentCategoryDetails.value
+  return details?.slug === base.slug ? { ...base, ...details } : base
 })
 
 const categoryOgImageUrl = computed(() => {
@@ -626,8 +681,14 @@ const title = computed(() => {
 const priceRange = ref({ min: 0, max: 50000 })
 const pieceCountRange = ref<{ min: number, max: number } | null>(null)
 
+/*
+ * Пустые подразделы (0 товаров в ветке) не показываются ни чипом фильтра, ни
+ * в разметке SiteNavigationElement — правило то же, что у меню и `noindex`
+ * (`isCategoryShown`). Иначе чип «Металлические машинки» давал пустую выдачу,
+ * а разметка ссылалась на закрытые от индекса страницы.
+ */
 const subcategories = computed(() =>
-  categoriesStore.getSubcategories(currentCategorySlug.value),
+  categoriesStore.getSubcategories(currentCategorySlug.value).filter(isCategoryShown),
 )
 
 /*
@@ -860,6 +921,30 @@ const displayedProducts = computed<CatalogProduct[]>(() => {
   }
   return accumulatedProducts.value
 })
+
+/*
+ * Начало цены со скидкой — для `validFrom` в разметке ItemList (Search Console
+ * держал «Отсутствует поле validFrom» на 42 разделах, 13 октября 2026).
+ * `get_filtered_products` отдаёт фиксированный набор колонок, и менять
+ * сигнатуру главной функции каталога ради одного поля незачем: один лёгкий
+ * запрос по тем десяти товарам, что идут в разметку.
+ */
+const itemListIds = computed(() => displayedProducts.value.slice(0, 10).map(p => p.id))
+const { data: saleStarts } = await useAsyncData(
+  `catalog-sale-starts:${ownPath}`,
+  async () => {
+    const ids = itemListIds.value
+    if (!ids.length)
+      return {} as Record<string, string>
+    const { data } = await supabase
+      .from('products')
+      .select('id, discount_started_at')
+      .in('id', ids)
+      .not('discount_started_at', 'is', null)
+    return Object.fromEntries((data ?? []).map(r => [r.id, r.discount_started_at as string])) as Record<string, string>
+  },
+  { watch: [itemListIds] },
+)
 
 /*
  * Здесь жил brandLandingProductsCount — число товаров связки по сетке. Им
@@ -1757,37 +1842,6 @@ const metaKeywords = computed(() => {
   return null
 })
 
-/**
- * SEO-текст текущей категории — точечным запросом, одной строкой.
- *
- * В `categoriesStore` это поле намеренно не выбирается: оно весит 76 КБ
- * на все 64 категории и раздувало payload на каждой странице сайта.
- * Но выбросить его совсем нельзя — на странице категории оно рисует
- * SEO-блок и попадает в `articleBody` разметки Schema.org.
- *
- * Именно это я и сломал коммитом c8e77b5: убрал поле из общей выборки,
- * не заметив здешнего потребителя. На превью пропали три заголовка
- * и `articleBody`, текста на странице стало 2620 знаков против 4913
- * на проде. Тут — восстановление, но уже без общего раздувания.
- */
-const { data: currentCategorySeoText } = await useAsyncData(
-  () => `category-seo-text-${currentCategorySlug.value}`,
-  async () => {
-    const slug = currentCategorySlug.value
-    if (!slug || slug === 'all')
-      return null
-
-    const { data } = await supabase
-      .from('categories')
-      .select('seo_text')
-      .eq('slug', slug)
-      .maybeSingle()
-
-    return (data as { seo_text: string | null } | null)?.seo_text ?? null
-  },
-  { watch: [currentCategorySlug] },
-)
-
 const seoText = computed(() => {
   /*
    * Написанный текст связки — только если он РИСУЕТСЯ. parseHTMLToBlocks
@@ -2500,7 +2554,7 @@ const schemaData = computed(() => {
               '@type': 'Offer',
               'price': offerPrice(product),
               'priceCurrency': 'KZT',
-              ...strikethroughPrice(product),
+              ...strikethroughPrice({ ...product, discount_started_at: saleStarts.value?.[product.id] ?? null }),
               'availability':
                 product.stock_quantity > 0
                   ? 'https://schema.org/InStock'

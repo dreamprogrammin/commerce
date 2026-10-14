@@ -232,6 +232,8 @@ export interface ICheckoutData {
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row'] & {
   featured_order?: number | null // 🆕 Добавляем поле для управления размером карточки
+  /** Активных товаров во всей ветке — считает server/api/categories.get.ts. */
+  products_in_branch?: number
   // 🆕 SEO поля (добавляем вручную, пока не обновлены типы Supabase)
   seo_title?: string | null
   seo_h1?: string | null
@@ -547,7 +549,10 @@ export type BannerUpdate = Database['public']['Tables']['banners']['Update']
 // Product Reviews
 export interface ProductReviewRow {
   id: string
-  user_id: string
+  /** NULL — отзыв гостя по ссылке из письма (`author_name`, `guest_checkout_id`). */
+  user_id: string | null
+  author_name: string | null
+  guest_checkout_id: string | null
   product_id: string
   order_id: string | null
   rating: number

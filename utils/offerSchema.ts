@@ -108,11 +108,19 @@ export function strikethroughPrice(product: {
   price: number | string | null
   final_price?: number | null
   discount_percentage?: number | null
+  discount_started_at?: string | null
 }) {
   const original = Math.round(Number(product.price))
   if (!(Number(product.discount_percentage) > 0) || !(original > offerPrice(product)))
     return {}
   return {
+    /*
+     * Начало цены со скидкой — Google ставит `validFrom` на Offer рядом с
+     * `priceValidUntil` (merchant listing). Дату ведёт триггер в базе
+     * (`products.discount_started_at`, миграция 20261014120000); нет даты —
+     * нет поля, выдумывать её нельзя.
+     */
+    ...(product.discount_started_at && { validFrom: product.discount_started_at }),
     priceSpecification: {
       '@type': 'UnitPriceSpecification' as const,
       'priceType': 'https://schema.org/StrikethroughPrice',

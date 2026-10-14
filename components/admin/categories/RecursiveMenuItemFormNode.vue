@@ -115,6 +115,13 @@ const seoText = computed({
   set: value => emit('update:item', { ...props.item, seo_text: value || null }),
 })
 
+/** Что форма знает о разделе — в блок ДАННЫЕ промпта (constants/adminPrompts.ts). */
+const promptData = computed(() => ({
+  name: props.item.name,
+  parent: props.parentHref,
+  children: (props.item.children ?? []).filter(c => !c._isDeleted).map(c => c.name).join(', '),
+}))
+
 // Санитизированный SEO текст для preview
 const sanitizedSeoText = computed(() => sanitizeHtml(seoText.value))
 
@@ -426,6 +433,11 @@ function removeImage() {
         </button>
 
         <div v-if="isSeoExpanded" class="p-4 pt-0 space-y-4 border-t">
+          <!-- Промпт для нейросети: ответ — по полям ниже -->
+          <div class="flex justify-end">
+            <AdminAiPromptButton kind="category" :data="promptData" />
+          </div>
+
           <!-- SEO Title -->
           <div>
             <div class="flex items-center justify-between">
