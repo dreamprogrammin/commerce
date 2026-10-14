@@ -231,5 +231,10 @@ const navLinks = [
         </div>
       </SheetContent>
     </Sheet>
+
+    <!-- Очередь обновления сайта после правок: adminRevalidateStore -->
+    <ClientOnly>
+      <AdminRevalidateTimer />
+    </ClientOnly>
   </div>
 </template>

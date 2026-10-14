@@ -14,11 +14,13 @@ import type {
   ProductUpdate,
   ProductWithImages,
 } from '@/types'
+import type { DeletedProductTarget } from '@/utils/revalidatePages'
 import { toast } from 'vue-sonner'
 import { announceIconFixes, sanitizeIconRow } from '@/composables/admin/useIconNameGuard'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { IMAGE_OPTIMIZATION_ENABLED, IMAGE_VARIANTS } from '@/config/images'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStore'
 import { formatFileSize, generateBlurPlaceholder, generateImageVariants, optimizeImageBeforeUpload, shouldOptimizeImage } from '@/utils/imageOptimizer'
 import { cleanProductName } from '@/utils/productName'
 
@@ -287,10 +289,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
    * зависит. Без него новая цена доезжала до карточки через час, а касса
    * брала её сразу (30 сентября 2026) — см. server/api/admin/revalidate-product.post.ts.
    */
-  function revalidateProductPages(body: { productId: string } | { slug: string, categoryId: string | null, brandId: string | null }) {
-    adminFetch('/api/admin/revalidate-product', { method: 'POST', body }).catch((error) => {
-      console.warn('[revalidate] не удалось сбросить кеш страниц товара', error)
-    })
+  function revalidateProductPages(body: { productId: string } | DeletedProductTarget) {
+    // В очередь, а не сразу: см. stores/adminStore/adminRevalidateStore.ts.
+    const queue = useAdminRevalidateStore()
+    if ('productId' in body)
+      queue.enqueue({ productIds: [body.productId] })
+    else
+      queue.enqueueDeletedProduct(body)
   }
 
   /**
