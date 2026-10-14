@@ -10,7 +10,7 @@ import { useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStor
  *
  * С 14 октября 2026 правки не уходят сразу, а копятся в очереди
  * (stores/adminStore/adminRevalidateStore.ts) и отправляются одним пакетом
- * через минуту после последней — общие страницы пересобираются один раз.
+ * через 10 минут после последней — общие страницы пересобираются один раз.
  */
 export interface RevalidatePagesBody {
   productIds?: string[]
