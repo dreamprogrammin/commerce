@@ -357,6 +357,13 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       const { row: safeProduct, report } = await sanitizeIconRow(withCleanName(productData))
       announceIconFixes(report)
 
+      // Прежний адрес — см. ниже, сброс кеша старой карточки.
+      const { data: before } = await supabase
+        .from('products')
+        .select('slug')
+        .eq('id', productId)
+        .maybeSingle()
+
       const { data: updatedProduct, error } = await supabase
         .from('products')
         .update(safeProduct)
@@ -375,6 +382,16 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
         notifySearchEngines(updatedProduct.slug)
       }
       revalidateProductPages({ productId })
+      /*
+       * Сменилось название — сменился и адрес. Сброс по `productId` считает
+       * страницы по НОВОМУ слагу, и старая карточка оставалась в кеше Vercel
+       * до суток со старым текстом, хотя страница умеет уводить прежний адрес
+       * 301-м на новый (slug history). Найдено 14 октября 2026 на превью:
+       * MOKA 2260 переименован в MokaToys 2260B, старый адрес — `HIT` со
+       * старым заголовком. Сброс старого адреса пересобирает его в редирект.
+       */
+      if (before?.slug && before.slug !== updatedProduct.slug)
+        useAdminRevalidateStore().enqueue({ paths: [`/catalog/products/${before.slug}`] })
 
       toast.success(`Товар "${updatedProduct.name}" успешно обновлен.`)
       return updatedProduct
