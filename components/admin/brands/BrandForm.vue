@@ -342,6 +342,12 @@ onBeforeUnmount(() => {
           SEO оптимизация
         </h3>
 
+        <AdminAiPromptButton
+          class="ml-auto"
+          kind="brand"
+          :data="{ name: formData.name, description: formData.description }"
+        />
+
         <Button
           v-if="brandId"
           type="button"
