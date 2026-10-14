@@ -915,13 +915,40 @@ const agePreview = computed(() =>
   formatAgeRange(formData.value.min_age_months, formData.value.max_age_months),
 )
 
+/**
+ * Заполненные характеристики — «Питание: Батарейки», «Длина: 20 см». Без них
+ * нейросеть писала описание мимо таблицы характеристик: в таблице «Питание:
+ * батарейки», «Световые эффекты: есть», а в тексте ни слова (Essa Toys 8213,
+ * 14 октября 2026).
+ */
+const filledSpecsForPrompt = computed(() => categoryAttributes.value.flatMap((attr) => {
+  if (attr.display_type === 'numeric') {
+    const value = numericAttributeValues.value[attr.id]
+    return value === null || value === undefined ? [] : [`${attr.name}: ${value}${attr.unit ? ` ${attr.unit}` : ''}`]
+  }
+  const optionId = productAttributeValues.value[attr.id]
+  const option = attr.attribute_options?.find(o => o.id === optionId)
+  return option ? [`${attr.name}: ${option.value}`] : []
+}))
+
+const materialForPrompt = computed(() => materials.value.find(m => m.id === formData.value?.material_id)?.name)
+const countryForPrompt = computed(() => countries.value.find(c => c.id === formData.value?.origin_country_id)?.name)
+
 /** Что форма уже знает о товаре — в блок ДАННЫЕ промпта (constants/adminPrompts.ts). */
 const promptData = computed(() => ({
   name: formData.value?.name,
   brand: brands.value.find(b => b.id === formData.value?.brand_id)?.name,
   category: categoriesStore.allCategories.find(c => c.id === formData.value?.category_id)?.name,
   sku: formData.value?.sku,
-  specs: formData.value?.piece_count ? `${formData.value.piece_count} деталей` : null,
+  specs: [
+    // Число деталей бывает и полем, и характеристикой — второй раз не повторять.
+    formData.value?.piece_count && !filledSpecsForPrompt.value.some(s => /детал/i.test(s))
+      ? `${formData.value.piece_count} деталей`
+      : null,
+    ...filledSpecsForPrompt.value,
+    materialForPrompt.value ? `Материал: ${materialForPrompt.value}` : null,
+    countryForPrompt.value ? `Страна производства: ${countryForPrompt.value}` : null,
+  ].filter(Boolean).join('; '),
   age: agePreview.value,
   price: formData.value?.price || null,
   description: formData.value?.description,
