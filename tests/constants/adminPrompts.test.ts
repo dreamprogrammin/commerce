@@ -24,6 +24,10 @@ describe('buildAdminPrompt', () => {
     expect(text).not.toMatch(/за 1 день при заказе/)
   })
 
+  it('запрет писать покупателю, что данных нет (ChatGPT так делал, 14 октября 2026)', () => {
+    expect(buildAdminPrompt('product')).toContain('НИКОГДА не пиши, что каких-то данных нет')
+  })
+
   it('раздел и бренд — подписи полей как в формах', () => {
     const category = buildAdminPrompt('category', { name: 'Толокар', parent: '/catalog/kiddy', children: '' })
     for (const field of ['SEO заголовок (Title):', 'H1 заголовок на странице:', 'Ключевые слова:', 'Описание ПОД товарами (SEO текст):'])
