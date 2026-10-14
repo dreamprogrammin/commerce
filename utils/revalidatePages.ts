@@ -17,7 +17,7 @@ export interface RevalidatePagesBody {
 }
 
 export function revalidatePages(body: RevalidatePagesBody): void {
-  $fetch('/api/admin/revalidate', { method: 'POST', body }).catch((error) => {
+  adminFetch('/api/admin/revalidate', { method: 'POST', body }).catch((error) => {
     console.warn('[revalidate] не удалось сбросить кеш страниц', error)
   })
 }

@@ -40,10 +40,16 @@ const FUNNEL_LABELS: Record<string, string> = {
 
 const days = ref(30)
 
+// `adminFetch`, а не `useFetch`: серверу нужен токен входа в заголовке — по
+// куке он сессию не видит (см. utils/adminFetch.ts).
 const { data: carts, pending: cartsPending, refresh: refreshCarts, error: cartsError }
-  = useFetch<AbandonedCart[]>('/api/admin/abandoned-carts', { server: false })
+  = useAsyncData('admin-abandoned-carts', () => adminFetch<AbandonedCart[]>('/api/admin/abandoned-carts'), { server: false })
 const { data: analytics, pending: analyticsPending, refresh: refreshAnalytics, error: analyticsError }
-  = useFetch<CartAnalytics>('/api/admin/cart-analytics', { query: { days }, server: false })
+  = useAsyncData(
+    'admin-cart-analytics',
+    () => adminFetch<CartAnalytics>('/api/admin/cart-analytics', { query: { days: days.value } }),
+    { server: false, watch: [days] },
+  )
 
 function refreshAll() {
   refreshCarts()

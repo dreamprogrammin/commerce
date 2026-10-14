@@ -288,7 +288,7 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
    * брала её сразу (30 сентября 2026) — см. server/api/admin/revalidate-product.post.ts.
    */
   function revalidateProductPages(body: { productId: string } | { slug: string, categoryId: string | null, brandId: string | null }) {
-    $fetch('/api/admin/revalidate-product', { method: 'POST', body }).catch((error) => {
+    adminFetch('/api/admin/revalidate-product', { method: 'POST', body }).catch((error) => {
       console.warn('[revalidate] не удалось сбросить кеш страниц товара', error)
     })
   }
