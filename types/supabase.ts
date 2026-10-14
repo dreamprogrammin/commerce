@@ -1639,6 +1639,7 @@ export interface Database {
           custom_fields_data: Json | null
           description: string | null
           discount_percentage: number
+          discount_started_at: string | null
           featured_order: number | null
           final_price: number | null
           gender: string | null
@@ -1699,6 +1700,7 @@ export interface Database {
           custom_fields_data?: Json | null
           description?: string | null
           discount_percentage?: number
+          discount_started_at?: string | null
           featured_order?: number | null
           final_price?: number | null
           gender?: string | null
@@ -1759,6 +1761,7 @@ export interface Database {
           custom_fields_data?: Json | null
           description?: string | null
           discount_percentage?: number
+          discount_started_at?: string | null
           featured_order?: number | null
           final_price?: number | null
           gender?: string | null

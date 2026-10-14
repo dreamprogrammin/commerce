@@ -58,6 +58,21 @@ describe('strikethroughPrice', () => {
   it('скидка есть, но «старая» не выше текущей — ничего', () => {
     expect(strikethroughPrice({ price: 7990, final_price: 7990, discount_percentage: 5 })).toEqual({})
   })
+
+  /*
+   * `validFrom` — начало цены со скидкой, на Offer рядом с priceValidUntil
+   * (Google merchant listing). До 14 октября 2026 его не было, и Search Console
+   * держал «Отсутствует поле validFrom» на 168 карточках и 42 разделах.
+   */
+  it('дата начала скидки — validFrom на Offer', () => {
+    expect(strikethroughPrice({ price: 8490, final_price: 7990, discount_percentage: 5, discount_started_at: '2026-10-14T10:21:00.811388+00:00' }))
+      .toMatchObject({ validFrom: '2026-10-14T10:21:00.811388+00:00', priceSpecification: { price: 8490 } })
+  })
+
+  it('без даты — validFrom нет (не выдумываем); без скидки — дата не выводится', () => {
+    expect(strikethroughPrice({ price: 8490, final_price: 7990, discount_percentage: 5 })).not.toHaveProperty('validFrom')
+    expect(strikethroughPrice({ price: 8490, final_price: 8490, discount_percentage: 0, discount_started_at: '2026-10-14T10:21:00+00:00' })).toEqual({})
+  })
 })
 
 /*

@@ -923,6 +923,30 @@ const displayedProducts = computed<CatalogProduct[]>(() => {
 })
 
 /*
+ * Начало цены со скидкой — для `validFrom` в разметке ItemList (Search Console
+ * держал «Отсутствует поле validFrom» на 42 разделах, 13 октября 2026).
+ * `get_filtered_products` отдаёт фиксированный набор колонок, и менять
+ * сигнатуру главной функции каталога ради одного поля незачем: один лёгкий
+ * запрос по тем десяти товарам, что идут в разметку.
+ */
+const itemListIds = computed(() => displayedProducts.value.slice(0, 10).map(p => p.id))
+const { data: saleStarts } = await useAsyncData(
+  `catalog-sale-starts:${ownPath}`,
+  async () => {
+    const ids = itemListIds.value
+    if (!ids.length)
+      return {} as Record<string, string>
+    const { data } = await supabase
+      .from('products')
+      .select('id, discount_started_at')
+      .in('id', ids)
+      .not('discount_started_at', 'is', null)
+    return Object.fromEntries((data ?? []).map(r => [r.id, r.discount_started_at as string])) as Record<string, string>
+  },
+  { watch: [itemListIds] },
+)
+
+/*
  * Здесь жил brandLandingProductsCount — число товаров связки по сетке. Им
  * решалось, открывать ли связку, но сетка грузит по 12, а у связки бывает
  * больше. С 21 сентября 2026 число и всё прочее считается по полной выборке
@@ -2530,7 +2554,7 @@ const schemaData = computed(() => {
               '@type': 'Offer',
               'price': offerPrice(product),
               'priceCurrency': 'KZT',
-              ...strikethroughPrice(product),
+              ...strikethroughPrice({ ...product, discount_started_at: saleStarts.value?.[product.id] ?? null }),
               'availability':
                 product.stock_quantity > 0
                   ? 'https://schema.org/InStock'
