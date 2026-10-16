@@ -2,6 +2,7 @@
 import { nextTick, watch } from 'vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
+import { formatPrice } from '@/utils/formatPrice'
 
 const props = defineProps<{
   isOpen: boolean
@@ -68,14 +69,20 @@ function handleSelectSuggestion(suggestion: string) {
   close()
 }
 
-function formatPrice(price: number, discount?: number): { original: string, final: string, hasDiscount: boolean } {
-  const original = price.toLocaleString('ru-RU')
-  const hasDiscount = !!discount && discount > 0
-  const final = hasDiscount
-    ? (price * (1 - discount / 100)).toLocaleString('ru-RU')
-    : original
-
-  return { original, final, hasDiscount }
+/*
+ * Цена со скидкой — `final_price` из базы, а не пересчёт процента здесь.
+ * База округляет её «до 90» (`roundToMarketingPrice`), и только эту цифру
+ * видят карточка товара и касса. Пересчёт давал другую: LEGO 60410 −10%
+ * в поиске 8 091 ₸, на карточке 7 990 ₸; в шторке ещё и с дробью —
+ * «16 141,5 ₸» (16 октября 2026, у всех товаров со скидкой).
+ */
+function searchPrice(product: { price: number, final_price: number, discount_percentage: number | null }) {
+  const hasDiscount = !!product.discount_percentage && product.discount_percentage > 0
+  return {
+    original: formatPrice(product.price),
+    final: formatPrice(hasDiscount ? product.final_price : product.price),
+    hasDiscount,
+  }
 }
 
 function handleRemoveHistory(text: string, event: Event) {
@@ -241,20 +248,20 @@ function getImageUrl(imageUrl: string | null): string | null {
                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <span
                     class="text-base font-bold"
-                    :class="formatPrice(product.price, product.discount_percentage).hasDiscount ? 'text-destructive' : 'text-foreground'"
+                    :class="searchPrice(product).hasDiscount ? 'text-destructive' : 'text-foreground'"
                   >
-                    {{ formatPrice(product.price, product.discount_percentage).final }}&nbsp;₸
+                    {{ searchPrice(product).final }}&nbsp;₸
                   </span>
 
                   <span
-                    v-if="formatPrice(product.price, product.discount_percentage).hasDiscount"
+                    v-if="searchPrice(product).hasDiscount"
                     class="text-xs text-muted-foreground line-through"
                   >
-                    {{ formatPrice(product.price, product.discount_percentage).original }}&nbsp;₸
+                    {{ searchPrice(product).original }}&nbsp;₸
                   </span>
 
                   <span
-                    v-if="formatPrice(product.price, product.discount_percentage).hasDiscount"
+                    v-if="searchPrice(product).hasDiscount"
                     class="text-xs font-semibold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded"
                   >
                     -{{ product.discount_percentage }}%
