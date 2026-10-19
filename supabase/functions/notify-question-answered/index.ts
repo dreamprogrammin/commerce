@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
+import { forbidden, isInternalCall } from '../_shared/internalAuth.ts'
 
 interface QuestionPayload {
   user_id: string
@@ -12,6 +13,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Зовёт только триггер базы. Проверки не было вовсе: любой мог завести
+  // пользователю уведомление с чужим текстом (_shared/internalAuth.ts).
+  if (!isInternalCall(req, () => true))
+    return forbidden(corsHeaders)
 
   try {
     const payload: QuestionPayload = await req.json()

@@ -5,12 +5,13 @@
  * 09:00 и 22:00 по Алматы. Тот же текст приходит по команде `/sales` в боте —
  * считает его общий модуль `_shared/salesDigest.ts`.
  *
- * ДОСТУП — как у team-report: запрос от pg_net либо верный `secret`. Наружу
- * функция ничего не отдаёт, худшее от постороннего вызова — лишняя сводка
- * владельцу в личку.
+ * ДОСТУП — как у team-report: расписание с общим секретом в заголовке
+ * x-internal-secret (миграция 20261019120000) либо верный `secret` в адресе.
+ * Наружу функция ничего не отдаёт.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fromPgNet, isInternalCall } from '../_shared/internalAuth.ts'
 import { buildDigest, type DigestSlot } from '../_shared/salesDigest.ts'
 
 const corsHeaders = {
@@ -37,7 +38,9 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
     const providedSecret = url.searchParams.get('secret')
-    const fromCron = (req.headers.get('user-agent') || '').toLowerCase().includes('pg_net')
+    // Расписание — с общим секретом, а пока он не заведён — pg_net
+    // (_shared/internalAuth.ts)
+    const fromCron = isInternalCall(req, () => fromPgNet(req))
 
     if (!fromCron && (!adminSecret || providedSecret !== adminSecret)) {
       console.error('❌ Вызов не от расписания и без секрета')

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { isTelegramCall } from '../_shared/internalAuth.ts'
 import { ACTION_FUNCTIONS, buildOrderKeyboard, type OrderAction, parseCallbackData } from '../_shared/orderActions.ts'
 import {
   assignedText,
@@ -64,6 +65,7 @@ import {
   parseMenuData,
   replyButtonScope,
 } from '../_shared/orderMenu.ts'
+import { secureWebhook } from '../_shared/webhookSecret.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,6 +89,18 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // GET — только постановка секрета вебхуку (_shared/webhookSecret.ts).
+  if (req.method === 'GET')
+    return secureWebhook(req, Deno.env.get('TELEGRAM_BOT_TOKEN')!)
+
+  /*
+   * Обновление обязано прийти от Telegram: с секретом из setWebhook, когда он
+   * заведён (TELEGRAM_WEBHOOK_SECRET). До 19 октября 2026 проверки не было, и
+   * поддельное нажатие кнопки «от менеджера» проходило как настоящее.
+   */
+  if (!isTelegramCall(req))
+    return new Response('Unauthorized', { status: 401 })
 
   try {
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')!
