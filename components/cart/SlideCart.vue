@@ -362,7 +362,9 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
           </div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-muted-foreground">Доставка</span>
-            <span v-if="hasFreeShipping" class="text-green-600 font-medium">Бесплатно</span>
+            <!-- Посылка в другой город: цена по весу, порог её не касается. -->
+            <span v-if="cartStore.deliveryMethod === 'post'">По весу посылки</span>
+            <span v-else-if="hasFreeShipping" class="text-green-600 font-medium">Бесплатно</span>
             <span v-else>Рассчитается при оформлении</span>
           </div>
           <Separator />

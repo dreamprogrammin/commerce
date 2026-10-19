@@ -16,9 +16,12 @@ interface StatusUpdatePayload {
     status: string
     telegram_message_id?: string | null
     /**
-     * Способ доставки приходит в теле вебхука вместе со всей строкой заказа —
-     * от него зависит подпись кнопки: «Передать курьеру» на самовывозном
-     * заказе неверна, а таких на проде 42 из 45.
+     * От способа доставки зависит подпись кнопки: «Передать курьеру» на
+     * самовывозном заказе неверна. Здесь считалось, что он приходит в теле
+     * вебхука со всей строкой, — но триггер `sync_order_status_to_telegram`
+     * шлёт только id, статус и id сообщения (проверено на бою 19 октября
+     * 2026), и кнопки всегда были курьерскими. Теперь способ берётся из той
+     * же выборки заказа, что сумма и клиент; это поле — запасное.
      */
     delivery_method?: string | null
   }
@@ -169,12 +172,14 @@ Deno.serve(async (req) => {
      * той же выборки, что и сумму с клиентом, — она ниже.
      */
     let orderNo = record.id.slice(-6)
+    let deliveryMethod: string | null = record.delivery_method ?? null
 
     if (table === 'orders') {
       const { data: orderData } = await supabase
         .from('orders')
         .select(`
           order_number,
+          delivery_method,
           final_amount,
           bonuses_spent,
           bonuses_awarded,
@@ -188,6 +193,7 @@ Deno.serve(async (req) => {
 
       if (orderData) {
         orderNo = String((orderData as { order_number?: number | null }).order_number ?? orderNo)
+        deliveryMethod = (orderData as { delivery_method?: string | null }).delivery_method ?? deliveryMethod
         const customerNameRaw = orderData.profile
           ? `${orderData.profile.first_name} ${orderData.profile.last_name || ''}`.trim()
           : 'Не указано'
@@ -222,12 +228,13 @@ Deno.serve(async (req) => {
     } else {
       const { data: guestData } = await supabase
         .from('guest_checkouts')
-        .select('order_number, final_amount, guest_name, assigned_admin_name, assigned_admin_username, cancelled_by')
+        .select('order_number, delivery_method, final_amount, guest_name, assigned_admin_name, assigned_admin_username, cancelled_by')
         .eq('id', record.id)
         .single()
 
       if (guestData) {
         orderNo = String((guestData as { order_number?: number | null }).order_number ?? orderNo)
+        deliveryMethod = (guestData as { delivery_method?: string | null }).delivery_method ?? deliveryMethod
         const guestName = escapeMarkdown(guestData.guest_name) || 'Гость'
         orderInfo = `\n💰 *Сумма:* ${guestData.final_amount} ₸`
         orderInfo += `\n👥 *Клиент:* ${guestName}`
@@ -275,7 +282,7 @@ Deno.serve(async (req) => {
       record.status,
       table,
       record.id,
-      record.delivery_method,
+      deliveryMethod,
     )
 
     console.log('🔘 Кнопки:', buttons ? JSON.stringify(buttons) : 'отсутствуют')

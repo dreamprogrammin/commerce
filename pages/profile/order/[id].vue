@@ -20,6 +20,7 @@ import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { profilePageShell } from '@/lib/shell'
 // Цена берётся из заказа, а не из товара: товар мог подорожать после покупки.
 import { orderItemUnitPrice } from '@/utils/orderItems'
+import { deliveryMethodTitle, isPostOrder } from '@/utils/orderStatus'
 
 const route = useRoute()
 const router = useRouter()
@@ -242,17 +243,14 @@ const isCourierDelivery = computed(() => {
   return method === 'courier' || method === 'delivery'
 })
 
-const deliveryMethodLabel = computed(() => {
-  if (!order.value)
-    return ''
+const deliveryMethodLabel = computed(() =>
+  order.value ? deliveryMethodTitle(order.value.delivery_method) : '',
+)
 
-  if (isCourierDelivery.value)
-    return 'Доставка курьером'
-  if (order.value.delivery_method === 'pickup')
-    return 'Самовывоз'
-
-  return order.value.delivery_method
-})
+/** Посылке в другой город (`post`) адрес нужен так же, как курьеру. */
+const showsAddress = computed(() =>
+  isCourierDelivery.value || isPostOrder(order.value?.delivery_method),
+)
 
 // Метод оплаты
 const paymentMethodLabel = computed(() => {
@@ -404,7 +402,7 @@ useHead({
                  значением блок не показывался вовсе, и покупатель не видел,
                  куда едет его заказ. -->
               <div
-                v-if="isCourierDelivery"
+                v-if="showsAddress"
                 class="flex items-start gap-3"
               >
                 <MapPin class="w-5 h-5 text-muted-foreground mt-0.5" />
@@ -443,7 +441,7 @@ useHead({
               <div
                 class="flex justify-between items-center text-lg font-semibold"
               >
-                <span>Итого:</span>
+                <span>{{ isPostOrder(order.delivery_method) ? 'Итого без доставки:' : 'Итого:' }}</span>
                 <span>{{ order.final_amount.toLocaleString("ru-RU") }}&nbsp;₸</span>
               </div>
 

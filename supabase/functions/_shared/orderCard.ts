@@ -50,6 +50,19 @@ export function shortNumber(id: string): string {
 }
 
 /**
+ * Способ получения одним словом для карточки заказа. Посылка в другой город
+ * (`post`, с 19 октября 2026) раньше подписалась бы «курьер» — и менеджер
+ * ждал бы, что её повезут по Алматы.
+ */
+export function deliveryLabel(method?: string | null): string {
+  if (method === 'pickup')
+    return 'самовывоз'
+  if (method === 'post')
+    return 'по Казахстану (Kazpost или CDEK), цена по весу'
+  return 'курьер'
+}
+
+/**
  * Номер заказа для человека.
  *
  * Раньше это был хвост UUID — «50B61F», «f973cb». Владелец попросил цифры:
@@ -170,9 +183,7 @@ export function orderCardMessage(order: OrderSummary, now?: Date): string {
   if (phone)
     lines.push(`*Телефон:* ${escapeMarkdown(phone)}`)
 
-  lines.push(
-    `*Доставка:* ${order.delivery_method === 'pickup' ? 'самовывоз' : 'курьер'}`,
-  )
+  lines.push(`*Доставка:* ${deliveryLabel(order.delivery_method)}`)
 
   if (order.delivery_method !== 'pickup' && order.delivery_address) {
     const address = [order.delivery_address.city, order.delivery_address.line1]

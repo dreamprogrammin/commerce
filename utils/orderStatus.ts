@@ -69,11 +69,28 @@ export const ORDER_TRACK_LABELS = [
   'Доставлен',
 ] as const
 
-/** Заказ забирают сами или везёт курьер. */
-export type DeliveryMethod = 'courier' | 'pickup' | string | null | undefined
+/**
+ * Заказ забирают сами, везёт курьер по Алматы или уходит посылкой в другой
+ * город (`post`, Kazpost или CDEK) — третий способ заведён 19 октября 2026:
+ * цену такой доставки называют после взвешивания, сервер ставит ей 0.
+ */
+export type DeliveryMethod = 'courier' | 'pickup' | 'post' | string | null | undefined
 
 export function isPickupOrder(method: DeliveryMethod): boolean {
   return method === 'pickup'
+}
+
+export function isPostOrder(method: DeliveryMethod): boolean {
+  return method === 'post'
+}
+
+/** Подпись способа получения на страницах заказа. */
+export function deliveryMethodTitle(method: DeliveryMethod): string {
+  if (isPickupOrder(method))
+    return 'Самовывоз'
+  if (isPostOrder(method))
+    return 'По Казахстану — Kazpost или CDEK'
+  return 'Доставка курьером'
 }
 
 /**
@@ -85,10 +102,13 @@ export function isPickupOrder(method: DeliveryMethod): boolean {
  * все. Первые три шага одинаковы, различаются только последние два.
  */
 export function orderTrackLabels(method: DeliveryMethod): readonly string[] {
-  if (!isPickupOrder(method))
-    return ORDER_TRACK_LABELS
+  if (isPickupOrder(method))
+    return ['Принят', 'В работе', 'Собран', 'Готов к выдаче', 'Выдан']
+  // Посылку не «везут» и не «доставляют» — её отправляют, и её получают.
+  if (isPostOrder(method))
+    return ['Принят', 'В работе', 'Подтверждён', 'Отправлен', 'Получен']
 
-  return ['Принят', 'В работе', 'Собран', 'Готов к выдаче', 'Выдан']
+  return ORDER_TRACK_LABELS
 }
 
 /** Индекс в полосе прогресса. −1 для отменённого: полоса гаснет целиком. */
@@ -173,10 +193,26 @@ export function orderStatusInfo(
   method?: DeliveryMethod,
 ): OrderStatusPresentation {
   const base = ORDER_STATUS_INFO[normalize(status)] ?? ORDER_STATUS_INFO.new
+  const normalized = normalize(status)
+
+  if (isPostOrder(method)) {
+    if (normalized === 'confirmed')
+      return { ...base, description: 'Готовим посылку к отправке Kazpost или CDEK' }
+    if (normalized === 'shipped') {
+      return {
+        ...base,
+        title: 'Заказ отправлен',
+        description: 'Посылка в пути — Kazpost или CDEK, обычно 3–7 рабочих дней',
+      }
+    }
+    if (normalized === 'delivered')
+      return { ...base, title: 'Заказ получен', description: 'Спасибо за покупку!' }
+    return base
+  }
+
   if (!isPickupOrder(method))
     return base
 
-  const normalized = normalize(status)
   if (normalized === 'shipped') {
     return {
       ...base,
@@ -243,6 +279,27 @@ const PICKUP_STEPS = [
   { icon: 'lucide:home', title: 'Выдан', sub: 'Спасибо за покупку!' },
 ] as const
 
+/** Те же пять шагов для посылки в другой город (Kazpost или CDEK). */
+const POST_STEPS = [
+  {
+    icon: 'lucide:check',
+    title: 'Заказ принят',
+    sub: 'Мы получили ваш заказ и начинаем его обработку',
+  },
+  {
+    icon: 'lucide:package-search',
+    title: 'В работе',
+    sub: 'Взвесим посылку и назовём стоимость доставки',
+  },
+  {
+    icon: 'lucide:package-check',
+    title: 'Подтверждён',
+    sub: 'Готовим посылку к отправке',
+  },
+  { icon: 'lucide:package', title: 'Отправлен', sub: 'Посылка в пути — Kazpost или CDEK' },
+  { icon: 'lucide:home', title: 'Получен', sub: 'Спасибо за покупку!' },
+] as const
+
 /**
  * Совместимость: часть кода ждёт готовый список. По умолчанию курьерский —
  * см. пояснение у `orderTrackLabels`.
@@ -250,7 +307,9 @@ const PICKUP_STEPS = [
 export const ORDER_STEPS = COURIER_STEPS
 
 export function orderSteps(method: DeliveryMethod) {
-  return isPickupOrder(method) ? PICKUP_STEPS : COURIER_STEPS
+  if (isPickupOrder(method))
+    return PICKUP_STEPS
+  return isPostOrder(method) ? POST_STEPS : COURIER_STEPS
 }
 
 /**
