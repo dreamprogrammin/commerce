@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampDescription, composeCategoryMeta, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu } from '@/utils/seoDescription'
+import { clampDescription, composeCategoryMeta, composeCategoryOgLine, DELIVERY_ALMATY_AND_KZ, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu } from '@/utils/seoDescription'
 
 /**
  * Тексты взяты из прод-базы: ровно на них аудит 12 августа и поймал обрезку
@@ -305,5 +305,40 @@ describe('hasLegacyTemplateMarks', () => {
     ).toBe(false)
     expect(hasLegacyTemplateMarks(null)).toBe(false)
     expect(hasLegacyTemplateMarks('')).toBe(false)
+  })
+})
+
+/*
+ * Строка фактов в превью ссылки на раздел. До 19 октября 2026 там стоял шаблон
+ * «Широкий ассортимент…», а число бралось с первой страницы выдачи (12+ при 19).
+ */
+describe('composeCategoryOgLine', () => {
+  it('число по ветке, цена «от» и бренды', () => {
+    expect(plain(composeCategoryOgLine({ productsCount: 19, minPrice: 6190, topBrands: ['LEGO', 'CaDA', 'Sluban'] })))
+      .toBe('19 моделей от 6 190 ₸ · LEGO, CaDA, Sluban')
+  })
+
+  it('склоняет «модель» по числу', () => {
+    expect(composeCategoryOgLine({ productsCount: 1 })).toBe('1 модель')
+    expect(composeCategoryOgLine({ productsCount: 2 })).toBe('2 модели')
+    expect(composeCategoryOgLine({ productsCount: 21 })).toBe('21 модель')
+  })
+
+  it('брендов не больше трёх', () => {
+    expect(composeCategoryOgLine({ productsCount: 5, topBrands: ['A', 'B', 'C', 'D'] })).toBe('5 моделей · A, B, C')
+  })
+
+  it('без числа и цены — только бренды; без всего — пусто, а не шаблон', () => {
+    expect(composeCategoryOgLine({ topBrands: ['LEGO'] })).toBe('LEGO')
+    expect(composeCategoryOgLine({ productsCount: 0, minPrice: null, topBrands: [] })).toBe('')
+    expect(composeCategoryOgLine({})).toBe('')
+  })
+})
+
+describe('строка доставки DELIVERY_ALMATY_AND_KZ', () => {
+  it('сроки из /terms: по Алматы 1–3 дня, по Казахстану 3–7', () => {
+    expect(DELIVERY_ALMATY_AND_KZ).toContain('по Алматы 1–3 дня')
+    expect(DELIVERY_ALMATY_AND_KZ).toContain('по Казахстану 3–7 дней')
+    expect(hasLegacyTemplateMarks(DELIVERY_ALMATY_AND_KZ)).toBe(false)
   })
 })

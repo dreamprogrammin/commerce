@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_BRANDS } from '@/constants'
 import { pageShell } from '@/lib/shell'
+import { DELIVERY_ALMATY_AND_KZ } from '@/utils/seoDescription'
 
 definePageMeta({ layout: 'shell', shell: pageShell })
 
@@ -58,11 +59,18 @@ useBreadcrumbSchema([
   { name: 'Бренды' },
 ])
 
+/*
+ * Бренды названы те, которых в наличии больше всего (19 октября 2026: LEGO 14,
+ * MokaToys 11, Zuru 8). До этого здесь стоял Hasbro — такого бренда в
+ * магазине нет вовсе, — и «широкий выбор» при двадцати брендах в наличии.
+ */
+const BRANDS_TEASER = 'LEGO, MokaToys, Zuru и другие производители'
+
 useSeoMeta({
   title: `Все бренды игрушек | ${siteName}`,
-  description: 'Широкий выбор брендов детских игрушек и товаров для детей. LEGO, Mattel, Hasbro и другие популярные производители. Доставка по Казахстану.',
+  description: `Бренды детских игрушек в Ухтышке: ${BRANDS_TEASER}. ${DELIVERY_ALMATY_AND_KZ}, самовывоз.`,
   ogTitle: `Все бренды игрушек | ${siteName}`,
-  ogDescription: 'Широкий выбор брендов детских игрушек и товаров для детей. LEGO, Mattel, Hasbro и другие популярные производители.',
+  ogDescription: `Бренды детских игрушек в Ухтышке: ${BRANDS_TEASER}.`,
   ogUrl: `${siteUrl}/brands`,
 })
 
@@ -70,7 +78,7 @@ useSeoMeta({
 // отдавался 404. Картинку рисует тот же генератор, что и для категорий.
 defineOgImageComponent('OgImageCatalog', {
   title: 'Все бренды игрушек',
-  description: 'LEGO, Mattel, Hasbro и другие производители',
+  description: BRANDS_TEASER,
   kicker: 'БРЕНДЫ',
 })
 
