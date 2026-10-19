@@ -10,7 +10,7 @@ import {
   HOME_CHIPS_CATEGORY_LIMIT,
   HOME_STATIC_CHIPS,
 } from '@/constants/homePlaceholders'
-import { SHOP, SHOP_ALTERNATE_NAMES } from '@/constants/shop'
+import { SHOP, SHOP_ALTERNATE_NAMES, SHOP_EXTRA_PHONE } from '@/constants/shop'
 import { homeShell } from '@/lib/shell'
 import { carouselContainerVariants, sectionSpacingVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
@@ -435,6 +435,8 @@ function scrollToShop() {
 // ==========================================================================
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
+/** Основной номер для ссылки `tel:` — в SHOP.phone он с дефисами, для разметки. */
+const SHOP_TEL = `tel:${SHOP.phone.replace(/-/g, '')}`
 
 /** Разделы в тексте главной — ссылками, см. шаблон. */
 const HOME_TEXT_LINKS = [
@@ -960,12 +962,18 @@ useIndexableRobotsRule({ index: true, follow: true })
                   <p class="text-sm text-muted-foreground">
                     Свяжитесь с нами:
                   </p>
+                  <!-- Основной — как в подвале и разметке; второй — подписан
+                       дополнительным (см. SHOP_EXTRA_PHONE). -->
                   <a
-                    href="tel:+77771243843"
+                    :href="SHOP_TEL"
                     class="text-lg font-semibold text-foreground hover:text-primary transition-colors"
                   >
-                    +7 (777) 124-38-43
+                    {{ SHOP.phoneHuman }}
                   </a>
+                  <p class="text-sm text-muted-foreground">
+                    Дополнительный:
+                    <a :href="SHOP_EXTRA_PHONE.href" class="hover:text-primary transition-colors">{{ SHOP_EXTRA_PHONE.human }}</a>
+                  </p>
                 </div>
               </div>
             </div>
