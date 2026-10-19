@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampDescription, composeCategoryMeta, composeCategoryOgLine, DELIVERY_ALMATY_AND_KZ, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu } from '@/utils/seoDescription'
+import { clampDescription, composeCategoryMeta, composeCategoryOgLine, composeHomeMeta, DELIVERY_ALMATY_AND_KZ, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu } from '@/utils/seoDescription'
 
 /**
  * Тексты взяты из прод-базы: ровно на них аудит 12 августа и поймал обрезку
@@ -340,5 +340,25 @@ describe('строка доставки DELIVERY_ALMATY_AND_KZ', () => {
     expect(DELIVERY_ALMATY_AND_KZ).toContain('по Алматы 1–3 дня')
     expect(DELIVERY_ALMATY_AND_KZ).toContain('по Казахстану 3–7 дней')
     expect(hasLegacyTemplateMarks(DELIVERY_ALMATY_AND_KZ)).toBe(false)
+  })
+})
+
+/*
+ * Описание главной — оно же описание магазина в разметке. До 19 октября 2026:
+ * эмодзи, галочки, 190 знаков и «Доставка по Алматы» без слова о Казахстане.
+ */
+describe('composeHomeMeta', () => {
+  const meta = composeHomeMeta('Ухтышка')
+
+  it('называет обе зоны доставки и самовывоз', () => {
+    expect(meta).toContain('по Алматы 1–3 дня')
+    expect(meta).toContain('по Казахстану 3–7 дней')
+    expect(meta).toContain('самовывоз')
+  })
+
+  it('без эмодзи и «за 1 день», целиком в пределах сниппета', () => {
+    expect(hasLegacyTemplateMarks(meta)).toBe(false)
+    expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+    expect(meta.endsWith('...')).toBe(false)
   })
 })
