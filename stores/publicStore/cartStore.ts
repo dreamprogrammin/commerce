@@ -10,7 +10,12 @@ import {
 } from '@/utils/deliverySlots'
 import { useProfileStore } from '../core/profileStore'
 
-export type DeliveryMethod = 'pickup' | 'courier'
+/**
+ * `post` — посылка в другой город, Kazpost или CDEK (с 19 октября 2026).
+ * Цену такой доставки называют после взвешивания; сервер (`calc_delivery_cost`)
+ * ставит 0 всему, что не `courier`, — в сумму заказа она не входит.
+ */
+export type DeliveryMethod = 'pickup' | 'courier' | 'post'
 
 const CART_STORAGE_KEY = 'uhti-cart-v1'
 
@@ -148,16 +153,19 @@ export const useCartStore = defineStore(
     /**
      * Стоимость доставки. Самовывоз бесплатен всегда, курьер — от порога.
      * Считается от subtotal (до промокода и бонусов), как в calc() макета.
+     * Посылке — 0, как и на сервере: её цену называют после взвешивания,
+     * и показывать её надо словами (`isDeliveryByWeight`), а не «Бесплатно».
      */
     const deliveryCost = computed(() => {
-      if (deliveryMethod.value === 'pickup')
+      if (deliveryMethod.value !== 'courier')
         return 0
       return subtotal.value >= FREE_SHIPPING_THRESHOLD
         ? 0
         : COURIER_DELIVERY_COST
     })
 
-    const isFreeShipping = computed(() => deliveryCost.value === 0)
+    const isDeliveryByWeight = computed(() => deliveryMethod.value === 'post')
+    const isFreeShipping = computed(() => deliveryCost.value === 0 && !isDeliveryByWeight.value)
 
     function setDeliveryMethod(method: DeliveryMethod) {
       deliveryMethod.value = method
@@ -643,9 +651,9 @@ export const useCartStore = defineStore(
             // Дату и слот шлём только для курьера: у самовывоза их нет.
             p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
             p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
-            // Пункт нужен только самовывозу; при курьере сервер его всё равно
+            // Пункт нужен только самовывозу; при доставке сервер его всё равно
             // отбросит, но не шлём и отсюда — так понятнее в логах.
-            p_pickup_point_id: isCourierOrder ? null : pickupPointId.value,
+            p_pickup_point_id: orderData.deliveryMethod === 'pickup' ? pickupPointId.value : null,
           })
 
           if (error)
@@ -673,7 +681,7 @@ export const useCartStore = defineStore(
             p_comment: orderData.comment || null,
             p_delivery_date: isCourierOrder ? deliveryDateIso.value : null,
             p_delivery_slot: isCourierOrder ? deliverySlotLabel.value : null,
-            p_pickup_point_id: isCourierOrder ? null : pickupPointId.value,
+            p_pickup_point_id: orderData.deliveryMethod === 'pickup' ? pickupPointId.value : null,
           })
 
           if (error)
@@ -758,6 +766,7 @@ export const useCartStore = defineStore(
       deliverySlotLabel,
       lastOrder,
       deliveryCost,
+      isDeliveryByWeight,
       isFreeShipping,
       setDeliveryMethod,
       discountAmount,

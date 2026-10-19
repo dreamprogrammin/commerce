@@ -50,6 +50,10 @@ export interface OrderEmailData {
 }
 
 const isPickup = (m: string | null) => m === 'pickup'
+/** Посылка в другой город — Kazpost или CDEK, цена по весу (с 19 октября 2026). */
+const isPost = (m: string | null) => m === 'post'
+/** Строка доставки у посылки: цену называют после взвешивания, в сумме заказа её нет. */
+const POST_DELIVERY = 'по весу посылки, сообщим до отправки'
 
 const REVIEW_LEAD = 'Спасибо за покупку! Оцените товары — это займёт минуту, входить на сайт не нужно.'
 
@@ -66,6 +70,7 @@ function escapeHtml(s: string): string {
 export function orderEmailCopy(d: Pick<OrderEmailData, 'kind' | 'orderNumber' | 'deliveryMethod' | 'pickup' | 'shop'>): { subject: string, heading: string, lead: string } {
   const no = `№${d.orderNumber}`
   const pickup = isPickup(d.deliveryMethod)
+  const post = isPost(d.deliveryMethod)
   const where = [d.pickup?.name, d.pickup?.address].filter(Boolean).join(', ') || d.shop.address
   const hours = d.pickup?.hours || d.shop.hours
   switch (d.kind) {
@@ -73,20 +78,28 @@ export function orderEmailCopy(d: Pick<OrderEmailData, 'kind' | 'orderNumber' | 
       return {
         subject: orderEmailSubject(d.orderNumber),
         heading: `Спасибо! Заказ ${no} принят`,
-        lead: 'Менеджер свяжется с вами, чтобы подтвердить детали. Платить заранее не нужно.',
+        lead: post
+          ? 'Менеджер свяжется с вами: взвесим посылку и назовём стоимость доставки. Оплата — Kaspi, до отправки.'
+          : 'Менеджер свяжется с вами, чтобы подтвердить детали. Платить заранее не нужно.',
       }
     case 'confirmed':
       return {
         subject: orderEmailSubject(d.orderNumber),
         heading: `Заказ ${no} подтверждён`,
-        lead: pickup ? 'Собираем заказ. Напишем, когда его можно будет забрать.' : 'Собираем заказ и скоро передадим курьеру.',
+        lead: pickup
+          ? 'Собираем заказ. Напишем, когда его можно будет забрать.'
+          : post ? 'Готовим посылку к отправке Kazpost или CDEK.' : 'Собираем заказ и скоро передадим курьеру.',
       }
     case 'shipped':
+      if (post)
+        return { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} отправлен`, lead: 'Посылка передана Kazpost или CDEK. Обычно она идёт 3–7 рабочих дней.' }
       return pickup
         ? { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} готов к выдаче`, lead: `Забрать можно здесь: ${where}, ${hours}.` }
         : { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} в пути`, lead: 'Курьер уже везёт заказ. Он позвонит перед приездом.' }
     case 'delivered':
       // Письмо уходит только со ссылками на отзыв (orderEmail.ts) — о них и речь
+      if (post)
+        return { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} получен`, lead: REVIEW_LEAD }
       return pickup
         ? { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} выдан`, lead: REVIEW_LEAD }
         : { subject: orderEmailSubject(d.orderNumber), heading: `Заказ ${no} доставлен`, lead: REVIEW_LEAD }
@@ -105,10 +118,13 @@ export function buildOrderEmail(d: OrderEmailData): { subject: string, html: str
   const rows = items.map(i =>
     `<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${escapeHtml(i.name)} × ${i.quantity}</td>`
     + `<td style="padding:6px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${tenge(i.price * i.quantity)}</td></tr>`).join('')
+  const post = isPost(d.deliveryMethod)
+  const deliveryText = post ? POST_DELIVERY : d.deliveryCost ? tenge(d.deliveryCost) : ''
+  const totalLabel = post ? 'Итого без доставки' : 'Итого'
   const totals = items.length
     ? `<table role="presentation" width="100%" style="border-collapse:collapse;font-size:14px;margin:16px 0">${rows}`
-    + (d.deliveryCost ? `<tr><td style="padding:6px 0;color:#666">Доставка</td><td style="padding:6px 0;text-align:right;color:#666">${tenge(d.deliveryCost)}</td></tr>` : '')
-    + `<tr><td style="padding:8px 0;font-weight:700">Итого</td><td style="padding:8px 0;text-align:right;font-weight:700">${tenge(d.total)}</td></tr></table>`
+    + (deliveryText ? `<tr><td style="padding:6px 0;color:#666">Доставка</td><td style="padding:6px 0;text-align:right;color:#666">${deliveryText}</td></tr>` : '')
+    + `<tr><td style="padding:8px 0;font-weight:700">${totalLabel}</td><td style="padding:8px 0;text-align:right;font-weight:700">${tenge(d.total)}</td></tr></table>`
     : ''
 
   const reviews = d.kind === 'delivered' ? (d.reviewLinks ?? []) : []
@@ -135,7 +151,7 @@ ${totals}${reviewBlock}
     heading,
     '',
     lead,
-    ...(items.length ? ['', ...items.map(i => `${i.name} × ${i.quantity} — ${tenge(i.price * i.quantity)}`), ...(d.deliveryCost ? [`Доставка — ${tenge(d.deliveryCost)}`] : []), `Итого — ${tenge(d.total)}`] : []),
+    ...(items.length ? ['', ...items.map(i => `${i.name} × ${i.quantity} — ${tenge(i.price * i.quantity)}`), ...(deliveryText ? [`Доставка — ${deliveryText}`] : []), `${totalLabel} — ${tenge(d.total)}`] : []),
     ...(reviews.length ? ['', 'Оцените покупку:', ...reviews.map(r => `${r.name} — ${r.url}`)] : []),
     '',
     `Статус заказа: ${d.statusUrl}`,

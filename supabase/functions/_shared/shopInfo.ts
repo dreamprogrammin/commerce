@@ -31,10 +31,25 @@ export const PICKUP_POINT = {
 } as const
 
 /** Способ доставки заказа в том виде, в каком его хранит база. */
-export type DeliveryMethod = 'courier' | 'pickup' | string | null | undefined
+export type DeliveryMethod = 'courier' | 'pickup' | 'post' | string | null | undefined
 
 export function isPickup(method: DeliveryMethod): boolean {
   return method === 'pickup'
+}
+
+/**
+ * Посылка в другой город — Kazpost или CDEK. Способ заведён 19 октября 2026:
+ * единой цены нет, посылку взвешивают, стоимость называют покупателю до
+ * отправки, оплата — Kaspi до отправки. Курьеров такой заказ не касается.
+ * ЗЕРКАЛО `utils/orderStatus.ts` на сайте.
+ */
+export function isPost(method: DeliveryMethod): boolean {
+  return method === 'post'
+}
+
+/** Курьер по Алматы — всё, что не самовывоз и не посылка. */
+export function isCourier(method: DeliveryMethod): boolean {
+  return !isPickup(method) && !isPost(method)
 }
 
 /**
@@ -63,6 +78,17 @@ export function shippedWording(method: DeliveryMethod) {
     }
   }
 
+  if (isPost(method)) {
+    return {
+      button: '📮 Отправлен',
+      adminTitle: 'ОТПРАВЛЕН',
+      adminNote: 'Посылка передана в Kazpost или CDEK',
+      customerTitle: '📮 Заказ отправлен!',
+      customerBody: (orderNo: string) =>
+        `Заказ №${orderNo} отправлен Kazpost или CDEK. Обычно посылка идёт 3–7 рабочих дней.`,
+    }
+  }
+
   return {
     button: '🚚 Передать курьеру',
     adminTitle: 'ПЕРЕДАН КУРЬЕРУ',
@@ -82,6 +108,16 @@ export function deliveredWording(method: DeliveryMethod) {
       customerTitle: '✅ Спасибо за покупку!',
       customerBody: (orderNo: string) =>
         `Заказ №${orderNo} выдан. Спасибо, что выбрали Ухтышку!`,
+    }
+  }
+
+  if (isPost(method)) {
+    return {
+      button: '✅ Получен',
+      adminTitle: 'ПОЛУЧЕН',
+      customerTitle: '✅ Спасибо за покупку!',
+      customerBody: (orderNo: string) =>
+        `Заказ №${orderNo} получен. Спасибо, что выбрали Ухтышку!`,
     }
   }
 

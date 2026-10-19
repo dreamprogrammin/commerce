@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   assignedTo,
   customerName,
+  deliveryLabel,
   formatAmount,
   orderCardMessage,
   orderListMessage,
@@ -189,5 +190,27 @@ describe('состав заказа', () => {
       NOW,
     ))
     expect(text).toContain('Товар удалён из каталога × 1 — 0 ₸')
+  })
+})
+
+/*
+ * Посылка в другой город (`post`, с 19 октября 2026). Раньше карточка
+ * подписала бы её «курьер», и менеджер ждал бы доставки по Алматы.
+ */
+describe('карточка посылки в другой город', () => {
+  it('подпись способа и адрес на месте', () => {
+    const text = plain(orderCardMessage(order({
+      delivery_method: 'post',
+      delivery_address: { city: 'Астана', line1: 'пр. Мангилик Ел 55' },
+    }), NOW))
+    expect(text).toContain('по Казахстану (Kazpost или CDEK), цена по весу')
+    expect(text).toContain('Астана, пр. Мангилик Ел 55')
+    expect(text).not.toMatch(/Доставка:\* курьер/)
+  })
+
+  it('у курьера и самовывоза подписи прежние', () => {
+    expect(deliveryLabel('courier')).toBe('курьер')
+    expect(deliveryLabel('pickup')).toBe('самовывоз')
+    expect(deliveryLabel(null)).toBe('курьер')
   })
 })

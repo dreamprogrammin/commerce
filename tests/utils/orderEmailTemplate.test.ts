@@ -88,3 +88,39 @@ describe('письма о заказе', () => {
     expect(tenge(18480)).not.toMatch(/\d ₸|\d \d{3}/)
   })
 })
+
+/*
+ * Посылка в другой город (`post`, с 19 октября 2026): цену доставки называют
+ * после взвешивания, в сумме заказа её нет — письмо не должно обещать ни
+ * курьера, ни «платить заранее не нужно».
+ */
+describe('письма о посылке в другой город', () => {
+  it('«принят» — про взвешивание и оплату Kaspi до отправки', () => {
+    const c = orderEmailCopy({ ...BASE, kind: 'created', deliveryMethod: 'post' })
+    expect(c.lead).toContain('взвесим посылку')
+    expect(c.lead).toContain('Kaspi')
+    expect(c.lead).not.toContain('Платить заранее не нужно')
+  })
+
+  it('«отправлен» и «получен» — без курьера', () => {
+    const shipped = orderEmailCopy({ ...BASE, kind: 'shipped', deliveryMethod: 'post' })
+    expect(shipped.heading).toBe('Заказ №1004 отправлен')
+    expect(shipped.lead).toContain('Kazpost или CDEK')
+    expect(shipped.lead).not.toMatch(/курьер/i)
+    expect(orderEmailCopy({ ...BASE, kind: 'delivered', deliveryMethod: 'post' }).heading).toBe('Заказ №1004 получен')
+  })
+
+  it('в итогах доставка «по весу», а сумма — «без доставки»', () => {
+    const m = buildOrderEmail({
+      ...BASE,
+      kind: 'created',
+      deliveryMethod: 'post',
+      deliveryCost: 0,
+      total: 17780,
+      items: [{ name: 'Толокар', quantity: 2, price: 8890 }],
+    })
+    expect(m.text).toContain('Доставка — по весу посылки, сообщим до отправки')
+    expect(m.text).toContain('Итого без доставки — 17\u00A0780\u00A0₸')
+    expect(m.html).toContain('Итого без доставки')
+  })
+})
