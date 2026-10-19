@@ -21,6 +21,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import { composeHomeMeta, DELIVERY_TERMS } from '@/utils/seoDescription'
 
 // Ленивая загрузка некритичных блоков
 const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
@@ -455,7 +456,8 @@ const HOME_TEXT_LINKS = [
  * Теперь по этому запросу главная выигрывает по совпадению в заголовке.
  */
 const metaTitle = `Купить детские игрушки в Алматы | ${siteName} (uhti.kz)`
-const metaDescription = `Интернет-магазин детских игрушек ${siteName} в Алматы ⭐ Развивающие игры, конструкторы, куклы, машинки ✓ Официальные бренды ✓ Доставка по Алматы ✓ Бонусная программа ✓ Гарантия качества`
+// Сборка и почему так — в utils/seoDescription.ts (`composeHomeMeta`).
+const metaDescription = composeHomeMeta(siteName)
 
 const keywords = computed(() => {
   const baseKeywords = [
@@ -918,7 +920,11 @@ useIndexableRobotsRule({ index: true, follow: true })
                   name="lucide:map-pin"
                   class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
                 />
-                <span><strong>Доставка по Алматы</strong> - быстрая и удобная</span>
+                <!-- Было «Доставка по Алматы — быстрая и удобная»: про другие
+                     города ни слова, а больше половины визитов из ChatGPT —
+                     не из Алматы (19 октября 2026). Сроки — те же, что в
+                     описании и превью ссылок. -->
+                <span><strong>Доставка</strong> {{ DELIVERY_TERMS }}</span>
               </li>
               <li class="flex items-start gap-2">
                 <Icon
