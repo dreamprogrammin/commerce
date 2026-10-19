@@ -7,7 +7,7 @@
 
 ⚠️ **Поправка к прежней шапке:** здесь стояло «Всё выкачено» — это было верно на момент той выкатки; правки, легшие в `dev` после неё, помечены в своих разделах.
 
-**19 октября — защита функций бота (общий секрет + секрет вебхука): КОД И МИГРАЦИЯ В DEV, НА БОЮ НЕ ВКЛЮЧЕНО — по шагам ниже.**
+**19 октября — защита функций бота (общий секрет + секрет вебхука): МИГРАЦИЯ И 7 ФУНКЦИЙ НА БОЮ (шаги 1–2), СЕКРЕТЫ НЕ ВКЛЮЧЕНЫ — шаги 3–4 ниже; перед шагом 4 выкатить `telegram-webhook` с правкой `/setup`.**
 Владелец: «Готовь исправление». **Дыра:** функции, которые зовёт база, стоят с `verify_jwt = false`, «защита» —
 `User-Agent` с `pg_net` (подделывается одной строкой); `send-user-telegram` и `notify-question-answered` не
 проверяли ничего; `telegram-webhook` не проверял, что обновление от Telegram. Можно было: переписать любое
@@ -24,36 +24,65 @@
 - `_shared/internalAuth.ts`: сверка с `INTERNAL_FUNCTIONS_SECRET` в notify-order, sync, notify-question-answered,
   send-user-telegram (+ сервисный ключ — так зовут ship-order и cancel-order), sales-digest, team-report;
   telegram-webhook сверяет `X-Telegram-Bot-Api-Secret-Token` с `TELEGRAM_WEBHOOK_SECRET`;
-- `_shared/webhookSecret.ts`: `GET …/telegram-webhook?action=secure-webhook&key=<TELEGRAM_WEBHOOK_SECRET>` —
-  функция сама зовёт setWebhook с `secret_token` (токен бота есть только у неё), адрес/max_connections/
-  allowed_updates прежние, ожидающие обновления не сбрасываются;
+- `_shared/webhookSecret.ts`: `GET …/telegram-webhook?action=secure-webhook` с заголовком
+  `x-webhook-key: <TELEGRAM_WEBHOOK_SECRET>` (до `fix/setup-webhook-secret` ключ шёл в адресе, а адрес оседает в
+  журнале функций) — функция сама зовёт setWebhook с `secret_token` (токен бота есть только у неё), адрес/
+  max_connections/allowed_updates прежние, ожидающие обновления не сбрасываются;
 - **пока секретов нет в окружении функций — прежнее поведение.**
 **Проверено на локальной базе:** миграция в транзакции с откатом, затем по-настоящему (локально применена,
 отмечена в `schema_migrations`); с секретами — 10 подделок отклонены (403/401/404, в Telegram ничего), настоящие
 пути проходят (сервисный ключ; триггер `notifications` → send-user-telegram; задание `sales-digest-morning`;
 вебхук с секретом; setWebhook — тот же адрес и наш `secret_token`; заказ через сайт → «Новый заказ», смена
 статуса → карточка; все ответы pg_net — 200); без секретов — прежнее поведение (и с заголовком, и без).
-Модульные тесты `tests/utils/internalAuth.test.ts` (8). Не проверено: `deno check` (нет Deno), бой.
-**ВКЛЮЧЕНИЕ НА БОЮ — строго по порядку** (каждый шаг безопасен сам по себе; обратный порядок ломает уведомления):
-1. **Владелец:** «Миграции Supabase» → Run workflow → `APPLY` (`20261019120000`). Видимых изменений нет:
-   нынешние функции заголовок игнорируют. Проверка — чтением: в 7 функциях `internal_function_headers`, секрет
-   в Vault есть, команды заданий переписаны.
-2. **Выкатка 7 функций по слову владельца:** notify-order-to-telegram, sync-order-status-to-telegram,
-   notify-question-answered, send-user-telegram, sales-digest, team-report, telegram-webhook (скачать прежние
-   версии по одной папке на функцию). Без секретов — прежнее поведение.
-3. **Включение секрета базы по слову владельца:** значение из Vault → секреты функций
-   `INTERNAL_FUNCTIONS_SECRET` (Management API: чтение `vault.decrypted_secrets` → `POST /v1/projects/<ref>/secrets`,
-   значение не печатать). Проверка: подделка с «pg_net» → 403; `select net.http_post(url := '<…>/sync-order-status-to-telegram',
-   headers := public.internal_function_headers(), body := '{"record":{"id":"00000000-0000-0000-0000-000000000000",
-   "status":"processing"},"old_record":{"status":"new"},"table":"orders"}')` → в `net._http_response` 200.
-4. **Включение секрета вебхука по слову владельца:** случайный `TELEGRAM_WEBHOOK_SECRET` → секреты функций и
-   сразу `GET …?action=secure-webhook&key=<он же>` (ответ: `url_unchanged: true`). Между этими двумя вызовами
-   Telegram получает 401 и повторяет доставку. Проверка: POST без заголовка → 401; владелец жмёт кнопку в боте.
-**Откат:** секреты удалить из окружения функций — сразу прежнее поведение; функции — код `94f419c5`.
+Модульные тесты `tests/utils/internalAuth.test.ts` (8; с правкой `/setup` — 13). Не проверено: `deno check` (нет Deno).
+**ВКЛЮЧЕНИЕ НА БОЮ — строго по порядку** (каждый шаг безопасен сам по себе; обратный порядок ломает уведомления).
+⚠️ Выкатку и запись секретов агенту не даёт классификатор авто-режима Claude Code («готова» он не принимает) —
+владелец запускает команды сам, через `!` в строке ввода; агент сверяет результат чтением.
+1. ✅ **Миграция — 19.10 в 16:24, владелец («Миграции Supabase» → `APPLY`), CI зелёный.** Проверено чтением:
+   `schema_migrations` есть, секрет в Vault 64 знака, у anon/authenticated нет `EXECUTE` на помощник, функций с
+   `functions/v1` без секрета 0 (все 7 — `SECURITY DEFINER`), 3 задания с заголовком; вебхуков базы
+   (`supabase_functions`, `tgargs`) и вызовов функций из других схем нет.
+2. ✅ **7 функций — 19.10 в 17:00, владелец сам (`! ~/bin/supabase functions deploy notify-order-to-telegram
+   sync-order-status-to-telegram notify-question-answered send-user-telegram sales-digest team-report
+   telegram-webhook --project-ref gvsdevsvzgcivpphcuai --use-api`).** Версии: notify v80, sync v48,
+   notify-question-answered v28, send-user-telegram v11, sales-digest v4, team-report v3, telegram-webhook v50;
+   у всех `verify_jwt = false`. До выкатки развёрнутые версии сверены с `94f419c5`: файл в файл, кроме
+   `_shared/orderCard.ts` у sales-digest/team-report (версия до 7 сентября — только отставала; функции берут из
+   него один `formatAmount`, он не менялся). После — скачаны: 51 файл = `cb5bbc54` байт в байт. Запуск: у всех
+   `OPTIONS` 200; notify/sync без pg_net, sales-digest/team-report без секрета — 403; send-user-telegram с пустым
+   телом — 400 (пока пускает всех, как раньше); вебхук `GET` — 404 (новый код, секрета нет).
+3. **Секрет базы — владелец: `! python3 -I scripts/enable-internal-functions-secret.py`.** Скрипт: значение
+   из Vault → `INTERNAL_FUNCTIONS_SECRET` (не печатается, сверка sha256-отпечатка из `GET /secrets`); ждёт 403 на
+   подделку «pg_net» с битым JSON (до включения такая подделка падает на разборе и ничего не делает); настоящий
+   путь — `net.http_post(… headers := public.internal_function_headers())` в sync с нулевым id заказа → 200
+   «No telegram_message_id»; не 200 или любой сбой до этого — сам удаляет секрет. Подделки в sales-digest и
+   team-report НЕ гоняются: до включения они отправили бы сводку — их проверит расписание (22:00, 9:00 по
+   Алматы; `net._http_response` хранит ответы 6 часов).
+4. **Секрет вебхука — только после выкатки `telegram-webhook` с правкой `/setup` (ниже). Владелец:
+   `! ~/bin/supabase functions deploy telegram-webhook --project-ref gvsdevsvzgcivpphcuai --use-api && python3 -I
+   scripts/enable-telegram-webhook-secret.py`.** Скрипт сам скачивает функцию и без `...webhookSecretParams()` в
+   `/setup` ничего не меняет; случайный `TELEGRAM_WEBHOOK_SECRET` (не печатается и не хранится) → ждёт, пока
+   функция его увидит, → `secure-webhook` (ключ заголовком); не 200 или сбой — удаляет секрет; затем POST без
+   заголовка и с чужим — 401. Между записью секрета и setWebhook Telegram получает 401 и повторяет доставку.
+   После — владелец жмёт кнопку в боте. Секрет потом не прочитать (API отдаёт только отпечатки): понадобится
+   переставить вебхук — завести новый.
+**Ловушка, найденная перед шагом 4 (`fix/setup-webhook-secret`):** команда бота `/setup` ставила вебхук без
+`secret_token`. После шага 4 первое же `/setup` (владелец им пользуется — см. записи ниже) сняло бы секрет у
+Telegram, функция отвечала бы 401 на всё, и бот замолчал бы, а `/setup` его не поднял бы — команда сама приходит
+через вебхук. Теперь каждый setWebhook передаёт `webhookSecretParams()` (`_shared/webhookSecret.ts`); страж в
+`tests/utils/internalAuth.test.ts` находит все `/setWebhook` в функциях и требует его. Без правки краснеют 4
+теста из 13. Запуском на локальном стенде (`tg-mock` + `functions serve` с секретом): старый `/setup` →
+setWebhook без `secret_token`, новый — с ним; ключ в адресе → 404, в заголовке → 200 и тот же адрес; обновление
+без заголовка → 401.
+**Откат:** секреты удалить из окружения функций (`DELETE /v1/projects/<ref>/secrets`) — сразу прежнее
+поведение; функции — код `94f419c5`.
 **Ещё открыто (не в этой ветке):** `generate-premium-questions` (тратит ключ Anthropic по любому запросу —
 нужна проверка админа в функции и токен сессии из админки вместо anon-ключа); `send-push-notification` есть
 на бою, в репозитории нет, таблицы `push_subscriptions` нет — удалить (решение владельца); `image-transformer`
-открыт — по назначению публичный, не разбирал. Локально: у тестового профиля `653f339a…` (на бою его нет)
+открыт — по назначению публичный, не разбирал; **`/setup` выполняет любой, кто напишет боту** (проверено на
+стенде: посторонний private-чат → «Setup complete» и сообщение «Кнопки под полем ввода…» в рабочий чат) — после
+правки вреда нет, всё ставится заново в те же значения, но ограничить владельцем стоит (решение владельца);
+в секретах функций лежит `TRIGGER_SECRET`, в коде он не используется. Локально: у тестового профиля `653f339a…` (на бою его нет)
 `telegram_chat_id` сброшен в NULL — прежнее значение не прочитано из-за ошибки в скрипте проверки.
 
 **19 октября — ФУНКЦИИ БОТА ВЫКАЧЕНЫ по слову владельца («Выкатить сейчас»).** Из `dev` на `94f419c5`:

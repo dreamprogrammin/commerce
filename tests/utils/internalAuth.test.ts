@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -79,22 +81,29 @@ describe('secureWebhook', () => {
     })
   })
 
-  const secure = async (url: string) => {
+  const secure = async (key?: string, url = 'https://x.test/fn?action=secure-webhook') => {
     const { secureWebhook } = await import('../../supabase/functions/_shared/webhookSecret')
-    return secureWebhook(req({}, url), 'bot-token')
+    return secureWebhook(req(key === undefined ? {} : { 'x-webhook-key': key }, url), 'bot-token')
   }
 
   it('без секрета в окружении или с чужим ключом — 404, Telegram не трогаем', async () => {
-    expect((await secure('https://x.test/fn?action=secure-webhook&key=any')).status).toBe(404)
+    expect((await secure('any')).status).toBe(404)
     env.set('TELEGRAM_WEBHOOK_SECRET', 'tg-secret')
-    expect((await secure('https://x.test/fn?action=secure-webhook&key=wrong')).status).toBe(404)
-    expect((await secure('https://x.test/fn?key=tg-secret')).status).toBe(404)
+    expect((await secure('wrong')).status).toBe(404)
+    expect((await secure()).status).toBe(404)
+    expect((await secure('tg-secret', 'https://x.test/fn')).status).toBe(404)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('ключ в адресе не принимается — адрес оседает в журнале функций', async () => {
+    env.set('TELEGRAM_WEBHOOK_SECRET', 'tg-secret')
+    expect((await secure(undefined, 'https://x.test/fn?action=secure-webhook&key=tg-secret')).status).toBe(404)
     expect(calls).toHaveLength(0)
   })
 
   it('с верным ключом — тот же адрес и настройки, меняется только секрет', async () => {
     env.set('TELEGRAM_WEBHOOK_SECRET', 'tg-secret')
-    const res = await secure('https://x.test/fn?action=secure-webhook&key=tg-secret')
+    const res = await secure('tg-secret')
     expect(res.status).toBe(200)
     const set = calls.find(c => c.method === 'setWebhook')!
     expect(set.body).toEqual({
@@ -106,5 +115,48 @@ describe('secureWebhook', () => {
     const out = await res.json()
     expect(out.url_unchanged).toBe(true)
     expect(JSON.stringify(out)).not.toContain('tg-secret')
+  })
+})
+
+/*
+ * Кто ставит вебхук, обязан передать secret_token. Иначе Telegram перестаёт
+ * слать заголовок, и при заведённом TELEGRAM_WEBHOOK_SECRET telegram-webhook
+ * отвечает 401 на всё: бот глохнет. Так сделала бы команда `/setup`
+ * (19 октября 2026), а поднять бота ею же нельзя — она сама приходит через
+ * вебхук.
+ */
+describe('setWebhook с секретом', () => {
+  it('webhookSecretParams — secret_token, пока секрет заведён', async () => {
+    const { webhookSecretParams } = await import('../../supabase/functions/_shared/webhookSecret')
+    expect(webhookSecretParams()).toEqual({})
+    env.set('TELEGRAM_WEBHOOK_SECRET', 'tg-secret')
+    expect(webhookSecretParams()).toEqual({ secret_token: 'tg-secret' })
+  })
+
+  const root = join(process.cwd(), 'supabase/functions')
+  const sites = (readdirSync(root, { recursive: true, encoding: 'utf8' }))
+    .filter(file => file.endsWith('.ts'))
+    .flatMap((file) => {
+      const src = readFileSync(join(root, file), 'utf8')
+      return [...src.matchAll(/\/setWebhook`/g)].map((m) => {
+        // Вызов — от адреса до следующего fetch: тело запроса целиком.
+        const rest = src.slice(m.index)
+        const next = rest.indexOf('fetch(')
+        return {
+          where: `${file}:${src.slice(0, m.index).split('\n').length}`,
+          call: next === -1 ? rest : rest.slice(0, next),
+        }
+      })
+    })
+
+  it('вызовы setWebhook найдены, и `/setup` среди них', () => {
+    expect(sites.map(s => s.where)).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^telegram-webhook\/index\.ts:/),
+      expect.stringMatching(/^_shared\/webhookSecret\.ts:/),
+    ]))
+  })
+
+  it.each(sites)('$where передаёт secret_token', ({ call }) => {
+    expect(call).toContain('webhookSecretParams()')
   })
 })

@@ -9,8 +9,10 @@
  *
  * Зачем через функцию. Токен бота лежит только в секретах функций — снаружи
  * его нет, а setWebhook требует именно его. Вызов:
- *   GET …/telegram-webhook?action=secure-webhook&key=<TELEGRAM_WEBHOOK_SECRET>
- * Ключ — тот же секрет: кто его знает, тот и так может слать обновления.
+ *   GET …/telegram-webhook?action=secure-webhook
+ *   x-webhook-key: <TELEGRAM_WEBHOOK_SECRET>
+ * Ключ — тот же секрет: кто его знает, тот и так может слать обновления. Он
+ * в заголовке, а не в адресе: адрес запроса оседает в журнале функций.
  * Адрес, max_connections и allowed_updates берутся у текущего вебхука —
  * меняется только секрет. Ожидающие обновления не сбрасываются.
  */
@@ -20,15 +22,30 @@ function apiBase(): string {
   return Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
 }
 
+/**
+ * `secret_token` для setWebhook — передаёт КАЖДЫЙ, кто ставит вебхук.
+ *
+ * Без него Telegram перестаёт слать заголовок с секретом, и при заведённом
+ * TELEGRAM_WEBHOOK_SECRET функция отвечает 401 на любое обновление: бот
+ * глохнет. Команда `/setup` поднять его уже не сможет — она сама приходит
+ * через вебхук. Пока секрета нет — пустой объект, вебхук ставится как раньше.
+ */
+export function webhookSecretParams(): { secret_token?: string } {
+  const secret = Deno.env.get('TELEGRAM_WEBHOOK_SECRET')
+  return secret ? { secret_token: secret } : {}
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
+
+export const WEBHOOK_KEY_HEADER = 'x-webhook-key'
 
 export async function secureWebhook(req: Request, botToken: string): Promise<Response> {
   const secret = Deno.env.get('TELEGRAM_WEBHOOK_SECRET')
   const url = new URL(req.url)
   if (url.searchParams.get('action') !== 'secure-webhook' || !secret
-    || !safeEqual(url.searchParams.get('key') ?? '', secret)) {
+    || !safeEqual(req.headers.get(WEBHOOK_KEY_HEADER) ?? '', secret)) {
     return new Response('Not Found', { status: 404 })
   }
 
@@ -38,7 +55,7 @@ export async function secureWebhook(req: Request, botToken: string): Promise<Res
   if (!current?.url)
     return json({ ok: false, error: 'у бота нет вебхука — ставить секрет некуда' }, 409)
 
-  const params: Record<string, unknown> = { url: current.url, secret_token: secret }
+  const params: Record<string, unknown> = { url: current.url }
   if (current.max_connections)
     params.max_connections = current.max_connections
   if (Array.isArray(current.allowed_updates))
@@ -47,7 +64,7 @@ export async function secureWebhook(req: Request, botToken: string): Promise<Res
   const set = await (await fetch(`${api}/setWebhook`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    body: JSON.stringify({ ...params, ...webhookSecretParams() }),
   })).json()
   const after = (await (await fetch(`${api}/getWebhookInfo`)).json())?.result ?? {}
 

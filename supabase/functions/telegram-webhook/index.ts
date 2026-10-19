@@ -65,7 +65,7 @@ import {
   parseMenuData,
   replyButtonScope,
 } from '../_shared/orderMenu.ts'
-import { secureWebhook } from '../_shared/webhookSecret.ts'
+import { secureWebhook, webhookSecretParams } from '../_shared/webhookSecret.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -182,9 +182,12 @@ Deno.serve(async (req) => {
           // остался от прошлой настройки, а нажатия кнопок под карточкой
           // заказа приходят именно как callback_query. Молча потерять их —
           // значит получить чат, где кнопки не работают вовсе.
+          // Секрет — тоже: без него при заведённом TELEGRAM_WEBHOOK_SECRET
+          // бот перестанет принимать обновления (_shared/webhookSecret.ts).
           body: JSON.stringify({
             url: webhookUrl,
             allowed_updates: ['message', 'callback_query'],
+            ...webhookSecretParams(),
           }),
         })
         const res = await r.json()
