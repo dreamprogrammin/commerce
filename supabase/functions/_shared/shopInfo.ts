@@ -196,7 +196,13 @@ export function courierMessage(order: CourierOrder): string {
 
   // Сумму показываем только при оплате наличными: при оплате картой её уже
   // забрали, и цифра в руках курьера только путает.
+  //
+  // Kaspi — отдельно. Курьеру писалось «оплачено картой», а это 64 заказа из 67
+  // на бою (19 октября 2026), и Kaspi бывает по-разному: кто-то переводит
+  // заранее, кто-то платит QR у двери (владелец). Знать этого курьер не может —
+  // поэтому сумма и просьба уточнить у менеджера.
   const cash = !order.payment_method || order.payment_method === 'cash'
+  const kaspi = order.payment_method === 'kaspi'
 
   const lines = [
     `*Доставка №${orderNumber(order)}*`,
@@ -212,6 +218,8 @@ export function courierMessage(order: CourierOrder): string {
     lines.push(`📞 ${phone}`)
   if (cash)
     lines.push(`💵 к оплате: ${money(order.final_amount)}`)
+  else if (kaspi)
+    lines.push(`📱 Kaspi: ${money(order.final_amount)} — уточните у менеджера, оплачено ли`)
   else
     lines.push('💳 оплачено картой')
   if (order.comment)
