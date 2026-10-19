@@ -118,6 +118,18 @@ describe('сообщение курьеру', () => {
   })
 
   /* При оплате картой деньги уже забрали — цифра в руках курьера только путает. */
+  /*
+   * Kaspi бывает по-разному — перевод заранее или QR у двери (владелец, 19
+   * октября 2026). Раньше курьер читал «оплачено картой» — на бою так шли 64
+   * заказа из 67.
+   */
+  it('у Kaspi — сумма и просьба уточнить у менеджера, а не «оплачено картой»', () => {
+    const text = courierMessage(order({ payment_method: 'kaspi', final_amount: 13390 }))
+    expect(text).toContain('Kaspi: 13 390 ₸')
+    expect(text).toContain('уточните у менеджера')
+    expect(text).not.toContain('оплачено картой')
+  })
+
   it('при оплате картой суммы к оплате нет', () => {
     const text = courierMessage(order({ payment_method: 'card' }))
     expect(text).toContain('оплачено картой')
