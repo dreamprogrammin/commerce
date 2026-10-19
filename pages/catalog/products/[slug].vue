@@ -19,6 +19,7 @@ import {
   BUCKET_NAME_CATEGORY,
   BUCKET_NAME_PRODUCT,
   BUCKET_NAME_PRODUCT_LINES,
+  REGIONAL_DELIVERY_COST_NOTE,
 } from '@/constants'
 import { SHOP } from '@/constants/shop'
 import { productShell } from '@/lib/shell'
@@ -537,7 +538,7 @@ const PICKUP_LINE = `${SHOP.street}, ${SHOP.openingHoursHuman}`
 const PICKUP_ROWS = [
   { icon: 'lucide:store', title: 'Самовывоз в Алматы — бесплатно', sub: PICKUP_LINE },
   { icon: 'lucide:truck', title: 'Курьером по Алматы', sub: '1–3 рабочих дня, при заказе до 14:00 — отправка в тот же день' },
-  { icon: 'lucide:package', title: 'По Казахстану', sub: '3–7 дней, Kazpost или CDEK' },
+  { icon: 'lucide:package', title: 'По Казахстану', sub: `3–7 дней, Kazpost или CDEK, ${REGIONAL_DELIVERY_COST_NOTE}` },
 ]
 
 const PERKS = [

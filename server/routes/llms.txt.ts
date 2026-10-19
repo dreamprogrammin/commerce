@@ -1,7 +1,7 @@
 import type { Database } from '@/types'
 import type { CategoryFactRow, NounForms } from '~/utils/categoryFacts'
 import { serverSupabaseClient } from '#supabase/server'
-import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '~/constants'
+import { COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD, REGIONAL_DELIVERY_COST_NOTE } from '~/constants'
 import { SHOP, SHOP_ADDRESS_FULL } from '~/constants/shop'
 import { categoryFactsFromRows, composeCategoryFactsParagraph, countPhrase, priceRangePhrase, sinceAge } from '~/utils/categoryFacts'
 import { formatPrice } from '~/utils/formatPrice'
@@ -164,9 +164,9 @@ export default defineEventHandler(async (event): Promise<string> => {
     '',
     '- Доставка: отправка из Алматы. По городу 1–3 рабочих дня, по остальным',
     '  городам Казахстана 3–7 рабочих дней. Курьер по Алматы',
-    `  ${formatPrice(COURIER_DELIVERY_COST)} ₸, от ${formatPrice(FREE_SHIPPING_THRESHOLD)} ₸ — бесплатно; в другие города — по адресу.`,
+    `  ${formatPrice(COURIER_DELIVERY_COST)} ₸, от ${formatPrice(FREE_SHIPPING_THRESHOLD)} ₸ — бесплатно; в другие города — Kazpost или CDEK, ${REGIONAL_DELIVERY_COST_NOTE}.`,
     `- Самовывоз в Алматы: бесплатно, ${SHOP_ADDRESS_FULL}, ${SHOP.openingHoursHuman}.`,
-    '- Оплата: наличными при получении либо переводом или по QR через Kaspi.',
+    '- Оплата: наличными при получении либо переводом или по QR через Kaspi; заказ в другой город — Kaspi до отправки.',
     '- Возврат и обмен: 14 календарных дней при сохранённых упаковке и',
     '  товарном виде; при заводском браке доставка за счёт магазина.',
     '- Бонусы: 1 бонус = 1 ₸ при оплате следующего заказа, активируются через',
