@@ -57,7 +57,7 @@ import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstP
 import { countProductsByCategory, isCategoryIndexable } from '@/utils/categoryLanding'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, stablePriceValidUntil, strikethroughPrice } from '@/utils/offerSchema'
-import { composeCategoryMeta, hasLegacyTemplateMarks } from '@/utils/seoDescription'
+import { composeCategoryMeta, composeCategoryOgLine, hasLegacyTemplateMarks } from '@/utils/seoDescription'
 import { failSsrOnDbError } from '@/utils/ssrDbError'
 
 // ─── Ленивая загрузка тяжёлых компонентов ────────────────────────────────────
@@ -2324,17 +2324,30 @@ const isLoading = computed(
     || (isLoadingProducts.value && currentPage.value === 1),
 )
 
-const ogImageDescription = computed(() => {
-  if (hasActiveFilters.value) {
-    return `Найдено товаров: ${displayedProducts.value.length}`
-  }
-  return 'Широкий ассортимент качественных товаров по выгодным ценам'
-})
+/*
+ * Строка фактов в превью ссылки — те же числа, что в описании для выдачи.
+ * Было «Широкий ассортимент качественных товаров по выгодным ценам» у всех
+ * разделов, а с фильтром — «Найдено товаров: N», где N — длина первой
+ * страницы (не больше 12). Цена «от» — только по ветке (`categoryFacts`):
+ * минимум первой страницы выдачи больше настоящего.
+ *
+ * Фактов нет («Все товары») — пустая строка, а не undefined: на undefined
+ * nuxt-og-image подставляет мета-описание страницы, и доставка в картинке
+ * выходила дважды (проверено на стенде 19 октября 2026).
+ */
+const ogImageDescription = computed(() =>
+  activeBrandSlug.value
+    ? brandLandingSummary.value
+    : composeCategoryOgLine({
+        productsCount: categoryProductsCount.value,
+        minPrice: categoryFacts.value?.minPrice,
+        topBrands: topBrands.value,
+      }),
+)
 
 defineOgImageComponent('OgImageCatalog', {
   title: title.value,
   description: ogImageDescription.value,
-  productsCount: displayedProducts.value.length || undefined,
 })
 
 useSeoMeta({
