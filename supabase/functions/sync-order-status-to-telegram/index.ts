@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fromPgNet, isInternalCall } from '../_shared/internalAuth.ts'
 import { buildOrderKeyboard } from '../_shared/orderActions.ts'
 import { updateTelegramMessage, escapeMarkdown } from '../_shared/telegramUtils.ts'
 import { closeCourierOffers } from '../_shared/courierOffers.ts'
@@ -49,11 +50,10 @@ Deno.serve(async (req) => {
       throw new Error('Отсутствуют переменные окружения для Telegram')
     }
 
-    // Проверяем источник запроса (должен быть от триггера БД)
-    const userAgent = req.headers.get('user-agent') || ''
-    const isFromTrigger = userAgent.toLowerCase().includes('pg_net')
-
-    console.log(`📨 User-Agent: "${userAgent}"`)
+    // Источник — триггер базы: общий секрет, а пока он не заведён — pg_net
+    // (_shared/internalAuth.ts). По одному User-Agent любой мог переписать
+    // сообщение бота в чате магазина: id сообщения и статус — из тела.
+    const isFromTrigger = isInternalCall(req, () => fromPgNet(req))
     console.log(`🔍 Запрос от триггера БД: ${isFromTrigger}`)
 
     if (!isFromTrigger) {

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendOrderEmail } from '../_shared/orderEmail.ts'
 import { buildOrderKeyboard } from '../_shared/orderActions.ts'
+import { fromPgNet, isInternalCall } from '../_shared/internalAuth.ts'
 import { isPickup, isPost } from '../_shared/shopInfo.ts'
 
 /*
@@ -128,11 +129,9 @@ Deno.serve(async (req) => {
       throw new Error('Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID')
     }
 
-    // Проверяем источник запроса
-    const userAgent = req.headers.get('user-agent') || ''
-    const isFromTrigger = userAgent.toLowerCase().includes('pg_net')
-    
-    console.log(`📨 User-Agent: "${userAgent}"`)
+    // Источник — триггер базы: общий секрет, а пока он не заведён — pg_net
+    // (_shared/internalAuth.ts). Одного User-Agent мало — подделывается.
+    const isFromTrigger = isInternalCall(req, () => fromPgNet(req))
     console.log(`🔍 Запрос от триггера БД: ${isFromTrigger}`)
 
     if (!isFromTrigger) {
