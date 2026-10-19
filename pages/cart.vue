@@ -391,8 +391,8 @@ let previousSubtotal = subtotal.value
 watch(subtotal, (newSubtotal) => {
   if (newSubtotal > previousSubtotal && newSubtotal < FREE_SHIPPING_THRESHOLD) {
     const remaining = FREE_SHIPPING_THRESHOLD - newSubtotal
-    toast.info(`До бесплатной доставки осталось ${formatPrice(remaining)} ₸`, {
-      description: '🚚 Добавьте ещё товаров для бесплатной доставки',
+    toast.info(`До бесплатной доставки по Алматы осталось ${formatPrice(remaining)} ₸`, {
+      description: '🚚 Добавьте ещё товаров — курьер по Алматы станет бесплатным',
       duration: 3000,
     })
   }
@@ -510,10 +510,10 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 v-if="isFreeShipping"
                 class="text-[13px] font-semibold text-success"
               >
-                Доставка бесплатная — порог пройден 🎉
+                Доставка по Алматы бесплатная — порог пройден 🎉
               </p>
               <p v-else class="text-[13px] text-muted-foreground">
-                До бесплатной доставки
+                До бесплатной доставки по Алматы
                 <b class="font-bold text-primary">{{ formatPrice(remainingForFreeShipping) }}&nbsp;₸</b>
               </p>
               <Progress :model-value="shippingProgress" class="mt-2 h-1.5" />

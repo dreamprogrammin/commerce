@@ -147,14 +147,14 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
         <div class="space-y-2">
           <div class="flex items-center justify-between text-sm">
             <span v-if="!hasFreeShipping" class="text-muted-foreground">
-              До бесплатной доставки
+              До бесплатной доставки по Алматы
             </span>
             <span
               v-else
               class="text-green-600 font-medium flex items-center gap-1"
             >
               <Icon name="lucide:check-circle" class="w-4 h-4" />
-              Бесплатная доставка!
+              Бесплатная доставка по Алматы!
             </span>
             <span v-if="!hasFreeShipping" class="font-semibold text-primary">
               {{ formatPrice(remainingForFreeShipping) }}&nbsp;₸
@@ -163,10 +163,10 @@ async function addAccessoryToCart(accessory: ProductWithImages) {
           <Progress :model-value="shippingProgress" class="h-2" />
           <p v-if="!hasFreeShipping" class="text-xs text-muted-foreground">
             Добавьте товаров на {{ formatPrice(remainingForFreeShipping) }}&nbsp;₸
-            для бесплатной доставки 🚚
+            для бесплатной доставки по Алматы 🚚
           </p>
           <p v-else class="text-xs text-green-600">
-            🎉 Ура! Доставка за наш счет!
+            🎉 Ура! Доставка по Алматы за наш счёт!
           </p>
         </div>
       </div>
