@@ -167,6 +167,19 @@ Deno.serve(async (req) => {
 
     // === /setup — одноразовая команда для настройки бота (webhook, описание, команды) ===
     if (message.text?.trim() === '/setup') {
+      /*
+       * Только владельцу (20 октября 2026, владелец: «ограничить»). Раньше
+       * команду выполнял любой, кто напишет боту: вебхук, команды и меню
+       * ставились заново, а в рабочий чат уходило «Кнопки под полем ввода…» —
+       * от постороннего. Правило то же, что у /plan, /team и /sales.
+       */
+      if (!await isOwner(supabase, message.from?.id ?? 0)) {
+        await sendRichMessage(botToken, chatId, 'Настройка бота доступна владельцу.')
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       console.log('🔧 Running bot setup...')
       const baseUrl = `${telegramApiBase()}/bot${botToken}`
       const webhookUrl = `${supabaseUrl}/functions/v1/telegram-webhook`
