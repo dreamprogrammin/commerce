@@ -91,9 +91,34 @@ setWebhook без `secret_token`, новый — с ним; ключ в адре
 секрета его не проверяет): `! curl -sS -X DELETE https://api.supabase.com/v1/projects/gvsdevsvzgcivpphcuai/secrets
 -H "Authorization: Bearer $(cat ~/.supabase/access-token)" -H "Content-Type: application/json" -d
 '["TELEGRAM_WEBHOOK_SECRET"]'`. Уведомления о заказах молчат → то же с `INTERNAL_FUNCTIONS_SECRET`.
-**Ещё открыто (не в этой ветке):** `generate-premium-questions` (тратит ключ Anthropic по любому запросу —
-нужна проверка админа в функции и токен сессии из админки вместо anon-ключа); `image-transformer`
-открыт — по назначению публичный, не разбирал; в секретах функций лежит `TRIGGER_SECRET`, в коде он не используется.
+**Ещё открыто (не в этой ветке):** `image-transformer` открыт — по назначению публичный, не разбирал; в секретах
+функций лежит `TRIGGER_SECRET`, в коде он не используется.
+**20 октября — `generate-premium-questions` только администратору (`fix/premium-questions-admin-only`, владелец:
+«давай последний тоже реши»): КОД В DEV, ЖДЁТ ВЫКАТКИ ФУНКЦИИ.** ⚠️ Поправка к прежнему «тратит ключ Anthropic по
+любому запросу» — неверно: `ANTHROPIC_API_KEY` в секретах функций НЕТ, на бою функция отвечает 500 «AI service not
+configured» на первом шаге и ничего не тратит и не пишет (на бою код = репозиторий). Дыра спящая, но хуже, чем
+описывалась: функция строит промпт из тела запроса и пишет ответ модели сервисным ключом в ПУБЛИЧНЫЕ вопросы-ответы
+(`product_questions`, `brand_questions`, `category_questions`, …) — с ключом любой мог бы вписать на страницы магазина
+свой текст. Ключ понадобится и `generate-brand-seo` (та же переменная) — в ту минуту дыра и открылась бы.
+**Что сделано:** в функции — проверка как в `generate-brand-seo` (JWT → `getUser(токен)` → роль из `profiles`
+сервисным ключом; иначе 401/403) до чтения тела; `[functions.generate-premium-questions]` в `config.toml` с
+`verify_jwt = true` (секции не было, выкатывали с `--no-verify-jwt`); `useProductQuestions`, `useBrandQuestions`,
+`useCategoryQuestions` — `supabase.functions.invoke` вместо `fetch` с анонимным ключом (живой вызов AI-шага один —
+«Сгенерировать FAQ» на `/admin/products/[id]` для товара дороже 50 000 ₸; одиночные бренд/категория экспортируются,
+но нигде не используются); `docs/FAQ_DEPLOYMENT_CHECKLIST.md` — без `--no-verify-jwt`, проверка токеном админа.
+**Проверено:** `tests/composables/premiumQuestions.test.ts` — без правки 3 из 5 красные; `check-premium-questions-admin.mjs`
+на локальном стенде (`functions serve` БЕЗ `--no-verify-jwt`, без ключа Anthropic): старый код — анонимный ключ и
+обычный пользователь доходят до AI-шага; новый — без токена 401, анонимный ключ 401, пользователь 403, админ проходит
+(дальше 500 «AI service not configured»), записей 0; CORS-префлайт без токена — 200. Браузер (сайт на локальной базе,
+вход админом через куки): «Сгенерировать FAQ» на товаре за 52 890 ₸ → запрос с токеном админа (`sub` = админ), не
+с анонимным ключом, функция пропустила. Полный vitest: 40 старых падений, 738 зелёных (+5).
+**Выкатка — владелец:** `! ~/bin/supabase functions deploy generate-premium-questions --project-ref
+gvsdevsvzgcivpphcuai --use-api` (из `config.toml` встанет `verify_jwt = true`). Фронт доедет до сайта со
+следующим `dev` → `master` (решение владельца); до этого живая админка шлёт анонимный ключ и получает 401 вместо
+нынешних 500 — AI-шаг и так молча падает, базовые вопросы создаются, как раньше.
+**Нашлось по дороге (не правил):** на дорогом товаре тост «Умные вопросы сгенерированы (базовые + AI)!» выходит,
+даже когда AI-шаг упал (`generateQuestionsForProduct` возвращает `true` в любом случае) — на бою так каждый раз,
+ключа нет; модель в функции — `claude-3-5-haiku-20241022` (2024 год): если заводить ключ, сверить, что она доступна.
 **20 октября — `send-push-notification` УДАЛЕНА с боя, ключи `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` сняты** — владелец
 сам (`functions delete`, `secrets unset`). Это остаток браузерных push-уведомлений: добавлены 17.02 (`bc6a4fdb`),
 убраны 23.02 в пользу Telegram (`ef025496`, миграция `20260223000000_remove_web_push.sql` — таблица, триггер и
