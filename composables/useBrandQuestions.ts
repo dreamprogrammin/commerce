@@ -24,16 +24,12 @@ export function useBrandQuestions() {
     if (data && data.needs_ai) {
       console.log('Premium brand detected, generating AI questions...')
 
+      // Токен текущего пользователя, не анонимный ключ — см. useProductQuestions.ts.
       try {
-        const response = await fetch(
-          `${supabase.supabaseUrl}/functions/v1/generate-premium-questions`,
+        const { data: aiResult, error: fnError } = await supabase.functions.invoke<{ questions_count: number }>(
+          'generate-premium-questions',
           {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.supabaseKey}`,
-            },
-            body: JSON.stringify({
+            body: {
               entity_type: 'brand',
               brand_id: data.brand_id,
               name: data.name,
@@ -43,16 +39,15 @@ export function useBrandQuestions() {
               max_price: data.max_price,
               categories_count: data.categories_count,
               country: data.country,
-            }),
+            },
           },
         )
 
-        if (!response.ok) {
-          console.error('AI generation failed:', await response.text())
+        if (fnError) {
+          console.error('AI generation failed:', fnError)
         }
         else {
-          const aiResult = await response.json()
-          console.log(`AI generated ${aiResult.questions_count} premium questions`)
+          console.log(`AI generated ${aiResult?.questions_count} premium questions`)
         }
       }
       catch (aiError) {

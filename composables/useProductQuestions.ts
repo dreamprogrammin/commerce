@@ -24,16 +24,17 @@ export function useProductQuestions() {
     if (data && data.needs_ai) {
       console.log('Premium product detected, generating AI questions...')
 
+      /*
+       * Через functions.invoke: клиент сам подставляет токен ТЕКУЩЕГО
+       * пользователя, а функция пускает только администратора (20 октября
+       * 2026). Раньше здесь был fetch с публичным анонимным ключом из разметки
+       * сайта — с ним функцию мог позвать кто угодно.
+       */
       try {
-        const response = await fetch(
-          `${supabase.supabaseUrl}/functions/v1/generate-premium-questions`,
+        const { data: aiResult, error: fnError } = await supabase.functions.invoke<{ questions_count: number }>(
+          'generate-premium-questions',
           {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.supabaseKey}`,
-            },
-            body: JSON.stringify({
+            body: {
               product_id: data.product_id,
               name: data.name,
               price: data.price,
@@ -44,17 +45,16 @@ export function useProductQuestions() {
               category: data.category,
               min_age: data.min_age,
               max_age: data.max_age,
-            }),
+            },
           },
         )
 
-        if (!response.ok) {
-          console.error('AI generation failed:', await response.text())
+        if (fnError) {
+          console.error('AI generation failed:', fnError)
           // Не критично - базовые вопросы уже созданы
         }
         else {
-          const aiResult = await response.json()
-          console.log(`AI generated ${aiResult.questions_count} premium questions`)
+          console.log(`AI generated ${aiResult?.questions_count} premium questions`)
         }
       }
       catch (aiError) {
