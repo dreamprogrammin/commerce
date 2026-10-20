@@ -1,6 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendOrderEmail } from '../_shared/orderEmail.ts'
 import { buildOrderKeyboard } from '../_shared/orderActions.ts'
+import { fromPgNet, isInternalCall } from '../_shared/internalAuth.ts'
+import { isPickup, isPost } from '../_shared/shopInfo.ts'
+
+/*
+ * База Telegram API — как в остальных функциях бота (`telegramUtils.ts`,
+ * `ship-order`): в проде переменная не задана, локально подменяется
+ * заглушкой. Здесь адрес был зашит, и тестовый прогон уходил на настоящий
+ * api.telegram.org (19 октября 2026).
+ */
+const TELEGRAM_API = Deno.env.get('TELEGRAM_API_BASE') ?? 'https://api.telegram.org'
 import { escapeMarkdown } from '../_shared/telegramUtils.ts'
 
 const corsHeaders = {
@@ -119,11 +129,9 @@ Deno.serve(async (req) => {
       throw new Error('Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID')
     }
 
-    // Проверяем источник запроса
-    const userAgent = req.headers.get('user-agent') || ''
-    const isFromTrigger = userAgent.toLowerCase().includes('pg_net')
-    
-    console.log(`📨 User-Agent: "${userAgent}"`)
+    // Источник — триггер базы: общий секрет, а пока он не заведён — pg_net
+    // (_shared/internalAuth.ts). Одного User-Agent мало — подделывается.
+    const isFromTrigger = isInternalCall(req, () => fromPgNet(req))
     console.log(`🔍 Запрос от триггера БД: ${isFromTrigger}`)
 
     if (!isFromTrigger) {
@@ -508,18 +516,33 @@ Deno.serve(async (req) => {
     }
     
     messageText += `*Оплата:* ${escapeMarkdown(typedOrderData.payment_method) || 'Не указано'}\n`
-    messageText += `*Доставка:* ${typedOrderData.delivery_method === 'courier' ? 'Курьер' : 'Самовывоз'}\n`
+    /*
+     * Три способа: курьер по Алматы, самовывоз и посылка в другой город
+     * (`post`, с 19 октября 2026). Раньше ветка была на `=== 'courier'`, и
+     * посылка подписалась бы «Самовывоз» без адреса — менеджер не знал бы,
+     * куда её отправлять.
+     */
+    const method = typedOrderData.delivery_method
+    const methodLabel = isPickup(method)
+      ? 'Самовывоз'
+      : isPost(method) ? 'По Казахстану — Kazpost или CDEK' : 'Курьер'
+    messageText += `*Доставка:* ${methodLabel}\n`
 
     // При самовывозе адрес доставки пуст, вместо него — куда ехать за заказом.
-    if (typedOrderData.delivery_method !== 'courier' && typedOrderData.pickup_point) {
+    if (isPickup(method) && typedOrderData.pickup_point) {
       const pp = typedOrderData.pickup_point
       messageText += `*Пункт выдачи:* ${escapeMarkdown(pp.name)} — ${escapeMarkdown(pp.address)}\n`
     }
 
-    if (typedOrderData.delivery_method === 'courier' && typedOrderData.delivery_address) {
+    if (!isPickup(method) && typedOrderData.delivery_address) {
       const city = escapeMarkdown(typedOrderData.delivery_address.city)
       const line1 = escapeMarkdown(typedOrderData.delivery_address.line1)
       messageText += `*Адрес:* ${city}, ${line1}\n`
+    }
+
+    // Цену посылки сервер не знает (ставит 0): её называют после взвешивания.
+    if (isPost(method)) {
+      messageText += `⚖️ *Доставка не включена в итог:* взвесить посылку и назвать покупателю стоимость; оплата — Kaspi до отправки\n`
     }
 
     // Желаемое время — прямо под адресом: оператору оно нужно раньше
@@ -599,7 +622,7 @@ Deno.serve(async (req) => {
       if (validImages.length > 0) {
         // Отправляем только первое изображение с текстом и кнопками
         const photoResponse = await fetch(
-          `https://api.telegram.org/bot${botToken}/sendPhoto`,
+          `${TELEGRAM_API}/bot${botToken}/sendPhoto`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -707,7 +730,7 @@ async function sendTextMessage(
   replyMarkup?: object
 ) {
   const response = await fetch(
-    `https://api.telegram.org/bot${botToken}/sendMessage`,
+    `${TELEGRAM_API}/bot${botToken}/sendMessage`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -3,7 +3,7 @@ import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { SHOP } from '@/constants/shop'
 import { formatPrice } from '@/utils/formatPrice'
-import { isPickupOrder } from '@/utils/orderStatus'
+import { deliveryMethodTitle, isPickupOrder, isPostOrder } from '@/utils/orderStatus'
 
 /*
  * Статус заказа по ссылке (29 сентября 2026) — без входа и регистрации.
@@ -87,7 +87,7 @@ const phoneHref = `tel:${SHOP.phone.replace(/[^\d+]/g, '')}`
 
       <section class="rounded-2xl border bg-card p-5 space-y-1.5 text-sm">
         <h2 class="text-base font-bold mb-1">
-          {{ isPickup ? 'Самовывоз' : 'Доставка курьером' }}
+          {{ deliveryMethodTitle(order.deliveryMethod) }}
         </h2>
         <template v-if="isPickup">
           <p>{{ order.pickupPoint?.name ?? 'Пункт выдачи' }}: {{ order.pickupPoint?.address ?? SHOP.street }}</p>
@@ -126,11 +126,14 @@ const phoneHref = `tel:${SHOP.phone.replace(/[^\d+]/g, '')}`
           </li>
         </ul>
         <div class="mt-4 border-t pt-3 space-y-1 text-sm">
-          <div v-if="order.deliveryCost" class="flex justify-between text-muted-foreground">
+          <div v-if="isPostOrder(order.deliveryMethod)" class="flex justify-between gap-3 text-muted-foreground">
+            <span>Доставка</span><span class="text-right">по весу посылки, сообщим до отправки</span>
+          </div>
+          <div v-else-if="order.deliveryCost" class="flex justify-between text-muted-foreground">
             <span>Доставка</span><span>{{ formatPrice(order.deliveryCost) }}&nbsp;₸</span>
           </div>
           <div class="flex justify-between text-base font-bold">
-            <span>Итого</span><span>{{ formatPrice(order.total) }}&nbsp;₸</span>
+            <span>{{ isPostOrder(order.deliveryMethod) ? 'Итого без доставки' : 'Итого' }}</span><span>{{ formatPrice(order.total) }}&nbsp;₸</span>
           </div>
         </div>
       </section>

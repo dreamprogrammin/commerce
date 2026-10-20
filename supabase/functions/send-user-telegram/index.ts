@@ -1,3 +1,5 @@
+import { forbidden, hasServiceKey, isInternalCall } from '../_shared/internalAuth.ts'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -58,6 +60,14 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  /*
+   * Зовут триггеры базы (общий секрет) и соседние функции — ship-order и
+   * cancel-order (сервисный ключ). Проверки не было вовсе: любой мог
+   * написать от имени бота магазина на любой chat_id (19 октября 2026).
+   */
+  if (!hasServiceKey(req) && !isInternalCall(req, () => true))
+    return forbidden(corsHeaders)
 
   try {
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')

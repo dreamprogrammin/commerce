@@ -3,6 +3,7 @@ import type { CategoryFacts, NounForms } from '@/utils/categoryFacts'
 import { ageBreakdown, allAgesKnown, composeCategoryFactsParagraph, countCheaperThan, countPhrase, factsTopBrands } from '@/utils/categoryFacts'
 import { formatPrice, formatTenge } from '@/utils/formatPrice'
 import { DELIVERY_PRICE, FREE_FROM, PICKUP } from './catalogStaticText'
+import { REGIONAL_DELIVERY_COST_NOTE } from './index'
 
 /**
  * Текст и вопросы для КОРНЕВЫХ разделов каталога.
@@ -139,7 +140,7 @@ function constructorsPriceFaq(q: string) {
 function whereToBuyFaq(q: string): CatalogFaqItem {
   return {
     q,
-    a: `В интернет-магазине «Ухтышка»: заказ на сайте uhti.kz, самовывоз бесплатно — ${PICKUP}. Курьер по Алматы — ${DELIVERY_PRICE}, от ${FREE_FROM} — бесплатно, 1–3 рабочих дня; по Казахстану — 3–7 рабочих дней. Платить заранее не нужно.`,
+    a: `В интернет-магазине «Ухтышка»: заказ на сайте uhti.kz, самовывоз бесплатно — ${PICKUP}. Курьер по Алматы — ${DELIVERY_PRICE}, от ${FREE_FROM} — бесплатно, 1–3 рабочих дня, платить заранее не нужно. По Казахстану — 3–7 рабочих дней, Kazpost или CDEK: ${REGIONAL_DELIVERY_COST_NOTE}, оплата — Kaspi.`,
   }
 }
 

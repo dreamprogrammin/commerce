@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { isPickup, shippedWording } from '../_shared/shopInfo.ts'
+import { isCourier, shippedWording } from '../_shared/shopInfo.ts'
 import { deliveryRecipients, offerKeyboard, offerText } from '../_shared/courierOffers.ts'
 
 const corsHeaders = {
@@ -183,9 +183,11 @@ Deno.serve(async (req) => {
      * половину задачи: кухню магазина курьер не видел, зато видел чужие
      * доставки — при двух курьерах каждый читал адреса и телефоны другого.
      *
-     * Самовывоз сюда не попадает: везти нечего.
+     * Самовывоз сюда не попадает: везти нечего. Посылка в другой город
+     * (`post`) — тоже: «отправлен» у неё значит, что она уже сдана в Kazpost
+     * или CDEK, и по Алматы её никто не повезёт.
      */
-    if (!isPickup(orderData.delivery_method)) {
+    if (isCourier(orderData.delivery_method)) {
       const { data: full } = await supabase
         .from(tableName)
         .select('*')

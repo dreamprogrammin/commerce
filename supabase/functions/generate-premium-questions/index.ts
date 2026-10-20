@@ -32,12 +32,52 @@ interface AIQuestion {
   answer: string
 }
 
+function deny(error: string, status: number): Response {
+  return new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    /*
+     * Только администратор (20 октября 2026). Функция строит промпт из тела
+     * запроса и пишет ответ модели сервисным ключом в публичные
+     * вопросы-ответы товаров, брендов и категорий. Админка звала её с
+     * публичным анонимным ключом из разметки сайта, а проверки не было: кто
+     * угодно мог потратить ключ Anthropic и вписать на страницы магазина свой
+     * текст. Проверка — как в generate-brand-seo: JWT подтверждает
+     * пользователя, роль читаем сервисным ключом (под RLS чужой профиль не
+     * виден, и проверка молча превратилась бы в «нет профиля»).
+     */
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const accessToken = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+    if (!accessToken)
+      return deny('Нужна авторизация', 401)
+
+    // Токен — явно в getUser: без аргумента он ищет сессию в хранилище,
+    // которого в функции нет (см. generate-brand-seo).
+    const asUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!)
+    const { data: { user }, error: userError } = await asUser.auth.getUser(accessToken)
+    if (userError || !user) {
+      console.error('getUser:', userError?.message ?? 'пользователь не найден')
+      return deny('Не удалось опознать пользователя', 401)
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profile?.role !== 'admin')
+      return deny('Доступно только администратору', 403)
+
     const data: ProductData = await req.json()
     const entityType = data.entity_type || 'product'
 
@@ -352,12 +392,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Сохраняем вопросы в базу
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
-
+    // Сохраняем вопросы в базу — тем же сервисным клиентом, что читал роль.
     // Определяем таблицу и ID поле в зависимости от типа сущности
     let tableName: string
     let idField: string

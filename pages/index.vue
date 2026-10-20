@@ -10,7 +10,7 @@ import {
   HOME_CHIPS_CATEGORY_LIMIT,
   HOME_STATIC_CHIPS,
 } from '@/constants/homePlaceholders'
-import { SHOP, SHOP_ALTERNATE_NAMES } from '@/constants/shop'
+import { SHOP, SHOP_ALTERNATE_NAMES, SHOP_EXTRA_PHONE } from '@/constants/shop'
 import { homeShell } from '@/lib/shell'
 import { carouselContainerVariants, sectionSpacingVariants } from '@/lib/variants'
 import { useAuthStore } from '@/stores/auth'
@@ -21,6 +21,7 @@ import { useProductsStore } from '@/stores/publicStore/productsStore'
 import { useRecommendationsStore } from '@/stores/publicStore/recommendationsStore'
 
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import { composeHomeMeta, DELIVERY_TERMS } from '@/utils/seoDescription'
 
 // Ленивая загрузка некритичных блоков
 const LazyProductsCarousel = defineAsyncComponent(() => import('@/components/home/ProductsCarousel.vue'))
@@ -434,6 +435,8 @@ function scrollToShop() {
 // ==========================================================================
 const siteUrl = 'https://uhti.kz'
 const siteName = 'Ухтышка'
+/** Основной номер для ссылки `tel:` — в SHOP.phone он с дефисами, для разметки. */
+const SHOP_TEL = `tel:${SHOP.phone.replace(/-/g, '')}`
 
 /** Разделы в тексте главной — ссылками, см. шаблон. */
 const HOME_TEXT_LINKS = [
@@ -455,7 +458,8 @@ const HOME_TEXT_LINKS = [
  * Теперь по этому запросу главная выигрывает по совпадению в заголовке.
  */
 const metaTitle = `Купить детские игрушки в Алматы | ${siteName} (uhti.kz)`
-const metaDescription = `Интернет-магазин детских игрушек ${siteName} в Алматы ⭐ Развивающие игры, конструкторы, куклы, машинки ✓ Официальные бренды ✓ Доставка по Алматы ✓ Бонусная программа ✓ Гарантия качества`
+// Сборка и почему так — в utils/seoDescription.ts (`composeHomeMeta`).
+const metaDescription = composeHomeMeta(siteName)
 
 const keywords = computed(() => {
   const baseKeywords = [
@@ -918,7 +922,11 @@ useIndexableRobotsRule({ index: true, follow: true })
                   name="lucide:map-pin"
                   class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
                 />
-                <span><strong>Доставка по Алматы</strong> - быстрая и удобная</span>
+                <!-- Было «Доставка по Алматы — быстрая и удобная»: про другие
+                     города ни слова, а больше половины визитов из ChatGPT —
+                     не из Алматы (19 октября 2026). Сроки — те же, что в
+                     описании и превью ссылок. -->
+                <span><strong>Доставка</strong> {{ DELIVERY_TERMS }}</span>
               </li>
               <li class="flex items-start gap-2">
                 <Icon
@@ -954,12 +962,18 @@ useIndexableRobotsRule({ index: true, follow: true })
                   <p class="text-sm text-muted-foreground">
                     Свяжитесь с нами:
                   </p>
+                  <!-- Основной — как в подвале и разметке; второй — подписан
+                       дополнительным (см. SHOP_EXTRA_PHONE). -->
                   <a
-                    href="tel:+77771243843"
+                    :href="SHOP_TEL"
                     class="text-lg font-semibold text-foreground hover:text-primary transition-colors"
                   >
-                    +7 (777) 124-38-43
+                    {{ SHOP.phoneHuman }}
                   </a>
+                  <p class="text-sm text-muted-foreground">
+                    Дополнительный:
+                    <a :href="SHOP_EXTRA_PHONE.href" class="hover:text-primary transition-colors">{{ SHOP_EXTRA_PHONE.human }}</a>
+                  </p>
                 </div>
               </div>
             </div>

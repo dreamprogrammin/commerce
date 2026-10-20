@@ -13,6 +13,7 @@ import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { formatPrice } from '@/utils/formatPrice'
 import { orderItemUnitPrice } from '@/utils/orderItems'
+import { deliveryMethodTitle, isPostOrder } from '@/utils/orderStatus'
 
 definePageMeta({ layout: 'checkout' })
 
@@ -171,16 +172,29 @@ const orderDate = computed(() => {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
 })
 
+/*
+ * Посылка в другой город: менеджер не только подтвердит детали, но и назовёт
+ * цену доставки после взвешивания. Гость свой заказ не читает (RLS), поэтому
+ * способ — из заказа, а без него — из корзины: он сохранён там с оформления.
+ */
+const isPostCheckout = computed(() =>
+  isPostOrder(order.value?.delivery_method ?? cartStore.deliveryMethod),
+)
+
 const fulfillLabel = computed(() => {
   if (!order.value)
     return ''
-  if (order.value.delivery_method !== 'courier') {
+  // Ветка была на `!== 'courier'`, и посылка в другой город (`post`, с 19
+  // октября 2026) показалась бы самовывозом из магазина.
+  if (order.value.delivery_method === 'pickup') {
     const pp = order.value.pickup_point
     return pp ? `Самовывоз · ${pp.name}, ${pp.address}` : 'Самовывоз из магазина'
   }
 
   const addr = order.value.delivery_address
   const place = [addr?.city, addr?.line1].filter(Boolean).join(', ')
+  if (isPostOrder(order.value.delivery_method))
+    return [deliveryMethodTitle('post'), place, 'стоимость по весу, сообщим до отправки'].filter(Boolean).join(' · ')
   // Желаемое время дописываем к адресу — покупателю важнее «когда», чем «как».
   const when = [order.value.delivery_date
     ? order.value.delivery_date.split('-').reverse().join('.')
@@ -356,7 +370,12 @@ onMounted(async () => {
           <span class="flex flex-col gap-2">
             <span class="flex items-start gap-[9px] text-sm leading-[1.45] text-muted-foreground">
               <span class="leading-[1.45] text-primary">•</span>
-              Наш менеджер скоро свяжется с вами для подтверждения деталей заказа
+              <template v-if="isPostCheckout">
+                Менеджер свяжется с вами: взвесим посылку и назовём стоимость доставки — оплата Kaspi до отправки
+              </template>
+              <template v-else>
+                Наш менеджер скоро свяжется с вами для подтверждения деталей заказа
+              </template>
             </span>
             <!--
               Здесь было обещание прислать статус на телефон. SMS у магазина
@@ -563,7 +582,7 @@ onMounted(async () => {
               Стоимость
             </div>
             <div class="mb-3.5 flex items-baseline justify-between">
-              <span class="text-[15px] font-bold">Итого</span>
+              <span class="text-[15px] font-bold">{{ isPostOrder(order.delivery_method) ? 'Итого без доставки' : 'Итого' }}</span>
               <b class="text-[22px] font-extrabold">{{ formatPrice(order.final_amount) }}&nbsp;₸</b>
             </div>
             <div

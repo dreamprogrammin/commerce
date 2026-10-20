@@ -6,14 +6,15 @@
  * `20260904..._weekly_team_report.sql`), как и остальные регулярные задачи
  * этого проекта.
  *
- * ДОСТУП. Вызов разрешён запросу от pg_net (так же, как у
- * sync-order-status-to-telegram) либо с верным `secret` — им проверяют функцию
- * руками. Секрета в расписании нет намеренно: миграции лежат в git, и ключ из
- * них попал бы в репозиторий. Худшее, что даёт посторонний вызов, — лишний
- * отчёт владельцу в личку; наружу функция не отдаёт ничего.
+ * ДОСТУП. Вызов разрешён расписанию — с общим секретом из Vault в заголовке
+ * x-internal-secret (миграция 20261019120000: значение рождается в базе и в
+ * git не попадает; до того признаком был «pg_net» в User-Agent, а он
+ * подделывается), — либо с верным `secret` в адресе: им проверяют функцию
+ * руками. Наружу функция не отдаёт ничего.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fromPgNet, isInternalCall } from '../_shared/internalAuth.ts'
 import { buildReport, type ReportPeriod, reportKeyboard } from '../_shared/teamReport.ts'
 
 const corsHeaders = {
@@ -40,7 +41,9 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
     const providedSecret = url.searchParams.get('secret')
-    const fromCron = (req.headers.get('user-agent') || '').toLowerCase().includes('pg_net')
+    // Расписание — с общим секретом, а пока он не заведён — pg_net
+    // (_shared/internalAuth.ts)
+    const fromCron = isInternalCall(req, () => fromPgNet(req))
 
     if (!fromCron && (!adminSecret || providedSecret !== adminSecret)) {
       console.error('❌ Вызов не от расписания и без секрета')

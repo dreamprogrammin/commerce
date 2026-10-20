@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import OrderProgressBar from '@/components/order/OrderProgressBar.vue'
 import OrderTracker from '@/components/order/OrderTracker.vue'
 import {
+  deliveryMethodTitle,
   ORDER_STEPS,
   ORDER_TRACK_LABELS,
   orderStatusBadge,
@@ -234,5 +235,53 @@ describe('подписи для самовывоза', () => {
     })
     expect(wrapper.text()).toContain('Выдан')
     expect(wrapper.text()).not.toContain('Курьер уже везёт')
+  })
+})
+
+/*
+ * Посылка в другой город (`post`, Kazpost или CDEK) — способ заведён 19 октября
+ * 2026. До него такой заказ показывался бы курьерским («Курьер уже мчит к вам»),
+ * а страница успеха называла его самовывозом: она ветвилась на `!== 'courier'`.
+ */
+describe('подписи для посылки в другой город', () => {
+  it('последние два шага — «Отправлен» и «Получен»', () => {
+    const post = orderTrackLabels('post')
+    expect(post.slice(0, 3)).toEqual(orderTrackLabels('courier').slice(0, 3))
+    expect(post[3]).toBe('Отправлен')
+    expect(post[4]).toBe('Получен')
+    expect(post).not.toContain('В пути')
+    expect(post).not.toContain('Готов к выдаче')
+  })
+
+  it('заголовки не обещают ни курьера, ни пункт выдачи', () => {
+    expect(orderStatusInfo('shipped', 'post').title).toBe('Заказ отправлен')
+    expect(orderStatusInfo('shipped', 'post').description).toMatch(/Kazpost или CDEK/)
+    expect(orderStatusInfo('delivered', 'post').title).toBe('Заказ получен')
+    expect(orderStatusInfo('confirmed', 'post').description).not.toMatch(/курьер/i)
+    expect(orderStatusInfo('new', 'post')).toEqual(orderStatusInfo('new', 'courier'))
+  })
+
+  it('лента шагов своя и той же длины', () => {
+    const titles = orderSteps('post').map(s => s.title)
+    expect(titles).toContain('Отправлен')
+    expect(titles).toContain('Получен')
+    expect(orderSteps('post')).toHaveLength(orderSteps('courier').length)
+    expect(orderSteps('post').map(s => s.sub).join(' ')).not.toMatch(/Курьер/)
+  })
+
+  it('подпись способа получения', () => {
+    expect(deliveryMethodTitle('post')).toBe('По Казахстану — Kazpost или CDEK')
+    expect(deliveryMethodTitle('pickup')).toBe('Самовывоз')
+    expect(deliveryMethodTitle('courier')).toBe('Доставка курьером')
+    expect(deliveryMethodTitle(null)).toBe('Доставка курьером')
+  })
+
+  it('полоса прогресса рисует подписи посылки', () => {
+    const wrapper = mount(OrderProgressBar, {
+      props: { status: 'shipped', deliveryMethod: 'post' },
+    })
+    expect(wrapper.text()).toContain('Отправлен')
+    expect(wrapper.text()).not.toContain('В пути')
+    expect(wrapper.findAll('.opb-seg--done')).toHaveLength(4)
   })
 })

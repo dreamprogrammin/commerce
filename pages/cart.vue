@@ -38,7 +38,7 @@ const cartStore = useCartStore()
 const authStore = useAuthStore()
 const modalStore = useModalStore()
 const supabase = useSupabaseClient()
-const { items, subtotal, totalItems, deliveryCost, isFreeShipping }
+const { items, subtotal, totalItems, deliveryCost, isFreeShipping, isDeliveryByWeight }
   = storeToRefs(cartStore)
 const { isLoggedIn } = storeToRefs(authStore)
 const { getVariantUrl } = useSupabaseStorage()
@@ -389,10 +389,16 @@ async function addSelectedAccessoriesToCart() {
 // Показать тостер о прогрессе доставки при изменении суммы
 let previousSubtotal = subtotal.value
 watch(subtotal, (newSubtotal) => {
+  // Порог — про курьера по Алматы; посылку в другой город он не делает
+  // бесплатной (19 октября 2026), и поздравлять тут не с чем.
+  if (isDeliveryByWeight.value) {
+    previousSubtotal = newSubtotal
+    return
+  }
   if (newSubtotal > previousSubtotal && newSubtotal < FREE_SHIPPING_THRESHOLD) {
     const remaining = FREE_SHIPPING_THRESHOLD - newSubtotal
-    toast.info(`До бесплатной доставки осталось ${formatPrice(remaining)} ₸`, {
-      description: '🚚 Добавьте ещё товаров для бесплатной доставки',
+    toast.info(`До бесплатной доставки по Алматы осталось ${formatPrice(remaining)} ₸`, {
+      description: '🚚 Добавьте ещё товаров — курьер по Алматы станет бесплатным',
       duration: 3000,
     })
   }
@@ -400,7 +406,7 @@ watch(subtotal, (newSubtotal) => {
     newSubtotal >= FREE_SHIPPING_THRESHOLD
     && previousSubtotal < FREE_SHIPPING_THRESHOLD
   ) {
-    toast.success('🎉 Поздравляем! Доставка бесплатная!', {
+    toast.success('🎉 Поздравляем! Доставка по Алматы бесплатная!', {
       description: 'Вы получили бесплатную доставку',
       duration: 5000,
     })
@@ -496,8 +502,10 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             </button>
           </div>
 
-          <!-- Прогресс бесплатной доставки -->
+          <!-- Прогресс бесплатной доставки — про курьера по Алматы; у посылки
+               в другой город цена по весу, порога нет. -->
           <div
+            v-if="!isDeliveryByWeight"
             class="cart-surface flex items-center gap-3 rounded-[18px] bg-white px-4 py-3"
           >
             <Icon
@@ -510,10 +518,10 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 v-if="isFreeShipping"
                 class="text-[13px] font-semibold text-success"
               >
-                Доставка бесплатная — порог пройден 🎉
+                Доставка по Алматы бесплатная — порог пройден 🎉
               </p>
               <p v-else class="text-[13px] text-muted-foreground">
-                До бесплатной доставки
+                До бесплатной доставки по Алматы
                 <b class="font-bold text-primary">{{ formatPrice(remainingForFreeShipping) }}&nbsp;₸</b>
               </p>
               <Progress :model-value="shippingProgress" class="mt-2 h-1.5" />
@@ -725,8 +733,9 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                 Доставка
                 <Icon name="lucide:info" class="size-3.5 text-muted-foreground/70" />
               </span>
+              <span v-if="isDeliveryByWeight" class="text-muted-foreground">По весу посылки</span>
               <span
-                v-if="isFreeShipping"
+                v-else-if="isFreeShipping"
                 class="font-semibold text-success"
               >Бесплатно</span>
               <span v-else>{{ formatPrice(deliveryCost) }}&nbsp;₸</span>

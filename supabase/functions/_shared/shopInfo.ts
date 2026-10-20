@@ -31,10 +31,25 @@ export const PICKUP_POINT = {
 } as const
 
 /** Способ доставки заказа в том виде, в каком его хранит база. */
-export type DeliveryMethod = 'courier' | 'pickup' | string | null | undefined
+export type DeliveryMethod = 'courier' | 'pickup' | 'post' | string | null | undefined
 
 export function isPickup(method: DeliveryMethod): boolean {
   return method === 'pickup'
+}
+
+/**
+ * Посылка в другой город — Kazpost или CDEK. Способ заведён 19 октября 2026:
+ * единой цены нет, посылку взвешивают, стоимость называют покупателю до
+ * отправки, оплата — Kaspi до отправки. Курьеров такой заказ не касается.
+ * ЗЕРКАЛО `utils/orderStatus.ts` на сайте.
+ */
+export function isPost(method: DeliveryMethod): boolean {
+  return method === 'post'
+}
+
+/** Курьер по Алматы — всё, что не самовывоз и не посылка. */
+export function isCourier(method: DeliveryMethod): boolean {
+  return !isPickup(method) && !isPost(method)
 }
 
 /**
@@ -63,6 +78,17 @@ export function shippedWording(method: DeliveryMethod) {
     }
   }
 
+  if (isPost(method)) {
+    return {
+      button: '📮 Отправлен',
+      adminTitle: 'ОТПРАВЛЕН',
+      adminNote: 'Посылка передана в Kazpost или CDEK',
+      customerTitle: '📮 Заказ отправлен!',
+      customerBody: (orderNo: string) =>
+        `Заказ №${orderNo} отправлен Kazpost или CDEK. Обычно посылка идёт 3–7 рабочих дней.`,
+    }
+  }
+
   return {
     button: '🚚 Передать курьеру',
     adminTitle: 'ПЕРЕДАН КУРЬЕРУ',
@@ -82,6 +108,16 @@ export function deliveredWording(method: DeliveryMethod) {
       customerTitle: '✅ Спасибо за покупку!',
       customerBody: (orderNo: string) =>
         `Заказ №${orderNo} выдан. Спасибо, что выбрали Ухтышку!`,
+    }
+  }
+
+  if (isPost(method)) {
+    return {
+      button: '✅ Получен',
+      adminTitle: 'ПОЛУЧЕН',
+      customerTitle: '✅ Спасибо за покупку!',
+      customerBody: (orderNo: string) =>
+        `Заказ №${orderNo} получен. Спасибо, что выбрали Ухтышку!`,
     }
   }
 
@@ -160,7 +196,13 @@ export function courierMessage(order: CourierOrder): string {
 
   // Сумму показываем только при оплате наличными: при оплате картой её уже
   // забрали, и цифра в руках курьера только путает.
+  //
+  // Kaspi — отдельно. Курьеру писалось «оплачено картой», а это 64 заказа из 67
+  // на бою (19 октября 2026), и Kaspi бывает по-разному: кто-то переводит
+  // заранее, кто-то платит QR у двери (владелец). Знать этого курьер не может —
+  // поэтому сумма и просьба уточнить у менеджера.
   const cash = !order.payment_method || order.payment_method === 'cash'
+  const kaspi = order.payment_method === 'kaspi'
 
   const lines = [
     `*Доставка №${orderNumber(order)}*`,
@@ -176,6 +218,8 @@ export function courierMessage(order: CourierOrder): string {
     lines.push(`📞 ${phone}`)
   if (cash)
     lines.push(`💵 к оплате: ${money(order.final_amount)}`)
+  else if (kaspi)
+    lines.push(`📱 Kaspi: ${money(order.final_amount)} — уточните у менеджера, оплачено ли`)
   else
     lines.push('💳 оплачено картой')
   if (order.comment)

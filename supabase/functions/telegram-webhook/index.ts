@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { isTelegramCall } from '../_shared/internalAuth.ts'
 import { ACTION_FUNCTIONS, buildOrderKeyboard, type OrderAction, parseCallbackData } from '../_shared/orderActions.ts'
 import {
   assignedText,
@@ -64,6 +65,7 @@ import {
   parseMenuData,
   replyButtonScope,
 } from '../_shared/orderMenu.ts'
+import { secureWebhook, webhookSecretParams } from '../_shared/webhookSecret.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,6 +89,18 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // GET — только постановка секрета вебхуку (_shared/webhookSecret.ts).
+  if (req.method === 'GET')
+    return secureWebhook(req, Deno.env.get('TELEGRAM_BOT_TOKEN')!)
+
+  /*
+   * Обновление обязано прийти от Telegram: с секретом из setWebhook, когда он
+   * заведён (TELEGRAM_WEBHOOK_SECRET). До 19 октября 2026 проверки не было, и
+   * поддельное нажатие кнопки «от менеджера» проходило как настоящее.
+   */
+  if (!isTelegramCall(req))
+    return new Response('Unauthorized', { status: 401 })
 
   try {
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')!
@@ -153,6 +167,19 @@ Deno.serve(async (req) => {
 
     // === /setup — одноразовая команда для настройки бота (webhook, описание, команды) ===
     if (message.text?.trim() === '/setup') {
+      /*
+       * Только владельцу (20 октября 2026, владелец: «ограничить»). Раньше
+       * команду выполнял любой, кто напишет боту: вебхук, команды и меню
+       * ставились заново, а в рабочий чат уходило «Кнопки под полем ввода…» —
+       * от постороннего. Правило то же, что у /plan, /team и /sales.
+       */
+      if (!await isOwner(supabase, message.from?.id ?? 0)) {
+        await sendRichMessage(botToken, chatId, 'Настройка бота доступна владельцу.')
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       console.log('🔧 Running bot setup...')
       const baseUrl = `${telegramApiBase()}/bot${botToken}`
       const webhookUrl = `${supabaseUrl}/functions/v1/telegram-webhook`
@@ -168,9 +195,12 @@ Deno.serve(async (req) => {
           // остался от прошлой настройки, а нажатия кнопок под карточкой
           // заказа приходят именно как callback_query. Молча потерять их —
           // значит получить чат, где кнопки не работают вовсе.
+          // Секрет — тоже: без него при заведённом TELEGRAM_WEBHOOK_SECRET
+          // бот перестанет принимать обновления (_shared/webhookSecret.ts).
           body: JSON.stringify({
             url: webhookUrl,
             allowed_updates: ['message', 'callback_query'],
+            ...webhookSecretParams(),
           }),
         })
         const res = await r.json()

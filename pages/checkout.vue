@@ -172,6 +172,41 @@ const phoneErrorMessage = computed(() => {
 // видит /cart, поэтому «Итого» на двух шагах больше не расходится.
 const isCourier = computed(() => deliveryMethod.value === 'courier')
 
+/*
+ * Посылка в другой город — Kazpost или CDEK (с 19 октября 2026). Цена по
+ * весу: сервер ставит ей 0 (`calc_delivery_cost`), сумму с доставкой менеджер
+ * называет до отправки, оплата — только Kaspi. Даты и интервала нет — это не
+ * курьер.
+ */
+const isPost = computed(() => deliveryMethod.value === 'post')
+const needsAddress = computed(() => isCourier.value || isPost.value)
+
+/** Курьер возит только по Алматы, посылка — во все остальные города. */
+function isAlmatyCity(city: string): boolean {
+  return /алмат|almat/i.test(city)
+}
+const cityTyped = computed(() => deliveryAddress.value.city.trim())
+const postCityProblem = computed(() => {
+  if (!isPost.value)
+    return ''
+  if (!cityTyped.value)
+    return 'Укажите город, куда отправить посылку'
+  return isAlmatyCity(cityTyped.value) ? 'По Алматы — курьер или самовывоз' : ''
+})
+
+watch(deliveryMethod, (method) => {
+  if (method === 'post') {
+    // «Алматы» стоит по умолчанию — для посылки нужен свой город.
+    if (isAlmatyCity(deliveryAddress.value.city))
+      deliveryAddress.value.city = ''
+    if (orderForm.value.paymentMethod === 'cash')
+      orderForm.value.paymentMethod = 'kaspi'
+  }
+  else if (method === 'courier' && !deliveryAddress.value.city.trim()) {
+    deliveryAddress.value.city = 'Алматы'
+  }
+})
+
 /**
  * Даты пересобираем на клиенте после монтирования, а не на сервере: «сегодня»
  * у SSR и у покупателя может отличаться, и подпись «Сегодня, 5 августа»
@@ -301,12 +336,14 @@ const isShippingReady = computed(() => {
   if (!isValidName.value || !isValidEmail.value || !isValidPhone.value)
     return false
 
-  // Адрес для курьера
-  if (isCourier.value && !deliveryAddress.value.line1.trim())
+  // Адрес для курьера и посылки; у посылки ещё и город — не Алматы
+  if (needsAddress.value && !deliveryAddress.value.line1.trim())
+    return false
+  if (postCityProblem.value)
     return false
 
   // Самовывоз без выбранного пункта — только если их вообще нет в справочнике
-  if (!isCourier.value && pickupPoints.value.length > 0 && !pickupPointId.value)
+  if (deliveryMethod.value === 'pickup' && pickupPoints.value.length > 0 && !pickupPointId.value)
     return false
 
   return true
@@ -353,9 +390,11 @@ onActivated(() => {
 const showAddrWarn = computed(
   () =>
     hasTriedSubmit.value
-    && isCourier.value
-    && !deliveryAddress.value.line1.trim(),
+    && needsAddress.value
+    && (!deliveryAddress.value.line1.trim() || !!postCityProblem.value),
 )
+
+const addrWarnText = computed(() => postCityProblem.value || 'Пожалуйста, укажите адрес доставки')
 
 // Предзаполнение формы
 watch(
@@ -446,9 +485,13 @@ async function placeOrder() {
     return
   }
 
-  // Адрес обязателен для курьера
-  if (isCourier.value && !deliveryAddress.value.line1.trim()) {
+  // Адрес обязателен для курьера и посылки
+  if (needsAddress.value && !deliveryAddress.value.line1.trim()) {
     toast.error('Укажите адрес доставки')
+    return
+  }
+  if (postCityProblem.value) {
+    toast.error(postCityProblem.value)
     return
   }
 
@@ -477,7 +520,7 @@ async function placeOrder() {
   await cartStore.checkout({
     deliveryMethod: deliveryMethod.value,
     paymentMethod: orderForm.value.paymentMethod,
-    deliveryAddress: isCourier.value
+    deliveryAddress: needsAddress.value
       ? {
           line1: deliveryAddress.value.line1,
           city: deliveryAddress.value.city,
@@ -520,6 +563,18 @@ const PAYMENT_METHODS = [
     tint: 'bg-green-50 text-green-600',
   },
 ]
+
+/*
+ * Посылке — только Kaspi до отправки (решение владельца 19 октября 2026):
+ * наличными «при получении» в другом городе платить некому.
+ */
+const visiblePaymentMethods = computed(() =>
+  isPost.value
+    ? PAYMENT_METHODS
+        .filter(pm => pm.key === 'kaspi')
+        .map(pm => ({ ...pm, desc: 'Сумму с доставкой назовём после взвешивания — оплата до отправки' }))
+    : PAYMENT_METHODS,
+)
 
 const containerClass = carouselContainerVariants({ contained: 'always' })
 
@@ -694,7 +749,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             <h2 class="mb-3.5 text-base font-extrabold">
               Способ получения
             </h2>
-            <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
               <button
                 type="button"
                 class="co-opt gap-[11px]"
@@ -710,7 +765,19 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
               <button
                 type="button"
                 class="co-opt gap-[11px]"
-                :class="!isCourier ? 'co-opt--active text-primary' : 'text-foreground'"
+                :class="isPost ? 'co-opt--active text-primary' : 'text-foreground'"
+                @click="cartStore.setDeliveryMethod('post')"
+              >
+                <Icon name="lucide:package" class="size-[22px] shrink-0" />
+                <span class="flex flex-col items-start leading-[1.25]">
+                  <span class="text-sm font-bold">По Казахстану</span>
+                  <span class="text-xs text-muted-foreground">Kazpost или CDEK, 3–7 дней</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="co-opt gap-[11px]"
+                :class="deliveryMethod === 'pickup' ? 'co-opt--active text-primary' : 'text-foreground'"
                 @click="cartStore.setDeliveryMethod('pickup')"
               >
                 <Icon name="lucide:store" class="size-[22px] shrink-0" />
@@ -723,7 +790,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           </section>
 
           <!-- Пункт самовывоза -->
-          <section v-if="!isCourier && pickupPoints.length > 0">
+          <section v-if="deliveryMethod === 'pickup' && pickupPoints.length > 0">
             <h2 class="mb-2.5 text-base font-extrabold">
               Пункт самовывоза
             </h2>
@@ -757,17 +824,18 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           </section>
 
           <!-- Адрес доставки -->
-          <section v-if="isCourier" class="flex flex-col gap-5">
+          <section v-if="needsAddress" class="flex flex-col gap-5">
             <div>
               <h2 class="mb-2.5 text-base font-extrabold">
-                Адрес доставки
+                {{ isPost ? 'Куда отправить' : 'Адрес доставки' }}
               </h2>
               <div class="flex flex-col gap-2.5">
                 <input
                   id="city"
                   v-model="deliveryAddress.city"
                   class="co-input"
-                  placeholder="Город"
+                  :class="{ 'co-input--error': hasTriedSubmit && !!postCityProblem }"
+                  :placeholder="isPost ? 'Город — например, Астана' : 'Город'"
                 >
                 <div
                   class="co-input flex items-center gap-2.5"
@@ -778,64 +846,93 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                     id="address"
                     v-model="deliveryAddress.line1"
                     class="min-w-0 flex-1 border-none bg-transparent outline-none"
-                    placeholder="Улица, дом, квартира"
+                    :placeholder="isPost ? 'Улица, дом, квартира или пункт СДЭК' : 'Улица, дом, квартира'"
                   >
                 </div>
                 <input
                   id="comment"
                   v-model="orderForm.comment"
                   class="co-input"
-                  placeholder="Комментарий к адресу — подъезд, этаж, домофон"
+                  :placeholder="isPost ? 'Комментарий — индекс, удобный пункт выдачи' : 'Комментарий к адресу — подъезд, этаж, домофон'"
                 >
+                <p
+                  v-if="isPost && cityTyped && postCityProblem"
+                  class="text-xs text-destructive"
+                >
+                  {{ postCityProblem }}
+                </p>
+                <p
+                  v-if="isPost"
+                  class="rounded-[14px] bg-brand-surface px-3.5 py-3 text-xs leading-[1.45]"
+                >
+                  Отправим Kazpost или CDEK, 3–7 рабочих дней. Доставка — по весу
+                  посылки: менеджер назовёт стоимость до отправки, оплата — Kaspi.
+                </p>
+                <p
+                  v-else-if="isCourier && cityTyped && !isAlmatyCity(cityTyped)"
+                  class="text-xs text-muted-foreground"
+                >
+                  Курьер возит по Алматы. В другой город —
+                  <button
+                    type="button"
+                    class="font-semibold text-primary underline-offset-2 hover:underline"
+                    @click="cartStore.setDeliveryMethod('post')"
+                  >
+                    отправим посылкой
+                  </button>.
+                </p>
               </div>
             </div>
 
-            <!-- Дата -->
-            <div>
-              <h2 class="mb-2.5 text-base font-extrabold">
-                Дата
-              </h2>
-              <div class="flex flex-wrap gap-2.5">
-                <button
-                  v-for="(date, index) in deliveryDates"
-                  :key="date.iso"
-                  type="button"
-                  class="co-pill"
-                  :class="{ 'co-pill--active': deliveryDateIndex === index }"
-                  @click="deliveryDateIndex = index"
-                >
-                  {{ date.label }}
-                </button>
+            <!-- Дата и время — только курьеру: посылку везёт перевозчик -->
+            <template v-if="isCourier">
+              <!-- Дата -->
+              <div>
+                <h2 class="mb-2.5 text-base font-extrabold">
+                  Дата
+                </h2>
+                <div class="flex flex-wrap gap-2.5">
+                  <button
+                    v-for="(date, index) in deliveryDates"
+                    :key="date.iso"
+                    type="button"
+                    class="co-pill"
+                    :class="{ 'co-pill--active': deliveryDateIndex === index }"
+                    @click="deliveryDateIndex = index"
+                  >
+                    {{ date.label }}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <!-- Время -->
-            <div>
-              <h2 class="mb-2.5 text-base font-extrabold">
-                Время
-              </h2>
-              <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
-                <button
-                  v-for="(slot, index) in DELIVERY_SLOTS"
-                  :key="slot"
-                  type="button"
-                  class="co-slot"
-                  :class="{ 'co-slot--active': deliverySlotIndex === index }"
-                  @click="deliverySlotIndex = index"
-                >
-                  <span class="inline-flex items-center gap-[5px] text-xs font-medium text-muted-foreground">
-                    <Icon
-                      name="lucide:clock"
-                      class="size-[13px]"
-                      :class="deliverySlotIndex === index ? 'text-primary' : 'text-muted-foreground'"
-                    />
-                    {{ DELIVERY_SLOT_DURATION }}
-                  </span>
-                  <span class="text-[15px] font-bold">{{ slot }}</span>
-                  <span class="text-xs font-medium text-success">Бесплатно</span>
-                </button>
+              <!-- Время -->
+              <div>
+                <h2 class="mb-2.5 text-base font-extrabold">
+                  Время
+                </h2>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
+                  <button
+                    v-for="(slot, index) in DELIVERY_SLOTS"
+                    :key="slot"
+                    type="button"
+                    class="co-slot"
+                    :class="{ 'co-slot--active': deliverySlotIndex === index }"
+                    @click="deliverySlotIndex = index"
+                  >
+                    <span class="inline-flex items-center gap-[5px] text-xs font-medium text-muted-foreground">
+                      <Icon
+                        name="lucide:clock"
+                        class="size-[13px]"
+                        :class="deliverySlotIndex === index ? 'text-primary' : 'text-muted-foreground'"
+                      />
+                      {{ DELIVERY_SLOT_DURATION }}
+                    </span>
+                    <span class="text-[15px] font-bold">{{ slot }}</span>
+                    <span class="text-xs font-medium text-success">Бесплатно</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            </template>
           </section>
 
           <!-- Способ оплаты -->
@@ -845,7 +942,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             </h2>
             <div class="flex flex-col gap-2.5">
               <button
-                v-for="pm in PAYMENT_METHODS"
+                v-for="pm in visiblePaymentMethods"
                 :key="pm.key"
                 type="button"
                 class="co-opt gap-[13px]"
@@ -1023,7 +1120,8 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             </div>
             <div class="flex items-center justify-between">
               <span class="text-muted-foreground">Доставка</span>
-              <span v-if="deliveryCost === 0" class="font-semibold text-success">Бесплатно</span>
+              <span v-if="isPost" class="text-muted-foreground">По весу посылки</span>
+              <span v-else-if="deliveryCost === 0" class="font-semibold text-success">Бесплатно</span>
               <span v-else>{{ formatPrice(deliveryCost) }}&nbsp;₸</span>
             </div>
             <div
@@ -1052,7 +1150,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <Separator class="my-4" />
 
           <div class="mb-4 flex items-baseline justify-between">
-            <span class="text-base font-bold">Итого</span>
+            <span class="text-base font-bold">{{ isPost ? 'Итого без доставки' : 'Итого' }}</span>
             <b class="text-[22px] font-extrabold">{{ formatPrice(orderTotal) }}&nbsp;₸</b>
           </div>
 
@@ -1086,7 +1184,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
             v-if="showAddrWarn"
             class="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-[13px] font-medium text-red-700"
           >
-            Пожалуйста, укажите адрес доставки
+            {{ addrWarnText }}
           </div>
 
           <div
@@ -1119,7 +1217,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           v-if="showAddrWarn"
           class="mb-2.5 rounded-2xl border border-red-300/60 bg-red-50/85 px-3.5 py-2.5 text-xs font-medium text-red-700 backdrop-blur-lg"
         >
-          Пожалуйста, укажите адрес доставки
+          {{ addrWarnText }}
         </div>
         <button
           type="button"
@@ -1133,7 +1231,13 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
           <span class="flex flex-col items-end leading-[1.12]">
             <b class="text-[17px] font-extrabold">{{ formatPrice(orderTotal) }}&nbsp;₸</b>
             <span
-              v-if="potentialBonuses > 0"
+              v-if="isPost"
+              class="text-[11px] font-semibold opacity-90"
+            >
+              без доставки
+            </span>
+            <span
+              v-else-if="potentialBonuses > 0"
               class="inline-flex items-center gap-1 text-[11px] font-semibold opacity-90"
             >
               <Icon name="lucide:gift" class="size-[11px]" />

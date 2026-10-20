@@ -89,7 +89,7 @@ supabase functions logs generate-premium-questions
 # Ручной тест через curl
 curl -X POST \
   'https://gvsdevsvzgcivpphcuai.supabase.co/functions/v1/generate-premium-questions' \
-  -H 'Authorization: Bearer YOUR_ANON_KEY' \
+  -H 'Authorization: Bearer <токен сессии АДМИНИСТРАТОРА — с анонимным ключом с 20.10.2026 будет 401>' \
   -H 'Content-Type: application/json' \
   -d '{
     "product_id": "uuid",
@@ -122,7 +122,9 @@ curl -X POST \
 
 ```bash
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-supabase functions deploy generate-premium-questions --no-verify-jwt
+supabase functions deploy generate-premium-questions
+# Без --no-verify-jwt: с 20.10.2026 функция только для администратора
+# (verify_jwt = true в supabase/config.toml + проверка роли в самой функции).
 ```
 
 ### Ошибка: "AI generation failed"

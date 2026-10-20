@@ -39,6 +39,9 @@ const isCourier = computed(
   () => !isMounted.value || deliveryMethod.value === 'courier',
 )
 
+/** Посылка в другой город — Kazpost или CDEK (с 19 октября 2026). */
+const isPost = computed(() => isMounted.value && deliveryMethod.value === 'post')
+
 const addressLine = computed(() =>
   isMounted.value ? deliveryAddress.value.line1.trim() : '',
 )
@@ -51,6 +54,10 @@ const city = computed(() => deliveryAddress.value.city || 'Алматы')
  * выбор восстанавливается из localStorage и на сервере ещё неизвестен.
  */
 const topLine = computed(() => {
+  // У посылки город свой: «Алматы» по умолчанию тут неверен. Коротко: на
+  // 390 px «· посылка Kazpost или CDEK» обрезалось, подробности — на оформлении.
+  if (isPost.value)
+    return `${deliveryAddress.value.city.trim() || 'Другой город'} · посылкой`
   if (!isCourier.value)
     return `${city.value} · самовывоз`
   return isMounted.value && deliverySlotLabel.value
@@ -61,11 +68,11 @@ const topLine = computed(() => {
 const bottomLine = computed(() => {
   if (addressLine.value)
     return addressLine.value
-  return isCourier.value ? 'Укажите адрес доставки' : 'Заберёте сами из магазина'
+  return isCourier.value || isPost.value ? 'Укажите адрес доставки' : 'Заберёте сами из магазина'
 })
 
 // Синим подсвечиваем только незаполненный адрес — это призыв к действию.
-const isBottomLineCta = computed(() => isCourier.value && !addressLine.value)
+const isBottomLineCta = computed(() => (isCourier.value || isPost.value) && !addressLine.value)
 
 function focusAddress() {
   if (props.currentStep !== 2) {

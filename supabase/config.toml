@@ -437,3 +437,13 @@ entrypoint = "./functions/send-broadcast/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/generate-brand-seo/index.ts"
+
+# AI-вопросы для дорогих товаров, популярных брендов и категорий — то же, что
+# generate-brand-seo: платформа проверяет токен, функция — роль администратора
+# (20 октября 2026). До этого секции не было, функцию выкатывали с
+# `--no-verify-jwt`, и звать её мог кто угодно с публичным ключом из разметки.
+[functions.generate-premium-questions]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-premium-questions/deno.json"
+entrypoint = "./functions/generate-premium-questions/index.ts"
