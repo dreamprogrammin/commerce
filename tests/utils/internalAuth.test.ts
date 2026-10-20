@@ -160,3 +160,19 @@ describe('setWebhook с секретом', () => {
     expect(call).toContain('webhookSecretParams()')
   })
 })
+
+/*
+ * `/setup` выполнял любой, кто напишет боту: вебхук, команды и меню ставились
+ * заново, а в рабочий чат уходило «Кнопки под полем ввода…» (20 октября 2026,
+ * владелец: «ограничить»). Поведение целиком — check-setup-owner-only.mjs на
+ * локальном стенде; здесь — что проверка не уехала ниже первого вызова Telegram.
+ */
+describe('/setup — только владельцу', () => {
+  it('проверка владельца раньше первого обращения к Telegram', () => {
+    const src = readFileSync(join(process.cwd(), 'supabase/functions/telegram-webhook/index.ts'), 'utf8')
+    const block = src.slice(src.indexOf('=== \'/setup\''))
+    const gate = block.indexOf('isOwner(')
+    expect(gate).toBeGreaterThan(-1)
+    expect(gate).toBeLessThan(block.indexOf('fetch('))
+  })
+})
