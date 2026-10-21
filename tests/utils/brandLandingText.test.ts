@@ -59,7 +59,7 @@ describe('composeBrandLandingMeta', () => {
   it('цены «от … до …» и число моделей бренда, а не всего раздела', () => {
     const d = composeBrandLandingMeta('Радиоуправляемые машинки MokaToys', brandLandingFacts(products))
     expect(d).toMatch(/Радиоуправляемые машинки MokaToys в Алматы: 3 модели от 7\xA0490 до 15\xA0990 ₸/)
-    expect(d).toContain('Доставка 1–3 дня')
+    expect(d).toContain('Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
     expect(d.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
   })
 
