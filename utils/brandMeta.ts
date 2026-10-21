@@ -14,12 +14,13 @@
  *    число моделей и цены «от … до …» встают впереди;
  *  • не написал — описание собирается целиком из товаров: «Игрушки ZURU в
  *    Алматы: 8 моделей от 7 390 до 25 390 ₸ — Smashers, Rainbocorns, Robo
- *    Alive. Доставка 1–3 дня, самовывоз.»;
+ *    Alive. Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.» (с 21
+ *    октября 2026 — с Казахстаном, `deliveryLinesForMeta`);
  *  • товаров нет — null, страница берёт прежние запасные варианты.
  */
 
 import { brandLandingFacts, modelsAndPrices, prependBrandLandingFacts } from './brandLandingText'
-import { clampDescription, DELIVERY_SHORT } from './seoDescription'
+import { clampDescription, withDeliveryForMeta } from './seoDescription'
 
 export interface BrandMetaProduct {
   price: number | string
@@ -68,8 +69,8 @@ export function composeBrandMeta(input: {
 
   const subject = [input.word?.trim(), input.brandName.trim()].filter(Boolean).join(' ')
   const lines = topLines(input.products)
-  return clampDescription(
-    `${subject} в Алматы: ${modelsAndPrices(facts)}${lines.length ? ` — ${lines.join(', ')}` : ''}. ${DELIVERY_SHORT}.`,
+  return withDeliveryForMeta(
+    delivery => `${subject} в Алматы: ${modelsAndPrices(facts)}${lines.length ? ` — ${lines.join(', ')}` : ''}. ${delivery}.`,
   )
 }
 

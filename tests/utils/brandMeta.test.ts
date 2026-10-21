@@ -27,7 +27,7 @@ describe('topLines', () => {
 describe('composeBrandMeta', () => {
   it('без описания владельца — факты и серии, которые реально есть', () => {
     const d = composeBrandMeta({ word: 'Игрушки', brandName: 'Zuru', products: zuru })
-    expect(d).toBe('Игрушки Zuru в Алматы: 8 моделей от 7\u00A0390 до 25\u00A0390 ₸ — Smashers Horror House, Robo Alive, Rainbocorns ZURU. Доставка 1–3 дня, самовывоз.')
+    expect(d).toBe('Игрушки Zuru в Алматы: 8 моделей от 7\u00A0390 до 25\u00A0390 ₸ — Smashers Horror House, Robo Alive, Rainbocorns ZURU. Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
     expect(d!.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
   })
 
@@ -38,7 +38,22 @@ describe('composeBrandMeta', () => {
 
   it('без слова раздела — просто бренд', () => {
     expect(composeBrandMeta({ word: null, brandName: 'Feelo', products: zuru.slice(0, 1) }))
-      .toBe('Feelo в Алматы: 1 модель за 7\u00A0390 ₸ — Robo Alive. Доставка 1–3 дня, самовывоз.')
+      .toBe('Feelo в Алматы: 1 модель за 7\u00A0390 ₸ — Robo Alive. Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
+  })
+
+  /*
+   * С 21 октября 2026 строка доставки называет Казахстан. Длинные серии —
+   * полная строка не влезает, идёт короткая: обрезки посреди доставки нет.
+   */
+  it('длинные серии — короткая строка «по Казахстану», без обрезки', () => {
+    const products = [
+      { price: 8790, final_price: 7390, stock_quantity: 2, lineName: 'Robo Alive' },
+      { price: 26990, final_price: 25390, stock_quantity: 1, lineName: 'Smashers Horror House' },
+      { price: 11990, final_price: 10390, stock_quantity: 1, lineName: 'Rainbocorns Sparkle Heart' },
+    ]
+    const d = composeBrandMeta({ word: 'Игрушки', brandName: 'Zuru', products })!
+    expect(d.endsWith('. Доставка по Казахстану, самовывоз.')).toBe(true)
+    expect(d.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
   })
 
   it('товаров нет — null, страница берёт запасные варианты', () => {
