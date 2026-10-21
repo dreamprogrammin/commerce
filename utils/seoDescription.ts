@@ -329,6 +329,21 @@ export interface CategoryMetaFacts {
 }
 
 /**
+ * Какая часть текста владельца (`categories.meta_description`) идёт в начало
+ * описания раздела: первые `CATEGORY_LEAD_LIMIT` знаков по границе слова, без
+ * тегов. Число моделей, цены, доставку и бренды `composeCategoryMeta`
+ * дописывает сам.
+ *
+ * Отдельной функцией — чтобы админка показывала ровно то, что уйдёт в выдачу.
+ * До 21 октября 2026 подсказка под полем обещала «до 160 символов»: владелец
+ * писал по 155, и хвост с «доставкой по всему Казахстану» у «Мальчикам» и
+ * «Девочкам» до выдачи так и не дошёл.
+ */
+export function categoryLeadForMeta(text: string | null | undefined): string {
+  return truncateWords((text ?? '').replace(/<[^>]*>/g, '').trim(), CATEGORY_LEAD_LIMIT)
+}
+
+/**
  * Мета-описание категории из фактов о ней.
  *
  * Что здесь важно и почему именно так.
@@ -362,7 +377,7 @@ export function composeCategoryMeta(facts: CategoryMetaFacts): string {
     : ''
   const from = price ? `от ${formatPrice(price)} ₸` : ''
 
-  const lead = truncateWords((facts.lead ?? '').replace(/<[^>]*>/g, '').trim(), CATEGORY_LEAD_LIMIT)
+  const lead = categoryLeadForMeta(facts.lead)
 
   let head = lead || `${facts.categoryName.trim()} в ${city}`
   const factsText = models && from

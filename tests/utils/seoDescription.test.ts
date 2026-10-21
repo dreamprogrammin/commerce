@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampDescription, composeCategoryMeta, composeCategoryOgLine, composeHomeMeta, DELIVERY_ALMATY_AND_KZ, deliveryLinesForMeta, firstThatFits, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu, withDeliveryForMeta } from '@/utils/seoDescription'
+import { CATEGORY_LEAD_LIMIT, categoryLeadForMeta, clampDescription, composeCategoryMeta, composeCategoryOgLine, composeHomeMeta, DELIVERY_ALMATY_AND_KZ, deliveryLinesForMeta, firstThatFits, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu, withDeliveryForMeta } from '@/utils/seoDescription'
 
 /**
  * Тексты взяты из прод-базы: ровно на них аудит 12 августа и поймал обрезку
@@ -440,5 +440,47 @@ describe('withDeliveryForMeta и firstThatFits', () => {
     const meta = firstThatFits(['а'.repeat(200), `${'слово '.repeat(40)}конец`])
     expect(meta.endsWith('...')).toBe(true)
     expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+  })
+})
+
+describe('categoryLeadForMeta — что из текста владельца уходит в выдачу', () => {
+  /*
+   * До 21.10.2026 подсказка в админке обещала «до 160 символов», а в выдачу шли
+   * первые 80. У «Мальчикам» хвост с «доставкой по всему Казахстану» пропадал.
+   */
+  it('длинный текст — первые 80 знаков по границе слова, хвост не доходит', () => {
+    const lead = categoryLeadForMeta(REAL.boys)
+    expect(lead).toBe('Машинки, роботы, супергерои, оружие и транспорт для мальчиков любого возраста')
+    expect(lead.length).toBeLessThanOrEqual(CATEGORY_LEAD_LIMIT)
+    expect(lead).not.toContain('Казахстан')
+  })
+
+  it('короткий текст — как есть', () => {
+    expect(categoryLeadForMeta('Игрушки для мальчиков: машинки, роботы, оружие')).toBe('Игрушки для мальчиков: машинки, роботы, оружие')
+  })
+
+  it('без тегов; пусто — пустая строка', () => {
+    expect(categoryLeadForMeta('<p>Куклы и <b>наборы</b></p>')).toBe('Куклы и наборы')
+    expect(categoryLeadForMeta(null)).toBe('')
+    expect(categoryLeadForMeta(undefined)).toBe('')
+  })
+
+  it('описание раздела начинается ровно с того, что показывает админка', () => {
+    for (const lead of [REAL.boys, REAL.constructors, REAL.kiddy, 'Игрушки для девочек: куклы, косметика, наборы']) {
+      const meta = composeCategoryMeta({ categoryName: 'Раздел', lead, productsCount: 38, minPrice: 1990, topBrands: BRANDS })
+      expect(meta.startsWith(`${categoryLeadForMeta(lead)}. `)).toBe(true)
+    }
+  })
+
+  it('короткий текст владельца — «по Казахстану» в первых 120 знаках мобильной выдачи', () => {
+    const cases = [
+      { categoryName: 'Игрушки для мальчиков', lead: 'Игрушки для мальчиков: машинки, роботы, оружие', productsCount: 51, minPrice: 1590, topBrands: ['MokaToys', 'Zuru', 'Essa Toys'] },
+      { categoryName: 'Игрушки для девочек', lead: 'Игрушки для девочек: куклы, косметика, наборы', productsCount: 38, minPrice: 1990, topBrands: ['Defa Lucy', 'Tourist', 'L.O.L. Surprise'] },
+    ]
+    for (const facts of cases) {
+      const meta = composeCategoryMeta(facts)
+      expect(meta.indexOf('по Казахстану') + 'по Казахстану'.length).toBeLessThanOrEqual(120)
+      expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+    }
   })
 })
