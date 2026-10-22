@@ -1047,7 +1047,6 @@ useSchemaOrg([
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
         'url': canonicalUrl.value,
-        'priceValidUntil': priceValidUntil,
         'itemCondition': 'https://schema.org/NewCondition',
         'seller': {
           '@type': 'Organization' as const,
@@ -1055,9 +1054,9 @@ useSchemaOrg([
           'url': 'https://uhti.kz',
         },
 
-        // Скидка, возврат и доставка — общие для всей разметки сайта:
-        // utils/offerSchema.ts, там же разбор, почему именно так.
-        ...strikethroughPrice(p),
+        // Скидка (со сроком цены), возврат и доставка — общие для всей
+        // разметки сайта: utils/offerSchema.ts, там же разбор, почему именно так.
+        ...strikethroughPrice(p, priceValidUntil),
         'hasMerchantReturnPolicy': merchantReturnPolicy(),
         'shippingDetails': offerShippingDetails(),
       }

@@ -2567,13 +2567,13 @@ const schemaData = computed(() => {
               '@type': 'Offer',
               'price': offerPrice(product),
               'priceCurrency': 'KZT',
-              ...strikethroughPrice({ ...product, discount_started_at: saleStarts.value?.[product.id] ?? null }),
+              // Срок цены — только вместе с началом скидки (utils/offerSchema.ts).
+              ...strikethroughPrice({ ...product, discount_started_at: saleStarts.value?.[product.id] ?? null }, priceValidUntil),
               'availability':
                 product.stock_quantity > 0
                   ? 'https://schema.org/InStock'
                   : 'https://schema.org/OutOfStock',
               'url': `https://uhti.kz/catalog/products/${product.slug}`,
-              'priceValidUntil': priceValidUntil,
               'itemCondition': 'https://schema.org/NewCondition',
               'seller': { '@type': 'Organization', 'name': 'Ухтышка' },
               'hasMerchantReturnPolicy': merchantReturnPolicy(),
