@@ -15,8 +15,8 @@ import { brandStaticFaq, emptyBrandAlternatives } from '@/constants/brandStaticT
 import { pageShell, setShellOverride } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
 import { useProductsStore } from '@/stores/publicStore/productsStore'
-import { brandHeadingWord } from '@/utils/brandHeading'
-import { composeBrandMeta, composeEmptyBrandMeta } from '@/utils/brandMeta'
+import { brandHeadingWord, findTopRootSlug } from '@/utils/brandHeading'
+import { composeBrandDescription, composeBrandTitle } from '@/utils/brandMeta'
 import { categoryFactsFromRows, composeCategoryFactsParagraph, insertAfterFirstParagraph } from '@/utils/categoryFacts'
 import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, strikethroughPrice } from '@/utils/offerSchema'
@@ -267,29 +267,12 @@ const { data: brandCategoryData } = await useAsyncData(
     }[]
 
     /*
-     * Корневая категория, в которой у бренда больше всего товаров. Из её
-     * слага берётся слово для заголовка — «Конструкторы LEGO»; почему не имя
-     * категории как есть, объяснено в `utils/brandHeading.ts`.
-     *
-     * Берём именно корень дерева, а не категорию товара: «Конструкторы»
-     * читается как раздел, «Конструкторы Мальчикам» в заголовке бренда
-     * звучит криво.
-     *
-     * Поля `seo_h1` и `meta_title` из админки по-прежнему главнее: это
-     * фолбэк для 32 брендов, у которых они пустые.
+     * Слово для заголовка — «Конструкторы LEGO» — из корня, где у бренда
+     * больше всего товаров (`findTopRootSlug`, им же считает предпросмотр в
+     * админке). Поля `seo_h1` и `meta_title` из админки по-прежнему главнее:
+     * это фолбэк для брендов, у которых они пустые.
      */
-    const byId = new Map(categories.map(c => [c.id, c]))
-    const rootCounts = new Map<string, number>()
-    for (const product of brandProducts.data ?? []) {
-      let current = product.category_id ? byId.get(product.category_id) : undefined
-      // Ограничение глубины — страховка от петли `parent_id` в данных.
-      for (let depth = 0; current?.parent_id && depth < 10; depth++)
-        current = byId.get(current.parent_id)
-      if (current)
-        rootCounts.set(current.id, (rootCounts.get(current.id) ?? 0) + 1)
-    }
-    const topRootId = [...rootCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
-    const topRootSlug = topRootId ? byId.get(topRootId)?.slug ?? null : null
+    const topRootSlug = findTopRootSlug(brandProducts.data ?? [], categories)
     const topCategory = brandHeadingWord(topRootSlug)
 
     const brandLandingRefs = (brandProducts.data ?? []).map(p => ({
@@ -544,70 +527,35 @@ const siteName = 'Ухтышка'
 
 const brandUrl = computed(() => `${siteUrl}/brand/${brandSlug}`)
 
+/*
+ * Заголовок и описание для выдачи собираются в `utils/brandMeta.ts` — теми
+ * же функциями считает предпросмотр в админке (`BrandForm.vue`). Пока это
+ * жило здесь, предпросмотр писал свою версию и расходился со страницей.
+ */
 const metaTitle = computed(() => {
   if (!brand.value)
     return 'Бренд не найден'
-  if (brand.value.meta_title)
-    return brand.value.meta_title
-  if (brand.value.seo_title)
-    return brand.value.seo_title
-  /*
-   * «Конструкторы LEGO — купить в Алматы с доставкой», а не «LEGO - Купить
-   * товары бренда в Алматы». Формулировка повторяет заголовок бренд-лендинга
-   * в категории: по тем же запросам он держится на 20-й позиции против 28-й
-   * у страницы бренда (Search Console, лето 2026). Слово раздела берётся из
-   * товаров бренда — см. `topCategory`.
-   */
-  if (topCategory.value)
-    return `${topCategory.value} ${brand.value.name} — купить в Алматы с доставкой | ${siteName}`
-  return `${brand.value.name} - Купить товары бренда в Алматы | ${siteName}`
+  return composeBrandTitle({
+    brandName: brand.value.name,
+    word: topCategory.value,
+    metaTitle: brand.value.meta_title,
+    seoTitle: brand.value.seo_title,
+  })
 })
 
 const metaDescription = computed(() => {
   if (!brand.value)
     return `Товары бренда в ${siteName}`
-  /*
-   * Из товаров бренда: число моделей, цены «от … до …» и серии, которые
-   * реально есть (utils/brandMeta.ts). Написанное владельцем мета-описание
-   * остаётся — факты встают впереди. Запасные варианты ниже — только для
-   * бренда без товаров: кусок текста о бренде рекламировал серии, которых в
-   * магазине нет (у ZURU — X-Shot, 5 Surprise, Pets Alive).
-   */
-  const composed = composeBrandMeta({
-    word: topCategory.value,
+  return composeBrandDescription({
     brandName: brand.value.name,
+    word: topCategory.value,
     products: brandMetaProducts.value ?? [],
-    lead: brand.value.meta_description,
+    hasProducts: brandHasProducts.value,
+    alternatives: brandAlternatives.value,
+    metaDescription: brand.value.meta_description,
+    seoDescription: brand.value.seo_description,
+    description: brand.value.description,
   })
-  if (composed)
-    return composed
-  /*
-   * Пустой бренд (план по аудиту, п. 10): ниже шли «Купить игрушки BOWA в
-   * Казахстане…» из базы, а на странице ни одного товара. Строка в выдаче
-   * говорит, как есть, и называет те же разделы, что блок на странице.
-   */
-  if (brandHasProducts.value === false)
-    return composeEmptyBrandMeta(brand.value.name, brandAlternatives.value)
-  if (brand.value.meta_description)
-    return brand.value.meta_description
-  /*
-   * `seo_description` — это ВЁРСТКА страницы бренда, а не мета-описание.
-   * Раньше она уходила в `<meta name="description">` как есть, и на проде
-   * 20 августа `/brand/hstar` отдавал в описании две тысячи знаков HTML
-   * (`<h2 data-icon="…">`, списки, абзацы). Поле заполнено разметкой только
-   * у одного бренда из 32, поэтому дефект и дожил незамеченным.
-   *
-   * Из вёрстки берётся первый абзац о бренде (`leadExcerpt`): снятая
-   * целиком, она приклеивала заголовок к абзацу без точки. Абзаца о бренде
-   * нет — пустая строка, и берётся следующий вариант.
-   */
-  const seoLead = leadExcerpt(brand.value.seo_description, 160)
-  if (seoLead)
-    return seoLead
-  const lead = leadExcerpt(brand.value.description, 140)
-  if (lead)
-    return `${lead.replace(/[.!?…]+$/, '')}. Доставка по Казахстану.`
-  return `Каталог товаров бренда ${brand.value.name} в интернет-магазине ${siteName}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 })
 
 const metaKeywords = computed(() => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { composeBrandMeta, composeEmptyBrandMeta, topLines } from '@/utils/brandMeta'
+import { composeBrandDescription, composeBrandMeta, composeBrandTitle, composeEmptyBrandMeta, topLines } from '@/utils/brandMeta'
 import { META_DESCRIPTION_LIMIT } from '@/utils/seoDescription'
 
 /*
@@ -77,5 +77,56 @@ describe('composeEmptyBrandMeta', () => {
     const text = composeEmptyBrandMeta('Eva Puzzle', [])
     expect(text).toBe('Товаров Eva Puzzle сейчас нет в наличии. Игрушки других брендов — в каталоге интернет-магазина Ухтышка в Алматы.')
     expect(text).not.toMatch(/купить/i)
+  })
+})
+
+/*
+ * Заголовок и описание страницы бренда целиком — им же считает предпросмотр
+ * в админке. До 22.10.2026 предпросмотр писал «Bibi-inn - Купить товары бренда
+ * в Алматы» и показывал «SEO описание», а страница отдавала другое.
+ */
+describe('composeBrandTitle', () => {
+  it('написанное руками главнее: meta_title, потом старое seo_title', () => {
+    expect(composeBrandTitle({ brandName: 'LEGO', word: 'Конструкторы', metaTitle: 'Свой', seoTitle: 'Старый' })).toBe('Свой')
+    expect(composeBrandTitle({ brandName: 'LEGO', word: 'Конструкторы', metaTitle: '', seoTitle: 'Старый' })).toBe('Старый')
+  })
+
+  it('пусто — слово раздела и бренд, как у бренд-лендинга', () => {
+    expect(composeBrandTitle({ brandName: 'Bibi-inn', word: 'Игрушки' }))
+      .toBe('Игрушки Bibi-inn — купить в Алматы с доставкой | Ухтышка')
+  })
+
+  it('без товаров слова раздела нет — прежний шаблон', () => {
+    expect(composeBrandTitle({ brandName: 'Bibi-inn', word: null }))
+      .toBe('Bibi-inn - Купить товары бренда в Алматы | Ухтышка')
+  })
+})
+
+describe('composeBrandDescription', () => {
+  const rattle = [{ price: 2890, final_price: 2690, stock_quantity: 6, lineName: null }]
+  const base = { brandName: 'Bibi-inn', word: 'Игрушки', alternatives: [] as { label: string }[] }
+
+  it('есть товары — из товаров, «SEO описание» и «Описание» в выдачу не идут', () => {
+    const d = composeBrandDescription({ ...base, products: rattle, hasProducts: true, seoDescription: 'Своё SEO', description: '<h2>О бренде</h2><p>Текст о бренде.</p>' })
+    expect(d.replace(/\u00A0/g, ' ')).toBe('Игрушки Bibi-inn в Алматы: 1 модель за 2 690 ₸. Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
+    expect(d).toBe(composeBrandMeta({ word: 'Игрушки', brandName: 'Bibi-inn', products: rattle }))
+  })
+
+  it('ручное meta_description остаётся — факты впереди', () => {
+    const d = composeBrandDescription({ ...base, products: rattle, hasProducts: true, metaDescription: 'Погремушки для малышей.' })
+    expect(d).toMatch(/^1 модель за 2\s690 ₸\. Погремушки для малышей\.$/)
+  })
+
+  it('товаров нет — как есть, с разделами-заменами', () => {
+    const d = composeBrandDescription({ ...base, word: null, products: [], hasProducts: false, seoDescription: 'Своё SEO', alternatives: [{ label: 'Развивающие игрушки' }] })
+    expect(d).toBe(composeEmptyBrandMeta('Bibi-inn', [{ label: 'Развивающие игрушки' }]))
+  })
+
+  it('товары не загрузились — запасные: meta_description, первый абзац SEO-вёрстки, первый абзац описания', () => {
+    const unknown = { ...base, word: null, products: [], hasProducts: null }
+    expect(composeBrandDescription({ ...unknown, metaDescription: 'Ручное.' })).toBe('Ручное.')
+    expect(composeBrandDescription({ ...unknown, seoDescription: '<h2>Заголовок</h2><p>Первый абзац о бренде.</p>' })).toBe('Первый абзац о бренде.')
+    expect(composeBrandDescription({ ...unknown, description: '<h2>Bibi-inn</h2><p>Погремушки и прорезыватели.</p>' }))
+      .toBe('Погремушки и прорезыватели. Доставка по Казахстану.')
   })
 })
