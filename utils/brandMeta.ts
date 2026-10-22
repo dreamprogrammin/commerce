@@ -21,6 +21,7 @@
 
 import { brandLandingFacts, modelsAndPrices, prependBrandLandingFacts } from './brandLandingText'
 import { clampDescription, withDeliveryForMeta } from './seoDescription'
+import { leadExcerpt } from './seoText'
 
 export interface BrandMetaProduct {
   price: number | string
@@ -91,4 +92,91 @@ export function composeEmptyBrandMeta(
     ? `Похожие игрушки — в ${alternatives.length === 1 ? 'разделе' : 'разделах'} ${alternatives.map(a => `«${a.label}»`).join(' и ')}`
     : 'Игрушки других брендов — в каталоге'
   return clampDescription(`Товаров ${brandName.trim()} сейчас нет в наличии. ${where} интернет-магазина Ухтышка в Алматы.`)
+}
+
+const SITE_NAME = 'Ухтышка'
+
+/**
+ * Заголовок страницы бренда для выдачи. Им же считает предпросмотр в админке
+ * (`components/admin/brands/BrandForm.vue`): до 22 октября 2026 тот писал
+ * свою версию — «X - Купить товары бренда в Алматы» — при том что страница
+ * давно отдавала «Конструкторы X — купить в Алматы с доставкой».
+ *
+ * Порядок: написанное руками (`meta_title`, потом старое `seo_title`), иначе
+ * «Конструкторы LEGO — купить в Алматы с доставкой», а не «LEGO - Купить
+ * товары бренда в Алматы». Формулировка повторяет заголовок бренд-лендинга в
+ * категории: по тем же запросам он держится на 20-й позиции против 28-й у
+ * страницы бренда (Search Console, лето 2026). Слово раздела — из товаров
+ * бренда (`brandHeadingWord(findTopRootSlug(…))`); товаров нет — прежний
+ * шаблон.
+ */
+export function composeBrandTitle(input: {
+  brandName: string
+  word: string | null
+  metaTitle?: string | null
+  seoTitle?: string | null
+}): string {
+  if (input.metaTitle)
+    return input.metaTitle
+  if (input.seoTitle)
+    return input.seoTitle
+  if (input.word)
+    return `${input.word} ${input.brandName} — купить в Алматы с доставкой | ${SITE_NAME}`
+  return `${input.brandName} - Купить товары бренда в Алматы | ${SITE_NAME}`
+}
+
+/**
+ * Описание страницы бренда для выдачи — целиком, со всеми запасными
+ * вариантами. Им же считает предпросмотр в админке: до 22 октября 2026 тот
+ * показывал поле «SEO описание» или сырую вёрстку «Описания», а страница с
+ * товарами отдаёт описание из товаров.
+ *
+ * Порядок:
+ *  • есть товары — из товаров: число моделей, цены «от … до …» и серии,
+ *    которые реально есть (`composeBrandMeta`); написанное владельцем
+ *    `meta_description` остаётся, факты встают впереди;
+ *  • товаров нет (план по аудиту, п. 10) — строка говорит, как есть, и
+ *    называет те же разделы, что блок на странице. Прежде шло «Купить
+ *    игрушки BOWA в Казахстане…» из базы при пустой сетке;
+ *  • дальше — только когда товары не загрузились (`hasProducts` не false, а
+ *    список пуст): ручное `meta_description`, затем первый абзац
+ *    `seo_description`, затем первый абзац `description`.
+ *
+ * `seo_description` — это ВЁРСТКА страницы бренда, а не мета-описание.
+ * Раньше она уходила в `<meta name="description">` как есть, и на проде
+ * 20 августа `/brand/hstar` отдавал в описании две тысячи знаков HTML
+ * (`<h2 data-icon="…">`, списки, абзацы). Из вёрстки берётся первый абзац о
+ * бренде (`leadExcerpt`): снятая целиком, она приклеивала заголовок к абзацу
+ * без точки. Абзаца о бренде нет — пустая строка, и берётся следующий вариант.
+ */
+export function composeBrandDescription(input: {
+  brandName: string
+  word: string | null
+  products: readonly BrandMetaProduct[]
+  /** false — у бренда нет ни одного активного товара; null — ещё неизвестно. */
+  hasProducts: boolean | null | undefined
+  alternatives: readonly { label: string }[]
+  metaDescription?: string | null
+  seoDescription?: string | null
+  description?: string | null
+}): string {
+  const composed = composeBrandMeta({
+    word: input.word,
+    brandName: input.brandName,
+    products: input.products,
+    lead: input.metaDescription,
+  })
+  if (composed)
+    return composed
+  if (input.hasProducts === false)
+    return composeEmptyBrandMeta(input.brandName, input.alternatives)
+  if (input.metaDescription)
+    return input.metaDescription
+  const seoLead = leadExcerpt(input.seoDescription, 160)
+  if (seoLead)
+    return seoLead
+  const lead = leadExcerpt(input.description, 140)
+  if (lead)
+    return `${lead.replace(/[.!?…]+$/, '')}. Доставка по Казахстану.`
+  return `Каталог товаров бренда ${input.brandName} в интернет-магазине ${SITE_NAME}. Оригинальная продукция с гарантией качества. Доставка по Казахстану.`
 }
