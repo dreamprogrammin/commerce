@@ -439,7 +439,11 @@ onBeforeUnmount(() => {
     background-image: linear-gradient(120deg, #c10007 0%, #fb2c36 52%, #ff6b6e 100%);
   }
 
-  /* Огромные «%» на фоне. */
+  /* Огромные «%» на фоне. В макете белый на 10, 7 и 6% — знак почти не
+     читался, тем более что бо́льшую часть карточки закрывают плитки. По
+     просьбе владельца (23.10.2026) — втрое заметнее: 30, 22 и 19%. Белый
+     заголовок поверх такого знака держит контраст выше 3:1, нормы для
+     крупного текста. */
   .dm-glyph {
     position: absolute;
     z-index: 0;
@@ -454,14 +458,14 @@ onBeforeUnmount(() => {
     left: -22px;
     top: -34px;
     font-size: 200px;
-    color: rgb(255 255 255 / 0.1);
+    color: rgb(255 255 255 / 0.3);
     transform: rotate(-10deg);
   }
   .dm-glyph--b {
     right: 6%;
     bottom: -62px;
     font-size: 210px;
-    color: rgb(255 255 255 / 0.07);
+    color: rgb(255 255 255 / 0.22);
     transform: rotate(12deg);
   }
   .dm-glyph--c {
@@ -469,7 +473,7 @@ onBeforeUnmount(() => {
     right: -30px;
     top: -40px;
     font-size: 220px;
-    color: rgb(255 255 255 / 0.06);
+    color: rgb(255 255 255 / 0.19);
     transform: rotate(8deg);
   }
 
