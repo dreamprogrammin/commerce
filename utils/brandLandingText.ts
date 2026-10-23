@@ -18,7 +18,7 @@
 import { categoryNamesBrand } from './brandLanding'
 import { formatPrice } from './formatPrice'
 import { formatAgeRange, productAgeMonths } from './productAge'
-import { clampDescription, DELIVERY_SHORT, pluralRu } from './seoDescription'
+import { clampDescription, pluralRu, withDeliveryForMeta } from './seoDescription'
 import { truncateWords } from './seoTitle'
 
 export interface BrandLandingProduct {
@@ -117,7 +117,7 @@ export function composeBrandLandingSummary(f: BrandLandingFacts): string {
 
 /** Описание для выдачи: число моделей бренда и цены «от … до …». */
 export function composeBrandLandingMeta(phrase: string, f: BrandLandingFacts): string {
-  return clampDescription(`${phrase} в Алматы: ${modelsAndPrices(f)}. ${DELIVERY_SHORT}.`)
+  return withDeliveryForMeta(delivery => `${phrase} в Алматы: ${modelsAndPrices(f)}. ${delivery}.`)
 }
 
 /**

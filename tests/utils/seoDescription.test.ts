@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampDescription, composeCategoryMeta, composeCategoryOgLine, composeHomeMeta, DELIVERY_ALMATY_AND_KZ, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu } from '@/utils/seoDescription'
+import { CATEGORY_LEAD_LIMIT, categoryLeadForMeta, clampDescription, composeCategoryMeta, composeCategoryOgLine, composeHomeMeta, DELIVERY_ALMATY_AND_KZ, deliveryLinesForMeta, firstThatFits, hasLegacyTemplateMarks, META_DESCRIPTION_LIMIT, pluralRu, withDeliveryForMeta } from '@/utils/seoDescription'
 
 /**
  * Тексты взяты из прод-базы: ровно на них аудит 12 августа и поймал обрезку
@@ -145,7 +145,7 @@ describe('composeCategoryMeta', () => {
   it('вперёд идут товар, количество и цена', () => {
     const meta = composeCategoryMeta(base)
     expect(plain(meta).startsWith('Куклы в Алматы: 48 моделей от 3 690 ₸.')).toBe(true)
-    expect(meta).toContain('Доставка 1–3 дня, самовывоз')
+    expect(meta).toContain('Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз')
   })
 
   /*
@@ -205,7 +205,7 @@ describe('composeCategoryMeta', () => {
       minPrice: null,
       topBrands: [],
     })
-    expect(meta).toBe('Куклы в Алматы. Доставка 1–3 дня, самовывоз.')
+    expect(meta).toBe('Куклы в Алматы. Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
   })
 
   it('одна модель — единственное число', () => {
@@ -227,7 +227,7 @@ describe('composeCategoryMeta', () => {
     })
     expect(meta.startsWith('Куклы, наборы и мягкие игрушки')).toBe(true)
     expect(plain(meta)).toContain('38 моделей от 5 090 ₸')
-    expect(meta).toContain('Доставка по Алматы 1–3 дня, самовывоз')
+    expect(meta).toContain('Доставка по Алматы 1–3 дня, по Казахстану 3–7 дней, самовывоз')
   })
 
   it('город называется один раз', () => {
@@ -360,5 +360,127 @@ describe('composeHomeMeta', () => {
     expect(hasLegacyTemplateMarks(meta)).toBe(false)
     expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
     expect(meta.endsWith('...')).toBe(false)
+  })
+})
+
+/*
+ * Доставка по Казахстану в описании раздела (21 октября 2026). До этого там
+ * был только срок по Алматы, и «Толокары» на 5–9 месте собирали около 290
+ * показов за четыре недели без единого клика, а из Google каждый третий
+ * посетитель — не из Алматы.
+ */
+describe('доставка по Казахстану в описании раздела', () => {
+  const brands = ['LEGO', 'CaDA', 'Sluban']
+
+  it('раздел называет Казахстан и не повторяет город', () => {
+    const meta = composeCategoryMeta({ categoryName: 'Толокары для детей', productsCount: 7, minPrice: 8890, topBrands: [] })
+    expect(plain(meta)).toBe('Толокары для детей в Алматы: 7 моделей от 8 890 ₸. Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
+    expect(meta.match(/Алматы/g)?.length).toBe(1)
+  })
+
+  it('«по Казахстану» видно и в мобильной выдаче — в первых 120 знаках', () => {
+    const meta = composeCategoryMeta({ categoryName: 'Конструкторы мальчикам', productsCount: 19, minPrice: 6190, topBrands: brands })
+    expect(meta.slice(0, 120)).toContain('по Казахстану')
+  })
+
+  /*
+   * Длинное название: полная строка с брендами не влезает, короткая с
+   * брендами — влезает. Бренды остаются, срок по Алматы уходит, обрезки нет.
+   */
+  it('не влезает полная строка — короткая, бренды остаются', () => {
+    const meta = composeCategoryMeta({
+      categoryName: 'Конструкторы для мальчиков и девочек любого возраста',
+      productsCount: 48,
+      minPrice: 3690,
+      topBrands: brands,
+    })
+    expect(meta).toContain('Доставка по Казахстану, самовывоз.')
+    expect(meta).toContain('Бренды: LEGO · CaDA · Sluban.')
+    expect(meta).not.toContain('1–3 дня')
+    expect(meta.endsWith('...')).toBe(false)
+    expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+  })
+
+  it('без брендов полная строка идёт, пока влезает', () => {
+    const meta = composeCategoryMeta({
+      categoryName: 'Конструкторы для мальчиков и девочек любого возраста',
+      productsCount: 48,
+      minPrice: 3690,
+      topBrands: [],
+    })
+    expect(meta).toContain('Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
+  })
+
+  it('город не назван в начале — короткая строка называет, где самовывоз', () => {
+    const { full, short } = deliveryLinesForMeta('Алматы', false)
+    expect(full).toBe('Доставка по Алматы 1–3 дня, по Казахстану 3–7 дней, самовывоз')
+    expect(short).toBe('Доставка по Казахстану, самовывоз в Алматы')
+
+    const lead = 'Куклы, пупсы, наборы доктора и кухни, домики и мебель для кукол, коляски и посуда для игры.'
+    const meta = composeCategoryMeta({ categoryName: 'Игрушки для девочек', lead, productsCount: 38, minPrice: 1990, topBrands: [] })
+    expect(meta).toContain('по Казахстану')
+    expect(meta.match(/Алматы/g)?.length).toBe(1)
+    expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+  })
+})
+
+describe('withDeliveryForMeta и firstThatFits', () => {
+  it('полная строка, если влезает', () => {
+    expect(withDeliveryForMeta(d => `Куклы в Алматы: 19 моделей. ${d}.`))
+      .toBe('Куклы в Алматы: 19 моделей. Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз.')
+  })
+
+  it('иначе короткая, а не обрезка посреди доставки', () => {
+    const long = 'Игрушки Zuru в Алматы: 3 модели от 7 390 до 25 390 ₸ — Rainbocorns Sparkle Heart, Robo Alive, Smashers Horror House'
+    const meta = withDeliveryForMeta(d => `${long}. ${d}.`)
+    expect(meta).toBe(`${long}. Доставка по Казахстану, самовывоз.`)
+  })
+
+  it('не влезает ничего — последний вариант обрезан по границе слова', () => {
+    const meta = firstThatFits(['а'.repeat(200), `${'слово '.repeat(40)}конец`])
+    expect(meta.endsWith('...')).toBe(true)
+    expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+  })
+})
+
+describe('categoryLeadForMeta — что из текста владельца уходит в выдачу', () => {
+  /*
+   * До 21.10.2026 подсказка в админке обещала «до 160 символов», а в выдачу шли
+   * первые 80. У «Мальчикам» хвост с «доставкой по всему Казахстану» пропадал.
+   */
+  it('длинный текст — первые 80 знаков по границе слова, хвост не доходит', () => {
+    const lead = categoryLeadForMeta(REAL.boys)
+    expect(lead).toBe('Машинки, роботы, супергерои, оружие и транспорт для мальчиков любого возраста')
+    expect(lead.length).toBeLessThanOrEqual(CATEGORY_LEAD_LIMIT)
+    expect(lead).not.toContain('Казахстан')
+  })
+
+  it('короткий текст — как есть', () => {
+    expect(categoryLeadForMeta('Игрушки для мальчиков: машинки, роботы, оружие')).toBe('Игрушки для мальчиков: машинки, роботы, оружие')
+  })
+
+  it('без тегов; пусто — пустая строка', () => {
+    expect(categoryLeadForMeta('<p>Куклы и <b>наборы</b></p>')).toBe('Куклы и наборы')
+    expect(categoryLeadForMeta(null)).toBe('')
+    expect(categoryLeadForMeta(undefined)).toBe('')
+  })
+
+  it('описание раздела начинается ровно с того, что показывает админка', () => {
+    for (const lead of [REAL.boys, REAL.constructors, REAL.kiddy, 'Игрушки для девочек: куклы, косметика, наборы']) {
+      const meta = composeCategoryMeta({ categoryName: 'Раздел', lead, productsCount: 38, minPrice: 1990, topBrands: BRANDS })
+      expect(meta.startsWith(`${categoryLeadForMeta(lead)}. `)).toBe(true)
+    }
+  })
+
+  it('короткий текст владельца — «по Казахстану» в первых 120 знаках мобильной выдачи', () => {
+    const cases = [
+      { categoryName: 'Игрушки для мальчиков', lead: 'Игрушки для мальчиков: машинки, роботы, оружие', productsCount: 51, minPrice: 1590, topBrands: ['MokaToys', 'Zuru', 'Essa Toys'] },
+      { categoryName: 'Игрушки для девочек', lead: 'Игрушки для девочек: куклы, косметика, наборы', productsCount: 38, minPrice: 1990, topBrands: ['Defa Lucy', 'Tourist', 'L.O.L. Surprise'] },
+    ]
+    for (const facts of cases) {
+      const meta = composeCategoryMeta(facts)
+      expect(meta.indexOf('по Казахстану') + 'по Казахстану'.length).toBeLessThanOrEqual(120)
+      expect(meta.length).toBeLessThanOrEqual(META_DESCRIPTION_LIMIT)
+    }
   })
 })

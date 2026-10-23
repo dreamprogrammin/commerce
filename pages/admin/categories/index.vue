@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCategoryImageUpload } from '@/composables/admin/useCategoryImageUpload'
 import { useCategoryQuestions } from '@/composables/useCategoryQuestions'
 import { useAdminCategoriesStore } from '@/stores/adminStore/adminCategoriesStore'
+import { CATEGORY_LEAD_LIMIT, categoryLeadForMeta } from '@/utils/seoDescription'
 
 definePageMeta({ layout: 'admin' })
 
@@ -55,6 +56,15 @@ function removeRootImage() {
     buildRootImageClearPatch(selectedRootCategory.value),
   )
 }
+
+/*
+ * Сколько из «Meta Description» доходит до выдачи. Сайт берёт первые
+ * CATEGORY_LEAD_LIMIT знаков и дописывает число моделей, цены, доставку и
+ * бренды сам (composeCategoryMeta). Подсказка до 21 октября 2026 обещала
+ * «до 160 символов» — хвост длинного текста молча пропадал.
+ */
+const metaDescriptionLength = computed(() => (selectedRootCategory.value?.meta_description ?? '').trim().length)
+const metaLeadPreview = computed(() => categoryLeadForMeta(selectedRootCategory.value?.meta_description))
 
 async function handleGenerateAllQuestions() {
   isGeneratingAll.value = true
@@ -405,12 +415,15 @@ function handleRemove(itemToRemove: EditableCategory) {
                 <label class="text-sm font-medium">Meta Description (описание для поисковых систем)</label>
                 <Textarea
                   v-model="selectedRootCategory.meta_description"
-                  placeholder="Например: Широкий выбор качественных игрушек для детей всех возрастов. Доставка по Алматы. Низкие цены и бонусная программа."
+                  placeholder="Например: Игрушки для девочек: куклы, косметика, наборы"
                   class="w-full min-h-[80px]"
                   maxlength="160"
                 />
                 <p class="text-xs text-muted-foreground">
-                  Рекомендуемая длина: до 160 символов. Текущая длина: {{ selectedRootCategory.meta_description?.length || 0 }}
+                  В выдачу идут первые {{ CATEGORY_LEAD_LIMIT }} знаков — напишите, что есть в разделе. Число моделей, цены, доставку и, если влезут, бренды сайт допишет сам. Сейчас: {{ metaDescriptionLength }} из {{ CATEGORY_LEAD_LIMIT }}.
+                </p>
+                <p v-if="metaDescriptionLength > CATEGORY_LEAD_LIMIT" class="text-xs text-amber-600">
+                  Длиннее {{ CATEGORY_LEAD_LIMIT }} — в выдачу попадёт только: «{{ metaLeadPreview }}»
                 </p>
               </div>
 

@@ -787,6 +787,12 @@ useIndexableRobotsRule({ index: true, follow: true })
         <HomePopularCategories />
       </div>
 
+      <!-- Скидки — мозаика (DiscountMosaic.dc.html; место — как в Homepage.dc.html,
+           между категориями и брендами). Обёртку и отступы задаёт сама секция:
+           на телефоне карточка во всю ширину экрана, без контейнера. Данные
+           берутся на сервере. -->
+      <HomeDiscountMosaic />
+
       <!-- Популярные бренды: данные берутся на сервере, гейт не нужен -->
       <div :class="[alwaysContainedClass, sectionSpacingVariants({ size: 'xs' })]">
         <HomeBrandsRail />

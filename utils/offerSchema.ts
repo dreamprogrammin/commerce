@@ -103,24 +103,37 @@ export function offerPrice(product: { price: number | string | null, final_price
  * Старая цена — `product.price`: ровно её сайт показывает зачёркнутой.
  * Разметка обязана совпадать с тем, что видит покупатель. Без скидки или
  * если «старая» не выше текущей — ничего.
+ *
+ * `priceValidUntil` (`stablePriceValidUntil`) страница передаёт сюда, а не
+ * ставит в Offer сама: срок цены выводится только вместе с её началом. Search
+ * Console отмечает «Отсутствует поле validFrom» на ЛЮБОМ Offer, где срок есть,
+ * а начала нет, — и у товара без скидки. 22 октября 2026 так стояли все 16
+ * товаров без скидки, в том числе пройденные Google 15, 20 и 21 октября — уже
+ * после правки 14-го, а в разделе «Развивающие игрушки» из десяти товаров
+ * замечание было ровно у одного, без скидки. На страницах брендов и серий
+ * срока нет совсем — и ни замечания про validFrom, ни просьбы о сроке у их
+ * 39 товаров.
  */
 export function strikethroughPrice(product: {
   price: number | string | null
   final_price?: number | null
   discount_percentage?: number | null
   discount_started_at?: string | null
-}) {
+}, priceValidUntil?: string) {
   const original = Math.round(Number(product.price))
   if (!(Number(product.discount_percentage) > 0) || !(original > offerPrice(product)))
     return {}
   return {
     /*
-     * Начало цены со скидкой — Google ставит `validFrom` на Offer рядом с
-     * `priceValidUntil` (merchant listing). Дату ведёт триггер в базе
-     * (`products.discount_started_at`, миграция 20261014120000); нет даты —
-     * нет поля, выдумывать её нельзя.
+     * Начало цены со скидкой — `validFrom` на Offer (merchant listing), с ним
+     * и срок. Дату ведёт триггер в базе (`products.discount_started_at`,
+     * миграция 20261014120000); нет даты — нет ни начала, ни срока,
+     * выдумывать её нельзя.
      */
-    ...(product.discount_started_at && { validFrom: product.discount_started_at }),
+    ...(product.discount_started_at && {
+      validFrom: product.discount_started_at,
+      ...(priceValidUntil && { priceValidUntil }),
+    }),
     priceSpecification: {
       '@type': 'UnitPriceSpecification' as const,
       'priceType': 'https://schema.org/StrikethroughPrice',
@@ -146,4 +159,49 @@ export function stablePriceValidUntil(monthsAhead: number, now: Date = new Date(
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthsAhead + 1, 0))
     .toISOString()
     .slice(0, 10)
+}
+
+/**
+ * Готовый JSON-LD без срока цены там, где нет её начала: у каждого Offer с
+ * `priceValidUntil`, но без `validFrom`, срок снимается. Правило — у
+ * `strikethroughPrice` выше.
+ *
+ * Зачем отдельно. Разметку разделов, брендов и серий сайт собирает сам, и
+ * срока без начала там нет. А граф `nuxt-schema-org` на карточке товара
+ * достраивает `@unhead/schema-org` (2.1.13): резолвер Offer ставит
+ * `priceValidUntil` любому Offer без него — конец следующего года
+ * (`setIfEmpty`), — и у товара без скидки получался ровно «срок без начала».
+ * Прогоняет граф через эту функцию `plugins/schema-org-offer-validity.ts`.
+ *
+ * Без срока в строке, с битым JSON или без таких Offer — строка та же.
+ */
+export function dropPriceValidUntilWithoutStart(json: string): string {
+  if (!json.includes('"priceValidUntil"'))
+    return json
+  let data: unknown
+  try {
+    data = JSON.parse(json)
+  }
+  catch {
+    return json
+  }
+  let changed = false
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(walk)
+      return
+    }
+    if (!node || typeof node !== 'object')
+      return
+    const obj = node as Record<string, unknown>
+    const type = obj['@type']
+    const isOffer = type === 'Offer' || (Array.isArray(type) && type.includes('Offer'))
+    if (isOffer && 'priceValidUntil' in obj && !obj.validFrom) {
+      delete obj.priceValidUntil
+      changed = true
+    }
+    Object.values(obj).forEach(walk)
+  }
+  walk(data)
+  return changed ? JSON.stringify(data) : json
 }

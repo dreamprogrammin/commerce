@@ -123,6 +123,10 @@ export function formatPriceRu(price: number): string {
  * Строка одна на весь сайт намеренно: пока она была написана в каждом месте
  * заново, «за 1 день» пережило три чистки подряд и осталось в запасном
  * описании карточки (найдено 17 сентября 2026).
+ *
+ * С 21 октября 2026 она осталась только в запасном описании карточки: там
+ * каждый знак строки доставки отнимается у названия товара. Разделы, бренды и
+ * связки называют и Казахстан — `deliveryLinesForMeta` ниже.
  */
 export const DELIVERY_SHORT = 'Доставка 1–3 дня, самовывоз'
 
@@ -145,6 +149,51 @@ export function deliveryLine(city: string, cityAlreadyMentioned: boolean): strin
  */
 export const DELIVERY_TERMS = 'по Алматы 1–3 дня, по Казахстану 3–7 дней'
 export const DELIVERY_ALMATY_AND_KZ = `Доставка ${DELIVERY_TERMS}`
+
+/*
+ * Доставка в описании раздела, бренда и связки для выдачи — с Казахстаном.
+ *
+ * До 21 октября 2026 там стояло одно `DELIVERY_SHORT` — срок по Алматы.
+ * Человек из Астаны видел «Толокары … в Алматы … Доставка 1–3 дня» и листал
+ * дальше. Search Console, 21.09–18.10: у «Толокаров» на 5–9 месте около 290
+ * показов и ни одного клика; Sluban, ZURU, Feelo, CaDA на 6–8 месте — 0–1
+ * клик. GA4 за 90 дней: из Google каждый третий посетитель не из Алматы
+ * (Астана, Костанай, Тараз, Актобе…). А с 20 октября посылку по Казахстану
+ * можно оформить на сайте.
+ *
+ * Варианта два: полный называет оба срока, короткий — только «по
+ * Казахстану». Короткий нужен там, где с полным описание не влезает в
+ * лимит: обрезка посреди строки доставки хуже, чем срок по Алматы, которого
+ * не будет. Город по-прежнему называется один раз — если он уже стоит в
+ * начале описания, «по Алматы» в строку доставки не идёт.
+ */
+export function deliveryLinesForMeta(
+  city: string,
+  cityAlreadyMentioned: boolean,
+): { full: string, short: string } {
+  return cityAlreadyMentioned
+    ? { full: 'Доставка 1–3 дня, по Казахстану 3–7 дней, самовывоз', short: 'Доставка по Казахстану, самовывоз' }
+    : { full: `Доставка по ${city} 1–3 дня, по Казахстану 3–7 дней, самовывоз`, short: `Доставка по Казахстану, самовывоз в ${city}` }
+}
+
+/**
+ * Первый вариант описания, который влезает в лимит. Не влез ни один —
+ * последний, обрезанный по границе слова.
+ */
+export function firstThatFits(variants: readonly string[]): string {
+  const fit = variants.find(text => text.trim().length <= META_DESCRIPTION_LIMIT)
+  return fit !== undefined ? fit.trim() : clampDescription(variants.at(-1))
+}
+
+/** Описание со строкой доставки: полной, если влезает, иначе с короткой. */
+export function withDeliveryForMeta(
+  compose: (delivery: string) => string,
+  city = 'Алматы',
+  cityAlreadyMentioned = true,
+): string {
+  const { full, short } = deliveryLinesForMeta(city, cityAlreadyMentioned)
+  return firstThatFits([compose(full), compose(short)])
+}
 
 /**
  * Описание главной. Оно же — описание магазина в разметке (`ToyStore`), то
@@ -280,6 +329,21 @@ export interface CategoryMetaFacts {
 }
 
 /**
+ * Какая часть текста владельца (`categories.meta_description`) идёт в начало
+ * описания раздела: первые `CATEGORY_LEAD_LIMIT` знаков по границе слова, без
+ * тегов. Число моделей, цены, доставку и бренды `composeCategoryMeta`
+ * дописывает сам.
+ *
+ * Отдельной функцией — чтобы админка показывала ровно то, что уйдёт в выдачу.
+ * До 21 октября 2026 подсказка под полем обещала «до 160 символов»: владелец
+ * писал по 155, и хвост с «доставкой по всему Казахстану» у «Мальчикам» и
+ * «Девочкам» до выдачи так и не дошёл.
+ */
+export function categoryLeadForMeta(text: string | null | undefined): string {
+  return truncateWords((text ?? '').replace(/<[^>]*>/g, '').trim(), CATEGORY_LEAD_LIMIT)
+}
+
+/**
  * Мета-описание категории из фактов о ней.
  *
  * Что здесь важно и почему именно так.
@@ -313,7 +377,7 @@ export function composeCategoryMeta(facts: CategoryMetaFacts): string {
     : ''
   const from = price ? `от ${formatPrice(price)} ₸` : ''
 
-  const lead = truncateWords((facts.lead ?? '').replace(/<[^>]*>/g, '').trim(), CATEGORY_LEAD_LIMIT)
+  const lead = categoryLeadForMeta(facts.lead)
 
   let head = lead || `${facts.categoryName.trim()} в ${city}`
   const factsText = models && from
@@ -342,22 +406,29 @@ export function composeCategoryMeta(facts: CategoryMetaFacts): string {
    * едет в строку доставки.
    */
   const cityMentioned = head.toLowerCase().includes(city.toLowerCase())
-  const parts = [head, deliveryLine(city, cityMentioned)]
+  const delivery = deliveryLinesForMeta(city, cityMentioned)
 
+  const rest: string[] = []
   const reviews = facts.reviewsCount ?? 0
   if (facts.rating && reviews >= MIN_REVIEWS_FOR_SNIPPET) {
     const rating = facts.rating.toFixed(1).replace('.', ',')
-    parts.push(
+    rest.push(
       `рейтинг ${rating} из 5 по ${reviews} ${pluralRu(reviews, 'отзыву', 'отзывам', 'отзывам')}`,
     )
   }
 
+  const text = (line: string) => `${[head, line, ...rest].join('. ')}.`
   const brands = (facts.topBrands ?? []).filter(Boolean).slice(0, 3)
-  if (brands.length > 0) {
-    const withBrands = `${parts.join('. ')}. Бренды: ${brands.join(' · ')}.`
-    if (withBrands.length <= META_DESCRIPTION_LIMIT)
-      return withBrands
-  }
+  const withBrands = (line: string) => `${text(line)} Бренды: ${brands.join(' · ')}.`
 
-  return clampDescription(`${parts.join('. ')}.`)
+  /*
+   * Бренды — такой же факт о разделе, как число и цена, а срок по Алматы и
+   * так читается из города в начале. Поэтому короткая доставка с брендами
+   * идёт раньше полной без них.
+   */
+  return firstThatFits([
+    ...(brands.length > 0 ? [withBrands(delivery.full), withBrands(delivery.short)] : []),
+    text(delivery.full),
+    text(delivery.short),
+  ])
 }

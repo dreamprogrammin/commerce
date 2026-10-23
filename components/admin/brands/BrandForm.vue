@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { GeneratedBrandSeo } from '@/composables/admin/useBrandSeoGenerator'
 import type { BrandInsert, BrandPageLayout, BrandUpdate, Database, ProductLine } from '@/types'
+import type { BrandMetaProduct } from '@/utils/brandMeta'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useBrandSeoGenerator } from '@/composables/admin/useBrandSeoGenerator'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
-import { BUCKET_NAME_BRANDS } from '@/constants'
+import { BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS, BUCKET_NAME_BRANDS } from '@/constants'
+import { emptyBrandAlternatives } from '@/constants/brandStaticText'
+import { brandHeadingWord, findTopRootSlug } from '@/utils/brandHeading'
+import { composeBrandDescription, composeBrandTitle } from '@/utils/brandMeta'
 import { formatFileSize, optimizeImageBeforeUpload } from '@/utils/imageOptimizer'
 import { slugify } from '@/utils/slugify'
 
@@ -176,16 +180,85 @@ const seoH1Value = computed({
   },
 })
 
-/**
- * Заголовок, который реально уйдёт в выдачу. Повторяет фолбэк из
- * `pages/brand/[slug].vue` — предпросмотр обязан показывать то же самое,
- * а не свою версию: раньше он рисовал «X - Купить товары бренда | Ухтышка»,
- * тогда как страница отдаёт «…в Алматы | Ухтышка».
+/*
+ * Предпросмотр выдачи — теми же функциями, что страница бренда
+ * (`utils/brandMeta.ts`), и на её же данных: активные товары бренда и дерево
+ * разделов. Своя версия здесь уже дважды расходилась со страницей: до
+ * 22 октября 2026 предпросмотр писал «X - Купить товары бренда в Алматы» при
+ * странице «Игрушки X — купить в Алматы с доставкой», а описанием показывал
+ * «SEO описание» или сырую вёрстку «Описания» — страница же с товарами
+ * собирает описание из товаров.
  */
-const effectiveTitle = computed(
-  () => metaTitleValue.value
-    || `${formData.value.name || 'Бренд'} - Купить товары бренда в Алматы | Ухтышка`,
+/** id сохранённого бренда; у нового его нет. Им же пользуется генерация SEO ниже. */
+const brandId = computed(
+  () => (props.initialData as any)?.id as string | undefined,
 )
+const previewProducts = ref<(BrandMetaProduct & { category_id: string | null })[]>([])
+const previewCategories = ref<{ id: string, parent_id: string | null, slug: string | null }[]>([])
+/** null — не загрузилось: тогда, как и страница, не считаем бренд пустым. */
+const previewHasProducts = ref<boolean | null>(null)
+const previewLoading = ref(false)
+
+async function loadPreviewData(id: string) {
+  previewLoading.value = true
+  const [products, categories] = await Promise.all([
+    supabase
+      .from('products')
+      .select('price, final_price, stock_quantity, category_id, product_lines(name)')
+      .eq('brand_id', id)
+      .eq('is_active', true),
+    supabase.from('categories').select('id, parent_id, slug'),
+  ])
+  previewLoading.value = false
+  if (products.error) {
+    console.error('Предпросмотр: не удалось загрузить товары бренда', products.error)
+    return
+  }
+  previewProducts.value = (products.data ?? []).map((p: any) => ({
+    price: p.price,
+    final_price: p.final_price,
+    stock_quantity: p.stock_quantity,
+    category_id: p.category_id,
+    lineName: p.product_lines?.name ?? null,
+  }))
+  previewCategories.value = categories.data ?? []
+  previewHasProducts.value = previewProducts.value.length > 0
+}
+
+watch(brandId, (id) => {
+  if (id)
+    loadPreviewData(id)
+  else
+    previewHasProducts.value = false // новый бренд — товаров у него ещё нет
+}, { immediate: true })
+
+const previewWord = computed(() =>
+  brandHeadingWord(findTopRootSlug(previewProducts.value, previewCategories.value)))
+
+/** Заголовок, который реально уйдёт в выдачу. */
+const effectiveTitle = computed(() => composeBrandTitle({
+  brandName: formData.value.name || 'Бренд',
+  word: previewWord.value,
+  metaTitle: metaTitleValue.value,
+  seoTitle: (props.initialData as any)?.seo_title ?? null,
+}))
+
+/** Описание, которое реально уйдёт в выдачу. */
+const effectiveDescription = computed(() => composeBrandDescription({
+  brandName: formData.value.name || 'Бренд',
+  word: previewWord.value,
+  products: previewProducts.value,
+  hasProducts: previewHasProducts.value,
+  alternatives: emptyBrandAlternatives(formData.value.slug),
+  metaDescription: (props.initialData as any)?.meta_description ?? null,
+  seoDescription: formData.value.seo_description,
+  description: formData.value.description,
+}))
+
+/** Пустой бренд закрыт от поиска, кроме нескольких оставленных ради спроса. */
+const previewClosedFromSearch = computed(() =>
+  previewHasProducts.value === false
+  && !BRANDS_KEPT_INDEXABLE_WITHOUT_PRODUCTS.includes(formData.value.slug ?? ''))
 
 const seoDescriptionValue = computed({
   get: () => formData.value.seo_description ?? '',
@@ -215,10 +288,9 @@ const seoKeywordsString = computed({
  * Сгенерированное НЕ сохраняется само: поля заполняются в форме, человек
  * читает, правит и жмёт «Сохранить». Это не осторожность ради осторожности —
  * модель пишет заголовок, который увидит покупатель в выдаче.
+ *
+ * `brandId` объявлен выше, у предпросмотра.
  */
-const brandId = computed(
-  () => (props.initialData as any)?.id as string | undefined,
-)
 
 const { generate, isGenerating } = useBrandSeoGenerator()
 
@@ -381,8 +453,9 @@ onBeforeUnmount(() => {
           placeholder="Конструкторы LEGO — купить в Алматы | Ухтышка"
         />
         <p class="text-xs text-muted-foreground mt-1">
-          Строка, которую видно в Google. Пусто — соберётся из названия бренда.
-          Google обрезает примерно на 60 знаках.
+          Строка, которую видно в Google. Пусто — сайт соберёт её сам из раздела
+          и названия бренда, как в предпросмотре ниже. Google обрезает примерно
+          на 60 знаках.
         </p>
       </div>
 
@@ -415,8 +488,14 @@ onBeforeUnmount(() => {
           rows="3"
           placeholder="Товары бренда L.O.L. Surprise в Алматы. Оригинальная продукция с доставкой по Казахстану."
         />
-        <p class="text-xs text-muted-foreground mt-1">
-          Описание для Google. Оптимально 120-160 символов.
+        <p v-if="formData.is_custom_page" class="text-xs text-muted-foreground mt-1">
+          Текст под заголовком брендовой страницы. В описание для Google не
+          идёт — его сайт собирает из товаров бренда, см. предпросмотр ниже.
+        </p>
+        <p v-else class="text-xs text-muted-foreground mt-1">
+          На обычной странице бренда не показывается и в описание для Google не
+          идёт — его сайт собирает из товаров бренда, см. предпросмотр ниже.
+          Нужно только для брендовой страницы-лендинга.
         </p>
       </div>
 
@@ -428,14 +507,14 @@ onBeforeUnmount(() => {
           placeholder="L.O.L. Surprise, куклы, игрушки для девочек, купить в Алматы"
         />
         <p class="text-xs text-muted-foreground mt-1">
-          Введите через запятую. Помогают поисковикам найти бренд.
+          Через запятую. Google ключевые слова не учитывает — можно не заполнять.
         </p>
       </div>
 
       <!-- Предпросмотр в Google -->
       <div v-if="formData.name" class="p-3 bg-muted/50 rounded-lg space-y-1">
         <p class="text-xs text-muted-foreground mb-2">
-          Предпросмотр в Google:
+          Предпросмотр в Google — так соберёт страница бренда:
         </p>
         <p class="text-blue-600 text-sm hover:underline cursor-pointer truncate">
           {{ effectiveTitle }}
@@ -444,7 +523,11 @@ onBeforeUnmount(() => {
           uhti.kz › brand › {{ formData.slug || '...' }}
         </p>
         <p class="text-xs text-muted-foreground line-clamp-2">
-          {{ seoDescriptionValue || descriptionValue || 'Описание бренда будет показано здесь...' }}
+          {{ previewLoading ? 'Считаем по товарам бренда…' : effectiveDescription }}
+        </p>
+        <p v-if="previewHasProducts === false" class="text-xs text-amber-600">
+          У бренда пока нет активных товаров{{ previewClosedFromSearch ? ' — страница закрыта от поиска' : '' }}.
+          Заголовок и описание станут такими, как у брендов с товарами, когда товары привяжут.
         </p>
       </div>
     </div>

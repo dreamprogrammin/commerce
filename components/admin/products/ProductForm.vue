@@ -36,6 +36,8 @@ import {
   optimizeImageBeforeUpload,
 } from '@/utils/imageOptimizer'
 import { ageToMonths, formatAgeRange, monthsToInput, productAgeMonths } from '@/utils/productAge'
+import { ageTextConflicts } from '@/utils/productAgeText'
+import { composeProductDescription, composeProductTitle, productGenderText } from '@/utils/productMeta'
 import { explainSpecs, matchSpecsToOptions } from '@/utils/productSpecs'
 import { slugify } from '@/utils/slugify'
 import BrandForm from '../brands/BrandForm.vue'
@@ -915,6 +917,18 @@ const agePreview = computed(() =>
   formatAgeRange(formData.value.min_age_months, formData.value.max_age_months),
 )
 
+/*
+ * Возраст в названии и описании, который расходится с «Возраст от». 21 октября
+ * 2026 погремушку завели «от 3 месяцев» в названии при пустом возрасте — на
+ * странице стояло и «от 3 месяцев», и «Игрушка с рождения». Разбор — тот же,
+ * что у стража check-product-age-text.mjs (utils/productAgeText.ts).
+ */
+const ageConflicts = computed(() => ageTextConflicts({
+  name: formData.value.name,
+  description: formData.value.description,
+  minAgeMonths: formData.value.min_age_months,
+}))
+
 /**
  * Заполненные характеристики — «Питание: Батарейки», «Длина: 20 см». Без них
  * нейросеть писала описание мимо таблицы характеристик: в таблице «Питание:
@@ -965,6 +979,31 @@ const discountedPrice = computed(() => {
   }
   return null
 })
+
+/*
+ * Предпросмотр выдачи — теми же функциями, что страница товара
+ * (utils/productMeta.ts). До 22 октября 2026 он писал «<название> - Купить в
+ * интернет-магазине | Ухтышка», а страница отдавала обрезанное по слову
+ * название; без SEO-описания показывал сырое «Описание» вместо строки из
+ * фактов. Цена — как `final_price` в базе: со скидкой — с округлением «на 90»
+ * (`discountedPrice` выше: 16 990 − 20 % = 13 490, а не 13 592), без — как есть.
+ */
+const previewTitle = computed(() => composeProductTitle({
+  name: formData.value.name,
+  metaTitle: props.initialData?.meta_title ?? null,
+  seoTitle: props.initialData?.seo_title ?? null,
+}))
+const previewDescription = computed(() => composeProductDescription({
+  name: formData.value.name ?? '',
+  metaDescription: props.initialData?.meta_description ?? null,
+  seoDescription: formData.value.seo_description,
+  gender: productGenderText(formData.value.gender),
+  age: agePreview.value,
+  inStock: (formData.value.stock_quantity ?? 0) > 0,
+  rating: props.initialData?.avg_rating ?? null,
+  reviewsCount: props.initialData?.review_count ?? null,
+  price: discountedPrice.value ?? (Number(formData.value.price) || null),
+}))
 
 // --- 13. СКИДКА И ПОРЯДОК ---
 
@@ -1282,7 +1321,8 @@ const seoKeywordsString = computed({
             />
             <p class="text-xs text-muted-foreground mt-1">
               Это описание показывается в результатах Google. Оптимально 120-160
-              символов.
+              символов. Пусто — сайт соберёт его сам из названия, наличия,
+              доставки и цены, как в предпросмотре ниже.
             </p>
           </div>
 
@@ -1294,8 +1334,8 @@ const seoKeywordsString = computed({
               placeholder="игрушки для детей, развивающие игрушки, купить в Алматы"
             />
             <p class="text-xs text-muted-foreground mt-1">
-              Введите ключевые слова через запятую. Они помогут поисковикам
-              найти товар.
+              Через запятую. Google ключевые слова не учитывает — можно не
+              заполнять.
             </p>
           </div>
 
@@ -1305,22 +1345,18 @@ const seoKeywordsString = computed({
             class="p-4 bg-muted/50 rounded-lg space-y-1"
           >
             <p class="text-xs text-muted-foreground mb-2">
-              Предпросмотр в Google:
+              Предпросмотр в Google — так соберёт страница товара:
             </p>
             <p
               class="text-blue-600 text-base hover:underline cursor-pointer truncate"
             >
-              {{ formData.name }} - Купить в интернет-магазине | Ухтышка
+              {{ previewTitle }}
             </p>
             <p class="text-green-700 text-xs">
               uhti.kz › catalog › products › {{ formData.slug || "..." }}
             </p>
             <p class="text-sm text-muted-foreground line-clamp-2">
-              {{
-                seoDescriptionValue
-                  || formData.description
-                  || "Описание товара будет показано здесь..."
-              }}
+              {{ previewDescription }}
             </p>
           </div>
         </CardContent>
@@ -1705,6 +1741,9 @@ const seoKeywordsString = computed({
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="!formData.category_id" class="text-xs text-amber-600 mt-1">
+              Без категории товар не попадёт ни в один раздел каталога.
+            </p>
           </div>
 
           <div class="flex items-center space-x-2 pt-2">
@@ -2136,6 +2175,18 @@ const seoKeywordsString = computed({
             Как на коробке: малышам — месяцами (6 мес., 18 мес.), остальным — годами.
             <template v-if="agePreview">
               На сайте: <span class="font-medium text-foreground">{{ agePreview }}</span>
+            </template>
+          </p>
+          <p v-if="ageConflicts.length" class="text-xs text-amber-600">
+            В тексте возраст
+            {{ ageConflicts.map(c => `«${c.src}» (${c.where})`).join(', ') }},
+            <template v-if="agePreview">
+              а в поле — {{ agePreview }}. На странице будет и то и другое —
+              поправьте одно из них.
+            </template>
+            <template v-else>
+              а поле «Возраст от» пустое. По нему работают фильтр каталога и
+              Google — заполните.
             </template>
           </p>
         </CardContent>

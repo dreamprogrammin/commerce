@@ -34,10 +34,8 @@ import { validGtin } from '@/utils/gtin'
 import { merchantReturnPolicy, offerPrice, offerShippingDetails, stablePriceValidUntil, strikethroughPrice } from '@/utils/offerSchema'
 import { parseHTMLToBlocks } from '@/utils/parseSEOContent'
 import { formatAgeRange, productAgeMonths } from '@/utils/productAge'
+import { composeProductDescription, composeProductTitle, productGenderText } from '@/utils/productMeta'
 import { attributeSpecRows, filterLink } from '@/utils/productSpecRows'
-import { composeProductMeta } from '@/utils/seoDescription'
-
-import { buildProductTitle } from '@/utils/seoTitle'
 
 definePageMeta({ layout: 'shell', shell: productShell })
 
@@ -572,17 +570,16 @@ const metaTitle = computed(() => {
   if (!product.value)
     return 'Товар | Ухтышка'
 
-  // Если есть ручной meta_title — используем его
-  if (product.value.meta_title)
-    return product.value.meta_title
-  if (product.value.seo_title)
-    return product.value.seo_title
-
+  // Ручной meta_title, потом seo_title, иначе обрезанное по слову название.
   // Раньше здесь склеивалось «[название] [материал] — от [цена] ₸ — Uhti.kz»,
   // и ни один из 172 товаров не помещался в 60 знаков: средняя длина 125,
   // максимум 162. В выдаче обрезалось больше половины, включая модель.
-  // Теперь — обрезанное по слову название и бренд, см. utils/seoTitle.ts.
-  return buildProductTitle(product.value.name)
+  // Сборка — в utils/productMeta.ts: ею же считает предпросмотр в админке.
+  return composeProductTitle({
+    name: product.value.name,
+    metaTitle: product.value.meta_title,
+    seoTitle: product.value.seo_title,
+  })
 })
 
 // Возраст — в месяцах, словами как на коробке: «от 6 месяцев», «от 1 года»,
@@ -595,16 +592,7 @@ const ageRangeText = computed(() => {
   return formatAgeRange(min, max)
 })
 
-const genderText = computed(() => {
-  switch (product.value?.gender) {
-    case 'female':
-      return 'для девочек'
-    case 'male':
-      return 'для мальчиков'
-    default:
-      return null
-  }
-})
+const genderText = computed(() => productGenderText(product.value?.gender))
 
 const audienceText = computed(() => {
   const parts = [genderText.value, ageRangeText.value].filter(Boolean)
@@ -615,25 +603,23 @@ const metaDescription = computed(() => {
   if (!product.value)
     return ''
 
-  // Если есть ручной meta_description — используем его
-  if (product.value.meta_description)
-    return product.value.meta_description
-  if (product.value.seo_description)
-    return product.value.seo_description
-
   /*
-   * Описания в базе нет — собираем сами. Сборка вынесена в
-   * `composeProductMeta`, потому что здесь она успела накопить три дефекта,
-   * и все три были видны на проде 17 сентября 2026:
+   * Ручное meta_description, потом SEO-описание из админки, иначе — из
+   * фактов (`composeProductMeta`). Сборка вынесена в utils, потому что здесь
+   * она успела накопить три дефекта, и все три были видны на проде
+   * 17 сентября 2026:
    *  • «Доставка по Алматы за 1 день» — обещание, которого магазин не даёт;
    *  • «…от 3 лет от 3 лет» — возраст приклеивался вторым разом к названию,
    *    в котором он уже стоял;
    *  • рейтинг с одного отзыва и эмодзи-звезда, от которых в сниппете
    *    остаются потраченные знаки.
-   * Плюс строка ничем не ограничивалась по длине.
+   * Плюс строка ничем не ограничивалась по длине. Той же функцией считает
+   * предпросмотр в админке (utils/productMeta.ts).
    */
-  return composeProductMeta({
+  return composeProductDescription({
     name: product.value.name,
+    metaDescription: product.value.meta_description,
+    seoDescription: product.value.seo_description,
     gender: genderText.value,
     age: ageRangeText.value,
     inStock: product.value.stock_quantity > 0,
@@ -1061,7 +1047,6 @@ useSchemaOrg([
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
         'url': canonicalUrl.value,
-        'priceValidUntil': priceValidUntil,
         'itemCondition': 'https://schema.org/NewCondition',
         'seller': {
           '@type': 'Organization' as const,
@@ -1069,9 +1054,9 @@ useSchemaOrg([
           'url': 'https://uhti.kz',
         },
 
-        // Скидка, возврат и доставка — общие для всей разметки сайта:
-        // utils/offerSchema.ts, там же разбор, почему именно так.
-        ...strikethroughPrice(p),
+        // Скидка (со сроком цены), возврат и доставка — общие для всей
+        // разметки сайта: utils/offerSchema.ts, там же разбор, почему именно так.
+        ...strikethroughPrice(p, priceValidUntil),
         'hasMerchantReturnPolicy': merchantReturnPolicy(),
         'shippingDetails': offerShippingDetails(),
       }
