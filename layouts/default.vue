@@ -15,8 +15,9 @@ const LazyCommonFooter = defineAsyncComponent(() => import('@/components/common/
       <CommonAppTabBarMobile />
     </div>
 
+    <!-- Резерв под нижнюю навигацию — в подвале (Footer.vue), а не здесь. -->
     <main
-      class="flex-1 lg:pt-0 pt-[76px] lg:pb-0 pb-[calc(4rem+env(safe-area-inset-bottom))]"
+      class="flex-1 lg:pt-0 pt-[76px]"
     >
       <slot />
     </main>

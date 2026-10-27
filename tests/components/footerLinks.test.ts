@@ -17,10 +17,15 @@ function read(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf8')
 }
 
-/** Ищет `to="..."` у NuxtLink, внутри которого лежит заданная подпись. */
+/**
+ * Ищет адрес ссылки с заданной подписью. Подвал по макету SiteFooter
+ * (23.10.2026) собирает колонки из массива `{ label, to }`; прежний подвал
+ * писал ссылки разметкой `<NuxtLink to="...">`. Понимаем обе записи.
+ */
 function footerLinkTarget(source: string, label: string): string | null {
-  const pattern = new RegExp(`<NuxtLink\\s+to="([^"]+)"[^>]*>\\s*${label}\\s*</NuxtLink>`)
-  return source.match(pattern)?.[1] ?? null
+  const inArray = new RegExp(`\\{\\s*label:\\s*'${label}',\\s*to:\\s*'([^']+)'`)
+  const inMarkup = new RegExp(`<NuxtLink\\s+to="([^"]+)"[^>]*>\\s*${label}\\s*</NuxtLink>`)
+  return source.match(inArray)?.[1] ?? source.match(inMarkup)?.[1] ?? null
 }
 
 /** Ищет `to` в массиве navItems по полю `label`. */

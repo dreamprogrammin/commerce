@@ -302,7 +302,8 @@ useSeoMeta({
       </section>
 
       <!-- Контакты -->
-      <section>
+      <!-- Якорь — для ссылки «Контакты» из подвала. -->
+      <section id="kontakty" class="scroll-mt-24">
         <h2 class="text-xl font-semibold">
           Контакты
         </h2>
