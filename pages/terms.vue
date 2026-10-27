@@ -119,8 +119,8 @@ useHead({
         </ul>
       </section>
 
-      <!-- 5. Доставка -->
-      <section>
+      <!-- 5. Доставка. Якоря `dostavka` и `samovyvoz` — для ссылок из подвала. -->
+      <section id="dostavka" class="scroll-mt-24">
         <h2 class="text-xl font-semibold">
           5. Доставка
         </h2>
@@ -147,7 +147,7 @@ useHead({
             Курьером по Алматы — {{ formatPrice(COURIER_DELIVERY_COST) }}&nbsp;₸; при
             заказе от {{ formatPrice(FREE_SHIPPING_THRESHOLD) }}&nbsp;₸ — бесплатно
           </li>
-          <li>
+          <li id="samovyvoz" class="scroll-mt-24">
             Самовывоз — бесплатно: {{ SHOP_ADDRESS_FULL }},
             {{ SHOP.openingHoursHuman }}
           </li>
