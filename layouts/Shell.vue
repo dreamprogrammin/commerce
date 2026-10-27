@@ -122,7 +122,10 @@ const headerSticky = computed(() => shell.value.header !== 'static')
         shell.grow ? 'flex-1' : '',
         shell.padTop === 76 ? 'pt-[76px] lg:pt-0' : '',
         shell.padTop === 56 ? 'pt-[56px] lg:pt-0' : '',
-        shell.padBottom ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : '',
+        // Резерв под нижнюю навигацию — только у страниц без подвала: где
+        // подвал есть, резерв в нём самом (Footer.vue), иначе он вставал
+        // пустой полосой между страницей и подвалом.
+        shell.padBottom && shell.footer === 'none' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : '',
       ]"
     >
       <slot />
@@ -141,11 +144,12 @@ const headerSticky = computed(() => shell.value.header !== 'static')
     <!-- Подвал в собственном слое нужен только там, где под ним лежит
          фиксированный герой (главная): иначе он рисуется ПОД ним и герой
          просвечивает сквозь полупрозрачный фон. Резерв под нижнюю навигацию
-         висит здесь же, а не на <main>: на <main> он давал прозрачную полосу
-         между листом контента и подвалом, сквозь которую светил герой. -->
+         — внутри самого подвала (Footer.vue), не на <main>: на <main> он
+         давал прозрачную полосу между листом контента и подвалом, сквозь
+         которую светил герой. -->
     <div
       v-if="shell.footer === 'layered'"
-      class="home-footer-layer mt-auto pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0"
+      class="home-footer-layer mt-auto"
     >
       <LazyCommonFooter />
     </div>
