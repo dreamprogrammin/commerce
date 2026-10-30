@@ -4,7 +4,10 @@ import { toast } from 'vue-sonner'
 export interface PosProduct {
   id: string
   name: string
+  /** Цена продажи — как на сайте, со скидкой (`final_price`) */
   price: number
+  /** Цена без скидки; до миграции 30.10.2026 поиск её не отдавал */
+  full_price?: number
   stock_quantity: number
   bonus_points_award: number
   barcode: string | null
