@@ -186,6 +186,9 @@ function getImageUrl(product: PosProduct): string | null {
               <div class="mt-auto pt-1">
                 <p class="text-sm font-bold text-primary">
                   {{ formatPrice(product.price) }}
+                  <s v-if="product.full_price && product.full_price > product.price" class="ml-1 text-xs font-normal text-muted-foreground">
+                    {{ formatPrice(product.full_price) }}
+                  </s>
                 </p>
                 <p
                   v-if="product.bonus_points_award > 0"

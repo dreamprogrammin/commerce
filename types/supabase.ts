@@ -3139,6 +3139,7 @@ export interface Database {
           barcode: string
           blur_placeholder: string
           bonus_points_award: number
+          full_price: number
           id: string
           image_url: string
           name: string
