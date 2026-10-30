@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     .filter(o => !o.user_id && o.offline_customer_id)
     .map(o => ({ ...o, user_id: o.offline_customer_id })))
   // Корзины — чтобы в списке было видно, у кого что лежит неоформленным
-  const cartByUser = new Map((await loadCarts(db)).map(c => [c.userId, c]))
+  const cartByUser = new Map((await loadCarts(db)).map(c => [c.userId!, c]))
   const cardByPhone = new Map((cards ?? []).map(c => [c.phone_digits, c]))
   const empty = { orders: 0, cancelled: 0, spent: 0, lastOrderAt: null }
 

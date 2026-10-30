@@ -9,7 +9,10 @@
  *     покупатели сложены; список пользователей и карточка показывают корзину;
  *     маршрут страницы «Корзины» отдаёт прежний формат;
  *  3) страницы «К закупке», «Пользователи», карточка и «Корзины» рисуются без
- *     ошибок консоли и показывают корзины.
+ *     ошибок консоли и показывают корзины;
+ *  4) гости (31.10.2026): браузер без входа кладёт товар — на сервере
+ *     появляется корзина без имени, в спросе она «гость»; очистил — запись
+ *     удалена. Гостевая корзина с подделанной ценой — сумма по каталогу.
  * Прежние корзины этих покупателей возвращаются на место.
  *
  *   node check-admin-carts.mjs --base=http://localhost:3141
@@ -73,13 +76,22 @@ async function setCart(userId, items) {
 
 console.log(`стенд ${BASE}`)
 const [a, b] = await rest('profiles?select=id,first_name&role=neq.admin&order=created_at&limit=2')
-const saved = await rest(`server_carts?select=user_id,items,total_amount,updated_at&user_id=in.(${a.id},${b.id})`)
+// Все корзины — до прогона: вход гостя в аккаунт тоже пишет корзину
+const saved = await rest('server_carts?select=user_id,items,total_amount,updated_at')
 const [p, q] = await rest('products?select=id,name,price,final_price,stock_quantity&is_active=eq.true&stock_quantity=gt.0&stock_quantity=lt.20&order=name&limit=2')
 const priceOf = x => Number(x.final_price || x.price)
+const guestRpc = (id, items) => fetch(`${SUPA}/rest/v1/rpc/save_guest_cart`, {
+  method: 'POST',
+  headers: { 'apikey': ANON, 'Authorization': `Bearer ${ANON}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ p_cart_id: id, p_items: items }),
+})
+const apiGuest = crypto.randomUUID()
 
 try {
   await setCart(a.id, [{ product_id: p.id, quantity: p.stock_quantity }, { product_id: q.id, quantity: 1 }])
   await setCart(b.id, [{ product_id: p.id, quantity: 1 }])
+  // Гость с подделанной ценой: сервер её не берёт
+  await guestRpc(apiGuest, [{ product_id: p.id, quantity: 2, price: 1 }])
 
   console.log('\n== доступ')
   check((await api('/api/admin/cart-demand')).status === 401, 'гость — 401')
@@ -91,8 +103,10 @@ try {
   const { body: demand } = await api('/api/admin/cart-demand', admin.token)
   const top = demand?.[0]
   check(top?.productId === p.id, `первым — товар, которого не хватит: ${top?.name?.slice(0, 40)}`)
-  check(top?.quantity === p.stock_quantity + 1 && top?.stock === p.stock_quantity, `в корзинах ${top?.quantity}, на складе ${top?.stock}`)
-  check(top?.customers.length === 2, `покупателей у товара: ${top?.customers.length}`)
+  check(top?.quantity === p.stock_quantity + 3 && top?.stock === p.stock_quantity, `в корзинах ${top?.quantity} (с гостем), на складе ${top?.stock}`)
+  check(top?.customers.length === 3 && top?.customers.filter(c => c.guest && !c.id && !c.name).length === 1, `покупателей у товара: ${top?.customers.length}, из них гость без имени`)
+  const [guestRow] = await rest(`guest_carts?select=total_amount,item_count&id=eq.${apiGuest}`)
+  check(Number(guestRow?.total_amount) === priceOf(p) * 2, `гость: сумма по каталогу ${guestRow?.total_amount}, а не присланная`)
   const { body: users } = await api('/api/admin/users', admin.token)
   const rowA = users?.find(u => u.id === a.id)
   const totalA = priceOf(p) * p.stock_quantity + priceOf(q)
@@ -102,6 +116,8 @@ try {
   const { body: carts } = await api('/api/admin/abandoned-carts', admin.token)
   const cartA = carts?.find(c => c.items.some(i => i.name === p.name.trim()) && c.items.length === 2)
   check(Boolean(cartA) && 'phone' in cartA && 'email' in cartA && typeof cartA.items[0].inStock === 'boolean', 'маршрут «Корзин»: прежний формат')
+  const guestCart = carts?.find(c => c.guest)
+  check(Boolean(guestCart) && !guestCart.name && !guestCart.phone && !guestCart.email, '«Корзины»: гость без имени и контактов')
 
   console.log('\n== страницы')
   const browser = await chromium.launch()
@@ -116,7 +132,7 @@ try {
 
     await page.goto(`${BASE}/admin/restock`, { waitUntil: 'load', timeout: 120000 })
     await page.getByText('В корзинах у покупателей').waitFor({ timeout: 30000 })
-    await page.getByText(`в корзинах ${p.stock_quantity + 1} шт.`).waitFor({ timeout: 10000 })
+    await page.getByText(`в корзинах ${p.stock_quantity + 3} шт.`).waitFor({ timeout: 10000 })
     check(true, '«К закупке»: блок корзин с товаром')
     if (process.env.SHOT)
       await page.screenshot({ path: `${process.env.SHOT}-restock.png`, fullPage: true })
@@ -138,21 +154,67 @@ try {
     await page.goto(`${BASE}/admin/carts`, { waitUntil: 'load', timeout: 120000 })
     await page.getByText(p.name.trim().slice(0, 30)).first().waitFor({ timeout: 30000 })
     check(true, '«Корзины»: страница показывает корзину')
+    check(await page.getByText('без входа').count() >= 1, '«Корзины»: гость подписан «без входа»')
+    if (process.env.SHOT)
+      await page.screenshot({ path: `${process.env.SHOT}-carts.png`, fullPage: true })
     check(!errors.length, `страницы без ошибок консоли${errors.length ? ` — ${errors[0].slice(0, 160)}` : ''}`)
+
+    console.log('\n== гость в браузере')
+    const guestCtx = await browser.newContext({ viewport: { width: 1366, height: 900 } })
+    const guest = await guestCtx.newPage()
+    const guestErrors = []
+    guest.on('pageerror', e => guestErrors.push(e.message))
+    await guest.goto(`${BASE}/catalog/all`, { waitUntil: 'load', timeout: 120000 })
+    const add = guest.locator('button.pc-add').first()
+    await add.waitFor({ timeout: 30000 })
+    await add.scrollIntoViewIfNeeded()
+    await add.click()
+    await guest.waitForTimeout(4000)
+    const stored = await guest.evaluate(() => JSON.parse(localStorage.getItem('uhti-cart-v1') ?? '{}'))
+    const browserGuest = stored.guestCartId
+    const [row] = browserGuest ? await rest(`guest_carts?select=items&id=eq.${browserGuest}`) : []
+    check(Boolean(browserGuest) && row?.items?.length === stored.items?.length && row.items[0].product_id === stored.items[0].product.id,
+      `гость положил товар — корзина на сервере (${browserGuest?.slice(0, 8)}…)`)
+    check(row && !JSON.stringify(row).match(/@|\+7/), 'в записи гостя нет контактов')
+    await guest.goto(`${BASE}/cart`, { waitUntil: 'load', timeout: 120000 })
+    await guest.getByRole('button', { name: /Очистить/ }).first().click()
+    const confirmBtn = guest.getByRole('button', { name: /^(Очистить|Да)/ }).last()
+    if (await confirmBtn.isVisible().catch(() => false))
+      await confirmBtn.click().catch(() => {})
+    await guest.waitForTimeout(4000)
+    const left = await rest(`guest_carts?select=id&id=eq.${browserGuest}`)
+    check(left.length === 0, 'гость очистил корзину — запись удалена')
+
+    // Вошёл — гостевая запись удаляется: корзина переезжает в аккаунт
+    const userB = await signIn('user')
+    await guest.goto(`${BASE}/catalog/all`, { waitUntil: 'load', timeout: 120000 })
+    await guest.locator('button.pc-add').nth(1).click()
+    await guest.waitForTimeout(4000)
+    const beforeLogin = (await guest.evaluate(() => JSON.parse(localStorage.getItem('uhti-cart-v1') ?? '{}'))).guestCartId
+    const existed = beforeLogin ? (await rest(`guest_carts?select=id&id=eq.${beforeLogin}`)).length : 0
+    await guestCtx.addCookies([...userB.cookies, ...userB.cookies.map(c => ({ ...c, name: c.name.replace('supabase-auth-token', 'sb-127-auth-token') }))]
+      .map(c => ({ name: c.name, value: c.value, domain: new URL(BASE).hostname, path: '/' })))
+    await guest.reload({ waitUntil: 'load', timeout: 120000 })
+    await guest.waitForTimeout(5000)
+    const afterLogin = beforeLogin ? await rest(`guest_carts?select=id&id=eq.${beforeLogin}`) : [1]
+    check(existed === 1 && afterLogin.length === 0, `вошёл — гостевая запись удалена (была ${existed}, осталось ${afterLogin.length})`)
+    check(!guestErrors.length, `гостевые страницы без ошибок${guestErrors.length ? ` — ${guestErrors[0].slice(0, 160)}` : ''}`)
+    await guestCtx.close()
   }
   finally {
     await browser.close()
   }
 }
 finally {
+  await guestRpc(apiGuest, [])
   // Вернуть прежние корзины, лишние — убрать
-  for (const id of [a.id, b.id]) {
-    const old = saved.find(c => c.user_id === id)
-    if (old)
-      await fetch(`${SUPA}/rest/v1/server_carts?on_conflict=user_id`, { method: 'POST', headers: { 'apikey': SERVICE, 'Authorization': `Bearer ${SERVICE}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(old) })
-    else
+  const now = await rest('server_carts?select=user_id')
+  for (const { user_id: id } of now) {
+    if (!saved.some(c => c.user_id === id))
       await fetch(`${SUPA}/rest/v1/server_carts?user_id=eq.${id}`, { method: 'DELETE', headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } })
   }
+  for (const old of saved)
+    await fetch(`${SUPA}/rest/v1/server_carts?on_conflict=user_id`, { method: 'POST', headers: { 'apikey': SERVICE, 'Authorization': `Bearer ${SERVICE}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(old) })
 }
 
 console.log(fails.length ? `\nКРАСНЫЙ: ${fails.length} провал(ов)` : '\nвсё зелено')
