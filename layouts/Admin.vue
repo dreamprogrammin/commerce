@@ -56,6 +56,7 @@ const navLinks = [
   { to: '/admin/promotions', label: 'Акции' },
   { to: '/admin/broadcast', label: 'Рассылка' },
   { to: '/admin/kaspi-export', label: 'Выгрузка Kaspi' },
+  { to: '/admin/ai', label: 'Модели ИИ' },
 ]
 </script>
 
