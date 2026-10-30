@@ -328,6 +328,23 @@ export default defineNuxtConfig({
     collections: ICON_COLLECTIONS,
     serverBundle: {
       collections: ICON_COLLECTIONS,
+      // Наборы — готовыми JSON из node_modules, а не JS-модулями в бандле.
+      //
+      // 30 октября 2026 сборка превью на Vercel упала: «JavaScript heap out of
+      // memory» на шаге Nitro, при лимите 4 ГБ из package.json. Код тот же,
+      // что в соседней удачной сборке (менялась только документация) — сборка
+      // давно жила у края. Причина — 11 коллекций целиком внутри серверного
+      // бандла: файлы icons*.mjs от 0,4 до 8,8 МБ, 40 МБ в сумме, и каждый
+      // проходит сборщик, минификацию и карты исходников. Замер сборкой с
+      // настройками Vercel (VERCEL=1, пресет vercel): пик кучи 4037 МБ из 4096
+      // без этой строки, 3156 МБ — с ней.
+      //
+      // Набор иконок тот же — меняется только способ загрузки: сервер
+      // импортирует JSON при первом запросе коллекции. На Vercel трассировка
+      // кладёт файлы в node_modules функции; локально она выключена (см.
+      // `externals` ниже), и JSON находится в node_modules репозитория.
+      // Импорту нужен атрибут со словом `with` — его задаёт `nitro.rollupConfig`.
+      externalizeIconsJson: true,
     },
     clientBundle: {
       scan: true,
@@ -815,6 +832,17 @@ export default defineNuxtConfig({
     ...(process.env.VERCEL
       ? {}
       : { externals: { trace: false } }),
+    // JSON наборов иконок (`icon.serverBundle.externalizeIconsJson`) сервер
+    // импортирует с атрибутом типа. Rollup 4 по умолчанию пишет его старым
+    // словом `assert`, а Node 22 понимает только `with`: `assert` пропускает
+    // и падает с ERR_IMPORT_ATTRIBUTE_MISSING. Без этой строки API иконок
+    // отвечал 500 на все 11 наборов — проверено запуском собранной функции
+    // Vercel вне репозитория 30 октября 2026.
+    rollupConfig: {
+      output: {
+        importAttributesKey: 'with',
+      },
+    },
     compressPublicAssets: {
       gzip: true,
       brotli: true,
