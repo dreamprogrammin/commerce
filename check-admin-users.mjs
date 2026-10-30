@@ -6,7 +6,11 @@
  *  1) гость — 401, вошедший не-администратор — 403 на оба маршрута;
  *  2) администратор — список совпадает с базой: число профилей, заказов и
  *     сумма выкупленного у каждого; карточка — все заказы и операции бонусов;
- *  3) страницы рисуются без ошибок консоли, поиск по телефону находит человека.
+ *  3) страницы рисуются без ошибок консоли, поиск по телефону находит человека;
+ *  4) ручное начисление бонусов: гость и не-администратор — отказ, неверная
+ *     сумма и пустая причина — 400; через окно в карточке баланс растёт сразу,
+ *     в истории строка «Начислено вручную» с причиной и тем, кто начислил.
+ *     ВНИМАНИЕ: начисляет настоящие бонусы в локальной базе.
  *
  * Вход — рецепт из docs/HANDOFF.md: пароль выдаётся существующему
  * пользователю ключом сервиса, куки собирает @supabase/ssr.
@@ -101,10 +105,27 @@ check(card?.bonuses.length === cardBonuses, `операций бонусов ${c
 check(card?.orders.every(o => o.items.every(i => i.name && i.quantity > 0)), 'у заказов есть состав с названиями')
 check((await api('/api/admin/users/00000000-0000-0000-0000-000000000000', admin.token)).status === 404, 'несуществующий — 404')
 
+console.log('\n== ручное начисление: доступ и проверки')
+async function post(path, token, body) {
+  const res = await fetch(`${BASE}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) })
+  return { status: res.status, body: await res.json().catch(() => null) }
+}
+const bonusPath = `/api/admin/users/${richest.id}/bonus`
+check((await post(bonusPath, null, { amount: 10, reason: 'проверка' })).status === 401, 'гость — 401')
+check((await post(bonusPath, user.token, { amount: 10, reason: 'проверка' })).status === 403, 'не-администратор — 403')
+check((await post(bonusPath, admin.token, { amount: 0, reason: 'проверка' })).status === 400, 'сумма 0 — 400')
+check((await post(bonusPath, admin.token, { amount: 10.5, reason: 'проверка' })).status === 400, 'дробная сумма — 400')
+check((await post(bonusPath, admin.token, { amount: 10, reason: ' ' })).status === 400, 'без причины — 400')
+const [before] = await rest(`profiles?select=active_bonus_balance&id=eq.${richest.id}`)
+
 const browser = await chromium.launch()
 try {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } })
-  await ctx.addCookies(admin.cookies.map(c => ({ name: c.name, value: c.value, domain: 'localhost', path: '/' })))
+  // Браузерный клиент читает сессию из `sb-127-auth-token`, сервер — из `supabase-auth-token`
+  await ctx.addCookies([
+    ...admin.cookies,
+    ...admin.cookies.map(c => ({ ...c, name: c.name.replace('supabase-auth-token', 'sb-127-auth-token') })),
+  ].map(c => ({ name: c.name, value: c.value, domain: 'localhost', path: '/' })))
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', e => errors.push(e.message))
@@ -134,6 +155,25 @@ try {
   check(!withItems || flat(text).includes(flat(withItems.items[0].name).slice(0, 40)), 'карточка: состав заказа виден')
   if (process.env.SHOT)
     await page.screenshot({ path: `${process.env.SHOT}-card.png`, fullPage: true })
+
+  // Начисление через окно
+  const reason = `Проверка стража ${Date.now()}`
+  await page.getByRole('button', { name: 'Начислить бонусы' }).click()
+  await page.getByLabel('Сколько бонусов').fill('125')
+  await page.getByLabel('Причина').fill(reason)
+  if (process.env.SHOT)
+    await page.screenshot({ path: `${process.env.SHOT}-bonus-dialog.png` })
+  await page.getByRole('button', { name: 'Начислить', exact: true }).click()
+  await page.getByText(reason).waitFor({ timeout: 30000 })
+  const [after] = await rest(`profiles?select=active_bonus_balance&id=eq.${richest.id}`)
+  check(after.active_bonus_balance === before.active_bonus_balance + 125, `баланс ${before.active_bonus_balance} → ${after.active_bonus_balance}, доступно сразу`)
+  const [tx] = await rest(`bonus_transactions?select=transaction_type,amount,balance_after,metadata&description=eq.${encodeURIComponent(reason)}`)
+  check(tx?.transaction_type === 'manual' && tx?.amount === 125 && tx?.balance_after === after.active_bonus_balance, `история: ${tx?.transaction_type} ${tx?.amount}, баланс после ${tx?.balance_after}`)
+  check(Boolean(tx?.metadata?.admin_id), 'в истории записано, кто начислил')
+  const cardAfter = await page.evaluate(() => document.body.innerText)
+  check(cardAfter.includes('Начислено вручную') && cardAfter.includes(reason), 'карточка: строка «Начислено вручную» с причиной')
+  if (process.env.SHOT)
+    await page.screenshot({ path: `${process.env.SHOT}-card-after.png`, fullPage: true })
   check(!errors.length, `страницы без ошибок консоли${errors.length ? ` — ${errors[0].slice(0, 160)}` : ''}`)
 }
 finally {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ArrowLeft, RefreshCw } from 'lucide-vue-next'
+import { ArrowLeft, Gift, RefreshCw } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import { formatPrice } from '@/utils/formatPrice'
 
 /*
@@ -32,6 +33,7 @@ interface AdminUserBonus {
   description: string | null
   orderId: string | null
   activationDate: string | null
+  by: string | null
 }
 
 interface AdminUserDetail {
@@ -82,6 +84,50 @@ const bonusTypeLabels: Record<string, string> = {
   refund_earned: 'Отмена начисления',
   rollback_earned: 'Отмена начисления',
   expiration: 'Сгорели',
+  manual: 'Начислено вручную',
+}
+
+/*
+ * Ручное начисление (30 октября 2026): «если вдруг бонусы не были зачислены».
+ * Доступны сразу — решение владельца. Причину видит и покупатель — она
+ * уходит ему в уведомление.
+ */
+const bonusOpen = ref(false)
+const bonusAmount = ref<number | null>(null)
+const bonusReason = ref('')
+const bonusOrderId = ref('')
+const bonusSaving = ref(false)
+
+function openBonus() {
+  bonusAmount.value = null
+  bonusReason.value = ''
+  bonusOrderId.value = ''
+  bonusOpen.value = true
+}
+
+const bonusValid = computed(() =>
+  Number.isInteger(bonusAmount.value) && bonusAmount.value! >= 1 && bonusAmount.value! <= 100000
+  && bonusReason.value.trim().length >= 3)
+
+async function submitBonus() {
+  if (!bonusValid.value || bonusSaving.value)
+    return
+  bonusSaving.value = true
+  try {
+    await adminFetch(`/api/admin/users/${id.value}/bonus`, {
+      method: 'POST',
+      body: { amount: bonusAmount.value, reason: bonusReason.value.trim(), orderId: bonusOrderId.value || null },
+    })
+    toast.success(`Начислено ${bonusAmount.value} бонусов`)
+    bonusOpen.value = false
+    await refresh()
+  }
+  catch (e: any) {
+    toast.error(e?.data?.message || e?.statusMessage || 'Не удалось начислить бонусы')
+  }
+  finally {
+    bonusSaving.value = false
+  }
 }
 
 function dateTime(iso: string | null) {
@@ -217,8 +263,12 @@ function phoneHref(phone: string) {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
             <CardTitle>История бонусов</CardTitle>
+            <Button size="sm" @click="openBonus">
+              <Gift class="w-4 h-4 mr-2" />
+              Начислить бонусы
+            </Button>
           </CardHeader>
           <CardContent>
             <p v-if="!user.bonuses.length" class="text-sm text-muted-foreground">
@@ -247,6 +297,9 @@ function phoneHref(phone: string) {
                     <div v-if="b.description" class="text-xs text-muted-foreground">
                       {{ b.description }}
                     </div>
+                    <div v-if="b.by" class="text-xs text-muted-foreground">
+                      начислил: {{ b.by }}
+                    </div>
                   </TableCell>
                   <TableCell class="text-right tabular-nums" :class="b.amount < 0 ? 'text-destructive' : 'text-green-700'">
                     {{ b.amount > 0 ? '+' : '' }}{{ b.amount }}
@@ -261,5 +314,45 @@ function phoneHref(phone: string) {
         </Card>
       </template>
     </ClientOnly>
+
+    <Dialog v-model:open="bonusOpen">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Начислить бонусы</DialogTitle>
+          <DialogDescription>
+            {{ user?.name || 'Покупателю' }} — бонусы будут доступны сразу. Причину покупатель увидит в уведомлении.
+          </DialogDescription>
+        </DialogHeader>
+        <form class="space-y-4" @submit.prevent="submitBonus">
+          <div class="space-y-1.5">
+            <Label for="bonus-amount">Сколько бонусов</Label>
+            <Input id="bonus-amount" v-model.number="bonusAmount" type="number" min="1" max="100000" step="1" inputmode="numeric" />
+          </div>
+          <div class="space-y-1.5">
+            <Label for="bonus-reason">Причина</Label>
+            <Textarea id="bonus-reason" v-model="bonusReason" rows="2" placeholder="Например: не начислились бонусы за заказ № 1005" />
+          </div>
+          <div v-if="user?.orders.length" class="space-y-1.5">
+            <Label for="bonus-order">За какой заказ (необязательно)</Label>
+            <select id="bonus-order" v-model="bonusOrderId" class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+              <option value="">
+                — без заказа —
+              </option>
+              <option v-for="o in user.orders" :key="o.id" :value="o.id">
+                {{ o.number ? `№ ${o.number}` : o.id.slice(0, 8) }} · {{ dateTime(o.createdAt) }} · {{ formatPrice(o.total) }} ₸
+              </option>
+            </select>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" @click="bonusOpen = false">
+              Отмена
+            </Button>
+            <Button type="submit" :disabled="!bonusValid || bonusSaving">
+              {{ bonusSaving ? 'Начисляю…' : 'Начислить' }}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
