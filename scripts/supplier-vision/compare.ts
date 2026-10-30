@@ -20,8 +20,11 @@
  *     --posts=~/supplier-posts/channel1 \
  *     --models=anthropic/claude-haiku-5-5,anthropic/claude-sonnet-5-5,gemini/gemini-2.5-flash
  *
- * Ключи — переменными окружения (ANTHROPIC_API_KEY, GEMINI_API_KEY, …) или
- * файлами ~/.config/uhti-<провайдер>.key. Результат — в <posts>/results/.
+ * Ключи: `--keys=prod` — те, что владелец задал в админке («Модели ИИ»),
+ * читаются из прод-базы через Management API (~/.supabase/access-token);
+ * без --models берётся и модель, выбранная там. Иначе — переменные окружения
+ * (ANTHROPIC_API_KEY, GEMINI_API_KEY, …) или ~/.config/uhti-<провайдер>.key.
+ * Результат — в <posts>/results/.
  */
 import type { ReadItem, ReadResult, SupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 import { DEFAULT_MODEL, parseModelSpec, pickPrice, PROVIDERS, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
@@ -36,11 +39,42 @@ if (!postsDir) {
   console.error('Нужен --posts=<папка>')
   Deno.exit(2)
 }
-const models = (args.models || Deno.env.get('VISION_MODEL') || DEFAULT_MODEL).split(',').map(s => s.trim()).filter(Boolean)
 const limit = args.limit ? Number(args.limit) : Infinity
 
-/** Ключ: переменная окружения, иначе ~/.config/uhti-<провайдер>.key */
+/** Чтение прод-базы через Management API — как в остальной работе с продом */
+async function prodQuery(sql: string): Promise<Record<string, unknown>[]> {
+  const token = (await Deno.readTextFile(`${home}/.supabase/access-token`)).trim()
+  const res = await fetch('https://api.supabase.com/v1/projects/gvsdevsvzgcivpphcuai/database/query', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: sql }),
+  })
+  if (!res.ok)
+    throw new Error(`Management API: ${res.status}`)
+  return res.json()
+}
+
+const fromProd = args.keys === 'prod'
+let prodModel: string | null = null
+if (fromProd && !args.models) {
+  const [row] = await prodQuery(`select value #>> '{}' as model from public.ai_settings where key = 'supplier_vision_model'`)
+  prodModel = (row?.model as string | undefined) ?? null
+}
+const models = (args.models || prodModel || Deno.env.get('VISION_MODEL') || DEFAULT_MODEL).split(',').map(s => s.trim()).filter(Boolean)
+
+const prodKeys = new Map<string, string>()
+if (fromProd) {
+  for (const provider of new Set(models.map(m => parseModelSpec(m).provider))) {
+    const [row] = await prodQuery(`select public.ai_key_get('${provider}') as key`)
+    if (typeof row?.key === 'string')
+      prodKeys.set(PROVIDERS[provider]!.keyEnv, row.key)
+  }
+}
+
+/** Ключ: из админки (--keys=prod), переменная окружения, ~/.config/uhti-<провайдер>.key */
 function env(name: string): string | undefined {
+  if (prodKeys.has(name))
+    return prodKeys.get(name)
   const fromEnv = Deno.env.get(name)
   if (fromEnv)
     return fromEnv
@@ -58,7 +92,7 @@ function env(name: string): string | undefined {
 for (const spec of models) {
   const { provider, config } = parseModelSpec(spec)
   if (!env(config.keyEnv)) {
-    console.error(`Нет ключа для ${spec}: переменная ${config.keyEnv} или файл ~/.config/uhti-${provider}.key`)
+    console.error(`Нет ключа для ${spec}: ${fromProd ? 'в админке («Модели ИИ») не задан' : `переменная ${config.keyEnv} или файл ~/.config/uhti-${provider}.key`}`)
     Deno.exit(2)
   }
 }

@@ -23,6 +23,7 @@
     "seo:generate": "npx tsx scripts/generate-alt-texts.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.123.0",
     "@iconify-json/gravity-ui": "^1.2.13",
     "@iconify-json/ic": "^1.2.4",
     "@iconify-json/line-md": "^1.2.16",
