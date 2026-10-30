@@ -109,6 +109,12 @@ export const useCartStore = defineStore(
     const isAddingItem = ref(false) // Флаг для предотвращения race condition
     const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
     const isMergingFromServer = ref(false) // Блокирует sync→server пока грузим данные с сервера
+    /**
+     * Номер гостевой корзины на сервере (31.10.2026): владелец хотел видеть,
+     * что кладут в корзину и гости. Случайный, без имени; живёт в localStorage
+     * рядом с корзиной (persist). Заводится при первой синхронизации.
+     */
+    const guestCartId = ref<string | null>(null)
     const isCartOpen = ref(false) // 🔥 Управление состоянием шторки корзины
     const hasMergedOnLogin = ref(false) // Флаг для предотвращения повторного мерджа
 
@@ -427,14 +433,39 @@ export const useCartStore = defineStore(
         = amount > maxPossible ? maxPossible : Math.floor(amount)
     }
 
-    // Синхронизация корзины на сервер (debounced, только для авторизованных)
+    // Синхронизация корзины на сервер (debounced): вошедшего — в server_carts,
+    // гостя — в guest_carts по номеру браузера
     function syncToServer() {
-      if (!user.value)
-        return
-
       if (syncTimeout.value)
         clearTimeout(syncTimeout.value)
+      if (!user.value) {
+        // 1,5 с — база принимает гостевую корзину не чаще раза в секунду
+        syncTimeout.value = setTimeout(() => syncGuestCart(), 1500)
+        return
+      }
       syncTimeout.value = setTimeout(() => forceSyncToServer(), 500)
+    }
+
+    /**
+     * Гостевая корзина — только номера товаров и количество; цены и сумму база
+     * считает сама (`save_guest_cart`). Пустая — удаляет запись. Ошибка не
+     * мешает покупке: корзина гостя по-прежнему живёт в браузере.
+     */
+    async function syncGuestCart() {
+      syncTimeout.value = null
+      if (user.value || import.meta.server)
+        return
+      if (!guestCartId.value) {
+        if (!items.value.length)
+          return
+        guestCartId.value = crypto.randomUUID()
+      }
+      const { error } = await supabase.rpc('save_guest_cart' as never, {
+        p_cart_id: guestCartId.value,
+        p_items: items.value.map(i => ({ product_id: i.product.id, quantity: i.quantity })),
+      } as never)
+      if (error)
+        console.warn('[CartStore] Guest cart sync failed:', error.message)
     }
 
     // Немедленная синхронизация без debounce
@@ -599,6 +630,23 @@ export const useCartStore = defineStore(
     watch([items, () => items.value.map(i => i.quantity)], syncToServer, {
       deep: true,
     })
+
+    /*
+     * Вошёл — гостевая запись больше не нужна: корзина живёт в server_carts с
+     * именем, иначе в спросе она посчиталась бы дважды. Через наблюдение за
+     * пользователем, а не в mergeOnLogin: тот зовут только на SIGNED_IN, а
+     * открывший сайт уже вошедшим (другая вкладка, сохранённая сессия)
+     * приходит с INITIAL_SESSION — так гостевая запись висела.
+     */
+    // guestCartId — тоже: persist подставляет его из localStorage уже после setup
+    watch([user, guestCartId], ([u]) => {
+      if (!u || !guestCartId.value || import.meta.server)
+        return
+      const id = guestCartId.value
+      guestCartId.value = null
+      supabase.rpc('save_guest_cart' as never, { p_cart_id: id, p_items: [] } as never)
+        .then(({ error }) => error && console.warn('[CartStore] Guest cart cleanup failed:', error.message))
+    }, { immediate: true })
 
     /**
      * Оформление заказа
@@ -781,6 +829,7 @@ export const useCartStore = defineStore(
       setBonusesToSpend,
       mergeOnLogin,
       cancelPendingSync,
+      guestCartId,
     }
   },
   {
@@ -792,6 +841,7 @@ export const useCartStore = defineStore(
       // показывает его на обоих шагах.
       pick: [
         'items',
+        'guestCartId',
         'bonusesToSpend',
         'deliveryMethod',
         'deliveryAddress',

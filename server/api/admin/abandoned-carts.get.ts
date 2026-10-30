@@ -12,8 +12,9 @@
  */
 export default defineEventHandler(async (event) => {
   const db = await requireAdmin(event)
-  const carts = await loadCarts(db)
-  const userIds = carts.map(c => c.userId)
+  // Гости — с 31.10.2026: без имени и контактов, только что лежит в корзине
+  const carts = await loadCarts(db, { guests: true })
+  const userIds = carts.map(c => c.userId).filter((id): id is string => Boolean(id))
 
   const { data: profiles } = userIds.length
     ? await db.from('profiles').select('id, first_name, last_name, phone').in('id', userIds)
@@ -29,11 +30,12 @@ export default defineEventHandler(async (event) => {
   }))
 
   return carts.map((cart) => {
-    const profile = profileById.get(cart.userId)
+    const profile = cart.userId ? profileById.get(cart.userId) : undefined
     return {
+      guest: !cart.userId,
       name: [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || null,
       phone: profile?.phone ?? null,
-      email: emails.get(cart.userId) ?? null,
+      email: cart.userId ? emails.get(cart.userId) ?? null : null,
       updatedAt: cart.updatedAt,
       total: cart.total,
       items: cart.items.map(i => ({ name: i.name, slug: i.slug, quantity: i.quantity, price: i.price, inStock: i.stock > 0 })),

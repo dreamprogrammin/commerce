@@ -75,7 +75,7 @@ export default defineEventHandler(async (event) => {
   const productById = new Map((products ?? []).map(p => [p.id, p]))
 
   // Что лежит в корзине сейчас — только у аккаунта: у карточки магазина корзины нет
-  const [cart] = profile ? await loadCarts(db, [id]) : []
+  const [cart] = profile ? await loadCarts(db, { userIds: [id] }) : []
 
   const person = (profile ?? card)!
   const fullName = (p: { first_name: string | null, last_name: string | null }) =>

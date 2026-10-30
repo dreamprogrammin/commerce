@@ -5,13 +5,13 @@
  * Зачем (31 октября 2026). Владелец: «знать, что мои клиенты кладут в
  * корзину, … а потом к закупке». Товар, которого в корзинах больше, чем на
  * складе, — первый кандидат на закупку, даже если до порога остатка далеко.
- * Гостевых корзин здесь нет: они живут только в браузере гостя.
+ * С 31.10.2026 — и корзины гостей (без имени, «Гость»).
  */
 export default defineEventHandler(async (event) => {
   const db = await requireAdmin(event)
-  const carts = await loadCarts(db)
+  const carts = await loadCarts(db, { guests: true })
 
-  const userIds = carts.map(c => c.userId)
+  const userIds = carts.map(c => c.userId).filter((id): id is string => Boolean(id))
   const { data: profiles } = userIds.length
     ? await db.from('profiles').select('id, first_name, last_name').in('id', userIds)
     : { data: [] as { id: string, first_name: string | null, last_name: string | null }[] }
@@ -24,7 +24,8 @@ export default defineEventHandler(async (event) => {
     price: number
     stock: number
     quantity: number
-    customers: { id: string, name: string | null, quantity: number, updatedAt: string }[]
+    /** id — null у гостя */
+    customers: { id: string | null, guest: boolean, name: string | null, quantity: number, updatedAt: string }[]
   }>()
   for (const cart of carts) {
     for (const item of cart.items) {
@@ -38,7 +39,13 @@ export default defineEventHandler(async (event) => {
         customers: [],
       }
       row.quantity += item.quantity
-      row.customers.push({ id: cart.userId, name: nameById.get(cart.userId) ?? null, quantity: item.quantity, updatedAt: cart.updatedAt })
+      row.customers.push({
+        id: cart.userId,
+        guest: !cart.userId,
+        name: cart.userId ? nameById.get(cart.userId) ?? null : null,
+        quantity: item.quantity,
+        updatedAt: cart.updatedAt,
+      })
       byProduct.set(item.productId, row)
     }
   }

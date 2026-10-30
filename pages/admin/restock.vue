@@ -79,7 +79,7 @@ interface CartDemandRow {
   price: number
   stock: number
   quantity: number
-  customers: { id: string, name: string | null, quantity: number, updatedAt: string }[]
+  customers: { id: string | null, guest: boolean, name: string | null, quantity: number, updatedAt: string }[]
 }
 const cartDemand = ref<CartDemandRow[]>([])
 const isLoadingDemand = ref(true)
@@ -190,7 +190,7 @@ async function assignSupplier(productId: string, supplierId: string) {
           В корзинах у покупателей
         </CardTitle>
         <CardDescription>
-          Положили, но ещё не оформили. Только вошедшие покупатели — корзина гостя живёт в его браузере.
+          Положили, но ещё не оформили — и вошедшие покупатели, и гости (без имени, за 30 дней).
         </CardDescription>
       </CardHeader>
       <CardContent class="px-4 md:px-6">
@@ -209,9 +209,10 @@ async function assignSupplier(productId: string, supplierId: string) {
               </NuxtLink>
               <span v-else class="font-medium">{{ row.name }}</span>
               <div class="text-xs text-muted-foreground">
-                <template v-for="(c, i) in row.customers" :key="c.id">
+                <template v-for="(c, i) in row.customers" :key="c.id ?? `g${i}`">
                   <span v-if="i">, </span>
-                  <NuxtLink :to="`/admin/users/${c.id}`" class="hover:underline">
+                  <span v-if="c.guest">гость</span>
+                  <NuxtLink v-else :to="`/admin/users/${c.id}`" class="hover:underline">
                     {{ c.name || 'Без имени' }}
                   </NuxtLink>
                   <span v-if="c.quantity > 1"> ({{ c.quantity }} шт.)</span>
