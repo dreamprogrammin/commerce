@@ -2528,6 +2528,16 @@ export interface Database {
       activate_my_pending_bonuses: { Args: never, Returns: Json }
       activate_pending_bonuses: { Args: never, Returns: string }
       activate_pending_order_bonuses: { Args: never, Returns: number }
+      admin_add_bonus: {
+        Args: {
+          p_admin_id: string
+          p_amount: number
+          p_order_id?: string
+          p_profile_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       can_assign_order: {
         Args: { p_order_id: string, p_table_name: string }
         Returns: boolean

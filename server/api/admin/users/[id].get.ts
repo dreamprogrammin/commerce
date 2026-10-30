@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
       .eq('user_id', id)
       .order('created_at', { ascending: false }),
     db.from('bonus_transactions')
-      .select('id, created_at, transaction_type, amount, balance_after, status, description, order_id, activation_date')
+      .select('id, created_at, transaction_type, amount, balance_after, status, description, order_id, activation_date, metadata')
       .or(`user_id.eq.${id},profile_id.eq.${id}`)
       .order('created_at', { ascending: false }),
     db.auth.admin.getUserById(id),
@@ -83,6 +83,8 @@ export default defineEventHandler(async (event) => {
       description: b.description,
       orderId: b.order_id,
       activationDate: b.activation_date,
+      // Ручное начисление: кто начислил (admin_add_bonus пишет в metadata)
+      by: (b.metadata as { admin_name?: string } | null)?.admin_name ?? null,
     })),
   }
 })

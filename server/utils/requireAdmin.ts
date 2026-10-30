@@ -37,5 +37,7 @@ export async function requireAdmin(event: H3Event) {
   const { data } = await db.from('profiles').select('role').eq('id', user.id).single()
   if (data?.role !== 'admin')
     throw createError({ statusCode: 403, message: 'Только для администратора' })
+  // Кто именно — для записей «кто сделал» (ручные бонусы)
+  event.context.adminId = user.id
   return db
 }
