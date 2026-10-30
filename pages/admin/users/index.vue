@@ -30,6 +30,8 @@ interface AdminUserRow {
   cancelled: number
   spent: number
   lastOrderAt: string | null
+  /** Неоформленная корзина вошедшего покупателя (31.10.2026) */
+  cart: { quantity: number, total: number, updatedAt: string } | null
 }
 
 // `adminFetch`, а не `useFetch`: серверу нужен токен входа в заголовке
@@ -38,9 +40,12 @@ const { data: users, pending, error, refresh }
 
 const query = ref('')
 const onlyMatches = ref(false)
+const onlyCarts = ref(false)
 const matchCount = computed(() => (users.value ?? []).filter(u => u.offlineMatch).length)
+const cartCount = computed(() => (users.value ?? []).filter(u => u.cart).length)
 const filtered = computed(() => (users.value ?? [])
   .filter(u => !onlyMatches.value || u.offlineMatch)
+  .filter(u => !onlyCarts.value || u.cart)
   .filter(u => matchesUserQuery(u, query.value)))
 
 function date(iso: string | null) {
@@ -78,6 +83,14 @@ function date(iso: string | null) {
       >
         Ждут объединения: {{ matchCount }}
       </Button>
+      <Button
+        v-if="cartCount"
+        :variant="onlyCarts ? 'default' : 'outline'"
+        size="sm"
+        @click="onlyCarts = !onlyCarts"
+      >
+        С корзиной: {{ cartCount }}
+      </Button>
     </div>
 
     <ClientOnly>
@@ -108,6 +121,9 @@ function date(iso: string | null) {
                 </TableHead>
                 <TableHead class="text-right">
                   Бонусы
+                </TableHead>
+                <TableHead class="text-right">
+                  В корзине
                 </TableHead>
                 <TableHead>Последний заказ</TableHead>
               </TableRow>
@@ -154,6 +170,15 @@ function date(iso: string | null) {
                   <div v-if="u.pendingBonuses" class="text-xs text-muted-foreground">
                     +{{ u.pendingBonuses }} ждут
                   </div>
+                </TableCell>
+                <TableCell class="text-right tabular-nums whitespace-nowrap">
+                  <template v-if="u.cart">
+                    {{ formatPrice(u.cart.total) }}&nbsp;₸
+                    <div class="text-xs text-muted-foreground">
+                      {{ u.cart.quantity }} шт. · {{ date(u.cart.updatedAt) }}
+                    </div>
+                  </template>
+                  <span v-else class="text-muted-foreground">—</span>
                 </TableCell>
                 <TableCell class="text-sm whitespace-nowrap">
                   {{ date(u.lastOrderAt) }}
