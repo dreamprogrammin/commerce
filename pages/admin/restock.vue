@@ -67,8 +67,44 @@ async function fetchRestockList() {
   }
 }
 
+/*
+ * Спрос из корзин (31.10.2026, просьба владельца: «знать, что клиенты кладут
+ * в корзину … а потом к закупке»). Корзины только вошедших покупателей —
+ * у гостей она живёт в браузере. Красным — чего не хватит на все корзины.
+ */
+interface CartDemandRow {
+  productId: string
+  name: string
+  slug: string | null
+  price: number
+  stock: number
+  quantity: number
+  customers: { id: string, name: string | null, quantity: number, updatedAt: string }[]
+}
+const cartDemand = ref<CartDemandRow[]>([])
+const isLoadingDemand = ref(true)
+
+async function fetchCartDemand() {
+  isLoadingDemand.value = true
+  try {
+    cartDemand.value = await adminFetch<CartDemandRow[]>('/api/admin/cart-demand')
+  }
+  catch (error: any) {
+    toast.error('Не удалось загрузить корзины', { description: error.message })
+  }
+  finally {
+    isLoadingDemand.value = false
+  }
+}
+
+function refreshAll() {
+  fetchRestockList()
+  fetchCartDemand()
+}
+
 onMounted(() => {
   fetchRestockList()
+  fetchCartDemand()
   if (suppliers.value.length === 0)
     suppliersStore.fetchSuppliers()
 })
@@ -139,12 +175,59 @@ async function assignSupplier(productId: string, supplierId: string) {
         <Badge v-if="!isLoading && totalProducts > 0" variant="destructive" class="text-sm px-3 py-1">
           {{ totalProducts }} {{ totalProducts === 1 ? 'товар' : 'товаров' }}
         </Badge>
-        <Button variant="outline" size="sm" :disabled="isLoading" @click="fetchRestockList">
+        <Button variant="outline" size="sm" :disabled="isLoading" @click="refreshAll">
           <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': isLoading }" />
           Обновить
         </Button>
       </div>
     </div>
+
+    <!-- Спрос из корзин -->
+    <Card v-if="!isLoadingDemand">
+      <CardHeader class="px-4 md:px-6">
+        <CardTitle class="text-base flex items-center gap-2">
+          <ShoppingCart class="w-4 h-4" />
+          В корзинах у покупателей
+        </CardTitle>
+        <CardDescription>
+          Положили, но ещё не оформили. Только вошедшие покупатели — корзина гостя живёт в его браузере.
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="px-4 md:px-6">
+        <p v-if="!cartDemand.length" class="text-sm text-muted-foreground">
+          Сейчас ни у кого нет товаров в корзине
+        </p>
+        <div v-else class="divide-y">
+          <div
+            v-for="row in cartDemand"
+            :key="row.productId"
+            class="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-2 text-sm"
+          >
+            <div class="min-w-0 flex-1">
+              <NuxtLink v-if="row.slug" :to="`/catalog/products/${row.slug}`" target="_blank" class="font-medium hover:underline">
+                {{ row.name }}
+              </NuxtLink>
+              <span v-else class="font-medium">{{ row.name }}</span>
+              <div class="text-xs text-muted-foreground">
+                <template v-for="(c, i) in row.customers" :key="c.id">
+                  <span v-if="i">, </span>
+                  <NuxtLink :to="`/admin/users/${c.id}`" class="hover:underline">
+                    {{ c.name || 'Без имени' }}
+                  </NuxtLink>
+                  <span v-if="c.quantity > 1"> ({{ c.quantity }} шт.)</span>
+                </template>
+              </div>
+            </div>
+            <div class="shrink-0 text-right tabular-nums whitespace-nowrap">
+              <div>в корзинах {{ row.quantity }} шт.</div>
+              <div class="text-xs" :class="row.stock < row.quantity ? 'text-destructive font-medium' : 'text-muted-foreground'">
+                на складе {{ row.stock }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
     <!-- Скелетон -->
     <template v-if="isLoading">

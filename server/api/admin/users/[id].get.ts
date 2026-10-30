@@ -74,6 +74,9 @@ export default defineEventHandler(async (event) => {
     : { data: [] as { id: string, name: string, slug: string }[] }
   const productById = new Map((products ?? []).map(p => [p.id, p]))
 
+  // Что лежит в корзине сейчас — только у аккаунта: у карточки магазина корзины нет
+  const [cart] = profile ? await loadCarts(db, [id]) : []
+
   const person = (profile ?? card)!
   const fullName = (p: { first_name: string | null, last_name: string | null }) =>
     [p.first_name, p.last_name].filter(Boolean).join(' ') || null
@@ -121,6 +124,7 @@ export default defineEventHandler(async (event) => {
         price: Number(i.price_at_purchase ?? 0),
       })),
     })),
+    cart: cart ?? null,
     bonuses: (bonuses ?? []).map(b => ({
       id: b.id,
       createdAt: b.created_at,

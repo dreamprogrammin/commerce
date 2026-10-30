@@ -38,6 +38,8 @@ export default defineEventHandler(async (event) => {
   const cardSummaries = summarizeOrders((orders ?? [])
     .filter(o => !o.user_id && o.offline_customer_id)
     .map(o => ({ ...o, user_id: o.offline_customer_id })))
+  // Корзины — чтобы в списке было видно, у кого что лежит неоформленным
+  const cartByUser = new Map((await loadCarts(db)).map(c => [c.userId, c]))
   const cardByPhone = new Map((cards ?? []).map(c => [c.phone_digits, c]))
   const empty = { orders: 0, cancelled: 0, spent: 0, lastOrderAt: null }
 
@@ -52,6 +54,7 @@ export default defineEventHandler(async (event) => {
     activeBonuses: c.active_bonus_balance,
     pendingBonuses: c.pending_bonus_balance,
     offlineMatch: null,
+    cart: null,
     ...(cardSummaries.get(c.id) ?? empty),
   }))
 
@@ -68,6 +71,9 @@ export default defineEventHandler(async (event) => {
       activeBonuses: p.active_bonus_balance ?? 0,
       pendingBonuses: p.pending_bonus_balance ?? 0,
       offlineMatch: card ? { id: card.id, name: [card.first_name, card.last_name].filter(Boolean).join(' ') } : null,
+      cart: cartByUser.has(p.id)
+        ? { quantity: cartByUser.get(p.id)!.quantity, total: cartByUser.get(p.id)!.total, updatedAt: cartByUser.get(p.id)!.updatedAt }
+        : null,
       ...(summaries.get(p.id) ?? empty),
     }
   })

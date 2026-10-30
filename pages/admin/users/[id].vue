@@ -63,6 +63,13 @@ interface AdminUserDetail {
   pendingBonuses: number
   summary: { orders: number, cancelled: number, spent: number, lastOrderAt: string | null }
   orders: AdminUserOrder[]
+  /** Что лежит в корзине сейчас, не оформлено (31.10.2026) */
+  cart: {
+    updatedAt: string
+    total: number
+    quantity: number
+    items: { productId: string, name: string, slug: string | null, quantity: number, price: number, stock: number }[]
+  } | null
   bonuses: AdminUserBonus[]
 }
 
@@ -292,6 +299,33 @@ function phoneHref(phone: string) {
               Объединить
             </Button>
           </CardHeader>
+        </Card>
+
+        <Card v-if="user.cart">
+          <CardHeader>
+            <CardTitle>В корзине сейчас</CardTitle>
+            <CardDescription>
+              Положено, но не оформлено · обновлена {{ new Date(user.cart.updatedAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-2">
+            <div
+              v-for="item in user.cart.items"
+              :key="item.productId"
+              class="flex items-center justify-between gap-3 text-sm"
+            >
+              <span class="min-w-0">
+                <NuxtLink v-if="item.slug" :to="`/catalog/products/${item.slug}`" target="_blank" class="hover:underline">{{ item.name }}</NuxtLink>
+                <span v-else>{{ item.name }}</span>
+                <span v-if="item.stock < item.quantity" class="ml-2 text-xs text-destructive">на складе {{ item.stock }}</span>
+              </span>
+              <span class="shrink-0 tabular-nums whitespace-nowrap">{{ item.quantity }} × {{ formatPrice(item.price) }}&nbsp;₸</span>
+            </div>
+            <div class="flex justify-between border-t pt-2 font-semibold">
+              <span>Итого</span>
+              <span class="tabular-nums whitespace-nowrap">{{ formatPrice(user.cart.total) }}&nbsp;₸</span>
+            </div>
+          </CardContent>
         </Card>
 
         <Card>
