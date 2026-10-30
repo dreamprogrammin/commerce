@@ -13,9 +13,12 @@
  *   anthropic/claude-haiku-5-5        — Anthropic, официальный SDK
  *   openai/gpt-…                      — OpenAI
  *   gemini/gemini-…                   — Google, через их OpenAI-совместимый адрес
- *   openrouter/vendor/model           — OpenRouter: сотни моделей одним ключом
- *   custom/имя-модели                 — любой OpenAI-совместимый сервер
- *                                       (VISION_BASE_URL, VISION_API_KEY)
+ *
+ * Только официальные API разработчиков моделей (решение владельца
+ * 31.10.2026): фото и цены поставщиков не должны уходить посредникам.
+ * OpenRouter и «любой совместимый сервер» были здесь и убраны — агрегатор
+ * пропускает данные через себя и через сторонних хостеров моделей.
+ * Новый провайдер — только с его собственным адресом API.
  * Ключи — переменными окружения, см. PROVIDERS. Модуль без зависимостей от
  * Supabase: его же гоняет стенд `scripts/supplier-vision/compare.ts`.
  */
@@ -127,8 +130,6 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
   anthropic: { kind: 'anthropic', keyEnv: 'ANTHROPIC_API_KEY' },
   openai: { kind: 'openai-compatible', baseURL: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY' },
   gemini: { kind: 'openai-compatible', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY' },
-  openrouter: { kind: 'openai-compatible', baseURL: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
-  custom: { kind: 'openai-compatible', keyEnv: 'VISION_API_KEY' },
 }
 
 /** Модель по умолчанию — кандидат из проекта агента; меняется VISION_MODEL. */
@@ -157,10 +158,12 @@ export async function readSupplierPost(post: SupplierPost, spec: string, env: En
   const apiKey = env(config.keyEnv)
   if (!apiKey)
     throw new Error(`Нет ключа ${config.keyEnv} для «${provider}»`)
-  // Адрес переопределяется — для заглушки на стенде и для своего сервера
-  const baseURL = env(`${provider.toUpperCase()}_BASE_URL`) || (provider === 'custom' ? env('VISION_BASE_URL') : undefined) || config.baseURL
-  if (config.kind === 'openai-compatible' && !baseURL)
-    throw new Error('Для custom нужен VISION_BASE_URL')
+  // Адрес переопределяется только на локальную заглушку стенда: иначе одна
+  // переменная окружения увела бы фото поставщиков на чужой сервер
+  const override = env(`${provider.toUpperCase()}_BASE_URL`)
+  if (override && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(override))
+    throw new Error(`${provider.toUpperCase()}_BASE_URL — только локальная заглушка, не ${override}`)
+  const baseURL = override || config.baseURL
 
   const started = Date.now()
   const out = config.kind === 'anthropic'
