@@ -8,7 +8,10 @@
  *  1) поиск показывает цену со скидкой и зачёркнутую полную;
  *  2) продажа покупателю проходит, чек открывается;
  *  3) в базе: заказ `completed` / `offline`, позиция по цене со скидкой,
- *     бонусы в истории, остаток уменьшился.
+ *     бонусы в истории, остаток уменьшился;
+ *  4) сканер (31.10.2026): незнакомый код + Enter → окно привязки → код
+ *     сохранён в товаре, товар в чеке; повторный скан — +1 шт.; «Без сдачи»
+ *     у наличных и сдача в чеке; F9 оформляет продажу.
  *
  *   node check-admin-pos.mjs --base=http://localhost:3141
  *
@@ -77,8 +80,8 @@ try {
   page.on('console', m => m.type() === 'error' && !m.text().includes('[nuxt-gtag]') && errors.push(m.text()))
 
   await page.goto(`${BASE}/admin/pos`, { waitUntil: 'load', timeout: 120000 })
-  await page.getByPlaceholder('Поиск по названию или штрихкоду...').first().fill(product.name.slice(0, 25))
-  const card = page.locator('button', { hasText: product.name.slice(0, 25) }).first()
+  await page.getByPlaceholder('Название, артикул или штрихкод', { exact: false }).fill(product.name.trim().slice(0, 25))
+  const card = page.locator('button', { hasText: product.name.trim().slice(0, 25) }).first()
   await card.waitFor({ timeout: 30000 })
   const cardText = (await card.innerText()).replace(/\s+/g, ' ')
   const fmt = n => new Intl.NumberFormat('ru-RU').format(Number(n)).replace(/\s/g, ' ')
@@ -88,11 +91,11 @@ try {
     await page.screenshot({ path: `${process.env.SHOT}-search.png` })
   await card.click()
 
-  await page.getByPlaceholder('+7 (700) 000-00-00').fill(customer.phone)
+  await page.getByLabel('Телефон покупателя').fill(customer.phone)
   await page.waitForTimeout(2500)
   if (process.env.SHOT)
     await page.screenshot({ path: `${process.env.SHOT}-before.png` })
-  await page.getByRole('button', { name: 'Оформить продажу' }).click()
+  await page.getByRole('button', { name: /Оформить продажу/ }).click()
   await page.getByRole('dialog').waitFor({ timeout: 30000 }).catch(async (e) => {
     if (process.env.SHOT)
       await page.screenshot({ path: `${process.env.SHOT}-fail.png` })
@@ -102,6 +105,37 @@ try {
   if (process.env.SHOT)
     await page.screenshot({ path: `${process.env.SHOT}-receipt.png` })
   check(true, 'чек открылся')
+
+  // --- Сканер: привязка незнакомого кода, повторный скан, сдача, F9 ---
+  await page.getByRole('button', { name: 'Новая продажа' }).click()
+  const [scanProduct] = await rest(`products?select=id,name,final_price,price&is_active=eq.true&stock_quantity=gt.3&barcode=is.null&id=neq.${product.id}&order=name&limit=1`)
+  const code = `46${String(Date.now()).slice(-10)}`
+  const search = page.getByPlaceholder('Название, артикул или штрихкод', { exact: false })
+  // Сканер «печатает» код и Enter в поле поиска
+  await search.pressSequentially(code, { delay: 5 })
+  await search.press('Enter')
+  const bind = page.getByRole('dialog')
+  await bind.getByText(`Штрихкод ${code} не найден`).waitFor({ timeout: 10000 })
+  check(true, 'незнакомый код — окно привязки')
+  await bind.getByLabel('Найти товар для штрихкода').fill(scanProduct.name.trim().slice(0, 20))
+  await bind.locator('button', { hasText: scanProduct.name.trim().slice(0, 20) }).first().click()
+  await bind.waitFor({ state: 'hidden', timeout: 10000 })
+  const [bound] = await rest(`products?select=barcode&id=eq.${scanProduct.id}`)
+  check(bound?.barcode === code, `штрихкод сохранён в товаре: ${bound?.barcode}`)
+  await search.pressSequentially(code, { delay: 5 })
+  await search.press('Enter')
+  const qty = await page.locator('aside').getByText(/^2$/).count()
+  check(qty === 1, 'повторный скан — 2 шт. в чеке')
+  await page.getByRole('button', { name: 'Без сдачи' }).click()
+  check(await page.getByText('Сдача', { exact: true }).count() === 1, 'наличные: сдача посчитана')
+  if (process.env.SHOT)
+    await page.screenshot({ path: `${process.env.SHOT}-scan.png` })
+  await page.keyboard.press('F9')
+  await page.getByText('Продажа оформлена').waitFor({ timeout: 30000 })
+  check(true, 'F9 — продажа оформлена')
+  // Код вернуть: страж не оставляет следов в каталоге
+  await fetch(`${SUPA}/rest/v1/products?id=eq.${scanProduct.id}`, { method: 'PATCH', headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: null }) })
+
   check(!errors.length, `без ошибок консоли${errors.length ? ` — ${errors[0].slice(0, 160)}` : ''}`)
 }
 finally {
