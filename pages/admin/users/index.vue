@@ -1,11 +1,142 @@
 <script setup lang="ts">
-definePageMeta({
-  layout: 'admin',
-})
+import { RefreshCw, Search } from 'lucide-vue-next'
+import { matchesUserQuery } from '@/utils/adminUsers'
+import { formatPrice } from '@/utils/formatPrice'
+
+/*
+ * Пользователи (30 октября 2026): кто зарегистрирован, сколько заказал и
+ * сколько бонусов на счету. Клик по строке — карточка с историей заказов и
+ * бонусов. Данные через серверный маршрут: историю бонусов и email чужого
+ * человека RLS админу не отдаёт.
+ */
+definePageMeta({ layout: 'admin' })
+
+interface AdminUserRow {
+  id: string
+  name: string | null
+  phone: string | null
+  email: string | null
+  role: string | null
+  createdAt: string
+  activeBonuses: number
+  pendingBonuses: number
+  orders: number
+  cancelled: number
+  spent: number
+  lastOrderAt: string | null
+}
+
+// `adminFetch`, а не `useFetch`: серверу нужен токен входа в заголовке
+const { data: users, pending, error, refresh }
+  = useAsyncData('admin-users', () => adminFetch<AdminUserRow[]>('/api/admin/users'), { server: false })
+
+const query = ref('')
+const filtered = computed(() => (users.value ?? []).filter(u => matchesUserQuery(u, query.value)))
+
+function date(iso: string | null) {
+  return iso ? new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+}
 </script>
 
 <template>
-  <h1>Управление пользователями</h1>
-</template>
+  <div class="container mx-auto p-4 md:p-8 space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">
+          Пользователи
+        </h1>
+        <p class="text-sm text-muted-foreground mt-1">
+          Покупатели, их заказы и бонусы
+        </p>
+      </div>
+      <Button variant="outline" size="sm" :disabled="pending" @click="refresh()">
+        <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': pending }" />
+        Обновить
+      </Button>
+    </div>
 
-<style scoped></style>
+    <div class="relative max-w-md">
+      <Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+      <Input v-model="query" class="pl-9" placeholder="Имя, телефон или email" />
+    </div>
+
+    <ClientOnly>
+      <template #fallback>
+        <Skeleton class="h-40 w-full" />
+      </template>
+      <p v-if="error" class="text-sm text-destructive">
+        Не удалось загрузить: {{ error.statusMessage || error.message }}
+      </p>
+      <template v-else-if="pending">
+        <Skeleton v-for="i in 4" :key="i" class="h-14 w-full" />
+      </template>
+      <p v-else-if="!filtered.length" class="text-sm text-muted-foreground">
+        {{ query ? 'Никого не нашлось.' : 'Пользователей пока нет.' }}
+      </p>
+      <Card v-else>
+        <CardContent class="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Покупатель</TableHead>
+                <TableHead>Контакты</TableHead>
+                <TableHead class="text-right">
+                  Заказы
+                </TableHead>
+                <TableHead class="text-right">
+                  Выкуплено
+                </TableHead>
+                <TableHead class="text-right">
+                  Бонусы
+                </TableHead>
+                <TableHead>Последний заказ</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow
+                v-for="u in filtered"
+                :key="u.id"
+                class="cursor-pointer"
+                @click="navigateTo(`/admin/users/${u.id}`)"
+              >
+                <TableCell>
+                  <NuxtLink :to="`/admin/users/${u.id}`" class="font-medium hover:underline" @click.stop>
+                    {{ u.name || 'Без имени' }}
+                  </NuxtLink>
+                  <Badge v-if="u.role === 'admin'" variant="secondary" class="ml-2">
+                    админ
+                  </Badge>
+                  <div class="text-xs text-muted-foreground">
+                    с {{ date(u.createdAt) }}
+                  </div>
+                </TableCell>
+                <TableCell class="text-sm">
+                  <div>{{ u.phone || '—' }}</div>
+                  <div class="text-muted-foreground">
+                    {{ u.email || '' }}
+                  </div>
+                </TableCell>
+                <TableCell class="text-right tabular-nums">
+                  {{ u.orders }}
+                  <span v-if="u.cancelled" class="text-xs text-muted-foreground">+{{ u.cancelled }} отм.</span>
+                </TableCell>
+                <TableCell class="text-right tabular-nums whitespace-nowrap">
+                  {{ formatPrice(u.spent) }}&nbsp;₸
+                </TableCell>
+                <TableCell class="text-right tabular-nums">
+                  {{ u.activeBonuses }}
+                  <div v-if="u.pendingBonuses" class="text-xs text-muted-foreground">
+                    +{{ u.pendingBonuses }} ждут
+                  </div>
+                </TableCell>
+                <TableCell class="text-sm whitespace-nowrap">
+                  {{ date(u.lastOrderAt) }}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </ClientOnly>
+  </div>
+</template>

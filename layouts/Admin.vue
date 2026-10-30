@@ -36,7 +36,7 @@ const navLinks = [
   { to: '/admin/categories', label: 'Управление меню' },
   { to: '/admin/popular-categories', label: 'Популярные категории' },
   { to: '/admin/slides', label: 'Управление слайдами' },
-  { to: '/admin/users', label: 'Управление пользователями' },
+  { to: '/admin/users', label: 'Пользователи' },
   { to: '/admin/products', label: 'Управление товарами' },
   { to: '/admin/brands', label: 'Добавление бренда' },
   { to: '/admin/brand-seo', label: 'SEO: Бренд + Категория' },
