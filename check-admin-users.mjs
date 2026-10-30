@@ -82,11 +82,16 @@ console.log('\n== список')
 const admin = await signIn('admin')
 const { body: list } = await api('/api/admin/users', admin.token)
 const profiles = await rest('profiles?select=id')
-const orders = await rest('orders?select=user_id,status,final_amount')
-check(list?.length === profiles.length, `пользователей: ${list?.length}, в базе ${profiles.length}`)
+// Карточки магазина (30.10.2026) — в том же списке; объединённые — нет
+const cards = await rest('offline_customers?select=id&merged_at=is.null')
+const orders = await rest('orders?select=user_id,offline_customer_id,status,final_amount')
+check(list?.length === profiles.length + cards.length, `пользователей: ${list?.length}, в базе ${profiles.length} аккаунтов + ${cards.length} карточек`)
 let mismatches = 0
 for (const u of list ?? []) {
-  const own = orders.filter(o => o.user_id === u.id)
+  // Заказ карточки до слияния — без user_id
+  const own = u.kind === 'offline'
+    ? orders.filter(o => !o.user_id && o.offline_customer_id === u.id)
+    : orders.filter(o => o.user_id === u.id)
   const active = own.filter(o => o.status !== 'cancelled').length
   const spent = own.filter(o => ['delivered', 'completed'].includes(o.status)).reduce((s, o) => s + Number(o.final_amount), 0)
   if (u.orders !== active || u.spent !== spent)
