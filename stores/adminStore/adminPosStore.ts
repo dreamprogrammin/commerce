@@ -22,6 +22,11 @@ export interface PosCartItem {
 
 export interface PosCustomer {
   id: string
+  /**
+   * `account` — аккаунт сайта, `offline` — карточка магазина (30.10.2026):
+   * покупатель без аккаунта, заведённый кассой по телефону
+   */
+  kind: 'account' | 'offline'
   first_name: string | null
   last_name: string | null
   phone: string | null
@@ -31,7 +36,7 @@ export interface PosCustomer {
 
 export interface OfflineSaleResult {
   order_id: string
-  type: 'user_order' | 'guest_checkout'
+  type: 'user_order' | 'offline_customer_order' | 'guest_checkout'
   total: number
   discount: number
   final: number
@@ -52,6 +57,9 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
   const phoneQuery = ref('')
   const customer = ref<PosCustomer | null>(null)
   const isLookingUpCustomer = ref(false)
+  /** Номер, по которому никого не нашли, — касса предлагает завести карточку */
+  const unknownPhone = ref<string | null>(null)
+  const isCreatingCustomer = ref(false)
 
   const paymentMethod = ref<'cash' | 'card' | 'transfer'>('cash')
   const bonusesToSpend = ref(0)
@@ -106,7 +114,10 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
   }
 
   // --- Поиск клиента по телефону ---
+  // Сначала аккаунт сайта, потом карточка магазина. Никого — касса предложит
+  // завести карточку, иначе продажа уйдёт анонимной.
   async function lookupCustomer(phone: string) {
+    unknownPhone.value = null
     if (!phone.trim()) {
       customer.value = null
       return
@@ -114,20 +125,25 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
 
     isLookingUpCustomer.value = true
     try {
-      const { data, error } = await (supabase.rpc as Function)('get_profile_by_phone', {
-        p_phone: phone.trim(),
-      })
-
+      const { data: accounts, error } = await supabase.rpc('get_profile_by_phone', { p_phone: phone.trim() })
       if (error)
         throw error
 
-      if (data && (data as PosCustomer[]).length > 0) {
-        customer.value = (data as PosCustomer[])[0]
-        toast.success(`Клиент найден: ${getCustomerName(customer.value)}`)
+      let found: PosCustomer | null = accounts?.[0] ? { ...accounts[0], kind: 'account' } : null
+      if (!found) {
+        const { data: cards, error: cardError } = await supabase.rpc('pos_find_offline_customer', { p_phone: phone.trim() })
+        if (cardError)
+          throw cardError
+        found = cards?.[0] ? { ...cards[0], kind: 'offline' } : null
+      }
+
+      customer.value = found
+      if (found) {
+        toast.success(`Клиент найден: ${getCustomerName(found)}`)
       }
       else {
-        customer.value = null
-        toast.info('Клиент не найден. Продажа будет оформлена анонимно.')
+        unknownPhone.value = phone.trim()
+        toast.info('Клиент не найден. Можно завести карточку или продать анонимно.')
       }
     }
     catch (err) {
@@ -139,8 +155,36 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
     }
   }
 
+  // --- Карточка магазина для нового покупателя ---
+  async function createOfflineCustomer(firstName: string, lastName: string) {
+    if (!unknownPhone.value || isCreatingCustomer.value)
+      return
+    isCreatingCustomer.value = true
+    try {
+      const { data, error } = await supabase.rpc('create_offline_customer', {
+        p_first_name: firstName,
+        p_last_name: lastName,
+        p_phone: unknownPhone.value,
+      })
+      if (error)
+        throw error
+      customer.value = data?.[0] ? { ...data[0], kind: 'offline' } : null
+      unknownPhone.value = null
+      if (customer.value)
+        toast.success(`Карточка заведена: ${getCustomerName(customer.value)}`)
+    }
+    catch (err: any) {
+      console.error('Ошибка создания карточки:', err)
+      toast.error(err?.message || 'Не удалось завести карточку')
+    }
+    finally {
+      isCreatingCustomer.value = false
+    }
+  }
+
   function clearCustomer() {
     customer.value = null
+    unknownPhone.value = null
     phoneQuery.value = ''
     bonusesToSpend.value = 0
   }
@@ -216,7 +260,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
       const { data, error } = await (supabase.rpc as Function)('create_offline_sale', {
         p_cart_items: cartItems,
         p_payment_method: paymentMethod.value,
-        p_profile_id: customer.value?.id ?? null,
+        p_profile_id: customer.value?.kind === 'account' ? customer.value.id : null,
+        p_offline_customer_id: customer.value?.kind === 'offline' ? customer.value.id : null,
         p_bonuses_to_spend: bonusesToSpend.value,
       })
 
@@ -262,6 +307,8 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
     phoneQuery,
     customer,
     isLookingUpCustomer,
+    unknownPhone,
+    isCreatingCustomer,
     paymentMethod,
     bonusesToSpend,
     isProcessing,
@@ -274,6 +321,7 @@ export const useAdminPosStore = defineStore('adminPosStore', () => {
     // Actions
     searchProducts,
     lookupCustomer,
+    createOfflineCustomer,
     clearCustomer,
     addToCart,
     removeFromCart,

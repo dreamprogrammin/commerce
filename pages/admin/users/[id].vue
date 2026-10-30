@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ArrowLeft, Gift, RefreshCw } from 'lucide-vue-next'
+import { ArrowLeft, Gift, Merge, RefreshCw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { formatPrice } from '@/utils/formatPrice'
 
 /*
  * Карточка покупателя (30 октября 2026): контакты, все заказы с составом —
  * с сайта и из кассы — и история бонусов.
+ *
+ * Та же страница показывает карточку магазина (`kind: 'offline'`) —
+ * покупателя кассы без аккаунта. У аккаунта с тем же телефоном — блок
+ * «Объединить»: телефон в профиле никто не подтверждает, поэтому решает
+ * администратор, а не автоматика (решение владельца 30.10.2026).
  */
 definePageMeta({ layout: 'admin' })
 
@@ -20,6 +25,7 @@ interface AdminUserOrder {
   bonusesAwarded: number
   deliveryMethod: string | null
   paymentMethod: string | null
+  fromCard: boolean
   items: { name: string, slug: string | null, quantity: number, price: number }[]
 }
 
@@ -38,6 +44,16 @@ interface AdminUserBonus {
 
 interface AdminUserDetail {
   id: string
+  kind: 'account' | 'offline'
+  offlineMatch: {
+    id: string
+    name: string | null
+    phone: string
+    orders: number
+    activeBonuses: number
+    pendingBonuses: number
+  } | null
+  mergedInto: { id: string, name: string | null, at: string } | null
   name: string | null
   phone: string | null
   email: string | null
@@ -130,6 +146,31 @@ async function submitBonus() {
   }
 }
 
+const mergeOpen = ref(false)
+const merging = ref(false)
+
+async function submitMerge() {
+  const card = user.value?.offlineMatch
+  if (!card || merging.value)
+    return
+  merging.value = true
+  try {
+    const res = await adminFetch<{ orders: number, active_moved: number, pending_moved: number }>(
+      `/api/admin/users/${id.value}/merge`,
+      { method: 'POST', body: { offlineCustomerId: card.id } },
+    )
+    toast.success(`Объединено: покупок ${res.orders}, бонусов ${res.active_moved + res.pending_moved}`)
+    mergeOpen.value = false
+    await refresh()
+  }
+  catch (e: any) {
+    toast.error(e?.data?.message || e?.statusMessage || 'Не удалось объединить')
+  }
+  finally {
+    merging.value = false
+  }
+}
+
 function dateTime(iso: string | null) {
   return iso
     ? new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -172,12 +213,15 @@ function phoneHref(phone: string) {
               <Badge v-if="user.role === 'admin'" variant="secondary">
                 админ
               </Badge>
+              <Badge v-if="user.kind === 'offline'" variant="outline">
+                Карточка магазина
+              </Badge>
             </CardTitle>
             <CardDescription class="flex flex-wrap gap-x-4 gap-y-1">
               <a v-if="user.phone" :href="phoneHref(user.phone)" class="text-primary hover:underline">{{ user.phone }}</a>
               <span v-else>телефона нет</span>
               <a v-if="user.email" :href="`mailto:${user.email}`" class="text-primary hover:underline">{{ user.email }}</a>
-              <span>на сайте с {{ dateTime(user.createdAt) }}</span>
+              <span>{{ user.kind === 'offline' ? 'карточка заведена' : 'на сайте с' }} {{ dateTime(user.createdAt) }}</span>
             </CardDescription>
           </CardHeader>
           <CardContent class="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -217,6 +261,39 @@ function phoneHref(phone: string) {
           </CardContent>
         </Card>
 
+        <Card v-if="user.mergedInto" class="border-muted">
+          <CardContent class="pt-6 text-sm">
+            Карточка объединена с аккаунтом
+            <NuxtLink :to="`/admin/users/${user.mergedInto.id}`" class="text-primary hover:underline">
+              {{ user.mergedInto.name || 'без имени' }}
+            </NuxtLink>
+            {{ dateTime(user.mergedInto.at) }} — покупки и бонусы теперь там.
+          </CardContent>
+        </Card>
+
+        <Card v-if="user.offlineMatch" class="border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+            <div class="space-y-1">
+              <CardTitle class="text-base">
+                Есть карточка магазина с тем же телефоном
+              </CardTitle>
+              <CardDescription>
+                <NuxtLink :to="`/admin/users/${user.offlineMatch.id}`" class="text-primary hover:underline">
+                  {{ user.offlineMatch.name || 'Без имени' }}
+                </NuxtLink>
+                · {{ user.offlineMatch.phone }} · покупок {{ user.offlineMatch.orders }} ·
+                бонусов {{ user.offlineMatch.activeBonuses }}<template v-if="user.offlineMatch.pendingBonuses">
+                  + {{ user.offlineMatch.pendingBonuses }} ждут
+                </template>
+              </CardDescription>
+            </div>
+            <Button size="sm" @click="mergeOpen = true">
+              <Merge class="w-4 h-4 mr-2" />
+              Объединить
+            </Button>
+          </CardHeader>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Заказы</CardTitle>
@@ -235,6 +312,9 @@ function phoneHref(phone: string) {
                 <div class="flex items-center gap-2">
                   <Badge variant="outline">
                     {{ sourceLabels[order.source ?? ''] ?? order.source ?? '—' }}
+                  </Badge>
+                  <Badge v-if="order.fromCard" variant="outline" title="Покупка на карточку магазина до объединения">
+                    с карточки
                   </Badge>
                   <Badge :variant="order.status === 'cancelled' ? 'destructive' : 'outline'">
                     {{ statusLabels[order.status] ?? order.status }}
@@ -265,7 +345,7 @@ function phoneHref(phone: string) {
         <Card>
           <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
             <CardTitle>История бонусов</CardTitle>
-            <Button size="sm" @click="openBonus">
+            <Button v-if="!user.mergedInto" size="sm" @click="openBonus">
               <Gift class="w-4 h-4 mr-2" />
               Начислить бонусы
             </Button>
@@ -314,6 +394,27 @@ function phoneHref(phone: string) {
         </Card>
       </template>
     </ClientOnly>
+
+    <Dialog v-model:open="mergeOpen">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Объединить с карточкой магазина?</DialogTitle>
+          <DialogDescription>
+            Покупки и бонусы карточки «{{ user?.offlineMatch?.name }}» перейдут в аккаунт
+            «{{ user?.name || 'без имени' }}». Отменить нельзя. Телефон в профиле покупатель
+            вписал сам — убедитесь, что это тот же человек.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" @click="mergeOpen = false">
+            Отмена
+          </Button>
+          <Button :disabled="merging" @click="submitMerge">
+            {{ merging ? 'Объединяю…' : 'Объединить' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Dialog v-model:open="bonusOpen">
       <DialogContent class="max-w-md">

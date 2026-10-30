@@ -5,6 +5,9 @@
  * были зачислены». Начисленное доступно сразу (решение владельца). Всё
  * делает `admin_add_bonus` одной транзакцией — функция открыта только ключу
  * сервиса, поэтому кто начислил, передаём сами: id из `requireAdmin`.
+ *
+ * `<id>` бывает и карточкой магазина (`offline_customers`) — тогда то же
+ * делает `admin_add_offline_customer_bonus`.
  */
 export default defineEventHandler(async (event) => {
   const db = await requireAdmin(event)
@@ -21,13 +24,16 @@ export default defineEventHandler(async (event) => {
   if (reason.length < 3)
     throw createError({ statusCode: 400, message: 'Укажите причину начисления' })
 
-  const { data, error } = await db.rpc('admin_add_bonus', {
-    p_profile_id: id,
+  const { data: card } = await db.from('offline_customers').select('id').eq('id', id).maybeSingle()
+  const args = {
     p_amount: amount,
     p_reason: reason,
     p_admin_id: event.context.adminId,
     p_order_id: orderId ?? undefined,
-  })
+  }
+  const { data, error } = card
+    ? await db.rpc('admin_add_offline_customer_bonus', { ...args, p_customer_id: id })
+    : await db.rpc('admin_add_bonus', { ...args, p_profile_id: id })
   if (error)
     throw createError({ statusCode: 400, message: error.message })
   return data as { transaction_id: string, amount: number, active_balance: number }
