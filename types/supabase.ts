@@ -181,6 +181,7 @@ export interface Database {
           expires_at: string | null
           id: string
           metadata: Json | null
+          offline_customer_id: string | null
           order_id: string | null
           pending_balance_after: number
           profile_id: string | null
@@ -197,6 +198,7 @@ export interface Database {
           expires_at?: string | null
           id?: string
           metadata?: Json | null
+          offline_customer_id?: string | null
           order_id?: string | null
           pending_balance_after?: number
           profile_id?: string | null
@@ -213,6 +215,7 @@ export interface Database {
           expires_at?: string | null
           id?: string
           metadata?: Json | null
+          offline_customer_id?: string | null
           order_id?: string | null
           pending_balance_after?: number
           profile_id?: string | null
@@ -221,6 +224,13 @@ export interface Database {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'bonus_transactions_offline_customer_id_fkey'
+            columns: ['offline_customer_id']
+            isOneToOne: false
+            referencedRelation: 'offline_customers'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'bonus_transactions_order_id_fkey'
             columns: ['order_id']
@@ -1017,6 +1027,76 @@ export interface Database {
         }
         Relationships: []
       }
+      offline_customers: {
+        Row: {
+          active_bonus_balance: number
+          created_at: string
+          created_by: string | null
+          first_name: string
+          has_received_welcome_bonus: boolean
+          id: string
+          last_name: string | null
+          merged_at: string | null
+          merged_by: string | null
+          merged_into: string | null
+          pending_bonus_balance: number
+          phone: string
+          phone_digits: string
+        }
+        Insert: {
+          active_bonus_balance?: number
+          created_at?: string
+          created_by?: string | null
+          first_name: string
+          has_received_welcome_bonus?: boolean
+          id?: string
+          last_name?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into?: string | null
+          pending_bonus_balance?: number
+          phone: string
+          phone_digits: string
+        }
+        Update: {
+          active_bonus_balance?: number
+          created_at?: string
+          created_by?: string | null
+          first_name?: string
+          has_received_welcome_bonus?: boolean
+          id?: string
+          last_name?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into?: string | null
+          pending_bonus_balance?: number
+          phone?: string
+          phone_digits?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'offline_customers_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'offline_customers_merged_by_fkey'
+            columns: ['merged_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'offline_customers_merged_into_fkey'
+            columns: ['merged_into']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -1180,13 +1260,14 @@ export interface Database {
           guest_name: string | null
           guest_phone: string | null
           id: string
+          offline_customer_id: string | null
           payment_method: string | null
           source: string | null
           status: string
           telegram_message_id: string | null
           total_amount: number
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           assigned_admin_name?: string | null
@@ -1211,13 +1292,14 @@ export interface Database {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          offline_customer_id?: string | null
           payment_method?: string | null
           source?: string | null
           status?: string
           telegram_message_id?: string | null
           total_amount: number
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           assigned_admin_name?: string | null
@@ -1242,15 +1324,23 @@ export interface Database {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          offline_customer_id?: string | null
           payment_method?: string | null
           source?: string | null
           status?: string
           telegram_message_id?: string | null
           total_amount?: number
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'orders_offline_customer_id_fkey'
+            columns: ['offline_customer_id']
+            isOneToOne: false
+            referencedRelation: 'offline_customers'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'orders_user_id_fkey'
             columns: ['user_id']
@@ -2526,6 +2616,7 @@ export interface Database {
     }
     Functions: {
       activate_my_pending_bonuses: { Args: never, Returns: Json }
+      activate_offline_customer_bonuses: { Args: never, Returns: string }
       activate_pending_bonuses: { Args: never, Returns: string }
       activate_pending_order_bonuses: { Args: never, Returns: number }
       admin_add_bonus: {
@@ -2535,6 +2626,24 @@ export interface Database {
           p_order_id?: string
           p_profile_id: string
           p_reason: string
+        }
+        Returns: Json
+      }
+      admin_add_offline_customer_bonus: {
+        Args: {
+          p_admin_id: string
+          p_amount: number
+          p_customer_id: string
+          p_order_id?: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      admin_merge_offline_customer: {
+        Args: {
+          p_admin_id: string
+          p_customer_id: string
+          p_profile_id: string
         }
         Returns: Json
       }
@@ -2584,10 +2693,22 @@ export interface Database {
           }
           Returns: string
         }
+      create_offline_customer: {
+        Args: { p_first_name: string, p_last_name: string, p_phone: string }
+        Returns: {
+          active_bonus_balance: number
+          first_name: string
+          id: string
+          last_name: string
+          pending_bonus_balance: number
+          phone: string
+        }[]
+      }
       create_offline_sale: {
         Args: {
           p_bonuses_to_spend?: number
           p_cart_items: Json
+          p_offline_customer_id?: string
           p_payment_method?: string
           p_profile_id?: string
         }
@@ -3089,7 +3210,19 @@ export interface Database {
         Returns: Json
       }
       is_admin: { Args: never, Returns: boolean }
+      kz_phone_digits: { Args: { p_phone: string }, Returns: string }
       link_telegram_by_code: { Args: { p_code: string }, Returns: Json }
+      pos_find_offline_customer: {
+        Args: { p_phone: string }
+        Returns: {
+          active_bonus_balance: number
+          first_name: string
+          id: string
+          last_name: string
+          pending_bonus_balance: number
+          phone: string
+        }[]
+      }
       process_confirmed_guest_checkout: {
         Args: { p_checkout_id: string }
         Returns: string

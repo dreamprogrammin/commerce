@@ -8,11 +8,17 @@ import { formatPrice } from '@/utils/formatPrice'
  * сколько бонусов на счету. Клик по строке — карточка с историей заказов и
  * бонусов. Данные через серверный маршрут: историю бонусов и email чужого
  * человека RLS админу не отдаёт.
+ *
+ * Карточки магазина — покупатели кассы без аккаунта — в том же списке с
+ * пометкой «Магазин». «Есть карточка магазина» у аккаунта — телефон совпал
+ * с карточкой; объединяет владелец кнопкой в карточке аккаунта.
  */
 definePageMeta({ layout: 'admin' })
 
 interface AdminUserRow {
   id: string
+  kind: 'account' | 'offline'
+  offlineMatch: { id: string, name: string } | null
   name: string | null
   phone: string | null
   email: string | null
@@ -31,7 +37,11 @@ const { data: users, pending, error, refresh }
   = useAsyncData('admin-users', () => adminFetch<AdminUserRow[]>('/api/admin/users'), { server: false })
 
 const query = ref('')
-const filtered = computed(() => (users.value ?? []).filter(u => matchesUserQuery(u, query.value)))
+const onlyMatches = ref(false)
+const matchCount = computed(() => (users.value ?? []).filter(u => u.offlineMatch).length)
+const filtered = computed(() => (users.value ?? [])
+  .filter(u => !onlyMatches.value || u.offlineMatch)
+  .filter(u => matchesUserQuery(u, query.value)))
 
 function date(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
@@ -55,9 +65,19 @@ function date(iso: string | null) {
       </Button>
     </div>
 
-    <div class="relative max-w-md">
-      <Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-      <Input v-model="query" class="pl-9" placeholder="Имя, телефон или email" />
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative w-full max-w-md">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input v-model="query" class="pl-9" placeholder="Имя, телефон или email" />
+      </div>
+      <Button
+        v-if="matchCount"
+        :variant="onlyMatches ? 'default' : 'outline'"
+        size="sm"
+        @click="onlyMatches = !onlyMatches"
+      >
+        Ждут объединения: {{ matchCount }}
+      </Button>
     </div>
 
     <ClientOnly>
@@ -105,6 +125,12 @@ function date(iso: string | null) {
                   </NuxtLink>
                   <Badge v-if="u.role === 'admin'" variant="secondary" class="ml-2">
                     админ
+                  </Badge>
+                  <Badge v-if="u.kind === 'offline'" variant="outline" class="ml-2">
+                    Магазин
+                  </Badge>
+                  <Badge v-if="u.offlineMatch" class="ml-2 bg-amber-100 text-amber-900 hover:bg-amber-100">
+                    есть карточка магазина
                   </Badge>
                   <div class="text-xs text-muted-foreground">
                     с {{ date(u.createdAt) }}

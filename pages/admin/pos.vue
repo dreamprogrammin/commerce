@@ -21,6 +21,8 @@ const {
   phoneQuery,
   customer,
   isLookingUpCustomer,
+  unknownPhone,
+  isCreatingCustomer,
   paymentMethod,
   bonusesToSpend,
   isProcessing,
@@ -51,6 +53,14 @@ watch(phoneQuery, (phone) => {
   else if (!phone) {
     store.clearCustomer()
   }
+})
+
+// Новая карточка магазина: имя для покупателя, которого не нашли по номеру
+const newFirstName = ref('')
+const newLastName = ref('')
+watch(unknownPhone, () => {
+  newFirstName.value = ''
+  newLastName.value = ''
 })
 
 // Диалог успешной продажи
@@ -323,6 +333,7 @@ function getImageUrl(product: PosProduct): string | null {
             <div>
               <p class="text-sm font-medium">
                 {{ store.getCustomerName(customer) }}
+                <span v-if="customer.kind === 'offline'" class="ml-1 rounded border px-1 text-[10px] font-normal text-muted-foreground">карточка магазина</span>
               </p>
               <p class="text-xs text-muted-foreground">
                 Бонусы: <span class="font-medium text-amber-500">{{ customer.active_bonus_balance }}</span>
@@ -354,6 +365,25 @@ function getImageUrl(product: PosProduct): string | null {
               class="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground"
             />
           </div>
+
+          <!-- Никого по номеру — завести карточку магазина -->
+          <form
+            v-if="!customer && unknownPhone"
+            class="space-y-2 rounded-lg border border-dashed bg-background p-3"
+            @submit.prevent="store.createOfflineCustomer(newFirstName, newLastName)"
+          >
+            <p class="text-xs text-muted-foreground">
+              Покупателя с номером {{ unknownPhone }} нет. Завести карточку — покупки и бонусы будут копиться на ней.
+            </p>
+            <div class="flex gap-2">
+              <Input v-model="newFirstName" placeholder="Имя" aria-label="Имя покупателя" class="h-8" />
+              <Input v-model="newLastName" placeholder="Фамилия" aria-label="Фамилия покупателя" class="h-8" />
+            </div>
+            <Button type="submit" size="sm" variant="outline" class="w-full" :disabled="!newFirstName.trim() || isCreatingCustomer">
+              <Icon name="lucide:user-plus" class="mr-2 h-4 w-4" />
+              {{ isCreatingCustomer ? 'Завожу…' : 'Завести карточку' }}
+            </Button>
+          </form>
         </div>
 
         <!-- Списание бонусов (только если клиент найден) -->
