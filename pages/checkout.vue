@@ -1091,15 +1091,27 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
                единственная возможность прочитать оферту и снять галочку.
                Не <label>: Checkbox из reka-ui рендерится как <button>, его
                label[for] всё равно не переключает, а ссылки внутри label
-               ловят клик мимо цели. Кликабельна сама галочка. -->
+               ловят клик мимо цели. Кликабельна сама галочка.
+               Модель — modelValue (reka-ui 2). До 31.10.2026 здесь стояло
+               v-model:checked из radix-vue: согласие было засчитано, а галочка
+               показывалась СНЯТОЙ, и снять его было нельзя. Значение — только
+               true/false: «indeterminate» согласием не считается. -->
           <div class="flex items-start gap-2.5">
-            <Checkbox id="terms" v-model:checked="agreedToTerms" class="mt-0.5" />
-            <span class="text-[11px] leading-[1.45] text-muted-foreground">
+            <Checkbox
+              id="terms"
+              :model-value="agreedToTerms"
+              class="mt-0.5"
+              @update:model-value="(value) => agreedToTerms = value === true"
+            />
+            <div class="text-[11px] leading-[1.45] text-muted-foreground">
               Я согласен с условиями
               <a href="/terms" target="_blank" class="text-primary hover:underline">Публичной оферты</a>
               и
               <a href="/privacy-policy" target="_blank" class="text-primary hover:underline">политикой обработки персональных данных</a>
-            </span>
+              <p v-if="!agreedToTerms" class="mt-1 font-semibold text-red-700" data-testid="terms-hint">
+                Без согласия заказ не оформить — поставьте галочку.
+              </p>
+            </div>
           </div>
         </div>
 
