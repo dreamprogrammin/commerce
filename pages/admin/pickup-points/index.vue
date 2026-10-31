@@ -246,8 +246,12 @@ onMounted(store.fetchPoints)
             </p>
           </div>
 
+          <!-- Модель — modelValue (reka-ui 2). До 1.11.2026 здесь стоял
+               v-model:checked из radix-vue: переключатель показывал «выкл» у
+               включённого пункта, а нажатие не меняло is_active — показ пункта
+               из админки не управлялся. -->
           <div class="flex items-center gap-3">
-            <Switch id="pp-active" v-model:checked="form.is_active" />
+            <Switch id="pp-active" v-model="form.is_active" />
             <Label for="pp-active" class="cursor-pointer">
               Показывать в оформлении
             </Label>
