@@ -43,6 +43,32 @@ export interface RestockProduct {
   /** Подписаны на «Сообщить о поступлении» */
   alerts: number
   wishlist: number
+  /** Заказано у поставщика и ещё не пришло — по открытым заказам */
+  pending: number
+}
+
+export type SupplierOrderStatus = 'ordered' | 'in_transit' | 'received' | 'cancelled'
+
+export interface SupplierOrderLine {
+  /** null — товар потом удалили; название и артикул — снимок на момент заказа */
+  productId: string | null
+  name: string
+  sku: string | null
+  quantity: number
+  received: number
+  costPrice: number | null
+}
+
+export interface SupplierOrder {
+  id: string
+  number: number
+  supplierId: string
+  status: SupplierOrderStatus
+  note: string | null
+  createdAt: string
+  shippedAt: string | null
+  closedAt: string | null
+  lines: SupplierOrderLine[]
 }
 
 export interface SaleRow {
@@ -143,8 +169,80 @@ async function loadSales(db: SupabaseClient, now: Date) {
   return aggregateSales(sold, returned, now)
 }
 
-export async function loadRestock(db: SupabaseClient, now = new Date()): Promise<{ suppliers: RestockSupplier[], products: RestockProduct[] }> {
-  const [suppliersRes, products, sales, carts, alerts, wishlist] = await Promise.all([
+interface OrderRow {
+  id: string
+  number: number
+  supplier_id: string
+  status: SupplierOrderStatus
+  note: string | null
+  created_at: string
+  shipped_at: string | null
+  closed_at: string | null
+  supplier_order_items: { product_id: string | null, product_name: string, sku: string | null, quantity: number, received_quantity: number, cost_price: number | null }[]
+}
+
+/**
+ * Заказы поставщикам (шаг 2, 31.10.2026): открытые и закрытые за 30 дней.
+ * `null` — таблиц ещё нет: миграция `20261031160000_supplier_orders` не
+ * применена (превью `dev` смотрит в боевую базу). Тогда страница работает
+ * как в шаге 1, без заказов, — выкатка безопасна в любом порядке.
+ */
+async function loadOrders(db: SupabaseClient, now: Date): Promise<SupplierOrder[] | null> {
+  const since = new Date(now.getTime() - 30 * DAY).toISOString()
+  const { data, error } = await db.from('supplier_orders')
+    .select('id, number, supplier_id, status, note, created_at, shipped_at, closed_at, supplier_order_items(product_id, product_name, sku, quantity, received_quantity, cost_price)')
+    .or(`status.in.(ordered,in_transit),closed_at.gte.${since}`)
+    .order('number', { ascending: false })
+    .limit(500)
+  if (error) {
+    // Таблиц нет. Проверено 31.10.2026 на PostgREST 12.2.3, обе таблицы спрятаны:
+    // запрос с вложенными строками отвечает PGRST200 («нет связи»), простой —
+    // 42P01; PostgREST 13 на отсутствующую таблицу отвечает PGRST205
+    if (error.code === 'PGRST200' || error.code === 'PGRST205' || error.code === '42P01') {
+      console.warn('[restock] заказов поставщикам нет — миграция не применена?', error.code, error.message)
+      return null
+    }
+    throw createError({ statusCode: 500, message: error.message })
+  }
+  return (data as OrderRow[] ?? []).map(o => ({
+    id: o.id,
+    number: o.number,
+    supplierId: o.supplier_id,
+    status: o.status,
+    note: o.note,
+    createdAt: o.created_at,
+    shippedAt: o.shipped_at,
+    closedAt: o.closed_at,
+    lines: o.supplier_order_items
+      .map(i => ({
+        productId: i.product_id,
+        name: i.product_name,
+        sku: i.sku,
+        quantity: i.quantity,
+        received: i.received_quantity,
+        costPrice: i.cost_price == null ? null : Number(i.cost_price),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+  }))
+}
+
+/** Сколько каждого товара заказано и ещё не пришло — по открытым заказам. */
+export function pendingByProduct(orders: Pick<SupplierOrder, 'status' | 'lines'>[]): Map<string, number> {
+  const pending = new Map<string, number>()
+  for (const order of orders) {
+    if (order.status !== 'ordered' && order.status !== 'in_transit')
+      continue
+    for (const line of order.lines) {
+      const left = line.quantity - line.received
+      if (line.productId && left > 0)
+        pending.set(line.productId, (pending.get(line.productId) ?? 0) + left)
+    }
+  }
+  return pending
+}
+
+export async function loadRestock(db: SupabaseClient, now = new Date()): Promise<{ suppliers: RestockSupplier[], products: RestockProduct[], orders: SupplierOrder[] | null }> {
+  const [suppliersRes, products, sales, carts, alerts, wishlist, orders] = await Promise.all([
     db.from('suppliers').select('id, name, contact_person, phone, address').order('name'),
     fetchAll<{
       id: string
@@ -170,6 +268,7 @@ export async function loadRestock(db: SupabaseClient, now = new Date()): Promise
     loadCarts(db, { guests: true }),
     fetchAll<{ product_id: string }>((from, to) => db.from('stock_alerts').select('product_id').order('product_id').order('user_id').range(from, to)),
     fetchAll<{ product_id: string }>((from, to) => db.from('wishlist').select('product_id').order('product_id').order('user_id').range(from, to)),
+    loadOrders(db, now),
   ])
   if (suppliersRes.error)
     throw createError({ statusCode: 500, message: suppliersRes.error.message })
@@ -185,6 +284,7 @@ export async function loadRestock(db: SupabaseClient, now = new Date()): Promise
   }
   const alertCount = countBy(alerts)
   const wishlistCount = countBy(wishlist)
+  const pending = pendingByProduct(orders ?? [])
 
   return {
     suppliers: (suppliersRes.data ?? []).map(s => ({
@@ -214,6 +314,8 @@ export async function loadRestock(db: SupabaseClient, now = new Date()): Promise
       cartUnits: inCarts.get(p.id)?.units ?? 0,
       alerts: alertCount.get(p.id) ?? 0,
       wishlist: wishlistCount.get(p.id) ?? 0,
+      pending: pending.get(p.id) ?? 0,
     })),
+    orders,
   }
 }

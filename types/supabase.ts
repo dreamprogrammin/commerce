@@ -2423,6 +2423,163 @@ export interface Database {
           },
         ]
       }
+      stock_receipts: {
+        Row: {
+          id: string
+          order_id: string | null
+          product_id: string
+          quantity: number
+          received_at: string
+          received_by: string | null
+          stock_after: number
+          stock_before: number
+        }
+        Insert: {
+          id?: string
+          order_id?: string | null
+          product_id: string
+          quantity: number
+          received_at?: string
+          received_by?: string | null
+          stock_after: number
+          stock_before: number
+        }
+        Update: {
+          id?: string
+          order_id?: string | null
+          product_id?: string
+          quantity?: number
+          received_at?: string
+          received_by?: string | null
+          stock_after?: number
+          stock_before?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'stock_receipts_order_id_fkey'
+            columns: ['order_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_orders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_receipts_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_receipts_received_by_fkey'
+            columns: ['received_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      supplier_order_items: {
+        Row: {
+          cost_price: number | null
+          id: string
+          order_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          received_quantity: number
+          sku: string | null
+        }
+        Insert: {
+          cost_price?: number | null
+          id?: string
+          order_id: string
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          received_quantity?: number
+          sku?: string | null
+        }
+        Update: {
+          cost_price?: number | null
+          id?: string
+          order_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          received_quantity?: number
+          sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_order_items_order_id_fkey'
+            columns: ['order_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_orders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'supplier_order_items_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      supplier_orders: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          number: number
+          shipped_at: string | null
+          status: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          number?: never
+          shipped_at?: string | null
+          status?: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          number?: never
+          shipped_at?: string | null
+          status?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_orders_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'supplier_orders_supplier_id_fkey'
+            columns: ['supplier_id']
+            isOneToOne: false
+            referencedRelation: 'suppliers'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -2639,12 +2796,34 @@ export interface Database {
         }
         Returns: Json
       }
+      admin_create_supplier_order: {
+        Args: {
+          p_admin_id: string
+          p_items: Json
+          p_note?: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       admin_merge_offline_customer: {
         Args: {
           p_admin_id: string
           p_customer_id: string
           p_profile_id: string
         }
+        Returns: Json
+      }
+      admin_receive_supplier_order: {
+        Args: {
+          p_admin_id: string
+          p_close?: boolean
+          p_items: Json
+          p_order_id: string
+        }
+        Returns: Json
+      }
+      admin_set_supplier_order_status: {
+        Args: { p_admin_id: string, p_order_id: string, p_status: string }
         Returns: Json
       }
       can_assign_order: {

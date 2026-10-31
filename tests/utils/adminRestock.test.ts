@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregateSales } from '../../server/utils/adminRestock'
+import { aggregateSales, pendingByProduct } from '../../server/utils/adminRestock'
 
 const now = new Date('2026-10-30T12:00:00Z')
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString()
@@ -28,5 +28,19 @@ describe('aggregateSales', () => {
       { productId: 'a', quantity: 9, orderedAt: daysAgo(45) },
     ], now)
     expect(sales.get('a')).toEqual({ sold30: 2, sold90: 0 })
+  })
+})
+
+describe('pendingByProduct', () => {
+  it('заказано и не пришло — только по открытым заказам, удалённые товары не в счёт', () => {
+    const line = (productId: string | null, quantity: number, received: number) => ({ productId, name: 'x', sku: null, quantity, received, costPrice: null })
+    const pending = pendingByProduct([
+      { status: 'ordered', lines: [line('a', 5, 0), line('b', 3, 1)] },
+      { status: 'in_transit', lines: [line('a', 2, 2), line('b', 1, 0), line(null, 4, 0)] },
+      { status: 'received', lines: [line('a', 9, 1)] },
+      { status: 'cancelled', lines: [line('b', 9, 0)] },
+      { status: 'ordered', lines: [line('c', 2, 5)] },
+    ])
+    expect(Object.fromEntries(pending)).toEqual({ a: 5, b: 3 })
   })
 })

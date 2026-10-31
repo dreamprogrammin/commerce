@@ -4,8 +4,9 @@
  * Владелец: «заказы должны собираться по поставщику». Заказ — товары одного
  * поставщика: дошедшие до порога попадают в него сами, с количеством из
  * правила товара; любые другие его товары добавляются вручную. Черновик —
- * только правки к автоматическому списку (`DraftEdits`), живёт в браузере до
- * шага с таблицей заказов поставщикам.
+ * только правки к автоматическому списку (`DraftEdits`), живёт в браузере;
+ * «Заказал» сохраняет его в базу заказом поставщику (шаг 2, 31.10.2026 —
+ * `utils/supplierOrders.ts`).
  */
 import { normalizePhone } from './adminUsers'
 
@@ -17,6 +18,8 @@ export interface RestockItem {
   minStock: number
   restockQty: number
   costPrice: number | null
+  /** Заказано у поставщика и ещё не пришло (шаг 2) */
+  pending?: number
 }
 
 /** id товара → сколько брать (0 — не брать). Без записи — по правилу товара. */
@@ -29,8 +32,13 @@ export interface DraftRow<T extends RestockItem = RestockItem> {
   manual: boolean
 }
 
-export function needsRestock(item: Pick<RestockItem, 'stock' | 'minStock'>): boolean {
-  return item.stock <= item.minStock
+/**
+ * Пора заказывать: остаток вместе с уже заказанным и не пришедшим не выше
+ * порога. Без учёта заказанного товар висел бы «на пороге», пока заказ едет, —
+ * и его заказали бы второй раз.
+ */
+export function needsRestock(item: Pick<RestockItem, 'stock' | 'minStock' | 'pending'>): boolean {
+  return item.stock + (item.pending ?? 0) <= item.minStock
 }
 
 const byName = (a: RestockItem, b: RestockItem) => a.name.localeCompare(b.name, 'ru')
@@ -89,7 +97,7 @@ export function pluralPositions(n: number): string {
  * по нему поставщик ищет товар у себя; на 30.10.2026 он есть у всех 186
  * активных товаров.
  */
-export function orderText(rows: DraftRow[], date: Date): string {
+export function orderText(rows: DraftRow[], date: Date, number?: number): string {
   const ordered = rows.filter(r => r.quantity > 0)
   const day = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: '2-digit', month: '2-digit', year: 'numeric' }).format(date)
   const lines = ordered.map((r, i) => {
@@ -98,7 +106,7 @@ export function orderText(rows: DraftRow[], date: Date): string {
   })
   const { positions, units } = orderTotals(ordered)
   return [
-    `Здравствуйте! Заказ от магазина «Ухтышка», ${day}:`,
+    `Здравствуйте! Заказ${number ? ` №${number}` : ''} от магазина «Ухтышка», ${day}:`,
     '',
     ...lines,
     '',
