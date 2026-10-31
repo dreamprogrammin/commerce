@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { Database } from '@/types'
 import type { DraftRow, OrderTotals, RestockItem } from '@/utils/restockOrder'
+import type { SupplierOrder, SupplierOrderStatus } from '@/utils/supplierOrders'
 import {
   AlertTriangle,
+  Ban,
+  Check,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -10,11 +13,14 @@ import {
   Link,
   MessageCircle,
   Package,
+  PackageCheck,
   Phone,
   Plus,
   RefreshCw,
   RotateCcw,
   ShoppingCart,
+  Truck,
+  Undo2,
   User,
   X,
 } from 'lucide-vue-next'
@@ -23,7 +29,9 @@ import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminRestockStore } from '@/stores/adminStore/adminRestockStore'
+import { useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStore'
 import { draftRows, needsRestock, orderText, orderTotals, plural, pluralPositions, whatsappUrl } from '@/utils/restockOrder'
+import { isOpenOrder, ORDER_STATUS_LABEL, orderSummary, receiveDefaults, receivePlan, remaining, supplierOrderText } from '@/utils/supplierOrders'
 
 definePageMeta({ layout: 'admin' })
 
@@ -35,6 +43,11 @@ const { getVariantUrl } = useSupabaseStorage()
  * поставщику», «смотрим спрос не только по корзинам»). Каждый поставщик —
  * черновик заказа: товары на пороге попадают сами, любые другие его товары —
  * кнопкой. Данные — `/api/admin/restock` (server/utils/adminRestock.ts).
+ *
+ * Шаг 2 (31.10.2026): «Заказал» сохраняет черновик в базу заказом поставщику;
+ * у заказа — «В пути», «Принять» (остаток прибавляется, ждавшие получают
+ * «Товар снова в наличии»), «Отменить». Заказанное и не пришедшее товар в
+ * новый заказ не возвращает (`needsRestock` с `pending`).
  */
 interface RestockSupplier {
   id: string
@@ -55,18 +68,24 @@ interface RestockProduct extends RestockItem {
   cartUnits: number
   alerts: number
   wishlist: number
+  pending: number
 }
 
 const suppliers = ref<RestockSupplier[]>([])
 const products = ref<RestockProduct[]>([])
+const orders = ref<SupplierOrder[]>([])
+/** false — миграция заказов на базе ещё не применена: страница работает как в шаге 1 */
+const ordersReady = ref(true)
 const isLoading = ref(true)
 
 async function fetchRestock() {
   isLoading.value = true
   try {
-    const data = await adminFetch<{ suppliers: RestockSupplier[], products: RestockProduct[] }>('/api/admin/restock')
+    const data = await adminFetch<{ suppliers: RestockSupplier[], products: RestockProduct[], orders: SupplierOrder[] | null }>('/api/admin/restock')
     suppliers.value = data.suppliers
     products.value = data.products
+    orders.value = data.orders ?? []
+    ordersReady.value = data.orders !== null
   }
   catch (error: any) {
     toast.error('Ошибка загрузки списка закупок', { description: error.data?.message || error.message })
@@ -121,6 +140,10 @@ const NO_SUPPLIER = 'none'
 interface SupplierBlock {
   key: string
   supplier: RestockSupplier | null
+  /** Открытые заказы поставщику — заказаны или в пути */
+  orders: SupplierOrder[]
+  /** Закрытые за 30 дней — принятые и отменённые */
+  closed: SupplierOrder[]
   rows: DraftRow<RestockProduct>[]
   /** Товары поставщика, которых ещё нет в заказе, — для «Добавить товар» */
   addable: RestockProduct[]
@@ -135,10 +158,14 @@ const blocks = computed<SupplierBlock[]>(() => {
     const key = product.supplierId ?? NO_SUPPLIER
     bySupplier.set(key, [...(bySupplier.get(key) ?? []), product])
   }
+  const ordersBySupplier = new Map<string, SupplierOrder[]>()
+  for (const order of orders.value)
+    ordersBySupplier.set(order.supplierId, [...(ordersBySupplier.get(order.supplierId) ?? []), order])
   const result: SupplierBlock[] = []
   for (const supplier of suppliers.value) {
-    const items = bySupplier.get(supplier.id)
-    if (!items?.length)
+    const items = bySupplier.get(supplier.id) ?? []
+    const supplierOrders = ordersBySupplier.get(supplier.id) ?? []
+    if (!items.length && !supplierOrders.length)
       continue
     const edits = drafts.value[supplier.id] ?? {}
     const rows = draftRows(items, edits)
@@ -147,6 +174,8 @@ const blocks = computed<SupplierBlock[]>(() => {
     result.push({
       key: supplier.id,
       supplier,
+      orders: supplierOrders.filter(isOpenOrder),
+      closed: supplierOrders.filter(o => !isOpenOrder(o)),
       rows,
       addable: items.filter(p => !inOrder.has(p.id)).sort((a, b) => a.name.localeCompare(b.name, 'ru')),
       autoCount: rows.filter(r => !r.manual).length,
@@ -154,7 +183,9 @@ const blocks = computed<SupplierBlock[]>(() => {
       order: { totals: orderTotals(rows), text, whatsapp: whatsappUrl(supplier.phone, text) },
     })
   }
-  result.sort((a, b) => Number(b.autoCount > 0) - Number(a.autoCount > 0) || a.supplier!.name.localeCompare(b.supplier!.name, 'ru'))
+  result.sort((a, b) => Number(b.autoCount > 0) - Number(a.autoCount > 0)
+    || Number(b.orders.length > 0) - Number(a.orders.length > 0)
+    || a.supplier!.name.localeCompare(b.supplier!.name, 'ru'))
 
   // Без поставщика заказать нельзя — только назначить
   const orphans = draftRows(bySupplier.get(NO_SUPPLIER) ?? [])
@@ -162,6 +193,8 @@ const blocks = computed<SupplierBlock[]>(() => {
     result.push({
       key: NO_SUPPLIER,
       supplier: null,
+      orders: [],
+      closed: [],
       rows: orphans,
       addable: [],
       autoCount: orphans.length,
@@ -177,7 +210,7 @@ const totalToRestock = computed(() => blocks.value.reduce((sum, b) => sum + b.au
 // Свёрнутость: по умолчанию раскрыт поставщик, у которого есть что заказывать
 const toggled = ref<Record<string, boolean>>({})
 function isExpanded(block: SupplierBlock): boolean {
-  return toggled.value[block.key] ?? (block.autoCount > 0 || block.edited)
+  return toggled.value[block.key] ?? (block.autoCount > 0 || block.edited || block.orders.length > 0)
 }
 function toggleBlock(block: SupplierBlock) {
   toggled.value = { ...toggled.value, [block.key]: !isExpanded(block) }
@@ -218,6 +251,160 @@ async function copyOrder(block: SupplierBlock) {
   }
   catch {
     toast.error('Не удалось скопировать — откройте «Текст заказа» и выделите его')
+  }
+}
+
+// ── Заказы поставщикам (шаг 2) ──────────────────────────────────────────────
+const revalidateStore = useAdminRevalidateStore()
+const productsById = computed(() => new Map(products.value.map(p => [p.id, p])))
+const busy = ref<string | null>(null)
+
+function formatDay(iso: string): string {
+  return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: '2-digit', month: '2-digit' }).format(new Date(iso))
+}
+
+const STATUS_VARIANT: Record<SupplierOrderStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+  ordered: 'secondary',
+  in_transit: 'default',
+  received: 'outline',
+  cancelled: 'outline',
+}
+
+/** «Заказал»: черновик уходит в базу заказом, браузерный черновик сбрасывается. */
+async function placeOrder(block: SupplierBlock) {
+  const items = block.rows.filter(r => r.quantity > 0).map(r => ({ productId: r.item.id, quantity: r.quantity }))
+  if (!block.supplier || !items.length)
+    return
+  busy.value = `place:${block.key}`
+  try {
+    const saved = await adminFetch<{ number: number }>('/api/admin/restock/orders', {
+      method: 'POST',
+      body: { supplierId: block.supplier.id, items },
+    })
+    restockStore.reset(block.key)
+    toast.success(`Заказ №${saved.number} сохранён`, { description: `${block.supplier.name} — товары из него больше не просятся в заказ` })
+    await fetchRestock()
+  }
+  catch (error: any) {
+    toast.error('Не удалось сохранить заказ', { description: error.data?.message || error.message })
+  }
+  finally {
+    busy.value = null
+  }
+}
+
+async function setOrderStatus(order: SupplierOrder, status: SupplierOrderStatus) {
+  busy.value = `status:${order.id}`
+  try {
+    await adminFetch(`/api/admin/restock/orders/${order.id}/status`, { method: 'POST', body: { status } })
+    toast.success(`Заказ №${order.number}: ${ORDER_STATUS_LABEL[status].toLowerCase()}`)
+    await fetchRestock()
+  }
+  catch (error: any) {
+    toast.error('Не удалось изменить заказ', { description: error.data?.message || error.message })
+  }
+  finally {
+    busy.value = null
+  }
+}
+
+async function copySavedOrder(order: SupplierOrder) {
+  try {
+    await navigator.clipboard.writeText(supplierOrderText(order))
+    toast.success(`Текст заказа №${order.number} скопирован`)
+  }
+  catch {
+    toast.error('Не удалось скопировать')
+  }
+}
+
+// Отменить и закрыть — необратимо, поэтому через подтверждение. Открыто ли
+// окно и что подтверждаем — разные состояния: кнопка AlertDialogAction сама
+// закрывает окно раньше своего @click, и общий ref обнулялся бы до действия
+const confirming = ref<{ order: SupplierOrder, status: 'cancelled' | 'received' } | null>(null)
+const confirmOpen = ref(false)
+
+function askConfirm(order: SupplierOrder, status: 'cancelled' | 'received') {
+  confirming.value = { order, status }
+  confirmOpen.value = true
+}
+
+function confirmStatus() {
+  const target = confirming.value
+  confirmOpen.value = false
+  if (target)
+    setOrderStatus(target.order, target.status)
+}
+
+// Приёмка: сколько пришло по каждой строке; по умолчанию — всё, что ждём
+const receiving = reactive({ order: null as SupplierOrder | null, quantities: {} as Record<string, number>, close: false, saving: false })
+const receiveOpen = computed({
+  get: () => receiving.order !== null,
+  set: (open: boolean) => {
+    if (!open)
+      receiving.order = null
+  },
+})
+const receivePreview = computed(() => receiving.order
+  ? receivePlan(receiving.order, receiving.quantities, productsById.value)
+  : { units: 0, notified: 0, short: false })
+
+/** Сколько человек ждут товар, которого сейчас 0, — если его принимают, им придёт уведомление. */
+function waitingFor(productId: string | null): number {
+  const product = productId ? productsById.value.get(productId) : undefined
+  if (!product || product.stock !== 0 || !(receiving.quantities[product.id] > 0))
+    return 0
+  return product.alerts
+}
+
+function openReceive(order: SupplierOrder) {
+  Object.assign(receiving, { order, quantities: receiveDefaults(order), close: false, saving: false })
+}
+
+function onReceiveQuantity(productId: string, event: Event) {
+  const input = event.target as HTMLInputElement
+  const value = Number.parseInt(input.value, 10)
+  receiving.quantities = { ...receiving.quantities, [productId]: Number.isNaN(value) ? 0 : Math.min(Math.max(value, 0), 9999) }
+  input.value = String(receiving.quantities[productId])
+}
+
+async function submitReceive() {
+  const order = receiving.order
+  if (!order)
+    return
+  receiving.saving = true
+  try {
+    const result = await adminFetch<{ status: SupplierOrderStatus, units: number, notified: number, received: { product_id: string }[] }>(
+      `/api/admin/restock/orders/${order.id}/receive`,
+      {
+        method: 'POST',
+        body: {
+          items: Object.entries(receiving.quantities).map(([productId, quantity]) => ({ productId, quantity })),
+          close: receivePreview.value.short && receiving.close,
+        },
+      },
+    )
+    receiving.order = null
+    // Кеш карточек сразу: уведомление «снова в наличии» ведёт на карточку,
+    // а закешированная на сутки страница показала бы «нет в наличии»
+    const productIds = result.received.map(r => r.product_id)
+    if (productIds.length) {
+      revalidateStore.enqueue({ productIds })
+      revalidateStore.flushNow()
+    }
+    toast.success(`Принято ${result.units} шт. по заказу №${order.number}`, {
+      description: [
+        result.status === 'received' ? 'Заказ закрыт' : 'Заказ открыт — ждём остальное',
+        result.notified ? `«Товар снова в наличии» ушло ${result.notified} ${plural(result.notified, 'покупателю', 'покупателям', 'покупателям')}` : '',
+      ].filter(Boolean).join('. '),
+    })
+    await fetchRestock()
+  }
+  catch (error: any) {
+    toast.error('Не удалось принять', { description: error.data?.message || error.message })
+  }
+  finally {
+    receiving.saving = false
   }
 }
 
@@ -305,7 +492,11 @@ async function assignSupplier(productId: string, supplierId: string) {
         </h1>
         <p class="text-sm text-muted-foreground mt-1 max-w-2xl">
           Заказы поставщикам. Товары, дошедшие до порога, попадают в заказ сами, любые другие товары
-          поставщика — кнопкой «Добавить товар». Состав заказов запоминается в этом браузере.
+          поставщика — кнопкой «Добавить товар». Новый заказ собирается в этом браузере; «Заказал» сохраняет
+          его для всех, «Принять» пополняет остаток, когда товар пришёл.
+        </p>
+        <p v-if="!isLoading && !ordersReady" class="text-xs text-amber-700 dark:text-amber-400 mt-1" data-testid="orders-not-ready">
+          Сохранение заказов и приёмка заработают после применения миграции заказов поставщикам.
         </p>
       </div>
       <div class="flex items-center gap-3">
@@ -420,7 +611,9 @@ async function assignSupplier(productId: string, supplierId: string) {
           class="cursor-pointer hover:bg-muted/50 transition-colors px-4 md:px-6"
           @click="toggleBlock(block)"
         >
-          <div class="flex items-center justify-between gap-2">
+          <!-- min-w-0: CardHeader — сетка, и без него строка не уже названия —
+               длинное имя поставщика выталкивало бейджи за край карточки -->
+          <div class="flex items-center justify-between gap-2 min-w-0">
             <div class="flex items-center gap-3 min-w-0">
               <div
                 class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
@@ -441,6 +634,9 @@ async function assignSupplier(productId: string, supplierId: string) {
               </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
+              <Badge v-if="block.orders.length" variant="secondary" data-testid="open-orders-badge">
+                {{ block.orders.length }} {{ plural(block.orders.length, 'заказ', 'заказа', 'заказов') }}
+              </Badge>
               <Badge :variant="block.autoCount ? 'destructive' : 'outline'">
                 на пороге {{ block.autoCount }}
               </Badge>
@@ -470,6 +666,106 @@ async function assignSupplier(productId: string, supplierId: string) {
         </CardHeader>
 
         <CardContent v-if="isExpanded(block)" class="pt-0 px-4 md:px-6 space-y-4">
+          <!-- Заказы поставщику: заказаны или в пути -->
+          <div v-if="block.orders.length" class="space-y-2" data-testid="supplier-orders">
+            <div
+              v-for="order in block.orders"
+              :key="order.id"
+              class="rounded-lg border p-3 space-y-2"
+              data-testid="supplier-order"
+              :data-number="order.number"
+              :data-status="order.status"
+            >
+              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span class="font-medium">Заказ №{{ order.number }}</span>
+                  <Badge :variant="STATUS_VARIANT[order.status]">
+                    {{ ORDER_STATUS_LABEL[order.status] }}
+                  </Badge>
+                  <span class="text-muted-foreground">от {{ formatDay(order.createdAt) }}<template v-if="order.shippedAt"> · в пути с {{ formatDay(order.shippedAt) }}</template></span>
+                  <span class="text-muted-foreground tabular-nums">· {{ orderSummary(order).positions }} {{ pluralPositions(orderSummary(order).positions) }}, {{ orderSummary(order).units }} шт.<template v-if="orderSummary(order).receivedUnits"> · принято {{ orderSummary(order).receivedUnits }}</template></span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <Button
+                    v-if="order.status === 'ordered'"
+                    variant="outline"
+                    size="sm"
+                    :disabled="busy === `status:${order.id}`"
+                    data-testid="order-shipped"
+                    @click="setOrderStatus(order, 'in_transit')"
+                  >
+                    <Truck class="w-4 h-4 mr-1.5" />
+                    В пути
+                  </Button>
+                  <Button size="sm" data-testid="order-receive" @click="openReceive(order)">
+                    <PackageCheck class="w-4 h-4 mr-1.5" />
+                    Принять
+                  </Button>
+                  <Button variant="ghost" size="sm" data-testid="order-saved-copy" @click="copySavedOrder(order)">
+                    <Copy class="w-4 h-4 mr-1.5" />
+                    Текст
+                  </Button>
+                  <Button
+                    v-if="order.status === 'in_transit' && !orderSummary(order).receivedUnits"
+                    variant="ghost"
+                    size="sm"
+                    title="«В пути» нажали по ошибке"
+                    :disabled="busy === `status:${order.id}`"
+                    @click="setOrderStatus(order, 'ordered')"
+                  >
+                    <Undo2 class="w-4 h-4 mr-1.5" />
+                    Не в пути
+                  </Button>
+                  <Button
+                    v-if="orderSummary(order).receivedUnits"
+                    variant="ghost"
+                    size="sm"
+                    data-testid="order-close"
+                    @click="askConfirm(order, 'received')"
+                  >
+                    <Check class="w-4 h-4 mr-1.5" />
+                    Закрыть
+                  </Button>
+                  <Button
+                    v-else
+                    variant="ghost"
+                    size="sm"
+                    class="text-destructive"
+                    data-testid="order-cancel"
+                    @click="askConfirm(order, 'cancelled')"
+                  >
+                    <Ban class="w-4 h-4 mr-1.5" />
+                    Отменить
+                  </Button>
+                </div>
+              </div>
+              <ul class="grid gap-x-6 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
+                <li v-for="(line, i) in order.lines" :key="line.productId ?? `d${i}`" class="flex justify-between gap-2" data-testid="supplier-order-line">
+                  <span class="truncate">{{ line.name }}<template v-if="!line.productId"> (товар удалён)</template></span>
+                  <span class="tabular-nums whitespace-nowrap">{{ line.received ? `${line.received} из ${line.quantity}` : line.quantity }} шт.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <Collapsible v-if="block.closed.length">
+            <CollapsibleTrigger class="text-xs text-muted-foreground hover:underline" data-testid="closed-orders-toggle">
+              Закрытые за 30 дней — {{ block.closed.length }}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ul class="mt-2 space-y-1 text-xs text-muted-foreground" data-testid="closed-orders">
+                <li v-for="order in block.closed" :key="order.id">
+                  №{{ order.number }} от {{ formatDay(order.createdAt) }} · {{ ORDER_STATUS_LABEL[order.status].toLowerCase() }}<template v-if="order.closedAt">
+                    {{ formatDay(order.closedAt) }}
+                  </template>
+                  <template v-if="order.status === 'received'">
+                    · принято {{ orderSummary(order).receivedUnits }} из {{ orderSummary(order).units }} шт.
+                  </template>
+                </li>
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
+
           <p v-if="!block.rows.length" class="text-sm text-muted-foreground">
             У этого поставщика ничего не дошло до порога. Заказ можно собрать вручную — «Добавить товар».
           </p>
@@ -532,6 +828,7 @@ async function assignSupplier(productId: string, supplierId: string) {
                       <span v-if="row.item.sku">Арт. {{ row.item.sku }}</span>
                       <span v-if="row.manual" class="ml-2 text-primary">добавлен вручную</span>
                       <span v-else-if="row.quantity === 0" class="ml-2">не берём</span>
+                      <span v-if="row.item.pending" class="ml-2 text-amber-700 dark:text-amber-400" data-testid="row-pending">уже заказано {{ row.item.pending }} шт.</span>
                     </div>
                   </TableCell>
                   <TableCell class="text-center">
@@ -673,6 +970,9 @@ async function assignSupplier(productId: string, supplierId: string) {
                   <p class="text-xs text-muted-foreground">
                     <span v-if="row.item.sku">Арт. {{ row.item.sku }} · </span>продано {{ row.item.sold30 }} / {{ row.item.sold90 }} за 30/90 дн.
                   </p>
+                  <p v-if="row.item.pending" class="text-xs text-amber-700 dark:text-amber-400">
+                    уже заказано {{ row.item.pending }} шт.
+                  </p>
                   <p v-if="row.item.cartCustomers || row.item.alerts || row.item.wishlist" class="text-xs text-muted-foreground">
                     <span
                       v-if="row.item.cartCustomers"
@@ -808,7 +1108,7 @@ async function assignSupplier(productId: string, supplierId: string) {
                                   {{ product.name }}
                                 </div>
                                 <div class="text-xs text-muted-foreground">
-                                  <span v-if="product.sku">Арт. {{ product.sku }} · </span>продано {{ product.sold90 }} за 90 дн.
+                                  <span v-if="product.sku">Арт. {{ product.sku }} · </span>продано {{ product.sold90 }} за 90 дн.<span v-if="product.pending"> · заказано {{ product.pending }}</span>
                                 </div>
                               </div>
                               <span class="text-xs text-muted-foreground tabular-nums whitespace-nowrap">остаток {{ product.stock }}</span>
@@ -861,6 +1161,16 @@ async function assignSupplier(productId: string, supplierId: string) {
                   WhatsApp
                 </Button>
                 <Button
+                  v-if="ordersReady"
+                  size="sm"
+                  :disabled="!block.order.totals.positions || busy === `place:${block.key}`"
+                  data-testid="order-place"
+                  @click="placeOrder(block)"
+                >
+                  <Check class="w-4 h-4 mr-1.5" />
+                  Заказал
+                </Button>
+                <Button
                   v-if="block.edited"
                   variant="ghost"
                   size="sm"
@@ -877,9 +1187,118 @@ async function assignSupplier(productId: string, supplierId: string) {
               class="whitespace-pre-wrap rounded-md border bg-background p-3 text-xs font-sans"
               data-testid="order-text"
             >{{ block.order.text }}</pre>
+            <p v-if="ordersReady && block.order.totals.positions" class="text-xs text-muted-foreground">
+              Отправили поставщику — нажмите «Заказал»: заказ сохранится, а его товары перестанут проситься в новый заказ.
+            </p>
           </div>
         </CardContent>
       </Card>
     </template>
+
+    <!-- Приёмка -->
+    <Dialog v-model:open="receiveOpen">
+      <DialogContent class="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Приёмка — заказ №{{ receiving.order?.number }}</DialogTitle>
+          <DialogDescription>
+            Сколько пришло сейчас. Остаток товара увеличится на эти штуки.
+          </DialogDescription>
+        </DialogHeader>
+        <form v-if="receiving.order" class="space-y-4" data-testid="receive-dialog" @submit.prevent="submitReceive">
+          <div class="max-h-[50vh] overflow-y-auto divide-y">
+            <div
+              v-for="(line, i) in receiving.order.lines"
+              :key="line.productId ?? `d${i}`"
+              class="flex items-center justify-between gap-3 py-2"
+              data-testid="receive-line"
+            >
+              <div class="min-w-0 text-sm">
+                <div class="font-medium line-clamp-2">
+                  {{ line.name }}
+                </div>
+                <div class="text-xs text-muted-foreground">
+                  заказано {{ line.quantity }}<template v-if="line.received">
+                    , принято {{ line.received }}
+                  </template><template v-if="line.productId && productsById.get(line.productId)">
+                    · на складе {{ productsById.get(line.productId)?.stock }}
+                  </template>
+                </div>
+                <div v-if="!line.productId" class="text-xs text-muted-foreground">
+                  товар удалён — принять нельзя
+                </div>
+                <div v-else-if="waitingFor(line.productId)" class="text-xs text-amber-700 dark:text-amber-400" data-testid="receive-waiting">
+                  {{ plural(waitingFor(line.productId), 'ждёт', 'ждут', 'ждут') }} {{ waitingFor(line.productId) }} — {{ plural(waitingFor(line.productId), 'получит', 'получат', 'получат') }} «Товар снова в наличии»
+                </div>
+                <div v-else-if="!remaining(line)" class="text-xs text-muted-foreground">
+                  пришло всё
+                </div>
+              </div>
+              <Input
+                v-if="line.productId"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                max="9999"
+                class="h-9 w-20 shrink-0 text-center tabular-nums"
+                :model-value="receiving.quantities[line.productId] ?? 0"
+                :aria-label="`Пришло: ${line.name}`"
+                data-testid="receive-qty"
+                @change="(e: Event) => onReceiveQuantity(line.productId!, e)"
+              />
+            </div>
+          </div>
+          <label v-if="receivePreview.short" class="flex items-start gap-2 text-sm">
+            <Checkbox v-model="receiving.close" class="mt-0.5" data-testid="receive-close" />
+            <span>
+              Остального не будет — закрыть заказ
+              <span class="block text-xs text-muted-foreground">Иначе заказ останется «В пути», а недостающее — заказанным.</span>
+            </span>
+          </label>
+          <p class="text-sm" data-testid="receive-summary">
+            Будет принято <span class="font-medium tabular-nums">{{ receivePreview.units }}</span> шт.<template v-if="receivePreview.notified">
+              «Товар снова в наличии» сразу уйдёт <span class="font-medium tabular-nums">{{ receivePreview.notified }}</span>
+              {{ plural(receivePreview.notified, 'покупателю', 'покупателям', 'покупателям') }}.
+            </template>
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="outline" @click="receiving.order = null">
+              Отмена
+            </Button>
+            <Button
+              type="submit"
+              :disabled="receiving.saving || (!receivePreview.units && !(receivePreview.short && receiving.close))"
+              data-testid="receive-submit"
+            >
+              {{ receiving.saving ? 'Принимаю…' : 'Принять' }}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Отменить / закрыть заказ -->
+    <AlertDialog v-model:open="confirmOpen">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {{ confirming?.status === 'cancelled' ? 'Отменить' : 'Закрыть' }} заказ №{{ confirming?.order.number }}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            <template v-if="confirming?.status === 'cancelled'">
+              Его товары снова начнут проситься в заказ. Вернуть отменённый заказ нельзя.
+            </template>
+            <template v-else>
+              Недопринятое перестанет считаться заказанным, принять по этому заказу больше ничего будет нельзя.
+            </template>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Назад</AlertDialogCancel>
+          <AlertDialogAction data-testid="confirm-order-action" @click="confirmStatus">
+            {{ confirming?.status === 'cancelled' ? 'Отменить заказ' : 'Закрыть заказ' }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>

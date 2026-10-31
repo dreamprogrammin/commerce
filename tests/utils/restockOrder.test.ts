@@ -1,6 +1,6 @@
 import type { RestockItem } from '../../utils/restockOrder'
 import { describe, expect, it } from 'vitest'
-import { draftRows, orderText, orderTotals, plural, pluralPositions, whatsappUrl } from '../../utils/restockOrder'
+import { draftRows, needsRestock, orderText, orderTotals, plural, pluralPositions, whatsappUrl } from '../../utils/restockOrder'
 
 function item(over: Partial<RestockItem> & { id: string }): RestockItem {
   return { name: over.id, sku: null, stock: 0, minStock: 2, restockQty: 5, costPrice: 1000, ...over }
@@ -34,6 +34,17 @@ describe('draftRows', () => {
 
   it('добавленный вручную с нулём из заказа уходит', () => {
     expect(draftRows(items, { full: 0 }).some(r => r.item.id === 'full')).toBe(false)
+  })
+
+  it('уже заказанное и не пришедшее считается: заказ, покрывший порог, второй раз не просится', () => {
+    const withPending = [
+      item({ id: 'a', name: 'А', stock: 0, pending: 5 }), // 0 + 5 > 2 — уже едет
+      item({ id: 'b', name: 'Б', stock: 0, pending: 1 }), // 0 + 1 ≤ 2 — мало заказали
+      item({ id: 'v', name: 'В', stock: 2 }),
+    ]
+    expect(draftRows(withPending).map(r => r.item.id)).toEqual(['b', 'v'])
+    // вручную добавить уже заказанный можно — строкой «добавлен вручную»
+    expect(draftRows(withPending, { a: 3 }).map(r => [r.item.id, r.manual])).toEqual([['b', false], ['v', false], ['a', true]])
   })
 })
 
@@ -83,5 +94,13 @@ describe('whatsappUrl', () => {
   it('нет номера — null', () => {
     expect(whatsappUrl(null, 'x')).toBeNull()
     expect(whatsappUrl('12-34', 'x')).toBeNull()
+  })
+})
+
+describe('needsRestock', () => {
+  it('порог — с учётом заказанного', () => {
+    expect(needsRestock({ stock: 2, minStock: 2 })).toBe(true)
+    expect(needsRestock({ stock: 2, minStock: 2, pending: 1 })).toBe(false)
+    expect(needsRestock({ stock: 0, minStock: 2, pending: 2 })).toBe(true)
   })
 })
