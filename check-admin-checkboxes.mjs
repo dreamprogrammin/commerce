@@ -1,6 +1,6 @@
 /*
- * Галочки выбора в админке — «Возвраты» и «Акции» (1.11.2026) — только на
- * ЛОКАЛЬНОЙ базе.
+ * Галочки и переключатели в админке — «Возвраты», «Акции», «Пункты
+ * самовывоза» (1.11.2026) — только на ЛОКАЛЬНОЙ базе.
  *
  * Зачем. Галочки стояли как `:checked` / `@update:checked` — API radix-vue, а у
  * Checkbox из reka-ui 2 модель `modelValue`. Выбор жил в строке (клик по строке
@@ -11,11 +11,15 @@
  *  1) «Возвраты»: клик по строке позиции ставит и галочку; клик по галочке
  *     выбирает и снимает позицию — строка и галочка всегда совпадают;
  *  2) «Акции»: то же для товаров (счётчик «Товары (N / M)») и галочка «выбрать
- *     все» в шапке таблицы.
+ *     все» в шапке таблицы;
+ *  3) «Пункты самовывоза»: переключатель «Показывать в оформлении» (Switch, та
+ *     же болезнь — `v-model:checked`) показывает и сохраняет `is_active` — и при
+ *     создании, и при правке.
  *
  * Данные заводит сам — администратор, покупатель и доставленный заказ из двух
  * позиций (триггеры orders на время вставки выключены: их тела стучатся в
- * БОЕВЫЕ функции) — и в конце убирает. Ни возврат, ни акция не создаются.
+ * БОЕВЫЕ функции) — и в конце убирает. Ни возврат, ни акция не создаются;
+ * тестовый пункт самовывоза создаётся и удаляется.
  *
  *   node check-admin-checkboxes.mjs --base=http://localhost:3141
  */
@@ -58,6 +62,7 @@ async function createUser(email) {
 
 const stamp = Date.now()
 const adminEmail = `checkbox-admin-${stamp}@example.test`
+const pointName = `Пункт проверки ${stamp}`
 const users = []
 let d = null
 
@@ -170,10 +175,36 @@ SELECT json_build_object('ord', :'ord', 'saved', :'saved'::json,
   await header.click()
   check(await counter() === `Товары (0 / ${total})` && (await boxes()).every(s => s === 'unchecked') && await header.getAttribute('data-state') === 'unchecked', 'галочка в шапке ещё раз — сняты все')
 
+  console.log('\n== «Пункты самовывоза» — переключатель «Показывать в оформлении»')
+  await page.goto(`${BASE}/admin/pickup-points`, { waitUntil: 'load', timeout: 120000 })
+  await hydrated()
+  await page.waitForTimeout(500)
+  await page.getByRole('button', { name: 'Добавить', exact: true }).click()
+  const toggle = page.locator('#pp-active')
+  await toggle.waitFor()
+  check(await toggle.getAttribute('data-state') === 'checked', 'новый пункт: переключатель включён — как и показ в форме')
+  await toggle.click()
+  check(await toggle.getAttribute('data-state') === 'unchecked', 'переключатель выключается')
+  await page.fill('#pp-name', pointName)
+  await page.fill('#pp-address', 'г. Алматы, ул. Проверочная, 1')
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await page.getByText(pointName, { exact: true }).waitFor({ timeout: 15000 })
+  const active = () => psql(`SELECT is_active FROM public.pickup_points WHERE name = :'n'`, { n: pointName })
+  check(active() === 'f', 'сохранён выключенным — в базе is_active = false')
+  const card = page.locator('div', { has: page.getByText(pointName, { exact: true }) }).filter({ has: page.locator('button') }).last()
+  await card.getByRole('button').first().click()
+  await toggle.waitFor()
+  check(await toggle.getAttribute('data-state') === 'unchecked', 'правка: переключатель показывает «выключен»')
+  await toggle.click()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await page.waitForTimeout(1500)
+  check(active() === 't', 'включили и сохранили — в базе is_active = true')
+
   check(!errors.length, `без ошибок консоли${errors.length ? ` — ${errors[0].slice(0, 160)}` : ''}`)
 }
 finally {
   await browser.close()
+  psql(`DELETE FROM public.pickup_points WHERE name = :'n'`, { n: pointName })
   if (d) {
     psql(`
 BEGIN;
