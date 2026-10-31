@@ -372,12 +372,14 @@ onUnmounted(() => {
               ]"
               @click="toggleItem(item)"
             >
-              <!-- Чекбокс -->
+              <!-- Чекбокс. Модель — modelValue (reka-ui 2): до 1.11.2026 здесь
+                   стояли :checked / @update:checked из radix-vue — галочка не
+                   показывала выбор, а клик по ней не менял его. -->
               <Checkbox
-                :checked="isSelected(item.product_id)"
+                :model-value="isSelected(item.product_id)"
                 :disabled="item.available_quantity <= 0"
                 @click.stop
-                @update:checked="toggleItem(item)"
+                @update:model-value="toggleItem(item)"
               />
 
               <!-- Название -->
