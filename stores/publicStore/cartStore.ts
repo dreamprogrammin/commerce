@@ -1,7 +1,9 @@
 import type { Database, ICheckoutData, ProductWithImages } from '@/types'
+import type { CartLine, ServerSyncMark } from '@/utils/cartSync'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_PRODUCT, COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
+import { cartSignature, decideCartSync, mergeCartLines } from '@/utils/cartSync'
 import {
   buildDeliveryDates,
   clampIndex,
@@ -108,7 +110,19 @@ export const useCartStore = defineStore(
     )
     const isAddingItem = ref(false) // Флаг для предотвращения race condition
     const syncTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
-    const isMergingFromServer = ref(false) // Блокирует sync→server пока грузим данные с сервера
+    /**
+     * Какую версию серверной корзины отражает эта (1.11.2026, utils/cartSync.ts).
+     * Живёт в localStorage рядом с корзиной: по ней сверка решает, взять
+     * серверную целиком или объединить.
+     */
+    const serverSync = ref<ServerSyncMark | null>(null)
+    /*
+     * В этой вкладке ещё не сверялись с сервером — своё не отправляем: правка
+     * из восстановленной корзины затёрла бы то, что положили в другом браузере.
+     * Не persist: каждая загрузка страницы сверяется заново.
+     */
+    let serverSyncedThisPage = false
+    let serverSyncInFlight: Promise<void> | null = null
     /**
      * Номер гостевой корзины на сервере (31.10.2026): владелец хотел видеть,
      * что кладут в корзину и гости. Случайный, без имени; живёт в localStorage
@@ -116,7 +130,8 @@ export const useCartStore = defineStore(
      */
     const guestCartId = ref<string | null>(null)
     const isCartOpen = ref(false) // 🔥 Управление состоянием шторки корзины
-    const hasMergedOnLogin = ref(false) // Флаг для предотвращения повторного мерджа
+
+    const toLine = (item: ICartItem): CartLine => ({ productId: item.product.id, quantity: itemQuantity(item) })
 
     /**
      * Количество позиции числом. Корзина восстанавливается из localStorage
@@ -397,20 +412,24 @@ export const useCartStore = defineStore(
       bonusesToSpend.value = 0
       // Очищаем серверную корзину
       if (user.value) {
-        const { error } = await supabase.from('server_carts').upsert(
+        const userId = user.value.id
+        const { data, error } = await supabase.from('server_carts').upsert(
           {
-            user_id: user.value.id,
+            user_id: userId,
             items: [] as any,
             total_amount: 0,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'user_id' },
-        )
+        ).select('updated_at').single()
         if (error) {
           console.error(
             '[CartStore] Failed to clear server cart:',
             error.message,
           )
+        }
+        else {
+          serverSync.value = { userId, at: data.updated_at, signature: '' }
         }
       }
     }
@@ -468,9 +487,13 @@ export const useCartStore = defineStore(
         console.warn('[CartStore] Guest cart sync failed:', error.message)
     }
 
-    // Немедленная синхронизация без debounce
-    async function forceSyncToServer() {
-      if (!user.value || isMergingFromServer.value)
+    /**
+     * Отправить корзину на сервер. Без `force` — только после сверки в этой
+     * вкладке и только если состав отличается от того, что сервер уже знает
+     * (иначе это эхо сверки или корзина, восстановленная из localStorage).
+     */
+    async function forceSyncToServer(force = false, userId = user.value?.id) {
+      if (!userId)
         return
 
       if (syncTimeout.value) {
@@ -478,50 +501,36 @@ export const useCartStore = defineStore(
         syncTimeout.value = null
       }
 
-      const cartItems = items.value.map(i => ({
-        product_id: i.product.id,
-        quantity: i.quantity,
-      }))
+      const lines = items.value.map(toLine)
+      const signature = cartSignature(lines)
+      const mark = serverSync.value?.userId === userId ? serverSync.value : null
+      if (!force && (!serverSyncedThisPage || mark?.signature === signature))
+        return
 
-      const { error } = await supabase.from('server_carts').upsert(
+      const { data, error } = await supabase.from('server_carts').upsert(
         {
-          user_id: user.value!.id,
-          items: cartItems as any,
+          user_id: userId,
+          items: lines.map(l => ({ product_id: l.productId, quantity: l.quantity })) as any,
           total_amount: subtotal.value,
           updated_at: new Date().toISOString(),
           reminder_1h_sent: false,
           reminder_24h_sent: false,
         },
         { onConflict: 'user_id' },
-      )
+      ).select('updated_at').single()
 
       if (error) {
         console.error('[CartStore] Sync to server failed:', error.message)
+        return
       }
+      serverSync.value = { userId, at: data.updated_at, signature }
     }
 
-    // Загрузка серверной корзины
-    async function loadServerCart(): Promise<ICartItem[]> {
-      if (!user.value)
+    /** Строки серверной корзины → позиции с товарами. Удалённых товаров нет. */
+    async function hydrateServerItems(raw: unknown): Promise<ICartItem[]> {
+      const lines = (Array.isArray(raw) ? raw : []) as Array<{ product_id: string, quantity: number }>
+      if (!lines.length)
         return []
-
-      const { data: serverCart } = await supabase
-        .from('server_carts')
-        .select('items')
-        .eq('user_id', user.value.id)
-        .single()
-
-      if (
-        !serverCart?.items
-        || !Array.isArray(serverCart.items)
-        || serverCart.items.length === 0
-      ) {
-        return []
-      }
-
-      const productIds = (
-        serverCart.items as Array<{ product_id: string, quantity: number }>
-      ).map(i => i.product_id)
 
       const { data: products, error } = await supabase
         .from('products')
@@ -537,7 +546,7 @@ export const useCartStore = defineStore(
         )
       `,
         )
-        .in('id', productIds)
+        .in('id', lines.map(l => l.product_id))
         .order('display_order', {
           referencedTable: 'product_images',
           ascending: true,
@@ -546,76 +555,82 @@ export const useCartStore = defineStore(
       if (error || !products)
         return []
 
-      const serverItems: ICartItem[] = []
-      for (const serverItem of serverCart.items as Array<{
-        product_id: string
-        quantity: number
-      }>) {
-        const product = products.find(p => p.id === serverItem.product_id)
-        if (product) {
-          serverItems.push({
-            product: product as ProductWithImages,
-            quantity: serverItem.quantity,
-          })
-        }
+      const result: ICartItem[] = []
+      for (const line of lines) {
+        const product = products.find(p => p.id === line.product_id)
+        if (product)
+          result.push({ product: product as ProductWithImages, quantity: line.quantity })
       }
-
-      return serverItems
+      return result
     }
 
-    // Merge при логине: объединяем локальную и серверную корзины
-    async function mergeOnLogin() {
-      if (!user.value || hasMergedOnLogin.value)
-        return
-
-      isMergingFromServer.value = true
-      hasMergedOnLogin.value = true
-      try {
-        const serverItems = await loadServerCart()
-
-        if (serverItems.length === 0) {
-          // Серверная корзина пустая → синхронизируем локальную на сервер
-          if (items.value.length > 0) {
-            await forceSyncToServer()
-          }
-          return
-        }
-
-        if (items.value.length === 0) {
-          // Локальная корзина пустая → загружаем серверную
-          items.value = serverItems
-          // 🔥 Сбрасываем бонусы при загрузке с сервера
-          bonusesToSpend.value = 0
-          return
-        }
-
-        // Обе корзины не пустые → мерджим (берем максимальное количество)
-        const mergedMap = new Map<string, ICartItem>()
-
-        // Добавляем серверные товары
-        serverItems.forEach((item) => {
-          mergedMap.set(item.product.id, { ...item })
-        })
-
-        // Добавляем локальные товары (берем максимум, не суммируем)
-        items.value.forEach((localItem) => {
-          const existing = mergedMap.get(localItem.product.id)
-          if (existing) {
-            existing.quantity = Math.max(existing.quantity, localItem.quantity)
-          }
-          else {
-            mergedMap.set(localItem.product.id, { ...localItem })
-          }
-        })
-
-        items.value = Array.from(mergedMap.values())
-        // 🔥 Сбрасываем бонусы после мерджа
+    function applyServerItems(list: ICartItem[], userId: string, at: string) {
+      const signature = cartSignature(list.map(toLine))
+      if (signature !== cartSignature(items.value.map(toLine))) {
+        items.value = list
+        // Состав сменился — списание бонусов считается заново
         bonusesToSpend.value = 0
-        await forceSyncToServer()
       }
-      finally {
-        isMergingFromServer.value = false
+      serverSync.value = { userId, at, signature }
+    }
+
+    /**
+     * Сверка с серверной корзиной (1.11.2026): при входе, при открытии сайта
+     * уже вошедшим и при возврате на вкладку (plugins/auth-init.client.ts).
+     * Что делать — решает `decideCartSync`. Одновременные вызовы — один.
+     */
+    function syncWithServer(userId = user.value?.id): Promise<void> {
+      if (import.meta.server || !userId)
+        return Promise.resolve()
+      serverSyncInFlight ??= runServerSync(userId).finally(() => {
+        serverSyncInFlight = null
+      })
+      return serverSyncInFlight
+    }
+
+    async function runServerSync(userId: string) {
+      const { data: row, error } = await supabase
+        .from('server_carts')
+        .select('items, updated_at')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (error) {
+        console.warn('[CartStore] Server cart read failed:', error.message)
+        return
       }
+
+      const action = decideCartSync({
+        userId,
+        mark: serverSync.value,
+        server: row ? { at: row.updated_at } : null,
+        local: items.value.map(toLine),
+      })
+      serverSyncedThisPage = true
+      if (action === 'nothing')
+        return
+      // Без серверной корзины решение — только «отправить» или «ничего»
+      if (action === 'push' || !row) {
+        await forceSyncToServer(true, userId)
+        return
+      }
+
+      const serverItems = await hydrateServerItems(row.items)
+      if (action === 'take-server') {
+        applyServerItems(serverItems, userId, row.updated_at)
+        return
+      }
+
+      // Объединение: серверные позиции свежее, локальные добавляются
+      const byId = new Map([...items.value, ...serverItems].map(i => [i.product.id, i]))
+      const merged = mergeCartLines(serverItems.map(toLine), items.value.map(toLine))
+        .map(l => ({ ...byId.get(l.productId)!, quantity: l.quantity }))
+      if (cartSignature(merged.map(toLine)) === cartSignature(serverItems.map(toLine))) {
+        applyServerItems(serverItems, userId, row.updated_at)
+        return
+      }
+      items.value = merged
+      bonusesToSpend.value = 0
+      await forceSyncToServer(true, userId)
     }
 
     // Отмена pending sync (для logout)
@@ -624,7 +639,9 @@ export const useCartStore = defineStore(
         clearTimeout(syncTimeout.value)
         syncTimeout.value = null
       }
-      hasMergedOnLogin.value = false // Сбрасываем флаг при логауте
+      // Следующий вход сверится заново, как впервые: объединит, а не заменит
+      serverSync.value = null
+      serverSyncedThisPage = false
     }
 
     watch([items, () => items.value.map(i => i.quantity)], syncToServer, {
@@ -634,9 +651,8 @@ export const useCartStore = defineStore(
     /*
      * Вошёл — гостевая запись больше не нужна: корзина живёт в server_carts с
      * именем, иначе в спросе она посчиталась бы дважды. Через наблюдение за
-     * пользователем, а не в mergeOnLogin: тот зовут только на SIGNED_IN, а
-     * открывший сайт уже вошедшим (другая вкладка, сохранённая сессия)
-     * приходит с INITIAL_SESSION — так гостевая запись висела.
+     * пользователем: так запись убирается при любом его появлении — и при
+     * входе, и при открытии сайта уже вошедшим (INITIAL_SESSION).
      */
     // guestCartId — тоже: persist подставляет его из localStorage уже после setup
     watch([user, guestCartId], ([u]) => {
@@ -827,9 +843,10 @@ export const useCartStore = defineStore(
       clearCart,
       checkout,
       setBonusesToSpend,
-      mergeOnLogin,
+      syncWithServer,
       cancelPendingSync,
       guestCartId,
+      serverSync,
     }
   },
   {
@@ -842,6 +859,7 @@ export const useCartStore = defineStore(
       pick: [
         'items',
         'guestCartId',
+        'serverSync',
         'bonusesToSpend',
         'deliveryMethod',
         'deliveryAddress',
