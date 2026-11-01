@@ -48,6 +48,7 @@ const navLinks = [
   { to: '/admin/suppliers', label: 'Поставщики' },
   { to: '/admin/pickup-points', label: 'Пункты самовывоза' },
   { to: '/admin/restock', label: 'К закупке' },
+  { to: '/admin/demand', label: 'Спрос на рынке' },
   { to: '/admin/pos', label: 'Оффлайн касса' },
   { to: '/admin/returns', label: 'Возвраты' },
   { to: '/admin/sales', label: 'Продажи' },

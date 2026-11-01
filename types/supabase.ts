@@ -925,6 +925,167 @@ export interface Database {
         }
         Relationships: []
       }
+      market_demand_candidates: {
+        Row: {
+          first_seen: string
+          keyword: string
+          last_seen: string
+          search_volume: number
+          status: string
+          trend_pct: number | null
+        }
+        Insert: {
+          first_seen?: string
+          keyword: string
+          last_seen?: string
+          search_volume: number
+          status?: string
+          trend_pct?: number | null
+        }
+        Update: {
+          first_seen?: string
+          keyword?: string
+          last_seen?: string
+          search_volume?: number
+          status?: string
+          trend_pct?: number | null
+        }
+        Relationships: []
+      }
+      market_demand_keywords: {
+        Row: {
+          competition_index: number | null
+          cpc: number | null
+          keyword: string
+          search_volume: number | null
+          updated_at: string
+        }
+        Insert: {
+          competition_index?: number | null
+          cpc?: number | null
+          keyword: string
+          search_volume?: number | null
+          updated_at?: string
+        }
+        Update: {
+          competition_index?: number | null
+          cpc?: number | null
+          keyword?: string
+          search_volume?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      market_demand_monthly: {
+        Row: {
+          keyword: string
+          month: string
+          search_volume: number
+        }
+        Insert: {
+          keyword: string
+          month: string
+          search_volume: number
+        }
+        Update: {
+          keyword?: string
+          month?: string
+          search_volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'market_demand_monthly_keyword_fkey'
+            columns: ['keyword']
+            isOneToOne: false
+            referencedRelation: 'market_demand_keywords'
+            referencedColumns: ['keyword']
+          },
+        ]
+      }
+      market_demand_runs: {
+        Row: {
+          cost: number | null
+          error: string | null
+          finished_at: string | null
+          id: number
+          items: number | null
+          keywords_sent: number
+          kind: string
+          request_id: number | null
+          requested_at: string
+          requested_by: string | null
+          scheduled: boolean
+          status: string
+        }
+        Insert: {
+          cost?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          items?: number | null
+          keywords_sent?: number
+          kind: string
+          request_id?: number | null
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
+        }
+        Update: {
+          cost?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          items?: number | null
+          keywords_sent?: number
+          kind?: string
+          request_id?: number | null
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
+        }
+        Relationships: []
+      }
+      market_demand_topics: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          keyword_cores: string[]
+          keywords: string[]
+          kind: string
+          match_terms: string[]
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          keyword_cores?: string[]
+          keywords: string[]
+          kind?: string
+          match_terms?: string[]
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          keyword_cores?: string[]
+          keywords?: string[]
+          kind?: string
+          match_terms?: string[]
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       material_questions: {
         Row: {
           answer_text: string | null
@@ -3391,6 +3552,83 @@ export interface Database {
       is_admin: { Args: never, Returns: boolean }
       kz_phone_digits: { Args: { p_phone: string }, Returns: string }
       link_telegram_by_code: { Args: { p_code: string }, Returns: Json }
+      market_demand_api_base: { Args: never, Returns: string }
+      market_demand_candidates_list: {
+        Args: { p_limit?: number }
+        Returns: {
+          first_seen: string
+          keyword: string
+          last_seen: string
+          search_volume: number
+          series: number[]
+          trend_pct: number
+        }[]
+      }
+      market_demand_collect: { Args: never, Returns: number }
+      market_demand_core: { Args: { p_keyword: string }, Returns: string }
+      market_demand_covered: { Args: { p_core: string }, Returns: boolean }
+      market_demand_credentials_delete: { Args: never, Returns: undefined }
+      market_demand_credentials_get: {
+        Args: never
+        Returns: {
+          login: string
+          password: string
+        }[]
+      }
+      market_demand_credentials_set: {
+        Args: { p_admin: string, p_login: string, p_password: string }
+        Returns: undefined
+      }
+      market_demand_credentials_status: {
+        Args: never
+        Returns: {
+          login: string
+          password_last4: string
+          updated_at: string
+        }[]
+      }
+      market_demand_ingest: {
+        Args: {
+          p_content: string
+          p_error?: string
+          p_http_status: number
+          p_run_id: number
+        }
+        Returns: string
+      }
+      market_demand_is_noise: { Args: { p_keyword: string }, Returns: boolean }
+      market_demand_normalize: {
+        Args: { p_list: string[], p_terms: boolean, p_what: string }
+        Returns: string[]
+      }
+      market_demand_request: {
+        Args: { p_admin?: string, p_scheduled?: boolean }
+        Returns: Json
+      }
+      market_demand_summary: {
+        Args: never
+        Returns: {
+          data_until: string
+          is_active: boolean
+          keywords: string[]
+          kind: string
+          match_terms: string[]
+          name: string
+          our_in_stock: number
+          our_total: number
+          peak_month: number
+          peak_ratio: number
+          season_soon: boolean
+          series: number[]
+          topic_id: string
+          trend_pct: number
+          updated_at: string
+          volume_avg3: number
+          volume_last: number
+          volume_prev3: number
+        }[]
+      }
+      market_demand_term_regex: { Args: { p_term: string }, Returns: string }
       pos_find_offline_customer: {
         Args: { p_phone: string }
         Returns: {
