@@ -123,14 +123,39 @@ interface ProviderConfig {
   kind: 'anthropic' | 'openai-compatible'
   baseURL?: string
   keyEnv: string
+  /**
+   * Как у OpenAI-совместимого называется потолок ответа. У OpenAI `max_tokens`
+   * устарел — заменён на `max_completion_tokens`, с моделями o-серии уже не
+   * работает. Google в описании своего совместимого адреса (на 2.11.2026) не
+   * называет ни один из двух — у него оставлен прежний `max_tokens`.
+   */
+  maxTokensParam?: 'max_tokens' | 'max_completion_tokens'
 }
 
 /** Провайдер → откуда брать ключ и адрес. Добавить нового — одна строка. */
 export const PROVIDERS: Record<string, ProviderConfig> = {
   anthropic: { kind: 'anthropic', keyEnv: 'ANTHROPIC_API_KEY' },
-  openai: { kind: 'openai-compatible', baseURL: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY' },
-  gemini: { kind: 'openai-compatible', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY' },
+  openai: { kind: 'openai-compatible', baseURL: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY', maxTokensParam: 'max_completion_tokens' },
+  gemini: { kind: 'openai-compatible', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY', maxTokensParam: 'max_tokens' },
 }
+
+/**
+ * Потолок ответа. У Claude и GPT в него входят и «размышления»: прежних
+ * 4 000 могло не хватить — Sonnet 5.5 без явного уровня думает на high.
+ * Платится только выданное, так что запас ничего не стоит; выше ~21 000 SDK
+ * Anthropic без потоковой передачи запрос не пускает.
+ */
+export const MAX_OUTPUT_TOKENS = 16000
+
+/**
+ * Уровень рассуждений — явно низкий (2.11.2026). Прочесть артикул и цену —
+ * не задача на долгие раздумья, а без явного уровня Claude 5.5 и GPT думают
+ * на medium, Sonnet 5.5 — на high, Gemini — на своём по умолчанию: дольше и
+ * дороже. В рейтинге чтения текста с фото (Roboflow, 26.10.2026) у четырёх
+ * моделей, где есть оба замера, low уступает high 1,6–4,1 пункта и дешевле в
+ * 1,4–4,3 раза. `low` есть у всех трёх провайдеров.
+ */
+export const EFFORT = 'low'
 
 /** Модель по умолчанию — кандидат из проекта агента; меняется VISION_MODEL. */
 export const DEFAULT_MODEL = 'anthropic/claude-haiku-5-5'
@@ -168,7 +193,7 @@ export async function readSupplierPost(post: SupplierPost, spec: string, env: En
   const started = Date.now()
   const out = config.kind === 'anthropic'
     ? await callAnthropic(post, model, apiKey, baseURL)
-    : await callOpenAICompatible(post, model, apiKey, baseURL!)
+    : await callOpenAICompatible(post, model, apiKey, baseURL!, config.maxTokensParam ?? 'max_tokens')
   return { model: spec, ...out, items: parseItems(out.raw), ms: Date.now() - started }
 }
 
@@ -210,13 +235,38 @@ export function parseItems(raw: string): ReadItem[] {
   }))
 }
 
+/**
+ * Принимает ли модель Anthropic уровень усилия: у Claude Haiku 4.5 и
+ * Sonnet 4.5 его нет, запрос с ним — 400. Спрашиваем Models API (так же
+ * админка узнаёт, понимает ли модель картинки) — раз на модель за запуск.
+ */
+const effortSupport = new Map<string, Promise<boolean>>()
+
+function supportsEffort(client: Anthropic, model: string): Promise<boolean> {
+  const key = `${client.baseURL} ${model}`
+  const known = effortSupport.get(key)
+  if (known)
+    return known
+  const asked: Promise<boolean> = client.models.retrieve(model)
+    // Типы SDK с esm.sh приходят не всегда — форма описана явно
+    .then((m: unknown) => (m as { capabilities?: { effort?: { low?: { supported?: boolean } } } | null }).capabilities?.effort?.low?.supported === true)
+    .catch(() => {
+      // Сбой справки не запоминаем; этот пост — на уровне модели по умолчанию
+      effortSupport.delete(key)
+      return false
+    })
+  effortSupport.set(key, asked)
+  return asked
+}
+
 async function callAnthropic(post: SupplierPost, model: string, apiKey: string, baseURL?: string) {
   const client = new Anthropic({ apiKey, baseURL })
+  const effort = await supportsEffort(client, model)
   const response = await client.messages.create({
     model,
-    max_tokens: 4000,
+    max_tokens: MAX_OUTPUT_TOKENS,
     system: SYSTEM_PROMPT,
-    output_config: { format: { type: 'json_schema', schema: READ_SCHEMA } },
+    output_config: { format: { type: 'json_schema', schema: READ_SCHEMA }, ...(effort ? { effort: EFFORT } : {}) },
     messages: [{
       role: 'user',
       content: [
@@ -232,7 +282,7 @@ async function callAnthropic(post: SupplierPost, model: string, apiKey: string, 
   if (response.stop_reason === 'refusal')
     throw new Error('Модель отказалась читать пост')
   if (response.stop_reason === 'max_tokens')
-    throw new Error('Ответ не поместился в max_tokens')
+    throw new Error(`Ответ не поместился в ${MAX_OUTPUT_TOKENS} токенов`)
   // Типы SDK с esm.sh в Deno приходят не всегда — форма блока описана явно
   const block = (response.content as { type: string, text?: string }[]).find(b => b.type === 'text')
   if (!block?.text)
@@ -240,39 +290,53 @@ async function callAnthropic(post: SupplierPost, model: string, apiKey: string, 
   return { raw: block.text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens }
 }
 
-async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: string, baseURL: string) {
-  const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    {
-      role: 'user',
-      content: [
-        ...post.images.map(img => ({ type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.data}` } })),
-        { type: 'text', text: USER_TEXT(post.caption) },
-      ],
-    },
-  ]
-  const request = (responseFormat: unknown, extraSystem = '') => fetch(`${baseURL.replace(/\/$/, '')}/chat/completions`, {
+async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: string, baseURL: string, maxTokensParam: 'max_tokens' | 'max_completion_tokens') {
+  const user = {
+    role: 'user',
+    content: [
+      ...post.images.map(img => ({ type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.data}` } })),
+      { type: 'text', text: USER_TEXT(post.caption) },
+    ],
+  }
+  // Что снимается, если модель ответила 400. Строгую схему понимают не все —
+  // тогда просим просто JSON и даём схему текстом; уровня рассуждений нет у
+  // моделей без рассуждений, вроде gpt-4.1
+  let strict = true
+  let effort = true
+  const request = () => fetch(`${baseURL.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      max_tokens: 4000,
-      messages: extraSystem ? [{ role: 'system', content: SYSTEM_PROMPT + extraSystem }, messages[1]] : messages,
-      response_format: responseFormat,
+      [maxTokensParam]: MAX_OUTPUT_TOKENS,
+      ...(effort ? { reasoning_effort: EFFORT } : {}),
+      messages: [
+        { role: 'system', content: strict ? SYSTEM_PROMPT : `${SYSTEM_PROMPT}\n\nОтветь только JSON по схеме:\n${JSON.stringify(READ_SCHEMA)}` },
+        user,
+      ],
+      response_format: strict
+        ? { type: 'json_schema', json_schema: { name: 'supplier_post', strict: true, schema: READ_SCHEMA } }
+        : { type: 'json_object' },
     }),
   })
 
-  let res = await request({ type: 'json_schema', json_schema: { name: 'supplier_post', strict: true, schema: READ_SCHEMA } })
-  // Строгую схему понимают не все: тогда просим просто JSON и даём схему текстом
-  if (res.status === 400) {
-    res = await request({ type: 'json_object' }, `\n\nОтветь только JSON по схеме:\n${JSON.stringify(READ_SCHEMA)}`)
+  let res = await request()
+  while (res.status === 400 && (strict || effort)) {
+    // Отвергнутый параметр OpenAI называет в error.param; у Google его там
+    // нет — тогда сначала схема, потом уровень рассуждений
+    const param = await res.json().then((b: { error?: { param?: string } }) => b?.error?.param, () => undefined)
+    if (param === 'reasoning_effort' || !strict)
+      effort = false
+    else
+      strict = false
+    res = await request()
   }
   if (!res.ok)
     throw new Error(`${model}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`)
   const body = await res.json()
   const choice = body.choices?.[0]
   if (choice?.finish_reason === 'length')
-    throw new Error('Ответ не поместился в max_tokens')
+    throw new Error(`Ответ не поместился в ${MAX_OUTPUT_TOKENS} токенов`)
   const raw = choice?.message?.content
   if (typeof raw !== 'string' || !raw.trim())
     throw new Error(`Пустой ответ модели: ${JSON.stringify(body).slice(0, 300)}`)
