@@ -1,8 +1,9 @@
 /**
  * Тема спроса из тела запроса админки («Спрос на рынке», 1.11.2026). Строгую
  * проверку и нормализацию фраз делает база (триггер
- * `market_demand_topics_normalize`) — здесь только форма: строки, списки
- * строк, разумные длины.
+ * `market_demand_topics_normalize`, для фразы Вордстата —
+ * `market_demand_topics_yandex`) — здесь только форма: строки, списки строк,
+ * разумные длины.
  */
 export interface DemandTopicInput {
   name: string
@@ -10,6 +11,12 @@ export interface DemandTopicInput {
   keywords: string[]
   match_terms: string[]
   is_active: boolean
+  /**
+   * Своя фраза для Вордстата (2.11.2026); пустая — по первой фразе. Нет в
+   * теле — поле не трогается: страница шлёт его, только когда миграция
+   * Вордстата применена, иначе запись темы упала бы на незнакомом столбце.
+   */
+  yandex_phrase?: string | null
 }
 
 function stringList(value: unknown, what: string): string[] {
@@ -31,13 +38,22 @@ export function parseDemandTopic(body: unknown): DemandTopicInput {
   const keywords = stringList(b.keywords, 'Поисковые фразы')
   if (!keywords.length)
     throw createError({ statusCode: 400, message: 'Нужна хотя бы одна поисковая фраза' })
-  return {
+  const topic: DemandTopicInput = {
     name,
     kind: b.kind === 'franchise' ? 'franchise' : 'type',
     keywords,
     match_terms: b.match_terms === undefined ? [] : stringList(b.match_terms, 'Признаки своего товара'),
     is_active: b.is_active === undefined ? true : b.is_active === true,
   }
+  if (b.yandex_phrase !== undefined) {
+    if (b.yandex_phrase !== null && typeof b.yandex_phrase !== 'string')
+      throw createError({ statusCode: 400, message: 'Фраза для Вордстата — строка' })
+    const phrase = typeof b.yandex_phrase === 'string' ? b.yandex_phrase.trim() : ''
+    if (phrase.length > 120)
+      throw createError({ statusCode: 400, message: 'Фраза для Вордстата — до 120 знаков' })
+    topic.yandex_phrase = phrase || null
+  }
+  return topic
 }
 
 /** Ошибка базы при записи темы → понятный ответ. */

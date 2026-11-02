@@ -35,6 +35,7 @@
 import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
 import http from 'node:http'
+import os from 'node:os'
 import process from 'node:process'
 import { chromium } from 'playwright'
 
@@ -70,9 +71,10 @@ function psql(sql, vars = {}) {
 /*
  * Настройку для сессий PostgREST (роль authenticator) ставит только
  * суперпользователь — локальный supabase_admin (пароль локального стенда).
+ * Через контейнер: psql на самой машине есть не везде (на WSL его нет).
  */
 function psqlSuper(sql) {
-  return execFileSync('psql', ['postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1'], { input: sql, encoding: 'utf8' }).trim()
+  return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=postgres', DB_CONTAINER, 'psql', '-w', '-h', '127.0.0.1', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1'], { input: sql, encoding: 'utf8' }).trim()
 }
 const serviceHeaders = { 'apikey': SERVICE, 'Authorization': `Bearer ${SERVICE}`, 'Content-Type': 'application/json' }
 async function rpc(name, body = {}) {
@@ -168,6 +170,48 @@ const stub = http.createServer((req, res) => {
   })
 })
 
+/*
+ * База зовёт заглушку по host.docker.internal. Под WSL с Docker Desktop это
+ * имя ведёт в Windows, а заглушка живёт в WSL — не достучаться. Зато адрес
+ * самого WSL (eth0) из контейнера виден: тогда на время прогона имя в
+ * /etc/hosts контейнера базы указывает туда, в конце файл возвращается.
+ * pg_net держит адреса в кеше libcurl до минуты — отсюда долгий повтор.
+ */
+let hostsBackup = null
+async function stubPing(host, seconds) {
+  const until = Date.now() + seconds * 1000
+  while (Date.now() < until) {
+    const id = psql(`SELECT net.http_get('http://${host}:${STUB_PORT}/ping')`)
+    for (let i = 0; i < 10; i++) {
+      await sleep(500)
+      const row = psql(`SELECT coalesce(status_code, 0) FROM net._http_response WHERE id = ${id}`)
+      if (row === '200')
+        return true
+      if (row)
+        break
+    }
+    await sleep(2000)
+  }
+  return false
+}
+async function reachStub() {
+  if (await stubPing('host.docker.internal', 5))
+    return
+  const wsl = os.networkInterfaces().eth0?.find(a => a.family === 'IPv4')?.address
+  if (!wsl || !(await stubPing(wsl, 5)))
+    throw new Error('база не достучалась до заглушки ни через host.docker.internal, ни по адресу WSL')
+  hostsBackup = execFileSync('docker', ['exec', DB_CONTAINER, 'cat', '/etc/hosts'], { encoding: 'utf8' })
+  const lines = hostsBackup.replace(/\n$/, '').split('\n').filter(l => !/\shost\.docker\.internal\s*$/.test(l))
+  // `cat >`, а не sed -i: /etc/hosts в контейнере смонтирован файлом, менять его inode нельзя
+  execFileSync('docker', ['exec', '-i', DB_CONTAINER, 'sh', '-c', 'cat > /etc/hosts'], { input: `${[...lines, `${wsl}\thost.docker.internal`].join('\n')}\n` })
+  if (!(await stubPing('host.docker.internal', 90)))
+    throw new Error(`база не достучалась до заглушки и после подмены host.docker.internal на ${wsl}`)
+}
+function restoreHosts() {
+  if (hostsBackup)
+    execFileSync('docker', ['exec', '-i', DB_CONTAINER, 'sh', '-c', 'cat > /etc/hosts'], { input: hostsBackup })
+}
+
 // ── Подготовка ──────────────────────────────────────────────────────────────
 const stamp = Date.now()
 const emails = { admin: `demand-admin-${stamp}@example.test`, buyer: `demand-buyer-${stamp}@example.test` }
@@ -193,14 +237,7 @@ try {
   await new Promise(r => stub.listen(STUB_PORT, r))
 
   // База видит заглушку? (pg_net из контейнера → host.docker.internal)
-  const pingId = psql(`SELECT net.http_get('http://host.docker.internal:${STUB_PORT}/ping')`)
-  let pinged = false
-  for (let i = 0; i < 20 && !pinged; i++) {
-    await sleep(500)
-    pinged = psql(`SELECT coalesce(status_code, 0) FROM net._http_response WHERE id = ${pingId}`) === '200'
-  }
-  if (!pinged)
-    throw new Error('база не достучалась до заглушки на host.docker.internal')
+  await reachStub()
 
   topicsBackup = psql(`SELECT coalesce(json_agg(t), '[]')::text FROM public.market_demand_topics t`)
   psql(`
@@ -272,14 +309,14 @@ COMMIT;`, { admin: adminId })
 
   await page.getByLabel('Логин API DataForSEO').fill('wrong_login')
   await page.getByLabel('Пароль API DataForSEO').fill('wrong_password_1')
-  await page.getByRole('button', { name: 'Проверить и сохранить' }).click()
+  await page.getByTestId('demand-key-form').getByRole('button', { name: 'Проверить и сохранить' }).click()
   check(await toastWith(page, 'не принял').waitFor({ timeout: 15000 }).then(() => true, () => false), 'неверный ключ — «DataForSEO не принял логин и пароль API»')
   check(secretCount() === '0', 'неверный ключ в базу не лёг')
 
   await page.getByLabel('Логин API DataForSEO').fill(STUB_LOGIN)
   await page.getByLabel('Пароль API DataForSEO').fill(STUB_PASSWORD)
-  await page.getByRole('button', { name: 'Проверить и сохранить' }).click()
-  await page.getByText('ключ задан').waitFor({ timeout: 15000 })
+  await page.getByTestId('demand-key-form').getByRole('button', { name: 'Проверить и сохранить' }).click()
+  await keyStatus.getByText('ключ задан').waitFor({ timeout: 15000 })
   const statusText = await keyStatus.innerText()
   check(statusText.includes(STUB_LOGIN) && statusText.includes('••••d_42') && statusText.includes('$0,64'), 'верный ключ: логин, 4 последних знака пароля и баланс $0,64')
   check(secretCount() === '1' && !statusText.includes(STUB_PASSWORD), 'ключ в Vault, пароль на страницу не вернулся')
@@ -388,10 +425,10 @@ COMMIT;`, { admin: adminId })
   await page.getByLabel('Найти тему').fill('')
 
   console.log('\n== удаление ключа')
-  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+  await keyStatus.getByRole('button', { name: 'Удалить', exact: true }).click()
   check(secretCount() === '1', 'первое нажатие только спрашивает')
-  await page.getByRole('button', { name: 'Точно удалить?' }).click()
-  await page.getByText('ключ не задан').waitFor({ timeout: 15000 })
+  await keyStatus.getByRole('button', { name: 'Точно удалить?' }).click()
+  await keyStatus.getByText('ключ не задан').waitFor({ timeout: 15000 })
   check(secretCount() === '0', 'второе — ключ удалён из Vault')
 
   console.log('\n== 390 px')
@@ -418,6 +455,13 @@ COMMIT;`, { admin: adminId })
 finally {
   await browser.close()
   stub.close()
+  try {
+    restoreHosts()
+  }
+  catch (e) {
+    console.error('/etc/hosts базы не вернулся:', e.message)
+    fails.push('уборка /etc/hosts')
+  }
   // Всё назад: темы, данные спроса, ключ, настройка PostgREST, пользователи
   try {
     if (topicsBackup) {
