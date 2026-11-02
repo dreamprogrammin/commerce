@@ -2,11 +2,15 @@ import type { DemandTopic } from '../../utils/marketDemand'
 import { describe, expect, it } from 'vitest'
 import {
   dataUntilLabel,
+  demandStats,
+  formatKztCost,
   formatUsd,
   formatVolume,
   matchesDemandFilter,
+  monthLabel,
   parseDemandList,
   peakLabel,
+  phrasesDative,
   sortDemandTopics,
   sparkPoints,
   topicNameFromKeyword,
@@ -93,6 +97,90 @@ describe('фильтры и порядок', () => {
 
   it('по спросу, без цифр — после, отключённые — в конце', () => {
     expect(sortDemandTopics([off, noData, puzzles, lego]).map(t => t.name)).toEqual(['LEGO', 'Пазлы', 'Беговел', 'Тамагочи'])
+  })
+})
+
+describe('вордстат рядом с Google (2.11.2026)', () => {
+  const both = topic({
+    name: 'Пазлы',
+    series: [1, 2, 3],
+    volume_avg3: 5400,
+    trend_pct: -40,
+    peak_month: 12,
+    peak_ratio: 1.6,
+    season_soon: true,
+    data_until: '2026-10-01',
+    y_series: [7, 8, 9],
+    y_volume_avg3: 900,
+    y_trend_pct: 25,
+    y_peak_month: 9,
+    y_peak_ratio: 1.4,
+    y_season_soon: false,
+    y_data_until: '2026-10-01',
+  })
+  const yandexOnly = topic({ name: 'Машинки', y_series: [1, 1, 1], y_volume_avg3: 3000, y_trend_pct: -20 })
+  const googleOnly = topic({ name: 'Куклы', series: [1, 1, 1], volume_avg3: 8000 })
+
+  it('числа темы — по выбранному источнику; без миграции Вордстата у Яндекса пусто', () => {
+    expect(demandStats(both, 'google')).toEqual({
+      series: [1, 2, 3],
+      volume_avg3: 5400,
+      trend_pct: -40,
+      peak_month: 12,
+      peak_ratio: 1.6,
+      season_soon: true,
+      data_until: '2026-10-01',
+    })
+    expect(demandStats(both, 'yandex')).toEqual({
+      series: [7, 8, 9],
+      volume_avg3: 900,
+      trend_pct: 25,
+      peak_month: 9,
+      peak_ratio: 1.4,
+      season_soon: false,
+      data_until: '2026-10-01',
+    })
+    expect(demandStats(googleOnly, 'yandex')).toEqual({
+      series: null,
+      volume_avg3: null,
+      trend_pct: null,
+      peak_month: null,
+      peak_ratio: null,
+      season_soon: false,
+      data_until: null,
+    })
+  })
+
+  it('фильтры — по числам выбранного источника, по умолчанию Google', () => {
+    expect(matchesDemandFilter(both, 'falling')).toBe(true)
+    expect(matchesDemandFilter(both, 'falling', 'yandex')).toBe(false)
+    expect(matchesDemandFilter(both, 'growing', 'yandex')).toBe(true)
+    expect(matchesDemandFilter(both, 'season', 'yandex')).toBe(false)
+    expect(matchesDemandFilter(yandexOnly, 'missing')).toBe(false)
+    expect(matchesDemandFilter(yandexOnly, 'missing', 'yandex')).toBe(true)
+  })
+
+  it('порядок — по спросу выбранного источника', () => {
+    expect(sortDemandTopics([both, yandexOnly, googleOnly]).map(t => t.name)).toEqual(['Куклы', 'Пазлы', 'Машинки'])
+    expect(sortDemandTopics([both, yandexOnly, googleOnly], 'yandex').map(t => t.name)).toEqual(['Машинки', 'Пазлы', 'Куклы'])
+  })
+
+  it('цена в тенге — и копеечная: знак не отрывается от числа', () => {
+    expect(formatKztCost(0.1)).toBe('0,1\u00A0₸')
+    expect(formatKztCost(0.5)).toBe('0,5\u00A0₸')
+    expect(formatKztCost(9.2)).toBe('9\u00A0₸')
+    expect(formatKztCost(1500)).toBe('1\u00A0500\u00A0₸')
+  })
+
+  it('месяц и «по … фразам»', () => {
+    expect(monthLabel('2026-10-01')).toBe('октябрь 2026')
+    expect(monthLabel(null)).toBeNull()
+    expect(monthLabel(undefined)).toBeNull()
+    expect(phrasesDative(1)).toBe('1 фразе')
+    expect(phrasesDative(21)).toBe('21 фразе')
+    expect(phrasesDative(11)).toBe('11 фразам')
+    expect(phrasesDative(4)).toBe('4 фразам')
+    expect(phrasesDative(92)).toBe('92 фразам')
   })
 })
 

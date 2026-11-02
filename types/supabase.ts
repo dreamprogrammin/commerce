@@ -1059,6 +1059,7 @@ export interface Database {
           match_terms: string[]
           name: string
           updated_at: string
+          yandex_phrase: string | null
         }
         Insert: {
           created_at?: string
@@ -1071,6 +1072,7 @@ export interface Database {
           match_terms?: string[]
           name: string
           updated_at?: string
+          yandex_phrase?: string | null
         }
         Update: {
           created_at?: string
@@ -1083,6 +1085,111 @@ export interface Database {
           match_terms?: string[]
           name?: string
           updated_at?: string
+          yandex_phrase?: string | null
+        }
+        Relationships: []
+      }
+      market_demand_yandex_jobs: {
+        Row: {
+          attempts: number
+          error: string | null
+          finished_at: string | null
+          next_at: string
+          phrase: string
+          request_id: number | null
+          run_id: number
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          error?: string | null
+          finished_at?: string | null
+          next_at?: string
+          phrase: string
+          request_id?: number | null
+          run_id: number
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          error?: string | null
+          finished_at?: string | null
+          next_at?: string
+          phrase?: string
+          request_id?: number | null
+          run_id?: number
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'market_demand_yandex_jobs_run_id_fkey'
+            columns: ['run_id']
+            isOneToOne: false
+            referencedRelation: 'market_demand_yandex_runs'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      market_demand_yandex_monthly: {
+        Row: {
+          count: number
+          month: string
+          phrase: string
+          share: number | null
+        }
+        Insert: {
+          count: number
+          month: string
+          phrase: string
+          share?: number | null
+        }
+        Update: {
+          count?: number
+          month?: string
+          phrase?: string
+          share?: number | null
+        }
+        Relationships: []
+      }
+      market_demand_yandex_runs: {
+        Row: {
+          api_base: string
+          error: string | null
+          finished_at: string | null
+          id: number
+          paused_until: string | null
+          phrases: number
+          requested_at: string
+          requested_by: string | null
+          scheduled: boolean
+          status: string
+        }
+        Insert: {
+          api_base: string
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          paused_until?: string | null
+          phrases: number
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
+        }
+        Update: {
+          api_base?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          paused_until?: string | null
+          phrases?: number
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
         }
         Relationships: []
       }
@@ -3626,9 +3733,67 @@ export interface Database {
           volume_avg3: number
           volume_last: number
           volume_prev3: number
+          y_data_until: string
+          y_peak_month: number
+          y_peak_ratio: number
+          y_phrase: string
+          y_season_soon: boolean
+          y_series: number[]
+          y_trend_pct: number
+          y_volume_avg3: number
+          y_volume_last: number
+          y_volume_prev3: number
+          yandex_phrase: string
         }[]
       }
       market_demand_term_regex: { Args: { p_term: string }, Returns: string }
+      market_demand_yandex_api_base: { Args: never, Returns: string }
+      market_demand_yandex_finish: {
+        Args: { p_run_id: number }
+        Returns: string
+      }
+      market_demand_yandex_ingest: {
+        Args: {
+          p_content: string
+          p_error?: string
+          p_headers?: Json
+          p_http_status: number
+          p_phrase: string
+          p_run_id: number
+        }
+        Returns: string
+      }
+      market_demand_yandex_key_delete: { Args: never, Returns: undefined }
+      market_demand_yandex_key_set: {
+        Args: {
+          p_admin: string
+          p_api_key: string
+          p_folder_id: string
+          p_region_id: string
+          p_region_name: string
+        }
+        Returns: undefined
+      }
+      market_demand_yandex_key_status: {
+        Args: never
+        Returns: {
+          folder_id: string
+          key_last4: string
+          region_id: string
+          region_name: string
+          updated_at: string
+        }[]
+      }
+      market_demand_yandex_phrase: {
+        Args: { p_keywords: string[], p_override: string }
+        Returns: string
+      }
+      market_demand_yandex_progress: { Args: never, Returns: Json }
+      market_demand_yandex_request: {
+        Args: { p_admin?: string, p_scheduled?: boolean }
+        Returns: Json
+      }
+      market_demand_yandex_tick: { Args: never, Returns: Json }
       pos_find_offline_customer: {
         Args: { p_phone: string }
         Returns: {

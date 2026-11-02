@@ -2,6 +2,10 @@
  * «Спрос на рынке» (1 ноября 2026): темы со спросом, новые запросы, последние
  * обновления и ключ DataForSEO с балансом. Если обновление идёт — пришедшие
  * ответы DataForSEO забираются здесь же.
+ *
+ * Вордстат (2 ноября 2026) — ключ и ход обновления. Без его миграции
+ * `yandex: null`, остальная страница работает как раньше: превью с `dev`
+ * смотрит в боевую базу ещё до того, как миграцию применят.
  */
 export default defineEventHandler(async (event) => {
   const db = await requireAdmin(event)
@@ -18,7 +22,7 @@ export default defineEventHandler(async (event) => {
     collectError = error?.message ?? null
   }
 
-  const [summary, candidates, runs, status] = await Promise.all([
+  const [summary, candidates, runs, status, yandexKey, yandexProgress] = await Promise.all([
     db.rpc('market_demand_summary'),
     db.rpc('market_demand_candidates_list', { p_limit: 40 }),
     db.from('market_demand_runs')
@@ -26,11 +30,21 @@ export default defineEventHandler(async (event) => {
       .order('id', { ascending: false })
       .limit(6),
     db.rpc('market_demand_credentials_status'),
+    db.rpc('market_demand_yandex_key_status'),
+    db.rpc('market_demand_yandex_progress'),
   ])
   for (const r of [summary, candidates, runs, status]) {
     if (r.error)
       throw createError({ statusCode: 500, message: r.error.message })
   }
+  const yandexInstalled = !demandNotInstalled(yandexKey.error) && !demandNotInstalled(yandexProgress.error)
+  for (const r of yandexInstalled ? [yandexKey, yandexProgress] : []) {
+    if (r.error)
+      throw createError({ statusCode: 500, message: r.error.message })
+  }
+  const yKey = yandexInstalled
+    ? (yandexKey.data as Array<{ folder_id: string, key_last4: string, region_name: string, updated_at: string }>)[0] ?? null
+    : null
 
   const key = (status.data as Array<{ login: string, password_last4: string, updated_at: string }>)[0] ?? null
   let balance: number | null = null
@@ -58,6 +72,12 @@ export default defineEventHandler(async (event) => {
     collectError,
     credentials: key
       ? { login: key.login, last4: key.password_last4, updatedAt: key.updated_at, balance, balanceError }
+      : null,
+    yandex: yandexInstalled
+      ? {
+          key: yKey ? { folderId: yKey.folder_id, last4: yKey.key_last4, region: yKey.region_name, updatedAt: yKey.updated_at } : null,
+          progress: yandexProgress.data,
+        }
       : null,
   }
 })
