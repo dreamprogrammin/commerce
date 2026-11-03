@@ -167,6 +167,22 @@ export interface Supplier {
 export type SupplierInsert = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>
 export type SupplierUpdate = Partial<SupplierInsert>
 
+// Канал поставщика в Telegram (supplier_channels) — пишет сервер админки
+export interface SupplierChannel {
+  id: string
+  supplier_id: string
+  /** Имя открытого канала, в нижнем регистре; null — канал по приглашению */
+  username: string | null
+  /** Код приглашения t.me/+<код>; null — открытый канал */
+  invite_hash: string | null
+  title: string
+  chat_type: 'channel' | 'group'
+  /** Посты видны без аккаунта на t.me/s/<имя> */
+  web_preview: boolean
+  checked_at: string
+  created_at: string
+}
+
 export type SlideRow = Database['public']['Tables']['slides']['Row']
 export type SlideInsert = Database['public']['Tables']['slides']['Insert']
 export type SlideUpdate = Database['public']['Tables']['slides']['Update']

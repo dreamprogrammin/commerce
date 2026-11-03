@@ -2746,6 +2746,53 @@ export interface Database {
           },
         ]
       }
+      supplier_channels: {
+        Row: {
+          chat_type: string
+          checked_at: string
+          created_at: string
+          created_by: string | null
+          id: string
+          invite_hash: string | null
+          supplier_id: string
+          title: string
+          username: string | null
+          web_preview: boolean
+        }
+        Insert: {
+          chat_type: string
+          checked_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invite_hash?: string | null
+          supplier_id: string
+          title: string
+          username?: string | null
+          web_preview?: boolean
+        }
+        Update: {
+          chat_type?: string
+          checked_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invite_hash?: string | null
+          supplier_id?: string
+          title?: string
+          username?: string | null
+          web_preview?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_channels_supplier_id_fkey'
+            columns: ['supplier_id']
+            isOneToOne: false
+            referencedRelation: 'suppliers'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       supplier_order_items: {
         Row: {
           cost_price: number | null
