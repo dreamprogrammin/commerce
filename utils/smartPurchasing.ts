@@ -17,6 +17,7 @@ import { plural } from './restockOrder'
 export const PURCHASING_PAGES = [
   { to: '/admin/suppliers', label: 'Поставщики' },
   { to: '/admin/telegram', label: 'Аккаунт Telegram' },
+  { to: '/admin/supplier-offers', label: 'Товары поставщиков' },
   { to: '/admin/demand', label: 'Спрос на рынке' },
   { to: '/admin/ai', label: 'Модели ИИ' },
   { to: '/admin/restock', label: 'К закупке' },
@@ -89,6 +90,15 @@ export interface PurchasingStatus {
   } | null
   /** Аккаунт Telegram, которым читаются закрытые каналы; null — миграции аккаунта нет */
   telegram: { connected: boolean } | null
+  /** «Товары поставщиков» за 30 дней; null — миграции нет */
+  offers: {
+    /** Ещё не разобраны */
+    fresh: number
+    added: number
+    skipped: number
+    /** Последний сбор какого-нибудь канала */
+    collectedAt: string | null
+  } | null
   demand: {
     hasKey: boolean
     /** Обновление запрошено, ответ DataForSEO ещё не разобран */
@@ -129,7 +139,7 @@ export interface PurchasingStatus {
 export type StepState = 'done' | 'action' | 'running' | 'later'
 
 export interface PurchasingStep {
-  id: 'suppliers' | 'demand' | 'ai' | 'digest' | 'order'
+  id: 'suppliers' | 'demand' | 'ai' | 'offers' | 'order'
   title: string
   /** Зачем шаг — одной строкой */
   about: string
@@ -323,6 +333,35 @@ function aiStep(s: PurchasingStatus): PurchasingStep {
   return { ...step, state: 'later', facts, next: 'Ключ есть. Дальше — подобрать модель на 20–30 постах ваших каналов и подключить чтение.' }
 }
 
+/*
+ * Владелец 4.11: «ссылки можно собирать в админке чтобы было удобно можно
+ * разгруппировать» — вместо задуманной сводки в Telegram-бот.
+ */
+function offersStep(s: PurchasingStatus): PurchasingStep {
+  const step = {
+    id: 'offers' as const,
+    title: 'Товары поставщиков',
+    about: 'Новые товары из каналов поставщиков: фото, подпись и ссылка на пост. Разобранное отмечаете — добавил на сайт или не брать.',
+    link: { to: '/admin/supplier-offers', label: 'Товары поставщиков' },
+  }
+  const o = s.offers
+  if (!o)
+    return { ...step, state: 'later', facts: [], next: NO_MIGRATION }
+  if (!s.channels?.total)
+    return { ...step, state: 'later', facts: ['каналов нет'], next: 'Появится, когда у поставщиков будут каналы в Telegram — шаг 1.' }
+  if (!o.collectedAt)
+    return { ...step, state: 'action', facts: ['ещё не собирали'], next: 'Откройте «Товары поставщиков» и нажмите «Собрать новые».' }
+  const facts = [
+    o.fresh ? `не разобрано: ${count(o.fresh, 'товар', 'товара', 'товаров')}` : 'всё разобрано',
+    `последний сбор — ${dayMonth(o.collectedAt)}`,
+  ]
+  if (o.added)
+    facts.push(`добавлено на сайт: ${o.added}`)
+  if (o.fresh)
+    return { ...step, state: 'action', facts, next: 'Разберите новые: «Добавил» — что выложили на сайт, «Не брать» — остальное.' }
+  return { ...step, state: 'done', facts, next: 'Посты, вышедшие позже, соберёт «Собрать новые».' }
+}
+
 function orderStep(s: PurchasingStatus): PurchasingStep {
   const step = {
     id: 'order' as const,
@@ -353,21 +392,7 @@ function orderStep(s: PurchasingStatus): PurchasingStep {
   return { ...step, state: 'done', facts, next: null }
 }
 
-/** Шаги умного закупа по порядку: откуда товар → спрос → чтение постов → сводка → заказ. */
+/** Шаги умного закупа по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ. */
 export function purchasingSteps(s: PurchasingStatus): PurchasingStep[] {
-  return [
-    suppliersStep(s),
-    demandStep(s),
-    aiStep(s),
-    {
-      id: 'digest',
-      title: 'Сводка «В заказ» / «Пропустить»',
-      about: 'Каждый день: новые посты поставщиков → товары → спрос по каждому → сводка в Telegram-бот с кнопками «В заказ» и «Пропустить».',
-      state: 'later',
-      facts: [],
-      next: 'Появится, когда заработают шаги 1–3.',
-      link: null,
-    },
-    orderStep(s),
-  ]
+  return [suppliersStep(s), demandStep(s), aiStep(s), offersStep(s), orderStep(s)]
 }

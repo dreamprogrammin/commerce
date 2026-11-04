@@ -1,6 +1,9 @@
-import type { TelegramClient, User } from '@mtcute/node'
+import type { Message, Photo, TelegramClient, Document as TgDocument, User } from '@mtcute/node'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ChannelMessage } from '~/utils/supplierPosts'
+import { Buffer } from 'node:buffer'
 import process from 'node:process'
+import { groupProducts } from '~/utils/supplierPosts'
 import { isSessionGone, phoneLast4, telegramErrorText } from '~/utils/telegramLogin'
 
 /**
@@ -54,6 +57,38 @@ export type InviteState
     | { state: 'not_member', title: string | null }
     | { state: 'expired' }
 
+/** Товар закрытого канала — для «Товаров поставщиков» (server/utils/supplierOffers.ts) */
+export interface ChannelPost {
+  /** Первое сообщение товара */
+  id: number
+  /** Последнее: товар из альбома может тянуться на несколько сообщений */
+  lastId: number
+  date: string
+  caption: string
+  photoCount: number
+  /** Первое фото, уже скачанное; null — не скачалось */
+  photo: { bytes: Uint8Array, type: string } | null
+}
+
+export interface ChannelRead {
+  /** Номер канала у Telegram — для ссылки t.me/c/<номер>/<сообщение> */
+  chatId: number
+  posts: ChannelPost[]
+  /** Последнее разобранное сообщение; null — в канале ни одного */
+  upTo: number | null
+  /** Разобрано не всё — следующий сбор продолжит */
+  more: boolean
+}
+
+export interface ReadOptions {
+  /** Разобрано до этого сообщения включительно; null — первый сбор */
+  afterId: number | null
+  /** Первый сбор берёт сообщения не старше этого */
+  since: Date
+  /** Товаров за раз, не больше */
+  limit: number
+}
+
 /** Что странице нужно от Telegram; настоящий — mtcute, для стража — подделка. */
 interface TelegramPort {
   sendCode: (app: TgApp, phone: string) => Promise<{ session: string, phoneCodeHash: string, via: string }>
@@ -61,12 +96,21 @@ interface TelegramPort {
   checkPassword: (app: TgApp, login: PendingLogin, password: string) => Promise<{ user: TgUser, session: string }>
   logOut: (app: TgApp, session: string) => Promise<void>
   checkInvites: (app: TgApp, session: string, hashes: string[]) => Promise<Record<string, InviteState>>
+  readChannel: (app: TgApp, session: string, hash: string, options: ReadOptions) => Promise<ChannelRead>
 }
 
 /** Вход живёт столько: код Telegram к этому времени всё равно устаревает */
 const LOGIN_TTL_MS = 15 * 60 * 1000
 /** Дольше одна операция не ждёт: иначе функция Vercel висела бы до своего предела */
 const CALL_TIMEOUT_MS = 40_000
+/** Чтение канала дольше: за раз скачивается до limit фото */
+const READ_TIMEOUT_MS = 55_000
+/** Сообщений за одно чтение канала, не больше */
+const SCAN_LIMIT = 300
+/** Бакет supplier-photos больше не примет */
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024
+const NOT_MEMBER = 'Аккаунт Telegram не в этом канале — вступите им по приглашению и соберите снова'
+const INVITE_EXPIRED = 'Приглашение в канал устарело — попросите у поставщика новое и замените канал на странице «Поставщики»'
 
 // ---------- mtcute ----------
 
@@ -83,14 +127,14 @@ async function newClient(app: TgApp): Promise<TelegramClient> {
   })
 }
 
-async function withClient<T>(app: TgApp, session: string | null, fn: (tg: TelegramClient) => Promise<T>): Promise<T> {
+async function withClient<T>(app: TgApp, session: string | null, fn: (tg: TelegramClient) => Promise<T>, timeoutMs = CALL_TIMEOUT_MS): Promise<T> {
   const tg = await newClient(app)
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     if (session)
       await tg.importSession(session)
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(createError({ statusCode: 504, message: 'Telegram не ответил — попробуйте ещё раз' })), CALL_TIMEOUT_MS)
+      timer = setTimeout(() => reject(createError({ statusCode: 504, message: 'Telegram не ответил — попробуйте ещё раз' })), timeoutMs)
     })
     return await Promise.race([fn(tg), timeout])
   }
@@ -108,6 +152,123 @@ function toUser(u: User): TgUser {
 async function rpcText(e: unknown): Promise<string | null> {
   const { tl } = await loadMtcute()
   return tl.RpcError.is(e) ? e.text : null
+}
+
+type Image = Photo | TgDocument
+
+// Картинки-файлы; прочие документы — сообщения без картинки
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+function imageOf(m: Message): Image | null {
+  const media = m.media
+  return media?.type === 'photo' || (media?.type === 'document' && IMAGE_TYPES.has(media.mimeType)) ? media : null
+}
+
+/** Фото для списка: снимок — в 800 px, картинка-файл — сама, а большая — миниатюрой */
+async function previewOf(tg: TelegramClient, image: Image): Promise<ChannelPost['photo']> {
+  if (image.type === 'photo')
+    return { bytes: await tg.downloadAsBuffer(image.getThumbnail('x') ?? image), type: 'image/jpeg' }
+  if (image.fileSize && image.fileSize <= PHOTO_MAX_BYTES)
+    return { bytes: await tg.downloadAsBuffer(image), type: image.mimeType }
+  const thumb = image.getThumbnail('m')
+  return thumb ? { bytes: await tg.downloadAsBuffer(thumb), type: 'image/jpeg' } : null
+}
+
+type Dated<T> = ChannelMessage<T> & { date: string }
+
+/** История канала: после номера — от старых к новым; последние — от свежего назад */
+interface History<T> {
+  after: (id: number) => AsyncIterable<Dated<T>>
+  latest: () => AsyncIterable<Dated<T>>
+}
+
+/**
+ * Товары канала от старых к новым, не больше limit. Последним товар берётся,
+ * только когда начался следующий: так альбом не режется посередине. upTo —
+ * докуда разобрано, следующий сбор начнётся после него. Первый сбор — с since.
+ */
+async function scanChannel<T>(history: History<T>, { afterId, since, limit }: ReadOptions) {
+  const messages: Dated<T>[] = []
+  let newestId = afterId
+  let cut = false
+  if (afterId) {
+    for await (const m of history.after(afterId)) {
+      messages.push(m)
+      newestId = m.id
+      if (groupProducts(messages).length > limit)
+        break
+      if (messages.length >= SCAN_LIMIT) {
+        cut = true
+        break
+      }
+    }
+  }
+  else {
+    for await (const m of history.latest()) {
+      newestId ??= m.id
+      if (Date.parse(m.date) < since.getTime())
+        break
+      messages.unshift(m)
+      if (messages.length >= SCAN_LIMIT)
+        break
+    }
+  }
+  const dates = new Map(messages.map(m => [m.id, m.date]))
+  const products = groupProducts(messages)
+  const taken = products.slice(0, limit)
+  const more = products.length > limit || cut
+  return {
+    taken: taken.map(p => ({ ...p, date: dates.get(p.id)! })),
+    upTo: more && taken.length ? taken.at(-1)!.lastId : newestId,
+    more,
+  }
+}
+
+async function* mapHistory<T>(messages: AsyncIterable<Message>, fn: (m: Message) => T) {
+  for await (const m of messages)
+    yield fn(m)
+}
+
+/** Канал по приглашению: аккаунт должен в нём состоять */
+async function joinedChannel(tg: TelegramClient, hash: string) {
+  let invite
+  try {
+    invite = await tg.call({ _: 'messages.checkChatInvite', hash })
+  }
+  catch (e) {
+    const text = await rpcText(e)
+    if (text === 'INVITE_HASH_EXPIRED' || text === 'INVITE_HASH_INVALID')
+      throw createError({ statusCode: 409, message: INVITE_EXPIRED })
+    throw e
+  }
+  if (invite._ !== 'chatInviteAlready' || invite.chat._ !== 'channel')
+    throw createError({ statusCode: 409, message: NOT_MEMBER })
+  return invite.chat
+}
+
+async function readChannelMtcute(tg: TelegramClient, hash: string, options: ReadOptions): Promise<ChannelRead> {
+  const chat = await joinedChannel(tg, hash)
+  const plain = (m: Message): Dated<Image> => ({ id: m.id, album: m.groupedIdUnique, text: m.text, image: imageOf(m), date: m.date.toISOString() })
+  const { taken, upTo, more } = await scanChannel<Image>({
+    after: id => mapHistory(tg.iterHistory(chat, { reverse: true, offset: { id: id + 1, date: 0 } }), plain),
+    latest: () => mapHistory(tg.iterHistory(chat), plain),
+  }, options)
+  const posts: ChannelPost[] = []
+  for (const p of taken) {
+    let photo: ChannelPost['photo'] = null
+    try {
+      photo = await previewOf(tg, p.images[0]!)
+    }
+    catch (e) {
+      // Сессия умерла — дальше не скачать ничего; одно фото — пусть товар будет без него
+      const text = await rpcText(e)
+      if (text && isSessionGone(text))
+        throw e
+      console.error('[telegram] фото', p.id, text ?? e)
+    }
+    posts.push({ id: p.id, lastId: p.lastId, date: p.date, caption: p.caption, photoCount: p.images.length, photo })
+  }
+  return { chatId: chat.id, posts, upTo, more }
 }
 
 const mtcute: TelegramPort = {
@@ -172,6 +333,8 @@ const mtcute: TelegramPort = {
     }
     return out
   }),
+
+  readChannel: (app, session, hash, options) => withClient(app, session, tg => readChannelMtcute(tg, hash, options), READ_TIMEOUT_MS),
 }
 
 // ---------- подделка для стража ----------
@@ -189,6 +352,27 @@ const fakeUser = (phone: string): TgUser => ({ id: 777000, displayName: 'Зак�
 async function fakeError(text: 'PHONE_NUMBER_INVALID' | 'PHONE_CODE_INVALID' | 'PASSWORD_HASH_INVALID'): Promise<never> {
   const { tl } = await loadMtcute()
   throw new tl.RpcError(400, text)
+}
+
+/*
+ * Закрытый канал подделки — 80 сообщений по часу, последнее 10 минут назад.
+ * 5, 15, … 75 — текст без фото; 41–42 — альбом одного товара (подпись у 41),
+ * 50–51 — альбом двух товаров со своими подписями; фото 60 не скачивается.
+ */
+const FAKE_PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mPo33EDAAP5AiCMelXAAAAAAElFTkSuQmCC', 'base64')
+
+function fakeHistory(): Dated<string>[] {
+  const last = Date.now() - 10 * 60_000
+  return Array.from({ length: 80 }, (_, i) => {
+    const id = i + 1
+    return {
+      id,
+      album: id === 41 || id === 42 ? 'a41' : id === 50 || id === 51 ? 'a50' : null,
+      text: id === 42 ? '' : id % 10 === 5 ? `Новости склада ${id}` : `Артикул ЗК-${id}\nЦена ${id * 100} ₸`,
+      image: id % 10 === 5 ? null : id === 60 ? 'broken' : 'photo',
+      date: new Date(last - (80 - id) * 3_600_000).toISOString(),
+    }
+  })
 }
 
 const fake: TelegramPort = {
@@ -214,6 +398,30 @@ const fake: TelegramPort = {
     return Object.fromEntries(hashes.map(h => [h, h.startsWith('Member')
       ? { state: 'member', title: 'Закрытый опт', lastPostAt: '2026-11-04T05:00:00.000Z' }
       : h.startsWith('Expired') ? { state: 'expired' } : { state: 'not_member', title: 'Закрытый опт' }] as const))
+  },
+  async readChannel(_app, _session, hash, options) {
+    if (hash.startsWith('Expired'))
+      throw createError({ statusCode: 409, message: INVITE_EXPIRED })
+    if (!hash.startsWith('Member'))
+      throw createError({ statusCode: 409, message: NOT_MEMBER })
+    const history = fakeHistory()
+    const { taken, upTo, more } = await scanChannel<string>({
+      async* after(id) {
+        yield* history.filter(m => m.id > id)
+      },
+      async* latest() {
+        yield* [...history].reverse()
+      },
+    }, options)
+    const posts = taken.map(p => ({
+      id: p.id,
+      lastId: p.lastId,
+      date: p.date,
+      caption: p.caption,
+      photoCount: p.images.length,
+      photo: p.images[0] === 'broken' ? null : { bytes: FAKE_PHOTO, type: 'image/png' },
+    }))
+    return { chatId: 1000000001, posts, upTo, more }
   },
 }
 
@@ -461,4 +669,25 @@ export async function checkTelegramChannels(db: SupabaseClient) {
     throw await failure(e)
   }
   return { channels: rows.map(r => ({ id: r.id, ...states[r.invite_hash] ?? { state: 'expired' as const } })) }
+}
+
+/**
+ * Товары закрытого канала поставщика — для сборщика «Товаров поставщиков»
+ * (server/utils/supplierOffers.ts). Telegram закрыл сессию — она стирается,
+ * как на странице «Аккаунт Telegram».
+ */
+export async function readClosedChannel(db: SupabaseClient, hash: string, options: ReadOptions): Promise<ChannelRead> {
+  const session = await getSecret(db, 'session')
+  if (!session)
+    throw createError({ statusCode: 409, message: 'Закрытый канал читается через аккаунт Telegram — подключите его на странице «Аккаунт Telegram»' })
+  const app = await loadApp(db)
+  try {
+    return await telegram().readChannel(app, session, hash, options)
+  }
+  catch (e) {
+    const text = await rpcText(e)
+    if (text && isSessionGone(text))
+      await forgetSession(db)
+    throw await failure(e)
+  }
 }

@@ -7,7 +7,7 @@ import { isOpenOrder } from '~/utils/supplierOrders'
 /**
  * «Умный закуп» (3 ноября 2026): сводка для дашборда — спрос по темам, остаток
  * DataForSEO, поставщики с товарами и каналами, аккаунт Telegram для закрытых
- * каналов, ключ ИИ, заказы поставщикам.
+ * каналов, товары поставщиков, ключ ИИ, заказы поставщикам.
  * Показатели и шаги из неё собирает `utils/smartPurchasing.ts`.
  *
  * Наружу ходит только за балансом — бесплатный `/v3/appendix/user_data`, как
@@ -19,9 +19,10 @@ import { isOpenOrder } from '~/utils/supplierOrders'
 export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
   const db = await requireAdmin(event)
 
-  const [channels, telegramSecrets, summary, candidates, runs, demandKey, aiKeys, aiModel, restock] = await Promise.all([
+  const [channels, telegramSecrets, offers, summary, candidates, runs, demandKey, aiKeys, aiModel, restock] = await Promise.all([
     db.from('supplier_channels').select('supplier_id, web_preview'),
     db.rpc('telegram_secrets_status'),
+    db.rpc('supplier_offers_summary'),
     db.rpc('market_demand_summary'),
     db.from('market_demand_candidates').select('keyword', { count: 'exact', head: true }).eq('status', 'new'),
     db.from('market_demand_runs').select('kind, status, cost, requested_at, finished_at').order('id', { ascending: false }).limit(20),
@@ -42,6 +43,9 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
   const telegram = missing(telegramSecrets, telegramNotInstalled)
     ? null
     : { connected: ((telegramSecrets.data ?? []) as { name: string }[]).some(r => r.name === 'session') }
+  const offerCounts = missing(offers, supplierOffersNotInstalled)
+    ? null
+    : offers.data as NonNullable<PurchasingStatus['offers']>
 
   const demandMissing = [summary, candidates, runs, demandKey].map(r => missing(r, demandNotInstalled)).some(Boolean)
   const runRows = runs.data ?? []
@@ -101,6 +105,7 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
       suppliers: channelsBySupplier.size,
     },
     telegram,
+    offers: offerCounts,
     demand: demandMissing
       ? null
       : {
