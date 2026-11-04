@@ -16,6 +16,7 @@ import { plural } from './restockOrder'
 /** Страницы умного закупа — кнопками на дашборде; в боковом меню их нет */
 export const PURCHASING_PAGES = [
   { to: '/admin/suppliers', label: 'Поставщики' },
+  { to: '/admin/telegram', label: 'Аккаунт Telegram' },
   { to: '/admin/demand', label: 'Спрос на рынке' },
   { to: '/admin/ai', label: 'Модели ИИ' },
   { to: '/admin/restock', label: 'К закупке' },
@@ -86,6 +87,8 @@ export interface PurchasingStatus {
     /** У скольких поставщиков есть хотя бы один канал */
     suppliers: number
   } | null
+  /** Аккаунт Telegram, которым читаются закрытые каналы; null — миграции аккаунта нет */
+  telegram: { connected: boolean } | null
   demand: {
     hasKey: boolean
     /** Обновление запрошено, ответ DataForSEO ещё не разобран */
@@ -247,16 +250,28 @@ function suppliersStep(s: PurchasingStatus): PurchasingStep {
   const closed = ch.total - ch.open
   if (closed)
     facts.push(`через аккаунт: ${closed}`)
+  const tg = s.telegram
+  if (closed && tg?.connected)
+    facts.push('аккаунт Telegram подключён')
 
   if (!s.suppliers)
     return { ...step, state: 'action', facts, next: 'Добавьте поставщика: «Добавить поставщика», там же — его каналы в Telegram.' }
   if (!ch.total)
     return { ...step, state: 'action', facts, next: 'Добавьте каналы: у поставщика «⋯» → «Редактировать» → «Каналы в Telegram» → вставьте ссылку → «Добавить» → «Сохранить».' }
+  if (closed && tg && !tg.connected) {
+    return {
+      ...step,
+      state: 'action',
+      facts,
+      next: 'Закрытые каналы читаются только через аккаунт Telegram — подключите его на странице «Аккаунт Telegram».',
+      link: { to: '/admin/telegram', label: 'Аккаунт Telegram' },
+    }
+  }
   return {
     ...step,
     state: 'done',
     facts,
-    next: closed ? 'Закрытые каналы читаются только через аккаунт Telegram — его подключим вместе с чтением постов.' : null,
+    next: closed && !tg ? 'Закрытые каналы читаются только через аккаунт Telegram — его страница заработает после миграции базы.' : null,
   }
 }
 

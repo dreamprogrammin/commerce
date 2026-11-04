@@ -2931,6 +2931,44 @@ export interface Database {
         }
         Relationships: []
       }
+      telegram_account: {
+        Row: {
+          display_name: string
+          id: boolean
+          logged_in_at: string
+          logged_in_by: string | null
+          phone_last4: string | null
+          user_id: number
+          username: string | null
+        }
+        Insert: {
+          display_name: string
+          id?: boolean
+          logged_in_at?: string
+          logged_in_by?: string | null
+          phone_last4?: string | null
+          user_id: number
+          username?: string | null
+        }
+        Update: {
+          display_name?: string
+          id?: boolean
+          logged_in_at?: string
+          logged_in_by?: string | null
+          phone_last4?: string | null
+          user_id?: number
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'telegram_account_logged_in_by_fkey'
+            columns: ['logged_in_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       telegram_broadcasts: {
         Row: {
           admin_id: string
@@ -3927,6 +3965,19 @@ export interface Database {
           p_token: string
         }
         Returns: string
+      }
+      telegram_secret_delete: { Args: { p_name: string }, Returns: undefined }
+      telegram_secret_get: { Args: { p_name: string }, Returns: string }
+      telegram_secret_set: {
+        Args: { p_admin: string, p_name: string, p_value: string }
+        Returns: undefined
+      }
+      telegram_secrets_status: {
+        Args: never
+        Returns: {
+          name: string
+          updated_at: string
+        }[]
       }
       toggle_stock_alert: { Args: { p_product_id: string }, Returns: Json }
       validate_promo_code: {

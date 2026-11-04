@@ -84,7 +84,7 @@ const OLD_LINKS = [
   '/admin/ai',
 ]
 // Страницы закупа — кнопками на дашборде, в меню их нет
-const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/demand', 'Спрос на рынке'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
+const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/demand', 'Спрос на рынке'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
 const MENU = [...OLD_LINKS.filter(h => !PAGES.some(([p]) => p === h)), '/admin/purchasing']
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
@@ -273,6 +273,9 @@ try {
   const nSuppliers = num(`SELECT count(*) FROM public.suppliers`)
   const nTopics = num(`SELECT count(*) FROM public.market_demand_topics WHERE is_active`)
   const nChannels = num(`SELECT count(*) FROM public.supplier_channels`)
+  // Аккаунт Telegram (миграция 20261104120000): есть ли она и подключён ли аккаунт — сессия в Vault
+  const tgInstalled = psql(`SELECT to_regclass('public.telegram_account') IS NOT NULL;`) === 't'
+  const tgConnected = num(`SELECT count(*) FROM vault.secrets WHERE name = 'telegram_session'`) > 0
   const nActive = num(`SELECT count(*) FROM public.products WHERE is_active`)
   const nUnassigned = num(`SELECT count(*) FROM public.products WHERE is_active AND supplier_id IS NULL`)
   const { products: restockProducts, restock } = await expectedRestock(adminToken)
@@ -286,6 +289,7 @@ try {
   check(first.status === 200, `администратору — 200${first.status === 200 ? '' : ` (${first.status} ${j.message})`}`)
   check(j.suppliers === nSuppliers && j.channels?.total === nChannels && j.demand?.overview?.topics === nTopics, `поставщики ${j.suppliers}, каналы ${j.channels?.total}, темы ${j.demand?.overview?.topics} — как в базе`)
   check(JSON.stringify(j.restock) === JSON.stringify(restock), `к закупке — как на «К закупке»: ${JSON.stringify(j.restock)}`)
+  check(JSON.stringify(j.telegram) === JSON.stringify(tgInstalled ? { connected: tgConnected } : null), `аккаунт Telegram — как в базе: ${JSON.stringify(j.telegram)}`)
   const loadOk = j.supplierLoad?.length === dbSuppliers.length && dbSuppliers.every((s) => {
     const row = j.supplierLoad.find(x => x.id === s.id)
     const toRestock = restockProducts.filter(p => p.supplierId === s.id && p.stock + (p.pending ?? 0) <= p.minStock).length
@@ -453,7 +457,10 @@ INSERT INTO public.supplier_channels (supplier_id, invite_hash, title, chat_type
   await refreshHub(page)
   const sup2 = await stepOf(page, 'suppliers')
   const nSup2 = nSuppliers + 1
-  check(sup2.state === 'done' && sup2.badge === 'Готово', 'каналы есть — шаг 1 «Готово»')
+  if (tgInstalled && !tgConnected)
+    check(sup2.state === 'action' && sup2.badge === 'Нужно ваше действие' && sup2.href === '/admin/telegram', `закрытый канал без аккаунта Telegram — шаг 1 ждёт владельца, кнопка на «Аккаунт Telegram» (${sup2.state}, ${sup2.href})`)
+  else
+    check(sup2.state === 'done' && sup2.badge === 'Готово', 'каналы есть — шаг 1 «Готово»')
   if (!nChannels) {
     check(sup2.facts === `${nSup2} ${word(nSup2, 'поставщик', 'поставщика', 'поставщиков')} · 2 канала в Telegram — у 1 из ${nSup2} ${word(nSup2, 'поставщика', 'поставщиков', 'поставщиков')} · через аккаунт: 1`, `сколько каналов, у скольких поставщиков, сколько через аккаунт: «${sup2.facts}»`)
     const ts = await tileOf(page, 'suppliers')

@@ -6,7 +6,8 @@ import { isOpenOrder } from '~/utils/supplierOrders'
 
 /**
  * «Умный закуп» (3 ноября 2026): сводка для дашборда — спрос по темам, остаток
- * DataForSEO, поставщики с товарами и каналами, ключ ИИ, заказы поставщикам.
+ * DataForSEO, поставщики с товарами и каналами, аккаунт Telegram для закрытых
+ * каналов, ключ ИИ, заказы поставщикам.
  * Показатели и шаги из неё собирает `utils/smartPurchasing.ts`.
  *
  * Наружу ходит только за балансом — бесплатный `/v3/appendix/user_data`, как
@@ -18,8 +19,9 @@ import { isOpenOrder } from '~/utils/supplierOrders'
 export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
   const db = await requireAdmin(event)
 
-  const [channels, summary, candidates, runs, demandKey, aiKeys, aiModel, restock] = await Promise.all([
+  const [channels, telegramSecrets, summary, candidates, runs, demandKey, aiKeys, aiModel, restock] = await Promise.all([
     db.from('supplier_channels').select('supplier_id, web_preview'),
+    db.rpc('telegram_secrets_status'),
     db.rpc('market_demand_summary'),
     db.from('market_demand_candidates').select('keyword', { count: 'exact', head: true }).eq('status', 'new'),
     db.from('market_demand_runs').select('kind, status, cost, requested_at, finished_at').order('id', { ascending: false }).limit(20),
@@ -36,6 +38,10 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
   }
 
   const channelRows = missing(channels, channelsNotInstalled) ? null : channels.data ?? []
+  // Подключён — есть сессия в Vault (как на странице «Аккаунт Telegram»); самих секретов функция не отдаёт
+  const telegram = missing(telegramSecrets, telegramNotInstalled)
+    ? null
+    : { connected: ((telegramSecrets.data ?? []) as { name: string }[]).some(r => r.name === 'session') }
 
   const demandMissing = [summary, candidates, runs, demandKey].map(r => missing(r, demandNotInstalled)).some(Boolean)
   const runRows = runs.data ?? []
@@ -94,6 +100,7 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
       open: channelRows.filter(c => c.web_preview).length,
       suppliers: channelsBySupplier.size,
     },
+    telegram,
     demand: demandMissing
       ? null
       : {

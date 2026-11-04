@@ -11,6 +11,7 @@ import {
   PackageSearch,
   RefreshCw,
   Search,
+  Send,
   ShoppingCart,
   TrendingDown,
   TrendingUp,
@@ -37,6 +38,7 @@ const { data, pending, error, refresh }
 
 const PAGE_ICON: Record<(typeof PURCHASING_PAGES)[number]['to'], Component> = {
   '/admin/suppliers': Truck,
+  '/admin/telegram': Send,
   '/admin/demand': Search,
   '/admin/ai': Bot,
   '/admin/restock': ShoppingCart,
