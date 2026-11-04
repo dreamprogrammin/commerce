@@ -1,14 +1,80 @@
 /**
  * «Умный закуп» (3 ноября 2026): отбор товаров поставщиков по спросу и заказ
- * поставщику — одной страницей `/admin/purchasing`. Владелец 3.11: «какая-то
- * неразбериха, собери всё в одном месте касательно умного закупа».
+ * поставщику — дашбордом `/admin/purchasing`. Владелец 3.11: «какая-то
+ * неразбериха, собери всё в одном месте касательно умного закупа», и следом:
+ * «я имел в виду дашборд со всеми показателями уровня спроса и юзадж — сколько
+ * осталось, сколько поставщиков загружено, — и лишнее с сайд-меню убрать».
  *
- * Сводку отдаёт `/api/admin/purchasing`, здесь из неё — шаги по порядку: что
- * готово, что идёт, что ждёт владельца и чего ещё нет в коде. Шаги — как
- * договорено 3.11 (docs/HANDOFF.md, «С чего продолжать»).
+ * Сводку отдаёт `/api/admin/purchasing`, здесь из неё — показатели спроса и
+ * шаги по порядку: что готово, что идёт, что ждёт владельца и чего ещё нет в
+ * коде. Шаги — как договорено 3.11 (docs/HANDOFF.md, «С чего продолжать»).
  */
-import { DEMAND_REFRESH_COST, formatUsd } from './marketDemand'
+import type { DemandTopic } from './marketDemand'
+import { DEMAND_REFRESH_COST, formatUsd, matchesDemandFilter, sortDemandTopics } from './marketDemand'
 import { plural } from './restockOrder'
+
+/** Страницы умного закупа — кнопками на дашборде; в боковом меню их нет */
+export const PURCHASING_PAGES = [
+  { to: '/admin/suppliers', label: 'Поставщики' },
+  { to: '/admin/demand', label: 'Спрос на рынке' },
+  { to: '/admin/ai', label: 'Модели ИИ' },
+  { to: '/admin/restock', label: 'К закупке' },
+] as const
+
+/** Тема в списках дашборда — числа Google (DataForSEO) */
+export interface DemandLine {
+  id: string
+  name: string
+  /** Поисков в месяц, в среднем за 3 последних месяца */
+  volume: number | null
+  /** Последние 3 месяца к тем же месяцам год назад, % */
+  trend: number | null
+  series: number[] | null
+  peakMonth: number | null
+  /** Наших товаров по теме: всего и в наличии */
+  ourTotal: number
+  ourInStock: number
+}
+
+export interface DemandOverview {
+  /** Отслеживаемых тем */
+  topics: number
+  /** Из них с цифрами */
+  withData: number
+  /** Поисков в месяц по отслеживаемым темам, в среднем за 3 последних месяца; null — цифр нет */
+  monthly: number | null
+  /** Тот же спрос помесячно — 24 месяца, от старого к новому */
+  series: number[] | null
+  /** Последние 3 месяца к тем же месяцам год назад, % — как у темы */
+  trend: number | null
+  dataUntil: string | null
+  /** Сколько тем в фильтрах «Спроса на рынке»: ищут, а у нас нет / растёт / падает / скоро сезон */
+  missing: number
+  growing: number
+  falling: number
+  season: number
+  /** Новые запросы рынка, ещё не разобранные */
+  newQueries: number
+  top: {
+    missing: DemandLine[]
+    growing: DemandLine[]
+    season: DemandLine[]
+    volume: DemandLine[]
+  }
+}
+
+/** Поставщик на дашборде: что у него на сайте и в Telegram */
+export interface SupplierLoad {
+  id: string
+  name: string
+  /** Активных товаров на сайте */
+  products: number
+  /** Из них на пороге остатка — к закупке */
+  toRestock: number
+  /** Каналов в Telegram и из них открытых; null — миграции каналов нет */
+  channels: number | null
+  openChannels: number | null
+}
 
 /** Сводка `/api/admin/purchasing`. null у части — миграции этого шага на базе ещё нет. */
 export interface PurchasingStatus {
@@ -21,13 +87,18 @@ export interface PurchasingStatus {
     suppliers: number
   } | null
   demand: {
-    topics: number
     hasKey: boolean
     /** Обновление запрошено, ответ DataForSEO ещё не разобран */
     running: boolean
     lastDoneAt: string | null
     /** Последнее обновление не удалось */
     lastFailed: boolean
+    /** Во сколько обошлось последнее удачное обновление, $ */
+    lastCost: number | null
+    /** Остаток на счёте DataForSEO, $; null — ключа нет или DataForSEO не ответил */
+    balance: number | null
+    balanceError: string | null
+    overview: DemandOverview
   } | null
   ai: {
     /** Провайдеры, у которых задан ключ */
@@ -45,6 +116,10 @@ export interface PurchasingStatus {
     /** Заказаны или в пути; null — миграции заказов ещё нет */
     openOrders: number | null
   }
+  /** Поставщики по числу товаров на сайте */
+  supplierLoad: SupplierLoad[]
+  /** Активные товары без поставщика */
+  unassigned: { products: number, toRestock: number }
 }
 
 /** done — готово, action — ждёт владельца, running — идёт само, later — ещё в разработке */
@@ -65,6 +140,88 @@ export interface PurchasingStep {
 
 const count = (n: number, one: string, few: string, many: string) => `${n} ${plural(n, one, few, many)}`
 const NO_MIGRATION = 'Заработает после миграции базы.'
+
+function demandLine(t: DemandTopic): DemandLine {
+  return {
+    id: t.topic_id,
+    name: t.name,
+    volume: t.volume_avg3,
+    trend: t.trend_pct,
+    series: t.series,
+    peakMonth: t.peak_month,
+    ourTotal: t.our_total,
+    ourInStock: t.our_in_stock,
+  }
+}
+
+/**
+ * Показатели спроса для дашборда — по Google (DataForSEO), с теми же
+ * фильтрами и порядком, что на «Спросе на рынке». Спрос тем складывается:
+ * фразы отслеживаемых тем не повторяются (на бою 3.11 — 162 фразы, общих 0);
+ * фраза в двух темах посчиталась бы дважды.
+ */
+export function demandOverview(topics: DemandTopic[], newQueries: number, top = 5): DemandOverview {
+  const active = topics.filter(t => t.is_active)
+  const withData = active.filter(t => t.series?.length)
+  const len = Math.max(0, ...withData.map(t => t.series!.length))
+  const series = len ? Array.from({ length: len }, (_, i) => withData.reduce((sum, t) => sum + (t.series![i] ?? 0), 0)) : null
+  // Как trend_pct темы в market_demand_summary: от 30 поисков за 3 месяца год назад
+  const last3 = series && len >= 15 ? series[len - 1]! + series[len - 2]! + series[len - 3]! : 0
+  const prev3 = series && len >= 15 ? series[len - 13]! + series[len - 14]! + series[len - 15]! : 0
+  const pick = (filter: 'missing' | 'growing' | 'falling' | 'season') => topics.filter(t => matchesDemandFilter(t, filter))
+  const [missing, growing, season] = [pick('missing'), pick('growing'), pick('season')]
+  return {
+    topics: active.length,
+    withData: withData.length,
+    monthly: withData.length ? withData.reduce((sum, t) => sum + (t.volume_avg3 ?? 0), 0) : null,
+    series,
+    trend: prev3 >= 30 ? Math.round((last3 - prev3) * 100 / prev3) : null,
+    dataUntil: withData[0]?.data_until ?? null,
+    missing: missing.length,
+    growing: growing.length,
+    falling: pick('falling').length,
+    season: season.length,
+    newQueries,
+    top: {
+      missing: sortDemandTopics(missing).slice(0, top).map(demandLine),
+      growing: [...growing]
+        .sort((a, b) => (b.trend_pct ?? 0) - (a.trend_pct ?? 0) || (b.volume_avg3 ?? 0) - (a.volume_avg3 ?? 0))
+        .slice(0, top)
+        .map(demandLine),
+      season: sortDemandTopics(season).slice(0, top).map(demandLine),
+      volume: sortDemandTopics(withData).slice(0, top).map(demandLine),
+    },
+  }
+}
+
+/** На сколько обновлений спроса хватит остатка: $0,64 → 3 (по $0,18) */
+export function refreshesLeft(balance: number): number {
+  return Math.max(0, Math.floor((balance + 1e-9) / DEMAND_REFRESH_COST))
+}
+
+/** Месяцы ряда спроса, `YYYY-MM-01`: последний — `dataUntil`, остальные по одному назад */
+export function seriesMonths(dataUntil: string, length: number): string[] {
+  const [y, m] = dataUntil.split('-').map(Number) as [number, number]
+  return Array.from({ length }, (_, i) => {
+    const n = y * 12 + m - 1 - (length - 1 - i)
+    return `${Math.floor(n / 12)}-${String(n % 12 + 1).padStart(2, '0')}-01`
+  })
+}
+
+const DAY = 86_400_000
+
+/**
+ * Когда спрос обновится сам и спишет с баланса: cron «Market Demand Monthly» —
+ * 5-го числа в 04:30 UTC (9:30 по Алматы), и только если за 20 дней до этого
+ * удачного обновления не было (`market_demand_request(NULL, true)`).
+ */
+export function nextAutoRefresh(lastDoneAt: string | null, now = new Date()): string {
+  const done = lastDoneAt ? new Date(lastDoneAt).getTime() : null
+  const run = (k: number) => Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + k, 5, 4, 30)
+  // Через месяц — всегда: до него больше 20 дней и от «сейчас», и от обновления
+  const k = [0, 1].find(k => run(k) > now.getTime() && (done == null || run(k) - done >= 20 * DAY)) ?? 1
+  return new Date(run(k)).toISOString()
+}
 
 function dayMonth(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: 'Asia/Almaty' })
@@ -113,7 +270,7 @@ function demandStep(s: PurchasingStatus): PurchasingStep {
   const d = s.demand
   if (!d)
     return { ...step, state: 'later', facts: [], next: NO_MIGRATION }
-  const facts = [count(d.topics, 'тема', 'темы', 'тем'), d.lastDoneAt ? `обновлено ${dayMonth(d.lastDoneAt)}` : 'цифр ещё нет']
+  const facts = [count(d.overview.topics, 'тема', 'темы', 'тем'), d.lastDoneAt ? `обновлено ${dayMonth(d.lastDoneAt)}` : 'цифр ещё нет']
   if (!d.hasKey)
     facts.push('ключ DataForSEO не задан')
   const cost = `около ${formatUsd(DEMAND_REFRESH_COST)} с баланса DataForSEO`

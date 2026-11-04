@@ -347,7 +347,9 @@ watch(hasYandexNumbers, (has) => {
   if (!has)
     source.value = 'google'
 })
-const filter = ref<DemandFilter>('all')
+// Фильтр из адреса — ссылки дашборда «Умный закуп»: /admin/demand?filter=missing
+const route = useRoute()
+const filter = ref<DemandFilter>(DEMAND_FILTERS.find(f => f.id === route.query.filter)?.id ?? 'all')
 const search = ref('')
 const topics = computed(() => sortDemandTopics(ready.value?.topics ?? [], source.value))
 const filterCounts = computed(() =>
