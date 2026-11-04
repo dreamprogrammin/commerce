@@ -15,7 +15,7 @@
  */
 import type { SupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 import assert from 'node:assert/strict'
-import { readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
+import { normArticle, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 
 type Body = Record<string, any>
 
@@ -171,4 +171,22 @@ Deno.test('чтение поста: параметры для каждого п�
   finally {
     await server.shutdown()
   }
+})
+
+/*
+ * Сравнение артикулов на стенде (4 ноября 2026). На фото AmrToys «Арт.»
+ * напечатано кириллицей, сам артикул — латиницей, и модель может переписать
+ * его кириллицей: «Н08-13» на глаз — тот же «H08-13», ошибкой чтения это не
+ * считается.
+ */
+Deno.test('артикул: буквы-двойники кириллицы равны латинским', () => {
+  assert.equal(normArticle('Н08-13'), normArticle('H08-13'))
+  assert.equal(normArticle('А1077В'), normArticle('A1077B'))
+  assert.equal(normArticle('Р8019М-ЕРХ'), normArticle('P8019M-EPX'))
+  assert.equal(normArticle('У347-9Р/11Р'), normArticle('Y347-9P/11P'))
+  assert.equal(normArticle('К111-1В/5В'), normArticle('K111-1B/5B'))
+  assert.equal(normArticle('zl 5801.1'), normArticle('ZL5801-1'))
+  // Настоящая ошибка чтения остаётся ошибкой
+  assert.notEqual(normArticle('H08-13'), normArticle('H08-16'))
+  assert.notEqual(normArticle('FC-40'), normArticle('FC-4O'))
 })

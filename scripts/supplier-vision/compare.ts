@@ -27,7 +27,7 @@
  * Результат — в <posts>/results/.
  */
 import type { ReadItem, ReadResult, SupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
-import { DEFAULT_MODEL, parseModelSpec, pickPrice, PROVIDERS, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
+import { DEFAULT_MODEL, normArticle, parseModelSpec, pickPrice, PROVIDERS, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 
 const args = Object.fromEntries(Deno.args.map((a) => {
   const [k, ...v] = a.replace(/^--/, '').split('=')
@@ -198,9 +198,6 @@ catch { /* ответов нет — будет шаблон */ }
 
 // ---------- прогон ----------
 
-/** Артикулы сравниваются без регистра, пробелов, дефисов и точек */
-const norm = (s: string | null) => (s ?? '').toUpperCase().replace(/[\s\-–._/]/g, '')
-
 interface PostRun { postId: string, result?: ReadResult, error?: string }
 const runs: Record<string, PostRun[]> = {}
 
@@ -225,7 +222,7 @@ function score(items: ReadItem[], want: { article: string | null, price: number 
   let articles = 0
   let prices = 0
   for (const w of want) {
-    const hit = items.find(i => norm(i.article) && norm(i.article) === norm(w.article))
+    const hit = items.find(i => normArticle(i.article) && normArticle(i.article) === normArticle(w.article))
     if (hit)
       articles++
     const priced = hit ?? (want.length === 1 ? items[0] : undefined)
