@@ -24,6 +24,7 @@ function status(patch: Partial<PurchasingStatus> = {}): PurchasingStatus {
   return {
     suppliers: 4,
     channels: { total: 0, open: 0, suppliers: 0 },
+    telegram: null,
     demand: demandPart(),
     ai: { providers: [], model: 'anthropic/claude-haiku-5-5' },
     restock: { atThreshold: 0, noSupplier: 0, suppliers: 0, openOrders: 0 },
@@ -69,7 +70,34 @@ describe('purchasingSteps', () => {
       const s = step(status({ suppliers: 4, channels: { total: 2, open: 1, suppliers: 1 } }), 'suppliers')
       expect(s.state).toBe('done')
       expect(s.facts).toEqual(['4 поставщика', '2 канала в Telegram — у 1 из 4 поставщиков', 'через аккаунт: 1'])
-      expect(s.next).toMatch(/через аккаунт Telegram/)
+      expect(s.next).toBe('Закрытые каналы читаются только через аккаунт Telegram — его страница заработает после миграции базы.')
+    })
+
+    describe('закрытый канал и аккаунт Telegram', () => {
+      const closed = { suppliers: 2, channels: { total: 2, open: 1, suppliers: 2 } }
+
+      it('аккаунт не подключён — ждёт владельца, кнопка на «Аккаунт Telegram»', () => {
+        const s = step(status({ ...closed, telegram: { connected: false } }), 'suppliers')
+        expect(s.state).toBe('action')
+        expect(s.facts).toEqual(['2 поставщика', '2 канала в Telegram', 'через аккаунт: 1'])
+        expect(s.next).toBe('Закрытые каналы читаются только через аккаунт Telegram — подключите его на странице «Аккаунт Telegram».')
+        expect(s.link).toEqual({ to: '/admin/telegram', label: 'Аккаунт Telegram' })
+      })
+
+      it('аккаунт подключён — готово, кнопка снова на «Поставщики»', () => {
+        const s = step(status({ ...closed, telegram: { connected: true } }), 'suppliers')
+        expect(s.state).toBe('done')
+        expect(s.facts).toEqual(['2 поставщика', '2 канала в Telegram', 'через аккаунт: 1', 'аккаунт Telegram подключён'])
+        expect(s.next).toBeNull()
+        expect(s.link?.to).toBe('/admin/suppliers')
+      })
+
+      it('закрытых каналов нет — аккаунт шагу не нужен', () => {
+        const s = step(status({ suppliers: 2, channels: { total: 2, open: 2, suppliers: 2 }, telegram: { connected: false } }), 'suppliers')
+        expect(s.state).toBe('done')
+        expect(s.facts).toEqual(['2 поставщика', '2 канала в Telegram'])
+        expect(s.next).toBeNull()
+      })
     })
 
     it('«у 1 из 21 поставщика», «1 канал», «5 каналов»', () => {
