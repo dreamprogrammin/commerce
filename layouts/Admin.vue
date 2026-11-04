@@ -11,6 +11,7 @@ import { useAuth } from '@/composables/auth/useAuth'
 import { useCacheManager } from '@/composables/useCacheManager'
 import { useAdminQuestionsStore } from '@/stores/adminStore/adminQuestionsStore'
 import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
+import { PURCHASING_PAGES } from '@/utils/smartPurchasing'
 
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
@@ -30,31 +31,15 @@ onMounted(() => {
   adminReviewsStore.fetchUnpublishedCount()
 })
 
-interface NavLink {
-  to: string
-  label: string
-  exact?: boolean
-  badge?: () => number
-  children?: NavLink[]
-}
-
-// Умный закуп — его шаги одной группой (владелец 3.11.2026: «собери всё в
-// одном месте»). Порядок — как шаги на /admin/purchasing
-const purchasing = {
-  to: '/admin/purchasing',
-  label: 'Умный закуп',
-  children: [
-    { to: '/admin/suppliers', label: 'Поставщики' },
-    { to: '/admin/demand', label: 'Спрос на рынке' },
-    { to: '/admin/ai', label: 'Модели ИИ' },
-    { to: '/admin/restock', label: 'К закупке' },
-  ],
-}
-const inPurchasing = computed(() => [purchasing, ...purchasing.children]
-  .some(l => route.path === l.to || route.path.startsWith(`${l.to}/`)))
+// Умный закуп — одним пунктом (владелец 3.11.2026: «собери всё в одном месте»,
+// «лишнее с сайд-меню убрать»). Его страницы — кнопками на дашборде, и пункт
+// горит на них так же, как на самом дашборде
+const PURCHASING = '/admin/purchasing'
+const inPurchasing = computed(() => [PURCHASING, ...PURCHASING_PAGES.map(p => p.to)]
+  .some(to => route.path === to || route.path.startsWith(`${to}/`)))
 
 // Все ссылки навигации
-const navLinks: NavLink[] = [
+const navLinks = [
   { to: '/admin', label: 'Дашборд', exact: true },
   { to: '/admin/categories', label: 'Управление меню' },
   { to: '/admin/popular-categories', label: 'Популярные категории' },
@@ -68,7 +53,7 @@ const navLinks: NavLink[] = [
   { to: '/admin/banners', label: 'Управление банерами' },
   { to: '/admin/questions', label: 'Вопросы', badge: () => adminQuestionsStore.unansweredCount },
   { to: '/admin/reviews', label: 'Отзывы', badge: () => adminReviewsStore.unpublishedCount },
-  purchasing,
+  { to: PURCHASING, label: 'Умный закуп' },
   { to: '/admin/pickup-points', label: 'Пункты самовывоза' },
   { to: '/admin/pos', label: 'Оффлайн касса' },
   { to: '/admin/returns', label: 'Возвраты' },
@@ -99,34 +84,23 @@ const navLinks: NavLink[] = [
       </div>
 
       <nav class="flex-1 space-y-1 overflow-y-auto p-4">
-        <template v-for="link in navLinks" :key="link.to">
-          <NuxtLink
-            :to="link.to"
-            class="flex items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-            :class="{ 'text-primary': link.children && inPurchasing }"
-            active-class="bg-muted text-primary"
+        <NuxtLink
+          v-for="link in navLinks"
+          :key="link.to"
+          :to="link.to"
+          class="flex items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          :class="{ 'bg-muted text-primary': link.to === PURCHASING && inPurchasing }"
+          active-class="bg-muted text-primary"
+        >
+          <span>{{ link.label }}</span>
+          <Badge
+            v-if="link.badge && link.badge() > 0"
+            variant="destructive"
+            class="text-xs"
           >
-            <span>{{ link.label }}</span>
-            <Badge
-              v-if="link.badge && link.badge() > 0"
-              variant="destructive"
-              class="text-xs"
-            >
-              {{ link.badge() }}
-            </Badge>
-          </NuxtLink>
-          <div v-if="link.children" class="ml-4 space-y-1 border-l pl-2" data-testid="nav-group">
-            <NuxtLink
-              v-for="child in link.children"
-              :key="child.to"
-              :to="child.to"
-              class="flex items-center rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-all hover:text-primary"
-              active-class="bg-muted text-primary"
-            >
-              {{ child.label }}
-            </NuxtLink>
-          </div>
-        </template>
+            {{ link.badge() }}
+          </Badge>
+        </NuxtLink>
       </nav>
     </aside>
 
@@ -195,7 +169,7 @@ const navLinks: NavLink[] = [
         </NuxtLink>
 
         <NuxtLink
-          to="/admin/purchasing"
+          :to="PURCHASING"
           class="flex flex-col items-center justify-center gap-0.5 flex-1 py-1 relative text-muted-foreground transition-colors"
           :class="{ 'text-primary': inPurchasing }"
           active-class="text-primary"
@@ -237,34 +211,23 @@ const navLinks: NavLink[] = [
           <SheetTitle>Навигация</SheetTitle>
         </SheetHeader>
         <nav class="flex-1 overflow-y-auto p-3 space-y-1 max-h-[calc(100vh-8rem)]">
-          <template v-for="link in navLinks" :key="link.to">
-            <NuxtLink
-              :to="link.to"
-              class="flex items-center justify-between rounded-lg px-3 py-2.5 text-muted-foreground transition-all hover:text-primary active:bg-muted"
-              :class="{ 'text-primary': link.children && inPurchasing }"
-              active-class="bg-muted text-primary"
+          <NuxtLink
+            v-for="link in navLinks"
+            :key="link.to"
+            :to="link.to"
+            class="flex items-center justify-between rounded-lg px-3 py-2.5 text-muted-foreground transition-all hover:text-primary active:bg-muted"
+            :class="{ 'bg-muted text-primary': link.to === PURCHASING && inPurchasing }"
+            active-class="bg-muted text-primary"
+          >
+            <span class="text-sm">{{ link.label }}</span>
+            <Badge
+              v-if="link.badge && link.badge() > 0"
+              variant="destructive"
+              class="text-xs"
             >
-              <span class="text-sm">{{ link.label }}</span>
-              <Badge
-                v-if="link.badge && link.badge() > 0"
-                variant="destructive"
-                class="text-xs"
-              >
-                {{ link.badge() }}
-              </Badge>
-            </NuxtLink>
-            <div v-if="link.children" class="ml-4 space-y-1 border-l pl-2" data-testid="nav-group">
-              <NuxtLink
-                v-for="child in link.children"
-                :key="child.to"
-                :to="child.to"
-                class="flex items-center rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:text-primary active:bg-muted"
-                active-class="bg-muted text-primary"
-              >
-                {{ child.label }}
-              </NuxtLink>
-            </div>
-          </template>
+              {{ link.badge() }}
+            </Badge>
+          </NuxtLink>
         </nav>
         <div class="border-t p-3 space-y-2">
           <Button variant="outline" size="sm" class="w-full" @click="clearAllQueryCache">

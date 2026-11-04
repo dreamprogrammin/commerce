@@ -1,15 +1,34 @@
+import type { DemandTopic } from '../../utils/marketDemand'
 import type { PurchasingStatus } from '../../utils/smartPurchasing'
 import { describe, expect, it } from 'vitest'
-import { purchasingSteps } from '../../utils/smartPurchasing'
+import { demandOverview, nextAutoRefresh, purchasingSteps, refreshesLeft, seriesMonths } from '../../utils/smartPurchasing'
+
+const overview = (topics: number) => ({ ...demandOverview([], 0), topics })
+type Demand = NonNullable<PurchasingStatus['demand']>
+function demandPart(patch: Partial<Demand> = {}): Demand {
+  return {
+    hasKey: false,
+    running: false,
+    lastDoneAt: null,
+    lastFailed: false,
+    lastCost: null,
+    balance: null,
+    balanceError: null,
+    overview: overview(92),
+    ...patch,
+  }
+}
 
 // Как на бою 3.11.2026: поставщики есть, каналов и ключей нет, спрос не обновлялся
 function status(patch: Partial<PurchasingStatus> = {}): PurchasingStatus {
   return {
     suppliers: 4,
     channels: { total: 0, open: 0, suppliers: 0 },
-    demand: { topics: 92, hasKey: false, running: false, lastDoneAt: null, lastFailed: false },
+    demand: demandPart(),
     ai: { providers: [], model: 'anthropic/claude-haiku-5-5' },
     restock: { atThreshold: 0, noSupplier: 0, suppliers: 0, openOrders: 0 },
+    supplierLoad: [],
+    unassigned: { products: 0, toRestock: 0 },
     ...patch,
   }
 }
@@ -76,8 +95,7 @@ describe('purchasingSteps', () => {
   })
 
   describe('спрос на рынке', () => {
-    const demand = (patch: Partial<NonNullable<PurchasingStatus['demand']>>) =>
-      step(status({ demand: { topics: 92, hasKey: true, running: false, lastDoneAt: null, lastFailed: false, ...patch } }), 'demand')
+    const demand = (patch: Partial<Demand>) => step(status({ demand: demandPart({ hasKey: true, ...patch }) }), 'demand')
 
     it('ключ есть, обновлений не было — нажать «Обновить сейчас» и сколько это стоит', () => {
       const s = demand({})
@@ -106,8 +124,8 @@ describe('purchasingSteps', () => {
     })
 
     it('«1 тема», «5 тем»', () => {
-      expect(demand({ topics: 1 }).facts[0]).toBe('1 тема')
-      expect(demand({ topics: 5 }).facts[0]).toBe('5 тем')
+      expect(demand({ overview: overview(1) }).facts[0]).toBe('1 тема')
+      expect(demand({ overview: overview(5) }).facts[0]).toBe('5 тем')
     })
 
     it('без миграции спроса — «в разработке»', () => {
@@ -180,5 +198,132 @@ describe('purchasingSteps', () => {
       expect(s.state).toBe('done')
       expect(s.facts).toEqual(['заказывать нечего — всё выше порога остатка'])
     })
+  })
+})
+
+function topic(patch: Partial<DemandTopic>): DemandTopic {
+  return {
+    topic_id: patch.name ?? 'тема',
+    name: 'Тема',
+    kind: 'type',
+    keywords: ['тема'],
+    match_terms: [],
+    is_active: true,
+    series: null,
+    volume_last: null,
+    volume_avg3: null,
+    volume_prev3: null,
+    trend_pct: null,
+    peak_month: null,
+    peak_ratio: null,
+    season_soon: false,
+    our_total: 0,
+    our_in_stock: 0,
+    data_until: null,
+    updated_at: null,
+    ...patch,
+  }
+}
+// 24 месяца: n в первых 21, last — в трёх последних
+const months = (n: number, last = n) => Array.from({ length: 24 }, (_, i) => (i >= 21 ? last : n))
+
+describe('demandOverview', () => {
+  const dolls = topic({ name: 'Куклы', series: months(1000), volume_avg3: 1000, trend_pct: 0, our_total: 5, our_in_stock: 3, data_until: '2026-10-01' })
+  const labubu = topic({ name: 'Лабубу', series: months(100, 300), volume_avg3: 300, trend_pct: 200, data_until: '2026-10-01' })
+  const sleds = topic({ name: 'Ледянки', series: months(50), volume_avg3: 50, trend_pct: 0, season_soon: true, our_total: 2, our_in_stock: 0, data_until: '2026-10-01' })
+  const off = topic({ name: 'Отключённая', is_active: false, series: months(9999), volume_avg3: 9999, data_until: '2026-10-01' })
+  const fresh = topic({ name: 'Новая, без цифр' })
+  const all = [dolls, labubu, sleds, off, fresh]
+
+  it('цифр нет — темы считаются, спроса и списков нет', () => {
+    const o = demandOverview([fresh, topic({ name: 'Ещё одна' }), topic({ name: 'Выключена', is_active: false })], 0)
+    expect(o).toMatchObject({ topics: 2, withData: 0, monthly: null, series: null, trend: null, dataUntil: null, missing: 0, growing: 0, season: 0 })
+    expect(o.top).toEqual({ missing: [], growing: [], season: [], volume: [] })
+  })
+
+  it('спрос — сумма отслеживаемых тем с цифрами; отключённая не в счёт', () => {
+    const o = demandOverview(all, 7)
+    expect(o.topics).toBe(4)
+    expect(o.withData).toBe(3)
+    expect(o.monthly).toBe(1350)
+    expect(o.series![0]).toBe(1150)
+    expect(o.series![23]).toBe(1350)
+    expect(o.dataUntil).toBe('2026-10-01')
+    expect(o.newQueries).toBe(7)
+  })
+
+  it('рост — как у темы: последние 3 месяца к тем же год назад', () => {
+    // (3·1350 − 3·1150) / (3·1150) = +17,4%
+    expect(demandOverview(all, 0).trend).toBe(17)
+    // меньше 30 поисков год назад — сравнивать не с чем
+    expect(demandOverview([topic({ series: months(5, 50), volume_avg3: 50 })], 0).trend).toBeNull()
+  })
+
+  it('фильтры — как на «Спросе на рынке»: ищут, а у нас нет / растёт / скоро сезон', () => {
+    const o = demandOverview(all, 0)
+    expect([o.missing, o.growing, o.falling, o.season]).toEqual([1, 1, 0, 1])
+    expect(o.top.missing.map(t => t.name)).toEqual(['Лабубу'])
+    expect(o.top.growing.map(t => t.name)).toEqual(['Лабубу'])
+    expect(o.top.season.map(t => t.name)).toEqual(['Ледянки'])
+    expect(o.top.volume.map(t => t.name)).toEqual(['Куклы', 'Лабубу', 'Ледянки'])
+  })
+
+  it('строка темы — спрос, рост, ряд и наши товары', () => {
+    expect(demandOverview(all, 0).top.volume[0]).toEqual({
+      id: 'Куклы',
+      name: 'Куклы',
+      volume: 1000,
+      trend: 0,
+      series: months(1000),
+      peakMonth: null,
+      ourTotal: 5,
+      ourInStock: 3,
+    })
+  })
+
+  it('растущие — по росту, при равном — по спросу; в списке не больше пяти', () => {
+    const grow = [10, 40, 40, 90, 25, 60, 30].map((trend, i) => topic({ name: `Т${i}`, series: months(100), volume_avg3: 100 + i, trend_pct: trend + 15, our_total: 1 }))
+    const o = demandOverview(grow, 0)
+    expect(o.growing).toBe(7)
+    expect(o.top.growing.map(t => t.name)).toEqual(['Т3', 'Т5', 'Т2', 'Т1', 'Т6'])
+  })
+})
+
+describe('refreshesLeft', () => {
+  it('сколько обновлений по $0,18 хватит остатка', () => {
+    expect(refreshesLeft(0.6412)).toBe(3)
+    expect(refreshesLeft(0.36)).toBe(2)
+    expect(refreshesLeft(0.18)).toBe(1)
+    expect(refreshesLeft(0.17)).toBe(0)
+    expect(refreshesLeft(-0.5)).toBe(0)
+  })
+})
+
+describe('seriesMonths', () => {
+  it('24 месяца, последний — месяц данных, через Новый год', () => {
+    const m = seriesMonths('2026-10-01', 24)
+    expect(m).toHaveLength(24)
+    expect(m[0]).toBe('2024-11-01')
+    expect(m[2]).toBe('2025-01-01')
+    expect(m[23]).toBe('2026-10-01')
+    expect(seriesMonths('2026-01-01', 2)).toEqual(['2025-12-01', '2026-01-01'])
+  })
+})
+
+describe('nextAutoRefresh', () => {
+  const at = (iso: string) => new Date(iso)
+  it('5-го в 9:30 по Алматы — в этом месяце, если ещё не наступило', () => {
+    expect(nextAutoRefresh(null, at('2026-11-03T10:00:00Z'))).toBe('2026-11-05T04:30:00.000Z')
+    expect(nextAutoRefresh(null, at('2026-11-05T04:00:00Z'))).toBe('2026-11-05T04:30:00.000Z')
+  })
+  it('прошло — в следующем, и через Новый год', () => {
+    expect(nextAutoRefresh(null, at('2026-11-05T05:00:00Z'))).toBe('2026-12-05T04:30:00.000Z')
+    expect(nextAutoRefresh(null, at('2026-12-20T00:00:00Z'))).toBe('2027-01-05T04:30:00.000Z')
+  })
+  it('обновляли меньше 20 дней назад — этот раз пропустит', () => {
+    // 3 ноября обновили вручную: 5 ноября пропуск, следующее — 5 декабря
+    expect(nextAutoRefresh('2026-11-02T20:30:00Z', at('2026-11-03T10:00:00Z'))).toBe('2026-12-05T04:30:00.000Z')
+    // 10 октября — к 5 ноября прошло 26 дней
+    expect(nextAutoRefresh('2026-10-10T08:00:00Z', at('2026-11-03T10:00:00Z'))).toBe('2026-11-05T04:30:00.000Z')
   })
 })
