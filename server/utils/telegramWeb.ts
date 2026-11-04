@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ChannelCheck, ChannelLink } from '~/utils/telegramChannel'
+import process from 'node:process'
 import { parseChannelLink } from '~/utils/telegramChannel'
+import { decodeEntities, isPreviewPage } from '~/utils/telegramPreview'
 
 /**
  * Проверка канала поставщика у Telegram (3 ноября 2026) — для поля «Каналы в
@@ -9,12 +11,20 @@ import { parseChannelLink } from '~/utils/telegramChannel'
  *   - t.me/<имя> и t.me/+<код> — название, подписчики, канал это или группа;
  *     человек и бот здесь тоже открываются, их не берём;
  *   - t.me/s/<имя> — просмотр канала без аккаунта: есть ли он и когда был
- *     последний пост. Отсюда же потом будут читаться посты.
+ *     последний пост. Посты оттуда читает сборщик «Товаров поставщиков»,
+ *     разбор общий — utils/telegramPreview.ts.
  *
  * Разметка t.me — не API. Если Telegram её поменяет, проверка ответит «канал
  * не найден», а не запишет в базу мусор.
  */
-const WEB = 'https://t.me'
+/**
+ * t.me. Стражи подменяют его заглушкой (TELEGRAM_WEB) — только адресом на
+ * localhost, чтобы переменная не могла увести запросы на чужой сервер.
+ */
+export function telegramWebBase(): string {
+  const stub = process.env.TELEGRAM_WEB
+  return stub && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(stub) ? stub : 'https://t.me'
+}
 const UA = 'Mozilla/5.0 (compatible; uhti.kz supplier channels; +https://uhti.kz)'
 
 /** Колонки supplier_channels, которые видит страница. */
@@ -27,18 +37,6 @@ export interface TgPage {
   /** other — человек или бот */
   type: 'channel' | 'group' | 'other'
   members: number | null
-}
-
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' }
-
-function decodeEntities(s: string): string {
-  return s.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
-    if (e[0] === '#') {
-      const code = e[1] === 'x' || e[1] === 'X' ? Number.parseInt(e.slice(2), 16) : Number(e.slice(1))
-      return Number.isFinite(code) && code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : m
-    }
-    return ENTITIES[e.toLowerCase()] ?? m
-  })
 }
 
 /** Текст фрагмента разметки: без тегов, галочки «проверен» и лишних пробелов. */
@@ -79,7 +77,7 @@ export function parseTgPage(html: string): TgPage {
  * самого свежего. null — это не страница канала.
  */
 export function parsePreviewPage(html: string): { posts: number, lastPostAt: string | null } | null {
-  if (!html.includes('class="tgme_channel_info"'))
+  if (!isPreviewPage(html))
     return null
   const posts = html.match(/class="tgme_widget_message [^"]*"[^>]*data-post="/g)?.length ?? 0
   const times = [...html.matchAll(/class="tgme_widget_message_date"[^>]*>\s*<time datetime="([^"]+)"/g)]
@@ -88,11 +86,12 @@ export function parsePreviewPage(html: string): { posts: number, lastPostAt: str
   return { posts, lastPostAt: times.length ? new Date(Math.max(...times)).toISOString() : null }
 }
 
-async function getPage(path: string): Promise<{ status: number, html: string }> {
+/** Страница t.me: ответ не 200 — не сбой, а ответ (у t.me/s/ на не-канал — 302) */
+export async function getTelegramPage(path: string): Promise<{ status: number, html: string }> {
   let res: Response
   try {
     // redirect: 'manual' — t.me/s/ на не-канал отвечает 302, это ответ, а не сбой
-    res = await fetch(`${WEB}/${path}`, {
+    res = await fetch(`${telegramWebBase()}/${path}`, {
       redirect: 'manual',
       headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
       signal: AbortSignal.timeout(10000),
@@ -112,7 +111,7 @@ async function getPage(path: string): Promise<{ status: number, html: string }> 
 
 /** Канал по ссылке — у самого Telegram. Не канал и не группа — 400 с причиной. */
 export async function checkTelegramChannel(link: ChannelRef): Promise<Omit<ChannelCheck, 'existing'>> {
-  const page = await getPage(link.kind === 'invite' ? `+${link.hash}` : link.username)
+  const page = await getTelegramPage(link.kind === 'invite' ? `+${link.hash}` : link.username)
   const info = page.status === 200 ? parseTgPage(page.html) : null
   if (!info?.title) {
     throw createError({
@@ -132,7 +131,7 @@ export async function checkTelegramChannel(link: ChannelRef): Promise<Omit<Chann
   let webPreview = false
   let lastPostAt: string | null = null
   if (link.kind === 'public' && info.type === 'channel') {
-    const preview = await getPage(`s/${link.username}`)
+    const preview = await getTelegramPage(`s/${link.username}`)
     const posts = preview.status === 200 ? parsePreviewPage(preview.html) : null
     webPreview = posts !== null
     lastPostAt = posts?.lastPostAt ?? null

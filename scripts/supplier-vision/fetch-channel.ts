@@ -15,6 +15,9 @@
  * последние посты. Фото и цены поставщика в git не кладём: репозиторий
  * публичный.
  */
+import type { PreviewPost } from '../../utils/telegramPreview.ts'
+import { isPreviewPage, parsePreviewPosts } from '../../utils/telegramPreview.ts'
+
 const args = Object.fromEntries(Deno.args.map((a) => {
   const [k, ...v] = a.replace(/^--/, '').split('=')
   return [k, v.join('=') || 'true']
@@ -29,43 +32,11 @@ if (!/^[a-z]\w{3,31}$/i.test(channel) || !out || !(count > 0)) {
 
 const UA = 'Mozilla/5.0 (compatible; uhti.kz supplier channels; +https://uhti.kz)'
 
-interface Post { id: number, photos: string[], caption: string }
-
-function decode(s: string): string {
-  return s
-    .replace(/<br\s*\/?>/g, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, '\'')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .trim()
-}
-
-/** Страница просмотра канала: посты с фото; видео и текст без фото пропускаются */
-function parsePage(html: string): { posts: Post[], firstId: number | null } {
-  const posts: Post[] = []
-  let firstId: number | null = null
-  for (const part of html.split('<div class="tgme_widget_message_wrap').slice(1)) {
-    const id = Number(part.match(/data-post="[^/"]+\/(\d+)"/)?.[1])
-    if (!id)
-      continue
-    firstId = firstId === null ? id : Math.min(firstId, id)
-    const photos = [...part.matchAll(/tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)/g)].map(m => m[1]!)
-    const caption = decode(part.match(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? '')
-    if (photos.length)
-      posts.push({ id, photos, caption })
-  }
-  return { posts, firstId }
-}
-
 async function get(url: string): Promise<Response | null> {
   return fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' }, signal: AbortSignal.timeout(15000) }).catch(() => null)
 }
 
-const posts = new Map<number, Post>()
+const posts = new Map<number, PreviewPost>()
 let before = args.before ? Number(args.before) : null
 while (posts.size < count) {
   const res = await get(`https://t.me/s/${channel}${before ? `?before=${before}` : ''}`)
@@ -74,11 +45,11 @@ while (posts.size < count) {
     Deno.exit(1)
   }
   const html = await res.text()
-  if (!html.includes('class="tgme_channel_info"')) {
+  if (!isPreviewPage(html)) {
     console.error(`У @${channel} нет просмотра без аккаунта: это не открытый канал (закрытый, группа, человек или бот)`)
     Deno.exit(1)
   }
-  const page = parsePage(html)
+  const page = parsePreviewPosts(html)
   for (const p of page.posts)
     posts.set(p.id, p)
   if (page.firstId === null || page.firstId === before)

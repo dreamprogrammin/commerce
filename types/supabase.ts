@@ -2750,6 +2750,8 @@ export interface Database {
         Row: {
           chat_type: string
           checked_at: string
+          collected_at: string | null
+          collected_up_to: number | null
           created_at: string
           created_by: string | null
           id: string
@@ -2762,6 +2764,8 @@ export interface Database {
         Insert: {
           chat_type: string
           checked_at?: string
+          collected_at?: string | null
+          collected_up_to?: number | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2774,6 +2778,8 @@ export interface Database {
         Update: {
           chat_type?: string
           checked_at?: string
+          collected_at?: string | null
+          collected_up_to?: number | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2789,6 +2795,69 @@ export interface Database {
             columns: ['supplier_id']
             isOneToOne: false
             referencedRelation: 'suppliers'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      supplier_offers: {
+        Row: {
+          caption: string
+          channel_id: string
+          created_at: string
+          id: string
+          message_id: number
+          photo_count: number
+          photo_path: string | null
+          photo_url: string | null
+          post_url: string
+          posted_at: string
+          status: string
+          status_at: string | null
+          status_by: string | null
+        }
+        Insert: {
+          caption?: string
+          channel_id: string
+          created_at?: string
+          id?: string
+          message_id: number
+          photo_count?: number
+          photo_path?: string | null
+          photo_url?: string | null
+          post_url: string
+          posted_at: string
+          status?: string
+          status_at?: string | null
+          status_by?: string | null
+        }
+        Update: {
+          caption?: string
+          channel_id?: string
+          created_at?: string
+          id?: string
+          message_id?: number
+          photo_count?: number
+          photo_path?: string | null
+          photo_url?: string | null
+          post_url?: string
+          posted_at?: string
+          status?: string
+          status_at?: string | null
+          status_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_offers_channel_id_fkey'
+            columns: ['channel_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_channels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'supplier_offers_status_by_fkey'
+            columns: ['status_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]
@@ -3966,6 +4035,7 @@ export interface Database {
         }
         Returns: string
       }
+      supplier_offers_summary: { Args: never, Returns: Json }
       telegram_secret_delete: { Args: { p_name: string }, Returns: undefined }
       telegram_secret_get: { Args: { p_name: string }, Returns: string }
       telegram_secret_set: {

@@ -11,8 +11,8 @@
  *
  * Пост — товар: фото со своей подписью. В «Оптом Игрушки Алматы» альбом —
  * пачка разных товаров, у каждого фото своя подпись-артикул, поэтому альбом
- * делится по подписям; фото без подписи (или с той же) — ещё один снимок
- * того же товара. В папке — `<номер>/photo.jpg` (снимков несколько —
+ * делится по подписям (utils/supplierPosts.ts); фото без подписи (или с той
+ * же) — ещё один снимок того же товара. В папке — `<номер>/photo.jpg` (снимков несколько —
  * photo1.jpg, photo2.jpg, …) и `captions.json`. Подписи модели не
  * показываются: стенд проверяет чтение с картинки, а подпись здесь — сам
  * артикул; `--with-captions` кладёт её в `<номер>/caption.txt`. Сообщения без
@@ -29,6 +29,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import process from 'node:process'
 import { MemoryStorage, TelegramClient, tl } from '@mtcute/node'
+import { groupProducts } from '../../utils/supplierPosts.ts'
 import { isSessionGone, telegramErrorText } from '../../utils/telegramLogin.ts'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
@@ -90,26 +91,9 @@ function imageOf(m: Message): Image | null {
   return media?.type === 'photo' || (media?.type === 'document' && IMAGE_EXT[media.mimeType]) ? media : null
 }
 
-interface Post { id: number, album: string | null, images: Image[], caption: string }
-
-/** Товары по порядку сообщений: в альбоме новая подпись — новый товар */
-function toPosts(messages: Message[]): Post[] {
-  const posts: Post[] = []
-  for (const m of messages) {
-    const image = imageOf(m)
-    if (!image)
-      continue
-    const text = m.text.trim()
-    const last = posts.at(-1)
-    if (last && m.groupedIdUnique && m.groupedIdUnique === last.album && (!text || !last.caption || text === last.caption)) {
-      last.images.push(image)
-      last.caption ||= text
-    }
-    else {
-      posts.push({ id: m.id, album: m.groupedIdUnique, images: [image], caption: text })
-    }
-  }
-  return posts
+/** Товары по порядку сообщений — общее правило альбома, utils/supplierPosts.ts */
+function toPosts(messages: Message[]) {
+  return groupProducts(messages.map(m => ({ id: m.id, album: m.groupedIdUnique, text: m.text, image: imageOf(m) })))
 }
 
 const tg = new TelegramClient({

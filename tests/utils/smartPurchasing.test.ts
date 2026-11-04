@@ -25,6 +25,7 @@ function status(patch: Partial<PurchasingStatus> = {}): PurchasingStatus {
     suppliers: 4,
     channels: { total: 0, open: 0, suppliers: 0 },
     telegram: null,
+    offers: null,
     demand: demandPart(),
     ai: { providers: [], model: 'anthropic/claude-haiku-5-5' },
     restock: { atThreshold: 0, noSupplier: 0, suppliers: 0, openOrders: 0 },
@@ -36,8 +37,8 @@ function status(patch: Partial<PurchasingStatus> = {}): PurchasingStatus {
 const step = (s: PurchasingStatus, id: string) => purchasingSteps(s).find(x => x.id === id)!
 
 describe('purchasingSteps', () => {
-  it('шаги по порядку: откуда товар → спрос → чтение постов → сводка → заказ', () => {
-    expect(purchasingSteps(status()).map(s => s.id)).toEqual(['suppliers', 'demand', 'ai', 'digest', 'order'])
+  it('шаги по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ', () => {
+    expect(purchasingSteps(status()).map(s => s.id)).toEqual(['suppliers', 'demand', 'ai', 'offers', 'order'])
   })
 
   it('как на бою 3.11: ждут владельца каналы, ключ DataForSEO и ключ ИИ', () => {
@@ -48,14 +49,40 @@ describe('purchasingSteps', () => {
     expect(steps[1]!.facts).toEqual(['92 темы', 'цифр ещё нет', 'ключ DataForSEO не задан'])
     expect(steps[1]!.next).toBe('Задайте ключ DataForSEO на странице «Спрос на рынке» и нажмите «Обновить сейчас» — около $0,18 с баланса DataForSEO.')
     expect(steps[2]!.facts).toEqual(['ключа ИИ нет'])
-    expect(steps[3]!.next).toBe('Появится, когда заработают шаги 1–3.')
-    expect(steps[3]!.link).toBeNull()
+    expect(steps[3]!.next).toBe('Заработает после миграции базы.')
     expect(steps[4]!.facts).toEqual(['заказывать нечего — всё выше порога остатка'])
   })
 
   it('ссылки — на страницы шагов', () => {
     expect(purchasingSteps(status()).map(s => s.link?.to ?? null))
-      .toEqual(['/admin/suppliers', '/admin/demand', '/admin/ai', null, '/admin/restock'])
+      .toEqual(['/admin/suppliers', '/admin/demand', '/admin/ai', '/admin/supplier-offers', '/admin/restock'])
+  })
+
+  describe('товары поставщиков', () => {
+    const channels = { total: 2, open: 1, suppliers: 2 }
+    const offers = (patch: Partial<NonNullable<PurchasingStatus['offers']>> = {}) => ({ fresh: 0, added: 0, skipped: 0, collectedAt: null, ...patch })
+
+    it('без каналов — появится после шага 1', () => {
+      expect(step(status({ offers: offers() }), 'offers')).toMatchObject({ state: 'later', facts: ['каналов нет'], next: 'Появится, когда у поставщиков будут каналы в Telegram — шаг 1.' })
+    })
+
+    it('каналы есть, не собирали — ждёт владельца', () => {
+      expect(step(status({ channels, offers: offers() }), 'offers')).toMatchObject({ state: 'action', facts: ['ещё не собирали'], next: 'Откройте «Товары поставщиков» и нажмите «Собрать новые».' })
+    })
+
+    it('есть неразобранные — сколько, когда собрано и сколько уже на сайте', () => {
+      const s = step(status({ channels, offers: offers({ fresh: 5, added: 2, skipped: 7, collectedAt: '2026-11-04T09:00:00Z' }) }), 'offers')
+      expect(s.state).toBe('action')
+      expect(s.facts).toEqual(['не разобрано: 5 товаров', 'последний сбор — 4 ноября', 'добавлено на сайт: 2'])
+      expect(s.next).toMatch(/«Добавил».*«Не брать»/)
+    })
+
+    it('всё разобрано — готово', () => {
+      const s = step(status({ channels, offers: offers({ skipped: 3, collectedAt: '2026-11-03T20:00:00Z' }) }), 'offers')
+      expect(s.state).toBe('done')
+      // 20:00 UTC — уже 4 ноября в Алматы
+      expect(s.facts).toEqual(['всё разобрано', 'последний сбор — 4 ноября'])
+    })
   })
 
   describe('поставщики и каналы', () => {

@@ -84,7 +84,7 @@ const OLD_LINKS = [
   '/admin/ai',
 ]
 // Страницы закупа — кнопками на дашборде, в меню их нет
-const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/demand', 'Спрос на рынке'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
+const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
 const MENU = [...OLD_LINKS.filter(h => !PAGES.some(([p]) => p === h)), '/admin/purchasing']
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
@@ -399,9 +399,9 @@ try {
   check(!nUnassigned || sp(await page.locator('[data-testid=supplier-row-none]').textContent()).startsWith(`Без поставщика ${nUnassigned}`), 'строка «Без поставщика» — с числом товаров')
 
   const all = await steps(page)
-  check(all.map(s => s.id).join() === 'suppliers,demand,ai,digest,order', `пять шагов по порядку: ${all.map(s => s.id).join(', ')}`)
-  check(all.map(s => s.href).join() === '/admin/suppliers,/admin/demand,/admin/ai,,/admin/restock', 'ссылки шагов — на их страницы, у сводки ссылки нет')
-  const [sup, dem, ai, digest, order] = all
+  check(all.map(s => s.id).join() === 'suppliers,demand,ai,offers,order', `пять шагов по порядку: ${all.map(s => s.id).join(', ')}`)
+  check(all.map(s => s.href).join() === '/admin/suppliers,/admin/demand,/admin/ai,/admin/supplier-offers,/admin/restock', 'ссылки шагов — на их страницы')
+  const [sup, dem, ai, offers, order] = all
   check(sup.facts.startsWith(`${nSuppliers} ${word(nSuppliers, 'поставщик', 'поставщика', 'поставщиков')}`), `шаг 1 — поставщиков столько же, сколько в базе: «${sup.facts}»`)
   if (!nChannels)
     check(sup.state === 'action' && sup.facts.includes('каналов в Telegram нет') && /«Каналы в Telegram»/.test(sup.next), `шаг 1 без каналов — ждёт владельца, как добавить: «${sup.next}»`)
@@ -410,7 +410,8 @@ try {
     check(dem.state === 'action' && dem.facts.includes('цифр ещё нет') && dem.facts.includes('ключ DataForSEO не задан') && /\$0,18/.test(dem.next), `шаг 2 без ключа — ждёт владельца, с ценой: «${dem.next}»`)
   if (!hadAi)
     check(ai.state === 'action' && ai.facts === 'ключа ИИ нет', `шаг 3 без ключа — ждёт владельца: «${ai.next}»`)
-  check(digest.state === 'later' && digest.badge === 'В разработке' && digest.next === 'Появится, когда заработают шаги 1–3.', 'шаг 4, сводка — «В разработке», когда появится')
+  const offersState = !j.offers || !nChannels ? 'later' : !j.offers.collectedAt || j.offers.fresh ? 'action' : 'done'
+  check(offers.state === offersState && (j.offers || offers.next === 'Заработает после миграции базы.'), `шаг 4, товары поставщиков — «${offers.badge}»: «${offers.next}»`)
   const orderState = (withSupplier || restock.noSupplier) ? 'action' : restock.openOrders ? 'running' : 'done'
   check(order.state === orderState, `шаг 5 — «${order.badge}», как по остаткам: ${withSupplier} у поставщиков, ${restock.noSupplier} без поставщика`)
   check(!withSupplier || order.facts.includes(`к закупке ${withSupplier} `), `шаг 5 — к закупке ${withSupplier}: «${order.facts}»`)
