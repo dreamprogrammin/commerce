@@ -91,6 +91,15 @@ if (!/localhost|127\.0\.0\.1/.test(BASE))
   throw new Error('Только локальный стенд: страж заводит пользователей, поставщиков, цифры спроса и пробные ключи')
 
 const fails = []
+// Подписи месяцев под графиком не налезают друг на друга
+function monthLabelsApart(p) {
+  return p.locator('[data-testid=demand-chart] svg text').evaluateAll((all) => {
+    const ts = all.filter(t => /^\p{Script=Cyrillic}{3} \d{4}$/u.test(t.textContent.trim()))
+    const r = ts.map(t => t.getBoundingClientRect()).sort((a, b) => a.left - b.left)
+    return { labels: ts.map(t => t.textContent).join(', '), apart: r.length > 1 && r.every((b, i) => !i || r[i - 1].right + 4 <= b.left) }
+  })
+}
+
 function check(ok, text) {
   console.log(`${ok ? '  ok  ' : ' ПРОВАЛ '} ${text}`)
   if (!ok)
@@ -603,6 +612,8 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
     const chartBox = page.locator('[data-testid=demand-chart]')
     await chartBox.scrollIntoViewIfNeeded()
     check(await text(page, 'demand-chart-end') === vol(series.at(-1)), `последний месяц подписан на графике: ${vol(series.at(-1))}`)
+    const wideLabels = await monthLabelsApart(page)
+    check(wideLabels.apart, `подписи месяцев не налезают друг на друга: ${wideLabels.labels}`)
     const plot = await page.locator('[data-testid=demand-chart] svg rect').boundingBox()
     const tip = () => text(page, 'demand-chart-tip')
     await page.mouse.move(plot.x + 1, plot.y + plot.height / 2)
@@ -680,6 +691,8 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
   check(fit.tiles && fit.pairs, `плитки — по две в ряд, в край не упираются${fit.tiles && fit.pairs ? '' : ` (в край: ${fit.tiles}, по две: ${fit.pairs})`}`)
   check(fit.table, 'таблица поставщиков влезает без своей прокрутки')
   check(fit.chart && fit.steps, `график и шаги не вылезают за край${fit.chart && fit.steps ? '' : ` (график: ${fit.chart}, шаги: ${fit.steps})`}`)
+  const narrowLabels = await monthLabelsApart(mobile)
+  check(narrowLabels.apart, `и на телефоне подписи месяцев не налезают: ${narrowLabels.labels}`)
   if (SHOTS)
     await mobile.screenshot({ path: `${SHOTS}/purchasing-390.png`, fullPage: true })
   await mobile.getByRole('button', { name: 'Меню' }).click()

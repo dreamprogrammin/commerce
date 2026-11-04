@@ -48,9 +48,11 @@ const area = computed(() => {
   return n ? `${line.value}L${x(n - 1).toFixed(1)},${y(0)}L${x(0).toFixed(1)},${y(0)}Z` : ''
 })
 
-// Подписи месяцев — каждый шестой от последнего, чтобы не налезали
+// Подписи месяцев — каждый шестой от последнего, а если тесно (телефон) —
+// каждый двенадцатый: подпись «окт 2026» шириной около 45px
+const labelStep = computed(() => plotW.value / Math.max(props.series.length - 1, 1) * 6 >= 80 ? 6 : 12)
 const xLabels = computed(() => props.months.flatMap((m, i) => {
-  if ((props.months.length - 1 - i) % 6)
+  if ((props.months.length - 1 - i) % labelStep.value)
     return []
   const [yy, mm] = m.split('-')
   return [{ i, label: `${SHORT[Number(mm) - 1]} ${yy}` }]
