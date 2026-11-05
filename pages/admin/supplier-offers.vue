@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { formatPrice } from '@/utils/formatPrice'
 import { formatVolume, trendKind, trendLabel } from '@/utils/marketDemand'
-import { filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, topicDraft } from '@/utils/offerDemand'
+import { DEMAND_LEVEL_TEXT, demandLevel, demandLevelBounds, filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, topicDraft } from '@/utils/offerDemand'
 import { buildOrderWorkbook, groupOrderLines, orderFileName } from '@/utils/orderSheet'
 import { plural } from '@/utils/restockOrder'
 import { collectedText, dayTitle, groupOffers, modelLabel, offerOrderLine, timeOf } from '@/utils/supplierOfferList'
@@ -85,6 +85,17 @@ const groups = computed(() => {
   }
   return list
 })
+// Уровень спроса — метка в углу фото: трети своих тем по запросам в месяц
+const levelBounds = computed(() => demandLevelBounds(page.value?.topics ?? []))
+const levelOf = (o: Offer) => demandLevel(demandById.value.get(o.id) ?? null, levelBounds.value)
+const LEVEL_CLASS = {
+  high: 'bg-emerald-600 text-white',
+  mid: 'bg-amber-400 text-amber-950',
+  low: 'bg-slate-200 text-slate-800',
+  none: 'bg-slate-200 text-slate-600',
+  unknown: 'bg-white/90 text-slate-600',
+} as const
+const LEVEL_BARS = { high: 3, mid: 2, low: 1, none: 0, unknown: 0 } as const
 function newTopicLink(o: Offer) {
   const d = topicDraft(o)
   return { path: '/admin/demand', query: d ? { newTopic: d.name, keyword: d.keyword } : { newTopic: '' } }
@@ -506,6 +517,12 @@ async function downloadOrder() {
                 <img v-if="o.photoUrl" :src="o.photoUrl" alt="" loading="lazy" decoding="async" class="h-full w-full object-contain">
                 <span v-else class="flex h-full items-center justify-center text-muted-foreground">
                   <ImageOff class="h-6 w-6" />
+                </span>
+                <span v-if="page.topics" class="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium shadow-sm" :class="LEVEL_CLASS[levelOf(o)]" :data-level="levelOf(o)" data-testid="offer-demand-level">
+                  <span class="flex h-3 items-end gap-px" aria-hidden="true">
+                    <span v-for="n in 3" :key="n" class="w-[3px] rounded-sm" :class="n <= LEVEL_BARS[levelOf(o)] ? 'bg-current' : 'bg-current opacity-30'" :style="{ height: `${n * 4}px` }" />
+                  </span>
+                  {{ DEMAND_LEVEL_TEXT[levelOf(o)] }}
                 </span>
                 <span v-if="o.photoCount > 1" class="absolute bottom-1.5 right-1.5 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white">
                   {{ o.photoCount }} фото
