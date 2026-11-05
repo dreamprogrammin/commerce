@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { OfferDemandFilter, OfferDemandTopic } from '@/utils/offerDemand'
 import type { OrderSheetLine } from '@/utils/orderSheet'
 import type { Offer, OfferChannel, OfferGrouping, OfferReading, OfferStatus } from '@/utils/supplierOfferList'
 import { useLocalStorage } from '@vueuse/core'
@@ -6,6 +7,8 @@ import { ExternalLink, ImageOff, Lock, RefreshCw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { formatPrice } from '@/utils/formatPrice'
+import { formatVolume, trendKind, trendLabel } from '@/utils/marketDemand'
+import { filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, topicDraft } from '@/utils/offerDemand'
 import { buildOrderWorkbook, groupOrderLines, orderFileName } from '@/utils/orderSheet'
 import { plural } from '@/utils/restockOrder'
 import { collectedText, dayTitle, groupOffers, modelLabel, offerOrderLine, timeOf } from '@/utils/supplierOfferList'
@@ -33,6 +36,8 @@ interface PageData {
   offers: Offer[]
   /** null — нет миграции чтения ИИ */
   reading: OfferReading | null
+  /** Темы «Спроса на рынке»; null — нет миграции спроса */
+  topics: OfferDemandTopic[] | null
 }
 
 /** Чтение ИИ за запрос сбора или «Прочитать» */
@@ -64,7 +69,27 @@ const { data, pending, error, refresh } = useAsyncData(
   { server: false, watch: [status] },
 )
 const page = computed(() => data.value?.installed ? data.value : null)
-const groups = computed(() => page.value ? groupOffers(page.value.offers, page.value.channels, grouping.value) : [])
+// Спрос (6.11.2026): у каждого товара — тема «Спроса на рынке», если нашлась
+const demandFilter = useLocalStorage<OfferDemandFilter>('admin-supplier-offers-demand', 'all')
+const demandById = computed(() => new Map((page.value?.offers ?? []).map(o => [o.id, page.value?.topics ? offerDemand(o, page.value.topics) : null])))
+const groups = computed(() => {
+  const p = page.value
+  if (!p)
+    return []
+  const filter = p.topics ? demandFilter.value : 'all'
+  const list = groupOffers(filterByDemand(p.offers, p.topics ?? [], filter), p.channels, grouping.value)
+  // «Есть спрос» — внутри группы сверху больший спрос (groupOffers ставит по времени)
+  if (filter === 'demand') {
+    for (const g of list)
+      g.offers.sort((a, b) => (demandById.value.get(b.id)?.volume ?? 0) - (demandById.value.get(a.id)?.volume ?? 0))
+  }
+  return list
+})
+function newTopicLink(o: Offer) {
+  const d = topicDraft(o)
+  return { path: '/admin/demand', query: d ? { newTopic: d.name, keyword: d.keyword } : { newTopic: '' } }
+}
+const TREND_TEXT = { up: 'text-emerald-700', down: 'text-destructive', flat: 'text-muted-foreground' } as const
 const channelById = computed(() => new Map((page.value?.channels ?? []).map(c => [c.id, c])))
 const closedWithoutAccount = computed(() => !!page.value && !page.value.account && page.value.channels.some(c => c.closed))
 
@@ -428,6 +453,19 @@ async function downloadOrder() {
               {{ s.label }} <span class="ml-1 tabular-nums opacity-70">{{ page.counts[s.id] }}</span>
             </Button>
           </div>
+          <div v-if="page.topics" class="flex flex-wrap gap-2" role="group" aria-label="Спрос">
+            <Button
+              v-for="f in OFFER_DEMAND_FILTERS"
+              :key="f.id"
+              size="sm"
+              :variant="demandFilter === f.id ? 'secondary' : 'ghost'"
+              :aria-pressed="demandFilter === f.id"
+              :data-testid="`offers-demand-${f.id}`"
+              @click="demandFilter = f.id"
+            >
+              {{ f.label }}
+            </Button>
+          </div>
           <div class="flex flex-wrap gap-2" role="group" aria-label="Группировка">
             <Button
               v-for="g in GROUPINGS"
@@ -444,7 +482,10 @@ async function downloadOrder() {
         </div>
 
         <p v-if="!groups.length" class="py-8 text-center text-sm text-muted-foreground" data-testid="offers-empty">
-          <template v-if="status !== 'new'">
+          <template v-if="page.offers.length && page.topics && demandFilter !== 'all'">
+            {{ demandFilter === 'demand' ? 'Ни у одного товара нет темы со спросом — посмотрите «Все» или добавьте темы на «Спросе на рынке».' : 'У всех товаров нашлась тема спроса.' }}
+          </template>
+          <template v-else-if="status !== 'new'">
             Здесь пока пусто.
           </template>
           <template v-else-if="page.channels.some(c => c.collectedAt)">
@@ -527,6 +568,27 @@ async function downloadOrder() {
                       В заказ
                     </Button>
                   </div>
+                </div>
+                <!-- Спрос: тема «Спроса на рынке», нашедшая товар -->
+                <div v-if="page.topics" class="text-xs" data-testid="offer-demand">
+                  <template v-if="demandById.get(o.id)">
+                    <p>
+                      <span class="font-medium">Спрос: {{ demandById.get(o.id)!.name }}</span>
+                      ·
+                      <span v-if="demandById.get(o.id)!.volume != null" class="whitespace-nowrap tabular-nums" data-testid="offer-demand-volume">{{ formatVolume(demandById.get(o.id)!.volume) }}/мес</span>
+                      <span v-else class="text-muted-foreground">цифр ещё нет</span>
+                      <span v-if="trendLabel(demandById.get(o.id)!.trendPct)" class="whitespace-nowrap" :class="TREND_TEXT[trendKind(demandById.get(o.id)!.trendPct) as keyof typeof TREND_TEXT]"> {{ trendLabel(demandById.get(o.id)!.trendPct) }}</span>
+                    </p>
+                    <p class="text-muted-foreground" data-testid="offer-demand-ours">
+                      {{ demandById.get(o.id)!.ourTotal ? `на сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'на сайте такого нет' }}{{ demandById.get(o.id)!.seasonSoon ? ' · скоро сезон' : '' }}
+                    </p>
+                  </template>
+                  <p v-else class="text-muted-foreground" data-testid="offer-demand-none">
+                    Темы спроса нет ·
+                    <NuxtLink :to="newTopicLink(o)" class="text-primary hover:underline" data-testid="offer-demand-add">
+                      Добавить тему
+                    </NuxtLink>
+                  </p>
                 </div>
                 <p class="whitespace-pre-line break-words text-sm" :class="[o.items?.length ? 'line-clamp-3 text-muted-foreground' : 'line-clamp-4', { 'text-muted-foreground': !o.caption }]" data-testid="offer-caption">
                   {{ o.caption || 'Без подписи' }}

@@ -270,10 +270,10 @@ const aiServer = http.createServer((req, res) => {
     const limits = (remaining, tokens) => ({
       'anthropic-ratelimit-requests-limit': '50',
       'anthropic-ratelimit-requests-remaining': String(remaining),
-      'anthropic-ratelimit-requests-reset': new Date(Date.now() + 30_000).toISOString(),
+      'anthropic-ratelimit-requests-reset': new Date(Date.now() + 600_000).toISOString(),
       'anthropic-ratelimit-input-tokens-limit': '50000',
       'anthropic-ratelimit-input-tokens-remaining': String(tokens),
-      'anthropic-ratelimit-input-tokens-reset': new Date(Date.now() + 20_000).toISOString(),
+      'anthropic-ratelimit-input-tokens-reset': new Date(Date.now() + 590_000).toISOString(),
     })
     if (ai.mode === 'limit')
       return send(429, { type: 'error', error: { type: 'rate_limit_error', message: 'Number of request tokens has exceeded your rate limit' } }, { 'retry-after': '0', ...limits(0, 0) })
@@ -329,6 +329,7 @@ async function removeProbeProducts() {
 
 async function cleanup() {
   await removeProbeProducts()
+  psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword = 'проверка спроса po-1016';`)
   const ids = psql(`SELECT coalesce(string_agg(c.id::text, ','), '') FROM public.supplier_channels c JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
     await removeFiles(await bucketFiles(id))
@@ -710,6 +711,44 @@ try {
   check(passed.every(r => r.images.length === 1 && r.images[0] === 'image/png как отдано'), 'фото — из бакета, те же байты')
   check(ownUnread().unread === 1 && sp(await page.locator('[data-testid=offers-unread]').textContent()) === 'Не прочлось: 1 — причина на карточке.', `остался один, что не читается: «${sp(await page.locator('[data-testid=offers-unread]').textContent())}»`)
   check((await cardOf(page, 'PO-1021')).prices[0] === '1 021 ₸' && (await cardOf(page, 'PO-1082')).prices[0] === '1 082 ₸', 'дочитанные — с ценой на карточке')
+
+  console.log('\n== спрос')
+  if (psql(`SELECT count(*) FROM public.market_demand_monthly;`) !== '0')
+    throw new Error('На локальной базе есть цифры спроса — страж кладёт свои за три месяца и их не трогает')
+  psql(`INSERT INTO public.market_demand_topics (name, kind, keywords, match_terms) VALUES ('Проверка спроса', 'type', '{"проверка спроса po-1016"}', '{"po-1016"}'), ('Проверка спроса без цифр', 'type', '{"проверка спроса po-1018"}', '{"po-1018"}');
+INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('проверка спроса po-1016', 2400);
+INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 'проверка спроса po-1016', m::date, 2400 FROM generate_series('2026-08-01'::date, '2026-10-01', interval '1 month') m;`)
+  await reload(page)
+  const demandOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand]').textContent().then(sp)
+  const d16 = await demandOf('PO-1016')
+  check(d16.startsWith('Спрос: Проверка спроса · 2 400/мес') && d16.includes('на сайте такого нет'), `тема нашла товар по прочитанному ИИ: «${d16}»`)
+  const d18 = await demandOf('PO-1018')
+  check(d18.startsWith('Спрос: Проверка спроса без цифр · цифр ещё нет'), `тема без цифр — так и сказано: «${d18}»`)
+  if (SHOTS) {
+    await page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' }).screenshot({ path: `${SHOTS}/offer-demand.png` })
+    await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).screenshot({ path: `${SHOTS}/offer-no-demand.png` })
+  }
+  const d20 = await demandOf('PO-1020')
+  check(d20 === 'Темы спроса нет · Добавить тему', `темы нет — предложение добавить: «${d20}»`)
+  await page.locator('[data-testid=offers-demand-demand]').click()
+  await painted(page)
+  const withDemand = await cards(page).locator('[data-testid=offer-name]').first().textContent().then(sp)
+  check(await cards(page).count() === 1 && withDemand === 'Игрушка PO-1016', `«Есть спрос» — только товары темы с цифрами: ${await cards(page).count()} — ${withDemand}`)
+  await page.locator('[data-testid=offers-demand-none]').click()
+  await painted(page)
+  const noneCount = await cards(page).count()
+  check(noneCount > 0 && await page.locator('[data-testid=offer-demand-none]').count() === noneCount, `«Темы нет» — только без темы: ${noneCount}`)
+  await reload(page)
+  check(await page.locator('[data-testid=offers-demand-none]').getAttribute('aria-pressed') === 'true', 'отбор по спросу — запомнен')
+  await page.locator('[data-testid=offers-demand-all]').click()
+  await painted(page)
+  await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).locator('[data-testid=offer-demand-add]').click()
+  await page.waitForURL(u => u.pathname === '/admin/demand', { timeout: 30000 })
+  await page.getByRole('dialog').waitFor({ timeout: 30000 })
+  const draftTopic = await page.getByRole('dialog').evaluate(d => ({ title: d.querySelector('h2')?.textContent.trim(), inputs: [...d.querySelectorAll('input, textarea')].map(i => i.value) }))
+  check(draftTopic.title === 'Новая тема' && draftTopic.inputs.includes('Игрушка PO-1020') && draftTopic.inputs.includes('игрушка po-1020') && !new URL(page.url()).searchParams.has('newTopic'), `«Добавить тему» — форма с заготовкой: ${JSON.stringify(draftTopic)}, адрес очищен`)
+  await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
+  await painted(page)
 
   console.log('\n== «На сайт»')
   const offerIdOf = m => psql(`SELECT id FROM public.supplier_offers WHERE channel_id = :'c' AND message_id = ${m};`, { c: openId })

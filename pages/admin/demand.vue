@@ -399,6 +399,20 @@ function openNew(candidate?: DemandCandidate) {
   })
 }
 
+/*
+ * «Добавить тему» из «Товаров поставщиков» (6.11.2026): ?newTopic=<название>&keyword=<фраза> —
+ * форма открыта с заготовкой, адрес очищается, чтобы перезагрузка её не повторяла
+ */
+onMounted(() => {
+  if (typeof route.query.newTopic !== 'string')
+    return
+  openNew()
+  editor.name = route.query.newTopic
+  editor.keywords = typeof route.query.keyword === 'string' ? route.query.keyword : ''
+  const { newTopic: _, keyword: __, ...rest } = route.query
+  navigateTo({ query: rest }, { replace: true })
+})
+
 function openEdit(t: DemandTopic) {
   Object.assign(editor, {
     open: true,
