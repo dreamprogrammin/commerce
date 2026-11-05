@@ -50,6 +50,7 @@ describe('orderFileName', () => {
     const d = new Date('2026-11-05T20:00:00Z') // в Алматы уже 6-е
     expect(orderFileName(d)).toBe('zakaz-2026-11-06.xlsx')
     expect(orderFileName(d, 'Оптом Игрушки «Алматы»')).toBe('zakaz-Оптом-Игрушки-Алматы-2026-11-06.xlsx')
+    expect(orderFileName(d, 'Опт', 12)).toBe('zakaz-12-Опт-2026-11-06.xlsx')
   })
 })
 

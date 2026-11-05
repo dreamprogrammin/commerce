@@ -24,6 +24,8 @@ export interface OrderSheetLine {
 
 export interface OrderSheetGroup {
   supplier: string
+  /** Номер сохранённого заказа — в заголовке листа */
+  number?: number
   lines: OrderSheetLine[]
   units: number
   /** Сумма по строкам с ценой */
@@ -68,10 +70,10 @@ export function sheetNames(suppliers: string[]): string[] {
   })
 }
 
-export function orderFileName(date: Date, supplier?: string): string {
+export function orderFileName(date: Date, supplier?: string, number?: number): string {
   const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(date)
   const who = supplier ? `-${supplier.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '')}` : ''
-  return `zakaz${who}-${day}.xlsx`
+  return `zakaz${number ? `-${number}` : ''}${who}-${day}.xlsx`
 }
 
 /** Сторона фото в ячейке, px */
@@ -100,7 +102,7 @@ export async function buildOrderWorkbook(groups: OrderSheetGroup[], date: Date, 
       { key: 'link', width: 30 },
     ]
     ws.mergeCells('A1:H1')
-    ws.getCell('A1').value = `Заказ магазина «Ухтышка» — ${g.supplier}, ${day}`
+    ws.getCell('A1').value = `Заказ${g.number ? ` №${g.number}` : ''} магазина «Ухтышка» — ${g.supplier}, ${day}`
     ws.getCell('A1').font = { bold: true, size: 14 }
     const head = ws.getRow(3)
     head.values = ['№', 'Фото', 'Товар', 'Артикул', 'Цена', 'Кол-во, шт.', 'Сумма', 'Пост']
