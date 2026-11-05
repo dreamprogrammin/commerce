@@ -728,6 +728,14 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' }).screenshot({ path: `${SHOTS}/offer-demand.png` })
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).screenshot({ path: `${SHOTS}/offer-no-demand.png` })
   }
+  const levelOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand-level]').evaluate(e => ({ level: e.dataset.level, text: e.textContent.trim().replace(/\s+/g, ' ') }))
+  const l16 = await levelOf('PO-1016')
+  const l18 = await levelOf('PO-1018')
+  const l20 = await levelOf('PO-1020')
+  // Тем с цифрами одна — делить на трети не на что, уровень средний
+  check(l16.level === 'mid' && l16.text === 'Спрос средний', `уровень у темы с цифрами: ${JSON.stringify(l16)}`)
+  check(l18.level === 'unknown' && l20.level === 'unknown' && l20.text === 'Спрос: нет данных', `уровень без цифр и без темы — «нет данных»: ${l18.level}, ${JSON.stringify(l20)}`)
+  check(await page.locator('[data-testid=offer-card]').count() === await page.locator('[data-testid=offer-demand-level]').count(), 'уровень — на каждой карточке')
   const d20 = await demandOf('PO-1020')
   check(d20 === 'Темы спроса нет · Добавить тему', `темы нет — предложение добавить: «${d20}»`)
   await page.locator('[data-testid=offers-demand-demand]').click()

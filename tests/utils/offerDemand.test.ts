@@ -1,6 +1,6 @@
 import type { OfferDemandTopic } from '@/utils/offerDemand'
 import { describe, expect, it } from 'vitest'
-import { filterByDemand, offerDemand, termRegex, topicDraft, topicMatches } from '@/utils/offerDemand'
+import { demandLevel, demandLevelBounds, filterByDemand, offerDemand, termRegex, topicDraft, topicMatches } from '@/utils/offerDemand'
 
 function topic(over: Partial<OfferDemandTopic>): OfferDemandTopic {
   return {
@@ -78,5 +78,24 @@ describe('topicDraft', () => {
     expect(topicDraft(offer('', [item('Кукла с аксессуарами', 'Barbie')]))).toEqual({ name: 'Barbie', keyword: 'barbie' })
     expect(topicDraft(offer('', [item('Конструктор «Город» 500 деталей')]))).toEqual({ name: 'Конструктор Город', keyword: 'конструктор город' })
     expect(topicDraft(offer('Подпись'))).toBeNull()
+  })
+})
+
+describe('уровень спроса', () => {
+  const t = (v: number | null, active = true) => ({ is_active: active, volume_avg3: v })
+  it('границы — трети тем с цифрами; без цифр, нули и отключённые не в счёт; меньше трёх — null', () => {
+    expect(demandLevelBounds([t(100), t(200), t(300), t(400), t(500), t(600), t(null), t(0), t(99999, false)])).toEqual({ mid: 300, high: 500 })
+    expect(demandLevelBounds([t(100), t(200)])).toBeNull()
+  })
+  it('уровни', () => {
+    const b = { mid: 300, high: 500 }
+    expect(demandLevel({ volume: 2400 }, b)).toBe('high')
+    expect(demandLevel({ volume: 500 }, b)).toBe('high')
+    expect(demandLevel({ volume: 300 }, b)).toBe('mid')
+    expect(demandLevel({ volume: 120 }, b)).toBe('low')
+    expect(demandLevel({ volume: 0 }, b)).toBe('none')
+    expect(demandLevel({ volume: null }, b)).toBe('unknown')
+    expect(demandLevel(null, b)).toBe('unknown')
+    expect(demandLevel({ volume: 50 }, null)).toBe('mid')
   })
 })

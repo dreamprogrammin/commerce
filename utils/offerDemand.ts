@@ -109,3 +109,38 @@ export function topicDraft(offer: Pick<Offer, 'caption' | 'items'>): { name: str
   const name = source.replace(/[^\p{L}\p{N} .'&+-]/gu, '').trim().slice(0, 80)
   return name ? { name, keyword: name.toLowerCase() } : null
 }
+
+export type DemandLevel = 'high' | 'mid' | 'low' | 'none' | 'unknown'
+
+export const DEMAND_LEVEL_TEXT: Record<DemandLevel, string> = {
+  high: 'Спрос высокий',
+  mid: 'Спрос средний',
+  low: 'Спрос низкий',
+  none: 'Спроса нет',
+  unknown: 'Спрос: нет данных',
+}
+
+/**
+ * Границы уровней (6.11.2026, владелец: «рядом с каждой карточкой поставить
+ * уровень спроса»): по темам с цифрами — верхняя треть по запросам в месяц —
+ * высокий, средняя — средний, нижняя — низкий. Относительно своих тем, а не
+ * порогом: какой спрос «высокий» для Казахстана, заранее не известно.
+ * null — тем с цифрами меньше трёх, делить не на что.
+ */
+export function demandLevelBounds(topics: Pick<OfferDemandTopic, 'is_active' | 'volume_avg3'>[]): { mid: number, high: number } | null {
+  const v = topics.filter(t => t.is_active && (t.volume_avg3 ?? 0) > 0).map(t => t.volume_avg3!).sort((a, b) => a - b)
+  if (v.length < 3)
+    return null
+  return { mid: v[Math.floor(v.length / 3)]!, high: v[Math.floor((2 * v.length) / 3)]! }
+}
+
+/** Уровень спроса товара: тема не нашлась или цифр нет — «нет данных», ноль — «нет спроса» */
+export function demandLevel(demand: Pick<OfferDemand, 'volume'> | null, bounds: { mid: number, high: number } | null): DemandLevel {
+  if (!demand || demand.volume == null)
+    return 'unknown'
+  if (demand.volume <= 0)
+    return 'none'
+  if (!bounds)
+    return 'mid'
+  return demand.volume >= bounds.high ? 'high' : demand.volume >= bounds.mid ? 'mid' : 'low'
+}
