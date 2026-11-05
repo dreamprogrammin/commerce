@@ -11,6 +11,7 @@
  */
 import type { DemandTopic } from './marketDemand'
 import type { VisionModelSpend } from './supplierOfferList'
+import type { UsageMeters } from './usageBatteries'
 import { DEMAND_REFRESH_COST, formatUsd, matchesDemandFilter, sortDemandTopics } from './marketDemand'
 import { plural } from './restockOrder'
 
@@ -81,6 +82,8 @@ export interface SupplierLoad {
 
 /** Сводка `/api/admin/purchasing`. null у части — миграции этого шага на базе ещё нет. */
 export interface PurchasingStatus {
+  /** «Батарейки»: бюджет и лимит ИИ, DataForSEO, Telegram */
+  meters: UsageMeters
   suppliers: number
   channels: {
     total: number

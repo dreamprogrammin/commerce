@@ -2,6 +2,7 @@
 import type { Component } from 'vue'
 import type { TrendKind } from '@/utils/marketDemand'
 import type { DemandLine, PurchasingStatus, StepState, SupplierLoad } from '@/utils/smartPurchasing'
+import type { BatteryState } from '@/utils/usageBatteries'
 import {
   AlertTriangle,
   ArrowRight,
@@ -18,11 +19,13 @@ import {
   Truck,
   Wallet,
 } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import DemandChart from '@/components/admin/purchasing/DemandChart.vue'
 import { dataUntilLabel, DEMAND_REFRESH_COST, formatUsd, formatVolume, peakLabel, sparkPoints, trendKind, trendLabel } from '@/utils/marketDemand'
 import { plural } from '@/utils/restockOrder'
 import { nextAutoRefresh, PURCHASING_PAGES, purchasingSteps, refreshesLeft, seriesMonths } from '@/utils/smartPurchasing'
 import { visionCost } from '@/utils/supplierOfferList'
+import { usageBatteries } from '@/utils/usageBatteries'
 
 definePageMeta({ layout: 'admin' })
 
@@ -68,6 +71,36 @@ const months = computed(() => {
   const o = overview.value
   return o?.series && o.dataUntil ? seriesMonths(o.dataUntil, o.series.length) : []
 })
+// --- «Батарейки» (6.11.2026): сколько осталось и когда сброс ---
+const batteries = computed(() => data.value?.meters ? usageBatteries(data.value.meters) : [])
+const BATTERY_BAR: Record<BatteryState, string> = { ok: 'bg-emerald-500', low: 'bg-amber-500', empty: 'bg-red-500', off: 'bg-muted-foreground/30' }
+const BATTERY_TEXT: Record<BatteryState, string> = { ok: 'text-foreground', low: 'text-amber-700', empty: 'text-destructive', off: 'text-muted-foreground' }
+const budgetOpen = ref(false)
+const budgetUsd = ref('')
+const budgetReset = ref('')
+const budgetSaving = ref(false)
+function openBudget() {
+  const b = data.value?.meters.aiBudget
+  budgetUsd.value = b ? String(b.usd) : ''
+  budgetReset.value = b?.resetDay ? String(b.resetDay) : ''
+  budgetOpen.value = true
+}
+async function saveBudget(remove = false) {
+  budgetSaving.value = true
+  try {
+    await adminFetch('/api/admin/ai-settings/budget', { method: 'PUT', body: { usd: remove ? 0 : Number(String(budgetUsd.value).replace(',', '.')), resetDay: budgetReset.value || null } })
+    budgetOpen.value = false
+    toast.success(remove ? 'Бюджет ИИ убран' : 'Бюджет ИИ сохранён')
+    await refresh()
+  }
+  catch (e: any) {
+    toast.error(e?.data?.message || 'Не удалось сохранить бюджет')
+  }
+  finally {
+    budgetSaving.value = false
+  }
+}
+
 const left = computed(() => demand.value?.balance != null ? refreshesLeft(demand.value.balance) : null)
 // «Последний месяц — октябрь 2026, обновлено 3 ноября»
 const demandAsOf = computed(() => {
@@ -290,6 +323,75 @@ const STATE: Record<StepState, { label: string, badge: string, number: string }>
                   <AlertTriangle class="mr-1 h-3 w-3" />
                   {{ t.warn }}
                 </Badge>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <!-- «Батарейки»: сколько осталось у платных сервисов и когда сброс -->
+        <section class="space-y-2" data-testid="batteries">
+          <h2 class="text-sm font-medium text-muted-foreground">
+            Здоровье сервисов
+          </h2>
+          <p v-if="data.meters && !data.meters.installed" class="text-xs text-muted-foreground" data-testid="batteries-no-migration">
+            Расход и лимиты ИИ появятся после миграции базы 20261106120000_usage_meters.
+          </p>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
+            <Card v-for="b in batteries" :key="b.id" class="gap-2 py-4 md:py-5" :data-testid="`battery-${b.id}`" :data-state="b.state">
+              <CardHeader class="px-4 md:px-5">
+                <CardTitle class="text-sm font-medium leading-snug">
+                  {{ b.title }}
+                </CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-2 px-4 md:px-5">
+                <div
+                  class="h-2.5 w-full overflow-hidden rounded-full bg-muted"
+                  role="meter"
+                  :aria-label="b.title"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-valuenow="b.level == null ? undefined : Math.round(b.level * 100)"
+                >
+                  <div class="h-full rounded-full transition-[width]" :class="BATTERY_BAR[b.state]" :style="{ width: `${b.level == null ? 0 : Math.max(b.level > 0 ? 3 : 0, Math.round(b.level * 100))}%` }" data-testid="battery-bar" />
+                </div>
+                <p class="text-base font-semibold tabular-nums" :class="BATTERY_TEXT[b.state]" data-testid="battery-value">
+                  {{ b.value }}
+                </p>
+                <p v-if="b.reset" class="text-xs font-medium" data-testid="battery-reset">
+                  {{ b.reset }}
+                </p>
+                <p v-if="b.note" class="text-xs text-muted-foreground" data-testid="battery-note">
+                  {{ b.note }}
+                </p>
+                <template v-if="b.id === 'ai_budget' && data.meters.installed">
+                  <form v-if="budgetOpen" class="space-y-2 border-t pt-2" data-testid="budget-form" @submit.prevent="saveBudget()">
+                    <label class="block text-xs">
+                      На счёте провайдера, $
+                      <Input v-model="budgetUsd" inputmode="decimal" class="mt-1 h-8" placeholder="5" data-testid="budget-usd" required />
+                    </label>
+                    <label class="block text-xs">
+                      День сброса (1–28), пусто — без сброса
+                      <Input v-model="budgetReset" inputmode="numeric" class="mt-1 h-8" placeholder="без сброса" data-testid="budget-reset" />
+                    </label>
+                    <p class="text-xs text-muted-foreground">
+                      Расход считаем с сегодняшнего дня.
+                    </p>
+                    <div class="flex flex-wrap gap-1.5">
+                      <Button type="submit" size="sm" :disabled="budgetSaving" data-testid="budget-save">
+                        Сохранить
+                      </Button>
+                      <Button v-if="data.meters.aiBudget" type="button" size="sm" variant="ghost" :disabled="budgetSaving" data-testid="budget-remove" @click="saveBudget(true)">
+                        Убрать
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" :disabled="budgetSaving" @click="budgetOpen = false">
+                        Отмена
+                      </Button>
+                    </div>
+                  </form>
+                  <Button v-else size="sm" variant="outline" data-testid="budget-edit" @click="openBudget">
+                    {{ data.meters.aiBudget ? 'Изменить' : 'Задать бюджет' }}
+                  </Button>
+                </template>
               </CardContent>
             </Card>
           </div>

@@ -65,6 +65,64 @@ export interface ReadResult {
   inputTokens: number | null
   outputTokens: number | null
   ms: number
+  /** Лимиты провайдера по заголовкам ответа; null — провайдер их не шлёт (Google) */
+  limits: RateLimits | null
+}
+
+/** Один лимит провайдера: сколько всего, сколько осталось, когда сброс (ISO) */
+export interface RateLimit {
+  limit: number | null
+  remaining: number | null
+  reset: string | null
+}
+
+/** Лимиты провайдера ИИ после ответа — для «батарейки» дашборда (6.11.2026) */
+export interface RateLimits {
+  requests: RateLimit | null
+  /** У Anthropic вход и выход считаются отдельно, у OpenAI — вместе (`tokens`) */
+  inputTokens: RateLimit | null
+  outputTokens: RateLimit | null
+  tokens: RateLimit | null
+}
+
+/** «6m0s», «1.5s», «20ms», «1h2m3s» — так OpenAI пишет время до сброса */
+function durationMs(text: string): number | null {
+  const parts = [...text.matchAll(/(\d+(?:\.\d+)?)(ms|[hms])/g)]
+  if (!parts.length || parts.map(p => p[0]).join('') !== text.trim())
+    return null
+  const unit = { h: 3_600_000, m: 60_000, s: 1000, ms: 1 } as const
+  return parts.reduce((sum, p) => sum + Number(p[1]) * unit[p[2] as keyof typeof unit], 0)
+}
+
+/**
+ * Лимиты из заголовков ответа (6.11.2026). Anthropic: `anthropic-ratelimit-
+ * <requests|input-tokens|output-tokens|tokens>-<limit|remaining|reset>`, сброс —
+ * время RFC 3339. OpenAI и совместимые: `x-ratelimit-<limit|remaining|reset>-
+ * <requests|tokens>`, сброс — длительность от `now`. Нет ни одного — null.
+ */
+export function rateLimits(headers: { get: (name: string) => string | null } | null | undefined, now = Date.now()): RateLimits | null {
+  if (!headers)
+    return null
+  const num = (v: string | null) => v != null && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null
+  const one = (limit: string | null, remaining: string | null, reset: string | null, resetIsDuration: boolean): RateLimit | null => {
+    if (limit == null && remaining == null && reset == null)
+      return null
+    let at: string | null = null
+    if (reset) {
+      const ms = resetIsDuration ? durationMs(reset) : Date.parse(reset) - now
+      at = ms != null && Number.isFinite(ms) ? new Date(now + ms).toISOString() : null
+    }
+    return { limit: num(limit), remaining: num(remaining), reset: at }
+  }
+  const a = (kind: string) => one(headers.get(`anthropic-ratelimit-${kind}-limit`), headers.get(`anthropic-ratelimit-${kind}-remaining`), headers.get(`anthropic-ratelimit-${kind}-reset`), false)
+  const o = (kind: string) => one(headers.get(`x-ratelimit-limit-${kind}`), headers.get(`x-ratelimit-remaining-${kind}`), headers.get(`x-ratelimit-reset-${kind}`), true)
+  const limits: RateLimits = {
+    requests: a('requests') ?? o('requests'),
+    inputTokens: a('input-tokens'),
+    outputTokens: a('output-tokens'),
+    tokens: a('tokens') ?? o('tokens'),
+  }
+  return Object.values(limits).some(Boolean) ? limits : null
 }
 
 /** Итоговая цена по правилу владельца: текст рядом с фото главнее цены на фото. */
@@ -214,8 +272,9 @@ export interface AnthropicReply {
 export interface AnthropicClient {
   baseURL: string
   models: { retrieve: (model: string) => Promise<unknown> }
-  // Тело запроса — как в SDK; его типы модуль не повторяет
-  messages: { create: (body: any) => Promise<AnthropicReply> }
+  // Тело запроса — как в SDK; его типы модуль не повторяет. withResponse у SDK
+  // есть всегда — из него заголовки лимитов; у заглушек тестов может не быть
+  messages: { create: (body: any) => Promise<AnthropicReply> & { withResponse?: () => Promise<{ data: AnthropicReply, response: { headers: { get: (name: string) => string | null } } }> } }
 }
 
 /** Клиент SDK под ключ и адрес — `options => new Anthropic(options)` */
@@ -320,7 +379,7 @@ function supportsEffort(client: AnthropicClient, model: string): Promise<boolean
 
 async function callAnthropic(client: AnthropicClient, post: SupplierPost, model: string) {
   const effort = await supportsEffort(client, model)
-  const response = await client.messages.create({
+  const call = client.messages.create({
     model,
     max_tokens: MAX_OUTPUT_TOKENS,
     system: SYSTEM_PROMPT,
@@ -336,6 +395,8 @@ async function callAnthropic(client: AnthropicClient, post: SupplierPost, model:
       ],
     }],
   })
+  const { data: response, response: http } = call.withResponse ? await call.withResponse() : { data: await call, response: null }
+  const limits = rateLimits(http?.headers)
   // Причина остановки — до чтения текста: отказ приходит с кодом 200
   if (response.stop_reason === 'refusal')
     throw new Error('Модель отказалась читать пост')
@@ -345,7 +406,7 @@ async function callAnthropic(client: AnthropicClient, post: SupplierPost, model:
   const block = (response.content as { type: string, text?: string }[]).find(b => b.type === 'text')
   if (!block?.text)
     throw new Error('Пустой ответ модели')
-  return { raw: block.text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens }
+  return { raw: block.text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, limits }
 }
 
 async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: string, baseURL: string, maxTokensParam: 'max_tokens' | 'max_completion_tokens', timeoutMs: number) {
@@ -393,8 +454,11 @@ async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: s
       strict = false
     res = await request()
   }
-  if (!res.ok)
-    throw new Error(`${model}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`)
+  const limits = rateLimits(res.headers)
+  if (!res.ok) {
+    // Лимиты — и при отказе: на 429 они важнее всего
+    throw Object.assign(new Error(`${model}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`), { status: res.status, limits })
+  }
   const body = await res.json()
   const choice = body.choices?.[0]
   if (choice?.finish_reason === 'length')
@@ -402,5 +466,5 @@ async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: s
   const raw = choice?.message?.content
   if (typeof raw !== 'string' || !raw.trim())
     throw new Error(`Пустой ответ модели: ${JSON.stringify(body).slice(0, 300)}`)
-  return { raw, inputTokens: body.usage?.prompt_tokens ?? null, outputTokens: body.usage?.completion_tokens ?? null }
+  return { raw, inputTokens: body.usage?.prompt_tokens ?? null, outputTokens: body.usage?.completion_tokens ?? null, limits }
 }
