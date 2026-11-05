@@ -1,6 +1,6 @@
 import type { Offer, OfferChannel } from '../../utils/supplierOfferList'
 import { describe, expect, it } from 'vitest'
-import { collectedText, dayTitle, groupOffers, isOfferStatus, modelLabel, visionCost } from '../../utils/supplierOfferList'
+import { collectedText, dayTitle, groupOffers, isOfferStatus, modelLabel, offerOrderLine, productDraft, visionCost } from '../../utils/supplierOfferList'
 
 // 4 ноября 2026, 15:00 в Алматы (UTC+5)
 const NOW = new Date('2026-11-04T10:00:00Z')
@@ -93,5 +93,36 @@ describe('visionCost', () => {
       { model: 'anthropic/claude-haiku-5-5', posts: 1, inputTokens: 2000, outputTokens: 300 },
       { model: 'openai/gpt-6.1-terra', posts: 1, inputTokens: 2000, outputTokens: 300 },
     ])).toBeNull()
+  })
+})
+
+describe('productDraft', () => {
+  const item = { name: 'Кукла Барби', article: 'HXJ11', brand: 'Mattel', price: 2400, priceFrom: 'text' as const, imagePrice: null, priceNote: null, age: '3+', confidence: 'high' as const, doubt: null }
+  const source = { id: 'o1', caption: '', postUrl: 'https://t.me/x/1', photoUrl: null, supplierId: 's1', supplierName: 'AmrToys', items: [item, { ...item, name: 'Набор', article: null, price: null }] }
+
+  it('товар поста: название, артикул, цена поставщика — в закупочную, поставщик', () => {
+    expect(productDraft(source)).toEqual({ name: 'Кукла Барби', sku: 'HXJ11', costPrice: 2400, supplierId: 's1' })
+  })
+
+  it('второй товар поста — свои поля; чего не прочитано — пусто', () => {
+    expect(productDraft(source, 1)).toEqual({ name: 'Набор', sku: null, costPrice: null, supplierId: 's1' })
+  })
+
+  it('пост не прочитан или номера нет — только поставщик', () => {
+    expect(productDraft({ ...source, items: null })).toEqual({ name: '', sku: null, costPrice: null, supplierId: 's1' })
+    expect(productDraft(source, 5)).toEqual({ name: '', sku: null, costPrice: null, supplierId: 's1' })
+  })
+})
+
+describe('offerOrderLine', () => {
+  const item = { name: 'Кукла Барби', article: 'HXJ11', brand: null, price: 2400, priceFrom: 'text' as const, imagePrice: null, priceNote: null, age: null, confidence: 'high' as const, doubt: null }
+  const offer = { id: 'o1', caption: '\n  Новинка!\nКукла', postUrl: 'https://t.me/x/1', photoUrl: 'https://s/1.jpg', items: [item] }
+
+  it('прочитанный товар: его название, артикул и цена; 1 шт.', () => {
+    expect(offerOrderLine(offer, 0, 'AmrToys')).toEqual({ key: 'o1:0', supplier: 'AmrToys', name: 'Кукла Барби', article: 'HXJ11', price: 2400, quantity: 1, photoUrl: 'https://s/1.jpg', link: 'https://t.me/x/1' })
+  })
+
+  it('пост не прочитан — первая непустая строка подписи, без артикула и цены', () => {
+    expect(offerOrderLine({ ...offer, items: null }, null, 'AmrToys')).toMatchObject({ key: 'o1:-', name: 'Новинка!', article: null, price: null })
   })
 })

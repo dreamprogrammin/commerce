@@ -1024,6 +1024,11 @@ export default defineNuxtConfig({
               // Транслитерация slug — только админка (utils/slugify.ts)
               if (id.includes('transliteration') || id.includes('slugify'))
                 return 'vendor-admin-slug'
+              // Таблица заказа поставщику — только админка (utils/orderSheet.ts),
+              // import() по кнопке. Без своей строки 1,7 МБ уехали в общий vendor
+              // и на каждую страницу сайта (замерено на сборке 5.11.2026)
+              if (id.includes('exceljs'))
+                return 'vendor-admin-excel'
               // Конфетти — одна страница: pages/order/success/[id].vue
               if (id.includes('canvas-confetti'))
                 return 'vendor-confetti'

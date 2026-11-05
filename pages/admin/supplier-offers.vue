@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import type { OrderSheetLine } from '@/utils/orderSheet'
 import type { Offer, OfferChannel, OfferGrouping, OfferReading, OfferStatus } from '@/utils/supplierOfferList'
 import { useLocalStorage } from '@vueuse/core'
 import { ExternalLink, ImageOff, Lock, RefreshCw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { formatPrice } from '@/utils/formatPrice'
+import { buildOrderWorkbook, groupOrderLines, orderFileName } from '@/utils/orderSheet'
 import { plural } from '@/utils/restockOrder'
-import { collectedText, dayTitle, groupOffers, modelLabel, timeOf } from '@/utils/supplierOfferList'
+import { collectedText, dayTitle, groupOffers, modelLabel, offerOrderLine, timeOf } from '@/utils/supplierOfferList'
 
 /*
  * «Товары поставщиков» (4 ноября 2026) — список ссылок умного закупа.
@@ -216,6 +219,56 @@ async function setStatus(offer: Offer, to: OfferStatus, undo = false) {
     busy.value.delete(offer.id)
   }
 }
+
+// --- Заказ поставщику ---
+/*
+ * Владелец 5.11: «пусть формируется список товара, который мне нужен, в
+ * понятную таблицу с картинками, которую я могу скачать и передать
+ * поставщику». Выбранное запоминается в этом браузере — снимком строки,
+ * чтобы пережить смену вкладки и «Добавил»; файл — utils/orderSheet.ts.
+ */
+type OrderPick = OrderSheetLine & { key: string }
+const picks = useLocalStorage<Record<string, OrderPick>>('admin-supplier-order', {})
+const pickList = computed(() => Object.values(picks.value))
+const pickGroups = computed(() => groupOrderLines(pickList.value))
+const pickKey = (o: Offer, item: number | null) => `${o.id}:${item ?? '-'}`
+
+function addPick(o: Offer, item: number | null) {
+  const c = channelById.value.get(o.channelId)
+  const line = offerOrderLine(o, item, c?.supplierName || c?.title || 'Поставщик')
+  picks.value = { ...picks.value, [line.key]: line }
+}
+function removePick(key: string) {
+  const { [key]: _, ...rest } = picks.value
+  picks.value = rest
+}
+function setPickQty(key: string, value: string | number) {
+  const n = Math.round(Number(value))
+  const pick = picks.value[key]
+  if (pick && Number.isFinite(n) && n >= 1 && n <= 9999)
+    picks.value = { ...picks.value, [key]: { ...pick, quantity: n } }
+}
+
+const downloading = ref(false)
+async function downloadOrder() {
+  if (downloading.value || !pickGroups.value.length)
+    return
+  downloading.value = true
+  const id = toast.loading('Собираю таблицу с фото…')
+  try {
+    const now = new Date()
+    const bytes = await buildOrderWorkbook(pickGroups.value, now, jpegForSheet)
+    const single = pickGroups.value.length === 1 ? pickGroups.value[0]!.supplier : undefined
+    saveOrderFile(bytes, orderFileName(now, single))
+    toast.success('Таблица скачана', { id, description: 'По листу на поставщика' })
+  }
+  catch {
+    toast.error('Не удалось собрать таблицу', { id })
+  }
+  finally {
+    downloading.value = false
+  }
+}
 </script>
 
 <template>
@@ -332,6 +385,34 @@ async function setStatus(offer: Offer, to: OfferStatus, undo = false) {
           </CardContent>
         </Card>
 
+        <!-- Заказ поставщику: выбранное «В заказ» -->
+        <Card v-if="pickList.length" data-testid="order-bar">
+          <CardContent class="space-y-3 pt-6">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm">
+                <span class="font-medium">В заказе {{ count(pickList.length, 'товар', 'товара', 'товаров') }}</span>
+                <span class="text-muted-foreground"> · {{ count(pickGroups.length, 'поставщик', 'поставщика', 'поставщиков') }}</span>
+              </p>
+              <div class="flex gap-2">
+                <Button size="sm" :disabled="downloading" data-testid="order-download" @click="downloadOrder">
+                  {{ downloading ? 'Собираю…' : 'Скачать таблицу' }}
+                </Button>
+                <Button size="sm" variant="ghost" :disabled="downloading" data-testid="order-clear" @click="picks = {}">
+                  Очистить
+                </Button>
+              </div>
+            </div>
+            <ul class="divide-y text-sm">
+              <li v-for="g in pickGroups" :key="g.supplier" class="flex flex-wrap items-baseline justify-between gap-x-4 py-1.5" data-testid="order-supplier">
+                <span class="font-medium">{{ g.supplier }}</span>
+                <span class="tabular-nums text-muted-foreground">
+                  {{ count(g.lines.length, 'товар', 'товара', 'товаров') }}, {{ g.units }}&nbsp;шт.<template v-if="g.sum"> · {{ formatPrice(g.sum) }}&nbsp;₸</template><template v-if="g.unpriced"> · без цены: {{ g.unpriced }}</template>
+                </span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+
         <!-- Отбор и группировка -->
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex flex-wrap gap-2" role="group" aria-label="Какие товары">
@@ -410,6 +491,18 @@ async function setStatus(offer: Offer, to: OfferStatus, undo = false) {
                     <p v-if="it.confidence !== 'high'" class="text-xs text-amber-700" data-testid="offer-doubt">
                       ИИ не уверен{{ it.doubt ? `: ${it.doubt}` : '' }}
                     </p>
+                    <div class="flex items-center gap-1.5 pt-1">
+                      <template v-if="picks[pickKey(o, i)]">
+                        <Input type="number" min="1" max="9999" inputmode="numeric" class="h-8 w-20" aria-label="Сколько штук" :model-value="picks[pickKey(o, i)]!.quantity" data-testid="offer-order-qty" @update:model-value="setPickQty(pickKey(o, i), $event)" />
+                        <span class="text-xs text-muted-foreground">шт. в заказе</span>
+                        <Button size="sm" variant="ghost" class="h-8 px-2" data-testid="offer-order-remove" @click="removePick(pickKey(o, i))">
+                          Убрать
+                        </Button>
+                      </template>
+                      <Button v-else size="sm" variant="outline" class="h-8 px-2" data-testid="offer-order-add" @click="addPick(o, i)">
+                        В заказ
+                      </Button>
+                    </div>
                   </div>
                   <p v-if="o.items.length > 3" class="text-xs text-muted-foreground">
                     И ещё {{ count(o.items.length - 3, 'товар', 'товара', 'товаров') }} — в посте
@@ -421,6 +514,20 @@ async function setStatus(offer: Offer, to: OfferStatus, undo = false) {
                 <p v-else-if="o.readError" class="text-xs text-destructive" data-testid="offer-read-error">
                   Не прочитано: {{ o.readError }}
                 </p>
+                <div v-if="!o.items?.length" data-testid="offer-order-post">
+                  <div class="flex items-center gap-1.5 pt-1">
+                    <template v-if="picks[pickKey(o, null)]">
+                      <Input type="number" min="1" max="9999" inputmode="numeric" class="h-8 w-20" aria-label="Сколько штук" :model-value="picks[pickKey(o, null)]!.quantity" data-testid="offer-order-qty" @update:model-value="setPickQty(pickKey(o, null), $event)" />
+                      <span class="text-xs text-muted-foreground">шт. в заказе</span>
+                      <Button size="sm" variant="ghost" class="h-8 px-2" data-testid="offer-order-remove" @click="removePick(pickKey(o, null))">
+                        Убрать
+                      </Button>
+                    </template>
+                    <Button v-else size="sm" variant="outline" class="h-8 px-2" data-testid="offer-order-add" @click="addPick(o, null)">
+                      В заказ
+                    </Button>
+                  </div>
+                </div>
                 <p class="whitespace-pre-line break-words text-sm" :class="[o.items?.length ? 'line-clamp-3 text-muted-foreground' : 'line-clamp-4', { 'text-muted-foreground': !o.caption }]" data-testid="offer-caption">
                   {{ o.caption || 'Без подписи' }}
                 </p>
@@ -430,6 +537,20 @@ async function setStatus(offer: Offer, to: OfferStatus, undo = false) {
                 <a :href="o.postUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm text-primary hover:underline" data-testid="offer-post">
                   Пост в Telegram <ExternalLink class="h-3 w-3" />
                 </a>
+                <!-- «На сайт»: форма нового товара с прочитанным ИИ и фото поста; товаров в посте
+                     несколько — у каждого своя ссылка -->
+                <div v-if="o.status === 'new' && (o.items?.length ?? 0) > 1" class="flex flex-wrap gap-1.5">
+                  <Button v-for="(it, i) in o.items!.slice(0, 3)" :key="i" as-child size="sm" class="max-w-full px-2" data-testid="offer-to-site">
+                    <NuxtLink :to="{ path: '/admin/products/new', query: { offer: o.id, item: i } }" class="truncate">
+                      На сайт: {{ it.article || it.name }}
+                    </NuxtLink>
+                  </Button>
+                </div>
+                <Button v-else-if="o.status === 'new'" as-child size="sm" data-testid="offer-to-site">
+                  <NuxtLink :to="{ path: '/admin/products/new', query: { offer: o.id } }">
+                    На сайт
+                  </NuxtLink>
+                </Button>
                 <div v-if="o.status === 'new'" class="grid grid-cols-2 gap-1.5">
                   <Button size="sm" variant="outline" class="px-2" :disabled="busy.has(o.id)" data-testid="offer-added" @click="setStatus(o, 'added')">
                     Добавил

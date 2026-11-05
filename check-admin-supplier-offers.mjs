@@ -64,6 +64,7 @@ import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
 import http from 'node:http'
 import process from 'node:process'
+import ExcelJS from 'exceljs'
 import { chromium } from 'playwright'
 
 const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'http://localhost:3141'
@@ -304,7 +305,21 @@ COMMIT;
 `, { admin: adminId })
 }
 
+// Товары сайта, созданные «На сайт», и их фото в product-images
+const PROBE_PRODUCTS = `sku IN ('PO-1013', 'PO-1014') AND name IN ('Игрушка PO-1013', 'Проверка дубля')`
+async function removeProbeProducts() {
+  const ids = psql(`SELECT coalesce(string_agg(id::text, ','), '') FROM public.products WHERE ${PROBE_PRODUCTS};`).split(',').filter(Boolean)
+  for (const id of ids) {
+    const res = await fetch(`${SUPA}/storage/v1/object/list/product-images`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ prefix: `products/${id}`, limit: 1000 }) })
+    const files = res.ok ? (await res.json()).filter(f => f.id).map(f => `products/${id}/${f.name}`) : []
+    if (files.length)
+      await fetch(`${SUPA}/storage/v1/object/product-images`, { method: 'DELETE', headers: serviceHeaders, body: JSON.stringify({ prefixes: files }) })
+  }
+  psql(`DELETE FROM public.products WHERE ${PROBE_PRODUCTS};`)
+}
+
 async function cleanup() {
+  await removeProbeProducts()
   const ids = psql(`SELECT coalesce(string_agg(c.id::text, ','), '') FROM public.supplier_channels c JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
     await removeFiles(await bucketFiles(id))
@@ -679,6 +694,84 @@ try {
   check(ownUnread().unread === 1 && sp(await page.locator('[data-testid=offers-unread]').textContent()) === 'Не прочлось: 1 — причина на карточке.', `остался один, что не читается: «${sp(await page.locator('[data-testid=offers-unread]').textContent())}»`)
   check((await cardOf(page, 'PO-1021')).prices[0] === '1 021 ₸' && (await cardOf(page, 'PO-1082')).prices[0] === '1 082 ₸', 'дочитанные — с ценой на карточке')
 
+  console.log('\n== «На сайт»')
+  const offerIdOf = m => psql(`SELECT id FROM public.supplier_offers WHERE channel_id = :'c' AND message_id = ${m};`, { c: openId })
+  check(await page.locator('[data-testid=offer-card]', { hasText: 'PO-1023' }).locator('[data-testid=offer-to-site]').count() === 3, 'несколько товаров в посте — «На сайт» у каждого из показанных')
+  const dupId = psql(`INSERT INTO public.products (name, slug, price, sku) VALUES ('Проверка дубля', :'s', 100, 'PO-1014') RETURNING id;`, { s: `probe-offer-dup-${stamp}` }).split('\n')[0]
+  const form = await newPage({ width: 1366, height: 900 }, `/admin/products/new?offer=${offerIdOf(1014)}`)
+  await form.locator('[data-testid=draft-duplicate]').waitFor({ timeout: 30000 })
+  check(sp(await form.locator('[data-testid=draft-duplicate]').textContent()).startsWith('Артикул PO-1014 уже есть на сайте: «Проверка дубля».') && await form.locator(`[data-testid=draft-duplicate] a[href="/admin/products/${dupId}"]`).count() === 1, 'артикул уже на сайте — предупреждение и ссылка на товар')
+  check(await form.locator('#cost_price').inputValue() === '2500', `цена с фото — тоже в закупочную: ${await form.locator('#cost_price').inputValue()}`)
+  await form.context().close()
+
+  // Клик со страницы, а не переход по адресу: ссылка ведёт куда надо
+  await page.route('**/api/seo/notify-indexing', r => r.fulfill({ json: { success: true, indexnow: { submitted: false, urls_count: 0 }, yandex_ping: { submitted: false }, bing_ping: { submitted: false } } }))
+  await page.locator('[data-testid=offer-card]', { hasText: 'PO-1013' }).locator('[data-testid=offer-to-site]').click()
+  await page.waitForURL(u => u.pathname === '/admin/products/new' && u.searchParams.get('offer') === offerIdOf(1013), { timeout: 30000 })
+  await page.waitForFunction(() => document.querySelector('#name')?.value === 'Игрушка PO-1013', null, { timeout: 30000 })
+  await page.locator('img[src^="blob:"]').first().waitFor({ timeout: 30000 })
+  const filled = await page.evaluate(() => ({
+    sku: document.querySelector('#sku')?.value,
+    slug: document.querySelector('#slug')?.value,
+    cost: document.querySelector('#cost_price')?.value,
+    price: document.querySelector('#price')?.value,
+    photos: document.querySelectorAll('img[src^="blob:"]').length,
+  }))
+  const supplierShown = await page.getByRole('combobox').filter({ hasText: SUPPLIER_OPEN }).count()
+  check(filled.sku === 'PO-1013' && filled.slug && filled.cost === '1013' && supplierShown === 1, `форма — название, артикул, закупочная цена, поставщик: ${filled.sku} · ${filled.cost} · поставщик ${supplierShown ? 'выбран' : 'нет'} · слаг ${filled.slug}`)
+  check(filled.photos >= 1 && filled.price === '0', `фото поста — в галерее (${filled.photos}), розничная цена не подставлена: ${filled.price}`)
+  check(sp(await page.locator('[data-testid=draft-source]').textContent()).startsWith(`Из поста поставщика — ${SUPPLIER_OPEN}`) && await page.locator('[data-testid=draft-duplicate]').count() === 0, 'над формой — откуда товар; дубля нет')
+  await page.locator('#price').fill('1990')
+  await page.getByRole('button', { name: 'Создать товар' }).click()
+  await page.waitForURL(u => u.pathname === '/admin/products', { timeout: 60000 })
+  const made = JSON.parse(psql(`SELECT json_build_object('n', count(*), 'cost', max(cost_price), 'price', max(price), 'supplier', max(supplier_id::text), 'images', (SELECT count(*) FROM public.product_images i JOIN public.products p ON p.id = i.product_id WHERE p.sku = 'PO-1013' AND p.name = 'Игрушка PO-1013')) FROM public.products WHERE sku = 'PO-1013' AND name = 'Игрушка PO-1013';`))
+  const supplierOpenId = psql(`SELECT id FROM public.suppliers WHERE name = '${SUPPLIER_OPEN}';`)
+  check(made.n === 1 && Number(made.cost) === 1013 && Number(made.price) === 1990 && made.supplier === supplierOpenId && made.images === 1, `товар создан: закупочная ${made.cost}, розничная ${made.price}, поставщик свой, фото ${made.images}`)
+  check(psql(`SELECT status FROM public.supplier_offers WHERE id = '${offerIdOf(1013)}';`) === 'added', 'у поставщика товар отмечен «Добавлен»')
+  await page.unroute('**/api/seo/notify-indexing')
+
+  console.log('\n== заказ поставщику')
+  await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
+  await painted(page)
+  check(await page.locator('[data-testid=offer-card]', { hasText: 'PO-1013' }).count() === 0 && await page.locator('[data-testid=order-bar]').count() === 0, 'добавленный ушёл из «Новых»; заказа ещё нет — панели нет')
+  const pick16 = page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' })
+  await pick16.locator('[data-testid=offer-order-add]').click()
+  await pick16.locator('[data-testid=offer-order-qty]').fill('5')
+  const pick23 = page.locator('[data-testid=offer-card]', { hasText: 'PO-1023' })
+  await pick23.locator('[data-testid=offer-order-add]').nth(0).click()
+  await pick23.locator('[data-testid=offer-order-add]').nth(0).click()
+  const pick22 = page.locator('[data-testid=offer-card]', { hasText: 'PO-1022' })
+  check(await pick22.locator('[data-testid=offer-order-post] [data-testid=offer-order-add]').count() === 1, 'непрочитанный пост — «В заказ» на весь пост')
+  await pick22.locator('[data-testid=offer-order-add]').click()
+  await page.locator('[data-testid=offer-card]', { hasText: 'ЗК-50' }).locator('[data-testid=offer-order-add]').first().click()
+  const bar = async () => ({ head: sp(await page.locator('[data-testid=order-bar] p').first().textContent()), rows: (await page.locator('[data-testid=order-supplier]').allTextContents()).map(sp) })
+  const b1 = await bar()
+  check(b1.head === 'В заказе 5 товаров · 2 поставщика', `панель заказа: «${b1.head}»`)
+  check(b1.rows.some(r => r.startsWith(SUPPLIER_OPEN) && r.includes('4 товара, 8 шт.') && r.includes('без цены: 1')) && b1.rows.some(r => r.startsWith(SUPPLIER_CLOSED) && r.includes('1 товар, 1 шт.')), `по поставщикам — товары, штуки, сумма, без цены: ${b1.rows.join(' | ')}`)
+  await reload(page)
+  check((await bar()).head === b1.head && await pick16.locator('[data-testid=offer-order-qty]').inputValue() === '5', 'выбранное и количество — пережили перезагрузку')
+
+  const got = page.waitForEvent('download', { timeout: 60000 })
+  await page.locator('[data-testid=order-download]').click()
+  const file = await got
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(new Date())
+  check(file.suggestedFilename() === `zakaz-${today}.xlsx`, `имя файла: ${file.suggestedFilename()}`)
+  const book = new ExcelJS.Workbook()
+  await book.xlsx.load(Buffer.concat(await (async () => { const parts = []; for await (const c of await file.createReadStream()) parts.push(c); return parts })()))
+  const sheets = book.worksheets.map(w => ({ name: w.name, rows: w.rowCount, images: w.getImages().length, title: w.getCell('A1').value, qty: w.getCell('F4').value, names: [4, 5, 6, 7].map(r => w.getCell(`C${r}`).value) }))
+  const open = sheets.find(w => SUPPLIER_OPEN.startsWith(w.name))
+  check(sheets.length === 2 && open && sheets.some(w => w.name === SUPPLIER_CLOSED.slice(0, 31)), `листы — по поставщику, имена до 31 знака: ${sheets.map(w => w.name).join(' | ')}`)
+  check(open?.title?.startsWith(`Заказ магазина «Ухтышка» — ${SUPPLIER_OPEN}, `) && open.qty === 5 && open.names.includes('Игрушка PO-1016'), `лист открытого: заголовок, количество 5, товары: ${open?.names.join(' / ')}`)
+  check(open?.images === 4 && sheets.find(w => w !== open)?.images === 1, `фото в таблице — у каждой строки: ${sheets.map(w => w.images).join(' и ')}`)
+  check(await toastWith(page, 'Таблица скачана').count() >= 1, 'уведомление «Таблица скачана»')
+  if (SHOTS)
+    await page.locator('[data-testid=order-bar]').screenshot({ path: `${SHOTS}/order-bar.png` })
+
+  await pick16.locator('[data-testid=offer-order-remove]').click()
+  check((await bar()).head === 'В заказе 4 товара · 2 поставщика' && await pick16.locator('[data-testid=offer-order-add]').count() === 1, '«Убрать» — строка ушла из заказа')
+  await page.locator('[data-testid=order-clear]').click()
+  check(await page.locator('[data-testid=order-bar]').count() === 0 && await page.locator('[data-testid=offer-order-qty]').count() === 0, '«Очистить» — заказ пуст, панели нет')
+
   console.log('\n== дашборд')
   await page.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
   await page.locator('[data-testid=purchasing-steps]').waitFor({ timeout: 30000 })
@@ -703,8 +796,8 @@ try {
   check(await noScroll(phone), 'без горизонтальной прокрутки')
   const box = await cards(phone).first().boundingBox()
   check(box && box.width > 150 && box.width < 200, `карточки в два столбца: ${Math.round(box?.width ?? 0)} px`)
-  const buttons = await cards(phone).first().locator('button').evaluateAll(bs => bs.map(b => b.scrollWidth <= b.clientWidth + 1))
-  check(buttons.length === 2 && buttons.every(Boolean), 'надписи «Добавил» и «Не брать» помещаются в кнопки')
+  const buttons = await cards(phone).locator('button, a[data-testid=offer-to-site]').evaluateAll(bs => bs.slice(0, 24).map(b => b.scrollWidth <= b.clientWidth + 1))
+  check(buttons.length === 24 && buttons.every(Boolean), `надписи кнопок помещаются — «На сайт», «В заказ», «Добавил», «Не брать»: ${buttons.filter(Boolean).length} из ${buttons.length}`)
   const prices = await cards(phone).locator('[data-testid=offer-price]').evaluateAll(ps => ps.slice(0, 12).map(p => p.getClientRects().length === 1 && p.getBoundingClientRect().right <= p.closest('[data-testid=offer-card]').getBoundingClientRect().right + 0.5))
   check(prices.length === 12 && prices.every(Boolean), `цена с ₸ — одной строкой и в карточке: ${prices.filter(Boolean).length} из ${prices.length}`)
   check(await phone.locator('[data-testid=offers-reread]').evaluate(b => b.scrollWidth <= b.clientWidth + 1), '«Прочитать» помещается в кнопку')
