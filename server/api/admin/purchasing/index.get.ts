@@ -60,13 +60,15 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
   // Остаток — как на «Спросе на рынке»: сбой ключа или DataForSEO дашборд не роняет
   let balance: number | null = null
   let balanceError: string | null = null
+  let account: Awaited<ReturnType<typeof dataforseoAccount>> | null = null
   if (!demandMissing && hasKey) {
     const { data: secret, error } = await db.rpc('market_demand_credentials_get')
     const creds = (secret as Array<{ login: string, password: string }> | null)?.[0]
     try {
       if (error || !creds)
         throw new Error(error?.message ?? 'ключ не прочитан')
-      balance = (await dataforseoAccount(creds.login, creds.password)).balance
+      account = await dataforseoAccount(creds.login, creds.password)
+      balance = account.balance
     }
     catch (e: any) {
       balanceError = e?.message ?? 'Не удалось узнать баланс'
@@ -99,7 +101,13 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
     .sort((a, b) => b.products - a.products || a.name.localeCompare(b.name, 'ru'))
   const unassigned = restock.products.filter(p => !p.supplierId)
 
+  // «Батарейки» — тем же запросом к DataForSEO, второй раз не спрашиваем
+  const meters = await readUsageMeters(db, !demandMissing && hasKey
+    ? { balance, total: account?.total ?? null, dayLimit: account?.dayLimit ?? null, daySpent: account?.daySpent ?? null, error: balanceError }
+    : null)
+
   return {
+    meters,
     suppliers: restock.suppliers.length,
     channels: channelRows && {
       total: channelRows.length,

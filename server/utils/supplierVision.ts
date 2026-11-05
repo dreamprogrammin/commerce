@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ReadItem, ReadResult, SupplierPost } from '../../supabase/functions/_shared/supplierVisionCore'
+import type { RateLimits, ReadItem, ReadResult, SupplierPost } from '../../supabase/functions/_shared/supplierVisionCore'
 import type { OfferItem } from '~/utils/supplierOfferList'
 
 /**
@@ -21,6 +21,8 @@ const READ_TIMEOUT_MS = 45_000
 export interface VisionReader {
   model: string
   read: (post: SupplierPost) => Promise<ReadResult>
+  /** Лимиты из отказа провайдера: SDK Anthropic кладёт заголовки в ошибку, модуль — в `limits` */
+  limitsOf: (error: unknown) => RateLimits | null
 }
 
 /** Модель задачи со страницы «Модели ИИ»; не выбрана — по умолчанию */
@@ -47,6 +49,12 @@ export async function loadVisionReader(db: SupabaseClient): Promise<VisionReader
   const env = (name: string) => name === config.keyEnv ? key : name === `${provider.toUpperCase()}_BASE_URL` ? base : undefined
   return {
     model,
+    limitsOf: (error) => {
+      const e = error as { limits?: RateLimits | null, headers?: { get?: unknown } } | null
+      if (e?.limits)
+        return e.limits
+      return typeof e?.headers?.get === 'function' ? core.rateLimits(e.headers as Headers) : null
+    },
     // Один повтор: SDK сам ждёт, сколько скажет провайдер; дольше сбор не тянем
     read: post => core.readSupplierPost(post, model, env, options => new Anthropic({ ...options, timeout: READ_TIMEOUT_MS, maxRetries: 1 })),
   }

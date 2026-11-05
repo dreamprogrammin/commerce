@@ -266,8 +266,17 @@ const aiServer = http.createServer((req, res) => {
     })
     if (ai.mode === 'down')
       return req.socket.destroy()
+    // Лимиты — как в заголовках Anthropic: на 429 запросов не осталось
+    const limits = (remaining, tokens) => ({
+      'anthropic-ratelimit-requests-limit': '50',
+      'anthropic-ratelimit-requests-remaining': String(remaining),
+      'anthropic-ratelimit-requests-reset': new Date(Date.now() + 30_000).toISOString(),
+      'anthropic-ratelimit-input-tokens-limit': '50000',
+      'anthropic-ratelimit-input-tokens-remaining': String(tokens),
+      'anthropic-ratelimit-input-tokens-reset': new Date(Date.now() + 20_000).toISOString(),
+    })
     if (ai.mode === 'limit')
-      return send(429, { type: 'error', error: { type: 'rate_limit_error', message: 'Number of request tokens has exceeded your rate limit' } }, { 'retry-after': '0' })
+      return send(429, { type: 'error', error: { type: 'rate_limit_error', message: 'Number of request tokens has exceeded your rate limit' } }, { 'retry-after': '0', ...limits(0, 0) })
     const answer = aiAnswer(article, caption)
     send(200, {
       id: `msg_probe_${ai.requests.length}`,
@@ -278,7 +287,7 @@ const aiServer = http.createServer((req, res) => {
       stop_reason: answer === 'refusal' ? 'refusal' : 'end_turn',
       stop_sequence: null,
       usage: { input_tokens: 2000, output_tokens: 300 },
-    })
+    }, limits(45, 40000))
   })
 })
 await new Promise(r => aiServer.listen(AI_PORT, '127.0.0.1', r))
@@ -325,6 +334,8 @@ async function cleanup() {
     await removeFiles(await bucketFiles(id))
   psql(`DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   if (started)
+    psql(`DELETE FROM public.ai_usage_daily; DELETE FROM public.service_meters; DELETE FROM public.ai_settings WHERE key = 'ai_budget';`)
+  if (started)
     psql(`DELETE FROM vault.secrets WHERE name LIKE 'telegram\\_%' OR name LIKE 'ai\\_key\\_%'; DELETE FROM public.telegram_account;`)
 }
 
@@ -347,6 +358,10 @@ try {
     throw new Error('На локальной базе нет миграции 20261104160000_supplier_offers')
   if (vaultNames())
     throw new Error(`На локальной базе уже есть секреты Telegram (${vaultNames()}) — страж их не трогает`)
+  if (psql(`SELECT to_regclass('public.service_meters') IS NOT NULL;`) !== 't')
+    throw new Error('На локальной базе нет миграции 20261106120000_usage_meters')
+  if (psql(`SELECT (SELECT count(*) FROM public.ai_usage_daily) + (SELECT count(*) FROM public.service_meters) + (SELECT count(*) FROM public.ai_settings WHERE key = 'ai_budget');`) !== '0')
+    throw new Error('На локальной базе уже есть расход ИИ, показания или бюджет — страж их не трогает')
   if (aiKeyNames())
     throw new Error(`На локальной базе уже есть ключи ИИ (${aiKeyNames()}) — страж их не трогает`)
   started = true
@@ -680,6 +695,8 @@ try {
   const limitedArticles = new Set(ai.requests.slice(asked).map(r => r.article))
   check(limited.text === 'не прочлось 2 — причина на карточке, осталось 8 — нажмите «Прочитать»' && limited.calls === 1 && limitedArticles.size === 2, `лимит провайдера — дальше не читает: «${limited.text}», запросов страницы ${limited.calls}, к модели — ${ai.requests.length - asked} по ${limitedArticles.size} товарам`)
   check(await page.locator('[data-testid=offer-read-error]', { hasText: 'Лимит запросов провайдера — прочитайте позже' }).count() === 2, 'причина — на двух карточках')
+  const atLimit = JSON.parse(psql(`SELECT value FROM public.service_meters WHERE key = 'ai_limits:anthropic';`) || 'null')
+  check(atLimit?.requests?.remaining === 0 && atLimit?.inputTokens?.limit === 50000 && atLimit.model === `anthropic/${VISION}`, `лимиты из отказа 429 — записаны: запросов осталось ${atLimit?.requests?.remaining}`)
   ai.mode = 'down'
   asked = ai.requests.length
   const down = await reread(page, 'не прочлось')
@@ -757,7 +774,10 @@ try {
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(new Date())
   check(file.suggestedFilename() === `zakaz-${today}.xlsx`, `имя файла: ${file.suggestedFilename()}`)
   const book = new ExcelJS.Workbook()
-  await book.xlsx.load(Buffer.concat(await (async () => { const parts = []; for await (const c of await file.createReadStream()) parts.push(c); return parts })()))
+  const parts = []
+  for await (const c of await file.createReadStream())
+    parts.push(c)
+  await book.xlsx.load(Buffer.concat(parts))
   const sheets = book.worksheets.map(w => ({ name: w.name, rows: w.rowCount, images: w.getImages().length, title: w.getCell('A1').value, qty: w.getCell('F4').value, names: [4, 5, 6, 7].map(r => w.getCell(`C${r}`).value) }))
   const open = sheets.find(w => SUPPLIER_OPEN.startsWith(w.name))
   check(sheets.length === 2 && open && sheets.some(w => w.name === SUPPLIER_CLOSED.slice(0, 31)), `листы — по поставщику, имена до 31 знака: ${sheets.map(w => w.name).join(' | ')}`)
@@ -791,6 +811,59 @@ try {
   const cost = spent.models.length === 1 && spent.models[0] === `anthropic/${VISION}` ? (usd < 0.01 ? 'меньше $0,01' : `≈ $${usd.toFixed(2).replace('.', ',')}`) : null
   check(aiStep.spend?.startsWith(`за 30 дней — ${spent.posts} `) && (!cost || aiStep.spend.endsWith(cost)), `расход на чтение: «${aiStep.spend}»${cost ? `, ждали ${cost}` : ''}`)
 
+  console.log('\n== батарейки')
+  const battery = id => page.evaluate((id) => {
+    const el = document.querySelector(`[data-testid=battery-${id}]`)
+    const t = s => el?.querySelector(`[data-testid=${s}]`)?.textContent.replace(/\s+/g, ' ').trim() ?? null
+    return { state: el?.dataset.state, value: t('battery-value'), reset: t('battery-reset'), note: t('battery-note'), width: el?.querySelector('[data-testid=battery-bar]')?.style.width, now: el?.querySelector('[role=meter]')?.getAttribute('aria-valuenow') }
+  }, id)
+  const usage = JSON.parse(psql(`SELECT json_build_object('posts', coalesce(sum(posts), 0), 'in', coalesce(sum(input_tokens), 0), 'out', coalesce(sum(output_tokens), 0), 'rows', count(*)) FROM public.ai_usage_daily;`))
+  const readNow = Number(psql(`SELECT count(*) FROM public.supplier_offers WHERE read_items IS NOT NULL;`))
+  check(usage.posts === readNow && usage.in === readNow * 2000 && usage.out === readNow * 300 && usage.rows === 1, `журнал расхода — все удачные чтения, одной строкой за день: ${usage.posts} из ${readNow}, токены ${usage.in}/${usage.out}`)
+  const lim = await battery('ai_limits')
+  check(lim.state === 'ok' && lim.value === '40 000 из 50 000 токенов входа' && lim.now === '80' && /^сброс в \d\d:\d\d$/.test(lim.reset ?? ''), `лимит ИИ — по слабому месту, со сбросом: ${lim.value} · ${lim.reset} · ${lim.now}%`)
+  const noBudget = await battery('ai_budget')
+  check(noBudget.state === 'off' && noBudget.value === 'не задан' && await page.locator('[data-testid=budget-edit]').textContent().then(sp) === 'Задать бюджет', 'бюджет не задан — «Задать бюджет»')
+  await page.locator('[data-testid=budget-edit]').click()
+  await page.locator('[data-testid=budget-usd]').fill('1')
+  await page.locator('[data-testid=budget-reset]').fill('1')
+  const saved = page.waitForResponse(r => r.url().includes('/api/admin/ai-settings/budget'))
+  await page.locator('[data-testid=budget-save]').click()
+  await saved
+  await toastWith(page, 'Бюджет ИИ сохранён').waitFor({ timeout: 15000 })
+  await page.locator('[data-testid=battery-ai_budget][data-state=ok]').waitFor({ timeout: 15000 })
+  const left = 1 - usage.posts * (2000 * 0.10 + 300 * 0.50) / 1e6
+  const budget = await battery('ai_budget')
+  const nextMonth = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: 'numeric', month: 'long' }).format(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1, 12)))
+  check(budget.value === `$${left.toFixed(2).replace('.', ',')} из $1,00` && budget.reset === `сброс ${nextMonth}` && budget.note?.includes(`${usage.posts} чтени`), `бюджет $1 со сбросом 1-го: ${budget.value} · ${budget.reset} · ${budget.note}`)
+  const stored = JSON.parse(psql(`SELECT value FROM public.ai_settings WHERE key = 'ai_budget';`))
+  check(stored.usd === 1 && stored.resetDay === 1 && stored.since === new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(new Date()), `бюджет в ai_settings — с сегодняшнего дня: ${JSON.stringify(stored)}`)
+  const badBudget = await Promise.all([{ usd: -1 }, { usd: 'x' }, { usd: 5, resetDay: 31 }, { usd: 5, resetDay: 1.5 }].map(b => api('/api/admin/ai-settings/budget', adminToken, b, 'PUT')))
+  check(badBudget.every(r => r.status === 400), `негодный бюджет — 400: ${badBudget.map(r => r.status).join(', ')}`)
+  check((await api('/api/admin/ai-settings/budget', buyerToken, { usd: 5 }, 'PUT')).status === 403, 'бюджет — только администратору')
+
+  const channelsAll = JSON.parse(psql(`SELECT json_build_object('n', count(*), 'today', count(*) FILTER (WHERE (collected_at AT TIME ZONE 'Asia/Almaty')::date = (now() AT TIME ZONE 'Asia/Almaty')::date)) FROM public.supplier_channels;`))
+  const tg = await battery('telegram')
+  check(tg.state === 'ok' && tg.value?.startsWith(`сегодня ${channelsAll.today} из ${channelsAll.n} `) && tg.note?.startsWith('Ограничений Telegram нет; последний сбор в '), `сбор Telegram: ${tg.value} · ${tg.note}`)
+  const floodId = psql(`INSERT INTO public.supplier_channels (supplier_id, invite_hash, title, chat_type) VALUES ((SELECT id FROM public.suppliers WHERE name = '${SUPPLIER_CLOSED}'), 'FloodProbe_offers', 'Проверка — ограничение', 'channel') RETURNING id;`).split('\n')[0]
+  const flood = await api('/api/admin/supplier-offers/collect', adminToken, { channelId: floodId })
+  const floodRow = JSON.parse(psql(`SELECT value FROM public.service_meters WHERE key = 'telegram_flood';`) || 'null')
+  const floodLeft = floodRow ? Date.parse(floodRow.until) - Date.now() : 0
+  check(flood.status === 400 && /подождать/.test(flood.json?.message ?? '') && floodRow?.channel === 'Проверка — ограничение' && floodLeft > 880_000 && floodLeft <= 900_000, `FLOOD_WAIT — запомнено, до какого времени: ${flood.status} «${flood.json?.message}», осталось ${Math.round(floodLeft / 1000)} с`)
+  await page.reload({ waitUntil: 'load' })
+  await page.locator('[data-testid=battery-telegram][data-state=empty]').waitFor({ timeout: 30000 })
+  const tgFlood = await battery('telegram')
+  check(tgFlood.value === 'Telegram просит подождать' && /^можно в \d\d:\d\d$/.test(tgFlood.reset ?? '') && tgFlood.note?.startsWith('Канал «Проверка — ограничение».'), `ограничение — на батарейке: ${tgFlood.value} · ${tgFlood.reset}`)
+  psql(`DELETE FROM public.supplier_channels WHERE id = '${floodId}'; DELETE FROM public.service_meters WHERE key = 'telegram_flood';`)
+  check((await battery('dataforseo')).value === 'ключа нет', 'DataForSEO без ключа — «ключа нет»')
+  if (SHOTS)
+    await page.locator('[data-testid=batteries]').screenshot({ path: `${SHOTS}/batteries-1366.png` })
+  await page.locator('[data-testid=budget-edit]').click()
+  await page.locator('[data-testid=budget-remove]').click()
+  await toastWith(page, 'Бюджет ИИ убран').waitFor({ timeout: 15000 })
+  await page.locator('[data-testid=battery-ai_budget][data-state=off]').waitFor({ timeout: 15000 })
+  check(psql(`SELECT count(*) FROM public.ai_settings WHERE key = 'ai_budget';`) === '0', '«Убрать» — бюджета нет и в базе')
+
   console.log('\n== телефон 390 px')
   const phone = await newPage({ width: 390, height: 844 })
   check(await noScroll(phone), 'без горизонтальной прокрутки')
@@ -807,6 +880,11 @@ try {
     await cards(phone).nth(2).scrollIntoViewIfNeeded()
     await phone.screenshot({ path: `${SHOTS}/offers-390-cards.png` })
   }
+  await phone.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
+  await phone.locator('[data-testid=batteries] [data-testid=battery-ai_limits]').waitFor({ timeout: 30000 })
+  check(await noScroll(phone), 'дашборд с батарейками на телефоне — без горизонтальной прокрутки')
+  if (SHOTS)
+    await phone.locator('[data-testid=batteries]').screenshot({ path: `${SHOTS}/batteries-390.png` })
   await phone.context().close()
 
   console.log('\n== секреты')

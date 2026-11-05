@@ -14,6 +14,30 @@ export interface Database {
   }
   public: {
     Tables: {
+      ai_usage_daily: {
+        Row: {
+          day: string
+          input_tokens: number
+          model: string
+          output_tokens: number
+          posts: number
+        }
+        Insert: {
+          day: string
+          input_tokens?: number
+          model: string
+          output_tokens?: number
+          posts?: number
+        }
+        Update: {
+          day?: string
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          posts?: number
+        }
+        Relationships: []
+      }
       attribute_options: {
         Row: {
           attribute_id: number
@@ -2571,6 +2595,24 @@ export interface Database {
         }
         Relationships: []
       }
+      service_meters: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           description: string | null
@@ -3212,6 +3254,10 @@ export interface Database {
       }
     }
     Functions: {
+      ai_usage_add: {
+        Args: { p_input: number, p_model: string, p_output: number, p_posts: number }
+        Returns: undefined
+      }
       activate_my_pending_bonuses: { Args: never, Returns: Json }
       activate_offline_customer_bonuses: { Args: never, Returns: string }
       activate_pending_bonuses: { Args: never, Returns: string }

@@ -400,6 +400,9 @@ const fake: TelegramPort = {
       : h.startsWith('Expired') ? { state: 'expired' } : { state: 'not_member', title: 'Закрытый опт' }] as const))
   },
   async readChannel(_app, _session, hash, options) {
+    // Ограничение Telegram — как его отдаёт failure() (для «батарейки» сбора)
+    if (hash.startsWith('Flood'))
+      throw createError({ statusCode: 400, message: telegramErrorText('FLOOD_WAIT_900', 900), data: { telegram: 'FLOOD_WAIT_900', seconds: 900 } })
     if (hash.startsWith('Expired'))
       throw createError({ statusCode: 409, message: INVITE_EXPIRED })
     if (!hash.startsWith('Member'))
@@ -435,7 +438,7 @@ async function failure(e: unknown): Promise<Error> {
   if (tl.RpcError.is(e)) {
     // FLOOD_WAIT_30 mtcute отдаёт как text 'FLOOD_WAIT_%d' и seconds: 30
     const seconds = 'seconds' in e && typeof e.seconds === 'number' ? e.seconds : undefined
-    return createError({ statusCode: 400, message: telegramErrorText(e.text, seconds), data: { telegram: e.text } })
+    return createError({ statusCode: 400, message: telegramErrorText(e.text, seconds), data: { telegram: e.text, seconds } })
   }
   if (typeof (e as { statusCode?: unknown })?.statusCode === 'number')
     return e as Error

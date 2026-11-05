@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { SupplierPost } from '../../supabase/functions/_shared/supplierVisionCore'
+import type { RateLimits, SupplierPost } from '../../supabase/functions/_shared/supplierVisionCore'
 import type { VisionReader } from './supplierVision'
 import type { ChannelPost, ReadOptions } from './telegramAccount'
 import type { Offer, OfferChannel, OfferReading, OfferStatus } from '~/utils/supplierOfferList'
@@ -8,6 +8,7 @@ import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { isPreviewPage, parsePreviewPosts } from '~/utils/telegramPreview'
 import { loadVisionReader, offerItemsReader, readFailure, visionModel } from './supplierVision'
+import { meterNotInstalled } from './usageMeters'
 
 /**
  * «Товары поставщиков» (4 ноября 2026) — список ссылок умного закупа на
@@ -435,6 +436,13 @@ async function readOffers(db: SupabaseClient, jobs: { id: string, post: Supplier
   }
   let next = 0
   let stopped = false
+  // Для «батареек» дашборда: расход прохода и лимиты после последнего ответа
+  const spent = { input: 0, output: 0, posts: 0 }
+  let limits: { at: number, value: RateLimits } | null = null
+  const seen = (value: RateLimits | null) => {
+    if (value)
+      limits = { at: Date.now(), value }
+  }
   await Promise.all(Array.from({ length: READ_AT_ONCE }, async () => {
     while (next < jobs.length && !stopped && Date.now() < deadline) {
       const job = jobs[next++]!
@@ -445,11 +453,16 @@ async function readOffers(db: SupabaseClient, jobs: { id: string, post: Supplier
       }
       try {
         const result = await reader.read(job.post)
+        spent.input += result.inputTokens ?? 0
+        spent.output += result.outputTokens ?? 0
+        spent.posts++
+        seen(result.limits)
         const saved = await save(job.id, { read_items: result.items, read_error: null, read_input_tokens: result.inputTokens, read_output_tokens: result.outputTokens })
         outcome[saved ? 'done' : 'failed']++
       }
       catch (e) {
         const failure = await readFailure(e)
+        seen(reader.limitsOf(e))
         stopped ||= failure.stop
         await save(job.id, { read_items: null, read_error: failure.text, read_input_tokens: null, read_output_tokens: null })
         outcome.failed++
@@ -457,7 +470,26 @@ async function readOffers(db: SupabaseClient, jobs: { id: string, post: Supplier
     }
   }))
   outcome.left = jobs.length - next
+  await saveUsage(db, reader.model, spent, limits)
   return outcome
+}
+
+/**
+ * Расход и лимиты — в журнал «батареек» (миграция 20261106120000). Без неё
+ * или при сбое — только запись в журнал сервера: прочитанное уже записано.
+ */
+async function saveUsage(db: SupabaseClient, model: string, spent: { input: number, output: number, posts: number }, limits: { at: number, value: RateLimits } | null) {
+  const writes: PromiseLike<{ error: { code?: string, message: string } | null }>[] = []
+  if (spent.posts)
+    writes.push(db.rpc('ai_usage_add', { p_model: model, p_input: spent.input, p_output: spent.output, p_posts: spent.posts }))
+  if (limits) {
+    const provider = model.slice(0, model.indexOf('/'))
+    writes.push(db.from('service_meters').upsert({ key: `ai_limits:${provider}`, value: { model, ...limits.value }, updated_at: new Date(limits.at).toISOString() }))
+  }
+  for (const { error } of await Promise.all(writes)) {
+    if (error && !meterNotInstalled(error))
+      console.error('[supplier-offers] расход ИИ не записался:', error.message)
+  }
 }
 
 /**

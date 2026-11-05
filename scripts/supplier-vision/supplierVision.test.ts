@@ -15,7 +15,7 @@
  */
 import type { SupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 import assert from 'node:assert/strict'
-import { normArticle, parseItems, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
+import { normArticle, parseItems, rateLimits, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 
 type Body = Record<string, any>
 
@@ -233,4 +233,40 @@ Deno.test('OpenAI и Google: зависший провайдер — ошибк�
   finally {
     await hang.shutdown()
   }
+})
+
+Deno.test('лимиты провайдера из заголовков ответа', () => {
+  const now = Date.parse('2026-11-06T06:00:00Z')
+  const h = (o: Record<string, string>) => new Headers(o)
+  assert.deepEqual(rateLimits(h({
+    'anthropic-ratelimit-requests-limit': '50',
+    'anthropic-ratelimit-requests-remaining': '48',
+    'anthropic-ratelimit-requests-reset': '2026-11-06T06:00:30Z',
+    'anthropic-ratelimit-input-tokens-limit': '50000',
+    'anthropic-ratelimit-input-tokens-remaining': '46000',
+    'anthropic-ratelimit-input-tokens-reset': '2026-11-06T06:00:05Z',
+  }), now), {
+    requests: { limit: 50, remaining: 48, reset: '2026-11-06T06:00:30.000Z' },
+    inputTokens: { limit: 50000, remaining: 46000, reset: '2026-11-06T06:00:05.000Z' },
+    outputTokens: null,
+    tokens: null,
+  })
+  // OpenAI: сброс — длительностью
+  assert.deepEqual(rateLimits(h({
+    'x-ratelimit-limit-requests': '500',
+    'x-ratelimit-remaining-requests': '499',
+    'x-ratelimit-reset-requests': '1m30.5s',
+    'x-ratelimit-limit-tokens': '200000',
+    'x-ratelimit-remaining-tokens': '198000',
+    'x-ratelimit-reset-tokens': '600ms',
+  }), now), {
+    requests: { limit: 500, remaining: 499, reset: '2026-11-06T06:01:30.500Z' },
+    inputTokens: null,
+    outputTokens: null,
+    tokens: { limit: 200000, remaining: 198000, reset: '2026-11-06T06:00:00.600Z' },
+  })
+  // Непонятный сброс — без времени, лимит остаётся; заголовков нет — null
+  assert.deepEqual(rateLimits(h({ 'x-ratelimit-remaining-requests': '3', 'x-ratelimit-reset-requests': 'soon' }), now)?.requests, { limit: null, remaining: 3, reset: null })
+  assert.equal(rateLimits(h({ 'content-type': 'application/json' }), now), null)
+  assert.equal(rateLimits(null), null)
 })

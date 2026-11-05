@@ -25,6 +25,11 @@ function apiBase(): string {
 export interface DataforseoAccount {
   /** Остаток на счёте, $; null — DataForSEO его не сообщил */
   balance: number | null
+  /** Сумма всех пополнений, $ — полная «батарейка» (6.11.2026) */
+  total: number | null
+  /** Дневной лимит трат и потрачено сегодня, $ */
+  dayLimit: number | null
+  daySpent: number | null
 }
 
 /** Проверить логин и пароль API у DataForSEO; отказ — понятной ошибкой. */
@@ -42,14 +47,15 @@ export async function dataforseoAccount(login: string, password: string): Promis
   const body = await res.json().catch(() => null) as {
     status_code?: number
     status_message?: string
-    tasks?: Array<{ result?: Array<{ money?: { balance?: unknown } }> }>
+    tasks?: Array<{ result?: Array<{ money?: { balance?: unknown, total?: unknown, limits?: { day?: { total?: unknown } }, statistics?: { day?: { total?: unknown } } } }> }>
   } | null
   if (res.status === 401 || body?.status_code === 40100)
     throw createError({ statusCode: 400, message: 'DataForSEO не принял логин и пароль API' })
   if (!res.ok || body?.status_code !== 20000)
     throw createError({ statusCode: 502, message: `DataForSEO ответил ошибкой: ${body?.status_message ?? res.status}` })
-  const balance = body.tasks?.[0]?.result?.[0]?.money?.balance
-  return { balance: typeof balance === 'number' ? balance : null }
+  const money = body.tasks?.[0]?.result?.[0]?.money
+  const num = (v: unknown) => typeof v === 'number' ? v : null
+  return { balance: num(money?.balance), total: num(money?.total), dayLimit: num(money?.limits?.day?.total), daySpent: num(money?.statistics?.day?.total) }
 }
 
 /*
