@@ -218,3 +218,19 @@ Deno.test('артикул: подпись продавца «Арт.» срез�
   assert.equal(read('Кодак-5'), 'Кодак-5')
   assert.equal(read('H08-13'), 'H08-13')
 })
+
+Deno.test('OpenAI и Google: зависший провайдер — ошибка тайм-аута, а не вечное ожидание', async () => {
+  // Отвечает только через 5 с — дольше, чем ждёт модуль
+  const hang = Deno.serve({ hostname: '127.0.0.1', port: 0, onListen: () => {} }, () => new Promise(r => setTimeout(() => r(new Response('{}')), 5000)))
+  const base = `http://127.0.0.1:${hang.addr.port}`
+  const post: SupplierPost = { images: [{ mediaType: 'image/png', data: 'iVBORw0KGgo=' }], caption: 'Арт. 1' }
+  const env = (name: string) => ({ OPENAI_API_KEY: 'sk-test', OPENAI_BASE_URL: base, VISION_TIMEOUT_MS: '300' } as Record<string, string>)[name]
+  const started = Date.now()
+  try {
+    await assert.rejects(readSupplierPost(post, 'openai/gpt-6.1-terra', env), (e: Error) => e.name === 'TimeoutError')
+    assert.ok(Date.now() - started < 3000, `ждал ${Date.now() - started} мс`)
+  }
+  finally {
+    await hang.shutdown()
+  }
+})
