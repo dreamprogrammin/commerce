@@ -1028,6 +1028,7 @@ export interface Database {
       }
       market_demand_runs: {
         Row: {
+          attempts: number
           cost: number | null
           error: string | null
           finished_at: string | null
@@ -1042,6 +1043,7 @@ export interface Database {
           status: string
         }
         Insert: {
+          attempts?: number
           cost?: number | null
           error?: string | null
           finished_at?: string | null
@@ -1056,6 +1058,7 @@ export interface Database {
           status?: string
         }
         Update: {
+          attempts?: number
           cost?: number | null
           error?: string | null
           finished_at?: string | null
@@ -3912,6 +3915,7 @@ export interface Database {
           updated_at: string
         }[]
       }
+      market_demand_idea_seeds: { Args: never, Returns: string[] }
       market_demand_ingest: {
         Args: {
           p_content: string
@@ -3930,6 +3934,7 @@ export interface Database {
         Args: { p_admin?: string, p_scheduled?: boolean }
         Returns: Json
       }
+      market_demand_send_ideas: { Args: { p_run_id: number }, Returns: number }
       market_demand_summary: {
         Args: never
         Returns: {
