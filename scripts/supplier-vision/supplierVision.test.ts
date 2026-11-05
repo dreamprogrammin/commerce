@@ -15,7 +15,7 @@
  */
 import type { SupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 import assert from 'node:assert/strict'
-import { normArticle, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
+import { normArticle, parseItems, readSupplierPost } from '../../supabase/functions/_shared/supplierVision.ts'
 
 type Body = Record<string, any>
 
@@ -189,4 +189,32 @@ Deno.test('артикул: буквы-двойники кириллицы рав
   // Настоящая ошибка чтения остаётся ошибкой
   assert.notEqual(normArticle('H08-13'), normArticle('H08-16'))
   assert.notEqual(normArticle('FC-40'), normArticle('FC-4O'))
+})
+
+/**
+ * Подпись продавца — не часть артикула (стенд 5.11.2026: Claude Haiku 5.5 на
+ * посте 30472 «Оптом Игрушки Алматы» дважды из четырёх ответила «Арт.039» при
+ * артикуле «039»). Латинское «ART-1234» без точки и двоеточия может быть самим
+ * артикулом — его не трогаем.
+ */
+Deno.test('артикул: подпись продавца «Арт.» срезается, сам артикул — нет', () => {
+  const read = (article: string) => parseItems(JSON.stringify({
+    items: [{ name: 'Кукла', article, brand: null, price_text: null, price_image: 2400, price_note: null, age: null, confidence: 'high', doubt: null }],
+  }))[0]!.article
+  assert.equal(read('Арт.039'), '039')
+  assert.equal(read('Арт. 039'), '039')
+  assert.equal(read('АРТ.F603EG'), 'F603EG')
+  assert.equal(read('Артикул: F603EG'), 'F603EG')
+  assert.equal(read('арт039'), '039')
+  assert.equal(read('Арт.: Y347-9P/11P'), 'Y347-9P/11P')
+  assert.equal(read('Art. 8493'), '8493')
+  assert.equal(read('Article: Н08-13'), 'Н08-13')
+  assert.equal(read('№ 039'), '039')
+  assert.equal(read('Код: 12345'), '12345')
+  // Похоже на подпись, но может быть самим артикулом
+  assert.equal(read('ART-1234'), 'ART-1234')
+  assert.equal(read('ART1234'), 'ART1234')
+  assert.equal(read('АРТ-5'), 'АРТ-5')
+  assert.equal(read('Кодак-5'), 'Кодак-5')
+  assert.equal(read('H08-13'), 'H08-13')
 })

@@ -217,6 +217,15 @@ export async function readSupplierPost(post: SupplierPost, spec: string, env: En
   return { model: spec, ...out, items: parseItems(out.raw), ms: Date.now() - started }
 }
 
+/**
+ * Подпись продавца перед артикулом — «Арт.039», «Артикул: F603EG», «Art. 8493»,
+ * «№ 039». Модель переписывает её вместе с артикулом (Claude Haiku 5.5 на
+ * стенде 5.11.2026). Кириллическую подпись срезаем и вплотную к цифрам;
+ * латинскую — только с точкой, двоеточием или пробелом: «ART-1234» может быть
+ * самим артикулом.
+ */
+const ARTICLE_LABEL = /^(?:(?:арт(?:икул)?|код)(?:[\s.:№#]+|(?=\d))|№\s*|art(?:icle)?[\s.:#]+)(?=\S)/iu
+
 /** Разбор и проверка ответа: структурированный вывод есть не у всех моделей. */
 export function parseItems(raw: string): ReadItem[] {
   // Модели без строгой схемы иногда заворачивают JSON в ```json … ```
@@ -244,7 +253,7 @@ export function parseItems(raw: string): ReadItem[] {
   }
   return items.map((it: Record<string, unknown>) => ({
     name: str(it.name) ?? 'без названия',
-    article: str(it.article),
+    article: str(it.article)?.replace(ARTICLE_LABEL, '') ?? null,
     brand: str(it.brand),
     price_text: num(it.price_text),
     price_image: num(it.price_image),
